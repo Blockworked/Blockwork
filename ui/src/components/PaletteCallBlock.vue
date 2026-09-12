@@ -31,7 +31,13 @@ function onContextMenu(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="instruction-row palette-prefab" :class="{ 'instruction-row-cap': def.shape === 'Ending' }" @pointerdown="onPointerDown" @contextmenu="onContextMenu">
+  <div
+    class="instruction-row palette-prefab blockwork-custom-block"
+    :class="{ 'instruction-row-cap': def.shape === 'Ending' }"
+    :style="{ '--blockwork-custom-block-color': def.color }"
+    @pointerdown="onPointerDown"
+    @contextmenu="onContextMenu"
+  >
     <div class="instruction-shape">
       <Blocks class="instruction-type-icon" />
       <div class="instruction-content">

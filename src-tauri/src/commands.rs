@@ -1,17 +1,22 @@
-use blockwork_core::config;
-use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
-use blockwork_core::macros::runner::VariableStore;
-use blockwork_core::macros::{loop_control, BlockPiece, BlockShape, Comment, FloatingValue, Instruction, InstructionKind, Macro, Strand, VariableDef, SPEED_MULTIPLIER_RANGE};
-use blockwork_core::input::types::InputToken;
-use blockwork_core::input::value::{Evaluated, Value, OPERATOR_KINDS};
-use blockwork_core::recording;
 use crate::macros_thread;
 use crate::state::{
-    build_state_dto, dto_to_block_piece, dto_to_hotkey_action, dto_to_instruction, dto_to_value, emit_state_updated,
-    value_to_dto, BlockPieceDto, ComboCapture, FieldId, HotkeyActionDto, InstructionDto, KeyCaptureTarget, MacroSnapshot,
-    Page, PathStep, RecordingPhase, SharedState, StateDto, TextEditSession, UpdateCheckState, ValueDto, ValueLocation,
-    ValueLocationDto,
+    BlockPieceDto, ComboCapture, FieldId, HotkeyActionDto, InstructionDto, KeyCaptureTarget,
+    MacroSnapshot, Page, PathStep, RecordingPhase, SharedState, StateDto, TextEditSession,
+    UpdateCheckState, ValueDto, ValueLocation, ValueLocationDto, build_state_dto,
+    dto_to_block_piece, dto_to_hotkey_action, dto_to_instruction, dto_to_value, emit_state_updated,
+    value_to_dto,
 };
+use blockwork_core::config;
+use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
+use blockwork_core::input::types::InputToken;
+use blockwork_core::input::value::{Evaluated, OPERATOR_KINDS, Value};
+use blockwork_core::macros::runner::VariableStore;
+use blockwork_core::macros::{
+    BlockPiece, BlockShape, Comment, FloatingValue, Instruction, InstructionKind, Macro,
+    SPEED_MULTIPLIER_RANGE, Strand, VariableDef, loop_control,
+    normalize_block_color as normalize_persisted_block_color,
+};
+use blockwork_core::recording;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
@@ -67,7 +72,11 @@ fn refresh_macro_list(s: &mut crate::state::AppState) {
 /// called after `current_macro` is (re)assigned, so stale entries don't linger.
 fn sync_variable_values(s: &mut crate::state::AppState) {
     let values = match &s.current_macro {
-        Some(mac) => mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect(),
+        Some(mac) => mac
+            .variables
+            .iter()
+            .map(|v| (v.name.clone(), v.value.clone()))
+            .collect(),
         None => HashMap::new(),
     };
     if let Ok(mut store) = s.variable_values.lock() {
@@ -96,7 +105,11 @@ pub(crate) fn get_state(state: State<SharedState>) -> Result<StateDto, String> {
 // ─── Macro library ─────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub(crate) fn select_macro<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, index: usize) -> Result<(), String> {
+pub(crate) fn select_macro<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    index: usize,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = s.macros_list.get(index).cloned() {
         s.macro_selected = Some(index);
@@ -117,7 +130,10 @@ pub(crate) fn select_macro<R: Runtime>(state: State<SharedState>, app: tauri::Ap
 }
 
 #[tauri::command]
-pub(crate) fn new_macro<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn new_macro<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let new_macro = Macro::new("New Macro".into(), "".into(), vec![]);
     let new_id = new_macro.id.clone();
     if let Err(e) = new_macro.add() {
@@ -126,7 +142,13 @@ pub(crate) fn new_macro<R: Runtime>(state: State<SharedState>, app: tauri::AppHa
     let mut s = state.lock().map_err(|e| e.to_string())?;
     refresh_macro_list(&mut s);
     // Select the newly created macro
-    if let Some((idx, mac)) = s.macros_list.iter().enumerate().find(|(_, m)| m.id == new_id).map(|(i, m)| (i, m.clone())) {
+    if let Some((idx, mac)) = s
+        .macros_list
+        .iter()
+        .enumerate()
+        .find(|(_, m)| m.id == new_id)
+        .map(|(i, m)| (i, m.clone()))
+    {
         s.macro_selected = Some(idx);
         s.current_macro = Some(mac);
         config::set_selected_macro_id(Some(&new_id));
@@ -141,7 +163,10 @@ pub(crate) fn new_macro<R: Runtime>(state: State<SharedState>, app: tauri::AppHa
 /// popup (`RemoveMacroDialog.vue`) before ever calling this, so it deletes
 /// unconditionally.
 #[tauri::command]
-pub(crate) fn remove_macro<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn remove_macro<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = s.current_macro.take() {
         if let Err(e) = mac.remove() {
@@ -157,7 +182,11 @@ pub(crate) fn remove_macro<R: Runtime>(state: State<SharedState>, app: tauri::Ap
 }
 
 #[tauri::command]
-pub(crate) fn set_title<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, title: String) -> Result<(), String> {
+pub(crate) fn set_title<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    title: String,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         mac.name = title;
@@ -172,10 +201,17 @@ pub(crate) fn set_title<R: Runtime>(state: State<SharedState>, app: tauri::AppHa
 }
 
 #[tauri::command]
-pub(crate) fn set_macro_speed_multiplier<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, multiplier: f64) -> Result<(), String> {
+pub(crate) fn set_macro_speed_multiplier<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    multiplier: f64,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
-        mac.speed_multiplier = multiplier.clamp(*SPEED_MULTIPLIER_RANGE.start(), *SPEED_MULTIPLIER_RANGE.end());
+        mac.speed_multiplier = multiplier.clamp(
+            *SPEED_MULTIPLIER_RANGE.start(),
+            *SPEED_MULTIPLIER_RANGE.end(),
+        );
         auto_save(&s);
     }
     emit_state_updated(&app, &s);
@@ -186,7 +222,11 @@ pub(crate) fn set_macro_speed_multiplier<R: Runtime>(state: State<SharedState>, 
 /// macro is selected" setting — see `MacroSettings::always_listen`. Edited
 /// from the "Macro Settings" popup next to the macro dropdown.
 #[tauri::command]
-pub(crate) fn set_macro_always_listen<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, enabled: bool) -> Result<(), String> {
+pub(crate) fn set_macro_always_listen<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    enabled: bool,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         mac.settings.always_listen = enabled;
@@ -207,14 +247,21 @@ fn create_variable_in(mac: &mut Macro, name: &str) -> Result<String, String> {
     if mac.variables.iter().any(|v| v.name == trimmed) {
         return Err(format!("A variable named \"{trimmed}\" already exists"));
     }
-    mac.variables.push(VariableDef { name: trimmed.clone(), value: Evaluated::Number(0.0) });
+    mac.variables.push(VariableDef {
+        name: trimmed.clone(),
+        value: Evaluated::Number(0.0),
+    });
     Ok(trimmed)
 }
 
 /// Declares a new macro-wide variable, starting at `0`. No `push_undo` —
 /// a naming/creation action, not an undoable structural edit.
 #[tauri::command]
-pub(crate) fn create_variable<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, name: String) -> Result<(), String> {
+pub(crate) fn create_variable<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    name: String,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let trimmed = create_variable_in(mac, &name)?;
@@ -274,7 +321,11 @@ fn delete_variable_in(mac: &mut Macro, name: &str) {
 /// Deletes a declared variable. No `push_undo` — same precedent as
 /// `create_variable`.
 #[tauri::command]
-pub(crate) fn delete_variable<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, name: String) -> Result<(), String> {
+pub(crate) fn delete_variable<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    name: String,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     delete_variable_in(mac, &name);
@@ -318,6 +369,13 @@ fn validate_block_pieces(pieces: &[BlockPiece]) -> Result<(), String> {
     Ok(())
 }
 
+/// Colors are stored as six-digit CSS hex values. Restricting the persisted
+/// value keeps imported/user-created macros from injecting arbitrary CSS when
+/// the frontend uses it as a custom property on a block row.
+fn normalize_block_color(color: &str) -> Result<String, String> {
+    normalize_persisted_block_color(color).ok_or_else(|| "Choose a valid block color".to_string())
+}
+
 /// Defines a new custom block, creating its (initially empty) header strand
 /// next to the macro's other strands. Pushes undo, since it has real canvas
 /// footprint.
@@ -327,14 +385,16 @@ pub(crate) fn create_block<R: Runtime>(
     app: tauri::AppHandle<R>,
     pieces: Vec<BlockPieceDto>,
     shape: BlockShape,
+    color: String,
 ) -> Result<String, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let pieces: Vec<BlockPiece> = pieces.iter().map(dto_to_block_piece).collect();
     validate_block_pieces(&pieces)?;
+    let color = normalize_block_color(&color)?;
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let (x, y) = next_strand_position(mac);
-    let id = mac.create_block(pieces, shape, x, y);
+    let id = mac.create_block(pieces, shape, color, x, y);
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(id)
@@ -350,10 +410,12 @@ pub(crate) fn edit_block<R: Runtime>(
     block_id: String,
     pieces: Vec<BlockPieceDto>,
     shape: BlockShape,
+    color: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let new_pieces: Vec<BlockPiece> = pieces.iter().map(dto_to_block_piece).collect();
     validate_block_pieces(&new_pieces)?;
+    let color = normalize_block_color(&color)?;
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let old_pieces = mac
@@ -366,9 +428,18 @@ pub(crate) fn edit_block<R: Runtime>(
     let renames: Vec<(String, String)> = new_pieces
         .iter()
         .filter_map(|new_piece| {
-            let BlockPiece::Input { id, name: new_name, .. } = new_piece else { return None };
-            let old_piece = old_pieces.iter().find(|p| matches!(p, BlockPiece::Input { id: old_id, .. } if old_id == id))?;
-            let BlockPiece::Input { name: old_name, .. } = old_piece else { return None };
+            let BlockPiece::Input {
+                id, name: new_name, ..
+            } = new_piece
+            else {
+                return None;
+            };
+            let old_piece = old_pieces
+                .iter()
+                .find(|p| matches!(p, BlockPiece::Input { id: old_id, .. } if old_id == id))?;
+            let BlockPiece::Input { name: old_name, .. } = old_piece else {
+                return None;
+            };
             (old_name != new_name).then(|| (old_name.clone(), new_name.clone()))
         })
         .collect();
@@ -377,9 +448,14 @@ pub(crate) fn edit_block<R: Runtime>(
     }
     mac.reconcile_block_call_args(&block_id, &old_pieces, &new_pieces);
 
-    let def = mac.block_defs.iter_mut().find(|b| b.id == block_id).ok_or("Unknown block")?;
+    let def = mac
+        .block_defs
+        .iter_mut()
+        .find(|b| b.id == block_id)
+        .ok_or("Unknown block")?;
     def.pieces = new_pieces;
     def.shape = shape;
+    def.color = color;
 
     auto_save(&s);
     emit_state_updated(&app, &s);
@@ -389,13 +465,19 @@ pub(crate) fn edit_block<R: Runtime>(
 /// Deletes a custom block entirely (see `Macro::remove_block`). Pushes
 /// undo, same reasoning as `create_block`.
 #[tauri::command]
-pub(crate) fn delete_block<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, block_id: String) -> Result<(), String> {
+pub(crate) fn delete_block<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    block_id: String,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {
         mac.remove_block(&block_id);
-        let surviving: std::collections::HashSet<String> = mac.strands.iter().map(|st| st.id.clone()).collect();
-        s.invalid_field_buffers.retain(|loc, _| loc.strand_id().is_none_or(|id| surviving.contains(id)));
+        let surviving: std::collections::HashSet<String> =
+            mac.strands.iter().map(|st| st.id.clone()).collect();
+        s.invalid_field_buffers
+            .retain(|loc, _| loc.strand_id().is_none_or(|id| surviving.contains(id)));
         auto_save(&s);
     }
     emit_state_updated(&app, &s);
@@ -403,7 +485,10 @@ pub(crate) fn delete_block<R: Runtime>(state: State<SharedState>, app: tauri::Ap
 }
 
 #[tauri::command]
-pub(crate) fn save_macro<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn save_macro<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &s.current_macro {
         if let Err(e) = mac.save() {
@@ -420,10 +505,20 @@ pub(crate) fn save_macro<R: Runtime>(state: State<SharedState>, app: tauri::AppH
 fn sanitize_filename(name: &str) -> String {
     let cleaned: String = name
         .chars()
-        .map(|c| if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') { '_' } else { c })
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+                '_'
+            } else {
+                c
+            }
+        })
         .collect();
     let trimmed = cleaned.trim();
-    if trimmed.is_empty() { "macro".to_string() } else { trimmed.to_string() }
+    if trimmed.is_empty() {
+        "macro".to_string()
+    } else {
+        trimmed.to_string()
+    }
 }
 
 /// Exports a single macro to a user-chosen `.macro` file (same JSON shape as
@@ -432,7 +527,10 @@ fn sanitize_filename(name: &str) -> String {
 #[tauri::command]
 pub(crate) async fn export_macro(macro_id: String) -> Result<(), String> {
     let macros = config::get_macros_from_config();
-    let mac = macros.into_iter().find(|m| m.id == macro_id).ok_or("Macro not found")?;
+    let mac = macros
+        .into_iter()
+        .find(|m| m.id == macro_id)
+        .ok_or("Macro not found")?;
 
     let file = rfd::AsyncFileDialog::new()
         .set_title("Export Macro")
@@ -441,7 +539,9 @@ pub(crate) async fn export_macro(macro_id: String) -> Result<(), String> {
         .save_file()
         .await;
 
-    let Some(file) = file else { return Ok(()); };
+    let Some(file) = file else {
+        return Ok(());
+    };
     config::write_macro_file(file.path(), &mac)
 }
 
@@ -455,16 +555,23 @@ fn body_contains_command(body: &[Instruction]) -> bool {
         // launchers) — a hand-edited macro file could carry any string
         // there, not just what the picker itself would ever produce.
         InstructionKind::Command(_) | InstructionKind::OpenApp { .. } => true,
-        InstructionKind::If { body, .. } | InstructionKind::Repeat { body, .. } | InstructionKind::Forever { body } | InstructionKind::While { body, .. } => {
-            body_contains_command(body)
-        }
-        InstructionKind::IfElse { then_body, else_body, .. } => body_contains_command(then_body) || body_contains_command(else_body),
+        InstructionKind::If { body, .. }
+        | InstructionKind::Repeat { body, .. }
+        | InstructionKind::Forever { body }
+        | InstructionKind::While { body, .. } => body_contains_command(body),
+        InstructionKind::IfElse {
+            then_body,
+            else_body,
+            ..
+        } => body_contains_command(then_body) || body_contains_command(else_body),
         _ => false,
     })
 }
 
 fn macro_contains_command(mac: &Macro) -> bool {
-    mac.strands.iter().any(|strand| body_contains_command(&strand.instructions))
+    mac.strands
+        .iter()
+        .any(|strand| body_contains_command(&strand.instructions))
 }
 
 /// One (key, label, getter, setter) entry per `MacroSettings` field — the
@@ -473,7 +580,12 @@ fn macro_contains_command(mac: &Macro) -> bool {
 /// identifier the frontend's toggle list and `confirm_import_macro`'s
 /// `keep_settings` map address it by; `label` is the human-readable text
 /// shown in that list.
-type SettingAccessor = (&'static str, &'static str, fn(&blockwork_core::macros::MacroSettings) -> bool, fn(&mut blockwork_core::macros::MacroSettings, bool));
+type SettingAccessor = (
+    &'static str,
+    &'static str,
+    fn(&blockwork_core::macros::MacroSettings) -> bool,
+    fn(&mut blockwork_core::macros::MacroSettings, bool),
+);
 
 const SETTING_ACCESSORS: &[SettingAccessor] = &[(
     "always_listen",
@@ -486,13 +598,19 @@ const SETTING_ACCESSORS: &[SettingAccessor] = &[(
 /// what `import_macro` shows the user for confirmation, since an imported
 /// macro asking for non-default behavior deserves a second look before it's
 /// silently applied.
-fn non_default_macro_settings(settings: &blockwork_core::macros::MacroSettings) -> Vec<crate::state::CustomMacroSettingDto> {
+fn non_default_macro_settings(
+    settings: &blockwork_core::macros::MacroSettings,
+) -> Vec<crate::state::CustomMacroSettingDto> {
     let default = blockwork_core::macros::MacroSettings::default();
     SETTING_ACCESSORS
         .iter()
         .filter_map(|(key, label, get, _)| {
             let value = get(settings);
-            (value != get(&default)).then(|| crate::state::CustomMacroSettingDto { key: key.to_string(), label: label.to_string(), enabled: value })
+            (value != get(&default)).then(|| crate::state::CustomMacroSettingDto {
+                key: key.to_string(),
+                label: label.to_string(),
+                enabled: value,
+            })
         })
         .collect()
 }
@@ -500,7 +618,10 @@ fn non_default_macro_settings(settings: &blockwork_core::macros::MacroSettings) 
 /// Resets every setting the user unchecked in the import review popup (i.e.
 /// present in `keep` as `false`) back to its default; anything not mentioned
 /// in `keep` is left as imported.
-fn apply_setting_overrides(settings: &mut blockwork_core::macros::MacroSettings, keep: &HashMap<String, bool>) {
+fn apply_setting_overrides(
+    settings: &mut blockwork_core::macros::MacroSettings,
+    keep: &HashMap<String, bool>,
+) {
     let default = blockwork_core::macros::MacroSettings::default();
     for (key, _, get, set) in SETTING_ACCESSORS {
         if !keep.get(*key).copied().unwrap_or(true) {
@@ -513,14 +634,24 @@ fn apply_setting_overrides(settings: &mut blockwork_core::macros::MacroSettings,
 /// overwrites an existing macro — even a re-imported copy of one already in
 /// the library lands as a separate entry), saves it, and makes it the
 /// selected/current macro.
-fn commit_imported_macro<R: Runtime>(mut mac: Macro, state: &SharedState, app: &tauri::AppHandle<R>) -> Result<(), String> {
+fn commit_imported_macro<R: Runtime>(
+    mut mac: Macro,
+    state: &SharedState,
+    app: &tauri::AppHandle<R>,
+) -> Result<(), String> {
     mac.id = uuid::Uuid::new_v4().simple().to_string();
     let new_id = mac.id.clone();
     mac.add()?;
 
     let mut s = state.lock().map_err(|e| e.to_string())?;
     refresh_macro_list(&mut s);
-    if let Some((idx, found)) = s.macros_list.iter().enumerate().find(|(_, m)| m.id == new_id).map(|(i, m)| (i, m.clone())) {
+    if let Some((idx, found)) = s
+        .macros_list
+        .iter()
+        .enumerate()
+        .find(|(_, m)| m.id == new_id)
+        .map(|(i, m)| (i, m.clone()))
+    {
         s.macro_selected = Some(idx);
         s.current_macro = Some(found);
         config::set_selected_macro_id(Some(&new_id));
@@ -539,21 +670,29 @@ fn commit_imported_macro<R: Runtime>(mut mac: Macro, state: &SharedState, app: &
 /// resolves it via `confirm_import_macro`/`cancel_import_macro`. Otherwise
 /// the macro is imported immediately and `None` is returned.
 #[tauri::command]
-pub(crate) async fn import_macro<R: Runtime>(state: State<'_, SharedState>, app: tauri::AppHandle<R>) -> Result<Option<crate::state::ImportPromptDto>, String> {
+pub(crate) async fn import_macro<R: Runtime>(
+    state: State<'_, SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<Option<crate::state::ImportPromptDto>, String> {
     let file = rfd::AsyncFileDialog::new()
         .set_title("Import Macro")
         .add_filter("Macro", &["macro"])
         .pick_file()
         .await;
 
-    let Some(file) = file else { return Ok(None); };
+    let Some(file) = file else {
+        return Ok(None);
+    };
     let mac = config::read_macro_file(file.path())?;
 
     let needs_command_warning = macro_contains_command(&mac);
     let custom_settings = non_default_macro_settings(&mac.settings);
 
     if needs_command_warning || !custom_settings.is_empty() {
-        let prompt = crate::state::ImportPromptDto { needs_command_warning, custom_settings };
+        let prompt = crate::state::ImportPromptDto {
+            needs_command_warning,
+            custom_settings,
+        };
         let mut s = state.lock().map_err(|e| e.to_string())?;
         s.pending_import = Some(mac);
         return Ok(Some(prompt));
@@ -570,9 +709,21 @@ pub(crate) async fn import_macro<R: Runtime>(state: State<'_, SharedState>, app:
 /// showed (because there was nothing to confirm) is simply absent, which
 /// `apply_setting_overrides` treats as "keep".
 #[tauri::command]
-pub(crate) async fn confirm_import_macro<R: Runtime>(state: State<'_, SharedState>, app: tauri::AppHandle<R>, keep_settings: HashMap<String, bool>) -> Result<(), String> {
-    let mac = { state.lock().map_err(|e| e.to_string())?.pending_import.take() };
-    let Some(mut mac) = mac else { return Ok(()); };
+pub(crate) async fn confirm_import_macro<R: Runtime>(
+    state: State<'_, SharedState>,
+    app: tauri::AppHandle<R>,
+    keep_settings: HashMap<String, bool>,
+) -> Result<(), String> {
+    let mac = {
+        state
+            .lock()
+            .map_err(|e| e.to_string())?
+            .pending_import
+            .take()
+    };
+    let Some(mut mac) = mac else {
+        return Ok(());
+    };
     apply_setting_overrides(&mut mac.settings, &keep_settings);
     commit_imported_macro(mac, &state, &app)
 }
@@ -626,7 +777,10 @@ pub(crate) fn add_instruction<R: Runtime>(
 /// Resolves an `InstrPath` to `(parent_list, local_index)` — read-only
 /// counterpart to `resolve_body_mut`, for placement checks that only need to
 /// look, not mutate.
-fn resolve_body<'a>(instructions: &'a [Instruction], path: &[PathStep]) -> Option<(&'a [Instruction], usize)> {
+fn resolve_body<'a>(
+    instructions: &'a [Instruction],
+    path: &[PathStep],
+) -> Option<(&'a [Instruction], usize)> {
     let (first, rest) = path.split_first()?;
     if rest.is_empty() {
         return Some((instructions, first.index));
@@ -639,7 +793,10 @@ fn resolve_body<'a>(instructions: &'a [Instruction], path: &[PathStep]) -> Optio
 /// instruction command does its actual `Vec` op (`insert`/`remove`/`swap`/
 /// `split_off`/indexing) on the returned list at the returned index, exactly
 /// as it did directly on `strand.instructions` before nesting existed.
-fn resolve_body_mut<'a>(instructions: &'a mut Vec<Instruction>, path: &[PathStep]) -> Option<(&'a mut Vec<Instruction>, usize)> {
+fn resolve_body_mut<'a>(
+    instructions: &'a mut Vec<Instruction>,
+    path: &[PathStep],
+) -> Option<(&'a mut Vec<Instruction>, usize)> {
     let (first, rest) = path.split_first()?;
     if rest.is_empty() {
         return Some((instructions, first.index));
@@ -652,13 +809,20 @@ fn resolve_body_mut<'a>(instructions: &'a mut Vec<Instruction>, path: &[PathStep
 /// strand — nothing may attach above or in front of one, and a header can
 /// only ever live at a strand's own top level, never nested inside an
 /// `If`/`IfElse` body.
-fn check_when_ran_attachment(list: &[Instruction], index: usize, ins: &Instruction, is_top_level: bool) -> Result<(), String> {
+fn check_when_ran_attachment(
+    list: &[Instruction],
+    index: usize,
+    ins: &Instruction,
+    is_top_level: bool,
+) -> Result<(), String> {
     let starts_with_header = list.first().map_or(false, Instruction::is_header);
     if index == 0 && starts_with_header {
         return Err("Can't attach a block above a When Ran/Block Definition block".to_string());
     }
     if ins.is_header() && (!is_top_level || index != 0) {
-        return Err("A When Ran/Block Definition block can only be the first block in a strand".to_string());
+        return Err(
+            "A When Ran/Block Definition block can only be the first block in a strand".to_string(),
+        );
     }
     Ok(())
 }
@@ -675,7 +839,10 @@ fn check_return_placement(mac: &Macro, strand: &Strand, ins: &Instruction) -> Re
     if valid {
         Ok(())
     } else {
-        Err("A Return block can only be used inside a custom block that returns a value".to_string())
+        Err(
+            "A Return block can only be used inside a custom block that returns a value"
+                .to_string(),
+        )
     }
 }
 
@@ -683,21 +850,40 @@ fn check_return_placement(mac: &Macro, strand: &Strand, ins: &Instruction) -> Re
 /// `While` body — enforced here (unlike `check_return_placement`, which only
 /// looks at the strand's header) by walking every ancestor bracket named in
 /// `path` and checking whether any of them is a loop instruction.
-fn check_loop_control_placement(strand: &Strand, path: &[PathStep], ins: &Instruction) -> Result<(), String> {
-    if !matches!(&ins.kind, InstructionKind::EscapeLoop | InstructionKind::ContinueLoop) {
+fn check_loop_control_placement(
+    strand: &Strand,
+    path: &[PathStep],
+    ins: &Instruction,
+) -> Result<(), String> {
+    if !matches!(
+        &ins.kind,
+        InstructionKind::EscapeLoop | InstructionKind::ContinueLoop
+    ) {
         return Ok(());
     }
     let mut list: &[Instruction] = &strand.instructions;
     for step in path {
         let Some(slot) = step.slot else { break };
-        let Some(ancestor) = list.get(step.index) else { break };
-        if matches!(&ancestor.kind, InstructionKind::Repeat { .. } | InstructionKind::Forever { .. } | InstructionKind::While { .. }) {
+        let Some(ancestor) = list.get(step.index) else {
+            break;
+        };
+        if matches!(
+            &ancestor.kind,
+            InstructionKind::Repeat { .. }
+                | InstructionKind::Forever { .. }
+                | InstructionKind::While { .. }
+        ) {
             return Ok(());
         }
-        let Some(body) = ancestor.body(slot) else { break };
+        let Some(body) = ancestor.body(slot) else {
+            break;
+        };
         list = body;
     }
-    Err("An Escape Loop/Continue Loop block can only be used inside a Repeat/Forever/While loop".to_string())
+    Err(
+        "An Escape Loop/Continue Loop block can only be used inside a Repeat/Forever/While loop"
+            .to_string(),
+    )
 }
 
 #[cfg(test)]
@@ -705,31 +891,75 @@ mod loop_control_placement_tests {
     use super::*;
 
     fn strand_with(instructions: Vec<Instruction>) -> Strand {
-        Strand { id: "s1".into(), x: 0, y: 0, instructions }
+        Strand {
+            id: "s1".into(),
+            x: 0,
+            y: 0,
+            instructions,
+        }
     }
 
     #[test]
     fn non_loop_control_instructions_are_always_allowed() {
         let strand = strand_with(vec![Instruction::new(InstructionKind::WhenRan)]);
-        assert!(check_loop_control_placement(&strand, &[PathStep { index: 1, slot: None }], &Instruction::new(InstructionKind::Comment("x".into()))).is_ok());
+        assert!(
+            check_loop_control_placement(
+                &strand,
+                &[PathStep {
+                    index: 1,
+                    slot: None
+                }],
+                &Instruction::new(InstructionKind::Comment("x".into()))
+            )
+            .is_ok()
+        );
     }
 
     #[test]
     fn escape_loop_at_strand_top_level_is_rejected() {
         let strand = strand_with(vec![Instruction::new(InstructionKind::WhenRan)]);
-        let path = vec![PathStep { index: 1, slot: None }];
-        assert!(check_loop_control_placement(&strand, &path, &Instruction::new(InstructionKind::EscapeLoop)).is_err());
+        let path = vec![PathStep {
+            index: 1,
+            slot: None,
+        }];
+        assert!(
+            check_loop_control_placement(
+                &strand,
+                &path,
+                &Instruction::new(InstructionKind::EscapeLoop)
+            )
+            .is_err()
+        );
     }
 
     #[test]
     fn escape_loop_directly_inside_repeat_body_is_allowed() {
         let strand = strand_with(vec![
             Instruction::new(InstructionKind::WhenRan),
-            Instruction::new(InstructionKind::Repeat { count: Value::number(3.0), body: vec![] }),
+            Instruction::new(InstructionKind::Repeat {
+                count: Value::number(3.0),
+                body: vec![],
+            }),
         ]);
         // Path: strand[1] (Repeat) -> slot 0 (its body) -> insertion index 0.
-        let path = vec![PathStep { index: 1, slot: Some(0) }, PathStep { index: 0, slot: None }];
-        assert!(check_loop_control_placement(&strand, &path, &Instruction::new(InstructionKind::ContinueLoop)).is_ok());
+        let path = vec![
+            PathStep {
+                index: 1,
+                slot: Some(0),
+            },
+            PathStep {
+                index: 0,
+                slot: None,
+            },
+        ];
+        assert!(
+            check_loop_control_placement(
+                &strand,
+                &path,
+                &Instruction::new(InstructionKind::ContinueLoop)
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -738,26 +968,64 @@ mod loop_control_placement_tests {
             Instruction::new(InstructionKind::WhenRan),
             Instruction::new(InstructionKind::While {
                 condition: Value::Bool,
-                body: vec![Instruction::new(InstructionKind::If { condition: Value::Bool, body: vec![] })],
+                body: vec![Instruction::new(InstructionKind::If {
+                    condition: Value::Bool,
+                    body: vec![],
+                })],
             }),
         ]);
         // strand[1] (While) -> slot 0 -> [0] (If) -> slot 0 -> insertion index 0.
         let path = vec![
-            PathStep { index: 1, slot: Some(0) },
-            PathStep { index: 0, slot: Some(0) },
-            PathStep { index: 0, slot: None },
+            PathStep {
+                index: 1,
+                slot: Some(0),
+            },
+            PathStep {
+                index: 0,
+                slot: Some(0),
+            },
+            PathStep {
+                index: 0,
+                slot: None,
+            },
         ];
-        assert!(check_loop_control_placement(&strand, &path, &Instruction::new(InstructionKind::EscapeLoop)).is_ok());
+        assert!(
+            check_loop_control_placement(
+                &strand,
+                &path,
+                &Instruction::new(InstructionKind::EscapeLoop)
+            )
+            .is_ok()
+        );
     }
 
     #[test]
     fn escape_loop_inside_if_with_no_enclosing_loop_is_rejected() {
         let strand = strand_with(vec![
             Instruction::new(InstructionKind::WhenRan),
-            Instruction::new(InstructionKind::If { condition: Value::Bool, body: vec![] }),
+            Instruction::new(InstructionKind::If {
+                condition: Value::Bool,
+                body: vec![],
+            }),
         ]);
-        let path = vec![PathStep { index: 1, slot: Some(0) }, PathStep { index: 0, slot: None }];
-        assert!(check_loop_control_placement(&strand, &path, &Instruction::new(InstructionKind::EscapeLoop)).is_err());
+        let path = vec![
+            PathStep {
+                index: 1,
+                slot: Some(0),
+            },
+            PathStep {
+                index: 0,
+                slot: None,
+            },
+        ];
+        assert!(
+            check_loop_control_placement(
+                &strand,
+                &path,
+                &Instruction::new(InstructionKind::EscapeLoop)
+            )
+            .is_err()
+        );
     }
 }
 
@@ -773,8 +1041,14 @@ pub(crate) fn edit_instruction<R: Runtime>(
     let ins = dto_to_instruction(&instruction).ok_or("Unknown instruction type")?;
     // Freeform text fields coalesce keystrokes into one undo group, like
     // `edit_value_field`; every other kind gets its own undo step.
-    let session = matches!(&ins.kind, InstructionKind::Command(_) | InstructionKind::Comment(_))
-        .then(|| TextEditSession::Instruction { strand_id: strand_id.clone(), index: path.clone() });
+    let session = matches!(
+        &ins.kind,
+        InstructionKind::Command(_) | InstructionKind::Comment(_)
+    )
+    .then(|| TextEditSession::Instruction {
+        strand_id: strand_id.clone(),
+        index: path.clone(),
+    });
     if s.text_edit_session != session || session.is_none() {
         push_undo(&mut s);
     }
@@ -809,7 +1083,9 @@ fn value_slot_mut(ins: &mut Instruction, field: FieldId) -> Option<&mut Value> {
         (InstructionKind::IfElse { condition, .. }, FieldId::Condition) => Some(condition),
         (InstructionKind::While { condition, .. }, FieldId::Condition) => Some(condition),
         (InstructionKind::Repeat { count, .. }, FieldId::RepeatCount) => Some(count),
-        (InstructionKind::WhenBatteryDischargedTo(v), FieldId::BatteryDischargeThreshold) => Some(v),
+        (InstructionKind::WhenBatteryDischargedTo(v), FieldId::BatteryDischargeThreshold) => {
+            Some(v)
+        }
         (InstructionKind::WhenBatteryChargedTo(v), FieldId::BatteryChargeThreshold) => Some(v),
         _ => None,
     }
@@ -819,13 +1095,20 @@ fn value_slot_mut(ins: &mut Instruction, field: FieldId) -> Option<&mut Value> {
 /// the specific `Value` node it addresses.
 fn resolve_location_mut<'a>(mac: &'a mut Macro, location: &ValueLocation) -> Option<&'a mut Value> {
     match location {
-        ValueLocation::Field { strand_id, index, field_id, path } => {
+        ValueLocation::Field {
+            strand_id,
+            index,
+            field_id,
+            path,
+        } => {
             let strand = mac.strand_mut(strand_id)?;
             let (list, idx) = resolve_body_mut(&mut strand.instructions, index)?;
             let ins = list.get_mut(idx)?;
             value_slot_mut(ins, *field_id)?.get_mut(path)
         }
-        ValueLocation::Floating { floating_id, path } => mac.floating_value_mut(floating_id)?.value.get_mut(path),
+        ValueLocation::Floating { floating_id, path } => {
+            mac.floating_value_mut(floating_id)?.value.get_mut(path)
+        }
     }
 }
 
@@ -849,11 +1132,19 @@ fn prune_value_buffers(buffers: &mut HashMap<ValueLocation, String>, location: &
 /// Applies `kind`'s default construction to `node` in place — used when
 /// dropping a fresh block onto an occupied slot. Best-effort keeps the old
 /// value rather than discarding it.
-fn apply_value_kind(node: &mut Value, kind: &str, env: &HashMap<String, Evaluated>) -> Result<(), String> {
+fn apply_value_kind(
+    node: &mut Value,
+    kind: &str,
+    env: &HashMap<String, Evaluated>,
+) -> Result<(), String> {
     match kind {
         "Number" => {
             // Best-effort: collapses `(2)+(3)` to `5` instead of discarding it.
-            let n = node.resolve_vars(env).eval().and_then(|e| e.as_number()).unwrap_or(0.0);
+            let n = node
+                .resolve_vars(env)
+                .eval()
+                .and_then(|e| e.as_number())
+                .unwrap_or(0.0);
             *node = Value::number(n);
         }
         "Text" => {
@@ -876,19 +1167,32 @@ fn apply_value_kind(node: &mut Value, kind: &str, env: &HashMap<String, Evaluate
             // keeping whatever it shadowed; otherwise the old value is
             // tucked away as `saved` so it comes back untouched if dragged
             // back out.
-            let spec = OPERATOR_KINDS.iter().find(|s| s.kind == kind).ok_or_else(|| format!("Unknown value kind: {kind}"))?;
+            let spec = OPERATOR_KINDS
+                .iter()
+                .find(|s| s.kind == kind)
+                .ok_or_else(|| format!("Unknown value kind: {kind}"))?;
             let existing = std::mem::replace(node, Value::number(0.0));
             *node = match existing {
-                Value::Op { mut args, saved, .. } => {
+                Value::Op {
+                    mut args, saved, ..
+                } => {
                     let mut defaults = (spec.default_args)();
                     if args.len() < spec.arity {
                         args.extend(defaults.split_off(args.len()));
                     } else {
                         args.truncate(spec.arity);
                     }
-                    Value::Op { op: spec.op, args, saved }
+                    Value::Op {
+                        op: spec.op,
+                        args,
+                        saved,
+                    }
                 }
-                other => Value::Op { op: spec.op, args: (spec.default_args)(), saved: Box::new(other) },
+                other => Value::Op {
+                    op: spec.op,
+                    args: (spec.default_args)(),
+                    saved: Box::new(other),
+                },
             };
         }
     }
@@ -944,7 +1248,11 @@ pub(crate) fn set_value_kind<R: Runtime>(
     let loc = location.to_location()?;
     let mut s = state.lock().map_err(|e| e.to_string())?;
     push_undo(&mut s);
-    let env: HashMap<String, Evaluated> = s.variable_values.lock().map(|g| g.clone()).unwrap_or_default();
+    let env: HashMap<String, Evaluated> = s
+        .variable_values
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_default();
     let result = if let Some(mac) = &mut s.current_macro {
         match resolve_location_mut(mac, &loc) {
             Some(node) => apply_value_kind(node, &kind, &env),
@@ -976,7 +1284,10 @@ pub(crate) fn take_value<R: Runtime>(
         let mac = s.current_macro.as_mut()?;
         if let ValueLocation::Floating { floating_id, path } = &loc {
             if path.is_empty() {
-                let idx = mac.floating_values.iter().position(|f| &f.id == floating_id)?;
+                let idx = mac
+                    .floating_values
+                    .iter()
+                    .position(|f| &f.id == floating_id)?;
                 return Some(mac.floating_values.remove(idx).value);
             }
         }
@@ -1030,13 +1341,20 @@ pub(crate) fn put_value<R: Runtime>(
 #[tauri::command]
 pub(crate) fn preview_value(state: State<SharedState>, value: ValueDto) -> Result<String, String> {
     let s = state.lock().map_err(|e| e.to_string())?;
-    let env: HashMap<String, Evaluated> = s.variable_values.lock().map(|g| g.clone()).unwrap_or_default();
+    let env: HashMap<String, Evaluated> = s
+        .variable_values
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_default();
     preview_value_with_env(&value, &env)
 }
 
 /// The actual evaluation logic behind `preview_value`, factored out so it's
 /// testable without a real `tauri::State`.
-fn preview_value_with_env(value: &ValueDto, env: &HashMap<String, Evaluated>) -> Result<String, String> {
+fn preview_value_with_env(
+    value: &ValueDto,
+    env: &HashMap<String, Evaluated>,
+) -> Result<String, String> {
     dto_to_value(value).resolve_vars(env).eval_text()
 }
 
@@ -1060,7 +1378,13 @@ pub(crate) fn create_floating_value<R: Runtime>(
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let id = uuid::Uuid::new_v4().simple().to_string();
-    mac.floating_values.push(FloatingValue { id: id.clone(), x, y, value: dto_to_value(&value), origin_block_id });
+    mac.floating_values.push(FloatingValue {
+        id: id.clone(),
+        x,
+        y,
+        value: dto_to_value(&value),
+        origin_block_id,
+    });
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(id)
@@ -1120,7 +1444,14 @@ pub(crate) fn create_comment<R: Runtime>(
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let id = uuid::Uuid::new_v4().simple().to_string();
-    mac.comments.push(Comment { id: id.clone(), x, y, text, collapsed: false, attached_to: None });
+    mac.comments.push(Comment {
+        id: id.clone(),
+        x,
+        y,
+        text,
+        collapsed: false,
+        attached_to: None,
+    });
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(id)
@@ -1143,7 +1474,14 @@ pub(crate) fn create_attached_comment<R: Runtime>(
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let id = uuid::Uuid::new_v4().simple().to_string();
-    mac.comments.push(Comment { id: id.clone(), x: dx, y: dy, text, collapsed: false, attached_to: Some(instruction_id) });
+    mac.comments.push(Comment {
+        id: id.clone(),
+        x: dx,
+        y: dy,
+        text,
+        collapsed: false,
+        attached_to: Some(instruction_id),
+    });
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(id)
@@ -1155,7 +1493,13 @@ pub(crate) fn create_attached_comment<R: Runtime>(
 /// `Comment`'s doc comment. No `push_undo` — pure repositioning, same as
 /// `move_floating_value`.
 #[tauri::command]
-pub(crate) fn move_comment<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, comment_id: String, x: i32, y: i32) -> Result<(), String> {
+pub(crate) fn move_comment<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    comment_id: String,
+    x: i32,
+    y: i32,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         if let Some(c) = mac.comment_mut(&comment_id) {
@@ -1170,7 +1514,11 @@ pub(crate) fn move_comment<R: Runtime>(state: State<SharedState>, app: tauri::Ap
 
 /// Deletes a note outright (its own "×" button) — mirrors `remove_floating_value`.
 #[tauri::command]
-pub(crate) fn remove_comment<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, comment_id: String) -> Result<(), String> {
+pub(crate) fn remove_comment<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    comment_id: String,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {
@@ -1184,9 +1532,16 @@ pub(crate) fn remove_comment<R: Runtime>(state: State<SharedState>, app: tauri::
 /// Edits a note's text — coalesces keystrokes into one undo group, same as
 /// `edit_instruction`'s freeform-text instructions.
 #[tauri::command]
-pub(crate) fn edit_comment_text<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, comment_id: String, text: String) -> Result<(), String> {
+pub(crate) fn edit_comment_text<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    comment_id: String,
+    text: String,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let session = Some(TextEditSession::Comment { comment_id: comment_id.clone() });
+    let session = Some(TextEditSession::Comment {
+        comment_id: comment_id.clone(),
+    });
     if s.text_edit_session != session {
         push_undo(&mut s);
     }
@@ -1204,7 +1559,12 @@ pub(crate) fn edit_comment_text<R: Runtime>(state: State<SharedState>, app: taur
 /// Toggles a note's collapsed state — view state, not content, so no
 /// `push_undo` (same reasoning as `move_comment`).
 #[tauri::command]
-pub(crate) fn set_comment_collapsed<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, comment_id: String, collapsed: bool) -> Result<(), String> {
+pub(crate) fn set_comment_collapsed<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    comment_id: String,
+    collapsed: bool,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         if let Some(c) = mac.comment_mut(&comment_id) {
@@ -1217,9 +1577,16 @@ pub(crate) fn set_comment_collapsed<R: Runtime>(state: State<SharedState>, app: 
 }
 
 #[tauri::command]
-pub(crate) fn remove_instruction<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, strand_id: String, path: Vec<PathStep>) -> Result<(), String> {
+pub(crate) fn remove_instruction<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    strand_id: String,
+    path: Vec<PathStep>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let should_remove = s.current_macro.as_ref()
+    let should_remove = s
+        .current_macro
+        .as_ref()
         .and_then(|mac| mac.strand(&strand_id))
         .and_then(|strand| resolve_body(&strand.instructions, &path))
         .is_some_and(|(list, idx)| idx < list.len());
@@ -1254,7 +1621,9 @@ pub(crate) fn delete_instruction<R: Runtime>(
     y: i32,
 ) -> Result<Option<String>, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let in_range = s.current_macro.as_ref()
+    let in_range = s
+        .current_macro
+        .as_ref()
         .and_then(|mac| mac.strand(&strand_id))
         .and_then(|strand| resolve_body(&strand.instructions, &path))
         .is_some_and(|(list, idx)| idx < list.len());
@@ -1265,13 +1634,19 @@ pub(crate) fn delete_instruction<R: Runtime>(
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let strand = mac.strand_mut(&strand_id).ok_or("Unknown strand")?;
-    let (list, idx) = resolve_body_mut(&mut strand.instructions, &path).ok_or("Unknown instruction path")?;
+    let (list, idx) =
+        resolve_body_mut(&mut strand.instructions, &path).ok_or("Unknown instruction path")?;
     list.remove(idx);
     let tail = list.split_off(idx.min(list.len()));
     let now_empty = strand.instructions.is_empty();
     let new_id = if !tail.is_empty() {
         let new_id = uuid::Uuid::new_v4().simple().to_string();
-        mac.strands.push(Strand { id: new_id.clone(), x, y, instructions: tail });
+        mac.strands.push(Strand {
+            id: new_id.clone(),
+            x,
+            y,
+            instructions: tail,
+        });
         Some(new_id)
     } else {
         None
@@ -1289,7 +1664,13 @@ pub(crate) fn delete_instruction<R: Runtime>(
 }
 
 #[tauri::command]
-pub(crate) fn reorder_instruction<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, strand_id: String, path: Vec<PathStep>, direction: i32) -> Result<(), String> {
+pub(crate) fn reorder_instruction<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    strand_id: String,
+    path: Vec<PathStep>,
+    direction: i32,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &s.current_macro {
         if let Some(strand) = mac.strand(&strand_id) {
@@ -1304,18 +1685,21 @@ pub(crate) fn reorder_instruction<R: Runtime>(state: State<SharedState>, app: ta
                     index
                 };
                 // Swapping either end into position 0 would move a When Ran
-                // block out of (or something else into) the head slot — only
-                // relevant at a strand's own top level, never a nested body.
-                let starts_with_header = list.first().map_or(false, Instruction::is_header);
-                let touches_when_ran_slot = path.len() == 1 && (index == 0 || new_index == 0) && starts_with_header;
-                if new_index != index && !touches_when_ran_slot {
-                    push_undo(&mut s);
-                    if let Some(mac) = &mut s.current_macro {
-                        if let Some(strand) = mac.strand_mut(&strand_id) {
-                            if let Some((list, index)) = resolve_body_mut(&mut strand.instructions, &path) {
-                                list.swap(index, new_index);
+                    // block out of (or something else into) the head slot — only
+                    // relevant at a strand's own top level, never a nested body.
+                    let starts_with_header = list.first().map_or(false, Instruction::is_header);
+                    let touches_when_ran_slot =
+                        path.len() == 1 && (index == 0 || new_index == 0) && starts_with_header;
+                    if new_index != index && !touches_when_ran_slot {
+                        push_undo(&mut s);
+                        if let Some(mac) = &mut s.current_macro {
+                            if let Some(strand) = mac.strand_mut(&strand_id) {
+                                if let Some((list, index)) =
+                                    resolve_body_mut(&mut strand.instructions, &path)
+                                {
+                                    list.swap(index, new_index);
+                                }
                             }
-                        }
                         s.invalid_field_buffers.clear();
                         auto_save(&s);
                     }
@@ -1329,7 +1713,10 @@ pub(crate) fn reorder_instruction<R: Runtime>(state: State<SharedState>, app: ta
 }
 
 #[tauri::command]
-pub(crate) fn clear_instructions<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn clear_instructions<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if !s.confirm_clear_instructions {
         s.confirm_clear_instructions = true;
@@ -1430,12 +1817,18 @@ fn perform_redo<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>) -> R
 }
 
 #[tauri::command]
-pub(crate) fn undo<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn undo<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     perform_undo(&state, &app)
 }
 
 #[tauri::command]
-pub(crate) fn redo<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn redo<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     perform_redo(&state, &app)
 }
 
@@ -1473,13 +1866,18 @@ pub(crate) fn add_strand<R: Runtime>(
 }
 
 #[tauri::command]
-pub(crate) fn remove_strand<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, strand_id: String) -> Result<(), String> {
+pub(crate) fn remove_strand<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    strand_id: String,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {
         mac.strands.retain(|strand| strand.id != strand_id);
         mac.prune_orphaned_comments();
-        s.invalid_field_buffers.retain(|loc, _| loc.strand_id() != Some(strand_id.as_str()));
+        s.invalid_field_buffers
+            .retain(|loc, _| loc.strand_id() != Some(strand_id.as_str()));
         auto_save(&s);
     }
     emit_state_updated(&app, &s);
@@ -1489,7 +1887,13 @@ pub(crate) fn remove_strand<R: Runtime>(state: State<SharedState>, app: tauri::A
 /// Repositions a strand on the canvas — used while dragging a stack that
 /// ends up dropped on empty space rather than snapped onto another strand.
 #[tauri::command]
-pub(crate) fn move_strand<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, strand_id: String, x: i32, y: i32) -> Result<(), String> {
+pub(crate) fn move_strand<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    strand_id: String,
+    x: i32,
+    y: i32,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         if let Some(strand) = mac.strand_mut(&strand_id) {
@@ -1519,13 +1923,19 @@ pub(crate) fn split_strand<R: Runtime>(
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let strand = mac.strand_mut(&strand_id).ok_or("Unknown strand")?;
-    let (list, idx) = resolve_body_mut(&mut strand.instructions, &path).ok_or("Unknown instruction path")?;
+    let (list, idx) =
+        resolve_body_mut(&mut strand.instructions, &path).ok_or("Unknown instruction path")?;
     if idx >= list.len() {
         return Err("Split index out of range".to_string());
     }
     let tail = list.split_off(idx);
     let new_id = uuid::Uuid::new_v4().simple().to_string();
-    mac.strands.push(Strand { id: new_id.clone(), x, y, instructions: tail });
+    mac.strands.push(Strand {
+        id: new_id.clone(),
+        x,
+        y,
+        instructions: tail,
+    });
     s.invalid_field_buffers.clear();
     auto_save(&s);
     emit_state_updated(&app, &s);
@@ -1548,7 +1958,9 @@ pub(crate) fn merge_strand<R: Runtime>(
     }
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let mac_ref = s.current_macro.as_ref().ok_or("No macro selected")?;
-    let dragged_ref = mac_ref.strand(&dragged_id).ok_or("Unknown dragged strand")?;
+    let dragged_ref = mac_ref
+        .strand(&dragged_id)
+        .ok_or("Unknown dragged strand")?;
     if dragged_ref.starts_with_when_ran() {
         return Err("A When Ran strand can't be merged into another strand".to_string());
     }
@@ -1562,7 +1974,11 @@ pub(crate) fn merge_strand<R: Runtime>(
     }
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
-    let dragged_pos = mac.strands.iter().position(|s| s.id == dragged_id).ok_or("Unknown dragged strand")?;
+    let dragged_pos = mac
+        .strands
+        .iter()
+        .position(|s| s.id == dragged_id)
+        .ok_or("Unknown dragged strand")?;
     let dragged = mac.strands.remove(dragged_pos);
     let Some(target) = mac.strand_mut(&target_id) else {
         // Target vanished (e.g. concurrent edit) — put the dragged
@@ -1576,7 +1992,8 @@ pub(crate) fn merge_strand<R: Runtime>(
     };
     let idx = idx.min(list.len());
     list.splice(idx..idx, dragged.instructions);
-    s.invalid_field_buffers.retain(|loc, _| loc.strand_id() != Some(dragged_id.as_str()));
+    s.invalid_field_buffers
+        .retain(|loc, _| loc.strand_id() != Some(dragged_id.as_str()));
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(())
@@ -1601,7 +2018,12 @@ pub(crate) fn paste_instructions<R: Runtime>(
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let new_id = uuid::Uuid::new_v4().simple().to_string();
-    mac.strands.push(Strand { id: new_id.clone(), x, y, instructions: ins });
+    mac.strands.push(Strand {
+        id: new_id.clone(),
+        x,
+        y,
+        instructions: ins,
+    });
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(new_id)
@@ -1611,7 +2033,11 @@ pub(crate) fn paste_instructions<R: Runtime>(
 /// the undo/redo stacks, so it survives undo/redo untouched; no-ops if
 /// `strand_id` doesn't exist.
 #[tauri::command]
-pub(crate) fn set_recording_target<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, strand_id: String) -> Result<(), String> {
+pub(crate) fn set_recording_target<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    strand_id: String,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         if mac.strand(&strand_id).is_some() {
@@ -1626,7 +2052,12 @@ pub(crate) fn set_recording_target<R: Runtime>(state: State<SharedState>, app: t
 // ─── Key capture ───────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub(crate) fn start_key_capture<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, strand_id: String, path: Vec<PathStep>) -> Result<(), String> {
+pub(crate) fn start_key_capture<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    strand_id: String,
+    path: Vec<PathStep>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.key_capture = Some(KeyCaptureTarget::Strand(strand_id, path));
     emit_state_updated(&app, &s);
@@ -1637,7 +2068,10 @@ pub(crate) fn start_key_capture<R: Runtime>(state: State<SharedState>, app: taur
 /// (the sidebar's Key prefab) — the result lands in `pending_standalone_key`
 /// instead of being written into a strand.
 #[tauri::command]
-pub(crate) fn start_standalone_key_capture<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn start_standalone_key_capture<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.key_capture = Some(KeyCaptureTarget::Standalone);
     emit_state_updated(&app, &s);
@@ -1652,7 +2086,9 @@ pub(crate) fn key_capture_event<R: Runtime>(
     key: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let Some(target) = s.key_capture.take() else { return Ok(()); };
+    let Some(target) = s.key_capture.take() else {
+        return Ok(());
+    };
 
     let captured_key = blockwork_core::key_mapping::web_code_to_macro_key(&code)
         .or_else(|| blockwork_core::key_mapping::web_key_to_macro_key(&key));
@@ -1662,8 +2098,11 @@ pub(crate) fn key_capture_event<R: Runtime>(
             KeyCaptureTarget::Strand(strand_id, path) => {
                 if let Some(mac) = &mut s.current_macro {
                     if let Some(strand) = mac.strand_mut(&strand_id) {
-                        if let Some((list, idx)) = resolve_body_mut(&mut strand.instructions, &path) {
-                            if let Some(InstructionKind::Token(InputToken::Key(_, dir))) = list.get(idx).map(|i| i.kind.clone()) {
+                        if let Some((list, idx)) = resolve_body_mut(&mut strand.instructions, &path)
+                        {
+                            if let Some(InstructionKind::Token(InputToken::Key(_, dir))) =
+                                list.get(idx).map(|i| i.kind.clone())
+                            {
                                 list[idx].kind = InstructionKind::Token(InputToken::Key(mk, dir));
                                 auto_save(&s);
                             }
@@ -1672,7 +2111,11 @@ pub(crate) fn key_capture_event<R: Runtime>(
                 }
             }
             KeyCaptureTarget::Standalone => {
-                s.pending_standalone_key = Some(blockwork_core::input::key_to_string(&mk).unwrap_or("Unknown").to_string());
+                s.pending_standalone_key = Some(
+                    blockwork_core::input::key_to_string(&mk)
+                        .unwrap_or("Unknown")
+                        .to_string(),
+                );
             }
         }
     }
@@ -1683,7 +2126,10 @@ pub(crate) fn key_capture_event<R: Runtime>(
 /// Consumes `pending_standalone_key` once the frontend has copied it, so a
 /// stale value can't leak into the next capture.
 #[tauri::command]
-pub(crate) fn clear_standalone_key_capture<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn clear_standalone_key_capture<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.pending_standalone_key = None;
     emit_state_updated(&app, &s);
@@ -1693,16 +2139,27 @@ pub(crate) fn clear_standalone_key_capture<R: Runtime>(state: State<SharedState>
 // ─── Execution ─────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub(crate) fn run_macro<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn run_macro<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let (mac, emulator, is_looping, loop_mode, speed_multiplier, variables) = {
         let s = state.lock().map_err(|e| e.to_string())?;
         let mac = s.current_macro.clone();
         let emulator = s.emulator.as_ref().map(Arc::clone);
         let is_looping = Arc::clone(&s.is_looping);
         let loop_mode = s.loop_mode_enabled;
-        let speed_multiplier = mac.as_ref().map_or(1.0, |m| m.speed_multiplier) * s.global_speed_multiplier;
+        let speed_multiplier =
+            mac.as_ref().map_or(1.0, |m| m.speed_multiplier) * s.global_speed_multiplier;
         let variables = Arc::clone(&s.variable_values);
-        (mac, emulator, is_looping, loop_mode, speed_multiplier, variables)
+        (
+            mac,
+            emulator,
+            is_looping,
+            loop_mode,
+            speed_multiplier,
+            variables,
+        )
     };
 
     if let (Some(mac), Some(emulator)) = (mac, emulator) {
@@ -1712,7 +2169,8 @@ pub(crate) fn run_macro<R: Runtime>(state: State<SharedState>, app: tauri::AppHa
                 return Ok(());
             }
             let mac_name = mac.name.clone();
-            let loop_task = macros_thread::into_loop_task(mac, 
+            let loop_task = macros_thread::into_loop_task(
+                mac,
                 Arc::clone(&emulator),
                 Arc::clone(&is_looping),
                 speed_multiplier,
@@ -1732,7 +2190,8 @@ pub(crate) fn run_macro<R: Runtime>(state: State<SharedState>, app: tauri::AppHa
         } else {
             let _ = loop_control::set_loop_state(&is_looping, true);
             let mac_name = mac.name.clone();
-            let single_run_task = macros_thread::into_single_run_task(mac, 
+            let single_run_task = macros_thread::into_single_run_task(
+                mac,
                 Arc::clone(&emulator),
                 Arc::clone(&is_looping),
                 speed_multiplier,
@@ -1758,7 +2217,11 @@ pub(crate) fn run_macro<R: Runtime>(state: State<SharedState>, app: tauri::AppHa
 }
 
 #[tauri::command]
-pub(crate) fn toggle_loop_mode<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, enabled: bool) -> Result<(), String> {
+pub(crate) fn toggle_loop_mode<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    enabled: bool,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.loop_mode_enabled = enabled;
     config::update_settings(|settings| settings.loop_mode_enabled = Some(enabled));
@@ -1767,9 +2230,16 @@ pub(crate) fn toggle_loop_mode<R: Runtime>(state: State<SharedState>, app: tauri
 }
 
 #[tauri::command]
-pub(crate) fn set_global_speed_multiplier<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, multiplier: f64) -> Result<(), String> {
+pub(crate) fn set_global_speed_multiplier<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    multiplier: f64,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let clamped = multiplier.clamp(*SPEED_MULTIPLIER_RANGE.start(), *SPEED_MULTIPLIER_RANGE.end());
+    let clamped = multiplier.clamp(
+        *SPEED_MULTIPLIER_RANGE.start(),
+        *SPEED_MULTIPLIER_RANGE.end(),
+    );
     s.global_speed_multiplier = clamped;
     config::update_settings(|settings| settings.global_speed_multiplier = Some(clamped));
     emit_state_updated(&app, &s);
@@ -1785,15 +2255,24 @@ pub(crate) fn set_global_speed_multiplier<R: Runtime>(state: State<SharedState>,
 /// capture_event_to_instruction`). Best-effort: if the backend can't report
 /// a position, absolute recording just waits for one via a later seed.
 fn seed_recording_mouse_pos(s: &crate::state::AppState) {
-    if let Some((x, y)) = s.emulator.as_ref().and_then(|e| e.lock().ok()?.cursor_pos()) {
+    if let Some((x, y)) = s
+        .emulator
+        .as_ref()
+        .and_then(|e| e.lock().ok()?.cursor_pos())
+    {
         recording::set_last_mouse_pos(x as f64, y as f64);
     }
 }
 
 #[tauri::command]
-pub(crate) fn start_recording<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn start_recording<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    if s.current_macro.is_none() { return Ok(()); }
+    if s.current_macro.is_none() {
+        return Ok(());
+    }
     s.recording_countdown_generation = s.recording_countdown_generation.wrapping_add(1);
     let countdown_gen = s.recording_countdown_generation;
     s.recording_phase = RecordingPhase::Countdown(3);
@@ -1809,7 +2288,9 @@ pub(crate) fn start_recording<R: Runtime>(state: State<SharedState>, app: tauri:
                 Ok(g) => g,
                 Err(_) => return,
             };
-            if s.recording_countdown_generation != countdown_gen { return; }
+            if s.recording_countdown_generation != countdown_gen {
+                return;
+            }
             if n == 0 {
                 s.recording_phase = RecordingPhase::Active;
                 recording::reset_timing();
@@ -1826,7 +2307,10 @@ pub(crate) fn start_recording<R: Runtime>(state: State<SharedState>, app: tauri:
 }
 
 #[tauri::command]
-pub(crate) fn stop_recording<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn stop_recording<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     stop_recording_impl(&mut s);
     emit_state_updated(&app, &s);
@@ -1882,7 +2366,11 @@ pub(crate) fn stop_recording_internal<R: Runtime>(state: &SharedState, app: &tau
 }
 
 #[tauri::command]
-pub(crate) fn toggle_record_mouse_relative<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, relative: bool) -> Result<(), String> {
+pub(crate) fn toggle_record_mouse_relative<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    relative: bool,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.record_mouse_relative = relative;
     recording::RECORD_MOUSE_RELATIVE.store(relative, Ordering::Relaxed);
@@ -1892,7 +2380,11 @@ pub(crate) fn toggle_record_mouse_relative<R: Runtime>(state: State<SharedState>
 }
 
 #[tauri::command]
-pub(crate) fn toggle_record_mouse_movement<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, enabled: bool) -> Result<(), String> {
+pub(crate) fn toggle_record_mouse_movement<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    enabled: bool,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.record_mouse_movement = enabled;
     recording::RECORD_MOUSE_MOVEMENT.store(enabled, Ordering::Relaxed);
@@ -1904,7 +2396,10 @@ pub(crate) fn toggle_record_mouse_movement<R: Runtime>(state: State<SharedState>
 // ─── Navigation ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub(crate) fn open_settings<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn open_settings<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.page = Page::Settings;
     s.hotkey_bindings = config::load_hotkey_bindings();
@@ -1915,7 +2410,10 @@ pub(crate) fn open_settings<R: Runtime>(state: State<SharedState>, app: tauri::A
 }
 
 #[tauri::command]
-pub(crate) fn close_settings<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn close_settings<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.page = Page::Main;
     s.combo_capture = None;
@@ -1927,7 +2425,11 @@ pub(crate) fn close_settings<R: Runtime>(state: State<SharedState>, app: tauri::
 // ─── Hotkey bindings ───────────────────────────────────────────────────────
 
 #[tauri::command]
-pub(crate) fn start_combo_capture<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, action: HotkeyActionDto) -> Result<(), String> {
+pub(crate) fn start_combo_capture<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    action: HotkeyActionDto,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.combo_capture = Some(ComboCapture::Named(dto_to_hotkey_action(&action)));
     emit_state_updated(&app, &s);
@@ -1935,7 +2437,10 @@ pub(crate) fn start_combo_capture<R: Runtime>(state: State<SharedState>, app: ta
 }
 
 #[tauri::command]
-pub(crate) fn start_pending_combo_capture<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn start_pending_combo_capture<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.combo_capture = Some(ComboCapture::Pending);
     emit_state_updated(&app, &s);
@@ -1954,7 +2459,10 @@ pub(crate) fn combo_capture_event<R: Runtime>(
         Some(n) => n,
         None => return Ok(()),
     };
-    let combo = KeyCombo { modifiers, key: key_name };
+    let combo = KeyCombo {
+        modifiers,
+        key: key_name,
+    };
 
     match s.combo_capture.take() {
         Some(ComboCapture::Named(action)) => {
@@ -1962,7 +2470,10 @@ pub(crate) fn combo_capture_event<R: Runtime>(
             // while it fires would themselves have already been captured as
             // macro steps before the trigger key arrives.
             let combo = if matches!(action, HotkeyAction::StopRecording) {
-                KeyCombo { modifiers: 0, ..combo }
+                KeyCombo {
+                    modifiers: 0,
+                    ..combo
+                }
             } else {
                 combo
             };
@@ -1984,7 +2495,10 @@ pub(crate) fn combo_capture_event<R: Runtime>(
 }
 
 #[tauri::command]
-pub(crate) fn cancel_combo_capture<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn cancel_combo_capture<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.combo_capture = None;
     emit_state_updated(&app, &s);
@@ -1992,7 +2506,11 @@ pub(crate) fn cancel_combo_capture<R: Runtime>(state: State<SharedState>, app: t
 }
 
 #[tauri::command]
-pub(crate) fn set_pending_macro_idx<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, index: Option<usize>) -> Result<(), String> {
+pub(crate) fn set_pending_macro_idx<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    index: Option<usize>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let entry = s.pending_macro_hotkey.get_or_insert((None, None));
     entry.0 = index;
@@ -2001,7 +2519,10 @@ pub(crate) fn set_pending_macro_idx<R: Runtime>(state: State<SharedState>, app: 
 }
 
 #[tauri::command]
-pub(crate) fn add_macro_hotkey<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn add_macro_hotkey<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some((Some(idx), Some(combo))) = s.pending_macro_hotkey.take() {
         let macros = config::get_macros_from_config();
@@ -2019,7 +2540,11 @@ pub(crate) fn add_macro_hotkey<R: Runtime>(state: State<SharedState>, app: tauri
 }
 
 #[tauri::command]
-pub(crate) fn remove_hotkey_binding<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, index: usize) -> Result<(), String> {
+pub(crate) fn remove_hotkey_binding<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    index: usize,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if index < s.hotkey_bindings.len() {
         s.hotkey_bindings.remove(index);
@@ -2030,7 +2555,11 @@ pub(crate) fn remove_hotkey_binding<R: Runtime>(state: State<SharedState>, app: 
 }
 
 #[tauri::command]
-pub(crate) fn clear_named_hotkey<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, action: HotkeyActionDto) -> Result<(), String> {
+pub(crate) fn clear_named_hotkey<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    action: HotkeyActionDto,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let action = dto_to_hotkey_action(&action);
     s.hotkey_bindings.retain(|b| b.action != action);
@@ -2040,14 +2569,21 @@ pub(crate) fn clear_named_hotkey<R: Runtime>(state: State<SharedState>, app: tau
 }
 
 #[tauri::command]
-pub(crate) fn reset_hotkey_to_default<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, action: HotkeyActionDto) -> Result<(), String> {
+pub(crate) fn reset_hotkey_to_default<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    action: HotkeyActionDto,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let action = dto_to_hotkey_action(&action);
     if let Some(default_combo) = config::default_combo_for_action(&action) {
         if let Some(existing) = s.hotkey_bindings.iter_mut().find(|b| b.action == action) {
             existing.combo = default_combo;
         } else {
-            s.hotkey_bindings.push(HotkeyBinding { action, combo: default_combo });
+            s.hotkey_bindings.push(HotkeyBinding {
+                action,
+                combo: default_combo,
+            });
         }
         save_hotkey_bindings_impl(&mut s);
     }
@@ -2063,7 +2599,11 @@ fn save_hotkey_bindings_impl(s: &mut crate::state::AppState) {
 // ─── IPC server ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub(crate) fn set_ipc_port_text<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, text: String) -> Result<(), String> {
+pub(crate) fn set_ipc_port_text<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    text: String,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     match text.trim().parse::<u16>() {
         Ok(port) => {
@@ -2080,12 +2620,17 @@ pub(crate) fn set_ipc_port_text<R: Runtime>(state: State<SharedState>, app: taur
 }
 
 #[tauri::command]
-pub(crate) async fn start_ipc_server<R: Runtime>(state: State<'_, SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) async fn start_ipc_server<R: Runtime>(
+    state: State<'_, SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if s.ipc_server.is_none() {
         if let Ok(port) = s.ipc_port_text.trim().parse::<u16>() {
             let (tx, rx) = tokio::sync::watch::channel(false);
-            s.ipc_server = Some(tauri::async_runtime::spawn(blockwork_core::ipc::run_server(port, rx)));
+            s.ipc_server = Some(tauri::async_runtime::spawn(
+                blockwork_core::ipc::run_server(port, rx),
+            ));
             s.ipc_shutdown_tx = Some(tx);
             s.ipc_active_port = Some(port);
         }
@@ -2095,7 +2640,10 @@ pub(crate) async fn start_ipc_server<R: Runtime>(state: State<'_, SharedState>, 
 }
 
 #[tauri::command]
-pub(crate) fn stop_ipc_server<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn stop_ipc_server<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(tx) = s.ipc_shutdown_tx.take() {
         let _ = tx.send(true);
@@ -2109,7 +2657,11 @@ pub(crate) fn stop_ipc_server<R: Runtime>(state: State<SharedState>, app: tauri:
 }
 
 #[tauri::command]
-pub(crate) fn set_ipc_auto_start<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>, enabled: bool) -> Result<(), String> {
+pub(crate) fn set_ipc_auto_start<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+    enabled: bool,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.ipc_auto_start = enabled;
     config::update_settings(|settings| settings.ipc_auto_start = Some(enabled));
@@ -2120,7 +2672,11 @@ pub(crate) fn set_ipc_auto_start<R: Runtime>(state: State<SharedState>, app: tau
 // ─── System tray ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub(crate) fn set_close_to_tray(state: State<SharedState>, app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
+pub(crate) fn set_close_to_tray(
+    state: State<SharedState>,
+    app: tauri::AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.close_to_tray = enabled;
     config::update_settings(|settings| settings.close_to_tray = Some(enabled));
@@ -2141,7 +2697,10 @@ pub(crate) fn set_close_to_tray(state: State<SharedState>, app: tauri::AppHandle
 // ─── Updates (Windows) ─────────────────────────────────────────────────────
 
 #[tauri::command]
-pub(crate) fn check_for_updates<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn check_for_updates<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     {
         let mut s = state.lock().map_err(|e| e.to_string())?;
         s.update_check_state = UpdateCheckState::Checking;
@@ -2155,13 +2714,18 @@ pub(crate) fn check_for_updates<R: Runtime>(state: State<SharedState>, app: taur
     Ok(())
 }
 
-pub(crate) async fn check_for_updates_internal<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>) {
+pub(crate) async fn check_for_updates_internal<R: Runtime>(
+    state: &SharedState,
+    app: &tauri::AppHandle<R>,
+) {
     #[cfg(windows)]
     {
         let version = env!("CARGO_PKG_VERSION").to_string();
-        let result = tokio::task::spawn_blocking(move || blockwork_core::updater::check_for_update(&version))
-            .await
-            .unwrap_or_else(|e| Err(e.to_string()));
+        let result = tokio::task::spawn_blocking(move || {
+            blockwork_core::updater::check_for_update(&version)
+        })
+        .await
+        .unwrap_or_else(|e| Err(e.to_string()));
         if let Ok(mut s) = state.lock() {
             s.update_check_state = match result {
                 Ok(Some(info)) => UpdateCheckState::UpdateAvailable(info.version),
@@ -2173,13 +2737,17 @@ pub(crate) async fn check_for_updates_internal<R: Runtime>(state: &SharedState, 
     }
     #[cfg(not(windows))]
     if let Ok(mut s) = state.lock() {
-        s.update_check_state = UpdateCheckState::Error("Updates are only supported on Windows".to_string());
+        s.update_check_state =
+            UpdateCheckState::Error("Updates are only supported on Windows".to_string());
         emit_state_updated(app, &s);
     }
 }
 
 #[tauri::command]
-pub(crate) fn apply_update<R: Runtime>(state: State<SharedState>, app: tauri::AppHandle<R>) -> Result<(), String> {
+pub(crate) fn apply_update<R: Runtime>(
+    state: State<SharedState>,
+    app: tauri::AppHandle<R>,
+) -> Result<(), String> {
     {
         let mut s = state.lock().map_err(|e| e.to_string())?;
         s.update_check_state = UpdateCheckState::Applying;
@@ -2191,9 +2759,11 @@ pub(crate) fn apply_update<R: Runtime>(state: State<SharedState>, app: tauri::Ap
         let app_clone = app.clone();
         tauri::async_runtime::spawn(async move {
             let version = env!("CARGO_PKG_VERSION").to_string();
-            let result = tokio::task::spawn_blocking(move || blockwork_core::updater::apply_update(&version))
-                .await
-                .unwrap_or_else(|e| Err(e.to_string()));
+            let result = tokio::task::spawn_blocking(move || {
+                blockwork_core::updater::apply_update(&version)
+            })
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()));
             match result {
                 Ok(_) => std::process::exit(0),
                 Err(e) => {
@@ -2210,7 +2780,11 @@ pub(crate) fn apply_update<R: Runtime>(state: State<SharedState>, app: tauri::Ap
 
 // ─── Hotkey action handler (called from QueueSignal task) ──────────────────
 
-pub(crate) fn handle_hotkey_action<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>, action: HotkeyAction) {
+pub(crate) fn handle_hotkey_action<R: Runtime>(
+    state: &SharedState,
+    app: &tauri::AppHandle<R>,
+    action: HotkeyAction,
+) {
     match &action {
         HotkeyAction::RunMacro | HotkeyAction::RunSpecificMacro(_) => {
             let s = match state.lock() {
@@ -2236,9 +2810,22 @@ pub(crate) fn handle_hotkey_action<R: Runtime>(state: &SharedState, app: &tauri:
                     let speed_multiplier = mac.speed_multiplier * global_speed_multiplier;
                     // Seeded from this macro's own persisted values, not
                     // `AppState::variable_values` (tracks the *selected* macro).
-                    let variables: VariableStore =
-                        Arc::new(Mutex::new(mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect()));
-                    run_macro_task(mac, emulator, is_looping, loop_mode, speed_multiplier, variables, shared_state, app.clone());
+                    let variables: VariableStore = Arc::new(Mutex::new(
+                        mac.variables
+                            .iter()
+                            .map(|v| (v.name.clone(), v.value.clone()))
+                            .collect(),
+                    ));
+                    run_macro_task(
+                        mac,
+                        emulator,
+                        is_looping,
+                        loop_mode,
+                        speed_multiplier,
+                        variables,
+                        shared_state,
+                        app.clone(),
+                    );
                 }
             }
         }
@@ -2280,7 +2867,11 @@ pub(crate) fn handle_hotkey_action<R: Runtime>(state: &SharedState, app: &tauri:
                     let current_idx = current_id
                         .and_then(|id| macros.iter().position(|m| m.id == id))
                         .unwrap_or(0);
-                    let prev = if current_idx == 0 { macros.len() - 1 } else { current_idx - 1 };
+                    let prev = if current_idx == 0 {
+                        macros.len() - 1
+                    } else {
+                        current_idx - 1
+                    };
                     s.macro_selected = Some(prev);
                     s.current_macro = macros.get(prev).cloned();
                     if let Some(mac) = &s.current_macro {
@@ -2301,7 +2892,8 @@ pub(crate) fn handle_hotkey_action<R: Runtime>(state: &SharedState, app: &tauri:
         HotkeyAction::StartRecordingImmediate => {
             if let Ok(mut s) = state.lock() {
                 if s.current_macro.is_some() {
-                    s.recording_countdown_generation = s.recording_countdown_generation.wrapping_add(1);
+                    s.recording_countdown_generation =
+                        s.recording_countdown_generation.wrapping_add(1);
                     s.recording_phase = RecordingPhase::Active;
                     recording::reset_timing();
                     seed_recording_mouse_pos(&s);
@@ -2339,11 +2931,21 @@ fn run_macro_task<R: Runtime>(
     let prep_backend = Arc::clone(&emulator);
 
     if loop_mode {
-        if let Ok(mut st) = is_looping.lock() { *st = true; }
+        if let Ok(mut st) = is_looping.lock() {
+            *st = true;
+        }
         let loop_flag = Arc::clone(&is_looping);
         // `into_loop_task` already loops until `loop_flag` clears and
         // persists final variable values — no need to hand-roll it here.
-        let task = macros_thread::into_loop_task(mac, emulator, loop_flag, speed_multiplier, variables, state, app);
+        let task = macros_thread::into_loop_task(
+            mac,
+            emulator,
+            loop_flag,
+            speed_multiplier,
+            variables,
+            state,
+            app,
+        );
         tokio::task::spawn_blocking(move || {
             // Registered before the run starts so "Stop Loop" can reach it
             // even during the focus switch below.
@@ -2354,9 +2956,19 @@ fn run_macro_task<R: Runtime>(
             blockwork_core::macros::run_registry::end_run(&playback_guard);
         });
     } else {
-        if let Ok(mut st) = is_looping.lock() { *st = true; }
+        if let Ok(mut st) = is_looping.lock() {
+            *st = true;
+        }
         let stop_flag = Arc::clone(&is_looping);
-        let task = macros_thread::into_single_run_task(mac, emulator, stop_flag, speed_multiplier, variables, state, app);
+        let task = macros_thread::into_single_run_task(
+            mac,
+            emulator,
+            stop_flag,
+            speed_multiplier,
+            variables,
+            state,
+            app,
+        );
         tokio::task::spawn_blocking(move || {
             // Same pre-registration as the loop branch above.
             let playback_guard = blockwork_core::macros::run_registry::begin_run();
@@ -2379,7 +2991,11 @@ fn run_macro_task<R: Runtime>(
 pub(crate) async fn list_installed_apps() -> Vec<crate::state::AppEntryDto> {
     crate::installed_apps::list_apps()
         .into_iter()
-        .map(|a| crate::state::AppEntryDto { name: a.name, command: a.command, icon: a.icon })
+        .map(|a| crate::state::AppEntryDto {
+            name: a.name,
+            command: a.command,
+            icon: a.icon,
+        })
         .collect()
 }
 
@@ -2412,7 +3028,13 @@ mod value_location_tests {
             }],
             recording_target: None,
             speed_multiplier: 1.0,
-            floating_values: vec![FloatingValue { id: "f1".into(), x: 10, y: 20, value: Value::number(5.0), origin_block_id: None }],
+            floating_values: vec![FloatingValue {
+                id: "f1".into(),
+                x: 10,
+                y: 20,
+                value: Value::number(5.0),
+                origin_block_id: None,
+            }],
             comments: vec![],
             variables: vec![],
             block_defs: vec![],
@@ -2423,23 +3045,45 @@ mod value_location_tests {
     #[test]
     fn resolves_field_location() {
         let mut mac = test_macro();
-        let loc = ValueLocation::Field { strand_id: "s1".into(), index: top(1), field_id: FieldId::WaitDuration, path: vec![] };
-        assert_eq!(resolve_location_mut(&mut mac, &loc), Some(&mut Value::number(1000.0)));
+        let loc = ValueLocation::Field {
+            strand_id: "s1".into(),
+            index: top(1),
+            field_id: FieldId::WaitDuration,
+            path: vec![],
+        };
+        assert_eq!(
+            resolve_location_mut(&mut mac, &loc),
+            Some(&mut Value::number(1000.0))
+        );
     }
 
     #[test]
     fn resolves_floating_location() {
         let mut mac = test_macro();
-        let loc = ValueLocation::Floating { floating_id: "f1".into(), path: vec![] };
-        assert_eq!(resolve_location_mut(&mut mac, &loc), Some(&mut Value::number(5.0)));
+        let loc = ValueLocation::Floating {
+            floating_id: "f1".into(),
+            path: vec![],
+        };
+        assert_eq!(
+            resolve_location_mut(&mut mac, &loc),
+            Some(&mut Value::number(5.0))
+        );
     }
 
     #[test]
     fn missing_location_resolves_to_none() {
         let mut mac = test_macro();
-        let bad_field = ValueLocation::Field { strand_id: "nope".into(), index: top(0), field_id: FieldId::WaitDuration, path: vec![] };
+        let bad_field = ValueLocation::Field {
+            strand_id: "nope".into(),
+            index: top(0),
+            field_id: FieldId::WaitDuration,
+            path: vec![],
+        };
         assert_eq!(resolve_location_mut(&mut mac, &bad_field), None);
-        let bad_floating = ValueLocation::Floating { floating_id: "nope".into(), path: vec![] };
+        let bad_floating = ValueLocation::Floating {
+            floating_id: "nope".into(),
+            path: vec![],
+        };
         assert_eq!(resolve_location_mut(&mut mac, &bad_floating), None);
     }
 
@@ -2449,14 +3093,21 @@ mod value_location_tests {
         apply_value_kind(&mut node, "Add", &HashMap::new()).unwrap();
         assert_eq!(
             node,
-            Value::Op { op: Op::Add, args: vec![Value::number(0.0), Value::number(0.0)], saved: Box::new(Value::number(5.0)) }
+            Value::Op {
+                op: Op::Add,
+                args: vec![Value::number(0.0), Value::number(0.0)],
+                saved: Box::new(Value::number(5.0))
+            }
         );
     }
 
     #[test]
     fn apply_value_kind_collapses_operator_to_number_best_effort() {
-        let mut node =
-            Value::Op { op: Op::Add, args: vec![Value::number(2.0), Value::number(3.0)], saved: Box::new(Value::number(0.0)) };
+        let mut node = Value::Op {
+            op: Op::Add,
+            args: vec![Value::number(2.0), Value::number(3.0)],
+            saved: Box::new(Value::number(0.0)),
+        };
         apply_value_kind(&mut node, "Number", &HashMap::new()).unwrap();
         assert_eq!(node, Value::number(5.0));
     }
@@ -2467,7 +3118,11 @@ mod value_location_tests {
         apply_value_kind(&mut node, "Random", &HashMap::new()).unwrap();
         assert_eq!(
             node,
-            Value::Op { op: Op::Random, args: vec![Value::number(0.0), Value::number(0.0)], saved: Box::new(Value::number(5.0)) }
+            Value::Op {
+                op: Op::Random,
+                args: vec![Value::number(0.0), Value::number(0.0)],
+                saved: Box::new(Value::number(5.0))
+            }
         );
     }
 
@@ -2481,12 +3136,19 @@ mod value_location_tests {
     fn apply_value_kind_var_becomes_a_plain_leaf() {
         let mut node = Value::number(5.0);
         apply_value_kind(&mut node, "Var:x", &HashMap::new()).unwrap();
-        assert_eq!(node, Value::Var { name: "x".to_string() });
+        assert_eq!(
+            node,
+            Value::Var {
+                name: "x".to_string()
+            }
+        );
     }
 
     #[test]
     fn apply_value_kind_number_best_effort_carries_over_variable_value() {
-        let mut node = Value::Var { name: "x".to_string() };
+        let mut node = Value::Var {
+            name: "x".to_string(),
+        };
         let env = HashMap::from([("x".to_string(), Evaluated::Number(7.0))]);
         apply_value_kind(&mut node, "Number", &env).unwrap();
         assert_eq!(node, Value::number(7.0));
@@ -2500,7 +3162,14 @@ mod value_location_tests {
             node,
             Value::Op {
                 op: Op::Join,
-                args: vec![Value::Text { value: String::new() }, Value::Text { value: String::new() }],
+                args: vec![
+                    Value::Text {
+                        value: String::new()
+                    },
+                    Value::Text {
+                        value: String::new()
+                    }
+                ],
                 saved: Box::new(Value::number(5.0)),
             }
         );
@@ -2510,7 +3179,10 @@ mod value_location_tests {
     fn apply_value_kind_join3_grows_existing_join_args() {
         let mut node = Value::Op {
             op: Op::Join,
-            args: vec![Value::Text { value: "a".into() }, Value::Text { value: "b".into() }],
+            args: vec![
+                Value::Text { value: "a".into() },
+                Value::Text { value: "b".into() },
+            ],
             saved: Box::new(Value::number(9.0)),
         };
         apply_value_kind(&mut node, "Join3", &HashMap::new()).unwrap();
@@ -2521,7 +3193,9 @@ mod value_location_tests {
                 args: vec![
                     Value::Text { value: "a".into() },
                     Value::Text { value: "b".into() },
-                    Value::Text { value: String::new() },
+                    Value::Text {
+                        value: String::new()
+                    },
                 ],
                 saved: Box::new(Value::number(9.0)),
             }
@@ -2532,7 +3206,11 @@ mod value_location_tests {
     fn apply_value_kind_join_shrinks_existing_join3_args() {
         let mut node = Value::Op {
             op: Op::Join,
-            args: vec![Value::Text { value: "a".into() }, Value::Text { value: "b".into() }, Value::Text { value: "c".into() }],
+            args: vec![
+                Value::Text { value: "a".into() },
+                Value::Text { value: "b".into() },
+                Value::Text { value: "c".into() },
+            ],
             saved: Box::new(Value::number(0.0)),
         };
         apply_value_kind(&mut node, "Join", &HashMap::new()).unwrap();
@@ -2540,7 +3218,10 @@ mod value_location_tests {
             node,
             Value::Op {
                 op: Op::Join,
-                args: vec![Value::Text { value: "a".into() }, Value::Text { value: "b".into() }],
+                args: vec![
+                    Value::Text { value: "a".into() },
+                    Value::Text { value: "b".into() }
+                ],
                 saved: Box::new(Value::number(0.0)),
             }
         );
@@ -2550,32 +3231,82 @@ mod value_location_tests {
     fn apply_value_kind_new_line_tucks_leaf_away_as_saved_with_no_args() {
         let mut node = Value::number(5.0);
         apply_value_kind(&mut node, "NewLine", &HashMap::new()).unwrap();
-        assert_eq!(node, Value::Op { op: Op::NewLine, args: vec![], saved: Box::new(Value::number(5.0)) });
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::NewLine,
+                args: vec![],
+                saved: Box::new(Value::number(5.0))
+            }
+        );
     }
 
     #[test]
     fn apply_value_kind_tab_tucks_leaf_away_as_saved_with_no_args() {
         let mut node = Value::number(5.0);
         apply_value_kind(&mut node, "Tab", &HashMap::new()).unwrap();
-        assert_eq!(node, Value::Op { op: Op::Tab, args: vec![], saved: Box::new(Value::number(5.0)) });
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Tab,
+                args: vec![],
+                saved: Box::new(Value::number(5.0))
+            }
+        );
     }
 
     #[test]
     fn apply_value_kind_swapping_join_to_new_line_drops_args() {
         let mut node = Value::Op {
             op: Op::Join,
-            args: vec![Value::Text { value: "a".into() }, Value::Text { value: "b".into() }],
+            args: vec![
+                Value::Text { value: "a".into() },
+                Value::Text { value: "b".into() },
+            ],
             saved: Box::new(Value::number(9.0)),
         };
         apply_value_kind(&mut node, "NewLine", &HashMap::new()).unwrap();
-        assert_eq!(node, Value::Op { op: Op::NewLine, args: vec![], saved: Box::new(Value::number(9.0)) });
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::NewLine,
+                args: vec![],
+                saved: Box::new(Value::number(9.0))
+            }
+        );
     }
 
     #[test]
     fn apply_value_kind_round_tucks_leaf_away_as_saved_with_one_arg() {
         let mut node = Value::number(5.0);
         apply_value_kind(&mut node, "Round", &HashMap::new()).unwrap();
-        assert_eq!(node, Value::Op { op: Op::Round, args: vec![Value::number(0.0)], saved: Box::new(Value::number(5.0)) });
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Round,
+                args: vec![Value::number(0.0)],
+                saved: Box::new(Value::number(5.0))
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_math_tucks_leaf_away_with_abs_selector() {
+        let mut node = Value::number(5.0);
+        apply_value_kind(&mut node, "Math", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Math,
+                args: vec![
+                    Value::Text {
+                        value: "Abs".into()
+                    },
+                    Value::number(0.0)
+                ],
+                saved: Box::new(Value::number(5.0)),
+            }
+        );
     }
 
     #[test]
@@ -2586,7 +3317,14 @@ mod value_location_tests {
             node,
             Value::Op {
                 op: Op::Case,
-                args: vec![Value::Text { value: String::new() }, Value::Text { value: "Upper".into() }],
+                args: vec![
+                    Value::Text {
+                        value: String::new()
+                    },
+                    Value::Text {
+                        value: "Upper".into()
+                    }
+                ],
                 saved: Box::new(Value::number(5.0)),
             }
         );
@@ -2597,13 +3335,22 @@ mod value_location_tests {
         // Round (arity 1) -> LetterOf (arity 2): the surviving first arg
         // keeps its value untouched, and the newly-added second slot gets
         // LetterOf's own default type (text), not Round's (number).
-        let mut node = Value::Op { op: Op::Round, args: vec![Value::number(7.0)], saved: Box::new(Value::number(0.0)) };
+        let mut node = Value::Op {
+            op: Op::Round,
+            args: vec![Value::number(7.0)],
+            saved: Box::new(Value::number(0.0)),
+        };
         apply_value_kind(&mut node, "LetterOf", &HashMap::new()).unwrap();
         assert_eq!(
             node,
             Value::Op {
                 op: Op::LetterOf,
-                args: vec![Value::number(7.0), Value::Text { value: String::new() }],
+                args: vec![
+                    Value::number(7.0),
+                    Value::Text {
+                        value: String::new()
+                    }
+                ],
                 saved: Box::new(Value::number(0.0)),
             }
         );
@@ -2612,26 +3359,52 @@ mod value_location_tests {
     #[test]
     fn prune_value_buffers_drops_only_descendants_of_changed_path() {
         let mut buffers: HashMap<ValueLocation, String> = HashMap::new();
-        let field = |path: Vec<u8>| ValueLocation::Field { strand_id: "s1".into(), index: top(1), field_id: FieldId::WaitDuration, path };
+        let field = |path: Vec<u8>| ValueLocation::Field {
+            strand_id: "s1".into(),
+            index: top(1),
+            field_id: FieldId::WaitDuration,
+            path,
+        };
         buffers.insert(field(vec![0]), "kept-sibling-subtree-root".into());
         buffers.insert(field(vec![1]), "dropped-descendant".into());
         buffers.insert(field(vec![1, 0]), "dropped-nested-descendant".into());
-        buffers.insert(ValueLocation::Field { strand_id: "s2".into(), index: top(1), field_id: FieldId::WaitDuration, path: vec![1] }, "kept-different-strand".into());
+        buffers.insert(
+            ValueLocation::Field {
+                strand_id: "s2".into(),
+                index: top(1),
+                field_id: FieldId::WaitDuration,
+                path: vec![1],
+            },
+            "kept-different-strand".into(),
+        );
 
         prune_value_buffers(&mut buffers, &field(vec![1]));
 
         assert_eq!(buffers.len(), 2);
         assert!(buffers.contains_key(&field(vec![0])));
-        assert!(buffers.contains_key(&ValueLocation::Field { strand_id: "s2".into(), index: top(1), field_id: FieldId::WaitDuration, path: vec![1] }));
+        assert!(buffers.contains_key(&ValueLocation::Field {
+            strand_id: "s2".into(),
+            index: top(1),
+            field_id: FieldId::WaitDuration,
+            path: vec![1]
+        }));
     }
 
     #[test]
     fn location_requires_integer_only_for_pixel_fields() {
-        let field = |field_id| ValueLocation::Field { strand_id: "s".into(), index: top(0), field_id, path: vec![] };
+        let field = |field_id| ValueLocation::Field {
+            strand_id: "s".into(),
+            index: top(0),
+            field_id,
+            path: vec![],
+        };
         assert!(location_requires_integer(&field(FieldId::MoveMouseX)));
         assert!(location_requires_integer(&field(FieldId::ScrollAmount)));
         assert!(!location_requires_integer(&field(FieldId::WaitDuration)));
-        assert!(!location_requires_integer(&ValueLocation::Floating { floating_id: "f1".into(), path: vec![] }));
+        assert!(!location_requires_integer(&ValueLocation::Floating {
+            floating_id: "f1".into(),
+            path: vec![]
+        }));
     }
 
     #[test]
@@ -2668,11 +3441,13 @@ mod value_location_tests {
                 id: "s1".into(),
                 x: 0,
                 y: 0,
-                instructions: vec![Instruction::new(InstructionKind::Token(blockwork_core::input::types::InputToken::MoveMouse(
-                    Value::number(1.0),
-                    Value::number(2.0),
-                    Coordinate::Rel,
-                )))],
+                instructions: vec![Instruction::new(InstructionKind::Token(
+                    blockwork_core::input::types::InputToken::MoveMouse(
+                        Value::number(1.0),
+                        Value::number(2.0),
+                        Coordinate::Rel,
+                    ),
+                ))],
             }],
             recording_target: None,
             speed_multiplier: 1.0,
@@ -2682,35 +3457,62 @@ mod value_location_tests {
             block_defs: vec![],
             settings: blockwork_core::macros::MacroSettings::default(),
         };
-        let loc = ValueLocation::Field { strand_id: "s1".into(), index: top(0), field_id: FieldId::MoveMouseY, path: vec![] };
-        assert_eq!(resolve_location_mut(&mut mac, &loc), Some(&mut Value::number(2.0)));
+        let loc = ValueLocation::Field {
+            strand_id: "s1".into(),
+            index: top(0),
+            field_id: FieldId::MoveMouseY,
+            path: vec![],
+        };
+        assert_eq!(
+            resolve_location_mut(&mut mac, &loc),
+            Some(&mut Value::number(2.0))
+        );
     }
 
     #[test]
     fn preview_value_stringifies_numeric_result() {
         let dto = ValueDto::Op {
             op: Op::Add,
-            args: vec![ValueDto::Number { value: 2.0 }, ValueDto::Number { value: 3.0 }],
+            args: vec![
+                ValueDto::Number { value: 2.0 },
+                ValueDto::Number { value: 3.0 },
+            ],
             saved: Box::new(ValueDto::Number { value: 0.0 }),
         };
-        assert_eq!(preview_value_with_env(&dto, &HashMap::new()), Ok("5".to_string()));
+        assert_eq!(
+            preview_value_with_env(&dto, &HashMap::new()),
+            Ok("5".to_string())
+        );
     }
 
     #[test]
     fn preview_value_joins_text_args() {
         let dto = ValueDto::Op {
             op: Op::Join,
-            args: vec![ValueDto::Text { value: "foo".into() }, ValueDto::Text { value: "bar".into() }],
+            args: vec![
+                ValueDto::Text {
+                    value: "foo".into(),
+                },
+                ValueDto::Text {
+                    value: "bar".into(),
+                },
+            ],
             saved: Box::new(ValueDto::Number { value: 0.0 }),
         };
-        assert_eq!(preview_value_with_env(&dto, &HashMap::new()), Ok("foobar".to_string()));
+        assert_eq!(
+            preview_value_with_env(&dto, &HashMap::new()),
+            Ok("foobar".to_string())
+        );
     }
 
     #[test]
     fn preview_value_surfaces_eval_errors() {
         let dto = ValueDto::Op {
             op: Op::Div,
-            args: vec![ValueDto::Number { value: 1.0 }, ValueDto::Number { value: 0.0 }],
+            args: vec![
+                ValueDto::Number { value: 1.0 },
+                ValueDto::Number { value: 0.0 },
+            ],
             saved: Box::new(ValueDto::Number { value: 0.0 }),
         };
         assert!(preview_value_with_env(&dto, &HashMap::new()).is_err());
@@ -2721,7 +3523,13 @@ mod value_location_tests {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
         let name = create_variable_in(&mut mac, "score").unwrap();
         assert_eq!(name, "score");
-        assert_eq!(mac.variables, vec![VariableDef { name: "score".into(), value: Evaluated::Number(0.0) }]);
+        assert_eq!(
+            mac.variables,
+            vec![VariableDef {
+                name: "score".into(),
+                value: Evaluated::Number(0.0)
+            }]
+        );
     }
 
     #[test]
@@ -2747,12 +3555,25 @@ mod value_location_tests {
 
     #[test]
     fn rename_variable_in_renames_and_updates_references() {
-        let mut mac = Macro::new("Test".into(), "".into(), vec![Instruction::new(InstructionKind::SetVariable("score".to_string(), Value::number(1.0)))]);
+        let mut mac = Macro::new(
+            "Test".into(),
+            "".into(),
+            vec![Instruction::new(InstructionKind::SetVariable(
+                "score".to_string(),
+                Value::number(1.0),
+            ))],
+        );
         create_variable_in(&mut mac, "score").unwrap();
         let name = rename_variable_in(&mut mac, "score", "points").unwrap();
         assert_eq!(name, "points");
         assert_eq!(mac.variables[0].name, "points");
-        assert_eq!(mac.strands[0].instructions[1], Instruction::new(InstructionKind::SetVariable("points".to_string(), Value::number(1.0))));
+        assert_eq!(
+            mac.strands[0].instructions[1],
+            Instruction::new(InstructionKind::SetVariable(
+                "points".to_string(),
+                Value::number(1.0)
+            ))
+        );
     }
 
     #[test]
@@ -2782,26 +3603,49 @@ mod value_location_tests {
     fn rename_variable_in_allows_renaming_to_its_own_current_name() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
         create_variable_in(&mut mac, "score").unwrap();
-        assert_eq!(rename_variable_in(&mut mac, "score", "score").unwrap(), "score");
+        assert_eq!(
+            rename_variable_in(&mut mac, "score", "score").unwrap(),
+            "score"
+        );
         assert_eq!(mac.variables.len(), 1);
     }
 
     #[test]
     fn delete_variable_in_removes_declaration_but_leaves_references() {
-        let mut mac = Macro::new("Test".into(), "".into(), vec![Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var { name: "score".to_string() })))]);
+        let mut mac = Macro::new(
+            "Test".into(),
+            "".into(),
+            vec![Instruction::new(InstructionKind::Token(InputToken::Text(
+                Value::Var {
+                    name: "score".to_string(),
+                },
+            )))],
+        );
         create_variable_in(&mut mac, "score").unwrap();
         delete_variable_in(&mut mac, "score");
         assert!(mac.variables.is_empty());
-        assert_eq!(mac.strands[0].instructions[1], Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var { name: "score".to_string() }))));
+        assert_eq!(
+            mac.strands[0].instructions[1],
+            Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var {
+                name: "score".to_string()
+            })))
+        );
     }
 
     // ─── Custom blocks ("My Blocks") ────────────────────────────────────────
 
     fn label(text: &str) -> BlockPiece {
-        BlockPiece::Label { id: format!("id-{text}"), text: text.to_string() }
+        BlockPiece::Label {
+            id: format!("id-{text}"),
+            text: text.to_string(),
+        }
     }
     fn input(id: &str, name: &str) -> BlockPiece {
-        BlockPiece::Input { id: id.to_string(), name: name.to_string(), value_type: Default::default() }
+        BlockPiece::Input {
+            id: id.to_string(),
+            name: name.to_string(),
+            value_type: Default::default(),
+        }
     }
 
     #[test]
@@ -2821,123 +3665,211 @@ mod value_location_tests {
 
     #[test]
     fn validate_block_pieces_rejects_duplicate_input_names() {
-        assert!(validate_block_pieces(&[label("add"), input("i1", "n"), input("i2", "n")]).is_err());
+        assert!(
+            validate_block_pieces(&[label("add"), input("i1", "n"), input("i2", "n")]).is_err()
+        );
     }
 
     #[test]
     fn create_block_appends_def_and_empty_header_strand() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        let id = mac.create_block(vec![label("double"), input("i1", "n")], BlockShape::ReturnsValue, 100, 0);
+        let id = mac.create_block(
+            vec![label("double"), input("i1", "n")],
+            BlockShape::ReturnsValue,
+            "#4C97FF".into(),
+            100,
+            0,
+        );
         assert_eq!(mac.block_defs.len(), 1);
         assert_eq!(mac.block_defs[0].id, id);
         assert_eq!(mac.block_defs[0].shape, BlockShape::ReturnsValue);
-        let header_strand = mac.strands.iter().find(|s| s.instructions == vec![Instruction::new(InstructionKind::BlockHeader(id.clone()))]);
+        let header_strand = mac.strands.iter().find(|s| {
+            s.instructions == vec![Instruction::new(InstructionKind::BlockHeader(id.clone()))]
+        });
         assert!(header_strand.is_some());
     }
 
     #[test]
     fn reconcile_block_call_args_preserves_value_across_rename_by_id() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        let id = mac.create_block(vec![input("i1", "a")], BlockShape::Normal, 0, 0);
+        let id = mac.create_block(
+            vec![input("i1", "a")],
+            BlockShape::Normal,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
         // A CallBlock call site with one arg bound to the "a" slot.
         mac.strands.push(Strand {
             id: "caller".into(),
             x: 0,
             y: 0,
-            instructions: vec![Instruction::new(InstructionKind::CallBlock { block_id: id.clone(), args: vec![Value::number(5.0)] })],
+            instructions: vec![Instruction::new(InstructionKind::CallBlock {
+                block_id: id.clone(),
+                args: vec![Value::number(5.0)],
+            })],
         });
         let old_pieces = mac.block_defs[0].pieces.clone();
         let new_pieces = vec![input("i1", "b")]; // same id, renamed
         mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);
         let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
-        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else { panic!("expected CallBlock") };
+        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else {
+            panic!("expected CallBlock")
+        };
         assert_eq!(args, &vec![Value::number(5.0)]);
     }
 
     #[test]
     fn reconcile_block_call_args_drops_removed_input_and_keeps_survivor() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        let id = mac.create_block(vec![input("i1", "a"), input("i2", "b")], BlockShape::Normal, 0, 0);
+        let id = mac.create_block(
+            vec![input("i1", "a"), input("i2", "b")],
+            BlockShape::Normal,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
         mac.strands.push(Strand {
             id: "caller".into(),
             x: 0,
             y: 0,
-            instructions: vec![Instruction::new(InstructionKind::CallBlock { block_id: id.clone(), args: vec![Value::number(1.0), Value::number(2.0)] })],
+            instructions: vec![Instruction::new(InstructionKind::CallBlock {
+                block_id: id.clone(),
+                args: vec![Value::number(1.0), Value::number(2.0)],
+            })],
         });
         let old_pieces = mac.block_defs[0].pieces.clone();
         let new_pieces = vec![input("i2", "b")]; // "a" (i1) removed
         mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);
         let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
-        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else { panic!("expected CallBlock") };
+        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else {
+            panic!("expected CallBlock")
+        };
         assert_eq!(args, &vec![Value::number(2.0)]);
     }
 
     #[test]
     fn reconcile_block_call_args_defaults_a_newly_added_input_to_zero() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        let id = mac.create_block(vec![input("i1", "a")], BlockShape::Normal, 0, 0);
+        let id = mac.create_block(
+            vec![input("i1", "a")],
+            BlockShape::Normal,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
         mac.strands.push(Strand {
             id: "caller".into(),
             x: 0,
             y: 0,
-            instructions: vec![Instruction::new(InstructionKind::CallBlock { block_id: id.clone(), args: vec![Value::number(5.0)] })],
+            instructions: vec![Instruction::new(InstructionKind::CallBlock {
+                block_id: id.clone(),
+                args: vec![Value::number(5.0)],
+            })],
         });
         let old_pieces = mac.block_defs[0].pieces.clone();
         let new_pieces = vec![input("i1", "a"), input("i2", "b")]; // "b" newly added
         mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);
         let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
-        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else { panic!("expected CallBlock") };
+        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else {
+            panic!("expected CallBlock")
+        };
         assert_eq!(args, &vec![Value::number(5.0), Value::number(0.0)]);
     }
 
     #[test]
     fn reconcile_block_call_args_defaults_a_newly_added_bool_input_to_blank_bool() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        let id = mac.create_block(vec![input("i1", "a")], BlockShape::Normal, 0, 0);
+        let id = mac.create_block(
+            vec![input("i1", "a")],
+            BlockShape::Normal,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
         mac.strands.push(Strand {
             id: "caller".into(),
             x: 0,
             y: 0,
-            instructions: vec![Instruction::new(InstructionKind::CallBlock { block_id: id.clone(), args: vec![Value::number(5.0)] })],
+            instructions: vec![Instruction::new(InstructionKind::CallBlock {
+                block_id: id.clone(),
+                args: vec![Value::number(5.0)],
+            })],
         });
         let old_pieces = mac.block_defs[0].pieces.clone();
-        let new_pieces = vec![input("i1", "a"), BlockPiece::Input { id: "i2".into(), name: "b".into(), value_type: InputValueType::Bool }];
+        let new_pieces = vec![
+            input("i1", "a"),
+            BlockPiece::Input {
+                id: "i2".into(),
+                name: "b".into(),
+                value_type: InputValueType::Bool,
+            },
+        ];
         mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);
         let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
-        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else { panic!("expected CallBlock") };
+        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else {
+            panic!("expected CallBlock")
+        };
         assert_eq!(args, &vec![Value::number(5.0), Value::Bool]);
     }
 
     #[test]
     fn remove_block_scrubs_call_block_and_call_references() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        let id = mac.create_block(vec![input("i1", "n")], BlockShape::ReturnsValue, 0, 0);
+        let id = mac.create_block(
+            vec![input("i1", "n")],
+            BlockShape::ReturnsValue,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
         mac.strands.push(Strand {
             id: "caller".into(),
             x: 0,
             y: 0,
             instructions: vec![Instruction::new(InstructionKind::SetVariable(
                 "x".to_string(),
-                Value::Call { block_id: id.clone(), args: vec![], saved: Box::new(Value::number(0.0)) },
+                Value::Call {
+                    block_id: id.clone(),
+                    args: vec![],
+                    saved: Box::new(Value::number(0.0)),
+                },
             ))],
         });
         mac.remove_block(&id);
         assert!(mac.block_defs.is_empty());
-        assert!(!mac.strands.iter().any(|s| matches!(s.instructions.first().map(|i| &i.kind), Some(InstructionKind::BlockHeader(_)))));
+        assert!(!mac.strands.iter().any(|s| matches!(
+            s.instructions.first().map(|i| &i.kind),
+            Some(InstructionKind::BlockHeader(_))
+        )));
         let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
-        assert_eq!(caller.instructions[0], Instruction::new(InstructionKind::SetVariable("x".to_string(), Value::number(0.0))));
+        assert_eq!(
+            caller.instructions[0],
+            Instruction::new(InstructionKind::SetVariable(
+                "x".to_string(),
+                Value::number(0.0)
+            ))
+        );
     }
 
     /// An unresolved `Call` node must degrade to an ordinary `Err`, never panic.
     #[test]
     fn preview_value_with_env_errors_on_unresolved_call() {
-        let dto = ValueDto::Call { block_id: "missing".into(), args: vec![], saved: Box::new(ValueDto::Number { value: 0.0 }) };
+        let dto = ValueDto::Call {
+            block_id: "missing".into(),
+            args: vec![],
+            saved: Box::new(ValueDto::Number { value: 0.0 }),
+        };
         assert!(preview_value_with_env(&dto, &HashMap::new()).is_err());
     }
 
     #[test]
     fn apply_value_kind_number_best_effort_defaults_to_zero_for_unresolved_call() {
-        let mut node = Value::Call { block_id: "missing".into(), args: vec![], saved: Box::new(Value::number(0.0)) };
+        let mut node = Value::Call {
+            block_id: "missing".into(),
+            args: vec![],
+            saved: Box::new(Value::number(0.0)),
+        };
         apply_value_kind(&mut node, "Number", &HashMap::new()).unwrap();
         assert_eq!(node, Value::number(0.0));
     }

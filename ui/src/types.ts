@@ -59,7 +59,7 @@ export type TimeScheduleDto =
 // src-tauri/src/state.rs's ValueDto, and satisfies blockstitch's generic
 // `ValueNode` shape structurally (see values/valueNode.ts there).
 export type ValueOp =
-  | 'Add' | 'Sub' | 'Mul' | 'Div' | 'Mod' | 'Round' | 'Random' | 'Join' | 'NewLine' | 'Tab'
+  | 'Add' | 'Sub' | 'Mul' | 'Div' | 'Mod' | 'Round' | 'Math' | 'Random' | 'Join' | 'NewLine' | 'Tab'
   | 'IndexOf' | 'LastIndexOf' | 'LetterOf' | 'Length' | 'Case'
   // Boolean: comparisons, logic, and the two standalone true/false literals
   // (separate blocks, not a toggle — see valueOps.ts's OPERATOR_KINDS).
@@ -428,6 +428,8 @@ export interface BlockDefDto {
   id: string;
   pieces: BlockPieceDto[];
   shape: BlockShapeDto;
+  /** Hex accent used by this custom block's icon and hover outline. */
+  color: string;
 }
 
 /** A block's declared input pieces, in prototype order — the positional key

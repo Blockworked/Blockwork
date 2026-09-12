@@ -6,11 +6,11 @@ use std::collections::HashMap;
 use uuid::Uuid;
 
 pub mod backend;
+pub mod loop_control;
 pub mod priority;
 pub mod run_registry;
 pub mod runner;
 pub mod thread_pool;
-pub mod loop_control;
 
 fn default_macro_id() -> String {
     Uuid::new_v4().simple().to_string()
@@ -139,8 +139,16 @@ pub enum InputValueType {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(tag = "kind")]
 pub enum BlockPiece {
-    Label { id: String, text: String },
-    Input { id: String, name: String, #[serde(default)] value_type: InputValueType },
+    Label {
+        id: String,
+        text: String,
+    },
+    Input {
+        id: String,
+        name: String,
+        #[serde(default)]
+        value_type: InputValueType,
+    },
 }
 
 impl BlockPiece {
@@ -216,7 +224,10 @@ impl<'de> Deserialize<'de> for BlockShape {
                 "ReturnsValue" => BlockShape::ReturnsValue,
                 "ReturnsBool" => BlockShape::ReturnsBool,
                 other => {
-                    return Err(serde::de::Error::unknown_variant(other, &["Normal", "Ending", "ReturnsValue", "ReturnsBool"]));
+                    return Err(serde::de::Error::unknown_variant(
+                        other,
+                        &["Normal", "Ending", "ReturnsValue", "ReturnsBool"],
+                    ));
                 }
             },
         })
@@ -232,6 +243,26 @@ pub struct BlockDef {
     pub pieces: Vec<BlockPiece>,
     #[serde(alias = "returns_value")]
     pub shape: BlockShape,
+    /// User-selected accent for the block's icon and hover outline. The
+    /// default preserves the established blue treatment for older macros.
+    #[serde(default = "default_block_color")]
+    pub color: String,
+}
+
+/// The legacy/default custom-block accent. Kept as a function so serde can
+/// supply it when loading macros saved before custom colors existed.
+pub fn default_block_color() -> String {
+    "#4C97FF".to_string()
+}
+
+/// Canonicalizes the one color format Blockwork persists and exposes to CSS.
+/// `None` means the supplied value cannot safely be used as a block accent.
+pub fn normalize_block_color(color: &str) -> Option<String> {
+    let color = color.trim();
+    (color.len() == 7
+        && color.starts_with('#')
+        && color[1..].bytes().all(|b| b.is_ascii_hexdigit()))
+    .then(|| color.to_ascii_uppercase())
 }
 
 impl BlockDef {
@@ -270,11 +301,13 @@ impl InstructionKind {
     /// instruction's own target name.
     pub fn rename_var(&mut self, old: &str, new: &str) {
         match self {
-            InstructionKind::Wait(value) | InstructionKind::Return(value) | InstructionKind::WhenBatteryDischargedTo(value) | InstructionKind::WhenBatteryChargedTo(value) => {
-                value.rename_var(old, new)
-            }
+            InstructionKind::Wait(value)
+            | InstructionKind::Return(value)
+            | InstructionKind::WhenBatteryDischargedTo(value)
+            | InstructionKind::WhenBatteryChargedTo(value) => value.rename_var(old, new),
             InstructionKind::Token(token) => token.rename_var(old, new),
-            InstructionKind::SetVariable(name, value) | InstructionKind::ChangeVariable(name, value) => {
+            InstructionKind::SetVariable(name, value)
+            | InstructionKind::ChangeVariable(name, value) => {
                 if name == old {
                     *name = new.to_string();
                 }
@@ -291,7 +324,11 @@ impl InstructionKind {
                     ins.rename_var(old, new);
                 }
             }
-            InstructionKind::IfElse { condition, then_body, else_body } => {
+            InstructionKind::IfElse {
+                condition,
+                then_body,
+                else_body,
+            } => {
                 condition.rename_var(old, new);
                 for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
                     ins.rename_var(old, new);
@@ -314,9 +351,17 @@ impl InstructionKind {
                     ins.rename_var(old, new);
                 }
             }
-            InstructionKind::Command(_) | InstructionKind::Comment(_) | InstructionKind::WhenRan | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop | InstructionKind::ContinueLoop | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn | InstructionKind::WhenPowerUnplugged | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. } => {}
+            InstructionKind::Command(_)
+            | InstructionKind::Comment(_)
+            | InstructionKind::WhenRan
+            | InstructionKind::BlockHeader(_)
+            | InstructionKind::EscapeLoop
+            | InstructionKind::ContinueLoop
+            | InstructionKind::WhenTime(_)
+            | InstructionKind::WhenPowerPluggedIn
+            | InstructionKind::WhenPowerUnplugged
+            | InstructionKind::OpenApp { .. }
+            | InstructionKind::CloseApp { .. } => {}
         }
     }
 
@@ -328,11 +373,14 @@ impl InstructionKind {
     /// find any `And`/`Or`/`Not` operands nested further in on its own.
     pub fn migrate_bool_slots(&mut self) {
         match self {
-            InstructionKind::Wait(value) | InstructionKind::Return(value) | InstructionKind::WhenBatteryDischargedTo(value) | InstructionKind::WhenBatteryChargedTo(value) => {
+            InstructionKind::Wait(value)
+            | InstructionKind::Return(value)
+            | InstructionKind::WhenBatteryDischargedTo(value)
+            | InstructionKind::WhenBatteryChargedTo(value) => value.migrate_bool_slots(false),
+            InstructionKind::Token(token) => token.migrate_bool_slots(),
+            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
                 value.migrate_bool_slots(false)
             }
-            InstructionKind::Token(token) => token.migrate_bool_slots(),
-            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => value.migrate_bool_slots(false),
             InstructionKind::CallBlock { args, .. } => {
                 for a in args.iter_mut() {
                     a.migrate_bool_slots(false);
@@ -344,7 +392,11 @@ impl InstructionKind {
                     ins.migrate_bool_slots();
                 }
             }
-            InstructionKind::IfElse { condition, then_body, else_body } => {
+            InstructionKind::IfElse {
+                condition,
+                then_body,
+                else_body,
+            } => {
                 condition.migrate_bool_slots(true);
                 for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
                     ins.migrate_bool_slots();
@@ -367,9 +419,17 @@ impl InstructionKind {
                     ins.migrate_bool_slots();
                 }
             }
-            InstructionKind::Command(_) | InstructionKind::Comment(_) | InstructionKind::WhenRan | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop | InstructionKind::ContinueLoop | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn | InstructionKind::WhenPowerUnplugged | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. } => {}
+            InstructionKind::Command(_)
+            | InstructionKind::Comment(_)
+            | InstructionKind::WhenRan
+            | InstructionKind::BlockHeader(_)
+            | InstructionKind::EscapeLoop
+            | InstructionKind::ContinueLoop
+            | InstructionKind::WhenTime(_)
+            | InstructionKind::WhenPowerPluggedIn
+            | InstructionKind::WhenPowerUnplugged
+            | InstructionKind::OpenApp { .. }
+            | InstructionKind::CloseApp { .. } => {}
         }
     }
 
@@ -377,11 +437,14 @@ impl InstructionKind {
     /// block's body working after one of its inputs is renamed.
     pub fn rename_param(&mut self, old: &str, new: &str) {
         match self {
-            InstructionKind::Wait(value) | InstructionKind::Return(value) | InstructionKind::WhenBatteryDischargedTo(value) | InstructionKind::WhenBatteryChargedTo(value) => {
+            InstructionKind::Wait(value)
+            | InstructionKind::Return(value)
+            | InstructionKind::WhenBatteryDischargedTo(value)
+            | InstructionKind::WhenBatteryChargedTo(value) => value.rename_param(old, new),
+            InstructionKind::Token(token) => token.rename_param(old, new),
+            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
                 value.rename_param(old, new)
             }
-            InstructionKind::Token(token) => token.rename_param(old, new),
-            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => value.rename_param(old, new),
             InstructionKind::CallBlock { args, .. } => {
                 for a in args.iter_mut() {
                     a.rename_param(old, new);
@@ -393,7 +456,11 @@ impl InstructionKind {
                     ins.rename_param(old, new);
                 }
             }
-            InstructionKind::IfElse { condition, then_body, else_body } => {
+            InstructionKind::IfElse {
+                condition,
+                then_body,
+                else_body,
+            } => {
                 condition.rename_param(old, new);
                 for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
                     ins.rename_param(old, new);
@@ -416,9 +483,17 @@ impl InstructionKind {
                     ins.rename_param(old, new);
                 }
             }
-            InstructionKind::Command(_) | InstructionKind::Comment(_) | InstructionKind::WhenRan | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop | InstructionKind::ContinueLoop | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn | InstructionKind::WhenPowerUnplugged | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. } => {}
+            InstructionKind::Command(_)
+            | InstructionKind::Comment(_)
+            | InstructionKind::WhenRan
+            | InstructionKind::BlockHeader(_)
+            | InstructionKind::EscapeLoop
+            | InstructionKind::ContinueLoop
+            | InstructionKind::WhenTime(_)
+            | InstructionKind::WhenPowerPluggedIn
+            | InstructionKind::WhenPowerUnplugged
+            | InstructionKind::OpenApp { .. }
+            | InstructionKind::CloseApp { .. } => {}
         }
     }
 
@@ -427,7 +502,10 @@ impl InstructionKind {
     /// argument lists aligned after a block's inputs change.
     pub fn for_each_call_args_mut(&mut self, block_id: &str, f: &mut dyn FnMut(&mut Vec<Value>)) {
         match self {
-            InstructionKind::Wait(value) | InstructionKind::Return(value) | InstructionKind::WhenBatteryDischargedTo(value) | InstructionKind::WhenBatteryChargedTo(value) => {
+            InstructionKind::Wait(value)
+            | InstructionKind::Return(value)
+            | InstructionKind::WhenBatteryDischargedTo(value)
+            | InstructionKind::WhenBatteryChargedTo(value) => {
                 value.for_each_call_args_mut(block_id, f)
             }
             InstructionKind::Token(token) => token.for_each_call_args_mut(block_id, f),
@@ -448,7 +526,11 @@ impl InstructionKind {
                     ins.for_each_call_args_mut(block_id, f);
                 }
             }
-            InstructionKind::IfElse { condition, then_body, else_body } => {
+            InstructionKind::IfElse {
+                condition,
+                then_body,
+                else_body,
+            } => {
                 condition.for_each_call_args_mut(block_id, f);
                 for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
                     ins.for_each_call_args_mut(block_id, f);
@@ -471,9 +553,17 @@ impl InstructionKind {
                     ins.for_each_call_args_mut(block_id, f);
                 }
             }
-            InstructionKind::Command(_) | InstructionKind::Comment(_) | InstructionKind::WhenRan | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop | InstructionKind::ContinueLoop | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn | InstructionKind::WhenPowerUnplugged | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. } => {}
+            InstructionKind::Command(_)
+            | InstructionKind::Comment(_)
+            | InstructionKind::WhenRan
+            | InstructionKind::BlockHeader(_)
+            | InstructionKind::EscapeLoop
+            | InstructionKind::ContinueLoop
+            | InstructionKind::WhenTime(_)
+            | InstructionKind::WhenPowerPluggedIn
+            | InstructionKind::WhenPowerUnplugged
+            | InstructionKind::OpenApp { .. }
+            | InstructionKind::CloseApp { .. } => {}
         }
     }
 
@@ -482,11 +572,14 @@ impl InstructionKind {
     /// entirely), so deleting a custom block never leaves a dangling ref.
     pub fn scrub_block_calls(&mut self, block_id: &str) {
         match self {
-            InstructionKind::Wait(value) | InstructionKind::Return(value) | InstructionKind::WhenBatteryDischargedTo(value) | InstructionKind::WhenBatteryChargedTo(value) => {
+            InstructionKind::Wait(value)
+            | InstructionKind::Return(value)
+            | InstructionKind::WhenBatteryDischargedTo(value)
+            | InstructionKind::WhenBatteryChargedTo(value) => value.scrub_block_calls(block_id),
+            InstructionKind::Token(token) => token.scrub_block_calls(block_id),
+            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
                 value.scrub_block_calls(block_id)
             }
-            InstructionKind::Token(token) => token.scrub_block_calls(block_id),
-            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => value.scrub_block_calls(block_id),
             InstructionKind::CallBlock { args, .. } => {
                 for a in args.iter_mut() {
                     a.scrub_block_calls(block_id);
@@ -498,7 +591,11 @@ impl InstructionKind {
                     ins.scrub_block_calls(block_id);
                 }
             }
-            InstructionKind::IfElse { condition, then_body, else_body } => {
+            InstructionKind::IfElse {
+                condition,
+                then_body,
+                else_body,
+            } => {
                 condition.scrub_block_calls(block_id);
                 for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
                     ins.scrub_block_calls(block_id);
@@ -521,9 +618,17 @@ impl InstructionKind {
                     ins.scrub_block_calls(block_id);
                 }
             }
-            InstructionKind::Command(_) | InstructionKind::Comment(_) | InstructionKind::WhenRan | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop | InstructionKind::ContinueLoop | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn | InstructionKind::WhenPowerUnplugged | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. } => {}
+            InstructionKind::Command(_)
+            | InstructionKind::Comment(_)
+            | InstructionKind::WhenRan
+            | InstructionKind::BlockHeader(_)
+            | InstructionKind::EscapeLoop
+            | InstructionKind::ContinueLoop
+            | InstructionKind::WhenTime(_)
+            | InstructionKind::WhenPowerPluggedIn
+            | InstructionKind::WhenPowerUnplugged
+            | InstructionKind::OpenApp { .. }
+            | InstructionKind::CloseApp { .. } => {}
         }
     }
 
@@ -561,7 +666,9 @@ impl InstructionKind {
 
 impl Strand {
     pub fn starts_with_when_ran(&self) -> bool {
-        self.instructions.first().map_or(false, Instruction::is_header)
+        self.instructions
+            .first()
+            .map_or(false, Instruction::is_header)
     }
 }
 
@@ -658,20 +765,68 @@ enum MacroDe {
 impl From<MacroDe> for Macro {
     fn from(de: MacroDe) -> Self {
         let mut mac = match de {
-            MacroDe::Current { id, name, description, mut strands, recording_target, speed_multiplier, floating_values, comments, variables, block_defs, settings } => {
+            MacroDe::Current {
+                id,
+                name,
+                description,
+                mut strands,
+                recording_target,
+                speed_multiplier,
+                floating_values,
+                comments,
+                variables,
+                block_defs,
+                settings,
+            } => {
                 // Pre-"When Ran" saves have a strand id=="root" that was the
                 // implicit entry point; give it a real WhenRan on upgrade.
                 if let Some(legacy) = strands.iter_mut().find(|s| s.id == LEGACY_ROOT_STRAND_ID) {
                     if !legacy.starts_with_when_ran() {
-                        legacy.instructions.insert(0, Instruction::new(InstructionKind::WhenRan));
+                        legacy
+                            .instructions
+                            .insert(0, Instruction::new(InstructionKind::WhenRan));
                     }
                 }
-                Self { id, name, description, strands, recording_target, speed_multiplier, floating_values, comments, variables, block_defs, settings }
+                Self {
+                    id,
+                    name,
+                    description,
+                    strands,
+                    recording_target,
+                    speed_multiplier,
+                    floating_values,
+                    comments,
+                    variables,
+                    block_defs,
+                    settings,
+                }
             }
-            MacroDe::Legacy { id, name, description, mut code } => {
+            MacroDe::Legacy {
+                id,
+                name,
+                description,
+                mut code,
+            } => {
                 code.insert(0, Instruction::new(InstructionKind::WhenRan));
-                let strand = Strand { id: default_strand_id(), x: 0, y: 0, instructions: code };
-                Self { id, name, description, strands: vec![strand], recording_target: None, speed_multiplier: default_speed_multiplier(), floating_values: Vec::new(), comments: Vec::new(), variables: Vec::new(), block_defs: Vec::new(), settings: MacroSettings::default() }
+                let strand = Strand {
+                    id: default_strand_id(),
+                    x: 0,
+                    y: 0,
+                    instructions: code,
+                };
+                Self {
+                    id,
+                    name,
+                    description,
+                    strands: vec![strand],
+                    recording_target: None,
+                    speed_multiplier: default_speed_multiplier(),
+                    floating_values: Vec::new(),
+                    comments: Vec::new(),
+                    variables: Vec::new(),
+                    block_defs: Vec::new(),
+                    settings: MacroSettings::default(),
+                }
             }
         };
         // Repairs boolean slots poisoned by the historical `Value::Bool`-less
@@ -685,6 +840,13 @@ impl From<MacroDe> for Macro {
         for fv in mac.floating_values.iter_mut() {
             fv.value.migrate_bool_slots(false);
         }
+        // A macro file may have been created before this field existed (in
+        // which case serde supplied blue), or hand-edited/imported with an
+        // invalid color. Keep all persisted values safe to place in a CSS
+        // custom property before the frontend ever sees them.
+        for def in mac.block_defs.iter_mut() {
+            def.color = normalize_block_color(&def.color).unwrap_or_else(default_block_color);
+        }
         mac.migrate_legacy_comments();
         mac
     }
@@ -693,7 +855,12 @@ impl From<MacroDe> for Macro {
 impl Macro {
     pub fn new(name: String, description: String, mut code: Vec<Instruction>) -> Self {
         code.insert(0, Instruction::new(InstructionKind::WhenRan));
-        let strand = Strand { id: default_strand_id(), x: 0, y: 0, instructions: code };
+        let strand = Strand {
+            id: default_strand_id(),
+            x: 0,
+            y: 0,
+            instructions: code,
+        };
         Self {
             id: default_macro_id(),
             name,
@@ -757,7 +924,11 @@ impl Macro {
     /// mutation that can remove instructions or whole strands.
     pub fn prune_orphaned_comments(&mut self) {
         let live = self.all_instruction_ids();
-        self.comments.retain(|c| c.attached_to.as_deref().map_or(true, |id| live.contains(id)));
+        self.comments.retain(|c| {
+            c.attached_to
+                .as_deref()
+                .map_or(true, |id| live.contains(id))
+        });
     }
 
     /// One-time upgrade for saves from before floating/attached comments
@@ -829,10 +1000,27 @@ impl Macro {
     /// Defines a new custom block: appends the `BlockDef` and creates its
     /// (initially empty) header strand at `(x, y)`. Caller validates
     /// `pieces` beforehand.
-    pub fn create_block(&mut self, pieces: Vec<BlockPiece>, shape: BlockShape, x: i32, y: i32) -> String {
+    pub fn create_block(
+        &mut self,
+        pieces: Vec<BlockPiece>,
+        shape: BlockShape,
+        color: String,
+        x: i32,
+        y: i32,
+    ) -> String {
         let id = default_block_id();
-        self.block_defs.push(BlockDef { id: id.clone(), pieces, shape });
-        self.strands.push(Strand { id: default_strand_id(), x, y, instructions: vec![Instruction::new(InstructionKind::BlockHeader(id.clone()))] });
+        self.block_defs.push(BlockDef {
+            id: id.clone(),
+            pieces,
+            shape,
+            color,
+        });
+        self.strands.push(Strand {
+            id: default_strand_id(),
+            x,
+            y,
+            instructions: vec![Instruction::new(InstructionKind::BlockHeader(id.clone()))],
+        });
         id
     }
 
@@ -841,7 +1029,8 @@ impl Macro {
     /// input; caller still needs to update `BlockDef::pieces` separately.
     pub fn rename_block_input_body(&mut self, block_id: &str, old: &str, new: &str) {
         for strand in &mut self.strands {
-            if matches!(strand.instructions.first().map(|i| &i.kind), Some(InstructionKind::BlockHeader(id)) if id == block_id) {
+            if matches!(strand.instructions.first().map(|i| &i.kind), Some(InstructionKind::BlockHeader(id)) if id == block_id)
+            {
                 for ins in &mut strand.instructions {
                     ins.rename_param(old, new);
                 }
@@ -856,8 +1045,17 @@ impl Macro {
     /// `value_type` (`0` for `Any`, an empty `Value::Bool` hexagon for
     /// `Bool`). Call before overwriting `BlockDef::pieces` — `old_pieces`
     /// must be the pieces beforehand.
-    pub fn reconcile_block_call_args(&mut self, block_id: &str, old_pieces: &[BlockPiece], new_pieces: &[BlockPiece]) {
-        let old_input_ids: Vec<&str> = old_pieces.iter().filter(|p| matches!(p, BlockPiece::Input { .. })).map(BlockPiece::id).collect();
+    pub fn reconcile_block_call_args(
+        &mut self,
+        block_id: &str,
+        old_pieces: &[BlockPiece],
+        new_pieces: &[BlockPiece],
+    ) {
+        let old_input_ids: Vec<&str> = old_pieces
+            .iter()
+            .filter(|p| matches!(p, BlockPiece::Input { .. }))
+            .map(BlockPiece::id)
+            .collect();
         let new_inputs: Vec<(&str, InputValueType)> = new_pieces
             .iter()
             .filter_map(|p| match p {
@@ -866,17 +1064,21 @@ impl Macro {
             })
             .collect();
         // For each new input slot, which old slot (if any) it carries over from.
-        let mapping: Vec<(Option<usize>, InputValueType)> =
-            new_inputs.iter().map(|(id, value_type)| (old_input_ids.iter().position(|old| old == id), *value_type)).collect();
+        let mapping: Vec<(Option<usize>, InputValueType)> = new_inputs
+            .iter()
+            .map(|(id, value_type)| (old_input_ids.iter().position(|old| old == id), *value_type))
+            .collect();
 
         let mut rebuild = |args: &mut Vec<Value>| {
             *args = mapping
                 .iter()
                 .map(|(old_idx, value_type)| {
-                    old_idx.and_then(|i| args.get(i).cloned()).unwrap_or_else(|| match value_type {
-                        InputValueType::Any => Value::number(0.0),
-                        InputValueType::Bool => Value::Bool,
-                    })
+                    old_idx
+                        .and_then(|i| args.get(i).cloned())
+                        .unwrap_or_else(|| match value_type {
+                            InputValueType::Any => Value::number(0.0),
+                            InputValueType::Bool => Value::Bool,
+                        })
                 })
                 .collect();
         };
@@ -922,7 +1124,12 @@ impl Macro {
             return &mut self.strands[pos];
         }
         if self.strands.is_empty() {
-            self.strands.push(Strand { id: default_strand_id(), x: 0, y: 0, instructions: vec![] });
+            self.strands.push(Strand {
+                id: default_strand_id(),
+                x: 0,
+                y: 0,
+                instructions: vec![],
+            });
         }
         &mut self.strands[0]
     }
@@ -990,13 +1197,21 @@ pub enum InstructionKind {
     /// `icon` (a `data:` URI, when one was found) are cached at the same
     /// time purely for display, so the block keeps showing the right label
     /// and picture even if the app is later renamed or uninstalled.
-    OpenApp { command: String, name: String, icon: Option<String> },
+    OpenApp {
+        command: String,
+        name: String,
+        icon: Option<String>,
+    },
     /// Same picker/payload shape as `OpenApp`, but terminates the app
     /// instead of launching it — `runner::close_app` derives a process
     /// matcher from `command` (and, on macOS, `name`) rather than executing
     /// it directly. `command`/`name`/`icon` are cached at pick time for the
     /// exact same reason `OpenApp`'s are.
-    CloseApp { command: String, name: String, icon: Option<String> },
+    CloseApp {
+        command: String,
+        name: String,
+        icon: Option<String>,
+    },
     /// `set <name> to <value>` — overwrites the named variable.
     SetVariable(String, Value),
     /// `change <name> by <value>` — adds `value` to the named variable.
@@ -1009,25 +1224,43 @@ pub enum InstructionKind {
     BlockHeader(String),
     /// Command-position invocation of a `Normal`/`Ending`-shaped custom
     /// block: runs its body inline with `args` bound to its inputs.
-    CallBlock { block_id: String, args: Vec<Value> },
+    CallBlock {
+        block_id: String,
+        args: Vec<Value>,
+    },
     /// Only meaningful inside a `ReturnsValue`/`ReturnsBool`-shaped block's
     /// body: evaluates `Value` and halts execution, returning the result to
     /// the caller.
     Return(Value),
     /// `if <condition> then { body }` — runs `body` inline (same strand,
     /// same depth) when `condition` evaluates truthy.
-    If { condition: Value, body: Vec<Instruction> },
+    If {
+        condition: Value,
+        body: Vec<Instruction>,
+    },
     /// `if <condition> then { then_body } else { else_body }`.
-    IfElse { condition: Value, then_body: Vec<Instruction>, else_body: Vec<Instruction> },
+    IfElse {
+        condition: Value,
+        then_body: Vec<Instruction>,
+        else_body: Vec<Instruction>,
+    },
     /// `repeat <count> { body }` — runs `body` `count` times (rounded,
     /// clamped to non-negative).
-    Repeat { count: Value, body: Vec<Instruction> },
+    Repeat {
+        count: Value,
+        body: Vec<Instruction>,
+    },
     /// `forever { body }` — runs `body` in an unconditional loop; only ends
     /// via `EscapeLoop`, a `Return` inside it, or the run being stopped.
-    Forever { body: Vec<Instruction> },
+    Forever {
+        body: Vec<Instruction>,
+    },
     /// `while <condition> { body }` — re-evaluates `condition` before every
     /// iteration, running `body` for as long as it's truthy.
-    While { condition: Value, body: Vec<Instruction> },
+    While {
+        condition: Value,
+        body: Vec<Instruction>,
+    },
     /// Stops the nearest enclosing `Repeat`/`Forever`/`While` immediately.
     /// A no-op if not inside a loop.
     EscapeLoop,
@@ -1055,35 +1288,121 @@ impl std::hash::Hash for Macro {
 impl std::hash::Hash for InstructionKind {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
-            Self::Token(t)   => { 0u8.hash(state); t.hash(state); }
-            Self::Wait(d)    => { 1u8.hash(state); d.hash(state); }
-            Self::Command(s) => { 2u8.hash(state); s.hash(state); }
-            Self::Comment(s) => { 3u8.hash(state); s.hash(state); }
-            Self::WhenRan    => { 4u8.hash(state); }
-            Self::SetVariable(n, v)    => { 5u8.hash(state); n.hash(state); v.hash(state); }
-            Self::ChangeVariable(n, v) => { 6u8.hash(state); n.hash(state); v.hash(state); }
-            Self::BlockHeader(id) => { 7u8.hash(state); id.hash(state); }
-            Self::CallBlock { block_id, args } => { 8u8.hash(state); block_id.hash(state); args.hash(state); }
-            Self::Return(v) => { 9u8.hash(state); v.hash(state); }
-            Self::If { condition, body } => { 10u8.hash(state); condition.hash(state); body.hash(state); }
-            Self::IfElse { condition, then_body, else_body } => {
+            Self::Token(t) => {
+                0u8.hash(state);
+                t.hash(state);
+            }
+            Self::Wait(d) => {
+                1u8.hash(state);
+                d.hash(state);
+            }
+            Self::Command(s) => {
+                2u8.hash(state);
+                s.hash(state);
+            }
+            Self::Comment(s) => {
+                3u8.hash(state);
+                s.hash(state);
+            }
+            Self::WhenRan => {
+                4u8.hash(state);
+            }
+            Self::SetVariable(n, v) => {
+                5u8.hash(state);
+                n.hash(state);
+                v.hash(state);
+            }
+            Self::ChangeVariable(n, v) => {
+                6u8.hash(state);
+                n.hash(state);
+                v.hash(state);
+            }
+            Self::BlockHeader(id) => {
+                7u8.hash(state);
+                id.hash(state);
+            }
+            Self::CallBlock { block_id, args } => {
+                8u8.hash(state);
+                block_id.hash(state);
+                args.hash(state);
+            }
+            Self::Return(v) => {
+                9u8.hash(state);
+                v.hash(state);
+            }
+            Self::If { condition, body } => {
+                10u8.hash(state);
+                condition.hash(state);
+                body.hash(state);
+            }
+            Self::IfElse {
+                condition,
+                then_body,
+                else_body,
+            } => {
                 11u8.hash(state);
                 condition.hash(state);
                 then_body.hash(state);
                 else_body.hash(state);
             }
-            Self::Repeat { count, body } => { 12u8.hash(state); count.hash(state); body.hash(state); }
-            Self::Forever { body } => { 13u8.hash(state); body.hash(state); }
-            Self::While { condition, body } => { 14u8.hash(state); condition.hash(state); body.hash(state); }
-            Self::EscapeLoop => { 15u8.hash(state); }
-            Self::ContinueLoop => { 16u8.hash(state); }
-            Self::WhenBatteryDischargedTo(v) => { 17u8.hash(state); v.hash(state); }
-            Self::WhenBatteryChargedTo(v) => { 18u8.hash(state); v.hash(state); }
-            Self::WhenTime(s) => { 19u8.hash(state); s.hash(state); }
-            Self::WhenPowerPluggedIn => { 20u8.hash(state); }
-            Self::WhenPowerUnplugged => { 21u8.hash(state); }
-            Self::OpenApp { command, name, icon } => { 22u8.hash(state); command.hash(state); name.hash(state); icon.hash(state); }
-            Self::CloseApp { command, name, icon } => { 23u8.hash(state); command.hash(state); name.hash(state); icon.hash(state); }
+            Self::Repeat { count, body } => {
+                12u8.hash(state);
+                count.hash(state);
+                body.hash(state);
+            }
+            Self::Forever { body } => {
+                13u8.hash(state);
+                body.hash(state);
+            }
+            Self::While { condition, body } => {
+                14u8.hash(state);
+                condition.hash(state);
+                body.hash(state);
+            }
+            Self::EscapeLoop => {
+                15u8.hash(state);
+            }
+            Self::ContinueLoop => {
+                16u8.hash(state);
+            }
+            Self::WhenBatteryDischargedTo(v) => {
+                17u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenBatteryChargedTo(v) => {
+                18u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenTime(s) => {
+                19u8.hash(state);
+                s.hash(state);
+            }
+            Self::WhenPowerPluggedIn => {
+                20u8.hash(state);
+            }
+            Self::WhenPowerUnplugged => {
+                21u8.hash(state);
+            }
+            Self::OpenApp {
+                command,
+                name,
+                icon,
+            } => {
+                22u8.hash(state);
+                command.hash(state);
+                name.hash(state);
+                icon.hash(state);
+            }
+            Self::CloseApp {
+                command,
+                name,
+                icon,
+            } => {
+                23u8.hash(state);
+                command.hash(state);
+                name.hash(state);
+                icon.hash(state);
+            }
         }
     }
 }
@@ -1100,18 +1419,44 @@ enum InstructionKindDe {
     WhenTime(TimeSchedule),
     WhenPowerPluggedIn,
     WhenPowerUnplugged,
-    OpenApp { command: String, name: String, icon: Option<String> },
-    CloseApp { command: String, name: String, icon: Option<String> },
+    OpenApp {
+        command: String,
+        name: String,
+        icon: Option<String>,
+    },
+    CloseApp {
+        command: String,
+        name: String,
+        icon: Option<String>,
+    },
     SetVariable(String, Value),
     ChangeVariable(String, Value),
     BlockHeader(String),
-    CallBlock { block_id: String, args: Vec<Value> },
+    CallBlock {
+        block_id: String,
+        args: Vec<Value>,
+    },
     Return(Value),
-    If { condition: Value, body: Vec<Instruction> },
-    IfElse { condition: Value, then_body: Vec<Instruction>, else_body: Vec<Instruction> },
-    Repeat { count: Value, body: Vec<Instruction> },
-    Forever { body: Vec<Instruction> },
-    While { condition: Value, body: Vec<Instruction> },
+    If {
+        condition: Value,
+        body: Vec<Instruction>,
+    },
+    IfElse {
+        condition: Value,
+        then_body: Vec<Instruction>,
+        else_body: Vec<Instruction>,
+    },
+    Repeat {
+        count: Value,
+        body: Vec<Instruction>,
+    },
+    Forever {
+        body: Vec<Instruction>,
+    },
+    While {
+        condition: Value,
+        body: Vec<Instruction>,
+    },
     EscapeLoop,
     ContinueLoop,
 }
@@ -1140,8 +1485,16 @@ fn migrate_wait_duration(duration: Value, randomness: Value) -> Value {
     Value::Op {
         op: Op::Random,
         args: vec![
-            Value::Op { op: Op::Sub, args: vec![duration.clone(), randomness.clone()], saved: zero() },
-            Value::Op { op: Op::Add, args: vec![duration, randomness], saved: zero() },
+            Value::Op {
+                op: Op::Sub,
+                args: vec![duration.clone(), randomness.clone()],
+                saved: zero(),
+            },
+            Value::Op {
+                op: Op::Add,
+                args: vec![duration, randomness],
+                saved: zero(),
+            },
         ],
         saved: zero(),
     }
@@ -1151,29 +1504,63 @@ impl From<InstructionKindDe> for InstructionKind {
     fn from(de: InstructionKindDe) -> Self {
         match de {
             InstructionKindDe::Token(t) => InstructionKind::Token(t),
-            InstructionKindDe::Wait(WaitDe::LegacyNumber(d)) => InstructionKind::Wait(Value::number(d as f64)),
-            InstructionKindDe::Wait(WaitDe::LegacyWithRandomness(d, r)) => InstructionKind::Wait(migrate_wait_duration(d, r)),
+            InstructionKindDe::Wait(WaitDe::LegacyNumber(d)) => {
+                InstructionKind::Wait(Value::number(d as f64))
+            }
+            InstructionKindDe::Wait(WaitDe::LegacyWithRandomness(d, r)) => {
+                InstructionKind::Wait(migrate_wait_duration(d, r))
+            }
             InstructionKindDe::Wait(WaitDe::Current(d)) => InstructionKind::Wait(d),
             InstructionKindDe::Command(s) => InstructionKind::Command(s),
             InstructionKindDe::Comment(s) => InstructionKind::Comment(s),
             InstructionKindDe::WhenRan => InstructionKind::WhenRan,
-            InstructionKindDe::WhenBatteryDischargedTo(v) => InstructionKind::WhenBatteryDischargedTo(v),
+            InstructionKindDe::WhenBatteryDischargedTo(v) => {
+                InstructionKind::WhenBatteryDischargedTo(v)
+            }
             InstructionKindDe::WhenBatteryChargedTo(v) => InstructionKind::WhenBatteryChargedTo(v),
             InstructionKindDe::WhenTime(s) => InstructionKind::WhenTime(s),
             InstructionKindDe::WhenPowerPluggedIn => InstructionKind::WhenPowerPluggedIn,
             InstructionKindDe::WhenPowerUnplugged => InstructionKind::WhenPowerUnplugged,
-            InstructionKindDe::OpenApp { command, name, icon } => InstructionKind::OpenApp { command, name, icon },
-            InstructionKindDe::CloseApp { command, name, icon } => InstructionKind::CloseApp { command, name, icon },
+            InstructionKindDe::OpenApp {
+                command,
+                name,
+                icon,
+            } => InstructionKind::OpenApp {
+                command,
+                name,
+                icon,
+            },
+            InstructionKindDe::CloseApp {
+                command,
+                name,
+                icon,
+            } => InstructionKind::CloseApp {
+                command,
+                name,
+                icon,
+            },
             InstructionKindDe::SetVariable(n, v) => InstructionKind::SetVariable(n, v),
             InstructionKindDe::ChangeVariable(n, v) => InstructionKind::ChangeVariable(n, v),
             InstructionKindDe::BlockHeader(id) => InstructionKind::BlockHeader(id),
-            InstructionKindDe::CallBlock { block_id, args } => InstructionKind::CallBlock { block_id, args },
+            InstructionKindDe::CallBlock { block_id, args } => {
+                InstructionKind::CallBlock { block_id, args }
+            }
             InstructionKindDe::Return(v) => InstructionKind::Return(v),
             InstructionKindDe::If { condition, body } => InstructionKind::If { condition, body },
-            InstructionKindDe::IfElse { condition, then_body, else_body } => InstructionKind::IfElse { condition, then_body, else_body },
+            InstructionKindDe::IfElse {
+                condition,
+                then_body,
+                else_body,
+            } => InstructionKind::IfElse {
+                condition,
+                then_body,
+                else_body,
+            },
             InstructionKindDe::Repeat { count, body } => InstructionKind::Repeat { count, body },
             InstructionKindDe::Forever { body } => InstructionKind::Forever { body },
-            InstructionKindDe::While { condition, body } => InstructionKind::While { condition, body },
+            InstructionKindDe::While { condition, body } => {
+                InstructionKind::While { condition, body }
+            }
             InstructionKindDe::EscapeLoop => InstructionKind::EscapeLoop,
             InstructionKindDe::ContinueLoop => InstructionKind::ContinueLoop,
         }
@@ -1200,7 +1587,10 @@ pub struct Instruction {
 
 impl Instruction {
     pub fn new(kind: InstructionKind) -> Self {
-        Self { id: default_instruction_id(), kind }
+        Self {
+            id: default_instruction_id(),
+            kind,
+        }
     }
 
     pub fn is_header(&self) -> bool {
@@ -1269,29 +1659,59 @@ mod tests {
 
     #[test]
     fn block_def_migrates_legacy_returns_value_true_to_returns_value_shape() {
-        let def: BlockDef = serde_json::from_str(r#"{"id":"b1","pieces":[],"returns_value":true}"#).unwrap();
+        let def: BlockDef =
+            serde_json::from_str(r#"{"id":"b1","pieces":[],"returns_value":true}"#).unwrap();
         assert_eq!(def.shape, BlockShape::ReturnsValue);
     }
 
     #[test]
     fn block_def_migrates_legacy_returns_value_false_to_normal_shape() {
-        let def: BlockDef = serde_json::from_str(r#"{"id":"b1","pieces":[],"returns_value":false}"#).unwrap();
+        let def: BlockDef =
+            serde_json::from_str(r#"{"id":"b1","pieces":[],"returns_value":false}"#).unwrap();
         assert_eq!(def.shape, BlockShape::Normal);
     }
 
     #[test]
     fn block_def_reads_current_shape_field() {
-        let def: BlockDef = serde_json::from_str(r#"{"id":"b1","pieces":[],"shape":"ReturnsBool"}"#).unwrap();
+        let def: BlockDef =
+            serde_json::from_str(r#"{"id":"b1","pieces":[],"shape":"ReturnsBool"}"#).unwrap();
         assert_eq!(def.shape, BlockShape::ReturnsBool);
     }
 
     #[test]
     fn block_def_round_trips_shape_through_serialize() {
-        let def = BlockDef { id: "b1".into(), pieces: vec![], shape: BlockShape::Ending };
+        let def = BlockDef {
+            id: "b1".into(),
+            pieces: vec![],
+            shape: BlockShape::Ending,
+            color: default_block_color(),
+        };
         let json = serde_json::to_string(&def).unwrap();
-        assert!(json.contains(r#""shape":"Ending""#), "expected serialized shape field, got: {json}");
+        assert!(
+            json.contains(r#""shape":"Ending""#),
+            "expected serialized shape field, got: {json}"
+        );
         let round_tripped: BlockDef = serde_json::from_str(&json).unwrap();
         assert_eq!(round_tripped.shape, BlockShape::Ending);
+    }
+
+    #[test]
+    fn block_def_defaults_color_for_older_macro_files() {
+        let def: BlockDef =
+            serde_json::from_str(r#"{"id":"b1","pieces":[],"shape":"Normal"}"#).unwrap();
+        assert_eq!(def.color, default_block_color());
+    }
+
+    #[test]
+    fn block_def_color_is_normalized_when_loading_a_macro() {
+        let mac: Macro = serde_json::from_str(r##"{"id":"m1","name":"Test","description":"","strands":[],"block_defs":[{"id":"b1","pieces":[],"shape":"Normal","color":"#beef00"}]}"##).unwrap();
+        assert_eq!(mac.block_defs[0].color, "#BEEF00");
+    }
+
+    #[test]
+    fn block_def_color_falls_back_when_loading_an_invalid_color() {
+        let mac: Macro = serde_json::from_str(r#"{"id":"m1","name":"Test","description":"","strands":[],"block_defs":[{"id":"b1","pieces":[],"shape":"Normal","color":"not a color"}]}"#).unwrap();
+        assert_eq!(mac.block_defs[0].color, default_block_color());
     }
 
     #[test]
@@ -1308,7 +1728,10 @@ mod tests {
         assert_eq!(mac.strands.len(), 1);
         // The legacy inline `Comment` instruction is pulled out into a
         // freestanding `Comment` note, not left in the instruction stream.
-        assert_eq!(mac.strands[0].instructions, vec![Instruction::new(InstructionKind::WhenRan)]);
+        assert_eq!(
+            mac.strands[0].instructions,
+            vec![Instruction::new(InstructionKind::WhenRan)]
+        );
         assert_eq!(mac.comments.len(), 1);
         assert_eq!(mac.comments[0].text, "hi");
         assert_eq!(mac.comments[0].attached_to, None);
@@ -1323,7 +1746,10 @@ mod tests {
         let mac: Macro = serde_json::from_str(json).unwrap();
         let root = mac.strand("root").unwrap();
         assert!(root.starts_with_when_ran());
-        assert_eq!(root.instructions, vec![Instruction::new(InstructionKind::WhenRan)]);
+        assert_eq!(
+            root.instructions,
+            vec![Instruction::new(InstructionKind::WhenRan)]
+        );
         assert_eq!(mac.comments.len(), 1);
         assert_eq!(mac.comments[0].text, "hi");
         // Untouched, non-entry strand should survive as-is.
@@ -1336,7 +1762,10 @@ mod tests {
             {"id":"root","x":0,"y":0,"instructions":["WhenRan",{"Comment":"hi"}]}
         ]}"#;
         let mac: Macro = serde_json::from_str(json).unwrap();
-        assert_eq!(mac.strand("root").unwrap().instructions, vec![Instruction::new(InstructionKind::WhenRan)]);
+        assert_eq!(
+            mac.strand("root").unwrap().instructions,
+            vec![Instruction::new(InstructionKind::WhenRan)]
+        );
         assert_eq!(mac.comments.len(), 1);
         assert_eq!(mac.comments[0].text, "hi");
     }
@@ -1351,7 +1780,10 @@ mod tests {
         let mac: Macro = serde_json::from_str(json).unwrap();
         let root = mac.strand("root").unwrap();
         match &root.instructions[1].kind {
-            InstructionKind::If { body, .. } => assert!(body.is_empty(), "nested Comment should be extracted, not left in the If body"),
+            InstructionKind::If { body, .. } => assert!(
+                body.is_empty(),
+                "nested Comment should be extracted, not left in the If body"
+            ),
             other => panic!("expected If, got {other:?}"),
         }
         assert_eq!(mac.comments.len(), 1);
@@ -1364,8 +1796,22 @@ mod tests {
         let wait = Instruction::new(InstructionKind::Wait(Value::number(1000.0)));
         let wait_id = wait.id.clone();
         let mut mac = Macro::new("Test".into(), "".into(), vec![wait]);
-        mac.comments.push(Comment { id: "c1".into(), x: 0, y: 0, text: "hi".into(), collapsed: false, attached_to: Some(wait_id) });
-        mac.comments.push(Comment { id: "c2".into(), x: 0, y: 0, text: "freestanding".into(), collapsed: false, attached_to: None });
+        mac.comments.push(Comment {
+            id: "c1".into(),
+            x: 0,
+            y: 0,
+            text: "hi".into(),
+            collapsed: false,
+            attached_to: Some(wait_id),
+        });
+        mac.comments.push(Comment {
+            id: "c2".into(),
+            x: 0,
+            y: 0,
+            text: "freestanding".into(),
+            collapsed: false,
+            attached_to: None,
+        });
 
         // Remove the Wait instruction (index 1 — index 0 is the WhenRan header).
         mac.strands[0].instructions.remove(1);
@@ -1379,9 +1825,19 @@ mod tests {
     fn prune_orphaned_comments_cascades_into_nested_wrap_body() {
         let inner = Instruction::new(InstructionKind::Wait(Value::number(1.0)));
         let inner_id = inner.id.clone();
-        let if_ins = Instruction::new(InstructionKind::If { condition: Value::Bool, body: vec![inner] });
+        let if_ins = Instruction::new(InstructionKind::If {
+            condition: Value::Bool,
+            body: vec![inner],
+        });
         let mut mac = Macro::new("Test".into(), "".into(), vec![if_ins]);
-        mac.comments.push(Comment { id: "c1".into(), x: 0, y: 0, text: "nested".into(), collapsed: false, attached_to: Some(inner_id) });
+        mac.comments.push(Comment {
+            id: "c1".into(),
+            x: 0,
+            y: 0,
+            text: "nested".into(),
+            collapsed: false,
+            attached_to: Some(inner_id),
+        });
 
         // Deleting the whole If block (index 1) takes its nested body with it.
         mac.strands[0].instructions.remove(1);
@@ -1395,7 +1851,14 @@ mod tests {
         let wait = Instruction::new(InstructionKind::Wait(Value::number(1000.0)));
         let wait_id = wait.id.clone();
         let mut mac = Macro::new("Test".into(), "".into(), vec![wait]);
-        mac.comments.push(Comment { id: "c1".into(), x: 0, y: 0, text: "hi".into(), collapsed: false, attached_to: Some(wait_id) });
+        mac.comments.push(Comment {
+            id: "c1".into(),
+            x: 0,
+            y: 0,
+            text: "hi".into(),
+            collapsed: false,
+            attached_to: Some(wait_id),
+        });
 
         mac.prune_orphaned_comments();
 
@@ -1437,9 +1900,21 @@ mod tests {
         ]}"#;
         let mac: Macro = serde_json::from_str(json).unwrap();
         match &mac.strand("root").unwrap().instructions[1].kind {
-            InstructionKind::If { condition: Value::Op { op: Op::And, args, .. }, .. } => {
+            InstructionKind::If {
+                condition: Value::Op {
+                    op: Op::And, args, ..
+                },
+                ..
+            } => {
                 assert_eq!(args[0], Value::Bool);
-                assert_eq!(args[1], Value::Op { op: Op::Eq, args: vec![Value::number(1.0), Value::number(1.0)], saved: Box::new(Value::Bool) });
+                assert_eq!(
+                    args[1],
+                    Value::Op {
+                        op: Op::Eq,
+                        args: vec![Value::number(1.0), Value::number(1.0)],
+                        saved: Box::new(Value::Bool)
+                    }
+                );
             }
             other => panic!("expected If(And(..)), got {other:?}"),
         }
@@ -1453,7 +1928,10 @@ mod tests {
             {"id":"root","x":0,"y":0,"instructions":["WhenRan",{"Wait":{"kind":"Number","value":0.0}}]}
         ]}"#;
         let mac: Macro = serde_json::from_str(json).unwrap();
-        assert_eq!(mac.strand("root").unwrap().instructions[1], Instruction::new(InstructionKind::Wait(Value::number(0.0))));
+        assert_eq!(
+            mac.strand("root").unwrap().instructions[1],
+            Instruction::new(InstructionKind::Wait(Value::number(0.0)))
+        );
     }
 
     #[test]
@@ -1485,14 +1963,20 @@ mod tests {
     fn legacy_wait_with_zero_randomness_migrates_to_plain_duration() {
         let json = r#"{"Wait":[1000.0,0.0]}"#;
         let ins: Instruction = serde_json::from_str(json).unwrap();
-        assert_eq!(ins, Instruction::new(InstructionKind::Wait(Value::number(1000.0))));
+        assert_eq!(
+            ins,
+            Instruction::new(InstructionKind::Wait(Value::number(1000.0)))
+        );
     }
 
     #[test]
     fn legacy_single_arg_wait_migrates_to_value() {
         let json = r#"{"Wait":1000}"#;
         let ins: Instruction = serde_json::from_str(json).unwrap();
-        assert_eq!(ins, Instruction::new(InstructionKind::Wait(Value::number(1000.0))));
+        assert_eq!(
+            ins,
+            Instruction::new(InstructionKind::Wait(Value::number(1000.0)))
+        );
     }
 
     #[test]
@@ -1501,48 +1985,134 @@ mod tests {
         let ins: Instruction = serde_json::from_str(json).unwrap();
         assert_eq!(
             ins,
-            Instruction::new(InstructionKind::Token(InputToken::MoveMouse(Value::number(5.0), Value::number(10.0), Coordinate::Rel))),
+            Instruction::new(InstructionKind::Token(InputToken::MoveMouse(
+                Value::number(5.0),
+                Value::number(10.0),
+                Coordinate::Rel
+            ))),
         );
     }
 
     #[test]
     fn rename_variable_renames_declaration_and_every_reference() {
-        let mut mac = Macro::new("Test".into(), "".into(), vec![
-            Instruction::new(InstructionKind::SetVariable("x".to_string(), Value::number(1.0))),
-            Instruction::new(InstructionKind::ChangeVariable("x".to_string(), Value::Var { name: "x".to_string() })),
-            Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var { name: "x".to_string() }))),
-        ]);
-        mac.variables.push(VariableDef { name: "x".to_string(), value: Evaluated::Number(0.0) });
-        mac.floating_values.push(FloatingValue { id: "f1".into(), x: 0, y: 0, value: Value::Var { name: "x".to_string() }, origin_block_id: None });
+        let mut mac = Macro::new(
+            "Test".into(),
+            "".into(),
+            vec![
+                Instruction::new(InstructionKind::SetVariable(
+                    "x".to_string(),
+                    Value::number(1.0),
+                )),
+                Instruction::new(InstructionKind::ChangeVariable(
+                    "x".to_string(),
+                    Value::Var {
+                        name: "x".to_string(),
+                    },
+                )),
+                Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var {
+                    name: "x".to_string(),
+                }))),
+            ],
+        );
+        mac.variables.push(VariableDef {
+            name: "x".to_string(),
+            value: Evaluated::Number(0.0),
+        });
+        mac.floating_values.push(FloatingValue {
+            id: "f1".into(),
+            x: 0,
+            y: 0,
+            value: Value::Var {
+                name: "x".to_string(),
+            },
+            origin_block_id: None,
+        });
 
         mac.rename_variable("x", "y");
 
         assert_eq!(mac.variables[0].name, "y");
         let strand = &mac.strands[0];
-        assert_eq!(strand.instructions[1], Instruction::new(InstructionKind::SetVariable("y".to_string(), Value::number(1.0))));
-        assert_eq!(strand.instructions[2], Instruction::new(InstructionKind::ChangeVariable("y".to_string(), Value::Var { name: "y".to_string() })));
-        assert_eq!(strand.instructions[3], Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var { name: "y".to_string() }))));
-        assert_eq!(mac.floating_values[0].value, Value::Var { name: "y".to_string() });
+        assert_eq!(
+            strand.instructions[1],
+            Instruction::new(InstructionKind::SetVariable(
+                "y".to_string(),
+                Value::number(1.0)
+            ))
+        );
+        assert_eq!(
+            strand.instructions[2],
+            Instruction::new(InstructionKind::ChangeVariable(
+                "y".to_string(),
+                Value::Var {
+                    name: "y".to_string()
+                }
+            ))
+        );
+        assert_eq!(
+            strand.instructions[3],
+            Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var {
+                name: "y".to_string()
+            })))
+        );
+        assert_eq!(
+            mac.floating_values[0].value,
+            Value::Var {
+                name: "y".to_string()
+            }
+        );
     }
 
     #[test]
     fn rename_variable_is_a_no_op_for_undeclared_name() {
-        let mut mac = Macro::new("Test".into(), "".into(), vec![Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var { name: "x".to_string() })))]);
+        let mut mac = Macro::new(
+            "Test".into(),
+            "".into(),
+            vec![Instruction::new(InstructionKind::Token(InputToken::Text(
+                Value::Var {
+                    name: "x".to_string(),
+                },
+            )))],
+        );
         mac.rename_variable("x", "y");
-        assert_eq!(mac.strands[0].instructions[1], Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var { name: "x".to_string() }))));
+        assert_eq!(
+            mac.strands[0].instructions[1],
+            Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var {
+                name: "x".to_string()
+            })))
+        );
     }
 
     #[test]
     fn rename_var_reaches_into_if_body_and_condition() {
         let mut ins = InstructionKind::If {
-            condition: Value::Var { name: "x".to_string() },
-            body: vec![Instruction::new(InstructionKind::SetVariable("x".to_string(), Value::Var { name: "x".to_string() }))],
+            condition: Value::Var {
+                name: "x".to_string(),
+            },
+            body: vec![Instruction::new(InstructionKind::SetVariable(
+                "x".to_string(),
+                Value::Var {
+                    name: "x".to_string(),
+                },
+            ))],
         };
         ins.rename_var("x", "y");
         match &ins {
             InstructionKind::If { condition, body } => {
-                assert_eq!(*condition, Value::Var { name: "y".to_string() });
-                assert_eq!(body[0], Instruction::new(InstructionKind::SetVariable("y".to_string(), Value::Var { name: "y".to_string() })));
+                assert_eq!(
+                    *condition,
+                    Value::Var {
+                        name: "y".to_string()
+                    }
+                );
+                assert_eq!(
+                    body[0],
+                    Instruction::new(InstructionKind::SetVariable(
+                        "y".to_string(),
+                        Value::Var {
+                            name: "y".to_string()
+                        }
+                    ))
+                );
             }
             _ => panic!("expected If"),
         }
@@ -1551,15 +2121,39 @@ mod tests {
     #[test]
     fn rename_var_reaches_into_if_else_both_branches() {
         let mut ins = InstructionKind::IfElse {
-            condition: Value::Var { name: "x".to_string() },
-            then_body: vec![Instruction::new(InstructionKind::SetVariable("x".to_string(), Value::number(1.0)))],
-            else_body: vec![Instruction::new(InstructionKind::SetVariable("x".to_string(), Value::number(2.0)))],
+            condition: Value::Var {
+                name: "x".to_string(),
+            },
+            then_body: vec![Instruction::new(InstructionKind::SetVariable(
+                "x".to_string(),
+                Value::number(1.0),
+            ))],
+            else_body: vec![Instruction::new(InstructionKind::SetVariable(
+                "x".to_string(),
+                Value::number(2.0),
+            ))],
         };
         ins.rename_var("x", "y");
         match &ins {
-            InstructionKind::IfElse { then_body, else_body, .. } => {
-                assert_eq!(then_body[0], Instruction::new(InstructionKind::SetVariable("y".to_string(), Value::number(1.0))));
-                assert_eq!(else_body[0], Instruction::new(InstructionKind::SetVariable("y".to_string(), Value::number(2.0))));
+            InstructionKind::IfElse {
+                then_body,
+                else_body,
+                ..
+            } => {
+                assert_eq!(
+                    then_body[0],
+                    Instruction::new(InstructionKind::SetVariable(
+                        "y".to_string(),
+                        Value::number(1.0)
+                    ))
+                );
+                assert_eq!(
+                    else_body[0],
+                    Instruction::new(InstructionKind::SetVariable(
+                        "y".to_string(),
+                        Value::number(2.0)
+                    ))
+                );
             }
             _ => panic!("expected IfElse"),
         }
@@ -1571,13 +2165,23 @@ mod tests {
             condition: Value::number(1.0),
             body: vec![Instruction::new(InstructionKind::SetVariable(
                 "x".to_string(),
-                Value::Call { block_id: "gone".to_string(), args: vec![], saved: Box::new(Value::number(0.0)) },
+                Value::Call {
+                    block_id: "gone".to_string(),
+                    args: vec![],
+                    saved: Box::new(Value::number(0.0)),
+                },
             ))],
         };
         ins.scrub_block_calls("gone");
         match &ins {
             InstructionKind::If { body, .. } => {
-                assert_eq!(body[0], Instruction::new(InstructionKind::SetVariable("x".to_string(), Value::number(0.0))));
+                assert_eq!(
+                    body[0],
+                    Instruction::new(InstructionKind::SetVariable(
+                        "x".to_string(),
+                        Value::number(0.0)
+                    ))
+                );
             }
             _ => panic!("expected If"),
         }
@@ -1585,8 +2189,16 @@ mod tests {
 
     #[test]
     fn body_mut_addresses_if_and_if_else_slots() {
-        let mut if_ins = InstructionKind::If { condition: Value::number(1.0), body: vec![Instruction::new(InstructionKind::Comment("a".into()))] };
-        assert_eq!(if_ins.body_mut(0), Some(&mut vec![Instruction::new(InstructionKind::Comment("a".into()))]));
+        let mut if_ins = InstructionKind::If {
+            condition: Value::number(1.0),
+            body: vec![Instruction::new(InstructionKind::Comment("a".into()))],
+        };
+        assert_eq!(
+            if_ins.body_mut(0),
+            Some(&mut vec![Instruction::new(InstructionKind::Comment(
+                "a".into()
+            ))])
+        );
         assert_eq!(if_ins.body_mut(1), None);
 
         let mut if_else = InstructionKind::IfElse {
@@ -1594,22 +2206,55 @@ mod tests {
             then_body: vec![Instruction::new(InstructionKind::Comment("then".into()))],
             else_body: vec![Instruction::new(InstructionKind::Comment("else".into()))],
         };
-        assert_eq!(if_else.body_mut(0), Some(&mut vec![Instruction::new(InstructionKind::Comment("then".into()))]));
-        assert_eq!(if_else.body_mut(1), Some(&mut vec![Instruction::new(InstructionKind::Comment("else".into()))]));
+        assert_eq!(
+            if_else.body_mut(0),
+            Some(&mut vec![Instruction::new(InstructionKind::Comment(
+                "then".into()
+            ))])
+        );
+        assert_eq!(
+            if_else.body_mut(1),
+            Some(&mut vec![Instruction::new(InstructionKind::Comment(
+                "else".into()
+            ))])
+        );
         assert_eq!(if_else.body_mut(2), None);
     }
 
     #[test]
     fn body_mut_addresses_loop_slots() {
-        let mut repeat = InstructionKind::Repeat { count: Value::number(3.0), body: vec![Instruction::new(InstructionKind::Comment("a".into()))] };
-        assert_eq!(repeat.body_mut(0), Some(&mut vec![Instruction::new(InstructionKind::Comment("a".into()))]));
+        let mut repeat = InstructionKind::Repeat {
+            count: Value::number(3.0),
+            body: vec![Instruction::new(InstructionKind::Comment("a".into()))],
+        };
+        assert_eq!(
+            repeat.body_mut(0),
+            Some(&mut vec![Instruction::new(InstructionKind::Comment(
+                "a".into()
+            ))])
+        );
         assert_eq!(repeat.body_mut(1), None);
 
-        let mut forever = InstructionKind::Forever { body: vec![Instruction::new(InstructionKind::Comment("b".into()))] };
-        assert_eq!(forever.body_mut(0), Some(&mut vec![Instruction::new(InstructionKind::Comment("b".into()))]));
+        let mut forever = InstructionKind::Forever {
+            body: vec![Instruction::new(InstructionKind::Comment("b".into()))],
+        };
+        assert_eq!(
+            forever.body_mut(0),
+            Some(&mut vec![Instruction::new(InstructionKind::Comment(
+                "b".into()
+            ))])
+        );
 
-        let mut while_ins = InstructionKind::While { condition: Value::Bool, body: vec![Instruction::new(InstructionKind::Comment("c".into()))] };
-        assert_eq!(while_ins.body_mut(0), Some(&mut vec![Instruction::new(InstructionKind::Comment("c".into()))]));
+        let mut while_ins = InstructionKind::While {
+            condition: Value::Bool,
+            body: vec![Instruction::new(InstructionKind::Comment("c".into()))],
+        };
+        assert_eq!(
+            while_ins.body_mut(0),
+            Some(&mut vec![Instruction::new(InstructionKind::Comment(
+                "c".into()
+            ))])
+        );
 
         assert_eq!(InstructionKind::EscapeLoop.body_mut(0), None);
         assert_eq!(InstructionKind::ContinueLoop.body_mut(0), None);

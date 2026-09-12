@@ -15,6 +15,10 @@ pub enum Op {
     Mod,
     /// `args[0]` rounded to the nearest whole number (half away from zero).
     Round,
+    /// Applies the numeric function selected by `args[0]` to `args[1]`.
+    /// The selector is the fixed dropdown in the Scratch-style `([abs v] of ())`
+    /// reporter; trigonometric inputs and outputs are in degrees.
+    Math,
     /// `args[0]`/`args[1]` are inclusive bounds (not operands), resampled
     /// fresh on every `eval`. Picks an integer if both bounds are whole
     /// numbers, otherwise a float.
@@ -219,6 +223,7 @@ pub const OPERATOR_KINDS: &[OperatorKindSpec] = &[
     OperatorKindSpec { kind: "Div", op: Op::Div, arity: 2, default_args: || vec![Value::number(0.0), Value::number(0.0)] },
     OperatorKindSpec { kind: "Mod", op: Op::Mod, arity: 2, default_args: || vec![Value::number(0.0), Value::number(0.0)] },
     OperatorKindSpec { kind: "Round", op: Op::Round, arity: 1, default_args: || vec![Value::number(0.0)] },
+    OperatorKindSpec { kind: "Math", op: Op::Math, arity: 2, default_args: || vec![Value::Text { value: "Abs".to_string() }, Value::number(0.0)] },
     OperatorKindSpec { kind: "Random", op: Op::Random, arity: 2, default_args: || vec![Value::number(0.0), Value::number(0.0)] },
     OperatorKindSpec { kind: "Join", op: Op::Join, arity: 2, default_args: || vec![text_default(), text_default()] },
     OperatorKindSpec { kind: "Join3", op: Op::Join, arity: 3, default_args: || vec![text_default(), text_default(), text_default()] },
@@ -348,6 +353,32 @@ impl Value {
                 Ok(Evaluated::Text(if upper { text.to_uppercase() } else { text.to_lowercase() }))
             }
             Value::Op { op: Op::Round, args, .. } => Ok(Evaluated::Number(args[0].eval_number()?.round())),
+            Value::Op { op: Op::Math, args, .. } => {
+                let function = args[0].eval_text()?;
+                let n = args[1].eval_number()?;
+                let degrees_to_radians = std::f64::consts::PI / 180.0;
+                let radians_to_degrees = 180.0 / std::f64::consts::PI;
+                let result = match function.as_str() {
+                    "Abs" => n.abs(),
+                    "Floor" => n.floor(),
+                    "Ceiling" => n.ceil(),
+                    "Sign" => if n > 0.0 { 1.0 } else if n < 0.0 { -1.0 } else { 0.0 },
+                    "Sqrt" => n.sqrt(),
+                    "Sin" => (n * degrees_to_radians).sin(),
+                    "Cos" => (n * degrees_to_radians).cos(),
+                    "Tan" => (n * degrees_to_radians).tan(),
+                    "Asin" => n.asin() * radians_to_degrees,
+                    "Acos" => n.acos() * radians_to_degrees,
+                    "Atan" => n.atan() * radians_to_degrees,
+                    "Ln" => n.ln(),
+                    "Log" => n.log10(),
+                    "Log2" => n.log2(),
+                    "EPower" => n.exp(),
+                    "TenPower" => 10.0_f64.powf(n),
+                    other => return Err(format!("unknown math function '{other}'")),
+                };
+                Ok(Evaluated::Number(result))
+            }
             Value::Op { op: Op::True, .. } => Ok(Evaluated::Bool(true)),
             Value::Op { op: Op::False, .. } => Ok(Evaluated::Bool(false)),
             Value::Op { op: Op::BatteryPercentage, .. } => Ok(Evaluated::Number(crate::battery::percentage()?)),
@@ -406,7 +437,7 @@ impl Value {
                         }
                     }
                     Op::Join | Op::NewLine | Op::Tab | Op::Length | Op::IndexOf | Op::LastIndexOf | Op::LetterOf | Op::Case
-                    | Op::Round | Op::True | Op::False | Op::Not | Op::And | Op::Or | Op::Eq | Op::Neq | Op::Gt | Op::Lt
+                    | Op::Round | Op::Math | Op::True | Op::False | Op::Not | Op::And | Op::Or | Op::Eq | Op::Neq | Op::Gt | Op::Lt
                     | Op::Gte | Op::Lte | Op::BatteryPercentage | Op::PluggedIn | Op::CurrentTime => unreachable!("matched above"),
                 };
                 Ok(Evaluated::Number(result))
@@ -937,6 +968,37 @@ mod tests {
     fn eval_number_round_rounds_half_away_from_zero() {
         let v = Value::Op { op: Op::Round, args: vec![Value::number(2.5)], saved: Box::new(Value::number(0.0)) };
         assert_eq!(v.eval_number(), Ok(3.0));
+    }
+
+    fn math(function: &str, n: f64) -> Value {
+        Value::Op { op: Op::Math, args: vec![text(function), Value::number(n)], saved: Box::new(Value::number(0.0)) }
+    }
+
+    #[test]
+    fn eval_number_math_functions_match_scratch_conventions() {
+        assert_eq!(math("Abs", -3.5).eval_number(), Ok(3.5));
+        assert_eq!(math("Floor", 2.9).eval_number(), Ok(2.0));
+        assert_eq!(math("Ceiling", 2.1).eval_number(), Ok(3.0));
+        assert_eq!(math("Sign", -2.0).eval_number(), Ok(-1.0));
+        assert_eq!(math("Sign", 0.0).eval_number(), Ok(0.0));
+        assert_eq!(math("Sign", 2.0).eval_number(), Ok(1.0));
+        assert_eq!(math("Sqrt", 9.0).eval_number(), Ok(3.0));
+        assert!((math("Sin", 90.0).eval_number().unwrap() - 1.0).abs() < 1e-12);
+        assert!((math("Cos", 180.0).eval_number().unwrap() + 1.0).abs() < 1e-12);
+        assert!((math("Tan", 45.0).eval_number().unwrap() - 1.0).abs() < 1e-12);
+        assert!((math("Asin", 1.0).eval_number().unwrap() - 90.0).abs() < 1e-12);
+        assert!((math("Acos", 0.0).eval_number().unwrap() - 90.0).abs() < 1e-12);
+        assert!((math("Atan", 1.0).eval_number().unwrap() - 45.0).abs() < 1e-12);
+        assert!((math("Ln", std::f64::consts::E).eval_number().unwrap() - 1.0).abs() < 1e-12);
+        assert_eq!(math("Log", 100.0).eval_number(), Ok(2.0));
+        assert_eq!(math("Log2", 8.0).eval_number(), Ok(3.0));
+        assert!((math("EPower", 1.0).eval_number().unwrap() - std::f64::consts::E).abs() < 1e-12);
+        assert_eq!(math("TenPower", 3.0).eval_number(), Ok(1000.0));
+    }
+
+    #[test]
+    fn eval_number_math_rejects_unknown_function() {
+        assert!(math("Hyperbolic", 1.0).eval_number().is_err());
     }
 
     #[test]

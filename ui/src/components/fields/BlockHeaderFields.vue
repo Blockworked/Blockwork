@@ -32,7 +32,7 @@ function paramDragKind(name: string): string {
 </script>
 
 <template>
-  <Blocks />
+  <Blocks class="custom-block-header-icon" />
   <template v-if="!def">
     <span class="instruction-label">(deleted block)</span>
   </template>
@@ -40,6 +40,8 @@ function paramDragKind(name: string): string {
     <span v-if="piece.kind === 'Label'" class="instruction-label block-header-label">{{ piece.text }}</span>
     <PaletteValueBlock
       v-else
+      class="blockwork-custom-value-block"
+      :style="{ '--blockwork-custom-block-color': def.color }"
       :kind="paramKind(piece.name)"
       :drag-kind="paramDragKind(piece.name)"
       :bool-override="piece.value_type === 'Bool'"

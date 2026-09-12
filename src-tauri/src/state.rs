@@ -1,11 +1,16 @@
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
 use blockwork_core::input::schedule::TimeSchedule;
-use blockwork_core::input::types::{Axis, Coordinate, Direction, InputToken, MacroButton, MacroKey};
+use blockwork_core::input::types::{
+    Axis, Coordinate, Direction, InputToken, MacroButton, MacroKey,
+};
 use blockwork_core::input::value::{Evaluated, Op, Value};
 use blockwork_core::input::{get_mouse_button_names, key_to_string, mouse_button_to_index};
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::thread_pool::ThreadPool;
-use blockwork_core::macros::{BlockDef, BlockPiece, BlockShape, Comment, FloatingValue, InputValueType, Instruction, InstructionKind, Macro, MacroSettings, Strand};
+use blockwork_core::macros::{
+    BlockDef, BlockPiece, BlockShape, Comment, FloatingValue, InputValueType, Instruction,
+    InstructionKind, Macro, MacroSettings, Strand, default_block_color,
+};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -266,7 +271,9 @@ pub(crate) struct MacroSettingsDto {
 }
 
 fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
-    MacroSettingsDto { always_listen: settings.always_listen }
+    MacroSettingsDto {
+        always_listen: settings.always_listen,
+    }
 }
 
 /// One non-default `MacroSettings` field an import wants confirmed — see
@@ -289,8 +296,16 @@ pub(crate) struct ImportPromptDto {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "kind")]
 pub(crate) enum BlockPieceDto {
-    Label { id: String, text: String },
-    Input { id: String, name: String, #[serde(default)] value_type: InputValueType },
+    Label {
+        id: String,
+        text: String,
+    },
+    Input {
+        id: String,
+        name: String,
+        #[serde(default)]
+        value_type: InputValueType,
+    },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -299,24 +314,53 @@ pub(crate) struct BlockDefDto {
     pub(crate) pieces: Vec<BlockPieceDto>,
     #[serde(alias = "returns_value")]
     pub(crate) shape: BlockShape,
+    #[serde(default = "default_block_color")]
+    pub(crate) color: String,
 }
 
 pub(crate) fn block_piece_to_dto(piece: &BlockPiece) -> BlockPieceDto {
     match piece {
-        BlockPiece::Label { id, text } => BlockPieceDto::Label { id: id.clone(), text: text.clone() },
-        BlockPiece::Input { id, name, value_type } => BlockPieceDto::Input { id: id.clone(), name: name.clone(), value_type: *value_type },
+        BlockPiece::Label { id, text } => BlockPieceDto::Label {
+            id: id.clone(),
+            text: text.clone(),
+        },
+        BlockPiece::Input {
+            id,
+            name,
+            value_type,
+        } => BlockPieceDto::Input {
+            id: id.clone(),
+            name: name.clone(),
+            value_type: *value_type,
+        },
     }
 }
 
 pub(crate) fn dto_to_block_piece(dto: &BlockPieceDto) -> BlockPiece {
     match dto {
-        BlockPieceDto::Label { id, text } => BlockPiece::Label { id: id.clone(), text: text.clone() },
-        BlockPieceDto::Input { id, name, value_type } => BlockPiece::Input { id: id.clone(), name: name.clone(), value_type: *value_type },
+        BlockPieceDto::Label { id, text } => BlockPiece::Label {
+            id: id.clone(),
+            text: text.clone(),
+        },
+        BlockPieceDto::Input {
+            id,
+            name,
+            value_type,
+        } => BlockPiece::Input {
+            id: id.clone(),
+            name: name.clone(),
+            value_type: *value_type,
+        },
     }
 }
 
 pub(crate) fn block_def_to_dto(def: &BlockDef) -> BlockDefDto {
-    BlockDefDto { id: def.id.clone(), pieces: def.pieces.iter().map(block_piece_to_dto).collect(), shape: def.shape }
+    BlockDefDto {
+        id: def.id.clone(),
+        pieces: def.pieces.iter().map(block_piece_to_dto).collect(),
+        shape: def.shape,
+        color: def.color.clone(),
+    }
 }
 
 #[derive(Serialize, Clone)]
@@ -337,13 +381,29 @@ pub(crate) struct KeyCaptureDto {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "kind")]
 pub(crate) enum ValueDto {
-    Number { value: f64 },
-    Text { value: String },
+    Number {
+        value: f64,
+    },
+    Text {
+        value: String,
+    },
     Bool,
-    Op { op: Op, args: Vec<ValueDto>, saved: Box<ValueDto> },
-    Var { name: String },
-    Param { name: String },
-    Call { block_id: String, args: Vec<ValueDto>, saved: Box<ValueDto> },
+    Op {
+        op: Op,
+        args: Vec<ValueDto>,
+        saved: Box<ValueDto>,
+    },
+    Var {
+        name: String,
+    },
+    Param {
+        name: String,
+    },
+    Call {
+        block_id: String,
+        args: Vec<ValueDto>,
+        saved: Box<ValueDto>,
+    },
 }
 
 #[derive(Serialize, Clone)]
@@ -360,8 +420,16 @@ pub(crate) struct FloatingValueDto {
 /// within that root. Resolved against a `Macro` by `commands::resolve_location_mut`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub(crate) enum ValueLocation {
-    Field { strand_id: String, index: InstrPath, field_id: FieldId, path: Vec<u8> },
-    Floating { floating_id: String, path: Vec<u8> },
+    Field {
+        strand_id: String,
+        index: InstrPath,
+        field_id: FieldId,
+        path: Vec<u8>,
+    },
+    Floating {
+        floating_id: String,
+        path: Vec<u8>,
+    },
 }
 
 impl ValueLocation {
@@ -378,10 +446,23 @@ impl ValueLocation {
     pub(crate) fn same_root(&self, other: &ValueLocation) -> bool {
         match (self, other) {
             (
-                ValueLocation::Field { strand_id: s1, index: i1, field_id: f1, .. },
-                ValueLocation::Field { strand_id: s2, index: i2, field_id: f2, .. },
+                ValueLocation::Field {
+                    strand_id: s1,
+                    index: i1,
+                    field_id: f1,
+                    ..
+                },
+                ValueLocation::Field {
+                    strand_id: s2,
+                    index: i2,
+                    field_id: f2,
+                    ..
+                },
             ) => s1 == s2 && i1 == i2 && f1 == f2,
-            (ValueLocation::Floating { floating_id: a, .. }, ValueLocation::Floating { floating_id: b, .. }) => a == b,
+            (
+                ValueLocation::Floating { floating_id: a, .. },
+                ValueLocation::Floating { floating_id: b, .. },
+            ) => a == b,
             _ => false,
         }
     }
@@ -411,71 +492,187 @@ pub(crate) enum TextEditSession {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "kind")]
 pub(crate) enum ValueLocationDto {
-    Field { strand_id: String, index: InstrPath, field_id: String, path: Vec<u8> },
-    Floating { floating_id: String, path: Vec<u8> },
+    Field {
+        strand_id: String,
+        index: InstrPath,
+        field_id: String,
+        path: Vec<u8>,
+    },
+    Floating {
+        floating_id: String,
+        path: Vec<u8>,
+    },
 }
 
 impl ValueLocationDto {
     pub(crate) fn to_location(&self) -> Result<ValueLocation, String> {
         Ok(match self {
-            ValueLocationDto::Field { strand_id, index, field_id, path } => ValueLocation::Field {
+            ValueLocationDto::Field {
+                strand_id,
+                index,
+                field_id,
+                path,
+            } => ValueLocation::Field {
                 strand_id: strand_id.clone(),
                 index: index.clone(),
                 field_id: field_id.parse()?,
                 path: path.clone(),
             },
-            ValueLocationDto::Floating { floating_id, path } => {
-                ValueLocation::Floating { floating_id: floating_id.clone(), path: path.clone() }
-            }
+            ValueLocationDto::Floating { floating_id, path } => ValueLocation::Floating {
+                floating_id: floating_id.clone(),
+                path: path.clone(),
+            },
         })
     }
 }
 
 pub(crate) fn location_to_dto(loc: &ValueLocation) -> ValueLocationDto {
     match loc {
-        ValueLocation::Field { strand_id, index, field_id, path } => ValueLocationDto::Field {
+        ValueLocation::Field {
+            strand_id,
+            index,
+            field_id,
+            path,
+        } => ValueLocationDto::Field {
             strand_id: strand_id.clone(),
             index: index.clone(),
             field_id: field_id.to_string(),
             path: path.clone(),
         },
-        ValueLocation::Floating { floating_id, path } => {
-            ValueLocationDto::Floating { floating_id: floating_id.clone(), path: path.clone() }
-        }
+        ValueLocation::Floating { floating_id, path } => ValueLocationDto::Floating {
+            floating_id: floating_id.clone(),
+            path: path.clone(),
+        },
     }
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "type")]
 pub(crate) enum InstructionDto {
-    Wait { id: String, duration: ValueDto },
-    Text { id: String, text: ValueDto },
-    Key { id: String, key: String, direction: String },
-    Button { id: String, button: String, direction: String },
-    MoveMouse { id: String, x: ValueDto, y: ValueDto, coordinate: String },
-    Scroll { id: String, amount: ValueDto, axis: String },
-    Command { id: String, command: String },
-    Comment { id: String, comment: String },
-    WhenRan { id: String },
-    WhenBatteryDischargedTo { id: String, threshold: ValueDto },
-    WhenBatteryChargedTo { id: String, threshold: ValueDto },
-    WhenTime { id: String, schedule: TimeSchedule },
-    WhenPowerPluggedIn { id: String },
-    WhenPowerUnplugged { id: String },
-    OpenApp { id: String, command: String, name: String, icon: Option<String> },
-    CloseApp { id: String, command: String, name: String, icon: Option<String> },
-    SetVariable { id: String, name: String, value: ValueDto },
-    ChangeVariable { id: String, name: String, value: ValueDto },
-    BlockHeader { id: String, block_id: String },
-    CallBlock { id: String, block_id: String, args: Vec<ValueDto> },
-    Return { id: String, value: ValueDto },
-    If { id: String, condition: ValueDto, body: Vec<InstructionDto> },
-    IfElse { id: String, condition: ValueDto, then_body: Vec<InstructionDto>, else_body: Vec<InstructionDto> },
-    Repeat { id: String, count: ValueDto, body: Vec<InstructionDto> },
-    Forever { id: String, body: Vec<InstructionDto> },
-    While { id: String, condition: ValueDto, body: Vec<InstructionDto> },
-    EscapeLoop { id: String },
-    ContinueLoop { id: String },
+    Wait {
+        id: String,
+        duration: ValueDto,
+    },
+    Text {
+        id: String,
+        text: ValueDto,
+    },
+    Key {
+        id: String,
+        key: String,
+        direction: String,
+    },
+    Button {
+        id: String,
+        button: String,
+        direction: String,
+    },
+    MoveMouse {
+        id: String,
+        x: ValueDto,
+        y: ValueDto,
+        coordinate: String,
+    },
+    Scroll {
+        id: String,
+        amount: ValueDto,
+        axis: String,
+    },
+    Command {
+        id: String,
+        command: String,
+    },
+    Comment {
+        id: String,
+        comment: String,
+    },
+    WhenRan {
+        id: String,
+    },
+    WhenBatteryDischargedTo {
+        id: String,
+        threshold: ValueDto,
+    },
+    WhenBatteryChargedTo {
+        id: String,
+        threshold: ValueDto,
+    },
+    WhenTime {
+        id: String,
+        schedule: TimeSchedule,
+    },
+    WhenPowerPluggedIn {
+        id: String,
+    },
+    WhenPowerUnplugged {
+        id: String,
+    },
+    OpenApp {
+        id: String,
+        command: String,
+        name: String,
+        icon: Option<String>,
+    },
+    CloseApp {
+        id: String,
+        command: String,
+        name: String,
+        icon: Option<String>,
+    },
+    SetVariable {
+        id: String,
+        name: String,
+        value: ValueDto,
+    },
+    ChangeVariable {
+        id: String,
+        name: String,
+        value: ValueDto,
+    },
+    BlockHeader {
+        id: String,
+        block_id: String,
+    },
+    CallBlock {
+        id: String,
+        block_id: String,
+        args: Vec<ValueDto>,
+    },
+    Return {
+        id: String,
+        value: ValueDto,
+    },
+    If {
+        id: String,
+        condition: ValueDto,
+        body: Vec<InstructionDto>,
+    },
+    IfElse {
+        id: String,
+        condition: ValueDto,
+        then_body: Vec<InstructionDto>,
+        else_body: Vec<InstructionDto>,
+    },
+    Repeat {
+        id: String,
+        count: ValueDto,
+        body: Vec<InstructionDto>,
+    },
+    Forever {
+        id: String,
+        body: Vec<InstructionDto>,
+    },
+    While {
+        id: String,
+        condition: ValueDto,
+        body: Vec<InstructionDto>,
+    },
+    EscapeLoop {
+        id: String,
+    },
+    ContinueLoop {
+        id: String,
+    },
 }
 
 /// A floating/attached note — see `blockwork_core::macros::Comment`.
@@ -608,76 +805,166 @@ fn str_to_axis(s: &str) -> Axis {
 pub(crate) fn value_to_dto(value: &Value) -> ValueDto {
     match value {
         Value::Number { value } => ValueDto::Number { value: *value },
-        Value::Text { value } => ValueDto::Text { value: value.clone() },
+        Value::Text { value } => ValueDto::Text {
+            value: value.clone(),
+        },
         Value::Bool => ValueDto::Bool,
-        Value::Op { op, args, saved } => {
-            ValueDto::Op { op: *op, args: args.iter().map(value_to_dto).collect(), saved: Box::new(value_to_dto(saved)) }
-        }
+        Value::Op { op, args, saved } => ValueDto::Op {
+            op: *op,
+            args: args.iter().map(value_to_dto).collect(),
+            saved: Box::new(value_to_dto(saved)),
+        },
         Value::Var { name } => ValueDto::Var { name: name.clone() },
         Value::Param { name } => ValueDto::Param { name: name.clone() },
-        Value::Call { block_id, args, saved } => {
-            ValueDto::Call { block_id: block_id.clone(), args: args.iter().map(value_to_dto).collect(), saved: Box::new(value_to_dto(saved)) }
-        }
+        Value::Call {
+            block_id,
+            args,
+            saved,
+        } => ValueDto::Call {
+            block_id: block_id.clone(),
+            args: args.iter().map(value_to_dto).collect(),
+            saved: Box::new(value_to_dto(saved)),
+        },
     }
 }
 
 pub(crate) fn dto_to_value(dto: &ValueDto) -> Value {
     match dto {
         ValueDto::Number { value } => Value::Number { value: *value },
-        ValueDto::Text { value } => Value::Text { value: value.clone() },
+        ValueDto::Text { value } => Value::Text {
+            value: value.clone(),
+        },
         ValueDto::Bool => Value::Bool,
-        ValueDto::Op { op, args, saved } => {
-            Value::Op { op: *op, args: args.iter().map(dto_to_value).collect(), saved: Box::new(dto_to_value(saved)) }
-        }
+        ValueDto::Op { op, args, saved } => Value::Op {
+            op: *op,
+            args: args.iter().map(dto_to_value).collect(),
+            saved: Box::new(dto_to_value(saved)),
+        },
         ValueDto::Var { name } => Value::Var { name: name.clone() },
         ValueDto::Param { name } => Value::Param { name: name.clone() },
-        ValueDto::Call { block_id, args, saved } => {
-            Value::Call { block_id: block_id.clone(), args: args.iter().map(dto_to_value).collect(), saved: Box::new(dto_to_value(saved)) }
-        }
+        ValueDto::Call {
+            block_id,
+            args,
+            saved,
+        } => Value::Call {
+            block_id: block_id.clone(),
+            args: args.iter().map(dto_to_value).collect(),
+            saved: Box::new(dto_to_value(saved)),
+        },
     }
 }
 
 pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
     let id = ins.id.clone();
     match &ins.kind {
-        InstructionKind::Wait(dur) => InstructionDto::Wait { id, duration: value_to_dto(dur) },
-        InstructionKind::Command(cmd) => InstructionDto::Command { id, command: cmd.clone() },
-        InstructionKind::Comment(c) => InstructionDto::Comment { id, comment: c.clone() },
+        InstructionKind::Wait(dur) => InstructionDto::Wait {
+            id,
+            duration: value_to_dto(dur),
+        },
+        InstructionKind::Command(cmd) => InstructionDto::Command {
+            id,
+            command: cmd.clone(),
+        },
+        InstructionKind::Comment(c) => InstructionDto::Comment {
+            id,
+            comment: c.clone(),
+        },
         InstructionKind::WhenRan => InstructionDto::WhenRan { id },
-        InstructionKind::WhenBatteryDischargedTo(threshold) => InstructionDto::WhenBatteryDischargedTo { id, threshold: value_to_dto(threshold) },
-        InstructionKind::WhenBatteryChargedTo(threshold) => InstructionDto::WhenBatteryChargedTo { id, threshold: value_to_dto(threshold) },
-        InstructionKind::WhenTime(schedule) => InstructionDto::WhenTime { id, schedule: *schedule },
+        InstructionKind::WhenBatteryDischargedTo(threshold) => {
+            InstructionDto::WhenBatteryDischargedTo {
+                id,
+                threshold: value_to_dto(threshold),
+            }
+        }
+        InstructionKind::WhenBatteryChargedTo(threshold) => InstructionDto::WhenBatteryChargedTo {
+            id,
+            threshold: value_to_dto(threshold),
+        },
+        InstructionKind::WhenTime(schedule) => InstructionDto::WhenTime {
+            id,
+            schedule: *schedule,
+        },
         InstructionKind::WhenPowerPluggedIn => InstructionDto::WhenPowerPluggedIn { id },
         InstructionKind::WhenPowerUnplugged => InstructionDto::WhenPowerUnplugged { id },
-        InstructionKind::OpenApp { command, name, icon } => InstructionDto::OpenApp { id, command: command.clone(), name: name.clone(), icon: icon.clone() },
-        InstructionKind::CloseApp { command, name, icon } => InstructionDto::CloseApp { id, command: command.clone(), name: name.clone(), icon: icon.clone() },
-        InstructionKind::SetVariable(name, value) => InstructionDto::SetVariable { id, name: name.clone(), value: value_to_dto(value) },
-        InstructionKind::ChangeVariable(name, value) => InstructionDto::ChangeVariable { id, name: name.clone(), value: value_to_dto(value) },
-        InstructionKind::BlockHeader(block_id) => InstructionDto::BlockHeader { id, block_id: block_id.clone() },
-        InstructionKind::CallBlock { block_id, args } => {
-            InstructionDto::CallBlock { id, block_id: block_id.clone(), args: args.iter().map(value_to_dto).collect() }
-        }
-        InstructionKind::Return(value) => InstructionDto::Return { id, value: value_to_dto(value) },
-        InstructionKind::If { condition, body } => {
-            InstructionDto::If { id, condition: value_to_dto(condition), body: body.iter().map(instruction_to_dto).collect() }
-        }
-        InstructionKind::IfElse { condition, then_body, else_body } => InstructionDto::IfElse {
+        InstructionKind::OpenApp {
+            command,
+            name,
+            icon,
+        } => InstructionDto::OpenApp {
+            id,
+            command: command.clone(),
+            name: name.clone(),
+            icon: icon.clone(),
+        },
+        InstructionKind::CloseApp {
+            command,
+            name,
+            icon,
+        } => InstructionDto::CloseApp {
+            id,
+            command: command.clone(),
+            name: name.clone(),
+            icon: icon.clone(),
+        },
+        InstructionKind::SetVariable(name, value) => InstructionDto::SetVariable {
+            id,
+            name: name.clone(),
+            value: value_to_dto(value),
+        },
+        InstructionKind::ChangeVariable(name, value) => InstructionDto::ChangeVariable {
+            id,
+            name: name.clone(),
+            value: value_to_dto(value),
+        },
+        InstructionKind::BlockHeader(block_id) => InstructionDto::BlockHeader {
+            id,
+            block_id: block_id.clone(),
+        },
+        InstructionKind::CallBlock { block_id, args } => InstructionDto::CallBlock {
+            id,
+            block_id: block_id.clone(),
+            args: args.iter().map(value_to_dto).collect(),
+        },
+        InstructionKind::Return(value) => InstructionDto::Return {
+            id,
+            value: value_to_dto(value),
+        },
+        InstructionKind::If { condition, body } => InstructionDto::If {
+            id,
+            condition: value_to_dto(condition),
+            body: body.iter().map(instruction_to_dto).collect(),
+        },
+        InstructionKind::IfElse {
+            condition,
+            then_body,
+            else_body,
+        } => InstructionDto::IfElse {
             id,
             condition: value_to_dto(condition),
             then_body: then_body.iter().map(instruction_to_dto).collect(),
             else_body: else_body.iter().map(instruction_to_dto).collect(),
         },
-        InstructionKind::Repeat { count, body } => {
-            InstructionDto::Repeat { id, count: value_to_dto(count), body: body.iter().map(instruction_to_dto).collect() }
-        }
-        InstructionKind::Forever { body } => InstructionDto::Forever { id, body: body.iter().map(instruction_to_dto).collect() },
-        InstructionKind::While { condition, body } => {
-            InstructionDto::While { id, condition: value_to_dto(condition), body: body.iter().map(instruction_to_dto).collect() }
-        }
+        InstructionKind::Repeat { count, body } => InstructionDto::Repeat {
+            id,
+            count: value_to_dto(count),
+            body: body.iter().map(instruction_to_dto).collect(),
+        },
+        InstructionKind::Forever { body } => InstructionDto::Forever {
+            id,
+            body: body.iter().map(instruction_to_dto).collect(),
+        },
+        InstructionKind::While { condition, body } => InstructionDto::While {
+            id,
+            condition: value_to_dto(condition),
+            body: body.iter().map(instruction_to_dto).collect(),
+        },
         InstructionKind::EscapeLoop => InstructionDto::EscapeLoop { id },
         InstructionKind::ContinueLoop => InstructionDto::ContinueLoop { id },
         InstructionKind::Token(token) => match token {
-            InputToken::Text(t) => InstructionDto::Text { id, text: value_to_dto(t) },
+            InputToken::Text(t) => InstructionDto::Text {
+                id,
+                text: value_to_dto(t),
+            },
             InputToken::Key(k, d) => InstructionDto::Key {
                 id,
                 key: key_to_string(k).unwrap_or("Unknown").to_string(),
@@ -699,7 +986,10 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
                 amount: value_to_dto(amt),
                 axis: axis_to_str(axis).to_string(),
             },
-            InputToken::Raw(_, _) => InstructionDto::Comment { id, comment: "(raw keycode)".to_string() },
+            InputToken::Raw(_, _) => InstructionDto::Comment {
+                id,
+                comment: "(raw keycode)".to_string(),
+            },
         },
     }
 }
@@ -707,64 +997,187 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
 pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
     use blockwork_core::input::{index_to_mouse_button, key_names::string_to_key};
     let (id, kind) = match dto {
-        InstructionDto::Wait { id, duration } => (id, InstructionKind::Wait(dto_to_value(duration))),
-        InstructionDto::Text { id, text } => (id, InstructionKind::Token(InputToken::Text(dto_to_value(text)))),
+        InstructionDto::Wait { id, duration } => {
+            (id, InstructionKind::Wait(dto_to_value(duration)))
+        }
+        InstructionDto::Text { id, text } => (
+            id,
+            InstructionKind::Token(InputToken::Text(dto_to_value(text))),
+        ),
         InstructionDto::Key { id, key, direction } => {
             let mk = string_to_key(key).ok()?;
-            (id, InstructionKind::Token(InputToken::Key(mk, str_to_direction(direction))))
+            (
+                id,
+                InstructionKind::Token(InputToken::Key(mk, str_to_direction(direction))),
+            )
         }
-        InstructionDto::Button { id, button, direction } => {
+        InstructionDto::Button {
+            id,
+            button,
+            direction,
+        } => {
             let names = get_mouse_button_names();
-            let idx = names.iter().position(|&n| n == button.as_str()).unwrap_or(0);
-            (id, InstructionKind::Token(InputToken::Button(index_to_mouse_button(idx), str_to_direction(direction))))
+            let idx = names
+                .iter()
+                .position(|&n| n == button.as_str())
+                .unwrap_or(0);
+            (
+                id,
+                InstructionKind::Token(InputToken::Button(
+                    index_to_mouse_button(idx),
+                    str_to_direction(direction),
+                )),
+            )
         }
-        InstructionDto::MoveMouse { id, x, y, coordinate } => {
-            (id, InstructionKind::Token(InputToken::MoveMouse(dto_to_value(x), dto_to_value(y), str_to_coordinate(coordinate))))
-        }
-        InstructionDto::Scroll { id, amount, axis } => {
-            (id, InstructionKind::Token(InputToken::Scroll(dto_to_value(amount), str_to_axis(axis))))
-        }
+        InstructionDto::MoveMouse {
+            id,
+            x,
+            y,
+            coordinate,
+        } => (
+            id,
+            InstructionKind::Token(InputToken::MoveMouse(
+                dto_to_value(x),
+                dto_to_value(y),
+                str_to_coordinate(coordinate),
+            )),
+        ),
+        InstructionDto::Scroll { id, amount, axis } => (
+            id,
+            InstructionKind::Token(InputToken::Scroll(dto_to_value(amount), str_to_axis(axis))),
+        ),
         InstructionDto::Command { id, command } => (id, InstructionKind::Command(command.clone())),
         InstructionDto::Comment { id, comment } => (id, InstructionKind::Comment(comment.clone())),
         InstructionDto::WhenRan { id } => (id, InstructionKind::WhenRan),
-        InstructionDto::WhenBatteryDischargedTo { id, threshold } => (id, InstructionKind::WhenBatteryDischargedTo(dto_to_value(threshold))),
-        InstructionDto::WhenBatteryChargedTo { id, threshold } => (id, InstructionKind::WhenBatteryChargedTo(dto_to_value(threshold))),
+        InstructionDto::WhenBatteryDischargedTo { id, threshold } => (
+            id,
+            InstructionKind::WhenBatteryDischargedTo(dto_to_value(threshold)),
+        ),
+        InstructionDto::WhenBatteryChargedTo { id, threshold } => (
+            id,
+            InstructionKind::WhenBatteryChargedTo(dto_to_value(threshold)),
+        ),
         InstructionDto::WhenTime { id, schedule } => (id, InstructionKind::WhenTime(*schedule)),
         InstructionDto::WhenPowerPluggedIn { id } => (id, InstructionKind::WhenPowerPluggedIn),
         InstructionDto::WhenPowerUnplugged { id } => (id, InstructionKind::WhenPowerUnplugged),
-        InstructionDto::OpenApp { id, command, name, icon } => (id, InstructionKind::OpenApp { command: command.clone(), name: name.clone(), icon: icon.clone() }),
-        InstructionDto::CloseApp { id, command, name, icon } => (id, InstructionKind::CloseApp { command: command.clone(), name: name.clone(), icon: icon.clone() }),
-        InstructionDto::SetVariable { id, name, value } => (id, InstructionKind::SetVariable(name.clone(), dto_to_value(value))),
-        InstructionDto::ChangeVariable { id, name, value } => (id, InstructionKind::ChangeVariable(name.clone(), dto_to_value(value))),
-        InstructionDto::BlockHeader { id, block_id } => (id, InstructionKind::BlockHeader(block_id.clone())),
-        InstructionDto::CallBlock { id, block_id, args } => {
-            (id, InstructionKind::CallBlock { block_id: block_id.clone(), args: args.iter().map(dto_to_value).collect() })
+        InstructionDto::OpenApp {
+            id,
+            command,
+            name,
+            icon,
+        } => (
+            id,
+            InstructionKind::OpenApp {
+                command: command.clone(),
+                name: name.clone(),
+                icon: icon.clone(),
+            },
+        ),
+        InstructionDto::CloseApp {
+            id,
+            command,
+            name,
+            icon,
+        } => (
+            id,
+            InstructionKind::CloseApp {
+                command: command.clone(),
+                name: name.clone(),
+                icon: icon.clone(),
+            },
+        ),
+        InstructionDto::SetVariable { id, name, value } => (
+            id,
+            InstructionKind::SetVariable(name.clone(), dto_to_value(value)),
+        ),
+        InstructionDto::ChangeVariable { id, name, value } => (
+            id,
+            InstructionKind::ChangeVariable(name.clone(), dto_to_value(value)),
+        ),
+        InstructionDto::BlockHeader { id, block_id } => {
+            (id, InstructionKind::BlockHeader(block_id.clone()))
         }
+        InstructionDto::CallBlock { id, block_id, args } => (
+            id,
+            InstructionKind::CallBlock {
+                block_id: block_id.clone(),
+                args: args.iter().map(dto_to_value).collect(),
+            },
+        ),
         InstructionDto::Return { id, value } => (id, InstructionKind::Return(dto_to_value(value))),
-        InstructionDto::If { id, condition, body } => (id, InstructionKind::If {
-            condition: dto_to_value(condition),
-            body: body.iter().map(dto_to_instruction).collect::<Option<Vec<_>>>()?,
-        }),
-        InstructionDto::IfElse { id, condition, then_body, else_body } => (id, InstructionKind::IfElse {
-            condition: dto_to_value(condition),
-            then_body: then_body.iter().map(dto_to_instruction).collect::<Option<Vec<_>>>()?,
-            else_body: else_body.iter().map(dto_to_instruction).collect::<Option<Vec<_>>>()?,
-        }),
-        InstructionDto::Repeat { id, count, body } => (id, InstructionKind::Repeat {
-            count: dto_to_value(count),
-            body: body.iter().map(dto_to_instruction).collect::<Option<Vec<_>>>()?,
-        }),
-        InstructionDto::Forever { id, body } => {
-            (id, InstructionKind::Forever { body: body.iter().map(dto_to_instruction).collect::<Option<Vec<_>>>()? })
-        }
-        InstructionDto::While { id, condition, body } => (id, InstructionKind::While {
-            condition: dto_to_value(condition),
-            body: body.iter().map(dto_to_instruction).collect::<Option<Vec<_>>>()?,
-        }),
+        InstructionDto::If {
+            id,
+            condition,
+            body,
+        } => (
+            id,
+            InstructionKind::If {
+                condition: dto_to_value(condition),
+                body: body
+                    .iter()
+                    .map(dto_to_instruction)
+                    .collect::<Option<Vec<_>>>()?,
+            },
+        ),
+        InstructionDto::IfElse {
+            id,
+            condition,
+            then_body,
+            else_body,
+        } => (
+            id,
+            InstructionKind::IfElse {
+                condition: dto_to_value(condition),
+                then_body: then_body
+                    .iter()
+                    .map(dto_to_instruction)
+                    .collect::<Option<Vec<_>>>()?,
+                else_body: else_body
+                    .iter()
+                    .map(dto_to_instruction)
+                    .collect::<Option<Vec<_>>>()?,
+            },
+        ),
+        InstructionDto::Repeat { id, count, body } => (
+            id,
+            InstructionKind::Repeat {
+                count: dto_to_value(count),
+                body: body
+                    .iter()
+                    .map(dto_to_instruction)
+                    .collect::<Option<Vec<_>>>()?,
+            },
+        ),
+        InstructionDto::Forever { id, body } => (
+            id,
+            InstructionKind::Forever {
+                body: body
+                    .iter()
+                    .map(dto_to_instruction)
+                    .collect::<Option<Vec<_>>>()?,
+            },
+        ),
+        InstructionDto::While {
+            id,
+            condition,
+            body,
+        } => (
+            id,
+            InstructionKind::While {
+                condition: dto_to_value(condition),
+                body: body
+                    .iter()
+                    .map(dto_to_instruction)
+                    .collect::<Option<Vec<_>>>()?,
+            },
+        ),
         InstructionDto::EscapeLoop { id } => (id, InstructionKind::EscapeLoop),
         InstructionDto::ContinueLoop { id } => (id, InstructionKind::ContinueLoop),
     };
-    Some(Instruction { id: id.clone(), kind })
+    Some(Instruction {
+        id: id.clone(),
+        kind,
+    })
 }
 
 fn strand_to_dto(strand: &Strand) -> StrandDto {
@@ -777,11 +1190,24 @@ fn strand_to_dto(strand: &Strand) -> StrandDto {
 }
 
 fn floating_value_to_dto(fv: &FloatingValue) -> FloatingValueDto {
-    FloatingValueDto { id: fv.id.clone(), x: fv.x, y: fv.y, value: value_to_dto(&fv.value), origin_block_id: fv.origin_block_id.clone() }
+    FloatingValueDto {
+        id: fv.id.clone(),
+        x: fv.x,
+        y: fv.y,
+        value: value_to_dto(&fv.value),
+        origin_block_id: fv.origin_block_id.clone(),
+    }
 }
 
 fn comment_to_dto(c: &Comment) -> CommentDto {
-    CommentDto { id: c.id.clone(), x: c.x, y: c.y, text: c.text.clone(), collapsed: c.collapsed, attached_to: c.attached_to.clone() }
+    CommentDto {
+        id: c.id.clone(),
+        x: c.x,
+        y: c.y,
+        text: c.text.clone(),
+        collapsed: c.collapsed,
+        attached_to: c.attached_to.clone(),
+    }
 }
 
 fn macro_to_dto(mac: &Macro) -> MacroDto {
@@ -792,7 +1218,11 @@ fn macro_to_dto(mac: &Macro) -> MacroDto {
         strands: mac.strands.iter().map(strand_to_dto).collect(),
         recording_target_strand_id: mac.recording_target_id(),
         speed_multiplier: mac.speed_multiplier,
-        floating_values: mac.floating_values.iter().map(floating_value_to_dto).collect(),
+        floating_values: mac
+            .floating_values
+            .iter()
+            .map(floating_value_to_dto)
+            .collect(),
         comments: mac.comments.iter().map(comment_to_dto).collect(),
         variables: mac.variables.iter().map(|v| v.name.clone()).collect(),
         block_defs: mac.block_defs.iter().map(block_def_to_dto).collect(),
@@ -811,7 +1241,9 @@ fn hotkey_action_to_dto(action: &HotkeyAction) -> HotkeyActionDto {
         HotkeyAction::StopRecording => HotkeyActionDto::StopRecording,
         HotkeyAction::Undo => HotkeyActionDto::Undo,
         HotkeyAction::Redo => HotkeyActionDto::Redo,
-        HotkeyAction::RunSpecificMacro(id) => HotkeyActionDto::RunSpecificMacro { macro_id: id.clone() },
+        HotkeyAction::RunSpecificMacro(id) => HotkeyActionDto::RunSpecificMacro {
+            macro_id: id.clone(),
+        },
     }
 }
 
@@ -826,7 +1258,9 @@ pub(crate) fn dto_to_hotkey_action(dto: &HotkeyActionDto) -> HotkeyAction {
         HotkeyActionDto::StopRecording => HotkeyAction::StopRecording,
         HotkeyActionDto::Undo => HotkeyAction::Undo,
         HotkeyActionDto::Redo => HotkeyAction::Redo,
-        HotkeyActionDto::RunSpecificMacro { macro_id } => HotkeyAction::RunSpecificMacro(macro_id.clone()),
+        HotkeyActionDto::RunSpecificMacro { macro_id } => {
+            HotkeyAction::RunSpecificMacro(macro_id.clone())
+        }
     }
 }
 
@@ -834,9 +1268,18 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
     let current_macro = s.current_macro.as_ref().map(macro_to_dto);
 
     let recording_phase = match &s.recording_phase {
-        RecordingPhase::Idle => RecordingPhaseDto { phase: "Idle".to_string(), countdown: None },
-        RecordingPhase::Countdown(n) => RecordingPhaseDto { phase: "Countdown".to_string(), countdown: Some(*n) },
-        RecordingPhase::Active => RecordingPhaseDto { phase: "Active".to_string(), countdown: None },
+        RecordingPhase::Idle => RecordingPhaseDto {
+            phase: "Idle".to_string(),
+            countdown: None,
+        },
+        RecordingPhase::Countdown(n) => RecordingPhaseDto {
+            phase: "Countdown".to_string(),
+            countdown: Some(*n),
+        },
+        RecordingPhase::Active => RecordingPhaseDto {
+            phase: "Active".to_string(),
+            countdown: None,
+        },
     };
 
     let combo_capture = s.combo_capture.as_ref().map(|cc| match cc {
@@ -853,20 +1296,28 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
     let macros_data: Vec<MacroDto> = s.macros_list.iter().map(macro_to_dto).collect();
 
     let macros_list = &s.macros_list;
-    let hotkey_bindings: Vec<HotkeyBindingDto> = s.hotkey_bindings.iter().enumerate().map(|(i, b)| {
-        let macro_name = if let HotkeyAction::RunSpecificMacro(ref id) = b.action {
-            macros_list.iter().find(|m| &m.id == id).map(|m| m.name.clone())
-                .or_else(|| Some("(deleted)".to_string()))
-        } else {
-            None
+    let hotkey_bindings: Vec<HotkeyBindingDto> = s
+        .hotkey_bindings
+        .iter()
+        .enumerate()
+        .map(|(i, b)| {
+            let macro_name = if let HotkeyAction::RunSpecificMacro(ref id) = b.action {
+                macros_list
+                    .iter()
+                    .find(|m| &m.id == id)
+                    .map(|m| m.name.clone())
+                    .or_else(|| Some("(deleted)".to_string()))
+            } else {
+                None
         };
         HotkeyBindingDto {
             binding_index: i,
             action: hotkey_action_to_dto(&b.action),
-            combo_display: b.combo.format(),
-            macro_name,
-        }
-    }).collect();
+                combo_display: b.combo.format(),
+                macro_name,
+            }
+        })
+        .collect();
 
     const NAMED_HOTKEY_ACTIONS: [HotkeyAction; 9] = [
         HotkeyAction::RunMacro,
@@ -879,21 +1330,31 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         HotkeyAction::Undo,
         HotkeyAction::Redo,
     ];
-    let named_hotkey_defaults: Vec<NamedHotkeyDefaultDto> = NAMED_HOTKEY_ACTIONS.iter().map(|action| {
-        NamedHotkeyDefaultDto {
+    let named_hotkey_defaults: Vec<NamedHotkeyDefaultDto> = NAMED_HOTKEY_ACTIONS
+        .iter()
+        .map(|action| NamedHotkeyDefaultDto {
             action: hotkey_action_to_dto(action),
-            combo_display: blockwork_core::config::default_combo_for_action(action).map(|c| c.format()),
-        }
-    }).collect();
+            combo_display: blockwork_core::config::default_combo_for_action(action)
+                .map(|c| c.format()),
+        })
+        .collect();
 
-    let pending_macro_hotkey = s.pending_macro_hotkey.as_ref().map(|(idx, combo)| PendingMacroHotkeyDto {
-        macro_index: *idx,
-        combo_display: combo.as_ref().map(|c| c.format()),
-    });
+    let pending_macro_hotkey =
+        s.pending_macro_hotkey
+            .as_ref()
+            .map(|(idx, combo)| PendingMacroHotkeyDto {
+                macro_index: *idx,
+                combo_display: combo.as_ref().map(|c| c.format()),
+            });
 
-    let invalid_field_buffers: Vec<InvalidFieldDto> = s.invalid_field_buffers.iter().map(|(location, text)| {
-        InvalidFieldDto { location: location_to_dto(location), text: text.clone() }
-    }).collect();
+    let invalid_field_buffers: Vec<InvalidFieldDto> = s
+        .invalid_field_buffers
+        .iter()
+        .map(|(location, text)| InvalidFieldDto {
+            location: location_to_dto(location),
+            text: text.clone(),
+        })
+        .collect();
 
     let key_capture = s.key_capture.as_ref().map(|target| match target {
         KeyCaptureTarget::Strand(strand_id, index) => KeyCaptureDto {
@@ -911,12 +1372,36 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
     let is_looping = s.is_looping.lock().map(|g| *g).unwrap_or(false);
 
     let update_check_state = match &s.update_check_state {
-        UpdateCheckState::Idle => UpdateCheckStateDto { state: "Idle".to_string(), version: None, error: None },
-        UpdateCheckState::Checking => UpdateCheckStateDto { state: "Checking".to_string(), version: None, error: None },
-        UpdateCheckState::UpToDate => UpdateCheckStateDto { state: "UpToDate".to_string(), version: None, error: None },
-        UpdateCheckState::UpdateAvailable(v) => UpdateCheckStateDto { state: "UpdateAvailable".to_string(), version: Some(v.clone()), error: None },
-        UpdateCheckState::Applying => UpdateCheckStateDto { state: "Applying".to_string(), version: None, error: None },
-        UpdateCheckState::Error(e) => UpdateCheckStateDto { state: "Error".to_string(), version: None, error: Some(e.clone()) },
+        UpdateCheckState::Idle => UpdateCheckStateDto {
+            state: "Idle".to_string(),
+            version: None,
+            error: None,
+        },
+        UpdateCheckState::Checking => UpdateCheckStateDto {
+            state: "Checking".to_string(),
+            version: None,
+            error: None,
+        },
+        UpdateCheckState::UpToDate => UpdateCheckStateDto {
+            state: "UpToDate".to_string(),
+            version: None,
+            error: None,
+        },
+        UpdateCheckState::UpdateAvailable(v) => UpdateCheckStateDto {
+            state: "UpdateAvailable".to_string(),
+            version: Some(v.clone()),
+            error: None,
+        },
+        UpdateCheckState::Applying => UpdateCheckStateDto {
+            state: "Applying".to_string(),
+            version: None,
+            error: None,
+        },
+        UpdateCheckState::Error(e) => UpdateCheckStateDto {
+            state: "Error".to_string(),
+            version: None,
+            error: Some(e.clone()),
+        },
     };
 
     StateDto {
@@ -939,7 +1424,10 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         recording_phase,
         record_mouse_relative: s.record_mouse_relative,
         record_mouse_movement: s.record_mouse_movement,
-        page: match s.page { Page::Main => "Main".to_string(), Page::Settings => "Settings".to_string() },
+        page: match s.page {
+            Page::Main => "Main".to_string(),
+            Page::Settings => "Settings".to_string(),
+        },
         combo_capture,
         hotkey_bindings,
         named_hotkey_defaults,

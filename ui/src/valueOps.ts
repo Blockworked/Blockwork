@@ -33,6 +33,29 @@ const CASE_OPTIONS = [
   { value: 'Lower', label: 'lowercase' },
 ];
 
+// Scratch's `([abs v] of ())` number reporter. Trig values use degrees; the
+// backend owns that behavior, while these strings are the serialized dropdown
+// values it matches on. `log2` appears in the supplied Scratch menu alongside
+// the standard base-10 `log`.
+const MATH_OPTIONS = [
+  { value: 'Abs', label: 'abs' },
+  { value: 'Floor', label: 'floor' },
+  { value: 'Ceiling', label: 'ceiling' },
+  { value: 'Sign', label: 'sign' },
+  { value: 'Sqrt', label: 'sqrt' },
+  { value: 'Sin', label: 'sin' },
+  { value: 'Cos', label: 'cos' },
+  { value: 'Tan', label: 'tan' },
+  { value: 'Asin', label: 'asin' },
+  { value: 'Acos', label: 'acos' },
+  { value: 'Atan', label: 'atan' },
+  { value: 'Ln', label: 'ln' },
+  { value: 'Log', label: 'log' },
+  { value: 'Log2', label: 'log2' },
+  { value: 'EPower', label: 'e ^' },
+  { value: 'TenPower', label: '10 ^' },
+];
+
 // Mirrors blockwork-core's `Value::eval`'s `Op::CurrentTime` match arm — always
 // numeric (`DayOfWeek` is 1=Sunday..7=Saturday, `Hour` is always 24-hour),
 // matching Scratch's own "current ()" sensing block.
@@ -53,6 +76,7 @@ export const OPERATOR_KINDS: OperatorKindSpec[] = [
   { kind: 'Div', op: 'Div', arity: 2, argTypes: ['number', 'number'], resultType: 'number', infix: '/' },
   { kind: 'Mod', op: 'Mod', arity: 2, argTypes: ['number', 'number'], resultType: 'number', infix: 'mod' },
   { kind: 'Round', op: 'Round', arity: 1, argTypes: ['number'], resultType: 'number', prefix: 'round' },
+  { kind: 'Math', op: 'Math', arity: 2, argTypes: ['text', 'number'], resultType: 'number', infix: 'of', enumArg: { index: 0, options: MATH_OPTIONS } },
   { kind: 'Random', op: 'Random', arity: 2, argTypes: ['number', 'number'], resultType: 'number', prefix: 'pick random from', infix: 'to' },
   { kind: 'Join', op: 'Join', arity: 2, argTypes: ['text', 'text'], resultType: 'text', prefix: 'join' },
   { kind: 'Join3', op: 'Join', arity: 3, argTypes: ['text', 'text', 'text'], resultType: 'text', prefix: 'join' },

@@ -39,10 +39,10 @@ export const createVariable = (name: string) => invoke<void>('create_variable', 
 export const renameVariable = (oldName: string, newName: string) =>
   invoke<void>('rename_variable', { oldName, newName });
 export const deleteVariable = (name: string) => invoke<void>('delete_variable', { name });
-export const createBlock = (pieces: BlockPieceDto[], shape: BlockShapeDto) =>
-  invoke<string>('create_block', { pieces, shape });
-export const editBlock = (blockId: string, pieces: BlockPieceDto[], shape: BlockShapeDto) =>
-  invoke<void>('edit_block', { blockId, pieces, shape });
+export const createBlock = (pieces: BlockPieceDto[], shape: BlockShapeDto, color: string) =>
+  invoke<string>('create_block', { pieces, shape, color });
+export const editBlock = (blockId: string, pieces: BlockPieceDto[], shape: BlockShapeDto, color: string) =>
+  invoke<void>('edit_block', { blockId, pieces, shape, color });
 export const deleteBlock = (blockId: string) => invoke<void>('delete_block', { blockId });
 
 // ─── Instructions ───────────────────────────────────────────────────────────

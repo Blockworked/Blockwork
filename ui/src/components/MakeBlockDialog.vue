@@ -8,7 +8,7 @@
 // createBlock/editBlock on OK, so Cancel is a true no-op.
 import type { ComponentPublicInstance } from 'vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
-import { Blocks, ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
+import { Blocks, ChevronLeft, ChevronRight, Pipette, X } from 'lucide-vue-next';
 import { createBlock, editBlock } from '../tauri';
 import { blockShapeReturnsValue } from '../types';
 import type { BlockDefDto, BlockPieceDto, BlockShapeDto, InputValueType } from '../types';
@@ -30,6 +30,61 @@ const pieces = reactive<BlockPieceDto[]>(
   props.editTarget ? props.editTarget.pieces.map(p => ({ ...p })) : [{ kind: 'Label', id: newPieceId(), text: 'block name' }],
 );
 const shape = ref<BlockShapeDto>(props.editTarget?.shape ?? 'Normal');
+const color = ref(props.editTarget?.color ?? '#4C97FF');
+// The final swatch opens a native color picker for colors outside this palette.
+const COLOR_PRESETS = [
+  '#4C97FF', '#9966FF', '#C65BCF', '#FFBF00', '#FFAB19', '#5BA9D0',
+  '#59C059', '#FF8C1A', '#FF5B1F', '#FF6680', '#19B88E', '#FF4D4F',
+  '#FF7F7F', '#FFB77B', '#FFF28A', '#8BF77A', '#78F0B0', '#70D5E8',
+  '#7DB5F5', '#8080F5', '#C667E8', '#F27AED', '#B3B3B3',
+] as const;
+const isPresetColor = computed(() => COLOR_PRESETS.includes(color.value as typeof COLOR_PRESETS[number]));
+function selectColor(next: string) {
+  color.value = next;
+}
+const customPickerOpen = ref(false);
+const customHue = ref(215);
+const customSaturation = ref(100);
+const customLightness = ref(65);
+const customColor = computed(() => hslToHex(customHue.value, customSaturation.value, customLightness.value));
+
+function hslToHex(hue: number, saturation: number, lightness: number): string {
+  const s = saturation / 100;
+  const l = lightness / 100;
+  const c = (1 - Math.abs(2 * l - 1)) * s;
+  const x = c * (1 - Math.abs((hue / 60) % 2 - 1));
+  const m = l - c / 2;
+  const [r, g, b] = hue < 60 ? [c, x, 0] : hue < 120 ? [x, c, 0] : hue < 180 ? [0, c, x] : hue < 240 ? [0, x, c] : hue < 300 ? [x, 0, c] : [c, 0, x];
+  return `#${[r, g, b].map(v => Math.round((v + m) * 255).toString(16).padStart(2, '0')).join('').toUpperCase()}`;
+}
+
+function hexToHsl(hex: string): [number, number, number] | null {
+  const match = /^#([\dA-F]{6})$/i.exec(hex);
+  if (!match) return null;
+  const channels = [0, 2, 4].map(i => parseInt(match[1].slice(i, i + 2), 16) / 255);
+  const max = Math.max(...channels);
+  const min = Math.min(...channels);
+  const delta = max - min;
+  const l = (max + min) / 2;
+  const s = delta === 0 ? 0 : delta / (1 - Math.abs(2 * l - 1));
+  let h = 0;
+  if (delta !== 0) {
+    h = max === channels[0] ? 60 * (((channels[1] - channels[2]) / delta) % 6)
+      : max === channels[1] ? 60 * ((channels[2] - channels[0]) / delta + 2)
+        : 60 * ((channels[0] - channels[1]) / delta + 4);
+  }
+  return [(h + 360) % 360, s * 100, l * 100];
+}
+
+function openCustomPicker() {
+  const hsl = hexToHsl(color.value);
+  if (hsl) [customHue.value, customSaturation.value, customLightness.value] = hsl;
+  customPickerOpen.value = !customPickerOpen.value;
+}
+
+function updateCustomColor() {
+  color.value = customColor.value;
+}
 // The "returns a value" checkbox is a view over `shape`, not separate state
 // of its own — it just picks which pair of mutually-exclusive shapes the two
 // wide buttons below offer (Normal/Ending vs ReturnsValue/ReturnsBool).
@@ -268,9 +323,9 @@ async function onOk() {
     // as part of this same click, and this makes the guarantee explicit.
     const snapshot = pieces.map(p => (p.kind === 'Label' ? { ...p, text: p.text.trim() } : { ...p, name: p.name.trim() }));
     if (props.editTarget) {
-      await editBlock(props.editTarget.id, snapshot, shape.value);
+      await editBlock(props.editTarget.id, snapshot, shape.value, color.value);
     } else {
-      await createBlock(snapshot, shape.value);
+      await createBlock(snapshot, shape.value, color.value);
     }
     emit('close');
   } catch (e) {
@@ -326,7 +381,8 @@ function onCancel() {
             <span
               v-if="isValueMode"
               class="value-block"
-              :class="shape === 'ReturnsBool' ? 'value-card-shape-bool' : 'value-card-shape'"
+              :class="[shape === 'ReturnsBool' ? 'value-card-shape-bool' : 'value-card-shape', 'blockwork-custom-value-block']"
+              :style="{ '--blockwork-custom-block-color': color }"
               ref="previewShapeEl"
               @pointerdown.self="selectedIndex = null"
             >
@@ -357,7 +413,12 @@ function onCancel() {
               </template>
             </span>
 
-            <div v-else class="instruction-row" :class="{ 'instruction-row-cap': shape === 'Ending' }">
+            <div
+              v-else
+              class="instruction-row blockwork-custom-block"
+              :class="{ 'instruction-row-cap': shape === 'Ending' }"
+              :style="{ '--blockwork-custom-block-color': color }"
+            >
               <div class="instruction-shape" ref="previewShapeEl">
                 <Blocks class="instruction-type-icon" />
                 <div class="instruction-content" @pointerdown.self="selectedIndex = null">
@@ -389,6 +450,45 @@ function onCancel() {
                 </div>
               </div>
             </div>
+          </div>
+        </div>
+
+        <div class="make-block-color-row">
+          <div class="make-block-color-picker-wrap">
+          <div class="make-block-color-picker" role="radiogroup" aria-label="Block color">
+            <button
+              v-for="preset in COLOR_PRESETS"
+              :key="preset"
+              type="button"
+              class="make-block-color-swatch"
+              :class="{ 'make-block-color-swatch-selected': color === preset }"
+              :style="{ background: preset }"
+              :aria-label="`Use ${preset}`"
+              :aria-checked="color === preset"
+              role="radio"
+              @click="selectColor(preset)"
+            />
+            <button
+              type="button"
+              class="make-block-color-swatch make-block-color-custom"
+              :class="{ 'make-block-color-swatch-selected': customPickerOpen || !isPresetColor }"
+              title="Choose a custom color"
+              aria-label="Choose a custom block color"
+              @click="openCustomPicker"
+            >
+              <Pipette aria-hidden="true" />
+            </button>
+          </div>
+          <div v-if="customPickerOpen" class="make-block-manual-picker">
+            <div class="make-block-manual-preview" :style="{ background: customColor }" aria-hidden="true" />
+            <div class="make-block-manual-controls">
+              <label>Hue <input v-model.number="customHue" type="range" min="0" max="359" @input="updateCustomColor" /></label>
+              <label>Saturation <input v-model.number="customSaturation" type="range" min="0" max="100" @input="updateCustomColor" /></label>
+              <label>Lightness <input v-model.number="customLightness" type="range" min="0" max="100" @input="updateCustomColor" /></label>
+            </div>
+            <span class="make-block-manual-hex">{{ customColor }}</span>
+            <button type="button" class="btn-primary make-block-manual-done" @click="customPickerOpen = false">Done</button>
+          </div>
           </div>
         </div>
 

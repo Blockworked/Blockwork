@@ -31,7 +31,8 @@ function onContextMenu(e: MouseEvent) {
 <template>
   <span
     class="value-block palette-prefab"
-    :class="def.shape === 'ReturnsBool' ? 'value-card-shape-bool' : 'value-card-shape'"
+    :class="[def.shape === 'ReturnsBool' ? 'value-card-shape-bool' : 'value-card-shape', 'blockwork-custom-value-block', 'blockwork-custom-operator']"
+    :style="{ '--blockwork-custom-block-color': def.color }"
     @pointerdown="onPointerDown"
     @contextmenu="onContextMenu"
   >

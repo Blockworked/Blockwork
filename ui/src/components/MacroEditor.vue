@@ -7,6 +7,7 @@ import { Canvas } from 'blockstitch';
 import EditorToolbar from './EditorToolbar.vue';
 import ContextMenu from './ContextMenu.vue';
 import DetailsDialog from './DetailsDialog.vue';
+import CustomBlockCanvasColorSync from './CustomBlockCanvasColorSync.vue';
 
 const isRecording = computed(() => state.recording_phase.phase === 'Active');
 const speedMultiplier = computed(() => state.current_macro?.speed_multiplier ?? 1);
@@ -84,5 +85,6 @@ function onSpeedNumberChange(e: Event) {
 
     <EditorToolbar />
     <DetailsDialog />
+    <CustomBlockCanvasColorSync />
   </div>
 </template>
