@@ -1,4 +1,9 @@
-// Operator value-block kinds.
+// Single source of truth for every operator value-block kind - mirrors
+// blockwork-core/src/input/value.rs's OPERATOR_KINDS. Add a new operator (or
+// arity variant, like Join/Join3) as one row here.
+//
+// Type-only import below avoids a circular-init hazard with types.ts.
+import { reactive } from 'vue';
 import type { ValueDto, ValueKind, ValueOp } from './types';
 
 /** Every operator `ValueKind` (excludes the `Number`/`Text` leaves). */
@@ -12,6 +17,10 @@ export interface OperatorKindSpec {
   resultType: 'number' | 'text' | 'bool';
   prefix?: string;
   infix?: string;
+  /** Rendered after the final arg. */
+  suffix?: string;
+  /** If set, `args[enumArg.index]` is a fixed dropdown choice, not a
+   * draggable Value slot - e.g. Case's upper/lowercase toggle. */
   enumArg?: { index: number; options: { value: string; label: string }[] };
 }
 
@@ -39,6 +48,24 @@ const MATH_OPTIONS = [
   { value: 'TenPower', label: '10 ^' },
 ];
 
+/** Live list-name choices shared by real and palette value blocks. The
+ * reactive array stays stable so blockstitch's registered operator specs see
+ * updates when a list is created, renamed, or deleted. */
+// The palette initializes before backend state arrives, so both arrays need a
+// usable first option immediately (defaultArgFor reads options[0]). They are
+// replaced with the real macro lists as soon as the sidebar mounts.
+export const LIST_NAME_OPTIONS = reactive<{ value: string; label: string }[]>([{ value: '', label: 'list' }]);
+const LIST_EMPTY_OPTIONS = reactive<{ value: string; label: string }[]>([{ value: '', label: 'list' }]);
+
+export function setListNameOptions(names: string[]) {
+  const choices = names.length ? names : [''];
+  LIST_NAME_OPTIONS.splice(0, LIST_NAME_OPTIONS.length, ...choices.map(name => ({ value: name, label: name || 'list' })));
+  LIST_EMPTY_OPTIONS.splice(0, LIST_EMPTY_OPTIONS.length, ...choices.map(name => ({ value: name, label: name || 'list' })));
+}
+
+// Mirrors blockwork-core's `Value::eval`'s `Op::CurrentTime` match arm - always
+// numeric (`DayOfWeek` is 1=Sunday..7=Saturday, `Hour` is always 24-hour),
+// matching Scratch's own "current ()" sensing block.
 const CURRENT_TIME_OPTIONS = [
   { value: 'Year', label: 'year' },
   { value: 'Month', label: 'month' },
@@ -81,6 +108,13 @@ export const OPERATOR_KINDS: OperatorKindSpec[] = [
   { kind: 'BatteryPercentage', op: 'BatteryPercentage', arity: 0, argTypes: [], resultType: 'number', prefix: 'battery percentage' },
   { kind: 'PluggedIn', op: 'PluggedIn', arity: 0, argTypes: [], resultType: 'bool', prefix: 'plugged in?' },
   { kind: 'CurrentTime', op: 'CurrentTime', arity: 1, argTypes: ['text'], resultType: 'number', prefix: 'current', enumArg: { index: 0, options: CURRENT_TIME_OPTIONS } },
+  { kind: 'ListItem', op: 'ListItem', arity: 2, argTypes: ['number', 'text'], resultType: 'text', prefix: 'item', infix: 'of', enumArg: { index: 1, options: LIST_NAME_OPTIONS } },
+  { kind: 'ListItemNumber', op: 'ListItemNumber', arity: 2, argTypes: ['text', 'text'], resultType: 'number', prefix: 'item # of', infix: 'in', enumArg: { index: 1, options: LIST_NAME_OPTIONS } },
+  { kind: 'ListAmount', op: 'ListAmount', arity: 2, argTypes: ['text', 'text'], resultType: 'number', prefix: 'amount of', infix: 'in', enumArg: { index: 1, options: LIST_NAME_OPTIONS } },
+  { kind: 'ListLength', op: 'ListLength', arity: 1, argTypes: ['text'], resultType: 'number', prefix: 'length of', enumArg: { index: 0, options: LIST_NAME_OPTIONS } },
+  { kind: 'ListContains', op: 'ListContains', arity: 2, argTypes: ['text', 'text'], resultType: 'bool', infix: 'contains', enumArg: { index: 0, options: LIST_NAME_OPTIONS } },
+  { kind: 'ListItemExists', op: 'ListItemExists', arity: 2, argTypes: ['number', 'text'], resultType: 'bool', prefix: 'item', infix: 'exists in', enumArg: { index: 1, options: LIST_NAME_OPTIONS } },
+  { kind: 'ListIsEmpty', op: 'ListIsEmpty', arity: 1, argTypes: ['text'], resultType: 'bool', prefix: 'is', suffix: 'empty?', enumArg: { index: 0, options: LIST_EMPTY_OPTIONS } },
 ];
 
 export function specForKind(kind: ValueKind): OperatorKindSpec | undefined {
@@ -91,13 +125,18 @@ export function specForOp(op: ValueOp): OperatorKindSpec | undefined {
   return OPERATOR_KINDS.find(s => s.op === op);
 }
 
-export function labelForOp(op: ValueOp): Pick<OperatorKindSpec, 'prefix' | 'infix'> | undefined {
+export function labelForOp(op: ValueOp): Pick<OperatorKindSpec, 'prefix' | 'infix' | 'suffix'> | undefined {
   const spec = specForOp(op);
-  return spec && { prefix: spec.prefix, infix: spec.infix };
+  return spec && { prefix: spec.prefix, infix: spec.infix, suffix: spec.suffix };
 }
 
 export function defaultArgFor(spec: OperatorKindSpec, index: number): ValueDto {
   if (spec.enumArg?.index === index) return { kind: 'Text', value: spec.enumArg.options[0].value };
+  // Lists are one-based. Keep the reporter palette consistent with the
+  // command-block defaults and the backend's operator construction.
+  if ((spec.kind === 'ListItem' || spec.kind === 'ListItemExists') && index === 0) {
+    return { kind: 'Number', value: 1 };
+  }
   if (spec.argTypes[index] === 'bool') return { kind: 'Bool' };
   return spec.argTypes[index] === 'text' ? { kind: 'Text', value: '' } : { kind: 'Number', value: 0 };
 }

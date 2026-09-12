@@ -88,7 +88,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
                 let (should_fire, next) = tick_decision(armed, holds);
 
                 if should_fire {
-                    scheduled_run::fire(mac.id.clone(), strand.instructions[1..].to_vec(), Arc::clone(&emulator), speed_multiplier, &mac.variables, Arc::clone(&shared_state), app.clone());
+                    scheduled_run::fire(mac.id.clone(), strand.instructions[1..].to_vec(), Arc::clone(&emulator), speed_multiplier, &mac.variables, &mac.lists, Arc::clone(&shared_state), app.clone());
                 }
                 next_arm_state.insert(key, next);
             }

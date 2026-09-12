@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { computed } from 'vue';
+import { computed, watch } from 'vue';
 import { state } from '../store';
 import { setTitle, setMacroSpeedMultiplier } from '../tauri';
 import InstructionSidebar from './InstructionSidebar.vue';
@@ -7,9 +7,17 @@ import { Canvas } from 'blockstitch';
 import EditorToolbar from './EditorToolbar.vue';
 import ContextMenu from './ContextMenu.vue';
 import DetailsDialog from './DetailsDialog.vue';
+import DeleteUsageDialog from './DeleteUsageDialog.vue';
 import CustomBlockCanvasColorSync from './CustomBlockCanvasColorSync.vue';
+import ListEditorOverlay from './ListEditorOverlay.vue';
+import { activateListEditors, isListEditorOpen } from '../listEditors';
 
 const isRecording = computed(() => state.recording_phase.phase === 'Active');
+watch(
+  () => state.current_macro?.id ?? null,
+  macroId => activateListEditors(macroId, state.current_macro?.lists ?? []),
+  { immediate: true },
+);
 const speedMultiplier = computed(() => state.current_macro?.speed_multiplier ?? 1);
 const speedFillPercent = computed(() => {
   const min = 0.1;
@@ -76,6 +84,11 @@ function onSpeedNumberChange(e: Event) {
             <span>Recording…</span>
             <span class="recording-overlay-hint">Adding and removing instructions is disabled while recording.</span>
           </div>
+          <ListEditorOverlay
+            v-for="list in state.current_macro?.lists?.filter(list => isListEditorOpen(list.name)) ?? []"
+            :key="list.name"
+            :name="list.name"
+          />
         </template>
         <template #context-menu>
           <ContextMenu />
@@ -85,6 +98,7 @@ function onSpeedNumberChange(e: Event) {
 
     <EditorToolbar />
     <DetailsDialog />
+    <DeleteUsageDialog />
     <CustomBlockCanvasColorSync />
   </div>
 </template>

@@ -1,5 +1,5 @@
 import { invoke, listen, getVersion } from './bridge';
-import type { AppEntryDto, BlockPieceDto, BlockShapeDto, HotkeyActionDto, ImportPromptDto, InstrPath, InstructionDto, StateDto, ValueDto, ValueKind, ValueLocationDto } from './types';
+import type { AppEntryDto, BlockPieceDto, BlockShapeDto, HotkeyActionDto, ImportPromptDto, InstrPath, InstructionDto, ListItemDto, StateDto, ValueDto, ValueKind, ValueLocationDto } from './types';
 
 export function getState(): Promise<StateDto> {
   return invoke('get_state');
@@ -49,6 +49,12 @@ export const createVariable = (name: string) => invoke<void>('create_variable', 
 export const renameVariable = (oldName: string, newName: string) =>
   invoke<void>('rename_variable', { oldName, newName });
 export const deleteVariable = (name: string) => invoke<void>('delete_variable', { name });
+export const createList = (name: string) => invoke<void>('create_list', { name });
+export const renameList = (oldName: string, newName: string) => invoke<void>('rename_list', { oldName, newName });
+export const deleteList = (name: string) => invoke<void>('delete_list', { name });
+export const setListItems = (name: string, items: ListItemDto[]) => invoke<void>('set_list_items', { name, items });
+export const setListEditorState = (name: string, visible: boolean, x: number, y: number) =>
+  invoke<void>('set_list_editor_state', { name, visible, x, y });
 export const createBlock = (pieces: BlockPieceDto[], shape: BlockShapeDto, color: string) =>
   invoke<string>('create_block', { pieces, shape, color });
 export const editBlock = (blockId: string, pieces: BlockPieceDto[], shape: BlockShapeDto, color: string) =>

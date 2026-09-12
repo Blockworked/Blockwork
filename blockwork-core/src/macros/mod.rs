@@ -4,7 +4,7 @@
 
 use crate::input::schedule::TimeSchedule;
 use crate::input::types::InputToken;
-use crate::input::value::{Op, Value};
+use crate::input::value::{Evaluated, Op, Value};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use uuid::Uuid;
@@ -43,6 +43,77 @@ fn default_speed_multiplier() -> f64 {
 /// Kept only so loading an old save file can find and migrate that strand.
 const LEGACY_ROOT_STRAND_ID: &str = "root";
 
+/// A list item is deliberately a literal only: unlike an instruction field it
+/// cannot contain an expression, variable, or custom-block call. This keeps a
+/// saved list stable and makes the editor safe to edit directly.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(tag = "kind", content = "value")]
+pub enum ListItem {
+    Number(f64),
+    Text(String),
+}
+
+impl ListItem {
+    pub fn from_evaluated(value: Evaluated) -> Option<Self> {
+        match value {
+            Evaluated::Number(value) => Some(Self::Number(value)),
+            Evaluated::Text(value) => Some(Self::Text(value)),
+            Evaluated::Bool(_) => None,
+        }
+    }
+
+    pub fn evaluated(&self) -> Evaluated {
+        match self {
+            Self::Number(value) => Evaluated::Number(*value),
+            Self::Text(value) => Evaluated::Text(value.clone()),
+        }
+    }
+}
+
+impl std::hash::Hash for ListItem {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        match self {
+            Self::Number(value) => {
+                0u8.hash(state);
+                value.to_bits().hash(state);
+            }
+            Self::Text(value) => {
+                1u8.hash(state);
+                value.hash(state);
+            }
+        }
+    }
+}
+
+/// A named, macro-scoped collection. Lists live alongside variables but only
+/// hold literal number/text items (see `ListItem`).
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct ListDef {
+    pub name: String,
+    #[serde(default)]
+    pub items: Vec<ListItem>,
+    /// Whether the editable list monitor is visible on the canvas. This is
+    /// persisted with its macro so reopening the app restores it.
+    #[serde(default)]
+    pub editor_visible: bool,
+    /// Canvas position of the editable list monitor in CSS pixels.
+    #[serde(default)]
+    pub editor_x: i32,
+    /// Canvas position of the editable list monitor in CSS pixels.
+    #[serde(default)]
+    pub editor_y: i32,
+}
+
+impl std::hash::Hash for ListDef {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.name.hash(state);
+        self.items.hash(state);
+        self.editor_visible.hash(state);
+        self.editor_x.hash(state);
+        self.editor_y.hash(state);
+    }
+}
+
 /// Blockwork's half of the block-editor contract: where its instructions
 /// keep values and bodies, which are headers, and how field ids map onto
 /// their slots. Every traversal built on this lives in blockstitch.
@@ -69,6 +140,15 @@ impl BlockKind for InstructionKind {
             InstructionKind::If { condition, .. }
             | InstructionKind::IfElse { condition, .. }
             | InstructionKind::While { condition, .. } => f(condition, InputValueType::Bool),
+            InstructionKind::AddToList { value, .. } | InstructionKind::InsertIntoList { value, .. } => {
+                f(value, InputValueType::Any)
+            }
+            InstructionKind::DeleteOfList { index, .. } => f(index, InputValueType::Any),
+            InstructionKind::ShiftList { amount, .. } => f(amount, InputValueType::Any),
+            InstructionKind::ReplaceItemOfList { index, value, .. } => {
+                f(index, InputValueType::Any);
+                f(value, InputValueType::Any);
+            }
             InstructionKind::Command(_)
             | InstructionKind::Comment(_)
             | InstructionKind::WhenRan
@@ -80,7 +160,9 @@ impl BlockKind for InstructionKind {
             | InstructionKind::WhenPowerUnplugged
             | InstructionKind::Forever { .. }
             | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => {}
+            | InstructionKind::CloseApp { .. }
+            | InstructionKind::DeleteAllOfList { .. }
+            | InstructionKind::ReverseList { .. } => {}
         }
     }
 
@@ -235,6 +317,20 @@ pub enum InstructionKind {
     /// No-op if `value` isn't numeric; the variable is coerced to `0` first
     /// if it wasn't already numeric.
     ChangeVariable(String, Value),
+    /// Appends a number/text value to a named list. Boolean values are ignored.
+    AddToList { value: Value, name: String },
+    /// Removes the 1-based item at `index` from a named list.
+    DeleteOfList { index: Value, name: String },
+    /// Removes every item from a named list.
+    DeleteAllOfList { name: String },
+    /// Rotates a named list by `amount` positions (positive is toward the end).
+    ShiftList { name: String, amount: Value },
+    /// Inserts a number/text value at the 1-based `index` in a named list.
+    InsertIntoList { value: Value, index: Value, name: String },
+    /// Replaces the 1-based item at `index` in a named list with a literal.
+    ReplaceItemOfList { index: Value, name: String, value: Value },
+    /// Reverses a named list in place.
+    ReverseList { name: String },
     /// Marks a strand as a custom block's body; the `String` is the
     /// `BlockDef::id`. Header-only, like `WhenRan`, but never auto-runs -
     /// only invoked via `CallBlock`/`Value::Call`.
@@ -404,6 +500,13 @@ impl std::hash::Hash for InstructionKind {
                 name.hash(state);
                 icon.hash(state);
             }
+            Self::AddToList { value, name } => { 24u8.hash(state); value.hash(state); name.hash(state); }
+            Self::DeleteOfList { index, name } => { 25u8.hash(state); index.hash(state); name.hash(state); }
+            Self::DeleteAllOfList { name } => { 26u8.hash(state); name.hash(state); }
+            Self::ShiftList { name, amount } => { 27u8.hash(state); name.hash(state); amount.hash(state); }
+            Self::InsertIntoList { value, index, name } => { 28u8.hash(state); value.hash(state); index.hash(state); name.hash(state); }
+            Self::ReplaceItemOfList { index, name, value } => { 29u8.hash(state); index.hash(state); name.hash(state); value.hash(state); }
+            Self::ReverseList { name } => { 30u8.hash(state); name.hash(state); }
         }
     }
 }
@@ -432,6 +535,13 @@ enum InstructionKindDe {
     },
     SetVariable(String, Value),
     ChangeVariable(String, Value),
+    AddToList { value: Value, name: String },
+    DeleteOfList { index: Value, name: String },
+    DeleteAllOfList { name: String },
+    ShiftList { name: String, amount: Value },
+    InsertIntoList { value: Value, index: Value, name: String },
+    ReplaceItemOfList { index: Value, name: String, value: Value },
+    ReverseList { name: String },
     BlockHeader(String),
     CallBlock {
         block_id: String,
@@ -542,6 +652,13 @@ impl From<InstructionKindDe> for InstructionKind {
             },
             InstructionKindDe::SetVariable(n, v) => InstructionKind::SetVariable(n, v),
             InstructionKindDe::ChangeVariable(n, v) => InstructionKind::ChangeVariable(n, v),
+            InstructionKindDe::AddToList { value, name } => InstructionKind::AddToList { value, name },
+            InstructionKindDe::DeleteOfList { index, name } => InstructionKind::DeleteOfList { index, name },
+            InstructionKindDe::DeleteAllOfList { name } => InstructionKind::DeleteAllOfList { name },
+            InstructionKindDe::ShiftList { name, amount } => InstructionKind::ShiftList { name, amount },
+            InstructionKindDe::InsertIntoList { value, index, name } => InstructionKind::InsertIntoList { value, index, name },
+            InstructionKindDe::ReplaceItemOfList { index, name, value } => InstructionKind::ReplaceItemOfList { index, name, value },
+            InstructionKindDe::ReverseList { name } => InstructionKind::ReverseList { name },
             InstructionKindDe::BlockHeader(id) => InstructionKind::BlockHeader(id),
             InstructionKindDe::CallBlock { block_id, args } => {
                 InstructionKind::CallBlock { block_id, args }
@@ -564,6 +681,151 @@ impl From<InstructionKindDe> for InstructionKind {
             }
             InstructionKindDe::EscapeLoop => InstructionKind::EscapeLoop,
             InstructionKindDe::ContinueLoop => InstructionKind::ContinueLoop,
+        }
+    }
+}
+
+/// Arg index holding the list name for a list-reporter op, by wire name.
+/// Mirrors the frontend's `enumArg` in `ui/src/valueOps.ts`: the name is the
+/// second arg except for `ListLength`/`ListContains`/`ListIsEmpty`, where it
+/// is the first.
+fn list_reporter_name_index(op_name: &str) -> Option<usize> {
+    match op_name {
+        "ListItem" | "ListItemNumber" | "ListAmount" | "ListItemExists" => Some(1),
+        "ListLength" | "ListContains" | "ListIsEmpty" => Some(0),
+        _ => None,
+    }
+}
+
+/// True for a value-position list reporter (`Op::Ext` with a list wire
+/// name) - resolved by the macro runner against the live lists, never by
+/// plain `Value::eval`.
+pub fn is_list_reporter(op: &Op) -> bool {
+    match op {
+        Op::Ext(name) => list_reporter_name_index(name).is_some(),
+        _ => false,
+    }
+}
+
+/// Renames a list reference inside a value tree: a list reporter's name arg
+/// (a plain `Text` leaf) plus every nested arg. Call args recurse too, since
+/// a reporter can sit inside a custom-block call.
+pub fn rename_list_in_value(value: &mut Value, old: &str, new: &str) {
+    match value {
+        Value::Op { op, args, saved } => {
+            if let Op::Ext(name) = op
+                && let Some(index) = list_reporter_name_index(name)
+                && let Some(Value::Text { value: name_arg }) = args.get_mut(index)
+                && name_arg == old
+            {
+                *name_arg = new.to_string();
+            }
+            for arg in args.iter_mut() {
+                rename_list_in_value(arg, old, new);
+            }
+            rename_list_in_value(saved, old, new);
+        }
+        Value::Call {
+            block_id: _,
+            args,
+            saved,
+        } => {
+            for arg in args.iter_mut() {
+                rename_list_in_value(arg, old, new);
+            }
+            rename_list_in_value(saved, old, new);
+        }
+        Value::Number { .. } | Value::Text { .. } | Value::Bool | Value::Var { .. } | Value::Param { .. } => {}
+    }
+}
+
+impl InstructionKind {
+    /// Renames command targets and list-reporter references throughout this
+    /// instruction, including nested control-flow bodies.
+    pub fn rename_list(&mut self, old: &str, new: &str) {
+        match self {
+            InstructionKind::Wait(value)
+            | InstructionKind::Return(value)
+            | InstructionKind::WhenBatteryDischargedTo(value)
+            | InstructionKind::WhenBatteryChargedTo(value) => rename_list_in_value(value, old, new),
+            InstructionKind::Token(token) => token.rename_list(old, new),
+            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
+                rename_list_in_value(value, old, new)
+            }
+            InstructionKind::AddToList { name, value }
+            | InstructionKind::InsertIntoList { name, value, .. } => {
+                if name == old {
+                    *name = new.to_string();
+                }
+                rename_list_in_value(value, old, new);
+            }
+            InstructionKind::DeleteOfList { name, index } | InstructionKind::ShiftList { name, amount: index } => {
+                if name == old {
+                    *name = new.to_string();
+                }
+                rename_list_in_value(index, old, new);
+            }
+            InstructionKind::ReplaceItemOfList { name, index, value } => {
+                if name == old {
+                    *name = new.to_string();
+                }
+                rename_list_in_value(index, old, new);
+                rename_list_in_value(value, old, new);
+            }
+            InstructionKind::DeleteAllOfList { name } | InstructionKind::ReverseList { name } => {
+                if name == old {
+                    *name = new.to_string();
+                }
+            }
+            InstructionKind::CallBlock { args, .. } => {
+                for arg in args {
+                    rename_list_in_value(arg, old, new);
+                }
+            }
+            InstructionKind::If { condition, body } => {
+                rename_list_in_value(condition, old, new);
+                for instruction in body {
+                    instruction.kind.rename_list(old, new);
+                }
+            }
+            InstructionKind::IfElse {
+                condition,
+                then_body,
+                else_body,
+            } => {
+                rename_list_in_value(condition, old, new);
+                for instruction in then_body.iter_mut().chain(else_body) {
+                    instruction.kind.rename_list(old, new);
+                }
+            }
+            InstructionKind::Repeat { count, body } => {
+                rename_list_in_value(count, old, new);
+                for instruction in body {
+                    instruction.kind.rename_list(old, new);
+                }
+            }
+            InstructionKind::Forever { body } => {
+                for instruction in body {
+                    instruction.kind.rename_list(old, new);
+                }
+            }
+            InstructionKind::While { condition, body } => {
+                rename_list_in_value(condition, old, new);
+                for instruction in body {
+                    instruction.kind.rename_list(old, new);
+                }
+            }
+            InstructionKind::Command(_)
+            | InstructionKind::Comment(_)
+            | InstructionKind::WhenRan
+            | InstructionKind::BlockHeader(_)
+            | InstructionKind::EscapeLoop
+            | InstructionKind::ContinueLoop
+            | InstructionKind::WhenTime(_)
+            | InstructionKind::WhenPowerPluggedIn
+            | InstructionKind::WhenPowerUnplugged
+            | InstructionKind::OpenApp { .. }
+            | InstructionKind::CloseApp { .. } => {}
         }
     }
 }
@@ -591,6 +853,9 @@ pub struct Macro {
     /// Settings edited from the "Macro Settings" popup - see [`MacroSettings`].
     #[serde(default)]
     pub settings: MacroSettings,
+    /// User-declared macro-wide lists - see [`ListDef`].
+    #[serde(default)]
+    pub lists: Vec<ListDef>,
 }
 
 impl Deref for Macro {
@@ -654,6 +919,8 @@ enum MacroDe {
         block_defs: Vec<BlockDef>,
         #[serde(default)]
         settings: MacroSettings,
+        #[serde(default)]
+        lists: Vec<ListDef>,
     },
     Legacy {
         #[serde(default = "default_macro_id")]
@@ -679,6 +946,7 @@ impl From<MacroDe> for Macro {
                 variables,
                 block_defs,
                 settings,
+                lists,
             } => {
                 // Pre-"When Ran" saves have a strand id=="root" that was the
                 // implicit entry point; give it a real WhenRan on upgrade.
@@ -703,6 +971,7 @@ impl From<MacroDe> for Macro {
                     recording_target,
                     speed_multiplier,
                     settings,
+                    lists,
                 }
             }
             MacroDe::Legacy {
@@ -723,6 +992,7 @@ impl From<MacroDe> for Macro {
                     recording_target: None,
                     speed_multiplier: default_speed_multiplier(),
                     settings: MacroSettings::default(),
+                    lists: Vec::new(),
                 }
             }
         };
@@ -754,6 +1024,7 @@ impl Macro {
             recording_target: None,
             speed_multiplier: default_speed_multiplier(),
             settings: MacroSettings::default(),
+            lists: Vec::new(),
         }
     }
 
@@ -777,6 +1048,33 @@ impl Macro {
     pub fn ensure_id(&mut self) {
         if self.id.trim().is_empty() {
             self.id = default_macro_id();
+        }
+    }
+
+    /// Writes live runtime list contents back into their declared lists.
+    pub fn sync_lists_from(&mut self, values: &std::collections::HashMap<String, Vec<ListItem>>) {
+        for list in &mut self.lists {
+            if let Some(items) = values.get(&list.name) {
+                list.items = items.clone();
+            }
+        }
+    }
+
+    /// Renames a declared list and every command/reporter reference to it.
+    /// No-op if `old` isn't declared.
+    pub fn rename_list(&mut self, old: &str, new: &str) {
+        if let Some(list) = self.lists.iter_mut().find(|list| list.name == old) {
+            list.name = new.to_string();
+        } else {
+            return;
+        }
+        for strand in &mut self.graph.strands {
+            for instruction in &mut strand.instructions {
+                instruction.kind.rename_list(old, new);
+            }
+        }
+        for floating_value in &mut self.graph.floating_values {
+            rename_list_in_value(&mut floating_value.value, old, new);
         }
     }
 
@@ -877,6 +1175,7 @@ impl std::hash::Hash for Macro {
         self.recording_target.hash(state);
         self.speed_multiplier.to_bits().hash(state);
         self.settings.hash(state);
+        self.lists.hash(state);
     }
 }
 
@@ -929,6 +1228,24 @@ mod tests {
         let def: BlockDef =
             serde_json::from_str(r#"{"id":"b1","pieces":[],"shape":"Normal"}"#).unwrap();
         assert_eq!(def.color, default_block_color());
+    }
+
+    #[test]
+    fn list_editor_state_round_trips_and_defaults_for_older_lists() {
+        let list = ListDef {
+            name: "queue".into(),
+            items: vec![ListItem::Text("first".into())],
+            editor_visible: true,
+            editor_x: 120,
+            editor_y: 80,
+        };
+        let json = serde_json::to_string(&list).unwrap();
+        let restored: ListDef = serde_json::from_str(&json).unwrap();
+        assert_eq!(restored, list);
+
+        let legacy: ListDef = serde_json::from_str(r#"{"name":"older","items":[]}"#).unwrap();
+        assert!(!legacy.editor_visible);
+        assert_eq!((legacy.editor_x, legacy.editor_y), (0, 0));
     }
 
     #[test]

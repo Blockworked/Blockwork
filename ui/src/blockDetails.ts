@@ -30,6 +30,13 @@ const INSTRUCTION_EXPLAINERS: Record<InstructionType, string> = {
   Comment: 'A free-form note left on the canvas - has no effect when the macro runs.',
   SetVariable: "Sets a variable to the given value, replacing whatever it held before.",
   ChangeVariable: "Adds the given number to a variable's current value.",
+  AddToList: 'Appends a number or text value to a list.',
+  DeleteOfList: 'Removes the requested 1-based item from a list.',
+  DeleteAllOfList: 'Removes every item from a list.',
+  ShiftList: 'Rotates a list by the requested number of positions.',
+  InsertIntoList: 'Inserts a number or text value at a 1-based position in a list.',
+  ReplaceItemOfList: 'Replaces a 1-based list item with a number or text value.',
+  ReverseList: 'Reverses the order of a list.',
   BlockHeader: 'The definition header of one of your custom "My Blocks" - everything below it runs each time the block is called.',
   CallBlock: 'Calls one of your own custom "My Blocks" definitions, running its body inline.',
   Return: "Ends a custom block's body immediately, handing the given value back to whoever called it.",
@@ -63,6 +70,8 @@ const VALUE_KIND_LABELS: Partial<Record<ValueKind, string>> = {
   And: 'And', Or: 'Or', Not: 'Not', True: 'True', False: 'False',
   BatteryPercentage: 'Battery Percentage', PluggedIn: 'Plugged In',
   CurrentTime: 'Current Time',
+  ListItem: 'List Item', ListItemNumber: 'Item Number', ListAmount: 'Amount in List', ListLength: 'List Length',
+  ListContains: 'List Contains', ListItemExists: 'List Item Exists', ListIsEmpty: 'List Is Empty',
 };
 
 const VALUE_KIND_EXPLAINERS: Partial<Record<ValueKind, string>> = {
@@ -99,6 +108,13 @@ const VALUE_KIND_EXPLAINERS: Partial<Record<ValueKind, string>> = {
   BatteryPercentage: "The system's current battery charge, from 0 to 100.",
   PluggedIn: 'True if the system is currently connected to external power.',
   CurrentTime: 'A component (year, month, date, day of week, hour, minute, or second) of the current local time.',
+  ListItem: 'Gets a 1-based item from a list.',
+  ListItemNumber: 'Gets the 1-based position of an item in a list, or 0 if it is absent.',
+  ListAmount: 'Counts matching items in a list.',
+  ListLength: 'Counts the items in a list.',
+  ListContains: 'True when a list contains a matching item.',
+  ListItemExists: 'True when the requested 1-based item exists.',
+  ListIsEmpty: 'True when a list has no items.',
 };
 
 export function detailsForValueKind(kind: string): BlockDetails {
@@ -107,6 +123,16 @@ export function detailsForValueKind(kind: string): BlockDetails {
     name: label ?? kind,
     identifier: kind,
     explainer: VALUE_KIND_EXPLAINERS[kind as ValueKind] ?? 'An operator block.',
+  };
+}
+
+/** A named list is data rather than a block, but its contextual Details item
+ * uses the same concise explainer dialog as every draggable block. */
+export function detailsForList(name: string): BlockDetails {
+  return {
+    name,
+    identifier: 'List',
+    explainer: 'A macro-wide ordered collection that holds literal text or number items. Use the list blocks to read or change it while the macro runs.',
   };
 }
 

@@ -190,7 +190,7 @@ fn build_virtual_device() -> io::Result<VirtualDevice> {
         rel_axes.insert(ax);
     }
 
-    VirtualDeviceBuilder::new()?
+    VirtualDevice::builder()?
         .name("macros-input")
         .with_keys(&keys)?
         .with_relative_axes(&rel_axes)?

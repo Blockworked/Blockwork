@@ -7,14 +7,18 @@ import { computed } from 'vue';
 import { state } from '../store';
 import { contextMenu, closeContextMenu } from '../contextMenu';
 import { copyAll, copyBlock, clipboardContents, hasClipboard } from '../clipboard';
-import { addInstruction, clearInstructions, createAttachedComment, createComment, deleteBlock, deleteInstruction, deleteVariable, pasteInstructions, setCommentCollapsed, setRecordingTarget } from '../tauri';
+import { addInstruction, clearInstructions, createAttachedComment, createComment, deleteBlock, deleteInstruction, deleteList, deleteVariable, pasteInstructions, setCommentCollapsed, setRecordingTarget } from '../tauri';
 import { ContextMenuPanel, clientToCanvas, focusCommentOnMount, type ContextMenuItem } from 'blockstitch';
 import { ICONS } from '../icons';
 import { openRenameVariableDialog } from '../variableDialogs';
+import { openRenameListDialog } from '../listDialogs';
+import { forgetListEditor } from '../listEditors';
+import { openDeleteUsageDialog } from '../deleteUsageDialog';
+import { macroUsesList, macroUsesVariable } from '../entityUsage';
 import { openEditBlockDialog } from '../blockDialogs';
 import { findBlockDef, nextSiblingPath, regenerateInstructionIds, resolveInstructionAt } from '../types';
 import type { InstructionType } from '../types';
-import { detailsForBlockDef, detailsForInstructionType, detailsForValueKind, type BlockDetails } from '../blockDetails';
+import { detailsForBlockDef, detailsForInstructionType, detailsForList, detailsForValueKind, type BlockDetails } from '../blockDetails';
 import { openDetailsDialog } from '../detailsDialog';
 
 // Default offset (canvas units) a freshly-attached comment spawns at,
@@ -151,7 +155,30 @@ function onRenameVariable() {
   closeContextMenu();
 }
 function onDeleteVariable() {
+  if (macroUsesVariable(state.current_macro, contextMenu.variableName)) {
+    openDeleteUsageDialog('variable', contextMenu.variableName);
+    closeContextMenu();
+    return;
+  }
   deleteVariable(contextMenu.variableName);
+  closeContextMenu();
+}
+function onRenameList() {
+  openRenameListDialog(contextMenu.listName);
+  closeContextMenu();
+}
+function onDeleteList() {
+  if (macroUsesList(state.current_macro, contextMenu.listName)) {
+    openDeleteUsageDialog('list', contextMenu.listName);
+    closeContextMenu();
+    return;
+  }
+  deleteList(contextMenu.listName);
+  forgetListEditor(contextMenu.listName);
+  closeContextMenu();
+}
+function onShowListDetails() {
+  openDetailsDialog(detailsForList(contextMenu.listName));
   closeContextMenu();
 }
 function onEditBlock() {
@@ -222,6 +249,13 @@ const items = computed<ContextMenuItem[]>(() => {
     return [
       { key: 'rename', label: 'Rename variable', icon: ICONS.equal, onSelect: onRenameVariable },
       { key: 'delete-var', label: 'Delete variable', icon: ICONS.trash, danger: true, onSelect: onDeleteVariable },
+    ];
+  }
+  if (contextMenu.type === 'list') {
+    return [
+      { key: 'rename-list', label: 'Rename list', icon: ICONS.equal, onSelect: onRenameList },
+      { key: 'list-details', label: 'Details', icon: ICONS.info, onSelect: onShowListDetails },
+      { key: 'delete-list', label: 'Delete list', icon: ICONS.trash, danger: true, onSelect: onDeleteList },
     ];
   }
   if (contextMenu.type === 'paletteInstruction') {

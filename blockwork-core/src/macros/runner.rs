@@ -1,8 +1,8 @@
 use crate::input::types::{Coordinate, Direction, InputToken, MacroButton, MacroKey};
-use crate::input::value::{Evaluated, Value};
-use crate::macros::backend::{InputBackend, create_backend};
+use crate::input::value::{Evaluated, Op, Value};
+use crate::macros::backend::{create_backend, InputBackend};
 use crate::macros::priority::raise_current_thread_priority;
-use crate::macros::{Instruction, InstructionKind, Macro};
+use crate::macros::{Instruction, InstructionKind, ListItem, Macro};
 use spin_sleep::{SpinSleeper, SpinStrategy};
 use std::collections::HashMap;
 use std::process::Command;
@@ -14,6 +14,8 @@ use tracing::warn;
 /// Shared, macro-wide variable store, so a `Set`/`Change` in one strand is
 /// visible to others running concurrently.
 pub type VariableStore = Arc<Mutex<HashMap<String, Evaluated>>>;
+/// Shared, macro-wide list contents, parallel to `VariableStore`.
+pub type ListStore = Arc<Mutex<HashMap<String, Vec<ListItem>>>>;
 
 /// A custom block's runtime shape: input names in prototype order (matched
 /// positionally against call args) plus its body instructions. Built once
@@ -59,6 +61,7 @@ struct ExecCtx<'a> {
     stop_flag: Option<Arc<Mutex<bool>>>,
     speed_multiplier: f64,
     variables: VariableStore,
+    lists: ListStore,
     block_table: Arc<HashMap<String, BlockRuntime>>,
     pressed_keys: &'a mut Vec<MacroKey>,
     /// Mouse buttons held by this strand, tracked and cleaned up like
@@ -66,6 +69,108 @@ struct ExecCtx<'a> {
     /// leaves the button physically stuck down for the rest of the session.
     pressed_buttons: &'a mut Vec<MacroButton>,
     param_env: HashMap<String, Evaluated>,
+}
+
+use crate::macros::is_list_reporter;
+
+/// Resolves one list reporter whose arguments have already been reduced to
+/// ordinary values. This is shared by the macro runner and the editor's
+/// click-to-preview evaluator so the two always agree about list semantics.
+fn resolve_list_reporter(
+    op_name: &str,
+    args: Vec<Value>,
+    lists: &HashMap<String, Vec<ListItem>>,
+) -> Result<Value, String> {
+    let text = |index: usize| {
+        args.get(index)
+            .ok_or_else(|| "missing list reporter argument".to_string())
+            .and_then(Value::eval_text)
+    };
+    let number = |index: usize| {
+        args.get(index)
+            .ok_or_else(|| "missing list reporter argument".to_string())
+            .and_then(Value::eval_number)
+    };
+    let list_name = match op_name {
+        "ListItem" | "ListItemNumber" | "ListAmount" | "ListItemExists" => text(1)?,
+        "ListContains" => text(0)?,
+        "ListLength" | "ListIsEmpty" => text(0)?,
+        _ => return Err("not a list reporter".to_string()),
+    };
+    let list = lists.get(&list_name).cloned().unwrap_or_default();
+    let evaluated = match op_name {
+        "ListItem" => list_index(number(0)?, list.len(), false)
+            .and_then(|index| list.get(index))
+            .map(ListItem::evaluated)
+            .unwrap_or(Evaluated::Text(String::new())),
+        "ListItemNumber" => {
+            let needle = ListItem::from_evaluated(args[0].eval()?)
+                .ok_or_else(|| "list items must be number or text".to_string())?;
+            Evaluated::Number(
+                list.iter()
+                    .position(|item| item == &needle)
+                    .map_or(0, |index| index + 1) as f64,
+            )
+        }
+        "ListAmount" => {
+            let needle = ListItem::from_evaluated(args[0].eval()?)
+                .ok_or_else(|| "list items must be number or text".to_string())?;
+            Evaluated::Number(list.iter().filter(|item| *item == &needle).count() as f64)
+        }
+        "ListLength" => Evaluated::Number(list.len() as f64),
+        "ListContains" => {
+            let needle = ListItem::from_evaluated(args[1].eval()?)
+                .ok_or_else(|| "list items must be number or text".to_string())?;
+            Evaluated::Bool(list.contains(&needle))
+        }
+        "ListItemExists" => Evaluated::Bool(list_index(number(0)?, list.len(), false).is_some()),
+        "ListIsEmpty" => Evaluated::Bool(list.is_empty()),
+        _ => unreachable!("validated by is_list_reporter"),
+    };
+    Ok(evaluated.into_value())
+}
+
+/// Replaces list reporter nodes with their values from `lists`, without
+/// executing custom-block calls. Useful for non-running contexts such as a
+/// canvas reporter preview; the full runner adds call/parameter resolution.
+pub fn resolve_list_reporters(
+    value: &Value,
+    lists: &HashMap<String, Vec<ListItem>>,
+) -> Result<Value, String> {
+    match value {
+        Value::Op { op, args, saved } => {
+            let args = args
+                .iter()
+                .map(|arg| resolve_list_reporters(arg, lists))
+                .collect::<Result<Vec<_>, _>>()?;
+            if is_list_reporter(op) {
+                let name: Box<str> = match op {
+                    Op::Ext(name) => name.clone(),
+                    _ => unreachable!("validated by is_list_reporter"),
+                };
+                resolve_list_reporter(&name, args, lists)
+            } else {
+                Ok(Value::Op {
+                    op: op.clone(),
+                    args,
+                    saved: saved.clone(),
+                })
+            }
+        }
+        Value::Call {
+            block_id,
+            args,
+            saved,
+        } => Ok(Value::Call {
+            block_id: block_id.clone(),
+            args: args
+                .iter()
+                .map(|arg| resolve_list_reporters(arg, lists))
+                .collect::<Result<Vec<_>, _>>()?,
+            saved: saved.clone(),
+        }),
+        _ => Ok(value.clone()),
+    }
 }
 
 impl<'a> ExecCtx<'a> {
@@ -99,6 +204,22 @@ fn resolve_calls_and_params(value: &Value, ctx: &mut ExecCtx, depth: u32) -> Res
             Some(e) => e.clone().into_value(),
             None => Value::number(0.0),
         }),
+        Value::Op { op, args, .. } if is_list_reporter(op) => {
+            let args = args
+                .iter()
+                .map(|arg| resolve_calls_and_params(arg, ctx, depth))
+                .collect::<Result<Vec<_>, _>>()?;
+            let name: Box<str> = match op {
+                Op::Ext(name) => name.clone(),
+                _ => unreachable!("validated by is_list_reporter"),
+            };
+            let lists = ctx
+                .lists
+                .lock()
+                .map(|lists| lists.clone())
+                .unwrap_or_default();
+            resolve_list_reporter(&name, args, &lists)
+        }
         Value::Op { op, args, saved } => {
             let args = args
                 .iter()
@@ -185,6 +306,21 @@ fn stop_requested(flag: &Arc<Mutex<bool>>) -> bool {
     !flag.lock().map(|g| *g).unwrap_or(false)
 }
 
+/// Converts a Scratch-style 1-based numeric index to a vector offset. An
+/// insert may target the slot immediately after the final item; other list
+/// commands require an existing item.
+fn list_index(value: f64, len: usize, allow_end: bool) -> Option<usize> {
+    if !value.is_finite() || value < 1.0 {
+        return None;
+    }
+    let index = value.floor() as usize - 1;
+    if index < len || (allow_end && index == len) {
+        Some(index)
+    } else {
+        None
+    }
+}
+
 impl Macro {
     /// Runs every "When Ran" entry-point strand concurrently on its own
     /// thread, sharing one `stop_flag`. A custom block's header strand isn't
@@ -198,30 +334,73 @@ impl Macro {
         speed_multiplier: f64,
         variables: VariableStore,
     ) {
-        self.run_with_offset(
+        let lists: ListStore = Arc::new(Mutex::new(
+            self.lists
+                .iter()
+                .map(|list| (list.name.clone(), list.items.clone()))
+                .collect(),
+        ));
+        self.run_with_lists(emulator, stop_flag, speed_multiplier, variables, lists);
+    }
+
+    /// `run` with an externally-owned list store, used by the desktop host to
+    /// persist list mutations after a macro finishes.
+    pub fn run_with_lists(
+        self,
+        emulator: Arc<Mutex<dyn InputBackend>>,
+        stop_flag: Option<Arc<Mutex<bool>>>,
+        speed_multiplier: f64,
+        variables: VariableStore,
+        lists: ListStore,
+    ) {
+        self.run_with_lists_offset(
             emulator,
             stop_flag,
             speed_multiplier,
             variables,
+            lists,
             Duration::ZERO,
         )
     }
 
-    /// Same as `run`, but backdates every entry strand's `Wait` deadline
-    /// anchor by `initial_offset` - pretends this run started
-    /// `initial_offset` ago rather than right now. For callers where real
-    /// time has already passed between the event this run should be synced
-    /// to and the moment this actually gets called (dispatch latency, or an
-    /// embedder whose trigger fires once per frame and overshoots by that
-    /// frame's `dt`), so the macro's timeline anchors to the intended start
-    /// instant rather than whichever frame the trigger landed on. Without
-    /// this, that overshoot becomes unrecoverable drift baked into the run.
+    /// Backward-compatible offset variant for callers that do not need to
+    /// retain a live list store after the run.
     pub fn run_with_offset(
         self,
         emulator: Arc<Mutex<dyn InputBackend>>,
         stop_flag: Option<Arc<Mutex<bool>>>,
         speed_multiplier: f64,
         variables: VariableStore,
+        initial_offset: Duration,
+    ) {
+        let lists: ListStore = Arc::new(Mutex::new(
+            self.lists
+                .iter()
+                .map(|list| (list.name.clone(), list.items.clone()))
+                .collect(),
+        ));
+        self.run_with_lists_offset(
+            emulator,
+            stop_flag,
+            speed_multiplier,
+            variables,
+            lists,
+            initial_offset,
+        )
+    }
+
+    /// Same as `run_with_offset`, but with an externally-owned list store,
+    /// used by the desktop host to persist list mutations after a macro
+    /// finishes. Backdates every entry strand's `Wait` deadline anchor by
+    /// `initial_offset` - pretends this run started `initial_offset` ago
+    /// rather than right now.
+    pub fn run_with_lists_offset(
+        self,
+        emulator: Arc<Mutex<dyn InputBackend>>,
+        stop_flag: Option<Arc<Mutex<bool>>>,
+        speed_multiplier: f64,
+        variables: VariableStore,
+        lists: ListStore,
         initial_offset: Duration,
     ) {
         let block_defs = self.graph.block_defs;
@@ -265,6 +444,7 @@ impl Macro {
                 let emulator = Arc::clone(&emulator);
                 let stop_flag = stop_flag.clone();
                 let variables = Arc::clone(&variables);
+                let lists = Arc::clone(&lists);
                 let block_table = Arc::clone(&block_table);
                 let spawned = std::thread::Builder::new()
                     .stack_size(STRAND_STACK_SIZE)
@@ -275,6 +455,7 @@ impl Macro {
                             stop_flag,
                             speed_multiplier,
                             variables,
+                            lists,
                             block_table,
                             initial_offset,
                         )
@@ -298,6 +479,7 @@ fn run_strand(
     stop_flag: Option<Arc<Mutex<bool>>>,
     speed_multiplier: f64,
     variables: VariableStore,
+    lists: ListStore,
     block_table: Arc<HashMap<String, BlockRuntime>>,
     initial_offset: Duration,
 ) {
@@ -317,6 +499,7 @@ fn run_strand(
             stop_flag,
             speed_multiplier,
             variables,
+            lists,
             block_table,
             pressed_keys: &mut pressed_keys,
             pressed_buttons: &mut pressed_buttons,
@@ -355,12 +538,32 @@ pub fn run_instructions(
     speed_multiplier: f64,
     variables: VariableStore,
 ) {
+    run_instructions_with_lists(
+        instructions,
+        emulator,
+        stop_flag,
+        speed_multiplier,
+        variables,
+        Arc::new(Mutex::new(HashMap::new())),
+    );
+}
+
+/// `run_instructions` with an externally-owned list store for watcher runs.
+pub fn run_instructions_with_lists(
+    instructions: Vec<Instruction>,
+    emulator: Arc<Mutex<dyn InputBackend>>,
+    stop_flag: Option<Arc<Mutex<bool>>>,
+    speed_multiplier: f64,
+    variables: VariableStore,
+    lists: ListStore,
+) {
     run_strand(
         instructions,
         emulator,
         stop_flag,
         speed_multiplier,
         variables,
+        lists,
         Arc::new(HashMap::new()),
         Duration::ZERO,
     );
@@ -485,8 +688,8 @@ fn run_block(
                 Ok(cond) => {
                     let branch = if cond.as_bool() { then_body } else { else_body };
                     let flow = run_block(branch, ctx, depth, Instant::now())?;
-                        if flow != Flow::Normal {
-                            return Ok(flow);
+                    if flow != Flow::Normal {
+                        return Ok(flow);
                     }
                 }
                 Err(e) => warn!("Skipping IfElse: condition {}", e),
@@ -773,6 +976,111 @@ fn run_block(
                     Err(e) => warn!("Skipping Change Variable: {}", e),
                 }
             }
+            InstructionKind::AddToList { value, name } => {
+                match ctx.resolve(value, depth).and_then(|v| v.eval()) {
+                    Ok(value) => match ListItem::from_evaluated(value) {
+                        Some(item) => {
+                            if let Ok(mut lists) = ctx.lists.lock() {
+                                if let Some(list) = lists.get_mut(name) {
+                                    list.push(item);
+                                }
+                            }
+                        }
+                        None => warn!("Skipping Add to List: list items must be number or text"),
+                    },
+                    Err(e) => warn!("Skipping Add to List: {e}"),
+                }
+            }
+            InstructionKind::DeleteOfList { index, name } => {
+                match ctx.resolve(index, depth).and_then(|v| v.eval_number()) {
+                    Ok(index) => {
+                        if let Ok(mut lists) = ctx.lists.lock() {
+                            if let Some(list) = lists.get_mut(name) {
+                                if let Some(index) = list_index(index, list.len(), false) {
+                                    list.remove(index);
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => warn!("Skipping Delete List Item: {e}"),
+                }
+            }
+            InstructionKind::DeleteAllOfList { name } => {
+                if let Ok(mut lists) = ctx.lists.lock() {
+                    if let Some(list) = lists.get_mut(name) {
+                        list.clear();
+                    }
+                }
+            }
+            InstructionKind::ShiftList { name, amount } => {
+                match ctx.resolve(amount, depth).and_then(|v| v.eval_number()) {
+                    Ok(amount) => {
+                        if let Ok(mut lists) = ctx.lists.lock() {
+                            if let Some(list) = lists.get_mut(name) {
+                                if !list.is_empty() {
+                                    let len = list.len();
+                                    let distance = amount.round() as isize;
+                                    if distance >= 0 {
+                                        list.rotate_right(distance as usize % len);
+                                    } else {
+                                        list.rotate_left(distance.unsigned_abs() % len);
+                                    }
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => warn!("Skipping Shift List: {e}"),
+                }
+            }
+            InstructionKind::InsertIntoList { value, index, name } => {
+                let value = ctx.resolve(value, depth).and_then(|v| v.eval());
+                let index = ctx.resolve(index, depth).and_then(|v| v.eval_number());
+                match (value, index) {
+                    (Ok(value), Ok(index)) => match ListItem::from_evaluated(value) {
+                        Some(item) => {
+                            if let Ok(mut lists) = ctx.lists.lock() {
+                                if let Some(list) = lists.get_mut(name) {
+                                    if let Some(index) = list_index(index, list.len(), true) {
+                                        list.insert(index, item);
+                                    }
+                                }
+                            }
+                        }
+                        None => {
+                            warn!("Skipping Insert into List: list items must be number or text")
+                        }
+                    },
+                    (Err(e), _) | (_, Err(e)) => warn!("Skipping Insert into List: {e}"),
+                }
+            }
+            InstructionKind::ReplaceItemOfList { index, name, value } => {
+                let index = ctx.resolve(index, depth).and_then(|v| v.eval_number());
+                let value = ctx.resolve(value, depth).and_then(|v| v.eval());
+                match (index, value) {
+                    (Ok(index), Ok(value)) => match ListItem::from_evaluated(value) {
+                        Some(item) => {
+                            if let Ok(mut lists) = ctx.lists.lock() {
+                                if let Some(list) = lists.get_mut(name) {
+                                    if let Some(index) = list_index(index, list.len(), false) {
+                                        list[index] = item;
+                                    }
+                                }
+                            }
+                        }
+                        None => {
+                            warn!("Skipping Replace List Item: list items must be number or text")
+                        }
+                    },
+                    (Err(e), _) | (_, Err(e)) => warn!("Skipping Replace List Item: {e}"),
+                }
+            }
+            InstructionKind::ReverseList { name } => {
+                if let Ok(mut lists) = ctx.lists.lock() {
+                    if let Some(list) = lists.get_mut(name) {
+                        list.reverse();
+                    }
+                }
+            }
         }
     }
 
@@ -942,6 +1250,147 @@ mod tests {
         Arc::new(Mutex::new(NoopBackend))
     }
 
+    #[test]
+    fn list_commands_and_reporters_share_the_same_literal_store() {
+        use crate::input::value::Op;
+
+        let text = |value: &str| Value::Text {
+            value: value.to_string(),
+        };
+        let reporter = |op, args| Value::Op {
+            op,
+            args,
+            saved: Box::new(Value::number(0.0)),
+        };
+        let variables: VariableStore = Arc::new(Mutex::new(HashMap::new()));
+        let lists: ListStore = Arc::new(Mutex::new(HashMap::from([(
+            "items".to_string(),
+            vec![ListItem::Text("one".into()), ListItem::Number(2.0)],
+        )])));
+
+        run_instructions_with_lists(
+            vec![
+                Instruction::new(InstructionKind::AddToList {
+                    value: Value::number(3.0),
+                    name: "items".into(),
+                }),
+                Instruction::new(InstructionKind::InsertIntoList {
+                    value: text("z"),
+                    index: Value::number(2.0),
+                    name: "items".into(),
+                }),
+                Instruction::new(InstructionKind::ReplaceItemOfList {
+                    index: Value::number(3.0),
+                    name: "items".into(),
+                    value: text("y"),
+                }),
+                Instruction::new(InstructionKind::ShiftList {
+                    name: "items".into(),
+                    amount: Value::number(1.0),
+                }),
+                Instruction::new(InstructionKind::DeleteOfList {
+                    index: Value::number(2.0),
+                    name: "items".into(),
+                }),
+                Instruction::new(InstructionKind::ReverseList {
+                    name: "items".into(),
+                }),
+                Instruction::new(InstructionKind::SetVariable(
+                    "item".into(),
+                    reporter(Op::from_name("ListItem"), vec![Value::number(1.0), text("items")]),
+                )),
+                Instruction::new(InstructionKind::SetVariable(
+                    "position".into(),
+                    reporter(Op::from_name("ListItemNumber"), vec![text("z"), text("items")]),
+                )),
+                Instruction::new(InstructionKind::SetVariable(
+                    "amount".into(),
+                    reporter(Op::from_name("ListAmount"), vec![text("y"), text("items")]),
+                )),
+                Instruction::new(InstructionKind::SetVariable(
+                    "length".into(),
+                    reporter(Op::from_name("ListLength"), vec![text("items")]),
+                )),
+                Instruction::new(InstructionKind::SetVariable(
+                    "contains".into(),
+                    reporter(Op::from_name("ListContains"), vec![text("items"), text("z")]),
+                )),
+                Instruction::new(InstructionKind::SetVariable(
+                    "exists".into(),
+                    reporter(Op::from_name("ListItemExists"), vec![Value::number(3.0), text("items")]),
+                )),
+                Instruction::new(InstructionKind::SetVariable(
+                    "empty".into(),
+                    reporter(Op::from_name("ListIsEmpty"), vec![text("items")]),
+                )),
+                Instruction::new(InstructionKind::DeleteAllOfList {
+                    name: "items".into(),
+                }),
+                Instruction::new(InstructionKind::SetVariable(
+                    "now_empty".into(),
+                    reporter(Op::from_name("ListIsEmpty"), vec![text("items")]),
+                )),
+            ],
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&variables),
+            Arc::clone(&lists),
+        );
+
+        assert!(lists.lock().unwrap().get("items").unwrap().is_empty());
+        let variables = variables.lock().unwrap();
+        assert_eq!(variables.get("item"), Some(&Evaluated::Text("y".into())));
+        assert_eq!(variables.get("position"), Some(&Evaluated::Number(2.0)));
+        assert_eq!(variables.get("amount"), Some(&Evaluated::Number(1.0)));
+        assert_eq!(variables.get("length"), Some(&Evaluated::Number(3.0)));
+        assert_eq!(variables.get("contains"), Some(&Evaluated::Bool(true)));
+        assert_eq!(variables.get("exists"), Some(&Evaluated::Bool(true)));
+        assert_eq!(variables.get("empty"), Some(&Evaluated::Bool(false)));
+        assert_eq!(variables.get("now_empty"), Some(&Evaluated::Bool(true)));
+    }
+
+    #[test]
+    fn resolve_list_reporters_supports_canvas_preview_without_running_a_macro() {
+        use crate::input::value::Op;
+
+        let lists = HashMap::from([(
+            "items".to_string(),
+            vec![ListItem::Text("first".into()), ListItem::Number(7.0)],
+        )]);
+        let list_item = Value::Op {
+            op: Op::from_name("ListItem"),
+            args: vec![
+                Value::number(2.0),
+                Value::Text {
+                    value: "items".into(),
+                },
+            ],
+            saved: Box::new(Value::number(0.0)),
+        };
+        let preview =
+            resolve_list_reporters(&list_item, &lists).and_then(|value| value.eval_text());
+        assert_eq!(preview, Ok("7".to_string()));
+
+        let nested_length = Value::Op {
+            op: Op::Add,
+            args: vec![
+                Value::Op {
+                    op: Op::from_name("ListLength"),
+                    args: vec![Value::Text {
+                        value: "items".into(),
+                    }],
+                    saved: Box::new(Value::number(0.0)),
+                },
+                Value::number(1.0),
+            ],
+            saved: Box::new(Value::number(0.0)),
+        };
+        let preview =
+            resolve_list_reporters(&nested_length, &lists).and_then(|value| value.eval_text());
+        assert_eq!(preview, Ok("3".to_string()));
+    }
+
     /// Three entry strands each waiting 150ms should finish in well under
     /// 3×150ms if they're actually running concurrently rather than one
     /// after another.
@@ -972,6 +1421,7 @@ mod tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
+            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         let start = Instant::now();
@@ -1002,6 +1452,7 @@ mod tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
+            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         let start = Instant::now();
@@ -1044,6 +1495,7 @@ mod tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
+            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         let stop_flag = Arc::new(Mutex::new(true));
@@ -1219,6 +1671,7 @@ mod tests {
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
+            lists: vec![],
         }
     }
 
@@ -1290,6 +1743,7 @@ mod tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
+            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -1341,6 +1795,7 @@ mod tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
+            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         let start = Instant::now();
@@ -1405,6 +1860,7 @@ mod tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
+            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         // Should return promptly (erroring out at MAX_CALL_DEPTH) rather than
@@ -1506,6 +1962,7 @@ mod tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
+            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -1711,6 +2168,7 @@ mod tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
+            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -1979,6 +2437,7 @@ mod tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
+            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));

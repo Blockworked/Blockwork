@@ -1,8 +1,9 @@
 use crate::macros_thread;
 use crate::state::{
-    AppState, ComboCapture, EditSession, HotkeyActionDto, InstructionDto, KeyCaptureTarget, Page,
-    PathStep, RecordingPhase, SharedState, StateDto, UpdateCheckState, ValueLocation,
-    build_state_dto, dto_to_hotkey_action, dto_to_instruction, emit_state_updated,
+    AppState, ComboCapture, EditSession, HotkeyActionDto, InstructionDto, KeyCaptureTarget,
+    ListItemDto, Page, PathStep, RecordingPhase, SharedState, StateDto, UpdateCheckState,
+    ValueLocation, build_state_dto, dto_to_hotkey_action, dto_to_instruction,
+    emit_state_updated,
 };
 use blockstitch_core::editor::{
     ValueEdit, drop_strand_buffers, prune_value_buffers, retain_live_buffers,
@@ -11,10 +12,10 @@ use blockwork_core::config;
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
 use blockwork_core::input::types::InputToken;
 use blockwork_core::input::value::{Evaluated, Value};
-use blockwork_core::macros::runner::VariableStore;
+use blockwork_core::macros::runner::{ListStore, VariableStore, resolve_list_reporters};
 use blockwork_core::macros::{
-    BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro, MacroGraph,
-    SPEED_MULTIPLIER_RANGE, Strand, loop_control,
+    BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, ListDef, ListItem, Macro,
+    MacroGraph, SPEED_MULTIPLIER_RANGE, Strand, loop_control,
     normalize_block_color as normalize_persisted_block_color,
 };
 use blockwork_core::recording;
@@ -35,7 +36,10 @@ fn push_undo(s: &mut AppState) {
 /// [`push_undo`] for an edit that coalesces with the keystrokes already in
 /// progress at `session` - only the first one checkpoints.
 fn push_undo_for(s: &mut AppState, session: Option<EditSession>) {
-    let snapshot = s.current_macro.as_ref().map(|mac| mac.graph.clone());
+    let snapshot = s
+        .current_macro
+        .as_ref()
+        .map(|mac| (mac.graph.clone(), mac.lists.clone()));
     match (snapshot, session) {
         (Some(snapshot), Some(session)) => {
             s.history.push_for_session(snapshot, session);
@@ -112,6 +116,20 @@ fn sync_variable_values(s: &mut crate::state::AppState) {
     }
 }
 
+fn sync_list_values(s: &mut crate::state::AppState) {
+    let values = match &s.current_macro {
+        Some(mac) => mac
+            .lists
+            .iter()
+            .map(|list| (list.name.clone(), list.items.clone()))
+            .collect(),
+        None => HashMap::new(),
+    };
+    if let Ok(mut store) = s.list_values.lock() {
+        *store = values;
+    }
+}
+
 fn auto_save(s: &crate::state::AppState) {
     if let Some(mac) = &s.current_macro {
         if let Err(e) = mac.save() {
@@ -149,6 +167,7 @@ pub(crate) fn select_macro(
     s.history.clear();
     s.invalid_field_buffers.clear();
     sync_variable_values(&mut s);
+    sync_list_values(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -178,6 +197,7 @@ pub(crate) fn new_macro(
     }
     s.invalid_field_buffers.clear();
     sync_variable_values(&mut s);
+    sync_list_values(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -320,6 +340,163 @@ pub(crate) fn delete_variable(
     if let Ok(mut store) = s.variable_values.lock() {
         store.remove(&name);
     }
+    auto_save(&s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+fn create_list_in(mac: &mut Macro, name: &str) -> Result<String, String> {
+    let trimmed = name.trim().to_string();
+    if trimmed.is_empty() {
+        return Err("List name can't be empty".to_string());
+    }
+    if mac.lists.iter().any(|list| list.name == trimmed) {
+        return Err(format!("A list named \"{trimmed}\" already exists"));
+    }
+    mac.lists.push(ListDef {
+        name: trimmed.clone(),
+        items: vec![],
+        editor_visible: false,
+        editor_x: 36,
+        editor_y: 36,
+    });
+    Ok(trimmed)
+}
+
+pub(crate) fn create_list(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    // Validate before checkpointing so a rejected name never creates a dead
+    // undo entry.
+    {
+        let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Err("List name can't be empty".to_string());
+        }
+        if mac.lists.iter().any(|list| list.name == trimmed) {
+            return Err(format!("A list named \"{trimmed}\" already exists"));
+        }
+    }
+    push_undo(&mut s);
+    create_list_in(s.current_macro.as_mut().ok_or("No macro selected")?, &name)?;
+    sync_list_values(&mut s);
+    auto_save(&s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn rename_list(
+    state: &SharedState,
+    app: &AppHandle,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let trimmed = new_name.trim().to_string();
+    {
+        let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+        if trimmed.is_empty() {
+            return Err("List name can't be empty".to_string());
+        }
+        if trimmed != old_name && mac.lists.iter().any(|list| list.name == trimmed) {
+            return Err(format!("A list named \"{trimmed}\" already exists"));
+        }
+        if !mac.lists.iter().any(|list| list.name == old_name) {
+            return Err("List not found".to_string());
+        }
+    }
+    if trimmed == old_name {
+        return Ok(());
+    }
+
+    push_undo(&mut s);
+    s.current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .rename_list(&old_name, &trimmed);
+    sync_list_values(&mut s);
+    auto_save(&s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn delete_list(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let exists = s
+        .current_macro
+        .as_ref()
+        .ok_or("No macro selected")?
+        .lists
+        .iter()
+        .any(|list| list.name == name);
+    if exists {
+        push_undo(&mut s);
+        s.current_macro
+            .as_mut()
+            .expect("checked above")
+            .lists
+            .retain(|list| list.name != name);
+    }
+    sync_list_values(&mut s);
+    auto_save(&s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Replaces a list's visible-editor contents. `ListItemDto` intentionally has
+/// no boolean/expression case, which enforces the literal-only list contract.
+pub(crate) fn set_list_items(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+    items: Vec<ListItemDto>,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let list = s
+        .current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .lists
+        .iter_mut()
+        .find(|list| list.name == name)
+        .ok_or("List not found")?;
+    list.items = items.iter().map(crate::state::dto_to_list_item).collect();
+    sync_list_values(&mut s);
+    auto_save(&s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Saves whether a list's editable canvas monitor is open and where it sits.
+/// This is a presentation preference rather than an undoable macro edit.
+pub(crate) fn set_list_editor_state(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+    visible: bool,
+    x: i32,
+    y: i32,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let list = s
+        .current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .lists
+        .iter_mut()
+        .find(|list| list.name == name)
+        .ok_or("List not found")?;
+    list.editor_visible = visible;
+    list.editor_x = x.max(0);
+    list.editor_y = y.max(0);
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(())
@@ -568,6 +745,7 @@ fn commit_imported_macro(
     }
     s.invalid_field_buffers.clear();
     sync_variable_values(&mut s);
+    sync_list_values(&mut s);
     emit_state_updated(app, &s);
     Ok(())
 }
@@ -744,17 +922,15 @@ mod loop_control_placement_tests {
     #[test]
     fn non_loop_control_instructions_are_always_allowed() {
         let strand = strand_with(vec![Instruction::new(InstructionKind::WhenRan)]);
-        assert!(
-            check_loop_control_placement(
-                &strand,
-                &[PathStep {
-                    index: 1,
-                    slot: None
-                }],
-                &Instruction::new(InstructionKind::Comment("x".into()))
-            )
-            .is_ok()
-        );
+        assert!(check_loop_control_placement(
+            &strand,
+            &[PathStep {
+                index: 1,
+                slot: None
+            }],
+            &Instruction::new(InstructionKind::Comment("x".into()))
+        )
+        .is_ok());
     }
 
     #[test]
@@ -764,14 +940,12 @@ mod loop_control_placement_tests {
             index: 1,
             slot: None,
         }];
-        assert!(
-            check_loop_control_placement(
-                &strand,
-                &path,
-                &Instruction::new(InstructionKind::EscapeLoop)
-            )
-            .is_err()
-        );
+        assert!(check_loop_control_placement(
+            &strand,
+            &path,
+            &Instruction::new(InstructionKind::EscapeLoop)
+        )
+        .is_err());
     }
 
     #[test]
@@ -794,14 +968,12 @@ mod loop_control_placement_tests {
                 slot: None,
             },
         ];
-        assert!(
-            check_loop_control_placement(
-                &strand,
-                &path,
-                &Instruction::new(InstructionKind::ContinueLoop)
-            )
-            .is_ok()
-        );
+        assert!(check_loop_control_placement(
+            &strand,
+            &path,
+            &Instruction::new(InstructionKind::ContinueLoop)
+        )
+        .is_ok());
     }
 
     #[test]
@@ -831,14 +1003,12 @@ mod loop_control_placement_tests {
                 slot: None,
             },
         ];
-        assert!(
-            check_loop_control_placement(
-                &strand,
-                &path,
-                &Instruction::new(InstructionKind::EscapeLoop)
-            )
-            .is_ok()
-        );
+        assert!(check_loop_control_placement(
+            &strand,
+            &path,
+            &Instruction::new(InstructionKind::EscapeLoop)
+        )
+        .is_ok());
     }
 
     #[test]
@@ -860,14 +1030,12 @@ mod loop_control_placement_tests {
                 slot: None,
             },
         ];
-        assert!(
-            check_loop_control_placement(
-                &strand,
-                &path,
-                &Instruction::new(InstructionKind::EscapeLoop)
-            )
-            .is_err()
-        );
+        assert!(check_loop_control_placement(
+            &strand,
+            &path,
+            &Instruction::new(InstructionKind::EscapeLoop)
+        )
+        .is_err());
     }
 }
 
@@ -1008,16 +1176,26 @@ pub(crate) fn preview_value(state: &SharedState, value: Value) -> Result<String,
         .lock()
         .map(|g| g.clone())
         .unwrap_or_default();
-    preview_value_with_env(&value, &env)
+    let lists = s.list_values.lock().map(|g| g.clone()).unwrap_or_default();
+    preview_value_with_env_and_lists(&value, &env, &lists)
 }
 
 /// The actual evaluation logic behind `preview_value`, factored out so it's
 /// testable without a real `tauri::State`.
+#[cfg(test)]
 fn preview_value_with_env(
     value: &Value,
     env: &HashMap<String, Evaluated>,
 ) -> Result<String, String> {
-    value.resolve_vars(env).eval_text()
+    preview_value_with_env_and_lists(value, env, &HashMap::new())
+}
+
+fn preview_value_with_env_and_lists(
+    value: &Value,
+    env: &HashMap<String, Evaluated>,
+    lists: &HashMap<String, Vec<ListItem>>,
+) -> Result<String, String> {
+    resolve_list_reporters(&value.resolve_vars(env), lists)?.eval_text()
 }
 
 /// Creates a new value block parked on open canvas - for a sidebar drop, or
@@ -1349,17 +1527,25 @@ pub(crate) fn clear_instructions(
 fn apply_history_step(
     state: &SharedState,
     app: &AppHandle,
-    step: fn(&mut crate::state::History<MacroGraph>, MacroGraph) -> Option<MacroGraph>,
+    step: fn(
+        &mut crate::state::History<(MacroGraph, Vec<ListDef>)>,
+        (MacroGraph, Vec<ListDef>),
+    ) -> Option<(MacroGraph, Vec<ListDef>)>,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    if let Some(current) = s.current_macro.as_ref().map(|mac| mac.graph.clone())
-        && let Some(restored) = step(&mut s.history, current)
+    if let Some(current) = s
+        .current_macro
+        .as_ref()
+        .map(|mac| (mac.graph.clone(), mac.lists.clone()))
+        && let Some((restored_graph, restored_lists)) = step(&mut s.history, current)
     {
         if let Some(mac) = &mut s.current_macro {
-            mac.graph = restored;
+            mac.graph = restored_graph;
+            mac.lists = restored_lists;
             mac.ensure_id();
         }
         sync_variable_values(&mut s);
+        sync_list_values(&mut s);
         s.invalid_field_buffers.clear();
         auto_save(&s);
     }
@@ -1626,7 +1812,7 @@ pub(crate) fn run_macro(
     state: &SharedState,
     app: &AppHandle,
 ) -> Result<(), String> {
-    let (mac, emulator, is_looping, loop_mode, speed_multiplier, variables) = {
+    let (mac, emulator, is_looping, loop_mode, speed_multiplier, variables, lists) = {
         let s = state.lock().map_err(|e| e.to_string())?;
         let mac = s.current_macro.clone();
         let emulator = s.emulator.as_ref().map(Arc::clone);
@@ -1635,6 +1821,7 @@ pub(crate) fn run_macro(
         let speed_multiplier =
             mac.as_ref().map_or(1.0, |m| m.speed_multiplier) * s.global_speed_multiplier;
         let variables = Arc::clone(&s.variable_values);
+        let lists = Arc::clone(&s.list_values);
         (
             mac,
             emulator,
@@ -1642,6 +1829,7 @@ pub(crate) fn run_macro(
             loop_mode,
             speed_multiplier,
             variables,
+            lists,
         )
     };
 
@@ -1658,6 +1846,7 @@ pub(crate) fn run_macro(
                 Arc::clone(&is_looping),
                 speed_multiplier,
                 variables,
+                lists,
                 Arc::clone(&*state),
                 app.clone(),
             );
@@ -1679,6 +1868,7 @@ pub(crate) fn run_macro(
                 Arc::clone(&is_looping),
                 speed_multiplier,
                 variables,
+                lists,
                 Arc::clone(&*state),
                 app.clone(),
             );
@@ -2277,6 +2467,12 @@ pub(crate) fn handle_hotkey_action(
                             .map(|v| (v.name.clone(), v.value.clone()))
                             .collect(),
                     ));
+                    let lists: ListStore = Arc::new(Mutex::new(
+                        mac.lists
+                            .iter()
+                            .map(|list| (list.name.clone(), list.items.clone()))
+                            .collect(),
+                    ));
                     run_macro_task(
                         mac,
                         emulator,
@@ -2284,6 +2480,7 @@ pub(crate) fn handle_hotkey_action(
                         loop_mode,
                         speed_multiplier,
                         variables,
+                        lists,
                         shared_state,
                         app.clone(),
                     );
@@ -2316,6 +2513,8 @@ pub(crate) fn handle_hotkey_action(
                     if let Some(mac) = &s.current_macro {
                         config::set_selected_macro_id(Some(&mac.id));
                     }
+                    sync_variable_values(&mut s);
+                    sync_list_values(&mut s);
                     emit_state_updated(app, &s);
                 }
             }
@@ -2338,6 +2537,8 @@ pub(crate) fn handle_hotkey_action(
                     if let Some(mac) = &s.current_macro {
                         config::set_selected_macro_id(Some(&mac.id));
                     }
+                    sync_variable_values(&mut s);
+                    sync_list_values(&mut s);
                     emit_state_updated(app, &s);
                 }
             }
@@ -2383,6 +2584,7 @@ fn run_macro_task(
     loop_mode: bool,
     speed_multiplier: f64,
     variables: VariableStore,
+    lists: ListStore,
     state: SharedState,
     app: AppHandle,
 ) {
@@ -2404,6 +2606,7 @@ fn run_macro_task(
             loop_flag,
             speed_multiplier,
             variables,
+            lists,
             state,
             app,
         );
@@ -2427,6 +2630,7 @@ fn run_macro_task(
             stop_flag,
             speed_multiplier,
             variables,
+            lists,
             state,
             app,
         );
@@ -2502,6 +2706,7 @@ mod value_location_tests {
             recording_target: None,
             speed_multiplier: 1.0,
             settings: blockwork_core::macros::MacroSettings::default(),
+            lists: vec![],
         }
     }
 
@@ -2921,6 +3126,7 @@ mod value_location_tests {
             recording_target: None,
             speed_multiplier: 1.0,
             settings: blockwork_core::macros::MacroSettings::default(),
+            lists: vec![],
         };
         let loc = ValueLocation::Field {
             strand_id: "s1".into(),

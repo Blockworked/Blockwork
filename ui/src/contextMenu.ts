@@ -3,7 +3,7 @@ import { reactive } from 'vue';
 import { registerOpen, unregisterOpen, clientToCanvas } from 'blockstitch';
 import type { InstrPath, ValueDto } from './types';
 
-export type ContextMenuType = 'block' | 'canvas' | 'variable' | 'myBlock' | 'paletteInstruction' | 'paletteValue' | 'value';
+export type ContextMenuType = 'block' | 'canvas' | 'variable' | 'list' | 'myBlock' | 'paletteInstruction' | 'paletteValue' | 'value';
 
 interface ContextMenuState {
   open: boolean;
@@ -15,6 +15,7 @@ interface ContextMenuState {
   canvasX: number;
   canvasY: number;
   variableName: string;
+  listName: string;
   blockId: string;
   paletteInstructionType: string;
   paletteVariantId: string | undefined;
@@ -32,6 +33,7 @@ export const contextMenu = reactive<ContextMenuState>({
   canvasX: 0,
   canvasY: 0,
   variableName: '',
+  listName: '',
   blockId: '',
   paletteInstructionType: '',
   paletteVariantId: undefined,
@@ -65,6 +67,13 @@ export function openVariableMenu(e: MouseEvent, name: string): void {
   openAt(e);
   contextMenu.type = 'variable';
   contextMenu.variableName = name;
+}
+
+export function openListMenu(e: MouseEvent, name: string): void {
+  e.preventDefault();
+  openAt(e);
+  contextMenu.type = 'list';
+  contextMenu.listName = name;
 }
 
 export function openMyBlockMenu(e: MouseEvent, blockId: string): void {

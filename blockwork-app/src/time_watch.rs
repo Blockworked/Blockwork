@@ -46,7 +46,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
                 let already_fired_today = last_fired.get(&key) == Some(&today);
 
                 if !already_fired_today && schedule.matches(&now) {
-                    scheduled_run::fire(mac.id.clone(), strand.instructions[1..].to_vec(), Arc::clone(&emulator), speed_multiplier, &mac.variables, Arc::clone(&shared_state), app.clone());
+                    scheduled_run::fire(mac.id.clone(), strand.instructions[1..].to_vec(), Arc::clone(&emulator), speed_multiplier, &mac.variables, &mac.lists, Arc::clone(&shared_state), app.clone());
                     next_last_fired.insert(key, today);
                 } else if already_fired_today {
                     next_last_fired.insert(key, today);

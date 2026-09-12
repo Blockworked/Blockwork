@@ -4,8 +4,8 @@
 
 use crate::state::{build_state_dto, SharedState};
 use blockwork_core::macros::backend::InputBackend;
-use blockwork_core::macros::runner::{run_instructions, VariableStore};
-use blockwork_core::macros::{run_registry, Instruction, VariableDef};
+use blockwork_core::macros::runner::{run_instructions_with_lists, ListStore, VariableStore};
+use blockwork_core::macros::{run_registry, Instruction, ListDef, VariableDef};
 use std::sync::{Arc, Mutex};
 use crate::AppHandle;
 use tracing::warn;
@@ -23,27 +23,32 @@ pub(crate) fn fire(
     emulator: Arc<Mutex<dyn InputBackend>>,
     speed_multiplier: f64,
     variable_defs: &[VariableDef],
+    list_defs: &[ListDef],
     shared_state: SharedState,
     app: AppHandle,
 ) {
     let variables: VariableStore = Arc::new(Mutex::new(variable_defs.iter().map(|v| (v.name.clone(), v.value.clone())).collect()));
+    let lists: ListStore = Arc::new(Mutex::new(list_defs.iter().map(|list| (list.name.clone(), list.items.clone())).collect()));
     std::thread::spawn(move || {
         let run_flag = run_registry::begin_run();
-        run_instructions(instructions, emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables));
+        run_instructions_with_lists(instructions, emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists));
         run_registry::end_run(&run_flag);
-        persist_fired_variables(&shared_state, &app, &macro_id, &variables);
+        persist_fired_variables(&shared_state, &app, &macro_id, &variables, &lists);
     });
 }
 
 /// Like `macros_thread::persist_variables`, but looks the macro up by id
 /// across the whole macro list instead of only the currently-selected one -
 /// a watcher-fired macro is very often not the one open in the editor.
-fn persist_fired_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str, variables: &VariableStore) {
+fn persist_fired_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str, variables: &VariableStore, lists: &ListStore) {
     let (mac_to_save, dto) = {
         let Ok(mut s) = shared_state.lock() else { return };
         let Some(mac) = s.macros_list.iter_mut().find(|m| m.id == macro_id) else { return };
         if let Ok(values) = variables.lock() {
             mac.sync_variables_from(&values);
+        }
+        if let Ok(values) = lists.lock() {
+            mac.sync_lists_from(&values);
         }
         let mac_to_save = mac.clone();
         if s.current_macro.as_ref().is_some_and(|c| c.id == macro_id) {

@@ -40,6 +40,7 @@ import CloseAppFields from './components/fields/CloseAppFields.vue';
 import CommentFields from './components/fields/CommentFields.vue';
 import SetVariableFields from './components/fields/SetVariableFields.vue';
 import ChangeVariableFields from './components/fields/ChangeVariableFields.vue';
+import ListCommandFields from './components/fields/ListCommandFields.vue';
 import BlockHeaderFields from './components/fields/BlockHeaderFields.vue';
 import CallBlockFields from './components/fields/CallBlockFields.vue';
 import ReturnFields from './components/fields/ReturnFields.vue';
@@ -68,6 +69,7 @@ import PaletteOpenAppFields from './components/fields/palette/PaletteOpenAppFiel
 import PaletteCloseAppFields from './components/fields/palette/PaletteCloseAppFields.vue';
 import PaletteSetVariableFields from './components/fields/palette/PaletteSetVariableFields.vue';
 import PaletteChangeVariableFields from './components/fields/palette/PaletteChangeVariableFields.vue';
+import PaletteListCommandFields from './components/fields/palette/PaletteListCommandFields.vue';
 import PaletteReturnFields from './components/fields/palette/PaletteReturnFields.vue';
 import PaletteIfFields from './components/fields/palette/PaletteIfFields.vue';
 import PaletteIfElseFields from './components/fields/palette/PaletteIfElseFields.vue';
@@ -94,7 +96,7 @@ export function setupBlockstitch(): void {
 const HEADER_TYPES: InstructionType[] = ['WhenRan', 'BlockHeader', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged'];
 const ENTRY_TRIGGER_TYPES = new Set<InstructionType>(['WhenRan', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged']);
 const CAP_TYPES: InstructionType[] = ['Return', 'EscapeLoop', 'ContinueLoop'];
-const STACK_TYPES: InstructionType[] = ['Wait', 'Text', 'Key', 'Button', 'MoveMouse', 'Scroll', 'Command', 'Comment', 'OpenApp', 'CloseApp', 'SetVariable', 'ChangeVariable'];
+const STACK_TYPES: InstructionType[] = ['Wait', 'Text', 'Key', 'Button', 'MoveMouse', 'Scroll', 'Command', 'Comment', 'OpenApp', 'CloseApp', 'SetVariable', 'ChangeVariable', 'AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList'];
 
 function registerShapes() {
   for (const type of HEADER_TYPES) {
@@ -175,6 +177,7 @@ function registerFields() {
   registerBlockField('Comment', CommentFields);
   registerBlockField('SetVariable', SetVariableFields);
   registerBlockField('ChangeVariable', ChangeVariableFields);
+  for (const type of ['AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList'] as const) registerBlockField(type, ListCommandFields);
   registerBlockField('BlockHeader', BlockHeaderFields);
   registerBlockField('CallBlock', CallBlockFields);
   registerBlockField('Return', ReturnFields);
@@ -207,6 +210,7 @@ function registerFields() {
   registerPaletteBlockField('CloseApp', PaletteCloseAppFields);
   registerPaletteBlockField('SetVariable', PaletteSetVariableFields);
   registerPaletteBlockField('ChangeVariable', PaletteChangeVariableFields);
+  for (const type of ['AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList'] as const) registerPaletteBlockField(type, PaletteListCommandFields);
   registerPaletteBlockField('Return', PaletteReturnFields);
   registerPaletteBlockField('If', PaletteIfFields);
   registerPaletteBlockField('IfElse', PaletteIfElseFields);

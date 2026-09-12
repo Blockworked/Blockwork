@@ -118,6 +118,7 @@ impl Backend {
             macro_strs: vec![],
             emulator,
             variable_values: Arc::new(Mutex::new(HashMap::new())),
+            list_values: Arc::new(Mutex::new(HashMap::new())),
             thread_pool: ThreadPool::new(),
             is_looping: Arc::new(Mutex::new(false)),
             loop_mode_enabled: settings.loop_mode_enabled.unwrap_or(false),

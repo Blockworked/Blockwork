@@ -17,6 +17,13 @@ pub enum FieldId {
     TextValue,
     SetVariableValue,
     ChangeVariableValue,
+    AddToListValue,
+    DeleteOfListIndex,
+    ShiftListAmount,
+    InsertIntoListValue,
+    InsertIntoListIndex,
+    ReplaceItemOfListIndex,
+    ReplaceItemOfListValue,
     ReturnValue,
     CallArg(usize),
     Condition,
@@ -36,6 +43,10 @@ impl FieldId {
                 | FieldId::ScrollAmount
                 | FieldId::BatteryDischargeThreshold
                 | FieldId::BatteryChargeThreshold
+                | FieldId::DeleteOfListIndex
+                | FieldId::ShiftListAmount
+                | FieldId::InsertIntoListIndex
+                | FieldId::ReplaceItemOfListIndex
         )
     }
 }
@@ -50,6 +61,13 @@ impl std::fmt::Display for FieldId {
             FieldId::TextValue => write!(f, "TextValue"),
             FieldId::SetVariableValue => write!(f, "SetVariableValue"),
             FieldId::ChangeVariableValue => write!(f, "ChangeVariableValue"),
+            FieldId::AddToListValue => write!(f, "AddToListValue"),
+            FieldId::DeleteOfListIndex => write!(f, "DeleteOfListIndex"),
+            FieldId::ShiftListAmount => write!(f, "ShiftListAmount"),
+            FieldId::InsertIntoListValue => write!(f, "InsertIntoListValue"),
+            FieldId::InsertIntoListIndex => write!(f, "InsertIntoListIndex"),
+            FieldId::ReplaceItemOfListIndex => write!(f, "ReplaceItemOfListIndex"),
+            FieldId::ReplaceItemOfListValue => write!(f, "ReplaceItemOfListValue"),
             FieldId::ReturnValue => write!(f, "ReturnValue"),
             FieldId::CallArg(i) => write!(f, "CallArg:{i}"),
             FieldId::Condition => write!(f, "Condition"),
@@ -71,6 +89,13 @@ impl std::str::FromStr for FieldId {
             "TextValue" => Ok(FieldId::TextValue),
             "SetVariableValue" => Ok(FieldId::SetVariableValue),
             "ChangeVariableValue" => Ok(FieldId::ChangeVariableValue),
+            "AddToListValue" => Ok(FieldId::AddToListValue),
+            "DeleteOfListIndex" => Ok(FieldId::DeleteOfListIndex),
+            "ShiftListAmount" => Ok(FieldId::ShiftListAmount),
+            "InsertIntoListValue" => Ok(FieldId::InsertIntoListValue),
+            "InsertIntoListIndex" => Ok(FieldId::InsertIntoListIndex),
+            "ReplaceItemOfListIndex" => Ok(FieldId::ReplaceItemOfListIndex),
+            "ReplaceItemOfListValue" => Ok(FieldId::ReplaceItemOfListValue),
             "ReturnValue" => Ok(FieldId::ReturnValue),
             "Condition" => Ok(FieldId::Condition),
             "RepeatCount" => Ok(FieldId::RepeatCount),
@@ -97,6 +122,21 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
         (InstructionKind::Return(v), FieldId::ReturnValue) => Some(v),
         (InstructionKind::CallBlock { args, .. }, FieldId::CallArg(i)) => args.get_mut(i),
         (InstructionKind::ChangeVariable(_, v), FieldId::ChangeVariableValue) => Some(v),
+        (InstructionKind::AddToList { value, .. }, FieldId::AddToListValue) => Some(value),
+        (InstructionKind::DeleteOfList { index, .. }, FieldId::DeleteOfListIndex) => Some(index),
+        (InstructionKind::ShiftList { amount, .. }, FieldId::ShiftListAmount) => Some(amount),
+        (InstructionKind::InsertIntoList { value, .. }, FieldId::InsertIntoListValue) => {
+            Some(value)
+        }
+        (InstructionKind::InsertIntoList { index, .. }, FieldId::InsertIntoListIndex) => {
+            Some(index)
+        }
+        (InstructionKind::ReplaceItemOfList { index, .. }, FieldId::ReplaceItemOfListIndex) => {
+            Some(index)
+        }
+        (InstructionKind::ReplaceItemOfList { value, .. }, FieldId::ReplaceItemOfListValue) => {
+            Some(value)
+        }
         (InstructionKind::If { condition, .. }, FieldId::Condition) => Some(condition),
         (InstructionKind::IfElse { condition, .. }, FieldId::Condition) => Some(condition),
         (InstructionKind::While { condition, .. }, FieldId::Condition) => Some(condition),

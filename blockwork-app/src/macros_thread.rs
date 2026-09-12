@@ -1,7 +1,7 @@
 use crate::state::{build_state_dto, SharedState};
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::run_registry;
-use blockwork_core::macros::runner::VariableStore;
+use blockwork_core::macros::runner::{ListStore, VariableStore};
 use blockwork_core::macros::thread_pool::ThreadPool;
 use blockwork_core::macros::Macro;
 use std::sync::{Arc, Mutex};
@@ -12,7 +12,7 @@ use tracing::warn;
 /// Writes the run's final variable values back into the (still-selected)
 /// macro and saves it to disk. Called once per run/loop finish rather than
 /// per-instruction, and a no-op if the macro was switched away mid-run.
-fn persist_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str, variables: &VariableStore) {
+fn persist_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str, variables: &VariableStore, lists: &ListStore) {
     let (mac_to_save, dto) = {
         let Ok(mut s) = shared_state.lock() else { return };
         let Some(mac) = s.current_macro.as_mut() else { return };
@@ -22,6 +22,7 @@ fn persist_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str
         if let Ok(values) = variables.lock() {
             mac.sync_variables_from(&values);
         }
+        if let Ok(values) = lists.lock() { mac.sync_lists_from(&values); }
         (mac.clone(), build_state_dto(&s))
     };
     // Saved after the state lock is released: this runs right when an IPC
@@ -39,6 +40,7 @@ pub(crate) fn into_loop_task(
     loop_flag: Arc<Mutex<bool>>,
     speed_multiplier: f64,
     variables: VariableStore,
+    lists: ListStore,
     shared_state: SharedState,
     app: AppHandle,
 ) -> impl FnOnce() + Send + 'static {
@@ -56,12 +58,12 @@ pub(crate) fn into_loop_task(
                 break;
             }
 
-            mac.clone().run(Arc::clone(&emulator), Some(Arc::clone(&loop_flag)), speed_multiplier, Arc::clone(&variables));
+            mac.clone().run_with_lists(Arc::clone(&emulator), Some(Arc::clone(&loop_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists));
 
             //todo better solution std::thread::sleep(std::time::Duration::from_millis(1));
         }
         run_registry::end_run(&loop_flag);
-        persist_variables(&shared_state, &app, &macro_id, &variables);
+        persist_variables(&shared_state, &app, &macro_id, &variables, &lists);
         println!("Macro loop stopped.");
     }
 }
@@ -72,6 +74,7 @@ pub(crate) fn into_single_run_task(
     stop_flag: Arc<Mutex<bool>>,
     speed_multiplier: f64,
     variables: VariableStore,
+    lists: ListStore,
     shared_state: SharedState,
     app: AppHandle,
 ) -> impl FnOnce() + Send + 'static {
@@ -82,9 +85,9 @@ pub(crate) fn into_single_run_task(
         // refers to - that one gets cleared by whichever run finishes first,
         // which would spuriously cut a concurrently-started run short.
         let run_flag = run_registry::begin_run();
-        mac.run(emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables));
+        mac.run_with_lists(emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists));
         run_registry::end_run(&run_flag);
-        persist_variables(&shared_state, &app, &macro_id, &variables);
+        persist_variables(&shared_state, &app, &macro_id, &variables, &lists);
         if let Ok(mut stopped) = stop_flag.lock() {
             *stopped = false;
         }

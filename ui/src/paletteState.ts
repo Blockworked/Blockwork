@@ -8,6 +8,7 @@ import type { OperatorKindSpec, OperatorValueKind } from './valueOps';
 const INSTRUCTION_TYPES: InstructionType[] = [
   'WhenRan', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged', 'Wait', 'Text', 'Key', 'Button', 'MoveMouse', 'Scroll', 'Command', 'OpenApp', 'CloseApp',
   'SetVariable', 'ChangeVariable', 'Return', 'If', 'IfElse',
+  'AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList',
   'Repeat', 'Forever', 'While', 'EscapeLoop', 'ContinueLoop',
 ];
 
@@ -36,6 +37,40 @@ const numberSeed = defaultValueForKind('Number');
 const textSeed = defaultValueForKind('Text');
 export const paletteNumber = reactive({ value: numberSeed.kind === 'Number' ? numberSeed.value : 0 });
 export const paletteText = reactive({ value: textSeed.kind === 'Text' ? textSeed.value : '' });
+
+const LIST_OPERATOR_KINDS: OperatorValueKind[] = [
+  'ListItem', 'ListItemNumber', 'ListAmount', 'ListLength',
+  'ListContains', 'ListItemExists', 'ListIsEmpty',
+];
+const LIST_COMMAND_TYPES: InstructionType[] = [
+  'AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList',
+  'InsertIntoList', 'ReplaceItemOfList', 'ReverseList',
+];
+
+/** Keeps sidebar prefabs useful as soon as names arrive from the backend.
+ * Only unselected or no-longer-valid palette targets are changed; blocks
+ * already dropped onto the canvas are persisted separately and untouched. */
+export function syncPaletteTargetDefaults(variableNames: string[], listNames: string[]): void {
+  const firstVariable = variableNames[0];
+  const firstList = listNames[0];
+  if (firstVariable) {
+    for (const type of ['SetVariable', 'ChangeVariable'] as const) {
+      const instruction = paletteInstructions[type] as Extract<InstructionDto, { type: 'SetVariable' | 'ChangeVariable' }>;
+      if (!instruction.name || !variableNames.includes(instruction.name)) instruction.name = firstVariable;
+    }
+  }
+  if (!firstList) return;
+  for (const type of LIST_COMMAND_TYPES) {
+    const instruction = paletteInstructions[type] as Extract<InstructionDto, { type: 'AddToList' | 'DeleteOfList' | 'DeleteAllOfList' | 'ShiftList' | 'InsertIntoList' | 'ReplaceItemOfList' | 'ReverseList' }>;
+    if (!instruction.name || !listNames.includes(instruction.name)) instruction.name = firstList;
+  }
+  for (const kind of LIST_OPERATOR_KINDS) {
+    const spec = specForKind(kind);
+    const index = spec?.enumArg?.index;
+    const args = paletteOperatorArgs[kind];
+    if (index !== undefined && (!args[index] || !listNames.includes(String(args[index])))) args[index] = firstList;
+  }
+}
 
 /** Applies an edit blockstitch's generic `PaletteValueBlock` made (via its
  * `update:value` emit) back onto this kind's own persisted draft state -
@@ -75,7 +110,11 @@ export function paletteValueFor(kind: ValueKind): ValueDto {
     op: spec.op,
     args: args.map((v, i) => {
       const argType = spec.argTypes[i];
-      if (argType === 'text') return textValue(String(v));
+      // A list dropdown's reactive choices can arrive after this palette
+      // state was initialized. Fall back to its first choice so the sidebar
+      // and a fresh drag always agree on the visible default.
+      const enumValue = spec.enumArg?.index === i && !v ? spec.enumArg.options[0]?.value ?? '' : v;
+      if (argType === 'text') return textValue(String(enumValue));
       // No editable palette leaf for booleans - blank, same as
       // defaultArgFor's fallback for a bool-typed slot.
       if (argType === 'bool') return { kind: 'Bool' };

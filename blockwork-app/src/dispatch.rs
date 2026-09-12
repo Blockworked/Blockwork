@@ -109,6 +109,48 @@ impl Backend {
                 let name: String = arg(&args, "name")?;
                 to_json(commands::delete_variable(&self.state, &self.app, name)?)
             }
+            "create_list" => {
+                let name: String = arg(&args, "name")?;
+                to_json(commands::create_list(&self.state, &self.app, name)?)
+            }
+            "rename_list" => {
+                let old_name: String = arg(&args, "oldName")?;
+                let new_name: String = arg(&args, "newName")?;
+                to_json(commands::rename_list(
+                    &self.state,
+                    &self.app,
+                    old_name,
+                    new_name,
+                )?)
+            }
+            "delete_list" => {
+                let name: String = arg(&args, "name")?;
+                to_json(commands::delete_list(&self.state, &self.app, name)?)
+            }
+            "set_list_items" => {
+                let name: String = arg(&args, "name")?;
+                let items: Vec<crate::state::ListItemDto> = arg(&args, "items")?;
+                to_json(commands::set_list_items(
+                    &self.state,
+                    &self.app,
+                    name,
+                    items,
+                )?)
+            }
+            "set_list_editor_state" => {
+                let name: String = arg(&args, "name")?;
+                let visible: bool = arg(&args, "visible")?;
+                let x: i32 = arg(&args, "x")?;
+                let y: i32 = arg(&args, "y")?;
+                to_json(commands::set_list_editor_state(
+                    &self.state,
+                    &self.app,
+                    name,
+                    visible,
+                    x,
+                    y,
+                )?)
+            }
             "create_block" => {
                 let pieces: Vec<BlockPiece> = arg(&args, "pieces")?;
                 let shape: BlockShape = arg(&args, "shape")?;
