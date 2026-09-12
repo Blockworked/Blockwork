@@ -5,7 +5,7 @@ use blockwork_core::input::value::{Evaluated, Op, Value};
 use blockwork_core::input::{get_mouse_button_names, key_to_string, mouse_button_to_index};
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::thread_pool::ThreadPool;
-use blockwork_core::macros::{BlockDef, BlockPiece, Comment, FloatingValue, Instruction, InstructionKind, Macro, MacroSettings, Strand};
+use blockwork_core::macros::{BlockDef, BlockPiece, BlockShape, Comment, FloatingValue, InputValueType, Instruction, InstructionKind, Macro, MacroSettings, Strand};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -165,7 +165,7 @@ pub(crate) struct AppState {
     pub(crate) ipc_active_port: Option<u16>,
     pub(crate) ipc_auto_start: bool,
     pub(crate) close_to_tray: bool,
-    pub(crate) tray_icon: Option<tauri::tray::TrayIcon<tauri::Cef>>,
+    pub(crate) tray_icon: Option<tauri::tray::TrayIcon>,
     /// Label of the currently-live main webview window, or `None` while
     /// `tray::quit_ui` has torn it down to save memory. The tauri-cef runtime
     /// never reports a destroyed window's label back to the window manager
@@ -290,32 +290,33 @@ pub(crate) struct ImportPromptDto {
 #[serde(tag = "kind")]
 pub(crate) enum BlockPieceDto {
     Label { id: String, text: String },
-    Input { id: String, name: String },
+    Input { id: String, name: String, #[serde(default)] value_type: InputValueType },
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub(crate) struct BlockDefDto {
     pub(crate) id: String,
     pub(crate) pieces: Vec<BlockPieceDto>,
-    pub(crate) returns_value: bool,
+    #[serde(alias = "returns_value")]
+    pub(crate) shape: BlockShape,
 }
 
 pub(crate) fn block_piece_to_dto(piece: &BlockPiece) -> BlockPieceDto {
     match piece {
         BlockPiece::Label { id, text } => BlockPieceDto::Label { id: id.clone(), text: text.clone() },
-        BlockPiece::Input { id, name } => BlockPieceDto::Input { id: id.clone(), name: name.clone() },
+        BlockPiece::Input { id, name, value_type } => BlockPieceDto::Input { id: id.clone(), name: name.clone(), value_type: *value_type },
     }
 }
 
 pub(crate) fn dto_to_block_piece(dto: &BlockPieceDto) -> BlockPiece {
     match dto {
         BlockPieceDto::Label { id, text } => BlockPiece::Label { id: id.clone(), text: text.clone() },
-        BlockPieceDto::Input { id, name } => BlockPiece::Input { id: id.clone(), name: name.clone() },
+        BlockPieceDto::Input { id, name, value_type } => BlockPiece::Input { id: id.clone(), name: name.clone(), value_type: *value_type },
     }
 }
 
 pub(crate) fn block_def_to_dto(def: &BlockDef) -> BlockDefDto {
-    BlockDefDto { id: def.id.clone(), pieces: def.pieces.iter().map(block_piece_to_dto).collect(), returns_value: def.returns_value }
+    BlockDefDto { id: def.id.clone(), pieces: def.pieces.iter().map(block_piece_to_dto).collect(), shape: def.shape }
 }
 
 #[derive(Serialize, Clone)]
@@ -351,6 +352,7 @@ pub(crate) struct FloatingValueDto {
     pub(crate) x: i32,
     pub(crate) y: i32,
     pub(crate) value: ValueDto,
+    pub(crate) origin_block_id: Option<String>,
 }
 
 /// Addresses a single `Value` node — either inside an instruction's field
@@ -775,7 +777,7 @@ fn strand_to_dto(strand: &Strand) -> StrandDto {
 }
 
 fn floating_value_to_dto(fv: &FloatingValue) -> FloatingValueDto {
-    FloatingValueDto { id: fv.id.clone(), x: fv.x, y: fv.y, value: value_to_dto(&fv.value) }
+    FloatingValueDto { id: fv.id.clone(), x: fv.x, y: fv.y, value: value_to_dto(&fv.value), origin_block_id: fv.origin_block_id.clone() }
 }
 
 fn comment_to_dto(c: &Comment) -> CommentDto {

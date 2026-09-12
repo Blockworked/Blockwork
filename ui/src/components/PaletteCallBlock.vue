@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Sidebar prefab for one user-defined `returns_value: false` custom block —
+// Sidebar prefab for one user-defined `Normal`/`Ending`-shaped custom block —
 // same role as PaletteInstructionBlock.vue, but keyed by `BlockDef` instead
 // of a fixed `InstructionType` (a block's shape is dynamic/per-macro, so
 // there's no static FIELD_COMPONENTS entry to look up). Editable in place
@@ -31,12 +31,19 @@ function onContextMenu(e: MouseEvent) {
 </script>
 
 <template>
-  <div class="instruction-row palette-prefab" @pointerdown="onPointerDown" @contextmenu="onContextMenu">
+  <div class="instruction-row palette-prefab" :class="{ 'instruction-row-cap': def.shape === 'Ending' }" @pointerdown="onPointerDown" @contextmenu="onContextMenu">
     <div class="instruction-shape">
       <Blocks class="instruction-type-icon" />
       <div class="instruction-content">
         <template v-for="piece in def.pieces" :key="piece.kind === 'Label' ? piece.text : piece.name">
           <span v-if="piece.kind === 'Label'" class="instruction-label">{{ piece.text }}</span>
+          <!-- Boolean inputs have no editable palette leaf — a static blank
+               hexagon placeholder, same as a built-in operator's bool arg
+               (see paletteState.ts's paletteValueFor) and a real unfilled
+               boolean slot. -->
+          <span v-else-if="piece.value_type === 'Bool'" class="value-block value-hex-blank">
+            <span class="value-op value-hex-blank-spacer">&nbsp;</span>
+          </span>
           <PaletteNumberField
             v-else
             :model-value="paletteCallArgs[def.id]?.[inputNames.indexOf(piece.name)] ?? { kind: 'Number', value: 0 }"

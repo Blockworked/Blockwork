@@ -1,5 +1,5 @@
 import { invoke, listen, getVersion } from './bridge';
-import type { AppEntryDto, BlockPieceDto, HotkeyActionDto, ImportPromptDto, InstrPath, InstructionDto, StateDto, ValueDto, ValueKind, ValueLocationDto } from './types';
+import type { AppEntryDto, BlockPieceDto, BlockShapeDto, HotkeyActionDto, ImportPromptDto, InstrPath, InstructionDto, StateDto, ValueDto, ValueKind, ValueLocationDto } from './types';
 
 export function getState(): Promise<StateDto> {
   return invoke('get_state');
@@ -39,10 +39,10 @@ export const createVariable = (name: string) => invoke<void>('create_variable', 
 export const renameVariable = (oldName: string, newName: string) =>
   invoke<void>('rename_variable', { oldName, newName });
 export const deleteVariable = (name: string) => invoke<void>('delete_variable', { name });
-export const createBlock = (pieces: BlockPieceDto[], returnsValue: boolean) =>
-  invoke<string>('create_block', { pieces, returnsValue });
-export const editBlock = (blockId: string, pieces: BlockPieceDto[], returnsValue: boolean) =>
-  invoke<void>('edit_block', { blockId, pieces, returnsValue });
+export const createBlock = (pieces: BlockPieceDto[], shape: BlockShapeDto) =>
+  invoke<string>('create_block', { pieces, shape });
+export const editBlock = (blockId: string, pieces: BlockPieceDto[], shape: BlockShapeDto) =>
+  invoke<void>('edit_block', { blockId, pieces, shape });
 export const deleteBlock = (blockId: string) => invoke<void>('delete_block', { blockId });
 
 // ─── Instructions ───────────────────────────────────────────────────────────
@@ -59,8 +59,8 @@ export const takeValue = (location: ValueLocationDto) =>
 export const putValue = (location: ValueLocationDto, value: ValueDto) =>
   invoke<void>('put_value', { location, value });
 export const previewValue = (value: ValueDto) => invoke<string>('preview_value', { value });
-export const createFloatingValue = (x: number, y: number, value: ValueDto) =>
-  invoke<string>('create_floating_value', { x, y, value });
+export const createFloatingValue = (x: number, y: number, value: ValueDto, originBlockId: string | null) =>
+  invoke<string>('create_floating_value', { x, y, value, originBlockId });
 export const moveFloatingValue = (floatingId: string, x: number, y: number) =>
   invoke<void>('move_floating_value', { floatingId, x, y });
 export const removeFloatingValue = (floatingId: string) =>

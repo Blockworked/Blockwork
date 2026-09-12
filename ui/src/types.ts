@@ -107,6 +107,22 @@ export function blankBoolValue(): ValueDto {
   return bsBlankBoolValue();
 }
 
+// A `Param:` kind carries a plain `<name>` for display (see
+// BlockHeaderFields.vue's `paramKind`, and PaletteValueBlock.vue's `kind`
+// prop, which slices it straight off) or, only as blockstitch's `dragKind`
+// override for that same header oval, `<blockId>:<name>` — the one extra
+// bit of context needed to recover which block a dropped-out `Param`
+// reporter came from once it's parked as a floating value with no strand of
+// its own to trace back to (see BlockHeaderFields.vue's `paramDragKind` and
+// blockstitchSetup.ts's `createFloatingValue`/`paramIsBool`). `blockId`
+// never contains ':' (a UUID), so splitting on the first one is
+// unambiguous even if `name` itself does.
+export function parseParamKind(kind: string): { blockId: string | null; name: string } {
+  const rest = kind.slice('Param:'.length);
+  const sep = rest.indexOf(':');
+  return sep === -1 ? { blockId: null, name: rest } : { blockId: rest.slice(0, sep), name: rest.slice(sep + 1) };
+}
+
 // Fresh default tree for a value block dragged off the sidebar palette —
 // mirrors src-tauri/src/commands.rs's apply_value_kind, looked up from
 // valueOps.ts's registry so a new operator never needs a new case here.
@@ -114,7 +130,7 @@ export function defaultValueForKind(kind: ValueKind): ValueDto {
   if (kind === 'Number') return { kind: 'Number', value: 0 };
   if (kind === 'Text') return { kind: 'Text', value: '' };
   if (kind.startsWith('Var:')) return { kind: 'Var', name: kind.slice('Var:'.length) };
-  if (kind.startsWith('Param:')) return { kind: 'Param', name: kind.slice('Param:'.length) };
+  if (kind.startsWith('Param:')) return { kind: 'Param', name: parseParamKind(kind).name };
   // Normally blockDefs.ts's paletteCallValueFor handles `Call:` (it needs the
   // block's input count); this is just a safe zero-arg fallback.
   if (kind.startsWith('Call:')) return { kind: 'Call', block_id: kind.slice('Call:'.length), args: [], saved: numberValue(0) };
@@ -172,6 +188,7 @@ export interface FloatingValueDto {
   x: number;
   y: number;
   value: ValueDto;
+  origin_block_id: string | null;
 }
 
 // A floating, collapsible note — freestanding (`attached_to: null`, `x`/`y`
@@ -379,22 +396,49 @@ export function sortedVariableNames(macro: MacroDto | null | undefined): string[
   return [...(macro?.variables ?? [])].sort((a, b) => a.localeCompare(b));
 }
 
+// What kind of value an input slot expects — 'Any' (number-or-text, the
+// long-standing default) or 'Bool' (renders as a hexagon, blank-defaults to
+// `{ kind: 'Bool' }` instead of `0`, see blockDefs.ts). Mirrors
+// blockwork-core/src/macros/mod.rs's InputValueType.
+export type InputValueType = 'Any' | 'Bool';
+
 // One piece of a custom block's prototype, in declaration order — mirrors
 // src-tauri/src/macros/mod.rs's BlockPiece. `id` is a stable identifier
 // (not the name) so the backend can tell "renamed" apart from "removed +
 // added" when reconciling call sites' args on edit_block.
-export type BlockPieceDto = { kind: 'Label'; id: string; text: string } | { kind: 'Input'; id: string; name: string };
+export type BlockPieceDto =
+  | { kind: 'Label'; id: string; text: string }
+  | { kind: 'Input'; id: string; name: string; value_type: InputValueType };
+
+// What a custom block's own call site looks like — 'Normal' (a plain
+// stackable instruction), 'Ending' (stackable, but nothing can be placed
+// below it — same shape family as the built-in Return/EscapeLoop/
+// ContinueLoop), 'ReturnsValue' (a number-or-text reporter, an oval — the
+// long-standing `returns_value: true`), or 'ReturnsBool' (a boolean
+// reporter, a hexagon). Mirrors blockwork-core/src/macros/mod.rs's
+// BlockShape.
+export type BlockShapeDto = 'Normal' | 'Ending' | 'ReturnsValue' | 'ReturnsBool';
+
+/** True for either reporter shape — mirrors BlockShape::returns_value(). */
+export function blockShapeReturnsValue(shape: BlockShapeDto): boolean {
+  return shape === 'ReturnsValue' || shape === 'ReturnsBool';
+}
 
 export interface BlockDefDto {
   id: string;
   pieces: BlockPieceDto[];
-  returns_value: boolean;
+  shape: BlockShapeDto;
 }
 
-/** A block's declared input names, in prototype order — the positional key
+/** A block's declared input pieces, in prototype order — the positional key
  * `CallBlock`/`Value.Call`'s `args` line up against. */
+export function blockInputPieces(def: BlockDefDto): Extract<BlockPieceDto, { kind: 'Input' }>[] {
+  return def.pieces.filter((p): p is Extract<BlockPieceDto, { kind: 'Input' }> => p.kind === 'Input');
+}
+
+/** A block's declared input names, in prototype order — see `blockInputPieces`. */
 export function blockInputNames(def: BlockDefDto): string[] {
-  return def.pieces.filter((p): p is Extract<BlockPieceDto, { kind: 'Input' }> => p.kind === 'Input').map(p => p.name);
+  return blockInputPieces(def).map(p => p.name);
 }
 
 /** Looks up a custom block by id in the current macro's `block_defs` — used

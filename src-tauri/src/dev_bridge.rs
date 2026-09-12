@@ -6,6 +6,7 @@
 
 use crate::commands;
 use crate::state::{self, BlockPieceDto, HotkeyActionDto, InstructionDto, PathStep, SharedState, ValueDto, ValueLocationDto};
+use blockwork_core::macros::BlockShape;
 use axum::extract::ws::{Message, WebSocket, WebSocketUpgrade};
 use axum::extract::{Path, State as AxumState};
 use axum::http::StatusCode;
@@ -15,7 +16,7 @@ use axum::{Json, Router};
 use serde::de::DeserializeOwned;
 use serde_json::Value as Json_;
 use std::sync::Arc;
-use tauri::{Cef, Listener, Manager};
+use tauri::{Listener, Manager};
 use tokio::sync::broadcast;
 use tower_http::cors::CorsLayer;
 use tracing::{info, warn};
@@ -24,11 +25,11 @@ const PORT: u16 = 4127;
 
 #[derive(Clone)]
 struct BridgeCtx {
-    app: tauri::AppHandle<Cef>,
+    app: tauri::AppHandle,
     state_tx: Arc<broadcast::Sender<String>>,
 }
 
-pub(crate) async fn run(app: tauri::AppHandle<Cef>) {
+pub(crate) async fn run(app: tauri::AppHandle) {
     let (state_tx, _) = broadcast::channel::<String>(64);
     let state_tx = Arc::new(state_tx);
 
@@ -176,14 +177,14 @@ async fn invoke_handler(Path(cmd): Path<String>, AxumState(ctx): AxumState<Bridg
         }
         "create_block" => {
             let pieces: Vec<BlockPieceDto> = match field(&body, "pieces") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
-            let returns_value: bool = match field(&body, "returnsValue") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
-            call!(commands::create_block(state, app, pieces, returns_value))
+            let shape: BlockShape = match field(&body, "shape") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
+            call!(commands::create_block(state, app, pieces, shape))
         }
         "edit_block" => {
             let block_id: String = match field(&body, "blockId") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
             let pieces: Vec<BlockPieceDto> = match field(&body, "pieces") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
-            let returns_value: bool = match field(&body, "returnsValue") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
-            call!(commands::edit_block(state, app, block_id, pieces, returns_value))
+            let shape: BlockShape = match field(&body, "shape") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
+            call!(commands::edit_block(state, app, block_id, pieces, shape))
         }
         "delete_block" => {
             let block_id: String = match field(&body, "blockId") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
@@ -216,7 +217,8 @@ async fn invoke_handler(Path(cmd): Path<String>, AxumState(ctx): AxumState<Bridg
             let x: i32 = match field(&body, "x") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
             let y: i32 = match field(&body, "y") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
             let value: ValueDto = match field(&body, "value") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
-            call!(commands::create_floating_value(state, app, x, y, value))
+            let origin_block_id: Option<String> = match field(&body, "originBlockId") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
+            call!(commands::create_floating_value(state, app, x, y, value, origin_block_id))
         }
         "move_floating_value" => {
             let floating_id: String = match field(&body, "floatingId") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
@@ -269,6 +271,8 @@ async fn invoke_handler(Path(cmd): Path<String>, AxumState(ctx): AxumState<Bridg
             let index: Vec<PathStep> = match field(&body, "path") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
             call!(commands::merge_strand(state, app, dragged_id, target_id, index))
         }
+        "undo" => call!(commands::undo(state, app)),
+        "redo" => call!(commands::redo(state, app)),
         "delete_instruction" => {
             let strand_id: String = match field(&body, "strandId") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };
             let index: Vec<PathStep> = match field(&body, "path") { Ok(v) => v, Err(e) => return ok_response::<()>(Err(e)) };

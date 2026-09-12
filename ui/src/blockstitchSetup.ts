@@ -19,7 +19,7 @@ import { ICONS, INSTRUCTION_TYPE_ICONS } from './icons';
 import { OPERATOR_KINDS } from './valueOps';
 import { clonePaletteInstruction, paletteValueFor } from './paletteState';
 import { paletteCallInstructionFor, paletteCallValueFor } from './blockDefs';
-import { findBlockDef, type InstructionDto, type InstructionType, type ValueDto, type ValueKind } from './types';
+import { findBlockDef, parseParamKind, type BlockPieceDto, type InstructionDto, type InstructionType, type ValueDto, type ValueKind } from './types';
 import { openBlockMenu, openCanvasMenu, openPaletteInstructionMenu, openPaletteValueMenu, openValueMenu, openVariableMenu } from './contextMenu';
 
 import WhenRanFields from './components/fields/WhenRanFields.vue';
@@ -94,7 +94,7 @@ export function setupBlockstitch(): void {
 const HEADER_TYPES: InstructionType[] = ['WhenRan', 'BlockHeader', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged'];
 const ENTRY_TRIGGER_TYPES = new Set<InstructionType>(['WhenRan', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged']);
 const CAP_TYPES: InstructionType[] = ['Return', 'EscapeLoop', 'ContinueLoop'];
-const STACK_TYPES: InstructionType[] = ['Wait', 'Text', 'Key', 'Button', 'MoveMouse', 'Scroll', 'Command', 'Comment', 'OpenApp', 'CloseApp', 'SetVariable', 'ChangeVariable', 'CallBlock'];
+const STACK_TYPES: InstructionType[] = ['Wait', 'Text', 'Key', 'Button', 'MoveMouse', 'Scroll', 'Command', 'Comment', 'OpenApp', 'CloseApp', 'SetVariable', 'ChangeVariable'];
 
 function registerShapes() {
   for (const type of HEADER_TYPES) {
@@ -106,6 +106,15 @@ function registerShapes() {
   for (const type of STACK_TYPES) {
     registerBlockShape(type, { kind: 'stack', icon: iconFor(type) });
   }
+  // Every custom block shares this one instruction type regardless of which
+  // BlockDef it calls, so — unlike CAP_TYPES above — "no bottom notch" can't
+  // be a static per-type registration here; `isCap` asks the specific block
+  // being called instead (see shapeRegistry.ts's BlockShapeDescriptor).
+  registerBlockShape<InstructionDto>('CallBlock', {
+    kind: 'stack',
+    icon: iconFor('CallBlock'),
+    isCap: n => n.type === 'CallBlock' && findBlockDef(state.current_macro, n.block_id)?.shape === 'Ending',
+  });
   // TNode is `InstructionDto` (the full union), not just the wrap variants —
   // a wrap block's own body/slots hold arbitrary instructions, not only
   // other wrap blocks, so getSlots/mapSlots must operate over the whole
@@ -222,7 +231,13 @@ function buildCanvasHost(): CanvasHost<InstructionDto> {
     takeValue: tauri.takeValue,
     putValue: tauri.putValue,
     previewValue: tauri.previewValue,
-    createFloatingValue: tauri.createFloatingValue,
+    // `sourceKind` is only set for a fresh sidebar/header drag (see
+    // host.ts's doc comment) — recover the origin block id a `Param:`
+    // header oval packed into its `dragKind` (see BlockHeaderFields.vue's
+    // `paramDragKind`) so paramIsBool can resolve the resulting floating
+    // value exactly instead of guessing.
+    createFloatingValue: (x, y, value, sourceKind) =>
+      tauri.createFloatingValue(x, y, value as ValueDto, sourceKind?.startsWith('Param:') ? parseParamKind(sourceKind).blockId : null),
     moveFloatingValue: tauri.moveFloatingValue,
     removeFloatingValue: tauri.removeFloatingValue,
     moveComment: tauri.moveComment,
@@ -251,6 +266,40 @@ function buildCanvasHost(): CanvasHost<InstructionDto> {
     onPaletteValueContextMenu: (e, kind) => openPaletteValueMenu(e, kind),
     onValueContextMenu: (e, _location, value) => openValueMenu(e, value as ValueDto),
     resolveCallPieces: blockId => findBlockDef(state.current_macro, blockId)?.pieces.map(p => (p.kind === 'Label' ? { kind: 'Label', text: p.text } : { kind: 'Input' })),
+    paramIsBool: (location, name) => {
+      const pieceIsBool = (blockId: string) => {
+        const piece = findBlockDef(state.current_macro, blockId)?.pieces.find(p => p.kind === 'Input' && p.name === name);
+        return piece?.kind === 'Input' && piece.value_type === 'Bool';
+      };
+      // Exact: a Param sitting in an instruction field lives in a specific
+      // strand, and a block's body strand always starts with its own
+      // BlockHeader — walk straight to that block's own declared type.
+      if (location.kind === 'Field') {
+        const strand = state.current_macro?.strands.find(s => s.id === location.strand_id);
+        const header = strand?.instructions[0];
+        if (header?.type === 'BlockHeader') return pieceIsBool(header.block_id);
+      }
+      // Floating: a standalone FloatingValue has no strand of its own to
+      // trace back to, but createFloatingValue records which block a
+      // freshly-dropped `Param` reporter came from (see this file's
+      // `createFloatingValue` and BlockHeaderFields.vue's `paramDragKind`)
+      // — use that exact origin when present.
+      if (location.kind === 'Floating') {
+        const fv = state.current_macro?.floating_values.find(f => f.id === location.floating_id);
+        if (fv?.origin_block_id) return pieceIsBool(fv.origin_block_id);
+      }
+      // No recorded origin (an older save from before that field existed,
+      // or an existing placed param picked back up and re-floated rather
+      // than freshly dragged from its header) — fall back to "every custom
+      // block with an input named this agrees it's boolean". Exact for the
+      // common case (one block currently being edited) and never worse than
+      // the plain-capsule default on a genuine cross-block name collision.
+      const matches = (state.current_macro?.block_defs ?? []).flatMap(d =>
+        d.pieces.filter((p): p is Extract<BlockPieceDto, { kind: 'Input' }> => p.kind === 'Input' && p.name === name),
+      );
+      return matches.length > 0 && matches.every(p => p.value_type === 'Bool');
+    },
+    callIsBool: blockId => findBlockDef(state.current_macro, blockId)?.shape === 'ReturnsBool',
     getInvalidText: location => {
       const entry = state.invalid_field_buffers.find(b => locationsEqual(b.location, location));
       if (!entry) return null;

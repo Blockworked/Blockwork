@@ -409,8 +409,9 @@ fn run_block(instructions: &[Instruction], ctx: &mut ExecCtx, depth: u32, start:
                         }
                     }
                 }
-                // A `returns_value: false` block's body normally has no
-                // `Return`; if one sneaks in, it just ends the call early.
+                // A non-reporter (`Normal`/`Ending`) block's body normally
+                // has no `Return`; if one sneaks in, it just ends the call
+                // early.
                 let _ = call_block(block_id, evaluated_args, ctx, depth + 1)?;
             }
             InstructionKind::If { condition, body } => {
@@ -796,7 +797,7 @@ pub fn make_backend() -> Option<Arc<Mutex<dyn InputBackend>>> {
 mod tests {
     use super::*;
     use crate::input::types::{Axis, Direction, MacroButton, MacroKey};
-    use crate::macros::{BlockDef, BlockPiece, Strand};
+    use crate::macros::{BlockDef, BlockPiece, BlockShape, InputValueType, Strand};
 
     struct NoopBackend;
     impl InputBackend for NoopBackend {
@@ -1016,8 +1017,11 @@ mod tests {
             variables: vec![],
             block_defs: vec![BlockDef {
                 id: block_id,
-                pieces: vec![BlockPiece::Label { id: "p1".into(), text: "double".into() }, BlockPiece::Input { id: "p2".into(), name: "n".into() }],
-                returns_value: true,
+                pieces: vec![
+                    BlockPiece::Label { id: "p1".into(), text: "double".into() },
+                    BlockPiece::Input { id: "p2".into(), name: "n".into(), value_type: InputValueType::Any },
+                ],
+                shape: BlockShape::ReturnsValue,
             }],
             settings: crate::macros::MacroSettings::default(),
         }
@@ -1034,7 +1038,7 @@ mod tests {
         assert_eq!(vars.lock().unwrap().get("x"), Some(&Evaluated::Number(42.0)));
     }
 
-    /// A `returns_value` block whose body never hits `Return` should leave
+    /// A reporter block whose body never hits `Return` should leave
     /// the caller's `SetVariable` un-applied rather than panicking or
     /// defaulting to some value.
     #[test]
@@ -1064,7 +1068,7 @@ mod tests {
             speed_multiplier: 1.0,
             floating_values: vec![], comments: vec![],
             variables: vec![],
-            block_defs: vec![BlockDef { id: block_id, pieces: vec![], returns_value: true }],
+            block_defs: vec![BlockDef { id: block_id, pieces: vec![], shape: BlockShape::ReturnsValue }],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -1101,7 +1105,7 @@ mod tests {
             speed_multiplier: 1.0,
             floating_values: vec![], comments: vec![],
             variables: vec![],
-            block_defs: vec![BlockDef { id: block_id, pieces: vec![], returns_value: false }],
+            block_defs: vec![BlockDef { id: block_id, pieces: vec![], shape: BlockShape::Normal }],
             settings: crate::macros::MacroSettings::default(),
         };
         let start = Instant::now();
@@ -1146,7 +1150,7 @@ mod tests {
             speed_multiplier: 1.0,
             floating_values: vec![], comments: vec![],
             variables: vec![],
-            block_defs: vec![BlockDef { id: block_id, pieces: vec![], returns_value: true }],
+            block_defs: vec![BlockDef { id: block_id, pieces: vec![], shape: BlockShape::ReturnsValue }],
             settings: crate::macros::MacroSettings::default(),
         };
         // Should return promptly (erroring out at MAX_CALL_DEPTH) rather than
@@ -1226,13 +1230,13 @@ mod tests {
             block_defs: vec![
                 BlockDef {
                     id: double_id,
-                    pieces: vec![BlockPiece::Input { id: "p1".into(), name: "n".into() }],
-                    returns_value: true,
+                    pieces: vec![BlockPiece::Input { id: "p1".into(), name: "n".into(), value_type: InputValueType::Any }],
+                    shape: BlockShape::ReturnsValue,
                 },
                 BlockDef {
                     id: triple_id,
-                    pieces: vec![BlockPiece::Input { id: "p1".into(), name: "n".into() }],
-                    returns_value: true,
+                    pieces: vec![BlockPiece::Input { id: "p1".into(), name: "n".into(), value_type: InputValueType::Any }],
+                    shape: BlockShape::ReturnsValue,
                 },
             ],
             settings: crate::macros::MacroSettings::default(),
@@ -1363,7 +1367,7 @@ mod tests {
             speed_multiplier: 1.0,
             floating_values: vec![], comments: vec![],
             variables: vec![],
-            block_defs: vec![BlockDef { id: block_id, pieces: vec![], returns_value: true }],
+            block_defs: vec![BlockDef { id: block_id, pieces: vec![], shape: BlockShape::ReturnsValue }],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -1540,7 +1544,7 @@ mod tests {
             speed_multiplier: 1.0,
             floating_values: vec![], comments: vec![],
             variables: vec![],
-            block_defs: vec![BlockDef { id: block_id, pieces: vec![], returns_value: true }],
+            block_defs: vec![BlockDef { id: block_id, pieces: vec![], shape: BlockShape::ReturnsValue }],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));

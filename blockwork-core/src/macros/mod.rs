@@ -56,6 +56,17 @@ pub struct FloatingValue {
     #[serde(default)]
     pub y: i32,
     pub value: Value,
+    /// Which custom block's own header this value was dragged out of, if
+    /// any — set only when the value came from a `Value::Param` reporter
+    /// (see `commands::create_floating_value`), since that's the one value
+    /// kind meaningless outside its declaring block. A floating value with
+    /// no such origin (a plain number/operator/variable, or an older save
+    /// from before this field existed — hence `#[serde(default)]`) is just
+    /// `None`. Lets the frontend render a floating `Param` reporter with
+    /// its real declared shape (e.g. a boolean hexagon) instead of guessing
+    /// from name alone.
+    #[serde(default)]
+    pub origin_block_id: Option<String>,
 }
 
 fn default_floating_value_id() -> String {
@@ -104,6 +115,22 @@ pub struct VariableDef {
     pub value: Evaluated,
 }
 
+/// What kind of value an input slot expects — drives the blank default a
+/// fresh call site's argument gets (`Value::number(0.0)` vs `Value::Bool`,
+/// see `reconcile_block_call_args`) and, transitively, whether that slot
+/// renders as the ordinary rounded capsule or a boolean hexagon (purely a
+/// function of the `Value` actually sitting there, same as every built-in
+/// boolean slot — see `blockstitch`'s `ValueBlock.vue`'s `isBool`). `Any`
+/// (number-or-text, free-typed) is the long-standing default; `#[serde(default)]`
+/// on `BlockPiece::Input::value_type` lets an older save missing this field
+/// deserialize as `Any` instead of failing.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub enum InputValueType {
+    #[default]
+    Any,
+    Bool,
+}
+
 /// One piece of a custom block's prototype, in declaration order — either
 /// static label text or a named input slot (read in the body via
 /// `Value::Param`). `id` is a stable identifier assigned once and never
@@ -113,7 +140,7 @@ pub struct VariableDef {
 #[serde(tag = "kind")]
 pub enum BlockPiece {
     Label { id: String, text: String },
-    Input { id: String, name: String },
+    Input { id: String, name: String, #[serde(default)] value_type: InputValueType },
 }
 
 impl BlockPiece {
@@ -124,6 +151,78 @@ impl BlockPiece {
     }
 }
 
+/// What a custom block's own call site looks like: a plain stackable
+/// instruction (`Normal`), a stackable instruction with no bottom notch so
+/// nothing can be placed below it (`Ending` — same shape family as the
+/// built-in `Return`/`EscapeLoop`/`ContinueLoop`), or a value-position
+/// reporter returning either a number-or-text (`ReturnsValue`, an oval,
+/// today's long-standing `returns_value: true`) or a boolean (`ReturnsBool`,
+/// a hexagon — see `BlockPiece`'s `InputValueType` for the same oval/hexagon
+/// split on an *input*). `Normal`/`Ending` and `ReturnsValue`/`ReturnsBool`
+/// are each a mutually-exclusive pair in the "Make a Block" UI (a "returns a
+/// value" checkbox swaps which pair the two shape buttons offer) — there's
+/// no such thing as an `Ending` reporter or a `Normal` block that also
+/// returns a boolean.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Default)]
+pub enum BlockShape {
+    #[default]
+    Normal,
+    Ending,
+    ReturnsValue,
+    ReturnsBool,
+}
+
+impl BlockShape {
+    /// True for either reporter shape — gates whether `Value::Call` nodes
+    /// referencing this block are meaningful and whether a `Return` inside
+    /// its body is valid placement (see `commands::check_return_placement`).
+    /// Boolean-vs-number/text is a pure rendering concern (which shape the
+    /// reporter draws as, and what a fresh call-site arg defaults to) with
+    /// no effect on execution — `Value::eval`/`Evaluated` are already
+    /// dynamically typed regardless of which reporter shape produced them.
+    pub fn returns_value(self) -> bool {
+        matches!(self, BlockShape::ReturnsValue | BlockShape::ReturnsBool)
+    }
+
+    /// True only for the no-bottom-notch command shape.
+    pub fn is_ending(self) -> bool {
+        matches!(self, BlockShape::Ending)
+    }
+}
+
+/// Old saves only ever had a `returns_value: bool` field; this decodes
+/// either that (`true` migrating to `ReturnsValue`, `false` to `Normal`) or
+/// the current `shape: "Normal" | "Ending" | "ReturnsValue" | "ReturnsBool"`
+/// tag, whichever `BlockDef`'s `#[serde(alias = "returns_value")]` field
+/// actually finds on disk. Mirrors `Value`'s own legacy-tolerant
+/// `Deserialize` impl further down this crate (`input/value.rs`).
+impl<'de> Deserialize<'de> for BlockShape {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        #[derive(Deserialize)]
+        #[serde(untagged)]
+        enum ShapeDe {
+            Legacy(bool),
+            Current(String),
+        }
+        Ok(match ShapeDe::deserialize(deserializer)? {
+            ShapeDe::Legacy(true) => BlockShape::ReturnsValue,
+            ShapeDe::Legacy(false) => BlockShape::Normal,
+            ShapeDe::Current(s) => match s.as_str() {
+                "Normal" => BlockShape::Normal,
+                "Ending" => BlockShape::Ending,
+                "ReturnsValue" => BlockShape::ReturnsValue,
+                "ReturnsBool" => BlockShape::ReturnsBool,
+                other => {
+                    return Err(serde::de::Error::unknown_variant(other, &["Normal", "Ending", "ReturnsValue", "ReturnsBool"]));
+                }
+            },
+        })
+    }
+}
+
 /// A user-defined custom block ("My Blocks") — just the prototype/signature;
 /// its body lives in a separate `Strand` whose `instructions[0]` is
 /// `InstructionKind::BlockHeader(id)`.
@@ -131,7 +230,8 @@ impl BlockPiece {
 pub struct BlockDef {
     pub id: String,
     pub pieces: Vec<BlockPiece>,
-    pub returns_value: bool,
+    #[serde(alias = "returns_value")]
+    pub shape: BlockShape,
 }
 
 impl BlockDef {
@@ -729,9 +829,9 @@ impl Macro {
     /// Defines a new custom block: appends the `BlockDef` and creates its
     /// (initially empty) header strand at `(x, y)`. Caller validates
     /// `pieces` beforehand.
-    pub fn create_block(&mut self, pieces: Vec<BlockPiece>, returns_value: bool, x: i32, y: i32) -> String {
+    pub fn create_block(&mut self, pieces: Vec<BlockPiece>, shape: BlockShape, x: i32, y: i32) -> String {
         let id = default_block_id();
-        self.block_defs.push(BlockDef { id: id.clone(), pieces, returns_value });
+        self.block_defs.push(BlockDef { id: id.clone(), pieces, shape });
         self.strands.push(Strand { id: default_strand_id(), x, y, instructions: vec![Instruction::new(InstructionKind::BlockHeader(id.clone()))] });
         id
     }
@@ -752,16 +852,33 @@ impl Macro {
     /// Rebuilds every call site's `args` to line up with `new_pieces`' input
     /// order, carrying over each surviving input's value by matching
     /// `BlockPiece::id` (identity survives a rename); removed inputs drop
-    /// their value, added ones get a fresh `0`. Call before overwriting
-    /// `BlockDef::pieces` — `old_pieces` must be the pieces beforehand.
+    /// their value, added ones get a fresh blank matching their declared
+    /// `value_type` (`0` for `Any`, an empty `Value::Bool` hexagon for
+    /// `Bool`). Call before overwriting `BlockDef::pieces` — `old_pieces`
+    /// must be the pieces beforehand.
     pub fn reconcile_block_call_args(&mut self, block_id: &str, old_pieces: &[BlockPiece], new_pieces: &[BlockPiece]) {
         let old_input_ids: Vec<&str> = old_pieces.iter().filter(|p| matches!(p, BlockPiece::Input { .. })).map(BlockPiece::id).collect();
-        let new_input_ids: Vec<&str> = new_pieces.iter().filter(|p| matches!(p, BlockPiece::Input { .. })).map(BlockPiece::id).collect();
+        let new_inputs: Vec<(&str, InputValueType)> = new_pieces
+            .iter()
+            .filter_map(|p| match p {
+                BlockPiece::Input { id, value_type, .. } => Some((id.as_str(), *value_type)),
+                BlockPiece::Label { .. } => None,
+            })
+            .collect();
         // For each new input slot, which old slot (if any) it carries over from.
-        let mapping: Vec<Option<usize>> = new_input_ids.iter().map(|id| old_input_ids.iter().position(|old| old == id)).collect();
+        let mapping: Vec<(Option<usize>, InputValueType)> =
+            new_inputs.iter().map(|(id, value_type)| (old_input_ids.iter().position(|old| old == id), *value_type)).collect();
 
         let mut rebuild = |args: &mut Vec<Value>| {
-            *args = mapping.iter().map(|old_idx| old_idx.and_then(|i| args.get(i).cloned()).unwrap_or_else(|| Value::number(0.0))).collect();
+            *args = mapping
+                .iter()
+                .map(|(old_idx, value_type)| {
+                    old_idx.and_then(|i| args.get(i).cloned()).unwrap_or_else(|| match value_type {
+                        InputValueType::Any => Value::number(0.0),
+                        InputValueType::Bool => Value::Bool,
+                    })
+                })
+                .collect();
         };
         for strand in &mut self.strands {
             for ins in &mut strand.instructions {
@@ -890,12 +1007,12 @@ pub enum InstructionKind {
     /// `BlockDef::id`. Header-only, like `WhenRan`, but never auto-runs —
     /// only invoked via `CallBlock`/`Value::Call`.
     BlockHeader(String),
-    /// Command-position invocation of a `returns_value == false` custom
+    /// Command-position invocation of a `Normal`/`Ending`-shaped custom
     /// block: runs its body inline with `args` bound to its inputs.
     CallBlock { block_id: String, args: Vec<Value> },
-    /// Only meaningful inside a `returns_value == true` block's body:
-    /// evaluates `Value` and halts execution, returning the result to the
-    /// caller.
+    /// Only meaningful inside a `ReturnsValue`/`ReturnsBool`-shaped block's
+    /// body: evaluates `Value` and halts execution, returning the result to
+    /// the caller.
     Return(Value),
     /// `if <condition> then { body }` — runs `body` inline (same strand,
     /// same depth) when `condition` evaluates truthy.
@@ -1151,6 +1268,33 @@ mod tests {
     use crate::input::types::Coordinate;
 
     #[test]
+    fn block_def_migrates_legacy_returns_value_true_to_returns_value_shape() {
+        let def: BlockDef = serde_json::from_str(r#"{"id":"b1","pieces":[],"returns_value":true}"#).unwrap();
+        assert_eq!(def.shape, BlockShape::ReturnsValue);
+    }
+
+    #[test]
+    fn block_def_migrates_legacy_returns_value_false_to_normal_shape() {
+        let def: BlockDef = serde_json::from_str(r#"{"id":"b1","pieces":[],"returns_value":false}"#).unwrap();
+        assert_eq!(def.shape, BlockShape::Normal);
+    }
+
+    #[test]
+    fn block_def_reads_current_shape_field() {
+        let def: BlockDef = serde_json::from_str(r#"{"id":"b1","pieces":[],"shape":"ReturnsBool"}"#).unwrap();
+        assert_eq!(def.shape, BlockShape::ReturnsBool);
+    }
+
+    #[test]
+    fn block_def_round_trips_shape_through_serialize() {
+        let def = BlockDef { id: "b1".into(), pieces: vec![], shape: BlockShape::Ending };
+        let json = serde_json::to_string(&def).unwrap();
+        assert!(json.contains(r#""shape":"Ending""#), "expected serialized shape field, got: {json}");
+        let round_tripped: BlockDef = serde_json::from_str(&json).unwrap();
+        assert_eq!(round_tripped.shape, BlockShape::Ending);
+    }
+
+    #[test]
     fn new_macro_defaults_to_one_when_ran_strand() {
         let mac = Macro::new("Test".into(), "".into(), vec![]);
         assert_eq!(mac.strands.len(), 1);
@@ -1369,7 +1513,7 @@ mod tests {
             Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var { name: "x".to_string() }))),
         ]);
         mac.variables.push(VariableDef { name: "x".to_string(), value: Evaluated::Number(0.0) });
-        mac.floating_values.push(FloatingValue { id: "f1".into(), x: 0, y: 0, value: Value::Var { name: "x".to_string() } });
+        mac.floating_values.push(FloatingValue { id: "f1".into(), x: 0, y: 0, value: Value::Var { name: "x".to_string() }, origin_block_id: None });
 
         mac.rename_variable("x", "y");
 

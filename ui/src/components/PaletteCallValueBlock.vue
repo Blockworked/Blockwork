@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Sidebar prefab for one user-defined `returns_value: true` custom block —
+// Sidebar prefab for one user-defined `ReturnsValue`/`ReturnsBool` custom block —
 // same role as PaletteValueBlock.vue, but keyed by `BlockDef` instead of a
 // fixed `ValueKind` string (see blockDefs.ts's header comment for why this
 // can't just be another entry in that registry-driven component).
@@ -29,9 +29,19 @@ function onContextMenu(e: MouseEvent) {
 </script>
 
 <template>
-  <span class="value-block value-card-shape palette-prefab" @pointerdown="onPointerDown" @contextmenu="onContextMenu">
+  <span
+    class="value-block palette-prefab"
+    :class="def.shape === 'ReturnsBool' ? 'value-card-shape-bool' : 'value-card-shape'"
+    @pointerdown="onPointerDown"
+    @contextmenu="onContextMenu"
+  >
     <template v-for="piece in def.pieces" :key="piece.kind === 'Label' ? piece.text : piece.name">
       <span v-if="piece.kind === 'Label'" class="value-op">{{ piece.text }}</span>
+      <!-- Boolean inputs have no editable palette leaf — see
+           PaletteCallBlock.vue's matching case. -->
+      <span v-else-if="piece.value_type === 'Bool'" class="value-block value-hex-blank">
+        <span class="value-op value-hex-blank-spacer">&nbsp;</span>
+      </span>
       <PaletteNumberField
         v-else
         :model-value="paletteCallArgs[def.id]?.[inputNames.indexOf(piece.name)] ?? { kind: 'Number', value: 0 }"

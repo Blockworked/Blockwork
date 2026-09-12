@@ -4,12 +4,14 @@
 // return-type choice, teleported to <body> like MakeVariableDialog.vue.
 // Doubles as both "Make a Block" (no `editTarget`) and "Edit Block" (from a
 // prefab's context menu, see ContextMenu.vue/blockDialogs.ts) — editing
-// works on a local copy of `pieces`/`returnsValue` and only writes back via
+// works on a local copy of `pieces`/`shape` and only writes back via
 // createBlock/editBlock on OK, so Cancel is a true no-op.
-import { computed, nextTick, reactive, ref, watch } from 'vue';
-import { ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
+import type { ComponentPublicInstance } from 'vue';
+import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
+import { Blocks, ChevronLeft, ChevronRight, X } from 'lucide-vue-next';
 import { createBlock, editBlock } from '../tauri';
-import type { BlockDefDto, BlockPieceDto } from '../types';
+import { blockShapeReturnsValue } from '../types';
+import type { BlockDefDto, BlockPieceDto, BlockShapeDto, InputValueType } from '../types';
 
 const props = defineProps<{ editTarget: BlockDefDto | null }>();
 const emit = defineEmits<{ close: [] }>();
@@ -27,7 +29,24 @@ function newPieceId(): string {
 const pieces = reactive<BlockPieceDto[]>(
   props.editTarget ? props.editTarget.pieces.map(p => ({ ...p })) : [{ kind: 'Label', id: newPieceId(), text: 'block name' }],
 );
-const returnsValue = ref(props.editTarget?.returns_value ?? false);
+const shape = ref<BlockShapeDto>(props.editTarget?.shape ?? 'Normal');
+// The "returns a value" checkbox is a view over `shape`, not separate state
+// of its own — it just picks which pair of mutually-exclusive shapes the two
+// wide buttons below offer (Normal/Ending vs ReturnsValue/ReturnsBool).
+const isValueMode = computed(() => blockShapeReturnsValue(shape.value));
+// Toggling the checkbox always lands on the *first* option of whichever pair
+// it switches to, per the dialog's spec — never tries to preserve e.g. an
+// Ending block's "endingness" as a boolean-return choice, since the two
+// pairs don't correspond piece-for-piece.
+function onToggleReturnsValue(e: Event) {
+  shape.value = (e.target as HTMLInputElement).checked ? 'ReturnsValue' : 'Normal';
+}
+function selectPrimaryShape() {
+  shape.value = isValueMode.value ? 'ReturnsValue' : 'Normal';
+}
+function selectSecondaryShape() {
+  shape.value = isValueMode.value ? 'ReturnsBool' : 'Ending';
+}
 const error = ref<string | null>(null);
 const submitting = ref(false);
 
@@ -39,6 +58,112 @@ const editInputEl = ref<HTMLInputElement | null>(null);
 // toolbar stays put once a rename commits instead of disappearing.
 const selectedIndex = ref<number | null>(null);
 
+// The toolbar floats above whichever piece is selected, but the preview now
+// reuses the real .instruction-row/.instruction-shape markup (see template)
+// so it looks exactly like the block that actually spawns on the canvas --
+// and .instruction-shape clip-paths its own content to cut the puzzle-piece
+// notch, which would silently clip away a CSS-only `position: absolute`
+// toolbar nested inside it. Instead the toolbar is a sibling of the clipped
+// shape, positioned in JS from the selected piece's actual measured
+// position, and re-measured on every resize (the preview's pieces grow/
+// shrink live while typing, see editingText below) via ResizeObserver.
+const previewAnchorEl = ref<HTMLElement | null>(null);
+// The whole block silhouette (.instruction-shape or .value-block) -- the
+// toolbar hovers above the entire block, not just the selected piece, so it
+// clears the shape's own top edge (and the drop-shadow .instruction-row
+// grows on hover) instead of floating at whatever height the piece itself
+// happens to sit at within the row.
+const previewShapeEl = ref<HTMLElement | null>(null);
+const pieceEls: (HTMLElement | null)[] = [];
+function setPieceEl(i: number, el: Element | ComponentPublicInstance | null) {
+  pieceEls[i] = el as HTMLElement | null;
+}
+const toolbarPos = reactive({ left: 0, top: 0 });
+function updateToolbarPos() {
+  const i = selectedIndex.value;
+  const anchor = previewAnchorEl.value;
+  const shapeEl = previewShapeEl.value;
+  const pieceEl = i === null ? null : pieceEls[i];
+  if (i === null || !anchor || !shapeEl || !pieceEl) return;
+  const anchorRect = anchor.getBoundingClientRect();
+  const shapeRect = shapeEl.getBoundingClientRect();
+  const pieceRect = pieceEl.getBoundingClientRect();
+  toolbarPos.left = pieceRect.left - anchorRect.left + pieceRect.width / 2;
+  toolbarPos.top = shapeRect.top - anchorRect.top;
+}
+watch([selectedIndex, shape], () => nextTick(updateToolbarPos));
+let resizeObserver: ResizeObserver | null = null;
+onMounted(() => {
+  resizeObserver = new ResizeObserver(() => updateToolbarPos());
+  if (previewAnchorEl.value) resizeObserver.observe(previewAnchorEl.value);
+});
+onBeforeUnmount(() => resizeObserver?.disconnect());
+
+// Left/middle-click drag-to-pan for the preview canvas -- mirrors the real
+// canvas's own pan gesture (blockstitch's canvasDrag.ts: beginPan/onPointerMove/
+// onPointerUp) but scoped to just this one scrollable box via pointer capture,
+// since there's no strand/drag/snap machinery to hook into here.
+const canvasEl = ref<HTMLElement | null>(null);
+const isPanning = ref(false);
+let pan: { pointerId: number; startX: number; startY: number; startScrollLeft: number; startScrollTop: number } | null = null;
+// On Linux, middle click pastes X11's primary selection into whatever's
+// focused -- CEF honors it regardless of hit-testing, so preventDefault() on
+// pointerdown alone doesn't stop it (same issue canvasDrag.ts's beginPan
+// works around). Swallow the paste that follows a middle-click pan instead,
+// since this dialog's rename inputs would otherwise eat it.
+let blockPrimaryPaste = false;
+let blockPrimaryPasteGeneration = 0;
+function onCanvasPaste(e: ClipboardEvent) {
+  if (!blockPrimaryPaste) return;
+  e.preventDefault();
+  e.stopImmediatePropagation();
+}
+function onCanvasPointerDown(e: PointerEvent) {
+  if (e.button !== 0 && e.button !== 1) return;
+  // A left click only pans when it starts on genuinely empty canvas space --
+  // one landing on the block shape itself (or its toolbar) is left alone so
+  // piece selection/editing and the toolbar buttons keep working. Middle
+  // click always pans, even over the block.
+  const target = e.target as HTMLElement;
+  if (e.button === 0 && target.closest('.instruction-shape, .value-card-shape, .make-block-piece-toolbar')) return;
+  const canvas = canvasEl.value;
+  if (!canvas) return;
+  if (e.button === 1) {
+    const active = document.activeElement;
+    if (active instanceof HTMLElement && (active.tagName === 'INPUT' || active.isContentEditable)) active.blur();
+    blockPrimaryPaste = true;
+    blockPrimaryPasteGeneration++;
+    document.addEventListener('paste', onCanvasPaste, true);
+  }
+  e.preventDefault();
+  canvas.setPointerCapture(e.pointerId);
+  pan = { pointerId: e.pointerId, startX: e.clientX, startY: e.clientY, startScrollLeft: canvas.scrollLeft, startScrollTop: canvas.scrollTop };
+  isPanning.value = true;
+}
+function onCanvasPointerMove(e: PointerEvent) {
+  if (!pan || pan.pointerId !== e.pointerId) return;
+  const canvas = canvasEl.value;
+  if (!canvas) return;
+  canvas.scrollLeft = pan.startScrollLeft - (e.clientX - pan.startX);
+  canvas.scrollTop = pan.startScrollTop - (e.clientY - pan.startY);
+}
+function endPan(e: PointerEvent) {
+  if (!pan || pan.pointerId !== e.pointerId) return;
+  pan = null;
+  isPanning.value = false;
+  // The primary-selection paste fires slightly after pointerup on middle-
+  // button release, so clear the flag after a tick rather than synchronously;
+  // guarded by a generation counter against a fresh pan starting in between.
+  const generation = blockPrimaryPasteGeneration;
+  setTimeout(() => {
+    if (blockPrimaryPasteGeneration === generation) {
+      blockPrimaryPaste = false;
+      document.removeEventListener('paste', onCanvasPaste, true);
+    }
+  }, 200);
+}
+onBeforeUnmount(() => document.removeEventListener('paste', onCanvasPaste, true));
+
 // Starts past however many inputs already exist so a freshly-inserted
 // input's default name doesn't collide with an existing "valueN" (which
 // would otherwise immediately trip the uniqueness check on OK).
@@ -46,6 +171,14 @@ let nextInputSeq = pieces.filter(p => p.kind === 'Input').length + 1;
 
 function pieceText(piece: BlockPieceDto): string {
   return piece.kind === 'Label' ? (piece.text || '(label)') : piece.name;
+}
+
+// A boolean input piece previews as the same hexagon shape it actually gets
+// once the block is called (see .make-block-piece-bool) instead of the
+// ordinary number/text capsule, so the prototype editor already reads as
+// "this is a boolean" instead of looking identical to every other input.
+function isBoolPiece(piece: BlockPieceDto): boolean {
+  return piece.kind === 'Input' && piece.value_type === 'Bool';
 }
 
 function startEditing(i: number) {
@@ -62,6 +195,14 @@ watch(editingIndex, async i => {
   editInputEl.value?.select();
 });
 
+// Fresh "Make a Block" opens with the block-name piece already selected and
+// ready to type over, since it's the one field every block needs. Editing an
+// existing block leaves selection alone -- its pieces are already named, so
+// nothing should jump into rename mode just from opening the dialog.
+onMounted(() => {
+  if (!props.editTarget) startEditing(0);
+});
+
 function commitEditing() {
   if (editingIndex.value === null) return;
   const piece = pieces[editingIndex.value];
@@ -74,18 +215,17 @@ function commitEditing() {
   editingIndex.value = null;
 }
 
-function addPiece(kind: 'Label' | 'Input') {
+function addPiece(kind: 'Label' | 'Input', valueType: InputValueType = 'Any') {
   const piece: BlockPieceDto =
-    kind === 'Label' ? { kind: 'Label', id: newPieceId(), text: 'label' } : { kind: 'Input', id: newPieceId(), name: `value${nextInputSeq++}` };
+    kind === 'Label'
+      ? { kind: 'Label', id: newPieceId(), text: 'label' }
+      : { kind: 'Input', id: newPieceId(), name: `value${nextInputSeq++}`, value_type: valueType };
   pieces.push(piece);
   const index = pieces.length - 1;
-  if (kind === 'Input') {
-    // New inputs land pre-selected for immediate renaming, matching "click
-    // the name to edit it" for every other piece.
-    nextTick(() => startEditing(index));
-  } else {
-    selectedIndex.value = index;
-  }
+  // Newly-added pieces land pre-selected and already in rename mode, matching
+  // "click the name to edit it" for every other piece, so typing can start
+  // immediately instead of requiring a click on the placeholder text first.
+  nextTick(() => startEditing(index));
 }
 
 function removePiece(i: number) {
@@ -120,11 +260,17 @@ async function onOk() {
   }
   submitting.value = true;
   try {
-    const snapshot = pieces.map(p => ({ ...p }));
+    // Trailing/leading spaces are fine mid-edit (the live preview shows
+    // exactly what's typed, see .make-block-piece-text's `white-space: pre`)
+    // but shouldn't survive into the saved block -- trim here rather than
+    // relying solely on commitEditing's own trim-on-blur, since a piece
+    // still focused at the moment OK is pressed commits (and its blur fires)
+    // as part of this same click, and this makes the guarantee explicit.
+    const snapshot = pieces.map(p => (p.kind === 'Label' ? { ...p, text: p.text.trim() } : { ...p, name: p.name.trim() }));
     if (props.editTarget) {
-      await editBlock(props.editTarget.id, snapshot, returnsValue.value);
+      await editBlock(props.editTarget.id, snapshot, shape.value);
     } else {
-      await createBlock(snapshot, returnsValue.value);
+      await createBlock(snapshot, shape.value);
     }
     emit('close');
   } catch (e) {
@@ -145,49 +291,104 @@ function onCancel() {
       <div class="modal-panel make-block-panel">
         <h2 class="modal-title">{{ isEdit ? 'Edit Block' : 'Make a Block' }}</h2>
 
-        <div class="make-block-canvas">
-          <div class="make-block-preview" @pointerdown.self="selectedIndex = null">
-            <template v-for="(piece, i) in pieces" :key="piece.id">
-              <span
-                class="make-block-piece"
-                :class="{ 'make-block-piece-input': piece.kind === 'Input', 'make-block-piece-selected': selectedIndex === i }"
+        <div
+          class="make-block-canvas"
+          ref="canvasEl"
+          :class="{ panning: isPanning }"
+          @pointerdown="onCanvasPointerDown"
+          @pointermove="onCanvasPointerMove"
+          @pointerup="endPan"
+          @pointercancel="endPan"
+        >
+          <div class="make-block-preview-anchor" ref="previewAnchorEl">
+            <div
+              v-if="selectedIndex !== null"
+              class="make-block-piece-toolbar"
+              :style="{ left: toolbarPos.left + 'px', top: toolbarPos.top + 'px' }"
+            >
+              <button type="button" class="make-block-piece-move" title="Move left" :disabled="selectedIndex === 0" @click.stop="movePiece(selectedIndex, -1)">
+                <ChevronLeft />
+              </button>
+              <button type="button" class="make-block-piece-remove" title="Remove" @click.stop="removePiece(selectedIndex)">
+                <X />
+              </button>
+              <button
+                type="button"
+                class="make-block-piece-move"
+                title="Move right"
+                :disabled="selectedIndex === pieces.length - 1"
+                @click.stop="movePiece(selectedIndex, 1)"
               >
-                <div v-if="selectedIndex === i" class="make-block-piece-toolbar">
-                  <button type="button" class="make-block-piece-move" title="Move left" :disabled="i === 0" @click.stop="movePiece(i, -1)">
-                    <ChevronLeft />
-                  </button>
-                  <button type="button" class="make-block-piece-remove" title="Remove" @click.stop="removePiece(i)">
-                    <X />
-                  </button>
-                  <button
-                    type="button"
-                    class="make-block-piece-move"
-                    title="Move right"
-                    :disabled="i === pieces.length - 1"
-                    @click.stop="movePiece(i, 1)"
-                  >
-                    <ChevronRight />
-                  </button>
-                </div>
-                <span class="make-block-piece-field">
-                  <span
-                    class="make-block-piece-text"
-                    :class="{ 'make-block-piece-text-hidden': editingIndex === i }"
-                    @click="startEditing(i)"
-                  >{{ pieceText(piece) }}</span>
-                  <input
-                    v-if="editingIndex === i"
-                    ref="editInputEl"
-                    type="text"
-                    class="make-block-piece-input-el"
-                    v-model="editingText"
-                    @blur="commitEditing"
-                    @keydown.enter="commitEditing"
-                    @keydown.esc="editingIndex = null"
-                  />
+                <ChevronRight />
+              </button>
+            </div>
+
+            <span
+              v-if="isValueMode"
+              class="value-block"
+              :class="shape === 'ReturnsBool' ? 'value-card-shape-bool' : 'value-card-shape'"
+              ref="previewShapeEl"
+              @pointerdown.self="selectedIndex = null"
+            >
+              <template v-for="(piece, i) in pieces" :key="piece.id">
+                <span
+                  class="make-block-piece"
+                  :ref="(el) => setPieceEl(i, el)"
+                  :class="{ 'make-block-piece-input': piece.kind === 'Input' && !isBoolPiece(piece), 'make-block-piece-bool': isBoolPiece(piece), 'make-block-piece-selected': selectedIndex === i }"
+                >
+                  <span class="make-block-piece-field">
+                    <span
+                      class="make-block-piece-text"
+                      :class="{ 'make-block-piece-text-hidden': editingIndex === i }"
+                      @click="startEditing(i)"
+                    >{{ editingIndex === i ? editingText || ' ' : pieceText(piece) }}</span>
+                    <input
+                      v-if="editingIndex === i"
+                      :ref="(el) => (editInputEl = el as HTMLInputElement | null)"
+                      type="text"
+                      class="make-block-piece-input-el"
+                      v-model="editingText"
+                      @blur="commitEditing"
+                      @keydown.enter="commitEditing"
+                      @keydown.esc="editingIndex = null"
+                    />
+                  </span>
                 </span>
-              </span>
-            </template>
+              </template>
+            </span>
+
+            <div v-else class="instruction-row" :class="{ 'instruction-row-cap': shape === 'Ending' }">
+              <div class="instruction-shape" ref="previewShapeEl">
+                <Blocks class="instruction-type-icon" />
+                <div class="instruction-content" @pointerdown.self="selectedIndex = null">
+                  <template v-for="(piece, i) in pieces" :key="piece.id">
+                    <span
+                      class="make-block-piece"
+                      :ref="(el) => setPieceEl(i, el)"
+                      :class="{ 'make-block-piece-input': piece.kind === 'Input' && !isBoolPiece(piece), 'make-block-piece-bool': isBoolPiece(piece), 'make-block-piece-selected': selectedIndex === i }"
+                    >
+                      <span class="make-block-piece-field">
+                        <span
+                          class="make-block-piece-text"
+                          :class="{ 'make-block-piece-text-hidden': editingIndex === i }"
+                          @click="startEditing(i)"
+                        >{{ editingIndex === i ? editingText || ' ' : pieceText(piece) }}</span>
+                        <input
+                          v-if="editingIndex === i"
+                          :ref="(el) => (editInputEl = el as HTMLInputElement | null)"
+                          type="text"
+                          class="make-block-piece-input-el"
+                          v-model="editingText"
+                          @blur="commitEditing"
+                          @keydown.enter="commitEditing"
+                          @keydown.esc="editingIndex = null"
+                        />
+                      </span>
+                    </span>
+                  </template>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 
@@ -199,6 +400,17 @@ function onCancel() {
               <span class="make-block-add-sub">number or text</span>
             </span>
           </button>
+          <button type="button" class="make-block-add-btn" @click="addPiece('Input', 'Bool')">
+            <span class="make-block-add-preview">
+              <span class="value-block value-hex-blank">
+                <span class="value-op value-hex-blank-spacer">&nbsp;</span>
+              </span>
+            </span>
+            <span class="make-block-add-text">
+              <span class="make-block-add-title">Add an input</span>
+              <span class="make-block-add-sub">boolean</span>
+            </span>
+          </button>
           <button type="button" class="make-block-add-btn" @click="addPiece('Label')">
             <span class="make-block-add-preview make-block-add-preview-label">Abc</span>
             <span class="make-block-add-text">
@@ -207,13 +419,28 @@ function onCancel() {
           </button>
         </div>
 
+        <div class="make-block-add-row">
+          <button
+            type="button"
+            class="make-block-add-btn make-block-shape-btn"
+            :class="{ 'make-block-shape-btn-selected': shape === (isValueMode ? 'ReturnsValue' : 'Normal') }"
+            @click="selectPrimaryShape"
+          >
+            <span class="make-block-add-title">{{ isValueMode ? 'Return Text or Number' : 'Normal block' }}</span>
+          </button>
+          <button
+            type="button"
+            class="make-block-add-btn make-block-shape-btn"
+            :class="{ 'make-block-shape-btn-selected': shape === (isValueMode ? 'ReturnsBool' : 'Ending') }"
+            @click="selectSecondaryShape"
+          >
+            <span class="make-block-add-title">{{ isValueMode ? 'Return a Boolean' : 'Ending block' }}</span>
+          </button>
+        </div>
+
         <div class="make-block-return-row">
-          <span class="instruction-label">This block:</span>
           <label class="make-block-radio">
-            <input type="radio" :checked="!returnsValue" @change="returnsValue = false" /> doesn't return a value
-          </label>
-          <label class="make-block-radio">
-            <input type="radio" :checked="returnsValue" @change="returnsValue = true" /> returns a value
+            <input type="checkbox" :checked="isValueMode" @change="onToggleReturnsValue" /> Returns a value
           </label>
         </div>
 

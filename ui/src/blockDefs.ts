@@ -5,10 +5,17 @@
 // block id, resized when inputs change) rather than a fixed Record.
 import { reactive, watch } from 'vue';
 import { state } from './store';
-import { numberValue, blockInputNames, findBlockDef, newId } from './types';
-import type { InstructionDto, ValueDto } from './types';
+import { numberValue, blockInputPieces, findBlockDef, newId } from './types';
+import type { BlockPieceDto, InstructionDto, ValueDto } from './types';
 
 export const paletteCallArgs = reactive<Record<string, ValueDto[]>>({});
+
+/** A fresh blank value for an input slot, matching its declared type — a
+ * boolean input defaults to an empty hexagon (`{ kind: 'Bool' }`, same as a
+ * built-in boolean slot), everything else to a plain `0`. */
+function blankArgFor(piece: Extract<BlockPieceDto, { kind: 'Input' }> | undefined): ValueDto {
+  return piece?.value_type === 'Bool' ? { kind: 'Bool' } : numberValue(0);
+}
 
 watch(
   () => state.current_macro?.block_defs,
@@ -19,9 +26,9 @@ watch(
       if (!ids.has(id)) delete paletteCallArgs[id];
     }
     for (const def of list) {
-      const count = blockInputNames(def).length;
+      const inputs = blockInputPieces(def);
       const existing = paletteCallArgs[def.id] ?? [];
-      paletteCallArgs[def.id] = Array.from({ length: count }, (_, i) => existing[i] ?? numberValue(0));
+      paletteCallArgs[def.id] = inputs.map((piece, i) => existing[i] ?? blankArgFor(piece));
     }
   },
   { immediate: true, deep: true },
@@ -29,9 +36,10 @@ watch(
 
 function currentArgs(blockId: string): ValueDto[] {
   const def = findBlockDef(state.current_macro, blockId);
-  const count = def ? blockInputNames(def).length : (paletteCallArgs[blockId]?.length ?? 0);
+  const inputs = def ? blockInputPieces(def) : null;
+  const count = inputs ? inputs.length : (paletteCallArgs[blockId]?.length ?? 0);
   const existing = paletteCallArgs[blockId] ?? [];
-  return Array.from({ length: count }, (_, i) => existing[i] ?? numberValue(0));
+  return Array.from({ length: count }, (_, i) => existing[i] ?? blankArgFor(inputs?.[i]));
 }
 
 /** The `ValueDto` a "My Blocks" reporter prefab represents — mirrors

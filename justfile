@@ -21,6 +21,31 @@ run: build
 clean:
     cargo clean
 
+# Point ui/'s blockstitch dependency at a local checkout via a pnpm `link:`
+# dependency, and hide the resulting package.json/pnpm-lock.yaml changes from
+# git (skip-worktree) so this machine-local switch never shows up as a diff or
+# gets committed. `cargo build`/`cargo run` always run `pnpm install` (see
+# src-tauri/build.rs) before compiling, in debug *and* release, so this takes
+# effect immediately with no separate release-mode step.
+#
+# Note: `just flatpak-sources`/`flatpak-build` consume the *committed*
+# ui/pnpm-lock.yaml to build fully offline -- run `just blockstitch-published`
+# first if you're packaging a release while local-link mode is active.
+blockstitch-local path="../../blockstitch":
+    cd ui && npm pkg set dependencies.blockstitch="link:{{path}}" && pnpm install
+    git update-index --skip-worktree ui/package.json ui/pnpm-lock.yaml
+
+# Switch back to the published, pinned blockstitch dependency: un-hide
+# package.json/pnpm-lock.yaml from git, restore their committed content, and
+# reinstall from the pinned GitHub commit. Optionally pass a new commit hash
+# (`just blockstitch-published <sha>`) to pin blockstitch to that commit
+# instead of the currently committed one.
+blockstitch-published commit="":
+    git update-index --no-skip-worktree ui/package.json ui/pnpm-lock.yaml
+    git checkout -- ui/package.json ui/pnpm-lock.yaml
+    if [ -n "{{commit}}" ]; then cd ui && npm pkg set dependencies.blockstitch="github:EthanRStokes/blockstitch#{{commit}}"; fi
+    cd ui && pnpm install
+
 # Install the project
 install:
     # Binary's RUNPATH is `$ORIGIN`, so the CEF runtime payload (libcef.so,

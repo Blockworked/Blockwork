@@ -1,7 +1,7 @@
 use crate::state::SharedState;
 use tauri::menu::{Menu, MenuBuilder};
 use tauri::tray::{MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent};
-use tauri::{AppHandle, Cef, Manager, WebviewWindowBuilder};
+use tauri::{AppHandle, Manager, WebviewWindowBuilder};
 
 /// Builds the tray icon shown while "close to tray" is enabled: left click
 /// opens the main window, right click shows the Open/Quit menu ("Quit UI"
@@ -11,7 +11,7 @@ use tauri::{AppHandle, Cef, Manager, WebviewWindowBuilder};
 /// run while holding the `SharedState` lock with the main window still up,
 /// so the initial menu can just assume the UI is open -- don't lock state
 /// here to check, that would deadlock against the caller's own lock.
-pub(crate) fn build(app: &AppHandle<Cef>) -> tauri::Result<TrayIcon<Cef>> {
+pub(crate) fn build(app: &AppHandle) -> tauri::Result<TrayIcon> {
     ensure_gtk_init(app);
 
     let menu = build_menu(app, true)?;
@@ -40,7 +40,7 @@ pub(crate) fn build(app: &AppHandle<Cef>) -> tauri::Result<TrayIcon<Cef>> {
 }
 
 /// Builds the tray's context menu, including "Quit UI" only when `ui_open`.
-fn build_menu(app: &AppHandle<Cef>, ui_open: bool) -> tauri::Result<Menu<Cef>> {
+fn build_menu(app: &AppHandle, ui_open: bool) -> tauri::Result<Menu<tauri::DynRuntime>> {
     let mut builder = MenuBuilder::new(app).text("open", "Open");
     if ui_open {
         builder = builder.text("quitui", "Quit UI");
@@ -50,7 +50,7 @@ fn build_menu(app: &AppHandle<Cef>, ui_open: bool) -> tauri::Result<Menu<Cef>> {
 
 /// Rebuilds and swaps in the tray's context menu to reflect whether the UI
 /// is currently running -- called right after `main_window_label` flips.
-fn refresh_menu(app: &AppHandle<Cef>) {
+fn refresh_menu(app: &AppHandle) {
     let shared = app.state::<SharedState>();
     let Ok(guard) = shared.lock() else {
         return;
@@ -70,7 +70,7 @@ fn refresh_menu(app: &AppHandle<Cef>) {
 }
 
 /// Shows the main window, recreating it first if `quit_ui` had destroyed it.
-pub(crate) fn show_main_window(app: &AppHandle<Cef>) {
+pub(crate) fn show_main_window(app: &AppHandle) {
     let label = app.state::<SharedState>().lock().ok().and_then(|s| s.main_window_label.clone());
 
     let window = match label.and_then(|label| app.get_webview_window(&label)) {
@@ -99,7 +99,7 @@ pub(crate) fn show_main_window(app: &AppHandle<Cef>) {
 /// make this `build()` fail outright with `WindowLabelAlreadyExists`.
 /// `capabilities/main.json` scopes its permissions to `main*` to cover
 /// whatever label ends up live.
-fn rebuild_main_window(app: &AppHandle<Cef>) -> tauri::Result<tauri::WebviewWindow<Cef>> {
+fn rebuild_main_window(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
     use std::sync::atomic::{AtomicU64, Ordering};
     static NEXT_LABEL: AtomicU64 = AtomicU64::new(1);
 
@@ -127,7 +127,7 @@ fn rebuild_main_window(app: &AppHandle<Cef>) -> tauri::Result<tauri::WebviewWind
 /// running in the background/tray so it can still respond to keybinds and
 /// everything. Opening the app again re-inits the tauri window (see
 /// `show_main_window`), reusing the same core process.
-pub(crate) fn quit_ui(app: &AppHandle<Cef>) {
+pub(crate) fn quit_ui(app: &AppHandle) {
     let shared = app.state::<SharedState>();
     let Some(label) = shared.lock().ok().and_then(|s| s.main_window_label.clone()) else {
         return;
@@ -146,7 +146,7 @@ pub(crate) fn quit_ui(app: &AppHandle<Cef>) {
 /// `EventLoop::new()`, but our CEF runtime's winit event loop never touches
 /// GTK, so nothing else in the app will have called `gtk::init()` yet.
 #[cfg(target_os = "linux")]
-fn ensure_gtk_init(app: &AppHandle<Cef>) {
+fn ensure_gtk_init(app: &AppHandle) {
     static INIT: std::sync::Once = std::sync::Once::new();
     INIT.call_once(|| {
         let (tx, rx) = std::sync::mpsc::channel();
@@ -163,4 +163,4 @@ fn ensure_gtk_init(app: &AppHandle<Cef>) {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn ensure_gtk_init(_app: &AppHandle<Cef>) {}
+fn ensure_gtk_init(_app: &AppHandle) {}

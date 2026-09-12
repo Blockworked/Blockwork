@@ -10,7 +10,7 @@ import MakeBlockDialog from './MakeBlockDialog.vue';
 import { OPERATOR_KINDS } from '../valueOps';
 import { applyPaletteValueEdit, paletteInstructions, paletteValueFor } from '../paletteState';
 import { state } from '../store';
-import { sortedVariableNames } from '../types';
+import { blockShapeReturnsValue, sortedVariableNames } from '../types';
 import type { InstructionDto, ValueDto, ValueKind } from '../types';
 import { closeVariableDialog, openCreateVariableDialog, variableDialog } from '../variableDialogs';
 import { blockDialog, closeBlockDialog, openCreateBlockDialog } from '../blockDialogs';
@@ -24,8 +24,8 @@ const instructionTypes = (Object.keys(INSTRUCTION_TYPE_LABELS) as InstructionDto
   .filter((t): t is Exclude<InstructionDto['type'], 'SetVariable' | 'ChangeVariable' | 'BlockHeader' | 'CallBlock' | 'Return' | 'Comment'> =>
     t !== 'SetVariable' && t !== 'ChangeVariable' && t !== 'BlockHeader' && t !== 'CallBlock' && t !== 'Return' && t !== 'Comment');
 
-const commandBlocks = computed(() => (state.current_macro?.block_defs ?? []).filter(b => !b.returns_value));
-const reporterBlocks = computed(() => (state.current_macro?.block_defs ?? []).filter(b => b.returns_value));
+const commandBlocks = computed(() => (state.current_macro?.block_defs ?? []).filter(b => !blockShapeReturnsValue(b.shape)));
+const reporterBlocks = computed(() => (state.current_macro?.block_defs ?? []).filter(b => blockShapeReturnsValue(b.shape)));
 
 // Number/Text literals, plus every operator registered in valueOps.ts's
 // OPERATOR_KINDS — adding an operator there is enough to get it a palette

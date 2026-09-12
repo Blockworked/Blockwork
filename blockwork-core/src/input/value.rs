@@ -104,7 +104,7 @@ pub enum Value {
     /// the macro-wide variable store), so nested/concurrent invocations of
     /// the same block don't share a slot.
     Param { name: String },
-    /// Value-position invocation of a `returns_value == true` custom block —
+    /// Value-position invocation of a `ReturnsValue`/`ReturnsBool`-shaped custom block —
     /// mirrors `Op`'s shape (including `saved`) but names a block instead of
     /// a fixed [`Op`]. Resolved before `eval` sees it, like `Var`/`Param`.
     Call { block_id: String, args: Vec<Value>, saved: Box<Value> },

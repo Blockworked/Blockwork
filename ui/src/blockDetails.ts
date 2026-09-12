@@ -109,13 +109,18 @@ export function detailsForValueKind(kind: string): BlockDetails {
   };
 }
 
+const BLOCK_SHAPE_EXPLAINERS: Record<BlockDefDto['shape'], string> = {
+  Normal: 'A custom block you defined — drag it onto a strand to call it, running the blocks under its "My Blocks" definition.',
+  Ending: 'A custom block you defined that ends a strand — drag it onto a strand to call it; nothing can be placed below it.',
+  ReturnsValue: 'A custom block you defined that returns a number or text — drag it into a value slot to call it and use its result.',
+  ReturnsBool: 'A custom block you defined that returns a boolean — drag it into a boolean slot to call it and use its result.',
+};
+
 export function detailsForBlockDef(def: BlockDefDto): BlockDetails {
   const name = def.pieces.map(p => (p.kind === 'Label' ? p.text : `[${p.name}]`)).join(' ').trim() || '(unnamed block)';
   return {
     name,
     identifier: def.id,
-    explainer: def.returns_value
-      ? 'A custom block you defined that returns a value — drag it into a value slot to call it and use its result.'
-      : 'A custom block you defined — drag it onto a strand to call it, running the blocks under its "My Blocks" definition.',
+    explainer: BLOCK_SHAPE_EXPLAINERS[def.shape],
   };
 }

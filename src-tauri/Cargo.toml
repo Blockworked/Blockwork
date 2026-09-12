@@ -37,8 +37,6 @@ gtk = "0.18"
 base64.workspace = true
 
 [features]
-default = ["cef"]
-cef = ["tauri/cef"]
 # Debug-only HTTP+WebSocket bridge that lets a plain browser tab (no Tauri
 # webview) drive the real running backend — see src/dev_bridge.rs.
 dev-bridge = ["dep:axum", "dep:tower-http"]

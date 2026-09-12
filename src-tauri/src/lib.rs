@@ -19,7 +19,7 @@ use blockwork_core::{config, recording};
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
-use tauri::{Cef, Manager};
+use tauri::{Manager};
 
 pub fn run() {
     tracing_subscriber::fmt::init();
@@ -47,8 +47,11 @@ pub fn run() {
         }
     };
 
-    tauri::Builder::<Cef>::default()
-        .command_line_args([("--use-mock-keychain", None::<String>)])
+    tauri::Builder::default()
+        .runtime(
+            tauri_runtime_cef::Cef::default()
+                .command_line_args([("--use-mock-keychain", None::<String>)]),
+        )
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let close_to_tray = window.state::<SharedState>().lock().map(|s| s.close_to_tray).unwrap_or(false);

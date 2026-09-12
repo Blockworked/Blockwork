@@ -1,7 +1,7 @@
 use blockwork_core::config;
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
 use blockwork_core::macros::runner::VariableStore;
-use blockwork_core::macros::{loop_control, BlockPiece, Comment, FloatingValue, Instruction, InstructionKind, Macro, Strand, VariableDef, SPEED_MULTIPLIER_RANGE};
+use blockwork_core::macros::{loop_control, BlockPiece, BlockShape, Comment, FloatingValue, Instruction, InstructionKind, Macro, Strand, VariableDef, SPEED_MULTIPLIER_RANGE};
 use blockwork_core::input::types::InputToken;
 use blockwork_core::input::value::{Evaluated, Value, OPERATOR_KINDS};
 use blockwork_core::recording;
@@ -326,7 +326,7 @@ pub(crate) fn create_block<R: Runtime>(
     state: State<SharedState>,
     app: tauri::AppHandle<R>,
     pieces: Vec<BlockPieceDto>,
-    returns_value: bool,
+    shape: BlockShape,
 ) -> Result<String, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let pieces: Vec<BlockPiece> = pieces.iter().map(dto_to_block_piece).collect();
@@ -334,7 +334,7 @@ pub(crate) fn create_block<R: Runtime>(
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let (x, y) = next_strand_position(mac);
-    let id = mac.create_block(pieces, returns_value, x, y);
+    let id = mac.create_block(pieces, shape, x, y);
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(id)
@@ -349,7 +349,7 @@ pub(crate) fn edit_block<R: Runtime>(
     app: tauri::AppHandle<R>,
     block_id: String,
     pieces: Vec<BlockPieceDto>,
-    returns_value: bool,
+    shape: BlockShape,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let new_pieces: Vec<BlockPiece> = pieces.iter().map(dto_to_block_piece).collect();
@@ -366,7 +366,7 @@ pub(crate) fn edit_block<R: Runtime>(
     let renames: Vec<(String, String)> = new_pieces
         .iter()
         .filter_map(|new_piece| {
-            let BlockPiece::Input { id, name: new_name } = new_piece else { return None };
+            let BlockPiece::Input { id, name: new_name, .. } = new_piece else { return None };
             let old_piece = old_pieces.iter().find(|p| matches!(p, BlockPiece::Input { id: old_id, .. } if old_id == id))?;
             let BlockPiece::Input { name: old_name, .. } = old_piece else { return None };
             (old_name != new_name).then(|| (old_name.clone(), new_name.clone()))
@@ -379,7 +379,7 @@ pub(crate) fn edit_block<R: Runtime>(
 
     let def = mac.block_defs.iter_mut().find(|b| b.id == block_id).ok_or("Unknown block")?;
     def.pieces = new_pieces;
-    def.returns_value = returns_value;
+    def.shape = shape;
 
     auto_save(&s);
     emit_state_updated(&app, &s);
@@ -671,7 +671,7 @@ fn check_return_placement(mac: &Macro, strand: &Strand, ins: &Instruction) -> Re
         return Ok(());
     }
     let valid = matches!(strand.instructions.first().map(|i| &i.kind), Some(InstructionKind::BlockHeader(id))
-        if mac.block_defs.iter().any(|b| &b.id == id && b.returns_value));
+        if mac.block_defs.iter().any(|b| &b.id == id && b.shape.returns_value()));
     if valid {
         Ok(())
     } else {
@@ -1042,6 +1042,11 @@ fn preview_value_with_env(value: &ValueDto, env: &HashMap<String, Evaluated>) ->
 
 /// Creates a new value block parked on open canvas — for a sidebar drop, or
 /// the "create" half of dragging an existing block out onto canvas.
+/// `origin_block_id` is set only when `value` is a `Param` reporter dragged
+/// straight out of its declaring block's header (the frontend recovers this
+/// from the drag's own palette kind, see blockstitchSetup.ts's
+/// `createFloatingValue` wrapper) — lets a floating param still render with
+/// its real declared shape instead of a guess.
 #[tauri::command]
 pub(crate) fn create_floating_value<R: Runtime>(
     state: State<SharedState>,
@@ -1049,12 +1054,13 @@ pub(crate) fn create_floating_value<R: Runtime>(
     x: i32,
     y: i32,
     value: ValueDto,
+    origin_block_id: Option<String>,
 ) -> Result<String, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let id = uuid::Uuid::new_v4().simple().to_string();
-    mac.floating_values.push(FloatingValue { id: id.clone(), x, y, value: dto_to_value(&value) });
+    mac.floating_values.push(FloatingValue { id: id.clone(), x, y, value: dto_to_value(&value), origin_block_id });
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(id)
@@ -2114,7 +2120,7 @@ pub(crate) fn set_ipc_auto_start<R: Runtime>(state: State<SharedState>, app: tau
 // ─── System tray ────────────────────────────────────────────────────────────
 
 #[tauri::command]
-pub(crate) fn set_close_to_tray(state: State<SharedState>, app: tauri::AppHandle<tauri::Cef>, enabled: bool) -> Result<(), String> {
+pub(crate) fn set_close_to_tray(state: State<SharedState>, app: tauri::AppHandle, enabled: bool) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.close_to_tray = enabled;
     config::update_settings(|settings| settings.close_to_tray = Some(enabled));
@@ -2382,6 +2388,7 @@ mod value_location_tests {
     use super::*;
     use blockwork_core::input::types::Coordinate;
     use blockwork_core::input::value::Op;
+    use blockwork_core::macros::{BlockShape, InputValueType};
 
     /// A flat, non-nested `InstrPath` — the shape every location was
     /// addressed by before nested `If`/`IfElse` bodies existed.
@@ -2405,7 +2412,7 @@ mod value_location_tests {
             }],
             recording_target: None,
             speed_multiplier: 1.0,
-            floating_values: vec![FloatingValue { id: "f1".into(), x: 10, y: 20, value: Value::number(5.0) }],
+            floating_values: vec![FloatingValue { id: "f1".into(), x: 10, y: 20, value: Value::number(5.0), origin_block_id: None }],
             comments: vec![],
             variables: vec![],
             block_defs: vec![],
@@ -2794,7 +2801,7 @@ mod value_location_tests {
         BlockPiece::Label { id: format!("id-{text}"), text: text.to_string() }
     }
     fn input(id: &str, name: &str) -> BlockPiece {
-        BlockPiece::Input { id: id.to_string(), name: name.to_string() }
+        BlockPiece::Input { id: id.to_string(), name: name.to_string(), value_type: Default::default() }
     }
 
     #[test]
@@ -2820,10 +2827,10 @@ mod value_location_tests {
     #[test]
     fn create_block_appends_def_and_empty_header_strand() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        let id = mac.create_block(vec![label("double"), input("i1", "n")], true, 100, 0);
+        let id = mac.create_block(vec![label("double"), input("i1", "n")], BlockShape::ReturnsValue, 100, 0);
         assert_eq!(mac.block_defs.len(), 1);
         assert_eq!(mac.block_defs[0].id, id);
-        assert!(mac.block_defs[0].returns_value);
+        assert_eq!(mac.block_defs[0].shape, BlockShape::ReturnsValue);
         let header_strand = mac.strands.iter().find(|s| s.instructions == vec![Instruction::new(InstructionKind::BlockHeader(id.clone()))]);
         assert!(header_strand.is_some());
     }
@@ -2831,7 +2838,7 @@ mod value_location_tests {
     #[test]
     fn reconcile_block_call_args_preserves_value_across_rename_by_id() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        let id = mac.create_block(vec![input("i1", "a")], false, 0, 0);
+        let id = mac.create_block(vec![input("i1", "a")], BlockShape::Normal, 0, 0);
         // A CallBlock call site with one arg bound to the "a" slot.
         mac.strands.push(Strand {
             id: "caller".into(),
@@ -2850,7 +2857,7 @@ mod value_location_tests {
     #[test]
     fn reconcile_block_call_args_drops_removed_input_and_keeps_survivor() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        let id = mac.create_block(vec![input("i1", "a"), input("i2", "b")], false, 0, 0);
+        let id = mac.create_block(vec![input("i1", "a"), input("i2", "b")], BlockShape::Normal, 0, 0);
         mac.strands.push(Strand {
             id: "caller".into(),
             x: 0,
@@ -2868,7 +2875,7 @@ mod value_location_tests {
     #[test]
     fn reconcile_block_call_args_defaults_a_newly_added_input_to_zero() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        let id = mac.create_block(vec![input("i1", "a")], false, 0, 0);
+        let id = mac.create_block(vec![input("i1", "a")], BlockShape::Normal, 0, 0);
         mac.strands.push(Strand {
             id: "caller".into(),
             x: 0,
@@ -2884,9 +2891,27 @@ mod value_location_tests {
     }
 
     #[test]
+    fn reconcile_block_call_args_defaults_a_newly_added_bool_input_to_blank_bool() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        let id = mac.create_block(vec![input("i1", "a")], BlockShape::Normal, 0, 0);
+        mac.strands.push(Strand {
+            id: "caller".into(),
+            x: 0,
+            y: 0,
+            instructions: vec![Instruction::new(InstructionKind::CallBlock { block_id: id.clone(), args: vec![Value::number(5.0)] })],
+        });
+        let old_pieces = mac.block_defs[0].pieces.clone();
+        let new_pieces = vec![input("i1", "a"), BlockPiece::Input { id: "i2".into(), name: "b".into(), value_type: InputValueType::Bool }];
+        mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);
+        let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
+        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else { panic!("expected CallBlock") };
+        assert_eq!(args, &vec![Value::number(5.0), Value::Bool]);
+    }
+
+    #[test]
     fn remove_block_scrubs_call_block_and_call_references() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        let id = mac.create_block(vec![input("i1", "n")], true, 0, 0);
+        let id = mac.create_block(vec![input("i1", "n")], BlockShape::ReturnsValue, 0, 0);
         mac.strands.push(Strand {
             id: "caller".into(),
             x: 0,
