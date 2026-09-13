@@ -22,6 +22,7 @@ pub type ListStore = Arc<Mutex<HashMap<String, Vec<ListItem>>>>;
 /// per run and shared read-only via `ExecCtx::block_table`.
 pub struct BlockRuntime {
     pub input_names: Vec<String>,
+    pub branch_names: Vec<String>,
     pub body: Vec<Instruction>,
 }
 
@@ -69,6 +70,7 @@ struct ExecCtx<'a> {
     /// leaves the button physically stuck down for the rest of the session.
     pressed_buttons: &'a mut Vec<MacroButton>,
     param_env: HashMap<String, Evaluated>,
+    branch_env: HashMap<String, Vec<Instruction>>,
 }
 
 use crate::macros::is_list_reporter;
@@ -234,12 +236,14 @@ fn resolve_calls_and_params(value: &Value, ctx: &mut ExecCtx, depth: u32) -> Res
         Value::Call { block_id, args, .. } => {
             // Args evaluate in the caller's scope, fully resolved to
             // concrete values before call_block swaps in the callee's scope.
+            // Reporter calls carry no branch bodies (blockstitch's `Value`
+            // has nowhere to put them), so the branch env stays empty.
             let mut evaluated_args = Vec::with_capacity(args.len());
             for a in args {
                 let resolved = resolve_calls_and_params(a, ctx, depth)?;
                 evaluated_args.push(resolved.eval()?);
             }
-            match call_block(block_id, evaluated_args, ctx, depth + 1)? {
+            match call_block(block_id, evaluated_args, Vec::new(), ctx, depth + 1)? {
                 Some(e) => Ok(e.into_value()),
                 None => Err(format!("custom block '{block_id}' didn't return a value")),
             }
@@ -254,6 +258,7 @@ fn resolve_calls_and_params(value: &Value, ctx: &mut ExecCtx, depth: u32) -> Res
 fn call_block(
     block_id: &str,
     arg_values: Vec<Evaluated>,
+    branch_values: Vec<Vec<Instruction>>,
     ctx: &mut ExecCtx,
     depth: u32,
 ) -> Result<Option<Evaluated>, String> {
@@ -272,9 +277,17 @@ fn call_block(
         .cloned()
         .zip(arg_values)
         .collect();
+    let new_branches: HashMap<String, Vec<Instruction>> = runtime
+        .branch_names
+        .iter()
+        .cloned()
+        .zip(branch_values)
+        .collect();
     let saved_env = std::mem::replace(&mut ctx.param_env, new_env);
+    let saved_branches = std::mem::replace(&mut ctx.branch_env, new_branches);
     let result = run_block(&runtime.body, ctx, depth, Instant::now());
     ctx.param_env = saved_env;
+    ctx.branch_env = saved_branches;
     // A stray Break/Continue reaching a custom block's own top level (no
     // enclosing loop within its body) is absorbed here, same as Normal -
     // a custom block is its own execution context, not an extension of the
@@ -413,8 +426,21 @@ impl Macro {
                     if let Some(def) = block_defs.iter().find(|b| &b.id == id) {
                         let input_names: Vec<String> =
                             def.input_names().map(str::to_string).collect();
+                        // Branch prototypes (`BlockPiece::Branch`) live in
+                        // blockstitch, which doesn't define them yet, so no
+                        // declared branch names can reach the runner. The
+                        // branch env plumbing below stays in place for when
+                        // they do; until then `RunBranch` is a no-op.
+                        let branch_names: Vec<String> = Vec::new();
                         let body = strand.instructions[1..].to_vec();
-                        block_table.insert(id.clone(), BlockRuntime { input_names, body });
+                        block_table.insert(
+                            id.clone(),
+                            BlockRuntime {
+                                input_names,
+                                branch_names,
+                                body,
+                            },
+                        );
                     }
                 }
                 Some(InstructionKind::WhenRan) => entry_strands.push(strand.instructions),
@@ -504,6 +530,7 @@ fn run_strand(
             pressed_keys: &mut pressed_keys,
             pressed_buttons: &mut pressed_buttons,
             param_env: HashMap::new(),
+            branch_env: HashMap::new(),
         };
         let _ = run_block(&instructions, &mut ctx, 0, start);
     }
@@ -651,7 +678,11 @@ fn run_block(
             }
             InstructionKind::EscapeLoop => return Ok(Flow::Break),
             InstructionKind::ContinueLoop => return Ok(Flow::Continue),
-            InstructionKind::CallBlock { block_id, args } => {
+            InstructionKind::CallBlock {
+                block_id,
+                args,
+                branches,
+            } => {
                 let mut evaluated_args = Vec::with_capacity(args.len());
                 for a in args {
                     match ctx.resolve(a, depth).and_then(|v| v.eval()) {
@@ -665,7 +696,15 @@ fn run_block(
                 // A non-reporter (`Normal`/`Ending`) block's body normally
                 // has no `Return`; if one sneaks in, it just ends the call
                 // early.
-                let _ = call_block(block_id, evaluated_args, ctx, depth + 1)?;
+                let _ = call_block(block_id, evaluated_args, branches.clone(), ctx, depth + 1)?;
+            }
+            InstructionKind::RunBranch(name) => {
+                if let Some(body) = ctx.branch_env.get(name).cloned() {
+                    let flow = run_block(&body, ctx, depth, Instant::now())?;
+                    if flow != Flow::Normal {
+                        return Ok(flow);
+                    }
+                }
             }
             InstructionKind::If { condition, body } => {
                 match ctx.resolve(condition, depth).and_then(|v| v.eval()) {
@@ -1193,6 +1232,7 @@ pub fn make_backend() -> Option<Arc<Mutex<dyn InputBackend>>> {
     }
 }
 
+#[cfg(test)]
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -1770,6 +1810,7 @@ mod tests {
                             Instruction::new(InstructionKind::CallBlock {
                                 block_id: block_id.clone(),
                                 args: vec![],
+                                branches: vec![],
                             }),
                         ],
                     },

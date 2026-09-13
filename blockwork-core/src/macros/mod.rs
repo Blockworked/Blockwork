@@ -119,6 +119,11 @@ impl std::hash::Hash for ListDef {
 /// their slots. Every traversal built on this lives in blockstitch.
 impl BlockKind for InstructionKind {
     const HEADER_LABEL: &'static str = "When Ran/Block Definition";
+    // CallBlock branch callbacks need one body slot per branch (up to 255,
+    // see validate_block_pieces), so walks cover every slot and `body_mut`
+    // decides per instruction. Other instructions answer `None` past their
+    // own slots, so the wider loop costs them nothing.
+    const BODY_SLOTS: u8 = u8::MAX;
 
     fn visit_values_mut(&mut self, f: &mut dyn FnMut(&mut Value, InputValueType)) {
         match self {
@@ -162,7 +167,8 @@ impl BlockKind for InstructionKind {
             | InstructionKind::OpenApp { .. }
             | InstructionKind::CloseApp { .. }
             | InstructionKind::DeleteAllOfList { .. }
-            | InstructionKind::ReverseList { .. } => {}
+            | InstructionKind::ReverseList { .. }
+            | InstructionKind::RunBranch(_) => {}
         }
     }
 
@@ -190,6 +196,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Repeat { body, .. }, 0) => Some(body),
             (InstructionKind::Forever { body }, 0) => Some(body),
             (InstructionKind::While { body, .. }, 0) => Some(body),
+            (InstructionKind::CallBlock { branches, .. }, slot) => branches.get(slot as usize),
             _ => None,
         }
     }
@@ -202,6 +209,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Repeat { body, .. }, 0) => Some(body),
             (InstructionKind::Forever { body }, 0) => Some(body),
             (InstructionKind::While { body, .. }, 0) => Some(body),
+            (InstructionKind::CallBlock { branches, .. }, slot) => branches.get_mut(slot as usize),
             _ => None,
         }
     }
@@ -221,7 +229,7 @@ impl BlockKind for InstructionKind {
 
     fn call_args_mut(&mut self, block_id: &str) -> Option<&mut Vec<Value>> {
         match self {
-            InstructionKind::CallBlock { block_id: id, args } if id == block_id => Some(args),
+            InstructionKind::CallBlock { block_id: id, args, .. } if id == block_id => Some(args),
             _ => None,
         }
     }
@@ -318,19 +326,40 @@ pub enum InstructionKind {
     /// if it wasn't already numeric.
     ChangeVariable(String, Value),
     /// Appends a number/text value to a named list. Boolean values are ignored.
-    AddToList { value: Value, name: String },
+    AddToList {
+        value: Value,
+        name: String,
+    },
     /// Removes the 1-based item at `index` from a named list.
-    DeleteOfList { index: Value, name: String },
+    DeleteOfList {
+        index: Value,
+        name: String,
+    },
     /// Removes every item from a named list.
-    DeleteAllOfList { name: String },
+    DeleteAllOfList {
+        name: String,
+    },
     /// Rotates a named list by `amount` positions (positive is toward the end).
-    ShiftList { name: String, amount: Value },
+    ShiftList {
+        name: String,
+        amount: Value,
+    },
     /// Inserts a number/text value at the 1-based `index` in a named list.
-    InsertIntoList { value: Value, index: Value, name: String },
+    InsertIntoList {
+        value: Value,
+        index: Value,
+        name: String,
+    },
     /// Replaces the 1-based item at `index` in a named list with a literal.
-    ReplaceItemOfList { index: Value, name: String, value: Value },
+    ReplaceItemOfList {
+        index: Value,
+        name: String,
+        value: Value,
+    },
     /// Reverses a named list in place.
-    ReverseList { name: String },
+    ReverseList {
+        name: String,
+    },
     /// Marks a strand as a custom block's body; the `String` is the
     /// `BlockDef::id`. Header-only, like `WhenRan`, but never auto-runs -
     /// only invoked via `CallBlock`/`Value::Call`.
@@ -340,7 +369,11 @@ pub enum InstructionKind {
     CallBlock {
         block_id: String,
         args: Vec<Value>,
+        #[serde(default)]
+        branches: Vec<Vec<Instruction>>,
     },
+    /// Runs one callback branch passed to the enclosing custom-block call.
+    RunBranch(String),
     /// Only meaningful inside a `ReturnsValue`/`ReturnsBool`-shaped block's
     /// body: evaluates `Value` and halts execution, returning the result to
     /// the caller.
@@ -418,10 +451,19 @@ impl std::hash::Hash for InstructionKind {
                 7u8.hash(state);
                 id.hash(state);
             }
-            Self::CallBlock { block_id, args } => {
+            Self::CallBlock {
+                block_id,
+                args,
+                branches,
+            } => {
                 8u8.hash(state);
                 block_id.hash(state);
                 args.hash(state);
+                branches.hash(state);
+            }
+            Self::RunBranch(name) => {
+                26u8.hash(state);
+                name.hash(state);
             }
             Self::Return(v) => {
                 9u8.hash(state);
@@ -500,13 +542,41 @@ impl std::hash::Hash for InstructionKind {
                 name.hash(state);
                 icon.hash(state);
             }
-            Self::AddToList { value, name } => { 24u8.hash(state); value.hash(state); name.hash(state); }
-            Self::DeleteOfList { index, name } => { 25u8.hash(state); index.hash(state); name.hash(state); }
-            Self::DeleteAllOfList { name } => { 26u8.hash(state); name.hash(state); }
-            Self::ShiftList { name, amount } => { 27u8.hash(state); name.hash(state); amount.hash(state); }
-            Self::InsertIntoList { value, index, name } => { 28u8.hash(state); value.hash(state); index.hash(state); name.hash(state); }
-            Self::ReplaceItemOfList { index, name, value } => { 29u8.hash(state); index.hash(state); name.hash(state); value.hash(state); }
-            Self::ReverseList { name } => { 30u8.hash(state); name.hash(state); }
+            Self::AddToList { value, name } => {
+                24u8.hash(state);
+                value.hash(state);
+                name.hash(state);
+            }
+            Self::DeleteOfList { index, name } => {
+                25u8.hash(state);
+                index.hash(state);
+                name.hash(state);
+            }
+            Self::DeleteAllOfList { name } => {
+                26u8.hash(state);
+                name.hash(state);
+            }
+            Self::ShiftList { name, amount } => {
+                27u8.hash(state);
+                name.hash(state);
+                amount.hash(state);
+            }
+            Self::InsertIntoList { value, index, name } => {
+                28u8.hash(state);
+                value.hash(state);
+                index.hash(state);
+                name.hash(state);
+            }
+            Self::ReplaceItemOfList { index, name, value } => {
+                29u8.hash(state);
+                index.hash(state);
+                name.hash(state);
+                value.hash(state);
+            }
+            Self::ReverseList { name } => {
+                30u8.hash(state);
+                name.hash(state);
+            }
         }
     }
 }
@@ -535,18 +605,42 @@ enum InstructionKindDe {
     },
     SetVariable(String, Value),
     ChangeVariable(String, Value),
-    AddToList { value: Value, name: String },
-    DeleteOfList { index: Value, name: String },
-    DeleteAllOfList { name: String },
-    ShiftList { name: String, amount: Value },
-    InsertIntoList { value: Value, index: Value, name: String },
-    ReplaceItemOfList { index: Value, name: String, value: Value },
-    ReverseList { name: String },
+    AddToList {
+        value: Value,
+        name: String,
+    },
+    DeleteOfList {
+        index: Value,
+        name: String,
+    },
+    DeleteAllOfList {
+        name: String,
+    },
+    ShiftList {
+        name: String,
+        amount: Value,
+    },
+    InsertIntoList {
+        value: Value,
+        index: Value,
+        name: String,
+    },
+    ReplaceItemOfList {
+        index: Value,
+        name: String,
+        value: Value,
+    },
+    ReverseList {
+        name: String,
+    },
     BlockHeader(String),
     CallBlock {
         block_id: String,
         args: Vec<Value>,
+        #[serde(default)]
+        branches: Vec<Vec<Instruction>>,
     },
+    RunBranch(String),
     Return(Value),
     If {
         condition: Value,
@@ -652,17 +746,36 @@ impl From<InstructionKindDe> for InstructionKind {
             },
             InstructionKindDe::SetVariable(n, v) => InstructionKind::SetVariable(n, v),
             InstructionKindDe::ChangeVariable(n, v) => InstructionKind::ChangeVariable(n, v),
-            InstructionKindDe::AddToList { value, name } => InstructionKind::AddToList { value, name },
-            InstructionKindDe::DeleteOfList { index, name } => InstructionKind::DeleteOfList { index, name },
-            InstructionKindDe::DeleteAllOfList { name } => InstructionKind::DeleteAllOfList { name },
-            InstructionKindDe::ShiftList { name, amount } => InstructionKind::ShiftList { name, amount },
-            InstructionKindDe::InsertIntoList { value, index, name } => InstructionKind::InsertIntoList { value, index, name },
-            InstructionKindDe::ReplaceItemOfList { index, name, value } => InstructionKind::ReplaceItemOfList { index, name, value },
+            InstructionKindDe::AddToList { value, name } => {
+                InstructionKind::AddToList { value, name }
+            }
+            InstructionKindDe::DeleteOfList { index, name } => {
+                InstructionKind::DeleteOfList { index, name }
+            }
+            InstructionKindDe::DeleteAllOfList { name } => {
+                InstructionKind::DeleteAllOfList { name }
+            }
+            InstructionKindDe::ShiftList { name, amount } => {
+                InstructionKind::ShiftList { name, amount }
+            }
+            InstructionKindDe::InsertIntoList { value, index, name } => {
+                InstructionKind::InsertIntoList { value, index, name }
+            }
+            InstructionKindDe::ReplaceItemOfList { index, name, value } => {
+                InstructionKind::ReplaceItemOfList { index, name, value }
+            }
             InstructionKindDe::ReverseList { name } => InstructionKind::ReverseList { name },
             InstructionKindDe::BlockHeader(id) => InstructionKind::BlockHeader(id),
-            InstructionKindDe::CallBlock { block_id, args } => {
-                InstructionKind::CallBlock { block_id, args }
-            }
+            InstructionKindDe::CallBlock {
+                block_id,
+                args,
+                branches,
+            } => InstructionKind::CallBlock {
+                block_id,
+                args,
+                branches,
+            },
+            InstructionKindDe::RunBranch(name) => InstructionKind::RunBranch(name),
             InstructionKindDe::Return(v) => InstructionKind::Return(v),
             InstructionKindDe::If { condition, body } => InstructionKind::If { condition, body },
             InstructionKindDe::IfElse {
@@ -777,11 +890,17 @@ impl InstructionKind {
                     *name = new.to_string();
                 }
             }
-            InstructionKind::CallBlock { args, .. } => {
+            InstructionKind::CallBlock { args, branches, .. } => {
                 for arg in args {
                     rename_list_in_value(arg, old, new);
                 }
+                for branch in branches {
+                    for instruction in branch {
+                        instruction.kind.rename_list(old, new);
+                    }
+                }
             }
+            InstructionKind::RunBranch(_) => {}
             InstructionKind::If { condition, body } => {
                 rename_list_in_value(condition, old, new);
                 for instruction in body {

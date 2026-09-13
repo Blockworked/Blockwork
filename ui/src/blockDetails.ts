@@ -39,6 +39,8 @@ const INSTRUCTION_EXPLAINERS: Record<InstructionType, string> = {
   ReverseList: 'Reverses the order of a list.',
   BlockHeader: 'The definition header of one of your custom "My Blocks" - everything below it runs each time the block is called.',
   CallBlock: 'Calls one of your own custom "My Blocks" definitions, running its body inline.',
+  BranchCallBlock: 'Calls a custom block and supplies one script for each of its branch inputs.',
+  RunBranch: 'Runs the script supplied to this branch input at the custom block call site.',
   Return: "Ends a custom block's body immediately, handing the given value back to whoever called it.",
   If: 'Runs the blocks inside only if the condition is true.',
   IfElse: 'Runs the first set of blocks if the condition is true, otherwise runs the second set.',

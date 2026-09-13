@@ -34,7 +34,7 @@ const pieces = computed(() => {
   <template v-else v-for="(item, i) in pieces" :key="i">
     <span v-if="item.piece.kind === 'Label'" class="instruction-label">{{ item.piece.text }}</span>
     <ValueBlock
-      v-else
+      v-else-if="item.piece.kind === 'Input'"
       :location="fieldLocation(strandId, path, `CallArg:${item.argIndex}`)"
       :value="instruction.args[item.argIndex] ?? item.fallback"
     />

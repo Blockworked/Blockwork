@@ -20,12 +20,15 @@ import { closeListDialog, listDialog, openCreateListDialog } from '../listDialog
 
 // SetVariable/ChangeVariable render in the Variables section below and
 // Return in the "My Blocks" section, not here; BlockHeader/CallBlock are
-// never dragged from a fixed prefab at all (see PaletteCallBlock.vue);
-// Comment is a floating note now (right-click canvas/a block), not a sidebar
-// prefab - all filtered out of the generic "Instruction" group.
+// never dragged from a fixed prefab at all (see PaletteCallBlock.vue).
+// BranchCallBlock and RunBranch are implementation-only: the former is
+// created by dragging a branched custom caller, while the latter is created
+// by dragging a named branch from its definition header. Comment is a
+// floating note now (right-click canvas/a block). Keep all of those out of
+// the generic Instruction group.
 const instructionTypes = (Object.keys(INSTRUCTION_TYPE_LABELS) as InstructionDto['type'][])
-  .filter((t): t is Exclude<InstructionDto['type'], 'SetVariable' | 'ChangeVariable' | 'AddToList' | 'DeleteOfList' | 'DeleteAllOfList' | 'ShiftList' | 'InsertIntoList' | 'ReplaceItemOfList' | 'ReverseList' | 'BlockHeader' | 'CallBlock' | 'Return' | 'Comment'> =>
-    !['SetVariable', 'ChangeVariable', 'AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList', 'BlockHeader', 'CallBlock', 'Return', 'Comment'].includes(t));
+  .filter((t): t is Exclude<InstructionDto['type'], 'SetVariable' | 'ChangeVariable' | 'AddToList' | 'DeleteOfList' | 'DeleteAllOfList' | 'ShiftList' | 'InsertIntoList' | 'ReplaceItemOfList' | 'ReverseList' | 'BlockHeader' | 'CallBlock' | 'BranchCallBlock' | 'RunBranch' | 'Return' | 'Comment'> =>
+    !['SetVariable', 'ChangeVariable', 'AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList', 'BlockHeader', 'CallBlock', 'BranchCallBlock', 'RunBranch', 'Return', 'Comment'].includes(t));
 
 const commandBlocks = computed(() => (state.current_macro?.block_defs ?? []).filter(b => !blockShapeReturnsValue(b.shape)));
 const reporterBlocks = computed(() => (state.current_macro?.block_defs ?? []).filter(b => blockShapeReturnsValue(b.shape)));

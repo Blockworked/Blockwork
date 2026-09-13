@@ -5,7 +5,8 @@
 // can't just be another entry in that registry-driven component).
 import { computed } from 'vue';
 import type { BlockDefDto } from '../types';
-import { blockInputNames } from '../types';
+import { blockInputNames, blockBranchPieces } from '../types';
+import PaletteCallBlock from './PaletteCallBlock.vue';
 import { paletteCallArgs } from '../blockDefs';
 import { beginValuePaletteDrag, paletteEvalPreview, PaletteNumberField } from 'blockstitch';
 import { openMyBlockMenu } from '../contextMenu';
@@ -13,6 +14,7 @@ import { openMyBlockMenu } from '../contextMenu';
 const props = defineProps<{ def: BlockDefDto }>();
 
 const inputNames = computed(() => blockInputNames(props.def));
+const hasBranches = computed(() => blockBranchPieces(props.def).length > 0);
 const kind = computed(() => `Call:${props.def.id}` as const);
 
 const preview = computed(() => (paletteEvalPreview.value?.kind === kind.value ? paletteEvalPreview.value : null));
@@ -31,23 +33,25 @@ function onContextMenu(e: MouseEvent) {
 <template>
   <span
     class="value-block palette-prefab"
-    :class="[def.shape === 'ReturnsBool' ? 'value-card-shape-bool' : 'value-card-shape', 'blockwork-custom-value-block', 'blockwork-custom-operator']"
+    :class="[def.shape === 'ReturnsBool' ? 'value-card-shape-bool' : 'value-card-shape', 'blockwork-custom-value-block', 'blockwork-custom-operator', { 'blockwork-branch-reporter': hasBranches }]"
     :style="{ '--blockwork-custom-block-color': def.color }"
     @pointerdown="onPointerDown"
     @contextmenu="onContextMenu"
   >
-    <template v-for="piece in def.pieces" :key="piece.kind === 'Label' ? piece.text : piece.name">
+    <PaletteCallBlock v-if="hasBranches" :def="def" preview-only />
+    <template v-else v-for="piece in def.pieces" :key="piece.kind === 'Label' ? piece.text : piece.name">
       <span v-if="piece.kind === 'Label'" class="value-op">{{ piece.text }}</span>
       <!-- Boolean inputs have no editable palette leaf - see
            PaletteCallBlock.vue's matching case. -->
-      <span v-else-if="piece.value_type === 'Bool'" class="value-block value-hex-blank">
+      <span v-else-if="piece.kind === 'Input' && piece.value_type === 'Bool'" class="value-block value-hex-blank">
         <span class="value-op value-hex-blank-spacer">&nbsp;</span>
       </span>
       <PaletteNumberField
-        v-else
+        v-else-if="piece.kind === 'Input'"
         :model-value="paletteCallArgs[def.id]?.[inputNames.indexOf(piece.name)] ?? { kind: 'Number', value: 0 }"
         @update:model-value="v => { if (paletteCallArgs[def.id]) paletteCallArgs[def.id][inputNames.indexOf(piece.name)] = v; }"
       />
+      <span v-else class="value-op">{{ piece.name }}</span>
     </template>
     <span v-if="preview" class="value-eval-tooltip" :class="{ 'value-eval-tooltip-error': preview.error }">{{ preview.text }}</span>
   </span>

@@ -19,7 +19,7 @@ import { ICONS, INSTRUCTION_TYPE_ICONS } from './icons';
 import { OPERATOR_KINDS } from './valueOps';
 import { clonePaletteInstruction, paletteValueFor } from './paletteState';
 import { paletteCallInstructionFor, paletteCallValueFor } from './blockDefs';
-import { findBlockDef, parseParamKind, type BlockPieceDto, type InstructionDto, type InstructionType, type ValueDto, type ValueKind } from './types';
+import { findBlockDef, newId, parseParamKind, type BlockPieceDto, type InstructionDto, type InstructionType, type ValueDto, type ValueKind } from './types';
 import { openBlockMenu, openCanvasMenu, openPaletteInstructionMenu, openPaletteValueMenu, openValueMenu, openVariableMenu } from './contextMenu';
 
 import WhenRanFields from './components/fields/WhenRanFields.vue';
@@ -43,6 +43,8 @@ import ChangeVariableFields from './components/fields/ChangeVariableFields.vue';
 import ListCommandFields from './components/fields/ListCommandFields.vue';
 import BlockHeaderFields from './components/fields/BlockHeaderFields.vue';
 import CallBlockFields from './components/fields/CallBlockFields.vue';
+import BranchCallBlockFields from './components/fields/BranchCallBlockFields.vue';
+import RunBranchFields from './components/fields/RunBranchFields.vue';
 import ReturnFields from './components/fields/ReturnFields.vue';
 import IfFields from './components/fields/IfFields.vue';
 import IfElseFields from './components/fields/IfElseFields.vue';
@@ -117,7 +119,13 @@ function registerShapes() {
     icon: iconFor('CallBlock'),
     isCap: n => n.type === 'CallBlock' && findBlockDef(state.current_macro, n.block_id)?.shape === 'Ending',
   });
-  // TNode is `InstructionDto` (the full union), not just the wrap variants -
+  registerBlockShape<InstructionDto>('BranchCallBlock', {
+    kind: 'wrap', icon: iconFor('CallBlock'),
+    getSlots: n => n.type === 'BranchCallBlock' ? n.branches : [],
+    mapSlots: (n, fn) => n.type === 'BranchCallBlock' ? { ...n, branches: n.branches.map((body, i) => fn(body, i)) } : n,
+  });
+  registerBlockShape('RunBranch', { kind: 'stack', icon: iconFor('RunBranch') });
+  // TNode is `InstructionDto` (the full union), not just the wrap variants —
   // a wrap block's own body/slots hold arbitrary instructions, not only
   // other wrap blocks, so getSlots/mapSlots must operate over the whole
   // union and narrow `n` themselves via `n.type === '...'`.
@@ -180,6 +188,8 @@ function registerFields() {
   for (const type of ['AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList'] as const) registerBlockField(type, ListCommandFields);
   registerBlockField('BlockHeader', BlockHeaderFields);
   registerBlockField('CallBlock', CallBlockFields);
+  registerBlockField('BranchCallBlock', BranchCallBlockFields);
+  registerBlockField('RunBranch', RunBranchFields);
   registerBlockField('Return', ReturnFields);
   registerBlockField('If', IfFields);
   registerBlockField('IfElse', IfElseFields);
@@ -260,8 +270,11 @@ function buildCanvasHost(): CanvasHost<InstructionDto> {
     backend,
     resolveFreshValue: kind =>
       kind.startsWith('Call:') ? paletteCallValueFor(kind.slice('Call:'.length)) : paletteValueFor(kind as ValueKind),
-    clonePaletteInstruction: (type, variantId) =>
-      type === 'CallBlock' && variantId ? paletteCallInstructionFor(variantId) : clonePaletteInstruction(type as InstructionType),
+    clonePaletteInstruction: (type, variantId) => {
+      if (type === 'CallBlock' && variantId) return paletteCallInstructionFor(variantId);
+      if (type === 'RunBranch' && variantId) return { id: newId(), type: 'RunBranch', name: variantId.slice(variantId.indexOf(':') + 1) };
+      return clonePaletteInstruction(type as InstructionType);
+    },
     isRecordingTarget: strandId => strandId === state.current_macro?.recording_target_strand_id,
     onCanvasContextMenu: e => openCanvasMenu(e),
     onBlockContextMenu: (e, strandId, path) => openBlockMenu(e, strandId, path),
@@ -269,7 +282,20 @@ function buildCanvasHost(): CanvasHost<InstructionDto> {
     onPaletteInstructionContextMenu: (e, type, variantId) => openPaletteInstructionMenu(e, type, variantId),
     onPaletteValueContextMenu: (e, kind) => openPaletteValueMenu(e, kind),
     onValueContextMenu: (e, _location, value) => openValueMenu(e, value as ValueDto),
-    resolveCallPieces: blockId => findBlockDef(state.current_macro, blockId)?.pieces.map(p => (p.kind === 'Label' ? { kind: 'Label', text: p.text } : { kind: 'Input' })),
+    resolveCallPieces: blockId => findBlockDef(state.current_macro, blockId)?.pieces.map(p => (p.kind === 'Label' ? { kind: 'Label', text: p.text } : { kind: p.kind })),
+    instructionAppearance: node => {
+      const instruction = node as InstructionDto;
+      if (instruction.type !== 'CallBlock' && instruction.type !== 'BranchCallBlock' && instruction.type !== 'BlockHeader') return undefined;
+      const def = findBlockDef(state.current_macro, instruction.block_id);
+      if (!def) return undefined;
+      return {
+        classes: {
+          'blockwork-custom-block': true,
+          'blockwork-wrap-ending': instruction.type === 'BranchCallBlock' && def.shape === 'Ending',
+        },
+        style: { '--blockwork-custom-block-color': def.color },
+      };
+    },
     floatingValueColor: floatingValue =>
       floatingValue.value.kind === 'Call'
         ? findBlockDef(state.current_macro, floatingValue.value.block_id)?.color

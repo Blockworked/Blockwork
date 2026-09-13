@@ -148,6 +148,8 @@ export const INSTRUCTION_TYPE_ICONS: Record<InstructionType, IconName> = {
   // Same icon as BlockHeader - a call site is the same custom block, just
   // invoked rather than defined.
   CallBlock: 'blocks',
+  BranchCallBlock: 'blocks',
+  RunBranch: 'git-branch',
   Return: 'corner-up-left',
   If: 'git-branch',
   IfElse: 'git-fork',
@@ -186,6 +188,8 @@ export const INSTRUCTION_TYPE_LABELS: Record<InstructionType, string> = {
   ReverseList: 'Reverse List',
   BlockHeader: 'Block Definition',
   CallBlock: 'Call Block',
+  BranchCallBlock: 'Call Block with Branches',
+  RunBranch: 'Run Branch',
   Return: 'Return',
   If: 'If',
   IfElse: 'If-Else',

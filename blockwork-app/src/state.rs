@@ -359,6 +359,16 @@ pub(crate) enum InstructionDto {
         block_id: String,
         args: Vec<Value>,
     },
+    BranchCallBlock {
+        id: String,
+        block_id: String,
+        args: Vec<Value>,
+        branches: Vec<Vec<InstructionDto>>,
+    },
+    RunBranch {
+        id: String,
+        name: String,
+    },
     Return {
         id: String,
         value: Value,
@@ -585,10 +595,31 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             id,
             block_id: block_id.clone(),
         },
-        InstructionKind::CallBlock { block_id, args } => InstructionDto::CallBlock {
+        InstructionKind::CallBlock {
+            block_id,
+            args,
+            branches,
+        } if branches.is_empty() => InstructionDto::CallBlock {
             id,
             block_id: block_id.clone(),
             args: args.clone(),
+        },
+        InstructionKind::CallBlock {
+            block_id,
+            args,
+            branches,
+        } => InstructionDto::BranchCallBlock {
+            id,
+            block_id: block_id.clone(),
+            args: args.clone(),
+            branches: branches
+                .iter()
+                .map(|branch| branch.iter().map(instruction_to_dto).collect())
+                .collect(),
+        },
+        InstructionKind::RunBranch(name) => InstructionDto::RunBranch {
+            id,
+            name: name.clone(),
         },
         InstructionKind::Return(value) => InstructionDto::Return {
             id,
@@ -774,8 +805,26 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
             InstructionKind::CallBlock {
                 block_id: block_id.clone(),
                 args: args.clone(),
+                branches: Vec::new(),
             },
         ),
+        InstructionDto::BranchCallBlock {
+            id,
+            block_id,
+            args,
+            branches,
+        } => (
+            id,
+            InstructionKind::CallBlock {
+                block_id: block_id.clone(),
+                args: args.clone(),
+                branches: branches
+                    .iter()
+                    .map(|branch| branch.iter().filter_map(dto_to_instruction).collect())
+                    .collect(),
+            },
+        ),
+        InstructionDto::RunBranch { id, name } => (id, InstructionKind::RunBranch(name.clone())),
         InstructionDto::Return { id, value } => (id, InstructionKind::Return(value.clone())),
         InstructionDto::If {
             id,
@@ -957,10 +1006,10 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
                     .or_else(|| Some("(deleted)".to_string()))
             } else {
                 None
-        };
-        HotkeyBindingDto {
-            binding_index: i,
-            action: hotkey_action_to_dto(&b.action),
+            };
+            HotkeyBindingDto {
+                binding_index: i,
+                action: hotkey_action_to_dto(&b.action),
                 combo_display: b.combo.format(),
                 macro_name,
             }

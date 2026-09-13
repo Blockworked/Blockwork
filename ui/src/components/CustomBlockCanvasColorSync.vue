@@ -5,19 +5,33 @@
 // custom block header's strand contents.
 import { nextTick, onBeforeUnmount, onMounted, watch } from 'vue';
 import { state } from '../store';
-import { resolveInstructionAt } from '../types';
+import { blockBranchPieces, resolveInstructionAt } from '../types';
 import type { InstructionDto, ValueDto, ValueLocationDto } from '../types';
 
-function collectCustomBlockRows(instructions: InstructionDto[], rows: Map<string, string>) {
+function collectCustomBlockRows(
+  instructions: InstructionDto[],
+  rows: Map<string, string>,
+  standaloneBranchOwners: Map<string, string | null>,
+  definitionBlockId: string | null = null,
+) {
+  const strandDefinitionBlockId = definitionBlockId
+    ?? instructions.find((instruction): instruction is Extract<InstructionDto, { type: 'BlockHeader' }> => instruction.type === 'BlockHeader')?.block_id
+    ?? null;
   for (const instruction of instructions) {
-    if (instruction.type === 'BlockHeader' || instruction.type === 'CallBlock') {
+    if (instruction.type === 'BlockHeader' || instruction.type === 'CallBlock' || instruction.type === 'BranchCallBlock') {
       rows.set(instruction.id, instruction.block_id);
     }
+    if (instruction.type === 'RunBranch') {
+      const blockId = strandDefinitionBlockId ?? standaloneBranchOwners.get(instruction.name);
+      if (blockId) rows.set(instruction.id, blockId);
+    }
     if (instruction.type === 'If' || instruction.type === 'Repeat' || instruction.type === 'Forever' || instruction.type === 'While') {
-      collectCustomBlockRows(instruction.body, rows);
+      collectCustomBlockRows(instruction.body, rows, standaloneBranchOwners, strandDefinitionBlockId);
     } else if (instruction.type === 'IfElse') {
-      collectCustomBlockRows(instruction.then_body, rows);
-      collectCustomBlockRows(instruction.else_body, rows);
+      collectCustomBlockRows(instruction.then_body, rows, standaloneBranchOwners, strandDefinitionBlockId);
+      collectCustomBlockRows(instruction.else_body, rows, standaloneBranchOwners, strandDefinitionBlockId);
+    } else if (instruction.type === 'BranchCallBlock') {
+      instruction.branches.forEach(branch => collectCustomBlockRows(branch, rows, standaloneBranchOwners, strandDefinitionBlockId));
     }
   }
 }
@@ -31,7 +45,8 @@ function fieldRootValue(instruction: InstructionDto, fieldId: string): ValueDto 
     case 'SetVariable': return fieldId === 'SetVariableValue' ? instruction.value : null;
     case 'ChangeVariable': return fieldId === 'ChangeVariableValue' ? instruction.value : null;
     case 'Return': return fieldId === 'ReturnValue' ? instruction.value : null;
-    case 'CallBlock': {
+    case 'CallBlock':
+    case 'BranchCallBlock': {
       const index = fieldId.startsWith('CallArg:') ? Number(fieldId.slice('CallArg:'.length)) : NaN;
       return Number.isInteger(index) ? instruction.args[index] ?? null : null;
     }
@@ -80,12 +95,26 @@ function syncCanvasColors() {
   const macro = state.current_macro;
   if (!macro) return;
   const blockIdsByInstruction = new Map<string, string>();
-  for (const strand of macro.strands) collectCustomBlockRows(strand.instructions, blockIdsByInstruction);
+  // A RunBranch marker normally lives under its definition header. A marker
+  // parked on the canvas after being dragged from that header has no owner
+  // strand yet, so use its branch name only when it identifies one definition
+  // unambiguously.
+  const standaloneBranchOwners = new Map<string, string | null>();
+  for (const def of macro.block_defs) {
+    for (const branch of blockBranchPieces(def)) {
+      standaloneBranchOwners.set(
+        branch.name,
+        standaloneBranchOwners.has(branch.name) ? null : def.id,
+      );
+    }
+  }
+  for (const strand of macro.strands) collectCustomBlockRows(strand.instructions, blockIdsByInstruction, standaloneBranchOwners);
   const colorsByBlockId = new Map(macro.block_defs.map(def => [def.id, def.color]));
 
   document.querySelectorAll<HTMLElement>('#canvas-inner .instruction-row[data-instr-id]').forEach(row => {
     const blockId = blockIdsByInstruction.get(row.dataset.instrId ?? '');
     const color = blockId ? colorsByBlockId.get(blockId) : undefined;
+    row.classList.toggle('blockwork-wrap-ending', row.classList.contains('instruction-row-wrap') && macro.block_defs.some(def => def.id === blockId && def.shape === 'Ending'));
     if (color) {
       row.classList.add('blockwork-custom-block');
       row.style.setProperty('--blockwork-custom-block-color', color);

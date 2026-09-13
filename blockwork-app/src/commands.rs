@@ -8,6 +8,8 @@ use crate::state::{
 use blockstitch_core::editor::{
     ValueEdit, drop_strand_buffers, prune_value_buffers, retain_live_buffers,
 };
+use base64::{engine::general_purpose::STANDARD, Engine as _};
+use serde::Deserialize;
 use blockwork_core::config;
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
 use blockwork_core::input::types::InputToken;
@@ -2705,8 +2707,8 @@ mod value_location_tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            settings: blockwork_core::macros::MacroSettings::default(),
             lists: vec![],
+            settings: blockwork_core::macros::MacroSettings::default(),
         }
     }
 
@@ -3125,8 +3127,8 @@ mod value_location_tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            settings: blockwork_core::macros::MacroSettings::default(),
             lists: vec![],
+            settings: blockwork_core::macros::MacroSettings::default(),
         };
         let loc = ValueLocation::Field {
             strand_id: "s1".into(),
@@ -3378,6 +3380,7 @@ mod value_location_tests {
             instructions: vec![Instruction::new(InstructionKind::CallBlock {
                 block_id: id.clone(),
                 args: vec![Value::number(5.0)],
+                branches: vec![],
             })],
         });
         let old_pieces = mac.block_defs[0].pieces.clone();
@@ -3407,6 +3410,7 @@ mod value_location_tests {
             instructions: vec![Instruction::new(InstructionKind::CallBlock {
                 block_id: id.clone(),
                 args: vec![Value::number(1.0), Value::number(2.0)],
+                branches: vec![],
             })],
         });
         let old_pieces = mac.block_defs[0].pieces.clone();
@@ -3436,6 +3440,7 @@ mod value_location_tests {
             instructions: vec![Instruction::new(InstructionKind::CallBlock {
                 block_id: id.clone(),
                 args: vec![Value::number(5.0)],
+                branches: vec![],
             })],
         });
         let old_pieces = mac.block_defs[0].pieces.clone();
@@ -3465,6 +3470,7 @@ mod value_location_tests {
             instructions: vec![Instruction::new(InstructionKind::CallBlock {
                 block_id: id.clone(),
                 args: vec![Value::number(5.0)],
+                branches: vec![],
             })],
         });
         let old_pieces = mac.block_defs[0].pieces.clone();

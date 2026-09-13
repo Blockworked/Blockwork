@@ -5,7 +5,7 @@
 // block id, resized when inputs change) rather than a fixed Record.
 import { reactive, watch } from 'vue';
 import { state } from './store';
-import { numberValue, blockInputPieces, findBlockDef, newId } from './types';
+import { numberValue, blockBranchPieces, blockInputPieces, findBlockDef, newId } from './types';
 import type { BlockPieceDto, InstructionDto, ValueDto } from './types';
 
 export const paletteCallArgs = reactive<Record<string, ValueDto[]>>({});
@@ -45,11 +45,16 @@ function currentArgs(blockId: string): ValueDto[] {
 /** The `ValueDto` a "My Blocks" reporter prefab represents - mirrors
  * paletteState.ts's `paletteValueFor`, but for dynamic-arity `Call:<blockId>` kinds. */
 export function paletteCallValueFor(blockId: string): ValueDto {
-  return { kind: 'Call', block_id: blockId, args: currentArgs(blockId), branches: [], saved: numberValue(0) };
+  const def = findBlockDef(state.current_macro, blockId);
+  return { kind: 'Call', block_id: blockId, args: currentArgs(blockId), branches: def ? blockBranchPieces(def).map(() => []) : [], saved: numberValue(0) };
 }
 
 /** The `InstructionDto` a "My Blocks" command prefab represents -
  * counterpart to `paletteCallValueFor`, for per-block-id `CallBlock`s. */
 export function paletteCallInstructionFor(blockId: string): InstructionDto {
-  return { id: newId(), type: 'CallBlock', block_id: blockId, args: currentArgs(blockId) };
+  const def = findBlockDef(state.current_macro, blockId);
+  const branches = def ? blockBranchPieces(def) : [];
+  return branches.length
+    ? { id: newId(), type: 'BranchCallBlock', block_id: blockId, args: currentArgs(blockId), branches: branches.map(() => []) }
+    : { id: newId(), type: 'CallBlock', block_id: blockId, args: currentArgs(blockId) };
 }

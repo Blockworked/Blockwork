@@ -184,6 +184,8 @@ export type InstructionDto = { id: string } & (
   | { type: 'ReverseList'; name: string }
   | { type: 'BlockHeader'; block_id: string }
   | { type: 'CallBlock'; block_id: string; args: ValueDto[] }
+  | { type: 'BranchCallBlock'; block_id: string; args: ValueDto[]; branches: InstructionDto[][] }
+  | { type: 'RunBranch'; name: string }
   | { type: 'Return'; value: ValueDto }
   | { type: 'If'; condition: ValueDto; body: InstructionDto[] }
   | { type: 'IfElse'; condition: ValueDto; then_body: InstructionDto[]; else_body: InstructionDto[] }
@@ -230,6 +232,8 @@ export function defaultInstruction(type: InstructionType): InstructionDto {
     case 'ReverseList': return { id, type: 'ReverseList', name: '' };
     case 'BlockHeader': return { id, type: 'BlockHeader', block_id: '' };
     case 'CallBlock': return { id, type: 'CallBlock', block_id: '', args: [] };
+    case 'BranchCallBlock': return { id, type: 'BranchCallBlock', block_id: '', args: [], branches: [] };
+    case 'RunBranch': return { id, type: 'RunBranch', name: '' };
     case 'Return': return { id, type: 'Return', value: numberValue(0) };
     case 'If': return { id, type: 'If', condition: blankBoolValue(), body: [] };
     case 'IfElse': return { id, type: 'IfElse', condition: blankBoolValue(), then_body: [], else_body: [] };
@@ -327,7 +331,8 @@ export type InputValueType = 'Any' | 'Bool';
 
 export type BlockPieceDto =
   | { kind: 'Label'; id: string; text: string }
-  | { kind: 'Input'; id: string; name: string; value_type: InputValueType };
+  | { kind: 'Input'; id: string; name: string; value_type: InputValueType }
+  | { kind: 'Branch'; id: string; name: string };
 
 export type BlockShapeDto = 'Normal' | 'Ending' | 'ReturnsValue' | 'ReturnsBool';
 
@@ -347,6 +352,11 @@ export function blockInputPieces(def: BlockDefDto): Extract<BlockPieceDto, { kin
   return def.pieces.filter((p): p is Extract<BlockPieceDto, { kind: 'Input' }> => p.kind === 'Input');
 }
 
+export function blockBranchPieces(def: BlockDefDto): Extract<BlockPieceDto, { kind: 'Branch' }>[] {
+  return def.pieces.filter((p): p is Extract<BlockPieceDto, { kind: 'Branch' }> => p.kind === 'Branch');
+}
+
+/** A block's declared input names, in prototype order — see `blockInputPieces`. */
 export function blockInputNames(def: BlockDefDto): string[] {
   return blockInputPieces(def).map(p => p.name);
 }

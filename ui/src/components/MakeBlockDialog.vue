@@ -10,6 +10,7 @@ import type { ComponentPublicInstance } from 'vue';
 import { computed, nextTick, onBeforeUnmount, onMounted, reactive, ref, watch } from 'vue';
 import { Blocks, ChevronLeft, ChevronRight, Pipette, X } from 'lucide-vue-next';
 import { createBlock, editBlock } from '../tauri';
+import BranchHeaderPiece from './fields/BranchHeaderPiece.vue';
 import { blockShapeReturnsValue } from '../types';
 import type { BlockDefDto, BlockPieceDto, BlockShapeDto, InputValueType } from '../types';
 
@@ -143,8 +144,8 @@ function updateToolbarPos() {
   const anchorRect = anchor.getBoundingClientRect();
   const shapeRect = shapeEl.getBoundingClientRect();
   const pieceRect = pieceEl.getBoundingClientRect();
-  toolbarPos.left = pieceRect.left - anchorRect.left + pieceRect.width / 2;
-  toolbarPos.top = shapeRect.top - anchorRect.top;
+  toolbarPos.left = (pieceRect.left - anchorRect.left + pieceRect.width / 2) / 0.75;
+  toolbarPos.top = (shapeRect.top - anchorRect.top) / 0.75;
 }
 watch([selectedIndex, shape], () => nextTick(updateToolbarPos));
 let resizeObserver: ResizeObserver | null = null;
@@ -180,7 +181,7 @@ function onCanvasPointerDown(e: PointerEvent) {
   // piece selection/editing and the toolbar buttons keep working. Middle
   // click always pans, even over the block.
   const target = e.target as HTMLElement;
-  if (e.button === 0 && target.closest('.instruction-shape, .value-card-shape, .make-block-piece-toolbar')) return;
+  if (e.button === 0 && target.closest('.instruction-row, .value-block, .make-block-piece-toolbar, input, button')) return;
   const canvas = canvasEl.value;
   if (!canvas) return;
   if (e.button === 1) {
@@ -223,6 +224,11 @@ onBeforeUnmount(() => document.removeEventListener('paste', onCanvasPaste, true)
 // input's default name doesn't collide with an existing "valueN" (which
 // would otherwise immediately trip the uniqueness check on OK).
 let nextInputSeq = pieces.filter(p => p.kind === 'Input').length + 1;
+let nextBranchSeq = 1;
+function newBranchName(): string {
+  while (pieces.some(piece => piece.kind === 'Branch' && piece.name === `branch${nextBranchSeq}`)) nextBranchSeq++;
+  return `branch${nextBranchSeq++}`;
+}
 
 function pieceText(piece: BlockPieceDto): string {
   return piece.kind === 'Label' ? (piece.text || '(label)') : piece.name;
@@ -236,19 +242,48 @@ function isBoolPiece(piece: BlockPieceDto): boolean {
   return piece.kind === 'Input' && piece.value_type === 'Bool';
 }
 
+const branchIndexes = computed(() => pieces.flatMap((piece, index) => piece.kind === 'Branch' ? [index] : []));
+const hasBranches = computed(() => branchIndexes.value.length > 0);
+const firstBranchIndex = computed(() => branchIndexes.value[0] ?? -1);
+function separatorIndex(branchOrdinal: number): number | null {
+  const branchIndex = branchIndexes.value[branchOrdinal];
+  const nextBranch = branchIndexes.value[branchOrdinal + 1];
+  if (branchIndex === undefined || nextBranch === undefined) return null;
+  for (let i = branchIndex + 1; i < nextBranch; i++) {
+    if (pieces[i].kind === 'Label') return i;
+  }
+  return null;
+}
+function separatorText(branchOrdinal: number): string {
+  const index = separatorIndex(branchOrdinal);
+  const piece = index === null ? null : pieces[index];
+  return piece?.kind === 'Label' ? piece.text : '';
+}
+
+function updateSeparator(branchOrdinal: number, event: Event) {
+  let index = separatorIndex(branchOrdinal);
+  if (index === null) {
+    commitEditing();
+    index = branchIndexes.value[branchOrdinal] + 1;
+    pieces.splice(index, 0, { kind: 'Label', id: newPieceId(), text: '' });
+  }
+  const piece = pieces[index];
+  if (piece.kind === 'Label') piece.text = (event.target as HTMLInputElement).value;
+}
+
 function startEditing(i: number) {
+  if (editingIndex.value !== null && editingIndex.value !== i) commitEditing();
   const piece = pieces[i];
   editingIndex.value = i;
   selectedIndex.value = i;
   editingText.value = piece.kind === 'Label' ? piece.text : piece.name;
+  nextTick(() => {
+    const input = previewAnchorEl.value?.querySelector<HTMLInputElement>('.make-block-piece-input-el');
+    input?.focus();
+    input?.select();
+  });
 }
 
-watch(editingIndex, async i => {
-  if (i === null) return;
-  await nextTick();
-  editInputEl.value?.focus();
-  editInputEl.value?.select();
-});
 
 // Fresh "Make a Block" opens with the block-name piece already selected and
 // ready to type over, since it's the one field every block needs. Editing an
@@ -256,6 +291,12 @@ watch(editingIndex, async i => {
 // nothing should jump into rename mode just from opening the dialog.
 onMounted(() => {
   if (!props.editTarget) startEditing(0);
+  nextTick(() => {
+    const canvas = canvasEl.value;
+    if (!canvas) return;
+    canvas.scrollLeft = (canvas.scrollWidth - canvas.clientWidth) / 2;
+    canvas.scrollTop = 240;
+  });
 });
 
 function commitEditing() {
@@ -270,13 +311,22 @@ function commitEditing() {
   editingIndex.value = null;
 }
 
-function addPiece(kind: 'Label' | 'Input', valueType: InputValueType = 'Any') {
+function addPiece(kind: 'Label' | 'Input' | 'Branch', valueType: InputValueType = 'Any') {
+  commitEditing();
+  // A label between two callback mouths is distinct from either callback's
+  // name. Seed it blank when a second (or later) branch is added so users can
+  // click the mid-bar in the preview and type their own "else"-style text.
+  if (kind === 'Branch' && hasBranches.value) {
+    pieces.push({ kind: 'Label', id: newPieceId(), text: '' });
+  }
   const piece: BlockPieceDto =
     kind === 'Label'
       ? { kind: 'Label', id: newPieceId(), text: 'label' }
-      : { kind: 'Input', id: newPieceId(), name: `value${nextInputSeq++}`, value_type: valueType };
-  pieces.push(piece);
-  const index = pieces.length - 1;
+      : kind === 'Branch'
+        ? { kind: 'Branch', id: newPieceId(), name: newBranchName() }
+        : { kind: 'Input', id: newPieceId(), name: `value${nextInputSeq++}`, value_type: valueType };
+  const index = kind === 'Label' && hasBranches.value ? firstBranchIndex.value : pieces.length;
+  pieces.splice(index, 0, piece);
   // Newly-added pieces land pre-selected and already in rename mode, matching
   // "click the name to edit it" for every other piece, so typing can start
   // immediately instead of requiring a click on the placeholder text first.
@@ -304,13 +354,13 @@ async function onOk() {
     error.value = 'Give the block a name';
     return;
   }
-  const inputNames = pieces.filter((p): p is Extract<BlockPieceDto, { kind: 'Input' }> => p.kind === 'Input').map(p => p.name.trim());
-  if (inputNames.some(n => !n)) {
-    error.value = 'Every input needs a name';
+  const namedPieceNames = pieces.filter((p): p is Extract<BlockPieceDto, { kind: 'Input' | 'Branch' }> => p.kind !== 'Label').map(p => p.name.trim());
+  if (namedPieceNames.some(n => !n)) {
+    error.value = 'Every input and branch needs a name';
     return;
   }
-  if (new Set(inputNames).size !== inputNames.length) {
-    error.value = 'Input names must be unique';
+  if (new Set(namedPieceNames).size !== namedPieceNames.length) {
+    error.value = 'Input and branch names must be unique';
     return;
   }
   submitting.value = true;
@@ -356,6 +406,7 @@ function onCancel() {
           @pointercancel="endPan"
         >
           <div class="make-block-preview-anchor" ref="previewAnchorEl">
+            <div :class="hasBranches && isValueMode ? ['value-block', 'blockwork-custom-value-block', 'blockwork-branch-reporter', shape === 'ReturnsBool' ? 'value-card-shape-bool' : 'value-card-shape'] : undefined" :style="{ '--blockwork-custom-block-color': color }">
             <div
               v-if="selectedIndex !== null"
               class="make-block-piece-toolbar"
@@ -379,7 +430,7 @@ function onCancel() {
             </div>
 
             <span
-              v-if="isValueMode"
+              v-if="isValueMode && !hasBranches"
               class="value-block"
               :class="[shape === 'ReturnsBool' ? 'value-card-shape-bool' : 'value-card-shape', 'blockwork-custom-value-block']"
               :style="{ '--blockwork-custom-block-color': color }"
@@ -390,7 +441,7 @@ function onCancel() {
                 <span
                   class="make-block-piece"
                   :ref="(el) => setPieceEl(i, el)"
-                  :class="{ 'make-block-piece-input': piece.kind === 'Input' && !isBoolPiece(piece), 'make-block-piece-bool': isBoolPiece(piece), 'make-block-piece-selected': selectedIndex === i }"
+                :class="{ 'make-block-piece-input': piece.kind === 'Input' && !isBoolPiece(piece), 'make-block-piece-bool': isBoolPiece(piece), 'make-block-piece-branch': piece.kind === 'Branch', 'make-block-piece-selected': selectedIndex === i }"
                 >
                   <span class="make-block-piece-field">
                     <span
@@ -414,6 +465,58 @@ function onCancel() {
             </span>
 
             <div
+              v-else-if="hasBranches"
+              class="instruction-row instruction-row-wrap blockwork-custom-block make-block-branch-preview"
+              :class="{ 'blockwork-wrap-ending': shape === 'Ending' }"
+              :style="{ '--blockwork-custom-block-color': color }"
+              ref="previewShapeEl"
+            >
+              <div class="wrap-head-line">
+                <Blocks class="instruction-type-icon-inline" />
+                <template v-for="(piece, i) in pieces" :key="piece.id">
+                  <span
+                    v-if="i < firstBranchIndex || piece.kind === 'Input'"
+                    class="make-block-piece"
+                    :ref="(el) => setPieceEl(i, el)"
+                    :class="{ 'make-block-piece-input': piece.kind === 'Input' && !isBoolPiece(piece), 'make-block-piece-bool': isBoolPiece(piece), 'make-block-piece-selected': selectedIndex === i }"
+                  >
+                    <span class="make-block-piece-field">
+                      <span class="make-block-piece-text" :class="{ 'make-block-piece-text-hidden': editingIndex === i }" @click="startEditing(i)">{{ editingIndex === i ? editingText || ' ' : pieceText(piece) }}</span>
+                      <input v-if="editingIndex === i" :ref="(el) => (editInputEl = el as HTMLInputElement | null)" type="text" class="make-block-piece-input-el" v-model="editingText" @blur="commitEditing" @keydown.enter="commitEditing" @keydown.esc="editingIndex = null" />
+                    </span>
+                  </span>
+                </template>
+              </div>
+              <template v-for="(branchIndex, branchOrdinal) in branchIndexes" :key="pieces[branchIndex].id">
+                <div v-if="branchOrdinal > 0" class="wrap-mid-bar">
+                  <span class="make-block-bar-label-field">
+                  <span class="make-block-bar-label-measure" aria-hidden="true">{{ separatorText(branchOrdinal - 1) || 'Add label' }}</span>
+                  <input
+                    class="make-block-bar-label"
+                    type="text"
+                    :aria-label="`Label between branches ${branchOrdinal} and ${branchOrdinal + 1}`"
+                    placeholder="Add label"
+                    :value="separatorText(branchOrdinal - 1)"
+                    @pointerdown.stop
+                    @input="updateSeparator(branchOrdinal - 1, $event)"
+                  />
+                  </span>
+                </div>
+                <div class="wrap-mouth make-block-branch-mouth">
+                  <BranchHeaderPiece block-id="" :name="pieceText(pieces[branchIndex])" :color="color" editable>
+                    <span class="make-block-piece" :ref="el => setPieceEl(branchIndex, el)" :class="{ 'make-block-piece-selected': selectedIndex === branchIndex }">
+                      <span class="make-block-piece-field">
+                        <span class="make-block-piece-text" :class="{ 'make-block-piece-text-hidden': editingIndex === branchIndex }" @click="startEditing(branchIndex)">{{ editingIndex === branchIndex ? editingText || ' ' : pieceText(pieces[branchIndex]) }}</span>
+                        <input v-if="editingIndex === branchIndex" type="text" class="make-block-piece-input-el" v-model="editingText" @blur="commitEditing" @keydown.enter="commitEditing" @keydown.esc="editingIndex = null" />
+                      </span>
+                    </span>
+                  </BranchHeaderPiece>
+                </div>
+              </template>
+              <div class="wrap-foot-bar" />
+            </div>
+
+            <div
               v-else
               class="instruction-row blockwork-custom-block"
               :class="{ 'instruction-row-cap': shape === 'Ending' }"
@@ -426,7 +529,7 @@ function onCancel() {
                     <span
                       class="make-block-piece"
                       :ref="(el) => setPieceEl(i, el)"
-                      :class="{ 'make-block-piece-input': piece.kind === 'Input' && !isBoolPiece(piece), 'make-block-piece-bool': isBoolPiece(piece), 'make-block-piece-selected': selectedIndex === i }"
+                      :class="{ 'make-block-piece-input': piece.kind === 'Input' && !isBoolPiece(piece), 'make-block-piece-bool': isBoolPiece(piece), 'make-block-piece-branch': piece.kind === 'Branch', 'make-block-piece-selected': selectedIndex === i }"
                     >
                       <span class="make-block-piece-field">
                         <span
@@ -449,6 +552,7 @@ function onCancel() {
                   </template>
                 </div>
               </div>
+            </div>
             </div>
           </div>
         </div>
@@ -509,6 +613,13 @@ function onCancel() {
             <span class="make-block-add-text">
               <span class="make-block-add-title">Add an input</span>
               <span class="make-block-add-sub">boolean</span>
+            </span>
+          </button>
+          <button type="button" class="make-block-add-btn" @click="addPiece('Branch')">
+            <span class="make-block-add-preview make-block-add-preview-branch">⌞</span>
+            <span class="make-block-add-text">
+              <span class="make-block-add-title">Add an input</span>
+              <span class="make-block-add-sub">branch</span>
             </span>
           </button>
           <button type="button" class="make-block-add-btn" @click="addPiece('Label')">

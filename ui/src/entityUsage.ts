@@ -49,6 +49,7 @@ function instructionUsesVariable(instruction: InstructionDto, name: string): boo
     case 'InsertIntoList': return valueUsesVariable(instruction.value, name) || valueUsesVariable(instruction.index, name);
     case 'ReplaceItemOfList': return valueUsesVariable(instruction.index, name) || valueUsesVariable(instruction.value, name);
     case 'CallBlock': return instruction.args.some(arg => valueUsesVariable(arg, name));
+    case 'BranchCallBlock': return instruction.args.some(arg => valueUsesVariable(arg, name)) || instruction.branches.some(branch => instructionsUseVariable(branch, name));
     case 'If': return valueUsesVariable(instruction.condition, name) || instructionsUseVariable(instruction.body, name);
     case 'IfElse': return valueUsesVariable(instruction.condition, name) || instructionsUseVariable(instruction.then_body, name) || instructionsUseVariable(instruction.else_body, name);
     case 'Repeat': return valueUsesVariable(instruction.count, name) || instructionsUseVariable(instruction.body, name);
@@ -72,6 +73,7 @@ function instructionUsesList(instruction: InstructionDto, name: string): boolean
     case 'MoveMouse': return valueUsesList(instruction.x, name) || valueUsesList(instruction.y, name);
     case 'Scroll': return valueUsesList(instruction.amount, name);
     case 'CallBlock': return instruction.args.some(arg => valueUsesList(arg, name));
+    case 'BranchCallBlock': return instruction.args.some(arg => valueUsesList(arg, name)) || instruction.branches.some(branch => instructionsUseList(branch, name));
     case 'If': return valueUsesList(instruction.condition, name) || instructionsUseList(instruction.body, name);
     case 'IfElse': return valueUsesList(instruction.condition, name) || instructionsUseList(instruction.then_body, name) || instructionsUseList(instruction.else_body, name);
     case 'Repeat': return valueUsesList(instruction.count, name) || instructionsUseList(instruction.body, name);
