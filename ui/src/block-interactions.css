@@ -1,0 +1,11 @@
+/* Inline dropdowns sit inside draggable canvas blocks. The shared button
+   hover style lifts them by one pixel, which moves their hit area out from
+   beneath a pointer resting on the bottom edge. That repeatedly alternates
+   between the dropdown's pointer cursor and the block's grab cursor. Keep
+   these embedded controls stationary while preserving the regular button
+   hover effect everywhere else. */
+.instruction-shape .dd-trigger:hover:not(:disabled),
+.value-card-shape .dd-trigger:hover:not(:disabled),
+.value-card-shape-bool .dd-trigger:hover:not(:disabled) {
+  transform: none;
+}

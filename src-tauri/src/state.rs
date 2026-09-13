@@ -9,7 +9,7 @@ use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::thread_pool::ThreadPool;
 use blockwork_core::macros::{
     BlockDef, BlockPiece, BlockShape, Comment, FloatingValue, InputValueType, Instruction,
-    InstructionKind, Macro, MacroSettings, Strand, default_block_color,
+    InstructionKind, Macro, MacroSettings, Strand, VariableDef, default_block_color,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -141,14 +141,15 @@ pub(crate) enum KeyCaptureTarget {
     Standalone,
 }
 
-/// One undo/redo checkpoint — everything a "structural" edit command can
-/// change: the strand list and the floating value blocks parked on canvas.
+/// One undo/redo checkpoint — the structural macro state, including declared
+/// variables for renames.
 #[derive(Debug, Clone)]
 pub(crate) struct MacroSnapshot {
     pub(crate) strands: Vec<Strand>,
     pub(crate) floating_values: Vec<FloatingValue>,
     pub(crate) comments: Vec<Comment>,
     pub(crate) block_defs: Vec<BlockDef>,
+    pub(crate) variables: Vec<VariableDef>,
 }
 
 pub(crate) struct AppState {

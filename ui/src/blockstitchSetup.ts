@@ -266,6 +266,10 @@ function buildCanvasHost(): CanvasHost<InstructionDto> {
     onPaletteValueContextMenu: (e, kind) => openPaletteValueMenu(e, kind),
     onValueContextMenu: (e, _location, value) => openValueMenu(e, value as ValueDto),
     resolveCallPieces: blockId => findBlockDef(state.current_macro, blockId)?.pieces.map(p => (p.kind === 'Label' ? { kind: 'Label', text: p.text } : { kind: 'Input' })),
+    floatingValueColor: floatingValue =>
+      floatingValue.value.kind === 'Call'
+        ? findBlockDef(state.current_macro, floatingValue.value.block_id)?.color
+        : undefined,
     paramIsBool: (location, name) => {
       const pieceIsBool = (blockId: string) => {
         const piece = findBlockDef(state.current_macro, blockId)?.pieces.find(p => p.kind === 'Input' && p.name === name);

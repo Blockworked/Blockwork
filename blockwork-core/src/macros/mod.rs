@@ -837,6 +837,7 @@ impl From<MacroDe> for Macro {
                 ins.migrate_bool_slots();
             }
         }
+        mac.migrate_custom_block_bool_args();
         for fv in mac.floating_values.iter_mut() {
             fv.value.migrate_bool_slots(false);
         }
@@ -853,6 +854,64 @@ impl From<MacroDe> for Macro {
 }
 
 impl Macro {
+    /// Repairs legacy numeric blanks at `CallBlock` argument positions whose
+    /// declared custom-block input is Boolean. Unlike built-in `If`/`While`
+    /// slots, the expected type lives in the referenced `BlockDef`, so the
+    /// generic `InstructionKind::migrate_bool_slots` cannot determine it on
+    /// its own.
+    fn migrate_custom_block_bool_args(&mut self) {
+        let boolean_inputs: HashMap<String, Vec<bool>> = self
+            .block_defs
+            .iter()
+            .map(|definition| {
+                let inputs = definition
+                    .pieces
+                    .iter()
+                    .filter_map(|piece| match piece {
+                        BlockPiece::Input { value_type, .. } => {
+                            Some(*value_type == InputValueType::Bool)
+                        }
+                        BlockPiece::Label { .. } => None,
+                    })
+                    .collect();
+                (definition.id.clone(), inputs)
+            })
+            .collect();
+
+        fn repair(instructions: &mut [Instruction], boolean_inputs: &HashMap<String, Vec<bool>>) {
+            for instruction in instructions {
+                match &mut instruction.kind {
+                    InstructionKind::CallBlock { block_id, args } => {
+                        if let Some(expected) = boolean_inputs.get(block_id) {
+                            for (arg, expects_bool) in args.iter_mut().zip(expected) {
+                                if *expects_bool {
+                                    arg.migrate_bool_slots(true);
+                                }
+                            }
+                        }
+                    }
+                    InstructionKind::If { body, .. }
+                    | InstructionKind::Repeat { body, .. }
+                    | InstructionKind::Forever { body }
+                    | InstructionKind::While { body, .. } => repair(body, boolean_inputs),
+                    InstructionKind::IfElse {
+                        then_body,
+                        else_body,
+                        ..
+                    } => {
+                        repair(then_body, boolean_inputs);
+                        repair(else_body, boolean_inputs);
+                    }
+                    _ => {}
+                }
+            }
+        }
+
+        for strand in &mut self.strands {
+            repair(&mut strand.instructions, &boolean_inputs);
+        }
+    }
+
     pub fn new(name: String, description: String, mut code: Vec<Instruction>) -> Self {
         code.insert(0, Instruction::new(InstructionKind::WhenRan));
         let strand = Strand {
@@ -1918,6 +1977,30 @@ mod tests {
             }
             other => panic!("expected If(And(..)), got {other:?}"),
         }
+    }
+
+    #[test]
+    fn migrate_bool_slots_repairs_custom_block_boolean_arguments() {
+        // The Boolean type of a custom-block argument lives in its
+        // definition, not at the call site. A prior drag-out bug saved a zero
+        // here, so loading must recover the blank hexagon from that type.
+        let json = r#"{"id":"m1","name":"Old","description":"","strands":[
+            {"id":"root","x":0,"y":0,"instructions":[{"CallBlock":{
+                "block_id":"b1","args":[{"kind":"Number","value":0.0}]
+            }}]}
+        ],"block_defs":[{"id":"b1","pieces":[
+            {"kind":"Input","id":"i1","name":"flag","value_type":"Bool"}
+        ],"shape":"Normal"}]}"#;
+        let mac: Macro = serde_json::from_str(json).unwrap();
+        let args = mac.strands[0]
+            .instructions
+            .iter()
+            .find_map(|instruction| match &instruction.kind {
+                InstructionKind::CallBlock { args, .. } => Some(args),
+                _ => None,
+            })
+            .expect("expected CallBlock");
+        assert_eq!(args, &vec![Value::Bool]);
     }
 
     #[test]

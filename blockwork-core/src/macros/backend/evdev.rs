@@ -223,10 +223,23 @@ impl InputBackend for EvdevBackend {
     }
 
     fn text(&mut self, s: &str) -> Result<(), String> {
-        for c in s.chars() {
+        // Unlike Windows/macOS (which go through enigo's own text-injection
+        // APIs), this backend synthesizes each character as a plain
+        // press/release on the uinput virtual device. Emitted back-to-back
+        // with no gap, X11/Wayland consumers - browsers especially - can
+        // coalesce or drop keystrokes that arrive faster than they can be
+        // processed (the same reason tools like xdotool/ydotool default to
+        // a non-zero per-character delay). A small delay between characters
+        // keeps typing reliable without being noticeably slow.
+        const INTER_CHAR_DELAY: std::time::Duration = std::time::Duration::from_micros(500);
+        let mut chars = s.chars().peekable();
+        while let Some(c) = chars.next() {
             match char_to_evdev(c) {
                 Some((key, needs_shift)) => emit_key_click(key, needs_shift)?,
                 None => warn!("no evdev mapping for char {:?}, skipping", c),
+            }
+            if chars.peek().is_some() {
+                std::thread::sleep(INTER_CHAR_DELAY);
             }
         }
         Ok(())

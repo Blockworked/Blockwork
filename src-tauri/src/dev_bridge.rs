@@ -584,6 +584,7 @@ async fn invoke_handler(
         }
         "open_settings" => call!(commands::open_settings(state, app)),
         "close_settings" => call!(commands::close_settings(state, app)),
+        "reset_zoom" => call!(commands::reset_zoom(app)),
         "start_combo_capture" => {
             let action: HotkeyActionDto = match field(&body, "action") {
                 Ok(v) => v,
