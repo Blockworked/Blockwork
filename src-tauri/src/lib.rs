@@ -55,8 +55,15 @@ pub fn run() {
         )
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
-                let close_to_tray = window.state::<SharedState>().lock().map(|s| s.close_to_tray).unwrap_or(false);
-                if close_to_tray {
+                let close_main_to_tray = window
+                    .state::<SharedState>()
+                    .lock()
+                    .map(|s| {
+                        s.close_to_tray
+                            && s.main_window_label.as_deref() == Some(window.label())
+                    })
+                    .unwrap_or(false);
+                if close_main_to_tray {
                     api.prevent_close();
                     if tauri_runtime_cef::is_wayland() {
                         // `window.hide()` is a no-op under Wayland (winit has no
@@ -360,6 +367,11 @@ pub fn run() {
             commands::check_for_updates,
             commands::apply_update,
             commands::list_installed_apps,
+            commands::start_element_picker,
+            commands::close_element_picker,
+            commands::element_picker_geometry,
+            commands::reset_element_picker_zoom,
+            commands::hit_test_element_at,
         ])
         .build(tauri::generate_context!())
         .expect("error while running tauri application")

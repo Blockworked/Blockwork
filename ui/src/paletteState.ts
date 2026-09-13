@@ -9,10 +9,12 @@ import { OPERATOR_KINDS, specForKind } from './valueOps';
 import type { OperatorKindSpec, OperatorValueKind } from './valueOps';
 
 const INSTRUCTION_TYPES: InstructionType[] = [
-  'WhenRan', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged', 'WhenClipboardChanged', 'Wait', 'Text', 'Key', 'Button', 'MoveMouse', 'Scroll', 'Command', 'OpenApp', 'CloseApp',
+  'WhenRan', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged', 'WhenClipboardChanged', 'Wait', 'WaitUntil', 'Text', 'Key', 'Button', 'MoveMouse', 'Scroll', 'Command', 'OpenApp', 'CloseApp',
   'SetVariable', 'ChangeVariable', 'SetClipboard', 'Return', 'If', 'IfElse',
   'AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList',
   'Repeat', 'Forever', 'While', 'EscapeLoop', 'ContinueLoop',
+  'FocusWindow', 'MinimizeWindow', 'MaximizeWindow', 'MoveWindow',
+  'ClickElement', 'SetElementValue', 'SendKeyToWindow', 'TypeTextInWindow',
 ];
 
 export const paletteInstructions: Record<InstructionType, InstructionDto> = reactive(

@@ -1,7 +1,7 @@
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
 use blockwork_core::input::schedule::TimeSchedule;
 use blockwork_core::input::types::{
-    Axis, Coordinate, Direction, InputToken, MacroButton, MacroKey,
+    Axis, Coordinate, Direction, ElementScope, InputToken, MacroButton, MacroKey,
 };
 use blockwork_core::input::value::{Evaluated, Op, Value};
 use blockwork_core::input::{get_mouse_button_names, key_to_string, mouse_button_to_index};
@@ -63,6 +63,30 @@ pub(crate) enum FieldId {
     BatteryDischargeThreshold,
     /// `WhenBatteryChargedTo`'s battery-percentage threshold.
     BatteryChargeThreshold,
+    FocusWindowApp,
+    FocusWindowTitle,
+    MinimizeWindowApp,
+    MinimizeWindowTitle,
+    MaximizeWindowApp,
+    MaximizeWindowTitle,
+    MoveWindowApp,
+    MoveWindowTitle,
+    MoveWindowX,
+    MoveWindowY,
+    ClickElementApp,
+    ClickElementTitle,
+    ClickElementName,
+    ClickElementRole,
+    SetElementValueApp,
+    SetElementValueTitle,
+    SetElementValueName,
+    SetElementValueRole,
+    SetElementValueValue,
+    SendKeyToWindowApp,
+    SendKeyToWindowTitle,
+    TypeTextInWindowApp,
+    TypeTextInWindowTitle,
+    TypeTextInWindowText,
 }
 
 impl std::fmt::Display for FieldId {
@@ -89,6 +113,30 @@ impl std::fmt::Display for FieldId {
             FieldId::RepeatCount => write!(f, "RepeatCount"),
             FieldId::BatteryDischargeThreshold => write!(f, "BatteryDischargeThreshold"),
             FieldId::BatteryChargeThreshold => write!(f, "BatteryChargeThreshold"),
+            FieldId::FocusWindowApp => write!(f, "FocusWindowApp"),
+            FieldId::FocusWindowTitle => write!(f, "FocusWindowTitle"),
+            FieldId::MinimizeWindowApp => write!(f, "MinimizeWindowApp"),
+            FieldId::MinimizeWindowTitle => write!(f, "MinimizeWindowTitle"),
+            FieldId::MaximizeWindowApp => write!(f, "MaximizeWindowApp"),
+            FieldId::MaximizeWindowTitle => write!(f, "MaximizeWindowTitle"),
+            FieldId::MoveWindowApp => write!(f, "MoveWindowApp"),
+            FieldId::MoveWindowTitle => write!(f, "MoveWindowTitle"),
+            FieldId::MoveWindowX => write!(f, "MoveWindowX"),
+            FieldId::MoveWindowY => write!(f, "MoveWindowY"),
+            FieldId::ClickElementApp => write!(f, "ClickElementApp"),
+            FieldId::ClickElementTitle => write!(f, "ClickElementTitle"),
+            FieldId::ClickElementName => write!(f, "ClickElementName"),
+            FieldId::ClickElementRole => write!(f, "ClickElementRole"),
+            FieldId::SetElementValueApp => write!(f, "SetElementValueApp"),
+            FieldId::SetElementValueTitle => write!(f, "SetElementValueTitle"),
+            FieldId::SetElementValueName => write!(f, "SetElementValueName"),
+            FieldId::SetElementValueRole => write!(f, "SetElementValueRole"),
+            FieldId::SetElementValueValue => write!(f, "SetElementValueValue"),
+            FieldId::SendKeyToWindowApp => write!(f, "SendKeyToWindowApp"),
+            FieldId::SendKeyToWindowTitle => write!(f, "SendKeyToWindowTitle"),
+            FieldId::TypeTextInWindowApp => write!(f, "TypeTextInWindowApp"),
+            FieldId::TypeTextInWindowTitle => write!(f, "TypeTextInWindowTitle"),
+            FieldId::TypeTextInWindowText => write!(f, "TypeTextInWindowText"),
         }
     }
 }
@@ -117,6 +165,30 @@ impl std::str::FromStr for FieldId {
             "RepeatCount" => Ok(FieldId::RepeatCount),
             "BatteryDischargeThreshold" => Ok(FieldId::BatteryDischargeThreshold),
             "BatteryChargeThreshold" => Ok(FieldId::BatteryChargeThreshold),
+            "FocusWindowApp" => Ok(FieldId::FocusWindowApp),
+            "FocusWindowTitle" => Ok(FieldId::FocusWindowTitle),
+            "MinimizeWindowApp" => Ok(FieldId::MinimizeWindowApp),
+            "MinimizeWindowTitle" => Ok(FieldId::MinimizeWindowTitle),
+            "MaximizeWindowApp" => Ok(FieldId::MaximizeWindowApp),
+            "MaximizeWindowTitle" => Ok(FieldId::MaximizeWindowTitle),
+            "MoveWindowApp" => Ok(FieldId::MoveWindowApp),
+            "MoveWindowTitle" => Ok(FieldId::MoveWindowTitle),
+            "MoveWindowX" => Ok(FieldId::MoveWindowX),
+            "MoveWindowY" => Ok(FieldId::MoveWindowY),
+            "ClickElementApp" => Ok(FieldId::ClickElementApp),
+            "ClickElementTitle" => Ok(FieldId::ClickElementTitle),
+            "ClickElementName" => Ok(FieldId::ClickElementName),
+            "ClickElementRole" => Ok(FieldId::ClickElementRole),
+            "SetElementValueApp" => Ok(FieldId::SetElementValueApp),
+            "SetElementValueTitle" => Ok(FieldId::SetElementValueTitle),
+            "SetElementValueName" => Ok(FieldId::SetElementValueName),
+            "SetElementValueRole" => Ok(FieldId::SetElementValueRole),
+            "SetElementValueValue" => Ok(FieldId::SetElementValueValue),
+            "SendKeyToWindowApp" => Ok(FieldId::SendKeyToWindowApp),
+            "SendKeyToWindowTitle" => Ok(FieldId::SendKeyToWindowTitle),
+            "TypeTextInWindowApp" => Ok(FieldId::TypeTextInWindowApp),
+            "TypeTextInWindowTitle" => Ok(FieldId::TypeTextInWindowTitle),
+            "TypeTextInWindowText" => Ok(FieldId::TypeTextInWindowText),
             _ if s.starts_with("CallArg:") => s["CallArg:".len()..]
                 .parse::<usize>()
                 .map(FieldId::CallArg)
@@ -808,6 +880,68 @@ pub(crate) enum InstructionDto {
     ContinueLoop {
         id: String,
     },
+    WaitUntil {
+        id: String,
+        condition: ValueDto,
+    },
+    FocusWindow {
+        id: String,
+        scope: String,
+        app: ValueDto,
+        title_contains: ValueDto,
+    },
+    MinimizeWindow {
+        id: String,
+        scope: String,
+        app: ValueDto,
+        title_contains: ValueDto,
+    },
+    MaximizeWindow {
+        id: String,
+        scope: String,
+        app: ValueDto,
+        title_contains: ValueDto,
+    },
+    MoveWindow {
+        id: String,
+        scope: String,
+        app: ValueDto,
+        title_contains: ValueDto,
+        x: ValueDto,
+        y: ValueDto,
+    },
+    ClickElement {
+        id: String,
+        scope: String,
+        app: ValueDto,
+        title_contains: ValueDto,
+        name: ValueDto,
+        role: ValueDto,
+    },
+    SetElementValue {
+        id: String,
+        scope: String,
+        app: ValueDto,
+        title_contains: ValueDto,
+        name: ValueDto,
+        role: ValueDto,
+        value: ValueDto,
+    },
+    SendKeyToWindow {
+        id: String,
+        scope: String,
+        app: ValueDto,
+        title_contains: ValueDto,
+        key: String,
+        modifiers: u8,
+    },
+    TypeTextInWindow {
+        id: String,
+        scope: String,
+        app: ValueDto,
+        title_contains: ValueDto,
+        text: ValueDto,
+    },
 }
 
 /// A floating/attached note — see `blockwork_core::macros::Comment`.
@@ -829,6 +963,97 @@ pub(crate) struct AppEntryDto {
     pub(crate) name: String,
     pub(crate) command: String,
     pub(crate) icon: Option<String>,
+}
+
+/// Wire shape of `blockwork_core::window::WindowAtPoint` — the element
+/// picker overlay hands this back on its next hover-hit-test call as a
+/// cache hint (see `blockwork_core::accessibility::element_at_point`'s doc
+/// comment), so it round-trips through the frontend as plain JSON rather
+/// than staying a Rust-only value between calls.
+#[derive(Serialize, Deserialize, Clone)]
+pub(crate) struct WindowAtPointDto {
+    pub(crate) app: String,
+    pub(crate) title: String,
+    pub(crate) x: i32,
+    pub(crate) y: i32,
+    pub(crate) width: i32,
+    pub(crate) height: i32,
+}
+
+impl From<blockwork_core::window::WindowAtPoint> for WindowAtPointDto {
+    fn from(w: blockwork_core::window::WindowAtPoint) -> Self {
+        Self { app: w.app, title: w.title, x: w.x, y: w.y, width: w.width, height: w.height }
+    }
+}
+
+impl From<WindowAtPointDto> for blockwork_core::window::WindowAtPoint {
+    fn from(w: WindowAtPointDto) -> Self {
+        Self { app: w.app, title: w.title, x: w.x, y: w.y, width: w.width, height: w.height }
+    }
+}
+
+/// Wire shape of `blockwork_core::accessibility::PickedElement` — the
+/// element-picker overlay's hover-hit-test result, and the shape the main
+/// window's "element-picked" event payload uses to fill in a block's fields.
+#[derive(Serialize, Clone)]
+pub(crate) struct PickedElementDto {
+    pub(crate) app: String,
+    pub(crate) window_title: String,
+    pub(crate) name: String,
+    pub(crate) role: String,
+    pub(crate) x: i32,
+    pub(crate) y: i32,
+    pub(crate) width: i32,
+    pub(crate) height: i32,
+    pub(crate) window: WindowAtPointDto,
+}
+
+impl From<blockwork_core::accessibility::PickedElement> for PickedElementDto {
+    fn from(p: blockwork_core::accessibility::PickedElement) -> Self {
+        Self {
+            app: p.app,
+            window_title: p.window_title,
+            name: p.name,
+            role: p.role,
+            x: p.x,
+            y: p.y,
+            width: p.width,
+            height: p.height,
+            window: p.window.into(),
+        }
+    }
+}
+
+/// One monitor's rectangle in the desktop's logical-pixel space, with the
+/// scale factor needed to map the picker overlay's own CSS pixels to it —
+/// see `ElementPickerGeometryDto`. Logical (not physical) because KWin's
+/// `frameGeometry` and every other coordinate the picker trades in are
+/// logical; fractional values are real (observed live under fractional
+/// display scaling), hence `f64`.
+#[derive(Serialize, Clone)]
+pub(crate) struct ElementPickerMonitorDto {
+    pub(crate) x: f64,
+    pub(crate) y: f64,
+    pub(crate) width: f64,
+    pub(crate) height: f64,
+    pub(crate) scale: f64,
+}
+
+/// The coordinate system the "pick from screen" overlay lives in: the union
+/// of all monitors in logical pixels (what `start_element_picker` sized the
+/// window to) plus each monitor's rect/scale. The overlay fetches this via
+/// `element_picker_geometry` instead of guessing its own screen origin from
+/// `outerPosition()` (unavailable/unreliable on Wayland) and instead of
+/// assuming one scale factor across a mixed-DPI desktop (this machine runs
+/// 1.5× and 2× side by side — a single global scale maps one monitor's
+/// cursor positions wrong by the scale ratio).
+#[derive(Serialize, Clone)]
+pub(crate) struct ElementPickerGeometryDto {
+    pub(crate) origin_x: f64,
+    pub(crate) origin_y: f64,
+    pub(crate) width: f64,
+    pub(crate) height: f64,
+    pub(crate) monitors: Vec<ElementPickerMonitorDto>,
 }
 
 #[derive(Serialize, Clone)]
@@ -920,6 +1145,22 @@ fn str_to_coordinate(s: &str) -> Coordinate {
     match s {
         "Relative" => Coordinate::Rel,
         _ => Coordinate::Abs,
+    }
+}
+
+fn element_scope_to_str(s: &ElementScope) -> &'static str {
+    match s {
+        ElementScope::Focused => "Focused Window",
+        ElementScope::App => "Specific App",
+        ElementScope::Window => "Specific Window",
+    }
+}
+
+fn str_to_element_scope(s: &str) -> ElementScope {
+    match s {
+        "Specific App" => ElementScope::App,
+        "Specific Window" => ElementScope::Window,
+        _ => ElementScope::Focused,
     }
 }
 
@@ -1162,6 +1403,68 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         },
         InstructionKind::EscapeLoop => InstructionDto::EscapeLoop { id },
         InstructionKind::ContinueLoop => InstructionDto::ContinueLoop { id },
+        InstructionKind::WaitUntil(condition) => InstructionDto::WaitUntil {
+            id,
+            condition: value_to_dto(condition),
+        },
+        InstructionKind::FocusWindow { scope, app, title_contains } => InstructionDto::FocusWindow {
+            id,
+            scope: element_scope_to_str(scope).to_string(),
+            app: value_to_dto(app),
+            title_contains: value_to_dto(title_contains),
+        },
+        InstructionKind::MinimizeWindow { scope, app, title_contains } => InstructionDto::MinimizeWindow {
+            id,
+            scope: element_scope_to_str(scope).to_string(),
+            app: value_to_dto(app),
+            title_contains: value_to_dto(title_contains),
+        },
+        InstructionKind::MaximizeWindow { scope, app, title_contains } => InstructionDto::MaximizeWindow {
+            id,
+            scope: element_scope_to_str(scope).to_string(),
+            app: value_to_dto(app),
+            title_contains: value_to_dto(title_contains),
+        },
+        InstructionKind::MoveWindow { scope, app, title_contains, x, y } => InstructionDto::MoveWindow {
+            id,
+            scope: element_scope_to_str(scope).to_string(),
+            app: value_to_dto(app),
+            title_contains: value_to_dto(title_contains),
+            x: value_to_dto(x),
+            y: value_to_dto(y),
+        },
+        InstructionKind::ClickElement { scope, app, title_contains, name, role } => InstructionDto::ClickElement {
+            id,
+            scope: element_scope_to_str(scope).to_string(),
+            app: value_to_dto(app),
+            title_contains: value_to_dto(title_contains),
+            name: value_to_dto(name),
+            role: value_to_dto(role),
+        },
+        InstructionKind::SetElementValue { scope, app, title_contains, name, role, value } => InstructionDto::SetElementValue {
+            id,
+            scope: element_scope_to_str(scope).to_string(),
+            app: value_to_dto(app),
+            title_contains: value_to_dto(title_contains),
+            name: value_to_dto(name),
+            role: value_to_dto(role),
+            value: value_to_dto(value),
+        },
+        InstructionKind::SendKeyToWindow { scope, app, title_contains, key, modifiers } => InstructionDto::SendKeyToWindow {
+            id,
+            scope: element_scope_to_str(scope).to_string(),
+            app: value_to_dto(app),
+            title_contains: value_to_dto(title_contains),
+            key: key_to_string(key).unwrap_or("Unknown").to_string(),
+            modifiers: *modifiers,
+        },
+        InstructionKind::TypeTextInWindow { scope, app, title_contains, text } => InstructionDto::TypeTextInWindow {
+            id,
+            scope: element_scope_to_str(scope).to_string(),
+            app: value_to_dto(app),
+            title_contains: value_to_dto(title_contains),
+            text: value_to_dto(text),
+        },
         InstructionKind::Token(token) => match token {
             InputToken::Text(t) => InstructionDto::Text {
                 id,
@@ -1456,6 +1759,133 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         ),
         InstructionDto::EscapeLoop { id } => (id, InstructionKind::EscapeLoop),
         InstructionDto::ContinueLoop { id } => (id, InstructionKind::ContinueLoop),
+        InstructionDto::WaitUntil { id, condition } => {
+            (id, InstructionKind::WaitUntil(dto_to_value(condition)))
+        }
+        InstructionDto::FocusWindow {
+            id,
+            scope,
+            app,
+            title_contains,
+        } => (
+            id,
+            InstructionKind::FocusWindow {
+                scope: str_to_element_scope(scope),
+                app: dto_to_value(app),
+                title_contains: dto_to_value(title_contains),
+            },
+        ),
+        InstructionDto::MinimizeWindow {
+            id,
+            scope,
+            app,
+            title_contains,
+        } => (
+            id,
+            InstructionKind::MinimizeWindow {
+                scope: str_to_element_scope(scope),
+                app: dto_to_value(app),
+                title_contains: dto_to_value(title_contains),
+            },
+        ),
+        InstructionDto::MaximizeWindow {
+            id,
+            scope,
+            app,
+            title_contains,
+        } => (
+            id,
+            InstructionKind::MaximizeWindow {
+                scope: str_to_element_scope(scope),
+                app: dto_to_value(app),
+                title_contains: dto_to_value(title_contains),
+            },
+        ),
+        InstructionDto::MoveWindow {
+            id,
+            scope,
+            app,
+            title_contains,
+            x,
+            y,
+        } => (
+            id,
+            InstructionKind::MoveWindow {
+                scope: str_to_element_scope(scope),
+                app: dto_to_value(app),
+                title_contains: dto_to_value(title_contains),
+                x: dto_to_value(x),
+                y: dto_to_value(y),
+            },
+        ),
+        InstructionDto::ClickElement {
+            id,
+            scope,
+            app,
+            title_contains,
+            name,
+            role,
+        } => (
+            id,
+            InstructionKind::ClickElement {
+                scope: str_to_element_scope(scope),
+                app: dto_to_value(app),
+                title_contains: dto_to_value(title_contains),
+                name: dto_to_value(name),
+                role: dto_to_value(role),
+            },
+        ),
+        InstructionDto::SetElementValue {
+            id,
+            scope,
+            app,
+            title_contains,
+            name,
+            role,
+            value,
+        } => (
+            id,
+            InstructionKind::SetElementValue {
+                scope: str_to_element_scope(scope),
+                app: dto_to_value(app),
+                title_contains: dto_to_value(title_contains),
+                name: dto_to_value(name),
+                role: dto_to_value(role),
+                value: dto_to_value(value),
+            },
+        ),
+        InstructionDto::SendKeyToWindow {
+            id,
+            scope,
+            app,
+            title_contains,
+            key,
+            modifiers,
+        } => (
+            id,
+            InstructionKind::SendKeyToWindow {
+                scope: str_to_element_scope(scope),
+                app: dto_to_value(app),
+                title_contains: dto_to_value(title_contains),
+                key: string_to_key(key).ok()?,
+                modifiers: *modifiers,
+            },
+        ),
+        InstructionDto::TypeTextInWindow {
+            id,
+            scope,
+            app,
+            title_contains,
+            text,
+        } => (
+            id,
+            InstructionKind::TypeTextInWindow {
+                scope: str_to_element_scope(scope),
+                app: dto_to_value(app),
+                title_contains: dto_to_value(title_contains),
+                text: dto_to_value(text),
+            },
+        ),
     };
     Some(Instruction {
         id: id.clone(),

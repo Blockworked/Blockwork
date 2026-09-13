@@ -1,10 +1,11 @@
 use crate::macros_thread;
 use crate::state::{
     build_state_dto, dto_to_block_piece, dto_to_hotkey_action, dto_to_instruction, dto_to_value,
-    emit_state_updated, value_to_dto, BlockPieceDto, ComboCapture, FieldId, HotkeyActionDto,
-    InstructionDto, KeyCaptureTarget, ListItemDto, MacroSnapshot, Page, PathStep, RecordingPhase,
-    SharedState, StateDto, TextEditSession, UpdateCheckState, ValueDto, ValueLocation,
-    ValueLocationDto,
+    emit_state_updated, value_to_dto, BlockPieceDto, ComboCapture, ElementPickerGeometryDto,
+    ElementPickerMonitorDto, FieldId, HotkeyActionDto, InstructionDto, KeyCaptureTarget,
+    ListItemDto, MacroSnapshot, Page, PathStep, PickedElementDto, RecordingPhase, SharedState,
+    StateDto, TextEditSession, UpdateCheckState, ValueDto, ValueLocation, ValueLocationDto,
+    WindowAtPointDto,
 };
 use base64::{engine::general_purpose::STANDARD, Engine as _};
 use serde::Deserialize;
@@ -1362,6 +1363,31 @@ fn value_slot_mut(ins: &mut Instruction, field: FieldId) -> Option<&mut Value> {
             Some(v)
         }
         (InstructionKind::WhenBatteryChargedTo(v), FieldId::BatteryChargeThreshold) => Some(v),
+        (InstructionKind::WaitUntil(condition), FieldId::Condition) => Some(condition),
+        (InstructionKind::FocusWindow { app, .. }, FieldId::FocusWindowApp) => Some(app),
+        (InstructionKind::FocusWindow { title_contains, .. }, FieldId::FocusWindowTitle) => Some(title_contains),
+        (InstructionKind::MinimizeWindow { app, .. }, FieldId::MinimizeWindowApp) => Some(app),
+        (InstructionKind::MinimizeWindow { title_contains, .. }, FieldId::MinimizeWindowTitle) => Some(title_contains),
+        (InstructionKind::MaximizeWindow { app, .. }, FieldId::MaximizeWindowApp) => Some(app),
+        (InstructionKind::MaximizeWindow { title_contains, .. }, FieldId::MaximizeWindowTitle) => Some(title_contains),
+        (InstructionKind::MoveWindow { app, .. }, FieldId::MoveWindowApp) => Some(app),
+        (InstructionKind::MoveWindow { title_contains, .. }, FieldId::MoveWindowTitle) => Some(title_contains),
+        (InstructionKind::MoveWindow { x, .. }, FieldId::MoveWindowX) => Some(x),
+        (InstructionKind::MoveWindow { y, .. }, FieldId::MoveWindowY) => Some(y),
+        (InstructionKind::ClickElement { app, .. }, FieldId::ClickElementApp) => Some(app),
+        (InstructionKind::ClickElement { title_contains, .. }, FieldId::ClickElementTitle) => Some(title_contains),
+        (InstructionKind::ClickElement { name, .. }, FieldId::ClickElementName) => Some(name),
+        (InstructionKind::ClickElement { role, .. }, FieldId::ClickElementRole) => Some(role),
+        (InstructionKind::SetElementValue { app, .. }, FieldId::SetElementValueApp) => Some(app),
+        (InstructionKind::SetElementValue { title_contains, .. }, FieldId::SetElementValueTitle) => Some(title_contains),
+        (InstructionKind::SetElementValue { name, .. }, FieldId::SetElementValueName) => Some(name),
+        (InstructionKind::SetElementValue { role, .. }, FieldId::SetElementValueRole) => Some(role),
+        (InstructionKind::SetElementValue { value, .. }, FieldId::SetElementValueValue) => Some(value),
+        (InstructionKind::SendKeyToWindow { app, .. }, FieldId::SendKeyToWindowApp) => Some(app),
+        (InstructionKind::SendKeyToWindow { title_contains, .. }, FieldId::SendKeyToWindowTitle) => Some(title_contains),
+        (InstructionKind::TypeTextInWindow { app, .. }, FieldId::TypeTextInWindowApp) => Some(app),
+        (InstructionKind::TypeTextInWindow { title_contains, .. }, FieldId::TypeTextInWindowTitle) => Some(title_contains),
+        (InstructionKind::TypeTextInWindow { text, .. }, FieldId::TypeTextInWindowText) => Some(text),
         _ => None,
     }
 }
@@ -2494,11 +2520,16 @@ pub(crate) fn key_capture_event<R: Runtime>(
                     if let Some(strand) = mac.strand_mut(&strand_id) {
                         if let Some((list, idx)) = resolve_body_mut(&mut strand.instructions, &path)
                         {
-                            if let Some(InstructionKind::Token(InputToken::Key(_, dir))) =
-                                list.get(idx).map(|i| i.kind.clone())
-                            {
-                                list[idx].kind = InstructionKind::Token(InputToken::Key(mk, dir));
-                                auto_save(&s);
+                            match list.get(idx).map(|i| i.kind.clone()) {
+                                Some(InstructionKind::Token(InputToken::Key(_, dir))) => {
+                                    list[idx].kind = InstructionKind::Token(InputToken::Key(mk, dir));
+                                    auto_save(&s);
+                                }
+                                Some(InstructionKind::SendKeyToWindow { scope, app, title_contains, modifiers, .. }) => {
+                                    list[idx].kind = InstructionKind::SendKeyToWindow { scope, app, title_contains, key: mk, modifiers };
+                                    auto_save(&s);
+                                }
+                                _ => {}
                             }
                         }
                     }
@@ -3433,6 +3464,188 @@ pub(crate) async fn list_installed_apps() -> Vec<crate::state::AppEntryDto> {
         .collect()
 }
 
+/// Window label/title for the "pick from screen" element-picker overlay —
+/// shared between `start_element_picker` (which sets both) and the KWin
+/// `set_keep_above` call, which has no other way to address it.
+const ELEMENT_PICKER_LABEL: &str = "element-picker";
+const ELEMENT_PICKER_TITLE: &str = blockwork_core::window::ELEMENT_PICKER_OVERLAY_TITLE;
+
+/// Opens (or refocuses, if already open) the full-desktop, transparent,
+/// click-through-free overlay window the element picker uses — see
+/// `blockDetails`/`ElementPickerOverlay.vue` for what runs inside it. Sized
+/// to the union of every monitor's bounds **in logical pixels** (each
+/// monitor's physical position/size divided by its own scale factor — mixing
+/// units here sized the window for a desktop that doesn't exist, the
+/// "screen looks smaller than it is" bug), not just the primary one, so the
+/// picker works across a multi-monitor, mixed-DPI setup.
+///
+/// Returns the logical-space geometry (and per-monitor rects/scales) so the
+/// overlay can map its own cursor coordinates to screen pixels exactly (see
+/// `element_picker_geometry`); the same value is cached for the overlay
+/// window to fetch, since it can't receive extra arguments on top of its
+/// `index.html#/element-picker` URL.
+#[tauri::command]
+pub(crate) fn start_element_picker<R: Runtime>(app: tauri::AppHandle<R>) -> Result<ElementPickerGeometryDto, String> {
+    if let Some(existing) = app.get_webview_window(ELEMENT_PICKER_LABEL) {
+        existing.show().map_err(|e| e.to_string())?;
+        existing.set_focus().map_err(|e| e.to_string())?;
+        let _ = existing.set_zoom(1.0);
+        return element_picker_geometry();
+    }
+
+    let monitors = app.available_monitors().map_err(|e| e.to_string())?;
+    let mut rects: Vec<ElementPickerMonitorDto> = Vec::with_capacity(monitors.len());
+    let (mut min_x, mut min_y, mut max_x, mut max_y) = (f64::MAX, f64::MAX, f64::MIN, f64::MIN);
+    for m in &monitors {
+        // Guard against a bogus zero scale (division by zero → infinite
+        // union); a scale-less monitor reporting physical pixels as-is is a
+        // saner fallback than no overlay at all.
+        let scale = m.scale_factor();
+        let scale = if scale > 0.0 { scale } else { 1.0 };
+        let pos = m.position().to_logical::<f64>(scale);
+        let size = m.size().to_logical::<f64>(scale);
+        if !(size.width > 0.0 && size.height > 0.0) {
+            continue;
+        }
+        min_x = min_x.min(pos.x);
+        min_y = min_y.min(pos.y);
+        max_x = max_x.max(pos.x + size.width);
+        max_y = max_y.max(pos.y + size.height);
+        rects.push(ElementPickerMonitorDto { x: pos.x, y: pos.y, width: size.width, height: size.height, scale });
+    }
+    if rects.is_empty() {
+        return Err("no monitors detected".to_string());
+    }
+    let geometry = ElementPickerGeometryDto {
+        origin_x: min_x,
+        origin_y: min_y,
+        width: max_x - min_x,
+        height: max_y - min_y,
+        monitors: rects,
+    };
+
+    let window = tauri::WebviewWindowBuilder::new(&app, ELEMENT_PICKER_LABEL, tauri::WebviewUrl::App("index.html#/element-picker".into()))
+        .title(ELEMENT_PICKER_TITLE)
+        .transparent(true)
+        .decorations(false)
+        .always_on_top(true)
+        .skip_taskbar(true)
+        .resizable(false)
+        .position(min_x, min_y)
+        .inner_size(geometry.width, geometry.height)
+        .build()
+        .map_err(|e| e.to_string())?;
+    let _ = window.set_focus();
+    // Chromium's page zoom is a per-origin preference, not per-window: this
+    // freshly-created webview otherwise silently inherits whatever zoom
+    // level the user has left the main window at (Ctrl/Cmd +/-, `reset_zoom`
+    // only ever runs from *that* window's own Ctrl/Cmd+0 handler — see
+    // `App.vue`'s `onKeydown` and `reset_zoom`'s doc comment). A non-1.0 zoom
+    // here inflates `window.innerWidth/innerHeight` relative to this
+    // window's true logical size (by `1/zoom`), which throws off every CSS
+    // px ↔ logical px assumption the overlay's coordinate math makes —
+    // observed live as a highlight box the wrong size and in the wrong
+    // place, on an otherwise-correct single monitor even.
+    let _ = window.set_zoom(1.0);
+
+    // Best-effort, and deliberately not on this command's own return path:
+    // the `position`/`inner_size` builder calls above are only advisory on
+    // Wayland — a client can't pick its own on-screen position at all, and
+    // KWin additionally clamps a freshly-mapped toplevel's initial size to
+    // whichever single output it lands on, which is why the overlay would
+    // otherwise end up covering only one monitor instead of the full
+    // multi-monitor union computed above. So also ask KWin directly to force
+    // the window's real frame geometry (see
+    // `blockwork_core::window::set_window_geometry`'s doc comment), same
+    // trick already used just below for `always_on_top`, which likewise has
+    // no effect on Wayland (see `window_at_point`'s doc comment for the
+    // related "clients can't see compositor state" limitation this is a
+    // cousin of). A KWin script round-trip can take a couple hundred
+    // milliseconds in the worst case, which would otherwise stall the
+    // overlay opening.
+    let (geo_x, geo_y, geo_w, geo_h) = (min_x.round() as i32, min_y.round() as i32, geometry.width.round() as i32, geometry.height.round() as i32);
+    std::thread::spawn(move || {
+        let _ = blockwork_core::window::set_window_geometry(None, Some(ELEMENT_PICKER_TITLE), geo_x, geo_y, geo_w, geo_h);
+        let _ = blockwork_core::window::set_keep_above(None, Some(ELEMENT_PICKER_TITLE), true);
+    });
+
+    *PICKER_GEOMETRY.lock().unwrap_or_else(|e| e.into_inner()) = Some(geometry.clone());
+    Ok(geometry)
+}
+
+/// The logical-space geometry `start_element_picker` opened the overlay
+/// with (see `ElementPickerGeometryDto`). The overlay window fetches this on
+/// mount: it spans monitors that may disagree on scale factor, so it needs
+/// the authoritative origin plus each monitor's rect/scale to map cursor
+/// coordinates exactly, rather than guessing from `outerPosition()` (which
+/// Wayland never reliably reports) and a single global scale.
+#[tauri::command]
+pub(crate) fn element_picker_geometry() -> Result<ElementPickerGeometryDto, String> {
+    PICKER_GEOMETRY
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .clone()
+        .ok_or_else(|| "the element picker isn't open".to_string())
+}
+
+/// Last geometry `start_element_picker` computed, for `element_picker_geometry`.
+static PICKER_GEOMETRY: std::sync::Mutex<Option<ElementPickerGeometryDto>> = std::sync::Mutex::new(None);
+
+/// Re-applies 100% zoom to just the picker overlay window, called by the
+/// overlay itself once its own page has mounted (see
+/// `ElementPickerOverlay.vue`'s `onMounted`). The `window.set_zoom(1.0)`
+/// already attempted in `start_element_picker`, right after building the
+/// window, is too early: Chromium's page zoom is a per-origin preference
+/// (not per-window), so this freshly-created webview inherits whatever zoom
+/// the user's left the main window at, and re-applies *that* once its own
+/// navigation finishes loading — after, not before, the early reset, racing
+/// it and winning. A stale non-1.0 zoom here inflates
+/// `window.innerWidth/innerHeight` relative to the window's true logical
+/// size (by `1/zoom`) and, since the browser scales the whole page from the
+/// viewport origin, also shifts every CSS position — together producing
+/// exactly the "highlight box is the wrong size *and* in the wrong place"
+/// bug this fixes. Deliberately scoped to just this window (unlike
+/// `reset_zoom`, which resets every window): a user who has zoomed the main
+/// editor for accessibility shouldn't have that silently undone just by
+/// opening the picker.
+#[tauri::command]
+pub(crate) fn reset_element_picker_zoom<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(ELEMENT_PICKER_LABEL) {
+        window.set_zoom(1.0).map_err(|e| e.to_string())?;
+    }
+    Ok(())
+}
+
+/// Destroys the picker overlay by its fixed native label. The overlay must
+/// not use the generic frontend `close()` path: the application's
+/// close-to-tray hook is intentionally special-cased for the main window,
+/// and an explicit target here also makes it impossible for picker input to
+/// close the editor window by mistake.
+#[tauri::command]
+pub(crate) fn close_element_picker<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
+    if let Some(window) = app.get_webview_window(ELEMENT_PICKER_LABEL) {
+        window.destroy().map_err(|e| e.to_string())?;
+    }
+    *PICKER_GEOMETRY.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    Ok(())
+}
+
+/// Hit-tests screen point `(x, y)` against the accessibility tree, for the
+/// element picker's overlay to call on every (throttled) mouse move. See
+/// `blockwork_core::accessibility::element_at_point`'s doc comment for the
+/// `known_window` caching contract — the overlay passes back the previous
+/// result's `window` field to skip the expensive half of this call while the
+/// cursor stays inside the same window.
+#[tauri::command]
+pub(crate) fn hit_test_element_at(x: i32, y: i32, known_window: Option<WindowAtPointDto>) -> Option<PickedElementDto> {
+    let picked = blockwork_core::accessibility::element_at_point(x, y, known_window.map(Into::into));
+    match picked.as_ref() {
+        Some(p) => tracing::warn!(x, y, app = %p.app, title = %p.window_title, name = %p.name, role = %p.role, "element picker hit test"),
+        None => tracing::warn!(x, y, "element picker hit test found no element"),
+    }
+    picked.map(Into::into)
+}
+
 #[cfg(test)]
 mod value_location_tests {
     use super::*;
@@ -4272,6 +4485,7 @@ mod value_location_tests {
                 Value::Call {
                     block_id: id.clone(),
                     args: vec![],
+                    branches: vec![],
                     saved: Box::new(Value::number(0.0)),
                 },
             ))],
@@ -4298,6 +4512,7 @@ mod value_location_tests {
         let dto = ValueDto::Call {
             block_id: "missing".into(),
             args: vec![],
+            branches: vec![],
             saved: Box::new(ValueDto::Number { value: 0.0 }),
         };
         assert!(preview_value_with_env(&dto, &HashMap::new()).is_err());
@@ -4308,6 +4523,7 @@ mod value_location_tests {
         let mut node = Value::Call {
             block_id: "missing".into(),
             args: vec![],
+            branches: vec![],
             saved: Box::new(Value::number(0.0)),
         };
         apply_value_kind(&mut node, "Number", &HashMap::new()).unwrap();

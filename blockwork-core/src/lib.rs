@@ -1,3 +1,4 @@
+pub mod accessibility;
 pub mod battery;
 pub mod clipboard;
 pub mod config;
@@ -10,4 +11,5 @@ pub mod macros;
 pub mod recording;
 #[cfg(all(windows, feature = "updater"))]
 pub mod updater;
+pub mod window;
 pub mod wire;

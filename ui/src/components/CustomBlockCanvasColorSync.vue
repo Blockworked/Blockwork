@@ -54,6 +54,37 @@ function fieldRootValue(instruction: InstructionDto, fieldId: string): ValueDto 
     case 'Repeat': return fieldId === 'RepeatCount' ? instruction.count : null;
     case 'WhenBatteryDischargedTo': return fieldId === 'BatteryDischargeThreshold' ? instruction.threshold : null;
     case 'WhenBatteryChargedTo': return fieldId === 'BatteryChargeThreshold' ? instruction.threshold : null;
+    case 'WaitUntil': return fieldId === 'Condition' ? instruction.condition : null;
+    case 'FocusWindow': case 'MinimizeWindow': case 'MaximizeWindow':
+      return fieldId === `${instruction.type}App` ? instruction.app : fieldId === `${instruction.type}Title` ? instruction.title_contains : null;
+    case 'MoveWindow':
+      return fieldId === 'MoveWindowApp' ? instruction.app
+        : fieldId === 'MoveWindowTitle' ? instruction.title_contains
+        : fieldId === 'MoveWindowX' ? instruction.x
+        : fieldId === 'MoveWindowY' ? instruction.y
+        : null;
+    case 'ClickElement':
+      return fieldId === 'ClickElementApp' ? instruction.app
+        : fieldId === 'ClickElementTitle' ? instruction.title_contains
+        : fieldId === 'ClickElementName' ? instruction.name
+        : fieldId === 'ClickElementRole' ? instruction.role
+        : null;
+    case 'SetElementValue':
+      return fieldId === 'SetElementValueApp' ? instruction.app
+        : fieldId === 'SetElementValueTitle' ? instruction.title_contains
+        : fieldId === 'SetElementValueName' ? instruction.name
+        : fieldId === 'SetElementValueRole' ? instruction.role
+        : fieldId === 'SetElementValueValue' ? instruction.value
+        : null;
+    case 'SendKeyToWindow':
+      return fieldId === 'SendKeyToWindowApp' ? instruction.app
+        : fieldId === 'SendKeyToWindowTitle' ? instruction.title_contains
+        : null;
+    case 'TypeTextInWindow':
+      return fieldId === 'TypeTextInWindowApp' ? instruction.app
+        : fieldId === 'TypeTextInWindowTitle' ? instruction.title_contains
+        : fieldId === 'TypeTextInWindowText' ? instruction.text
+        : null;
     default: return null;
   }
 }

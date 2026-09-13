@@ -1,5 +1,5 @@
 use crate::input::schedule::TimeSchedule;
-use crate::input::types::InputToken;
+use crate::input::types::{ElementScope, InputToken, MacroKey};
 use crate::input::value::{Evaluated, Op, Value};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -384,7 +384,42 @@ impl InstructionKind {
             | InstructionKind::Return(value)
             | InstructionKind::WhenBatteryDischargedTo(value)
             | InstructionKind::WhenBatteryChargedTo(value)
-            | InstructionKind::SetClipboard(value) => value.rename_var(old, new),
+            | InstructionKind::SetClipboard(value)
+            | InstructionKind::WaitUntil(value) => value.rename_var(old, new),
+            InstructionKind::FocusWindow { app, title_contains, .. }
+            | InstructionKind::MinimizeWindow { app, title_contains, .. }
+            | InstructionKind::MaximizeWindow { app, title_contains, .. } => {
+                app.rename_var(old, new);
+                title_contains.rename_var(old, new);
+            }
+            InstructionKind::MoveWindow { app, title_contains, x, y, .. } => {
+                app.rename_var(old, new);
+                title_contains.rename_var(old, new);
+                x.rename_var(old, new);
+                y.rename_var(old, new);
+            }
+            InstructionKind::ClickElement { app, title_contains, name, role, .. } => {
+                app.rename_var(old, new);
+                title_contains.rename_var(old, new);
+                name.rename_var(old, new);
+                role.rename_var(old, new);
+            }
+            InstructionKind::SetElementValue { app, title_contains, name, role, value, .. } => {
+                app.rename_var(old, new);
+                title_contains.rename_var(old, new);
+                name.rename_var(old, new);
+                role.rename_var(old, new);
+                value.rename_var(old, new);
+            }
+            InstructionKind::SendKeyToWindow { app, title_contains, .. } => {
+                app.rename_var(old, new);
+                title_contains.rename_var(old, new);
+            }
+            InstructionKind::TypeTextInWindow { app, title_contains, text, .. } => {
+                app.rename_var(old, new);
+                title_contains.rename_var(old, new);
+                text.rename_var(old, new);
+            }
             InstructionKind::Token(token) => token.rename_var(old, new),
             InstructionKind::SetVariable(name, value)
             | InstructionKind::ChangeVariable(name, value) => {
@@ -470,7 +505,42 @@ impl InstructionKind {
             | InstructionKind::Return(value)
             | InstructionKind::WhenBatteryDischargedTo(value)
             | InstructionKind::WhenBatteryChargedTo(value)
-            | InstructionKind::SetClipboard(value) => value.rename_list(old, new),
+            | InstructionKind::SetClipboard(value)
+            | InstructionKind::WaitUntil(value) => value.rename_list(old, new),
+            InstructionKind::FocusWindow { app, title_contains, .. }
+            | InstructionKind::MinimizeWindow { app, title_contains, .. }
+            | InstructionKind::MaximizeWindow { app, title_contains, .. } => {
+                app.rename_list(old, new);
+                title_contains.rename_list(old, new);
+            }
+            InstructionKind::MoveWindow { app, title_contains, x, y, .. } => {
+                app.rename_list(old, new);
+                title_contains.rename_list(old, new);
+                x.rename_list(old, new);
+                y.rename_list(old, new);
+            }
+            InstructionKind::ClickElement { app, title_contains, name, role, .. } => {
+                app.rename_list(old, new);
+                title_contains.rename_list(old, new);
+                name.rename_list(old, new);
+                role.rename_list(old, new);
+            }
+            InstructionKind::SetElementValue { app, title_contains, name, role, value, .. } => {
+                app.rename_list(old, new);
+                title_contains.rename_list(old, new);
+                name.rename_list(old, new);
+                role.rename_list(old, new);
+                value.rename_list(old, new);
+            }
+            InstructionKind::SendKeyToWindow { app, title_contains, .. } => {
+                app.rename_list(old, new);
+                title_contains.rename_list(old, new);
+            }
+            InstructionKind::TypeTextInWindow { app, title_contains, text, .. } => {
+                app.rename_list(old, new);
+                title_contains.rename_list(old, new);
+                text.rename_list(old, new);
+            }
             InstructionKind::Token(token) => token.rename_list(old, new),
             InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
                 value.rename_list(old, new)
@@ -576,6 +646,43 @@ impl InstructionKind {
             | InstructionKind::WhenBatteryDischargedTo(value)
             | InstructionKind::WhenBatteryChargedTo(value)
             | InstructionKind::SetClipboard(value) => value.migrate_bool_slots(false),
+            // `WaitUntil`'s condition is boolean-typed by construction, same
+            // as `While`'s.
+            InstructionKind::WaitUntil(condition) => condition.migrate_bool_slots(true),
+            InstructionKind::FocusWindow { app, title_contains, .. }
+            | InstructionKind::MinimizeWindow { app, title_contains, .. }
+            | InstructionKind::MaximizeWindow { app, title_contains, .. } => {
+                app.migrate_bool_slots(false);
+                title_contains.migrate_bool_slots(false);
+            }
+            InstructionKind::MoveWindow { app, title_contains, x, y, .. } => {
+                app.migrate_bool_slots(false);
+                title_contains.migrate_bool_slots(false);
+                x.migrate_bool_slots(false);
+                y.migrate_bool_slots(false);
+            }
+            InstructionKind::ClickElement { app, title_contains, name, role, .. } => {
+                app.migrate_bool_slots(false);
+                title_contains.migrate_bool_slots(false);
+                name.migrate_bool_slots(false);
+                role.migrate_bool_slots(false);
+            }
+            InstructionKind::SetElementValue { app, title_contains, name, role, value, .. } => {
+                app.migrate_bool_slots(false);
+                title_contains.migrate_bool_slots(false);
+                name.migrate_bool_slots(false);
+                role.migrate_bool_slots(false);
+                value.migrate_bool_slots(false);
+            }
+            InstructionKind::SendKeyToWindow { app, title_contains, .. } => {
+                app.migrate_bool_slots(false);
+                title_contains.migrate_bool_slots(false);
+            }
+            InstructionKind::TypeTextInWindow { app, title_contains, text, .. } => {
+                app.migrate_bool_slots(false);
+                title_contains.migrate_bool_slots(false);
+                text.migrate_bool_slots(false);
+            }
             InstructionKind::Token(token) => token.migrate_bool_slots(),
             InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
                 value.migrate_bool_slots(false)
@@ -657,7 +764,42 @@ impl InstructionKind {
             | InstructionKind::Return(value)
             | InstructionKind::WhenBatteryDischargedTo(value)
             | InstructionKind::WhenBatteryChargedTo(value)
-            | InstructionKind::SetClipboard(value) => value.rename_param(old, new),
+            | InstructionKind::SetClipboard(value)
+            | InstructionKind::WaitUntil(value) => value.rename_param(old, new),
+            InstructionKind::FocusWindow { app, title_contains, .. }
+            | InstructionKind::MinimizeWindow { app, title_contains, .. }
+            | InstructionKind::MaximizeWindow { app, title_contains, .. } => {
+                app.rename_param(old, new);
+                title_contains.rename_param(old, new);
+            }
+            InstructionKind::MoveWindow { app, title_contains, x, y, .. } => {
+                app.rename_param(old, new);
+                title_contains.rename_param(old, new);
+                x.rename_param(old, new);
+                y.rename_param(old, new);
+            }
+            InstructionKind::ClickElement { app, title_contains, name, role, .. } => {
+                app.rename_param(old, new);
+                title_contains.rename_param(old, new);
+                name.rename_param(old, new);
+                role.rename_param(old, new);
+            }
+            InstructionKind::SetElementValue { app, title_contains, name, role, value, .. } => {
+                app.rename_param(old, new);
+                title_contains.rename_param(old, new);
+                name.rename_param(old, new);
+                role.rename_param(old, new);
+                value.rename_param(old, new);
+            }
+            InstructionKind::SendKeyToWindow { app, title_contains, .. } => {
+                app.rename_param(old, new);
+                title_contains.rename_param(old, new);
+            }
+            InstructionKind::TypeTextInWindow { app, title_contains, text, .. } => {
+                app.rename_param(old, new);
+                title_contains.rename_param(old, new);
+                text.rename_param(old, new);
+            }
             InstructionKind::Token(token) => token.rename_param(old, new),
             InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
                 value.rename_param(old, new)
@@ -740,8 +882,43 @@ impl InstructionKind {
             | InstructionKind::Return(value)
             | InstructionKind::WhenBatteryDischargedTo(value)
             | InstructionKind::WhenBatteryChargedTo(value)
-            | InstructionKind::SetClipboard(value) => {
+            | InstructionKind::SetClipboard(value)
+            | InstructionKind::WaitUntil(value) => {
                 value.for_each_call_args_mut(block_id, f)
+            }
+            InstructionKind::FocusWindow { app, title_contains, .. }
+            | InstructionKind::MinimizeWindow { app, title_contains, .. }
+            | InstructionKind::MaximizeWindow { app, title_contains, .. } => {
+                app.for_each_call_args_mut(block_id, f);
+                title_contains.for_each_call_args_mut(block_id, f);
+            }
+            InstructionKind::MoveWindow { app, title_contains, x, y, .. } => {
+                app.for_each_call_args_mut(block_id, f);
+                title_contains.for_each_call_args_mut(block_id, f);
+                x.for_each_call_args_mut(block_id, f);
+                y.for_each_call_args_mut(block_id, f);
+            }
+            InstructionKind::ClickElement { app, title_contains, name, role, .. } => {
+                app.for_each_call_args_mut(block_id, f);
+                title_contains.for_each_call_args_mut(block_id, f);
+                name.for_each_call_args_mut(block_id, f);
+                role.for_each_call_args_mut(block_id, f);
+            }
+            InstructionKind::SetElementValue { app, title_contains, name, role, value, .. } => {
+                app.for_each_call_args_mut(block_id, f);
+                title_contains.for_each_call_args_mut(block_id, f);
+                name.for_each_call_args_mut(block_id, f);
+                role.for_each_call_args_mut(block_id, f);
+                value.for_each_call_args_mut(block_id, f);
+            }
+            InstructionKind::SendKeyToWindow { app, title_contains, .. } => {
+                app.for_each_call_args_mut(block_id, f);
+                title_contains.for_each_call_args_mut(block_id, f);
+            }
+            InstructionKind::TypeTextInWindow { app, title_contains, text, .. } => {
+                app.for_each_call_args_mut(block_id, f);
+                title_contains.for_each_call_args_mut(block_id, f);
+                text.for_each_call_args_mut(block_id, f);
             }
             InstructionKind::Token(token) => token.for_each_call_args_mut(block_id, f),
             InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
@@ -836,7 +1013,42 @@ impl InstructionKind {
             | InstructionKind::Return(value)
             | InstructionKind::WhenBatteryDischargedTo(value)
             | InstructionKind::WhenBatteryChargedTo(value)
-            | InstructionKind::SetClipboard(value) => value.scrub_block_calls(block_id),
+            | InstructionKind::SetClipboard(value)
+            | InstructionKind::WaitUntil(value) => value.scrub_block_calls(block_id),
+            InstructionKind::FocusWindow { app, title_contains, .. }
+            | InstructionKind::MinimizeWindow { app, title_contains, .. }
+            | InstructionKind::MaximizeWindow { app, title_contains, .. } => {
+                app.scrub_block_calls(block_id);
+                title_contains.scrub_block_calls(block_id);
+            }
+            InstructionKind::MoveWindow { app, title_contains, x, y, .. } => {
+                app.scrub_block_calls(block_id);
+                title_contains.scrub_block_calls(block_id);
+                x.scrub_block_calls(block_id);
+                y.scrub_block_calls(block_id);
+            }
+            InstructionKind::ClickElement { app, title_contains, name, role, .. } => {
+                app.scrub_block_calls(block_id);
+                title_contains.scrub_block_calls(block_id);
+                name.scrub_block_calls(block_id);
+                role.scrub_block_calls(block_id);
+            }
+            InstructionKind::SetElementValue { app, title_contains, name, role, value, .. } => {
+                app.scrub_block_calls(block_id);
+                title_contains.scrub_block_calls(block_id);
+                name.scrub_block_calls(block_id);
+                role.scrub_block_calls(block_id);
+                value.scrub_block_calls(block_id);
+            }
+            InstructionKind::SendKeyToWindow { app, title_contains, .. } => {
+                app.scrub_block_calls(block_id);
+                title_contains.scrub_block_calls(block_id);
+            }
+            InstructionKind::TypeTextInWindow { app, title_contains, text, .. } => {
+                app.scrub_block_calls(block_id);
+                title_contains.scrub_block_calls(block_id);
+                text.scrub_block_calls(block_id);
+            }
             InstructionKind::Token(token) => token.scrub_block_calls(block_id),
             InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
                 value.scrub_block_calls(block_id)
@@ -1773,6 +1985,92 @@ pub enum InstructionKind {
     /// Skips straight to the next iteration of the nearest enclosing
     /// `Repeat`/`Forever`/`While`. A no-op if not inside a loop.
     ContinueLoop,
+    /// `wait until <condition>` — re-evaluates `condition` on a poll loop
+    /// (same cadence/stop-flag handling as `Wait`) until it's truthy, the
+    /// run is stopped, or the condition errs. Generic (any boolean
+    /// reporter), not window-specific — e.g. "wait until window matching ()
+    /// exists?" is just this with `Op::WindowExists` as the condition; see
+    /// the palette default in the frontend rather than a second instruction.
+    WaitUntil(Value),
+    /// Focuses the first window matching both filters (either blank matches
+    /// anything). `scope` picks whether `app`/`title_contains` are consulted
+    /// at all (see `ElementScope`) — `Focused` targets the currently active
+    /// window directly instead. See `crate::window::focus_window`.
+    FocusWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+    },
+    /// Minimizes the first window matching both filters. See
+    /// `crate::window::minimize_window`.
+    MinimizeWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+    },
+    /// Maximizes the first window matching both filters. See
+    /// `crate::window::maximize_window`.
+    MaximizeWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+    },
+    /// Moves the first window matching both filters so its top-left corner
+    /// is at `(x, y)`, keeping its current size. See
+    /// `crate::window::move_window`.
+    MoveWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+        x: Value,
+        y: Value,
+    },
+    /// Invokes the first matching element's primary action (its "click"
+    /// action if named as such, else whichever action the platform lists
+    /// first). `scope` picks whether `app`/`title_contains` are consulted at
+    /// all (see `ElementScope`); `name`/`role` narrow the search within the
+    /// located app/window — same locator shape as `Op::ElementText`. See
+    /// `crate::accessibility::click_element`.
+    ClickElement {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+        name: Value,
+        role: Value,
+    },
+    /// Sets the first matching element's text contents (or, for an element
+    /// with no editable text but a numeric value, its value parsed from
+    /// `value`). See `crate::accessibility::set_element_value`.
+    SetElementValue {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+        name: Value,
+        role: Value,
+        value: Value,
+    },
+    /// Sends `key` (with `modifiers` held) to the first window matching both
+    /// filters via a synthetic key event delivered directly to that window —
+    /// never touches the real keyboard or window focus. Linux-only for now,
+    /// and even there only reaches genuine X11 client windows (a plain X11
+    /// session, or an XWayland-backed app under Wayland) — never a native
+    /// Wayland toplevel. See `crate::window::send_key_to_window`.
+    SendKeyToWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+        key: MacroKey,
+        modifiers: u8,
+    },
+    /// Types `text` character-by-character into the first window matching
+    /// both filters — same mechanism and platform/Wayland limitations as
+    /// `SendKeyToWindow`. See `crate::window::type_text_in_window`.
+    TypeTextInWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+        text: Value,
+    },
 }
 
 impl std::hash::Hash for Macro {
@@ -1961,6 +2259,68 @@ impl std::hash::Hash for InstructionKind {
             Self::WhenClipboardChanged => {
                 32u8.hash(state);
             }
+            Self::WaitUntil(condition) => {
+                33u8.hash(state);
+                condition.hash(state);
+            }
+            Self::FocusWindow { scope, app, title_contains } => {
+                34u8.hash(state);
+                scope.hash(state);
+                app.hash(state);
+                title_contains.hash(state);
+            }
+            Self::MinimizeWindow { scope, app, title_contains } => {
+                35u8.hash(state);
+                scope.hash(state);
+                app.hash(state);
+                title_contains.hash(state);
+            }
+            Self::MaximizeWindow { scope, app, title_contains } => {
+                36u8.hash(state);
+                scope.hash(state);
+                app.hash(state);
+                title_contains.hash(state);
+            }
+            Self::MoveWindow { scope, app, title_contains, x, y } => {
+                37u8.hash(state);
+                scope.hash(state);
+                app.hash(state);
+                title_contains.hash(state);
+                x.hash(state);
+                y.hash(state);
+            }
+            Self::ClickElement { scope, app, title_contains, name, role } => {
+                38u8.hash(state);
+                scope.hash(state);
+                app.hash(state);
+                title_contains.hash(state);
+                name.hash(state);
+                role.hash(state);
+            }
+            Self::SetElementValue { scope, app, title_contains, name, role, value } => {
+                39u8.hash(state);
+                scope.hash(state);
+                app.hash(state);
+                title_contains.hash(state);
+                name.hash(state);
+                role.hash(state);
+                value.hash(state);
+            }
+            Self::SendKeyToWindow { scope, app, title_contains, key, modifiers } => {
+                40u8.hash(state);
+                scope.hash(state);
+                app.hash(state);
+                title_contains.hash(state);
+                key.hash(state);
+                modifiers.hash(state);
+            }
+            Self::TypeTextInWindow { scope, app, title_contains, text } => {
+                41u8.hash(state);
+                scope.hash(state);
+                app.hash(state);
+                title_contains.hash(state);
+                text.hash(state);
+            }
         }
     }
 }
@@ -2050,6 +2410,57 @@ enum InstructionKindDe {
     },
     EscapeLoop,
     ContinueLoop,
+    WaitUntil(Value),
+    FocusWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+    },
+    MinimizeWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+    },
+    MaximizeWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+    },
+    MoveWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+        x: Value,
+        y: Value,
+    },
+    ClickElement {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+        name: Value,
+        role: Value,
+    },
+    SetElementValue {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+        name: Value,
+        role: Value,
+        value: Value,
+    },
+    SendKeyToWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+        key: MacroKey,
+        modifiers: u8,
+    },
+    TypeTextInWindow {
+        scope: ElementScope,
+        app: Value,
+        title_contains: Value,
+        text: Value,
+    },
 }
 
 #[derive(Deserialize)]
@@ -2182,6 +2593,31 @@ impl From<InstructionKindDe> for InstructionKind {
             }
             InstructionKindDe::EscapeLoop => InstructionKind::EscapeLoop,
             InstructionKindDe::ContinueLoop => InstructionKind::ContinueLoop,
+            InstructionKindDe::WaitUntil(condition) => InstructionKind::WaitUntil(condition),
+            InstructionKindDe::FocusWindow { scope, app, title_contains } => {
+                InstructionKind::FocusWindow { scope, app, title_contains }
+            }
+            InstructionKindDe::MinimizeWindow { scope, app, title_contains } => {
+                InstructionKind::MinimizeWindow { scope, app, title_contains }
+            }
+            InstructionKindDe::MaximizeWindow { scope, app, title_contains } => {
+                InstructionKind::MaximizeWindow { scope, app, title_contains }
+            }
+            InstructionKindDe::MoveWindow { scope, app, title_contains, x, y } => {
+                InstructionKind::MoveWindow { scope, app, title_contains, x, y }
+            }
+            InstructionKindDe::ClickElement { scope, app, title_contains, name, role } => {
+                InstructionKind::ClickElement { scope, app, title_contains, name, role }
+            }
+            InstructionKindDe::SetElementValue { scope, app, title_contains, name, role, value } => {
+                InstructionKind::SetElementValue { scope, app, title_contains, name, role, value }
+            }
+            InstructionKindDe::SendKeyToWindow { scope, app, title_contains, key, modifiers } => {
+                InstructionKind::SendKeyToWindow { scope, app, title_contains, key, modifiers }
+            }
+            InstructionKindDe::TypeTextInWindow { scope, app, title_contains, text } => {
+                InstructionKind::TypeTextInWindow { scope, app, title_contains, text }
+            }
         }
     }
 }

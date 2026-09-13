@@ -678,6 +678,13 @@ async fn invoke_handler(
         "check_for_updates" => call!(commands::check_for_updates(state, app)),
         "apply_update" => call!(commands::apply_update(state, app)),
         "list_installed_apps" => call!(Ok(commands::list_installed_apps().await)),
+        // The element picker opens a real second native window and reads
+        // its bundled `ui/dist` build — meaningless from a browser tab
+        // driving the backend over HTTP, so this is a clear error rather
+        // than a silent no-op or a window the dev-bridge browser can't see.
+        "start_element_picker" | "close_element_picker" | "element_picker_geometry" | "reset_element_picker_zoom" | "hit_test_element_at" => {
+            return ok_response::<()>(Err("the element picker isn't available via the dev-bridge — run the native app".to_string()));
+        }
         other => ok_response::<()>(Err(format!("unknown command: {other}"))),
     }
 }

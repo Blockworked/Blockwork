@@ -44,6 +44,19 @@ core-foundation = "0.10.1"
 foreign-types = "0.5"
 starship-battery = { version = "0.11.1", default-features = false }
 arboard = { version = "3.6.1", features = ["wayland-data-control"] }
+sysinfo = { version = "0.39.6", default-features = false, features = ["system"] }
+# Default features (async-io + blocking-api) give a synchronous
+# `zbus::blocking` client with no extra tokio runtime, which is all the KWin
+# scripting D-Bus calls in `window::linux::kwin_dbus` need.
+zbus = "5.19.0"
+# AT-SPI2 accessibility-tree queries/actions (see `accessibility/linux.rs`).
+# Depend on `atspi-connection` directly with its defaults disabled: the
+# umbrella crate's `connection` feature enables the connection crate's P2P
+# defaults, whose eager peer discovery can wait indefinitely on a stalled
+# desktop application. Plain bus proxies are sufficient for these queries.
+atspi = { version = "0.30", default-features = false, features = ["proxies"] }
+atspi-connection = { version = "0.14", default-features = false }
+futures-lite = { version = "2", default-features = false, features = ["std"] }
 base64 = "0.23.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 tauri-build = { git = "https://github.com/EthanRStokes/tauri", rev = "e8458ba7", features = [] }
@@ -54,3 +67,11 @@ tower-http = { version = "0.7.1", features = ["cors"] }
 [patch.crates-io]
 cef = { git = "https://github.com/EthanRStokes/cef-rs", rev = "b8fad92" }
 cef-dll-sys = { git = "https://github.com/EthanRStokes/cef-rs", rev = "b8fad92" }
+
+# Local integration override for the transparent CEF/OSR implementation used
+# by the element-picker overlay. Replace this with a pinned fork revision once
+# the sibling tauri change has been committed and published.
+[patch."https://github.com/EthanRStokes/tauri"]
+tauri = { path = "../tauri/crates/tauri" }
+tauri-build = { path = "../tauri/crates/tauri-build" }
+tauri-runtime-cef = { path = "../tauri/crates/tauri-runtime-cef" }

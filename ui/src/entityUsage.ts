@@ -55,6 +55,24 @@ function instructionUsesVariable(instruction: InstructionDto, name: string): boo
     case 'Repeat': return valueUsesVariable(instruction.count, name) || instructionsUseVariable(instruction.body, name);
     case 'While': return valueUsesVariable(instruction.condition, name) || instructionsUseVariable(instruction.body, name);
     case 'Forever': return instructionsUseVariable(instruction.body, name);
+    case 'WaitUntil': return valueUsesVariable(instruction.condition, name);
+    case 'FocusWindow': case 'MinimizeWindow': case 'MaximizeWindow':
+      return valueUsesVariable(instruction.app, name) || valueUsesVariable(instruction.title_contains, name);
+    case 'MoveWindow':
+      return valueUsesVariable(instruction.app, name) || valueUsesVariable(instruction.title_contains, name)
+        || valueUsesVariable(instruction.x, name) || valueUsesVariable(instruction.y, name);
+    case 'ClickElement':
+      return valueUsesVariable(instruction.app, name) || valueUsesVariable(instruction.title_contains, name)
+        || valueUsesVariable(instruction.name, name) || valueUsesVariable(instruction.role, name);
+    case 'SetElementValue':
+      return valueUsesVariable(instruction.app, name) || valueUsesVariable(instruction.title_contains, name)
+        || valueUsesVariable(instruction.name, name) || valueUsesVariable(instruction.role, name)
+        || valueUsesVariable(instruction.value, name);
+    case 'SendKeyToWindow':
+      return valueUsesVariable(instruction.app, name) || valueUsesVariable(instruction.title_contains, name);
+    case 'TypeTextInWindow':
+      return valueUsesVariable(instruction.app, name) || valueUsesVariable(instruction.title_contains, name)
+        || valueUsesVariable(instruction.text, name);
     default: return false;
   }
 }
@@ -79,6 +97,24 @@ function instructionUsesList(instruction: InstructionDto, name: string): boolean
     case 'Repeat': return valueUsesList(instruction.count, name) || instructionsUseList(instruction.body, name);
     case 'While': return valueUsesList(instruction.condition, name) || instructionsUseList(instruction.body, name);
     case 'Forever': return instructionsUseList(instruction.body, name);
+    case 'WaitUntil': return valueUsesList(instruction.condition, name);
+    case 'FocusWindow': case 'MinimizeWindow': case 'MaximizeWindow':
+      return valueUsesList(instruction.app, name) || valueUsesList(instruction.title_contains, name);
+    case 'MoveWindow':
+      return valueUsesList(instruction.app, name) || valueUsesList(instruction.title_contains, name)
+        || valueUsesList(instruction.x, name) || valueUsesList(instruction.y, name);
+    case 'ClickElement':
+      return valueUsesList(instruction.app, name) || valueUsesList(instruction.title_contains, name)
+        || valueUsesList(instruction.name, name) || valueUsesList(instruction.role, name);
+    case 'SetElementValue':
+      return valueUsesList(instruction.app, name) || valueUsesList(instruction.title_contains, name)
+        || valueUsesList(instruction.name, name) || valueUsesList(instruction.role, name)
+        || valueUsesList(instruction.value, name);
+    case 'SendKeyToWindow':
+      return valueUsesList(instruction.app, name) || valueUsesList(instruction.title_contains, name);
+    case 'TypeTextInWindow':
+      return valueUsesList(instruction.app, name) || valueUsesList(instruction.title_contains, name)
+        || valueUsesList(instruction.text, name);
     default: return false;
   }
 }

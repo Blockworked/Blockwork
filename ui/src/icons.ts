@@ -58,6 +58,10 @@ import {
   AppWindow,
   SquareX,
   Info,
+  Minimize2,
+  Maximize2,
+  Hourglass,
+  Type,
 } from 'lucide-vue-next';
 import type { InstructionType } from './types';
 
@@ -118,6 +122,10 @@ export const ICONS = {
   'app-window': AppWindow,
   'square-x': SquareX,
   info: Info,
+  'minimize-2': Minimize2,
+  'maximize-2': Maximize2,
+  hourglass: Hourglass,
+  type: Type,
 } satisfies Record<string, Component>;
 
 export type IconName = keyof typeof ICONS;
@@ -165,6 +173,15 @@ export const INSTRUCTION_TYPE_ICONS: Record<InstructionType, IconName> = {
   While: 'rotate-cw',
   EscapeLoop: 'log-out',
   ContinueLoop: 'skip-forward',
+  WaitUntil: 'hourglass',
+  FocusWindow: 'app-window',
+  MinimizeWindow: 'minimize-2',
+  MaximizeWindow: 'maximize-2',
+  MoveWindow: 'move',
+  ClickElement: 'mouse-pointer-click',
+  SetElementValue: 'text-cursor',
+  SendKeyToWindow: 'key',
+  TypeTextInWindow: 'type',
 };
 
 export const INSTRUCTION_TYPE_LABELS: Record<InstructionType, string> = {
@@ -207,4 +224,13 @@ export const INSTRUCTION_TYPE_LABELS: Record<InstructionType, string> = {
   While: 'While',
   EscapeLoop: 'Escape Loop',
   ContinueLoop: 'Continue Loop',
+  WaitUntil: 'Wait Until',
+  FocusWindow: 'Focus Window',
+  MinimizeWindow: 'Minimize Window',
+  MaximizeWindow: 'Maximize Window',
+  MoveWindow: 'Move Window',
+  ClickElement: 'Click Element',
+  SetElementValue: 'Set Element Value',
+  SendKeyToWindow: 'Send Key to Window',
+  TypeTextInWindow: 'Type Text in Window',
 };

@@ -22,6 +22,28 @@ pub enum Axis {
     Horizontal,
 }
 
+/// Which window an accessibility-tree locator (`ClickElement`/
+/// `SetElementValue`/`Op::ElementText`&co.) searches — the "beginner" default
+/// vs. two narrower cross-app cases, mirroring `Coordinate`'s Abs/Rel toggle
+/// rather than exposing an always-visible app/title pair. See
+/// `crate::accessibility::ElementLocator`.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum ElementScope {
+    /// Search whichever window currently has OS focus — `app`/`title_contains`
+    /// fields are ignored; the locator's `name`/`role` alone narrow the
+    /// search. See `crate::window::focused_application`/`focused_window_title`.
+    Focused,
+    /// Search using the locator's own `app` field only (`title_contains` is
+    /// ignored) — for targeting an app other than whichever one is focused
+    /// right now (e.g. reading one app while about to click a button in
+    /// another), when any of that app's windows will do.
+    App,
+    /// Search using the locator's own `title_contains` field only (`app` is
+    /// ignored) — for targeting one specific window by its title regardless
+    /// of which app owns it.
+    Window,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MacroKey {
     Return,

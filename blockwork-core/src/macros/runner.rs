@@ -1,5 +1,5 @@
-use crate::input::types::{Coordinate, Direction, InputToken, MacroButton, MacroKey};
-use crate::input::value::{Evaluated, Op, Value};
+use crate::input::types::{Coordinate, Direction, ElementScope, InputToken, MacroButton, MacroKey};
+use crate::input::value::{non_empty, Evaluated, Op, Value};
 use crate::macros::backend::{create_backend, InputBackend};
 use crate::macros::priority::raise_current_thread_priority;
 use crate::macros::{Instruction, InstructionKind, ListItem, Macro};
@@ -318,6 +318,49 @@ const STOP_POLL_INTERVAL: Duration = Duration::from_millis(15);
 /// "should keep running", so this is just its negation behind the lock).
 fn stop_requested(flag: &Arc<Mutex<bool>>) -> bool {
     !flag.lock().map(|g| *g).unwrap_or(false)
+}
+
+/// Resolves a `FocusWindow`/`MinimizeWindow`/`MaximizeWindow`/`MoveWindow`
+/// instruction's app/title fields, shared by all four. `scope` picks which
+/// (if either) field is consulted (see `ElementScope`) — the field(s) hidden
+/// in the UI for the current scope are never evaluated, and come back as
+/// `None`, which lets the window backend's own matcher fall through to the
+/// topmost normal window, i.e. the focused one, in place of a filter.
+fn resolve_window_filters(
+    ctx: &mut ExecCtx,
+    scope: ElementScope,
+    app: &Value,
+    title_contains: &Value,
+    depth: u32,
+) -> Result<(Option<String>, Option<String>), String> {
+    match scope {
+        ElementScope::Focused => Ok((None, None)),
+        ElementScope::App => {
+            let app = ctx.resolve(app, depth).and_then(|v| v.eval_text())?;
+            Ok((non_empty(&app).map(str::to_string), None))
+        }
+        ElementScope::Window => {
+            let title = ctx.resolve(title_contains, depth).and_then(|v| v.eval_text())?;
+            Ok((None, non_empty(&title).map(str::to_string)))
+        }
+    }
+}
+
+/// Resolves a `ClickElement`/`SetElementValue` instruction's locator fields
+/// to plain text, shared by both — same spirit as `resolve_window_filters`.
+fn resolve_element_locator_fields(
+    ctx: &mut ExecCtx,
+    app: &Value,
+    title_contains: &Value,
+    name: &Value,
+    role: &Value,
+    depth: u32,
+) -> Result<(String, String, String, String), String> {
+    let app = ctx.resolve(app, depth).and_then(|v| v.eval_text())?;
+    let title = ctx.resolve(title_contains, depth).and_then(|v| v.eval_text())?;
+    let name = ctx.resolve(name, depth).and_then(|v| v.eval_text())?;
+    let role = ctx.resolve(role, depth).and_then(|v| v.eval_text())?;
+    Ok((app, title, name, role))
 }
 
 /// Converts a Scratch-style 1-based numeric index to a vector offset. An
@@ -709,6 +752,115 @@ fn run_block(
                     warn!("Failed to close app: {}", e);
                 }
             }
+            InstructionKind::FocusWindow { scope, app, title_contains } => {
+                match resolve_window_filters(ctx, *scope, app, title_contains, depth) {
+                    Ok((app, title)) => {
+                        if let Err(e) = crate::window::focus_window(app.as_deref(), title.as_deref()) {
+                            warn!("Failed to focus window: {}", e);
+                        }
+                    }
+                    Err(e) => warn!("Skipping FocusWindow: {}", e),
+                }
+            }
+            InstructionKind::MinimizeWindow { scope, app, title_contains } => {
+                match resolve_window_filters(ctx, *scope, app, title_contains, depth) {
+                    Ok((app, title)) => {
+                        if let Err(e) = crate::window::minimize_window(app.as_deref(), title.as_deref()) {
+                            warn!("Failed to minimize window: {}", e);
+                        }
+                    }
+                    Err(e) => warn!("Skipping MinimizeWindow: {}", e),
+                }
+            }
+            InstructionKind::MaximizeWindow { scope, app, title_contains } => {
+                match resolve_window_filters(ctx, *scope, app, title_contains, depth) {
+                    Ok((app, title)) => {
+                        if let Err(e) = crate::window::maximize_window(app.as_deref(), title.as_deref()) {
+                            warn!("Failed to maximize window: {}", e);
+                        }
+                    }
+                    Err(e) => warn!("Skipping MaximizeWindow: {}", e),
+                }
+            }
+            InstructionKind::MoveWindow { scope, app, title_contains, x, y } => {
+                match resolve_window_filters(ctx, *scope, app, title_contains, depth) {
+                    Ok((app, title)) => {
+                        let coords = ctx
+                            .resolve(x, depth)
+                            .and_then(|v| v.eval_number())
+                            .and_then(|x| Ok((x, ctx.resolve(y, depth).and_then(|v| v.eval_number())?)));
+                        match coords {
+                            Ok((x, y)) => {
+                                if let Err(e) = crate::window::move_window(app.as_deref(), title.as_deref(), x as i32, y as i32) {
+                                    warn!("Failed to move window: {}", e);
+                                }
+                            }
+                            Err(e) => warn!("Skipping MoveWindow: coordinate {}", e),
+                        }
+                    }
+                    Err(e) => warn!("Skipping MoveWindow: {}", e),
+                }
+            }
+            InstructionKind::ClickElement { scope, app, title_contains, name, role } => {
+                match resolve_element_locator_fields(ctx, app, title_contains, name, role, depth) {
+                    Ok((app, title, name, role)) => {
+                        let locator = crate::accessibility::ElementLocator {
+                            scope: *scope,
+                            app: non_empty(&app),
+                            title_contains: non_empty(&title),
+                            name: non_empty(&name),
+                            role: non_empty(&role),
+                        };
+                        if let Err(e) = crate::accessibility::click_element(&locator) {
+                            warn!("Failed to click element: {}", e);
+                        }
+                    }
+                    Err(e) => warn!("Skipping ClickElement: {}", e),
+                }
+            }
+            InstructionKind::SetElementValue { scope, app, title_contains, name, role, value } => {
+                match resolve_element_locator_fields(ctx, app, title_contains, name, role, depth) {
+                    Ok((app, title, name, role)) => match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {
+                        Ok(value) => {
+                            let locator = crate::accessibility::ElementLocator {
+                                scope: *scope,
+                                app: non_empty(&app),
+                                title_contains: non_empty(&title),
+                                name: non_empty(&name),
+                                role: non_empty(&role),
+                            };
+                            if let Err(e) = crate::accessibility::set_element_value(&locator, &value) {
+                                warn!("Failed to set element value: {}", e);
+                            }
+                        }
+                        Err(e) => warn!("Skipping SetElementValue: value {}", e),
+                    },
+                    Err(e) => warn!("Skipping SetElementValue: {}", e),
+                }
+            }
+            InstructionKind::SendKeyToWindow { scope, app, title_contains, key, modifiers } => {
+                match resolve_window_filters(ctx, *scope, app, title_contains, depth) {
+                    Ok((app, title)) => {
+                        if let Err(e) = crate::window::send_key_to_window(app.as_deref(), title.as_deref(), key, *modifiers) {
+                            warn!("Failed to send key to window: {}", e);
+                        }
+                    }
+                    Err(e) => warn!("Skipping SendKeyToWindow: {}", e),
+                }
+            }
+            InstructionKind::TypeTextInWindow { scope, app, title_contains, text } => {
+                match resolve_window_filters(ctx, *scope, app, title_contains, depth) {
+                    Ok((app, title)) => match ctx.resolve(text, depth).and_then(|v| v.eval_text()) {
+                        Ok(text) => {
+                            if let Err(e) = crate::window::type_text_in_window(app.as_deref(), title.as_deref(), &text) {
+                                warn!("Failed to type text in window: {}", e);
+                            }
+                        }
+                        Err(e) => warn!("Skipping TypeTextInWindow: text {}", e),
+                    },
+                    Err(e) => warn!("Skipping TypeTextInWindow: {}", e),
+                }
+            }
             InstructionKind::Return(value) => {
                 let resolved = ctx.resolve(value, depth)?;
                 return Ok(Flow::Return(resolved.eval()?));
@@ -869,6 +1021,38 @@ fn run_block(
                     } else {
                         spin_sleeper().sleep_until(deadline);
                     }
+                }
+            }
+            // Generic `wait until <condition>` — re-evaluates `condition` on
+            // the same `STOP_POLL_INTERVAL` cadence `Wait` polls its stop
+            // flag on, rather than a fixed deadline. Unlike `Wait`, there's
+            // no way to "catch up" here if a macro falls behind, since there
+            // is no duration to begin with; the loop just keeps polling
+            // until the condition holds, the run stops, or evaluating it
+            // errs (treated as "give up waiting", same as `While`'s own
+            // "Skipping While: condition {}" handling, so a bad condition
+            // can't hang the macro forever).
+            InstructionKind::WaitUntil(condition) => {
+                let mut stopped = false;
+                loop {
+                    if let Some(flag) = &ctx.stop_flag {
+                        if stop_requested(flag) {
+                            stopped = true;
+                            break;
+                        }
+                    }
+                    match ctx.resolve(condition, depth).and_then(|v| v.eval()) {
+                        Ok(cond) if cond.as_bool() => break,
+                        Ok(_) => {}
+                        Err(e) => {
+                            warn!("Skipping WaitUntil: condition {}", e);
+                            break;
+                        }
+                    }
+                    spin_sleeper().sleep(STOP_POLL_INTERVAL);
+                }
+                if stopped {
+                    break;
                 }
             }
             InstructionKind::Command(command) => {
@@ -2000,8 +2184,20 @@ mod tests {
             settings: crate::macros::MacroSettings::default(),
         };
         // Should return promptly (erroring out at MAX_CALL_DEPTH) rather than
-        // hanging or crashing the test process via a stack overflow.
-        mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+        // hanging or crashing the test process via a stack overflow. Run on
+        // a thread with a generous explicit stack: a single-entry-strand
+        // macro like this one runs `run_block`'s recursion straight on the
+        // calling thread (see `run_with_lists_offset`), and the default test
+        // thread stack (2 MiB) is only barely enough to reach
+        // `MAX_CALL_DEPTH` even without this test needing to grow further as
+        // `run_block` gains more instruction kinds over time.
+        let vars_for_thread = Arc::clone(&vars);
+        std::thread::Builder::new()
+            .stack_size(16 * 1024 * 1024)
+            .spawn(move || mac.run(noop_emulator(), None, 1.0, vars_for_thread))
+            .unwrap()
+            .join()
+            .unwrap();
         assert_eq!(vars.lock().unwrap().get("x"), None);
     }
 
@@ -2512,6 +2708,95 @@ mod tests {
             start.elapsed() < Duration::from_millis(1000),
             "forever loop wasn't stopped by the stop flag"
         );
+    }
+
+    /// `wait until <condition>` should return immediately if the condition
+    /// is already true — no polling at all.
+    #[test]
+    fn wait_until_returns_immediately_when_condition_already_true() {
+        let start = Instant::now();
+        run_instructions(
+            vec![Instruction::new(InstructionKind::WaitUntil(Value::Op {
+                op: Op::True,
+                args: vec![],
+                saved: Box::new(Value::Bool),
+            }))],
+            noop_emulator(),
+            None,
+            1.0,
+            empty_vars(),
+        );
+        assert!(start.elapsed() < Duration::from_millis(200), "wait until didn't return immediately for an already-true condition");
+    }
+
+    /// `wait until <condition>` should keep polling until a concurrently
+    /// mutated variable makes the condition true, same spirit as
+    /// `while_loop_runs_until_condition_goes_false` but for the one-shot
+    /// (non-looping) wait primitive.
+    #[test]
+    fn wait_until_polls_until_condition_becomes_true() {
+        let vars = empty_vars();
+        vars.lock().unwrap().insert("ready".to_string(), Evaluated::Bool(false));
+        let vars_for_thread = Arc::clone(&vars);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(50));
+            vars_for_thread.lock().unwrap().insert("ready".to_string(), Evaluated::Bool(true));
+        });
+        let start = Instant::now();
+        run_instructions(
+            vec![Instruction::new(InstructionKind::WaitUntil(Value::Var { name: "ready".to_string() }))],
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&vars),
+        );
+        assert!(start.elapsed() >= Duration::from_millis(40), "wait until returned before the condition actually became true");
+        assert!(start.elapsed() < Duration::from_millis(1000), "wait until didn't notice the condition becoming true promptly");
+    }
+
+    /// `wait until <condition>` should give up (not hang) if the condition
+    /// itself errs on evaluation — same "skip and move on" spirit as
+    /// `While`'s own unresolvable-condition handling.
+    #[test]
+    fn wait_until_gives_up_when_condition_errs() {
+        let start = Instant::now();
+        run_instructions(
+            vec![Instruction::new(InstructionKind::WaitUntil(Value::Op {
+                op: Op::Div,
+                args: vec![Value::number(1.0), Value::number(0.0)],
+                saved: Box::new(Value::Bool),
+            }))],
+            noop_emulator(),
+            None,
+            1.0,
+            empty_vars(),
+        );
+        assert!(start.elapsed() < Duration::from_millis(200), "wait until hung instead of giving up on an erroring condition");
+    }
+
+    /// A stop request should interrupt a `wait until` that would otherwise
+    /// poll forever, same as `forever_loop_is_interrupted_by_stop_flag`.
+    #[test]
+    fn wait_until_stops_when_stop_flag_is_set() {
+        let stop_flag = Arc::new(Mutex::new(true));
+        let flag_clone = Arc::clone(&stop_flag);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(50));
+            *flag_clone.lock().unwrap() = false;
+        });
+        let start = Instant::now();
+        run_instructions(
+            vec![Instruction::new(InstructionKind::WaitUntil(Value::Op {
+                op: Op::False,
+                args: vec![],
+                saved: Box::new(Value::Bool),
+            }))],
+            noop_emulator(),
+            Some(stop_flag),
+            1.0,
+            empty_vars(),
+        );
+        assert!(start.elapsed() < Duration::from_millis(1000), "wait until wasn't stopped by the stop flag");
     }
 
     /// `Return` inside a `Repeat` must unwind straight through the loop,

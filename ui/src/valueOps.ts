@@ -36,6 +36,17 @@ const CASE_OPTIONS = [
   { value: 'Lower', label: 'lowercase' },
 ];
 
+// Mirrors blockwork-core's `ElementScope` — shared by the three element
+// reporters below and by ClickElementFields.vue/SetElementValueFields.vue
+// (which use the same two wire strings to decide whether to show their
+// app/title fields at all, since a reporter's args can't be hidden the way
+// an instruction's custom field layout can).
+const ELEMENT_SCOPE_OPTIONS = [
+  { value: 'Focused Window', label: 'Focused Window' },
+  { value: 'Specific App', label: 'Specific App' },
+  { value: 'Specific Window', label: 'Specific Window' },
+];
+
 // Scratch's `([abs v] of ())` number reporter. Trig values use degrees; the
 // backend owns that behavior, while these strings are the serialized dropdown
 // values it matches on. `log2` appears in the supplied Scratch menu alongside
@@ -122,6 +133,26 @@ export const OPERATOR_KINDS: OperatorKindSpec[] = [
   // Zero-arity, like NewLine/Tab — evaluates to the live system battery percentage.
   { kind: 'BatteryPercentage', op: 'BatteryPercentage', arity: 0, argTypes: [], resultType: 'number', prefix: 'battery percentage' },
   { kind: 'PluggedIn', op: 'PluggedIn', arity: 0, argTypes: [], resultType: 'bool', prefix: 'plugged in' },
+  // Zero-arity, like BatteryPercentage — evaluates to the app/title of the
+  // currently focused window.
+  { kind: 'FocusedApplication', op: 'FocusedApplication', arity: 0, argTypes: [], resultType: 'text', prefix: 'focused application' },
+  { kind: 'FocusedWindowTitle', op: 'FocusedWindowTitle', arity: 0, argTypes: [], resultType: 'text', prefix: 'focused window title' },
+  { kind: 'ApplicationIsRunning', op: 'ApplicationIsRunning', arity: 1, argTypes: ['text'], resultType: 'bool', prefix: 'application', suffix: 'is running?' },
+  { kind: 'WindowExists', op: 'WindowExists', arity: 2, argTypes: ['text', 'text'], resultType: 'bool', prefix: 'window app', infix: 'title contains', suffix: 'exists?' },
+  // `args[0]` is the Focused/Specific-App toggle; `args[1..=4]` are the app
+  // filter, title-substring filter, element-name filter, element-role
+  // filter (e.g. "push button") — each blank matching anything. Five slots
+  // is more than the generic prefix/infix/suffix rendering can cleanly
+  // label one-by-one (same limit `Join3` already accepts at arity 3 with a
+  // bare `prefix` and no per-slot labels at all), so the exact order is
+  // spelled out in the suffix instead — see each kind's hover explainer in
+  // blockDetails.ts for the full picture. Unlike ClickElementFields.vue/
+  // SetElementValueFields.vue, app/title can't be visually hidden here (a
+  // reporter's args always render, unconditionally) — but "Focused Window"
+  // still makes them unnecessary to fill in for the common case.
+  { kind: 'ElementText', op: 'ElementText', arity: 5, argTypes: ['text', 'text', 'text', 'text', 'text'], resultType: 'text', prefix: 'text of element', suffix: '· app · title · name · role', enumArg: { index: 0, options: ELEMENT_SCOPE_OPTIONS } },
+  { kind: 'ElementExists', op: 'ElementExists', arity: 5, argTypes: ['text', 'text', 'text', 'text', 'text'], resultType: 'bool', prefix: 'element exists?', suffix: '· app · title · name · role', enumArg: { index: 0, options: ELEMENT_SCOPE_OPTIONS } },
+  { kind: 'ElementEnabled', op: 'ElementEnabled', arity: 5, argTypes: ['text', 'text', 'text', 'text', 'text'], resultType: 'bool', prefix: 'element enabled?', suffix: '· app · title · name · role', enumArg: { index: 0, options: ELEMENT_SCOPE_OPTIONS } },
   // Zero-arity, like BatteryPercentage — evaluates to the live clipboard text.
   { kind: 'ClipboardText', op: 'ClipboardText', arity: 0, argTypes: [], resultType: 'text', prefix: 'clipboard text' },
   // Zero-arity, like PluggedIn — evaluates to whether the clipboard currently

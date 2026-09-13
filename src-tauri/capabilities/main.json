@@ -2,8 +2,9 @@
   "$schema": "../gen/schemas/desktop-schema.json",
   "identifier": "main",
   "description": "Main window capability — grants access to core IPC and all app commands.",
-  "windows": ["main*"],
+  "windows": ["main*", "element-picker"],
   "permissions": [
-    "core:default"
+    "core:default",
+    "core:window:allow-close"
   ]
 }

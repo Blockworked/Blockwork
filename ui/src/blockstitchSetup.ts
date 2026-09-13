@@ -55,6 +55,12 @@ import ForeverFields from './components/fields/ForeverFields.vue';
 import WhileFields from './components/fields/WhileFields.vue';
 import EscapeLoopFields from './components/fields/EscapeLoopFields.vue';
 import ContinueLoopFields from './components/fields/ContinueLoopFields.vue';
+import WaitUntilFields from './components/fields/WaitUntilFields.vue';
+import WindowActionFields from './components/fields/WindowActionFields.vue';
+import ClickElementFields from './components/fields/ClickElementFields.vue';
+import SetElementValueFields from './components/fields/SetElementValueFields.vue';
+import SendKeyToWindowFields from './components/fields/SendKeyToWindowFields.vue';
+import TypeTextInWindowFields from './components/fields/TypeTextInWindowFields.vue';
 
 import PaletteWhenRanFields from './components/fields/palette/PaletteWhenRanFields.vue';
 import PaletteWhenBatteryDischargedToFields from './components/fields/palette/PaletteWhenBatteryDischargedToFields.vue';
@@ -84,6 +90,12 @@ import PaletteForeverFields from './components/fields/palette/PaletteForeverFiel
 import PaletteWhileFields from './components/fields/palette/PaletteWhileFields.vue';
 import PaletteEscapeLoopFields from './components/fields/palette/PaletteEscapeLoopFields.vue';
 import PaletteContinueLoopFields from './components/fields/palette/PaletteContinueLoopFields.vue';
+import PaletteWaitUntilFields from './components/fields/palette/PaletteWaitUntilFields.vue';
+import PaletteWindowActionFields from './components/fields/palette/PaletteWindowActionFields.vue';
+import PaletteClickElementFields from './components/fields/palette/PaletteClickElementFields.vue';
+import PaletteSetElementValueFields from './components/fields/palette/PaletteSetElementValueFields.vue';
+import PaletteSendKeyToWindowFields from './components/fields/palette/PaletteSendKeyToWindowFields.vue';
+import PaletteTypeTextInWindowFields from './components/fields/palette/PaletteTypeTextInWindowFields.vue';
 
 let didSetup = false;
 
@@ -102,7 +114,7 @@ export function setupBlockstitch(): void {
 const HEADER_TYPES: InstructionType[] = ['WhenRan', 'BlockHeader', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged', 'WhenClipboardChanged'];
 const ENTRY_TRIGGER_TYPES = new Set<InstructionType>(['WhenRan', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged', 'WhenClipboardChanged']);
 const CAP_TYPES: InstructionType[] = ['Return', 'EscapeLoop', 'ContinueLoop'];
-const STACK_TYPES: InstructionType[] = ['Wait', 'Text', 'Key', 'Button', 'MoveMouse', 'Scroll', 'Command', 'Comment', 'OpenApp', 'CloseApp', 'SetVariable', 'ChangeVariable', 'SetClipboard', 'AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList'];
+const STACK_TYPES: InstructionType[] = ['Wait', 'WaitUntil', 'Text', 'Key', 'Button', 'MoveMouse', 'Scroll', 'Command', 'Comment', 'OpenApp', 'CloseApp', 'SetVariable', 'ChangeVariable', 'SetClipboard', 'AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList', 'FocusWindow', 'MinimizeWindow', 'MaximizeWindow', 'MoveWindow', 'ClickElement', 'SetElementValue', 'SendKeyToWindow', 'TypeTextInWindow'];
 
 function registerShapes() {
   for (const type of HEADER_TYPES) {
@@ -204,6 +216,12 @@ function registerFields() {
   registerBlockField('While', WhileFields);
   registerBlockField('EscapeLoop', EscapeLoopFields);
   registerBlockField('ContinueLoop', ContinueLoopFields);
+  registerBlockField('WaitUntil', WaitUntilFields);
+  for (const type of ['FocusWindow', 'MinimizeWindow', 'MaximizeWindow', 'MoveWindow'] as const) registerBlockField(type, WindowActionFields);
+  registerBlockField('ClickElement', ClickElementFields);
+  registerBlockField('SetElementValue', SetElementValueFields);
+  registerBlockField('SendKeyToWindow', SendKeyToWindowFields);
+  registerBlockField('TypeTextInWindow', TypeTextInWindowFields);
 
   // Palette variants — BlockHeader/CallBlock/Comment are never a fixed
   // sidebar prefab (see components/PaletteCallBlock.vue and
@@ -237,6 +255,12 @@ function registerFields() {
   registerPaletteBlockField('While', PaletteWhileFields);
   registerPaletteBlockField('EscapeLoop', PaletteEscapeLoopFields);
   registerPaletteBlockField('ContinueLoop', PaletteContinueLoopFields);
+  registerPaletteBlockField('WaitUntil', PaletteWaitUntilFields);
+  for (const type of ['FocusWindow', 'MinimizeWindow', 'MaximizeWindow', 'MoveWindow'] as const) registerPaletteBlockField(type, PaletteWindowActionFields);
+  registerPaletteBlockField('ClickElement', PaletteClickElementFields);
+  registerPaletteBlockField('SetElementValue', PaletteSetElementValueFields);
+  registerPaletteBlockField('SendKeyToWindow', PaletteSendKeyToWindowFields);
+  registerPaletteBlockField('TypeTextInWindow', PaletteTypeTextInWindowFields);
 }
 
 // ── Canvas host ──────────────────────────────────────────────────────────────
@@ -351,7 +375,7 @@ function buildCanvasHost(): CanvasHost<InstructionDto> {
         const num = Number(trimmed);
         if (!isNaN(num)) {
           const fieldId = location.kind === 'Field' ? location.field_id : null;
-          invalid = fieldId === 'MoveMouseX' || fieldId === 'MoveMouseY' || fieldId === 'ScrollAmount' ? !Number.isInteger(num) : false;
+          invalid = fieldId === 'MoveMouseX' || fieldId === 'MoveMouseY' || fieldId === 'ScrollAmount' || fieldId === 'MoveWindowX' || fieldId === 'MoveWindowY' ? !Number.isInteger(num) : false;
         }
       }
       return { text: entry.text, invalid };

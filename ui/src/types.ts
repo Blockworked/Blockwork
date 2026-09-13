@@ -30,6 +30,13 @@ export type KeyDirection = 'Click' | 'Press' | 'Release';
 export type MouseButton = 'Left' | 'Right' | 'Middle' | 'Side' | 'Extra';
 export type Coordinate = 'Absolute' | 'Relative';
 export type ScrollAxis = 'Vertical' | 'Horizontal';
+// Which window an accessibility-tree locator searches — mirrors blockwork-core's
+// `ElementScope`. 'Focused Window' ignores app/title_contains entirely (see
+// ClickElementFields.vue/SetElementValueFields.vue, which hide those fields
+// for this choice) in favor of whichever window currently has OS focus.
+// 'Specific App' shows only the app field (title_contains ignored); 'Specific
+// Window' shows only the title_contains field (app ignored).
+export type ElementScope = 'Focused Window' | 'Specific App' | 'Specific Window';
 
 export type WeekdayDto = 'Sunday' | 'Monday' | 'Tuesday' | 'Wednesday' | 'Thursday' | 'Friday' | 'Saturday';
 
@@ -69,6 +76,18 @@ export type ValueOp =
   // Zero-arity boolean — whether the system is currently on external power
   // (always true with no battery/UPS present).
   | 'PluggedIn'
+  // Zero-arity text — the app owning the currently focused window (e.g.
+  // "firefox"), or the currently focused window's title, respectively.
+  | 'FocusedApplication' | 'FocusedWindowTitle'
+  // One arg (app name, case-insensitive substring match): whether a
+  // matching process is running. Two args (app filter, title-substring
+  // filter, either blank matching anything): whether any window matches both.
+  | 'ApplicationIsRunning' | 'WindowExists'
+  // Four args (app filter, title-substring filter, element-name filter,
+  // element-role filter — e.g. "push button" — each blank matching
+  // anything): best-effort text content / whether any element matches /
+  // whether a matching element exists and is enabled, respectively.
+  | 'ElementText' | 'ElementExists' | 'ElementEnabled'
   // Zero-arity — the live clipboard contents as text.
   | 'ClipboardText'
   // Zero-arity booleans — whether the clipboard currently holds image data
@@ -272,6 +291,15 @@ export type InstructionDto = { id: string } & (
   | { type: 'While'; condition: ValueDto; body: InstructionDto[] }
   | { type: 'EscapeLoop' }
   | { type: 'ContinueLoop' }
+  | { type: 'WaitUntil'; condition: ValueDto }
+  | { type: 'FocusWindow'; scope: ElementScope; app: ValueDto; title_contains: ValueDto }
+  | { type: 'MinimizeWindow'; scope: ElementScope; app: ValueDto; title_contains: ValueDto }
+  | { type: 'MaximizeWindow'; scope: ElementScope; app: ValueDto; title_contains: ValueDto }
+  | { type: 'MoveWindow'; scope: ElementScope; app: ValueDto; title_contains: ValueDto; x: ValueDto; y: ValueDto }
+  | { type: 'ClickElement'; scope: ElementScope; app: ValueDto; title_contains: ValueDto; name: ValueDto; role: ValueDto }
+  | { type: 'SetElementValue'; scope: ElementScope; app: ValueDto; title_contains: ValueDto; name: ValueDto; role: ValueDto; value: ValueDto }
+  | { type: 'SendKeyToWindow'; scope: ElementScope; app: ValueDto; title_contains: ValueDto; key: string; modifiers: number }
+  | { type: 'TypeTextInWindow'; scope: ElementScope; app: ValueDto; title_contains: ValueDto; text: ValueDto }
 );
 
 export type InstructionType = InstructionDto['type'];
@@ -326,6 +354,15 @@ export function defaultInstruction(type: InstructionType): InstructionDto {
     case 'While': return { id, type: 'While', condition: blankBoolValue(), body: [] };
     case 'EscapeLoop': return { id, type: 'EscapeLoop' };
     case 'ContinueLoop': return { id, type: 'ContinueLoop' };
+    case 'WaitUntil': return { id, type: 'WaitUntil', condition: blankBoolValue() };
+    case 'FocusWindow': return { id, type: 'FocusWindow', scope: 'Focused Window', app: textValue(''), title_contains: textValue('') };
+    case 'MinimizeWindow': return { id, type: 'MinimizeWindow', scope: 'Focused Window', app: textValue(''), title_contains: textValue('') };
+    case 'MaximizeWindow': return { id, type: 'MaximizeWindow', scope: 'Focused Window', app: textValue(''), title_contains: textValue('') };
+    case 'MoveWindow': return { id, type: 'MoveWindow', scope: 'Focused Window', app: textValue(''), title_contains: textValue(''), x: numberValue(0), y: numberValue(0) };
+    case 'ClickElement': return { id, type: 'ClickElement', scope: 'Focused Window', app: textValue(''), title_contains: textValue(''), name: textValue(''), role: textValue('') };
+    case 'SetElementValue': return { id, type: 'SetElementValue', scope: 'Focused Window', app: textValue(''), title_contains: textValue(''), name: textValue(''), role: textValue(''), value: textValue('') };
+    case 'SendKeyToWindow': return { id, type: 'SendKeyToWindow', scope: 'Focused Window', app: textValue(''), title_contains: textValue(''), key: 'Enter', modifiers: 0 };
+    case 'TypeTextInWindow': return { id, type: 'TypeTextInWindow', scope: 'Focused Window', app: textValue(''), title_contains: textValue(''), text: textValue('text') };
     default: return { id, type: 'Comment', comment: '' };
   }
 }
@@ -547,6 +584,53 @@ export interface PendingMacroHotkeyDto {
 export interface InvalidFieldDto {
   location: ValueLocationDto;
   text: string;
+}
+
+// Mirrors src-tauri's `WindowAtPointDto`/`PickedElementDto` — the element
+// picker's hover-hit-test result. `window` round-trips back into the next
+// `hit_test_element_at` call as a cache hint (see that command's doc
+// comment) so the overlay never needs its own geometry logic.
+export interface WindowAtPointDto {
+  app: string;
+  title: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+}
+
+export interface PickedElementDto {
+  app: string;
+  window_title: string;
+  name: string;
+  role: string;
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  window: WindowAtPointDto;
+}
+
+// Mirrors src-tauri's `ElementPickerMonitorDto`/`ElementPickerGeometryDto` —
+// the logical-space coordinate system `start_element_picker` opened the
+// overlay in. The overlay fetches this on mount (see
+// `ElementPickerOverlay.vue`) to map cursor positions to screen pixels
+// exactly on mixed-DPI desktops, where no single scale factor is right for
+// every monitor.
+export interface ElementPickerMonitorDto {
+  x: number;
+  y: number;
+  width: number;
+  height: number;
+  scale: number;
+}
+
+export interface ElementPickerGeometryDto {
+  origin_x: number;
+  origin_y: number;
+  width: number;
+  height: number;
+  monitors: ElementPickerMonitorDto[];
 }
 
 export type RecordingPhaseName = 'Idle' | 'Countdown' | 'Active';

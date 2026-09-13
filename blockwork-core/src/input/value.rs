@@ -72,6 +72,38 @@ pub enum Op {
     /// Zero-arity boolean — whether the system is currently receiving
     /// external power. See `crate::battery::is_plugged_in`.
     PluggedIn,
+    /// Zero-arity text — the app owning the currently focused window (e.g.
+    /// `"firefox"`), or an empty string if it can't be determined. See
+    /// `crate::window::focused_application`.
+    FocusedApplication,
+    /// Zero-arity text — the title of the currently focused window, or an
+    /// empty string if it can't be determined. See
+    /// `crate::window::focused_window_title`.
+    FocusedWindowTitle,
+    /// `args[0]` (app name, case-insensitive substring match) — whether a
+    /// matching process is currently running. See
+    /// `crate::window::is_app_running`.
+    ApplicationIsRunning,
+    /// `args[0]` (app name filter) / `args[1]` (title-substring filter,
+    /// case-insensitive) — whether any window matches both (a blank filter
+    /// matches anything). See `crate::window::window_exists`.
+    WindowExists,
+    /// `args[0]` is a fixed dropdown (`"Focused Window"`/`"Specific App"`,
+    /// see `enumArg` in `OPERATOR_KINDS` and `ElementScope`) rather than a
+    /// draggable value; `args[1..=4]` are the app filter, title-substring
+    /// filter, element-name filter and element-role filter (each blank
+    /// meaning "don't filter on this" — `args[1]`/`args[2]` are ignored
+    /// entirely when `args[0]` is `"Focused Window"`). Best-effort textual
+    /// content of the first matching element (empty text if nothing
+    /// matched). See `crate::accessibility::element_text`.
+    ElementText,
+    /// Same five args as `ElementText` — whether any element matches. See
+    /// `crate::accessibility::element_exists`.
+    ElementExists,
+    /// Same five args as `ElementText` — whether a matching element exists
+    /// *and* is currently enabled. See
+    /// `crate::accessibility::element_enabled`.
+    ElementEnabled,
     /// Zero-arity — current clipboard contents as text. See
     /// `crate::clipboard::get_text`.
     ClipboardText,
@@ -228,6 +260,22 @@ fn text_default() -> Value {
     Value::Text { value: String::new() }
 }
 
+/// Wire strings for `Op::ElementText`/`ElementExists`/`ElementEnabled`'s
+/// `args[0]` fixed dropdown — matches `ElementScope`'s three variants,
+/// spelled out (rather than "Focused"/"App"/"Window") because `valueOps.ts`'s
+/// `enumArg` dropdown shows these strings to the user verbatim, same as
+/// `CurrentTime`'s `"Year"`/`"Month"`/... options.
+const ELEMENT_SCOPE_FOCUSED: &str = "Focused Window";
+const ELEMENT_SCOPE_APP: &str = "Specific App";
+const ELEMENT_SCOPE_WINDOW: &str = "Specific Window";
+
+/// Default for the element reporters' scope dropdown — "Focused Window", so
+/// a freshly-dragged block only needs a name/role filled in for the common
+/// case (see `ElementScope`).
+fn element_scope_default() -> Value {
+    Value::Text { value: ELEMENT_SCOPE_FOCUSED.to_string() }
+}
+
 /// Default for a boolean-typed operand slot — blank (`Value::Bool`), same
 /// spirit as `text_default`, not a pre-filled `false`.
 fn bool_default() -> Value {
@@ -277,6 +325,38 @@ pub const OPERATOR_KINDS: &[OperatorKindSpec] = &[
     // Zero-arity, like True/False — evaluates to whether the system is
     // currently on external power.
     OperatorKindSpec { kind: "PluggedIn", op: Op::PluggedIn, arity: 0, default_args: Vec::new },
+    // Zero-arity, like BatteryPercentage — evaluates to the app owning the
+    // currently focused window.
+    OperatorKindSpec { kind: "FocusedApplication", op: Op::FocusedApplication, arity: 0, default_args: Vec::new },
+    // Zero-arity, like FocusedApplication — evaluates to the currently
+    // focused window's title.
+    OperatorKindSpec { kind: "FocusedWindowTitle", op: Op::FocusedWindowTitle, arity: 0, default_args: Vec::new },
+    OperatorKindSpec { kind: "ApplicationIsRunning", op: Op::ApplicationIsRunning, arity: 1, default_args: || vec![text_default()] },
+    OperatorKindSpec { kind: "WindowExists", op: Op::WindowExists, arity: 2, default_args: || vec![text_default(), text_default()] },
+    // `args[0]` is the Focused/Specific-App/Specific-Window toggle (see
+    // `ELEMENT_SCOPE_*` and `enumArg` below); `args[1..=4]` are the app filter, title-substring
+    // filter, element-name filter, element-role filter (e.g. "push button")
+    // — each blank matching anything. Shared shape across all three element
+    // reporters, and defaults to "Focused Window" so a freshly-dragged block
+    // only *needs* name/role filled in for the common case.
+    OperatorKindSpec {
+        kind: "ElementText",
+        op: Op::ElementText,
+        arity: 5,
+        default_args: || vec![element_scope_default(), text_default(), text_default(), text_default(), text_default()],
+    },
+    OperatorKindSpec {
+        kind: "ElementExists",
+        op: Op::ElementExists,
+        arity: 5,
+        default_args: || vec![element_scope_default(), text_default(), text_default(), text_default(), text_default()],
+    },
+    OperatorKindSpec {
+        kind: "ElementEnabled",
+        op: Op::ElementEnabled,
+        arity: 5,
+        default_args: || vec![element_scope_default(), text_default(), text_default(), text_default(), text_default()],
+    },
     // Zero-arity, like BatteryPercentage — evaluates to the live clipboard
     // text contents.
     OperatorKindSpec { kind: "ClipboardText", op: Op::ClipboardText, arity: 0, default_args: Vec::new },
@@ -319,6 +399,14 @@ fn char_last_index_of(haystack: &str, needle: &str) -> usize {
         return 0;
     }
     (0..=h.len() - n.len()).rev().find(|&i| h[i..i + n.len()] == n[..]).map_or(0, |i| i + 1)
+}
+
+/// Treats a blank string as "no filter" — shared by `Op::WindowExists` here
+/// and the `FocusWindow`/`MinimizeWindow`/`MaximizeWindow`/`MoveWindow`
+/// instructions in `macros::runner`, both of which pass user-editable
+/// app/title fields through to `crate::window`.
+pub(crate) fn non_empty(s: &str) -> Option<&str> {
+    if s.is_empty() { None } else { Some(s) }
 }
 
 /// `Op::Eq`'s comparison rule: numeric if both sides parse as a number,
@@ -418,6 +506,43 @@ impl Value {
             Value::Op { op: Op::False, .. } => Ok(Evaluated::Bool(false)),
             Value::Op { op: Op::BatteryPercentage, .. } => Ok(Evaluated::Number(crate::battery::percentage()?)),
             Value::Op { op: Op::PluggedIn, .. } => Ok(Evaluated::Bool(crate::battery::is_plugged_in())),
+            Value::Op { op: Op::FocusedApplication, .. } => Ok(Evaluated::Text(crate::window::focused_application().unwrap_or_default())),
+            Value::Op { op: Op::FocusedWindowTitle, .. } => Ok(Evaluated::Text(crate::window::focused_window_title().unwrap_or_default())),
+            Value::Op { op: Op::ApplicationIsRunning, args, .. } => Ok(Evaluated::Bool(crate::window::is_app_running(&args[0].eval_text()?))),
+            Value::Op { op: Op::WindowExists, args, .. } => {
+                let app = args[0].eval_text()?;
+                let title = args[1].eval_text()?;
+                Ok(Evaluated::Bool(crate::window::window_exists(non_empty(&app), non_empty(&title))))
+            }
+            Value::Op { op: op @ (Op::ElementText | Op::ElementExists | Op::ElementEnabled), args, .. } => {
+                // Bound to locals (rather than inlined) so `locator`'s
+                // borrows below stay valid for the rest of this arm.
+                let scope_text = args[0].eval_text()?;
+                let scope = if scope_text == ELEMENT_SCOPE_APP {
+                    crate::accessibility::ElementScope::App
+                } else if scope_text == ELEMENT_SCOPE_WINDOW {
+                    crate::accessibility::ElementScope::Window
+                } else {
+                    crate::accessibility::ElementScope::Focused
+                };
+                let app = args[1].eval_text()?;
+                let title = args[2].eval_text()?;
+                let name = args[3].eval_text()?;
+                let role = args[4].eval_text()?;
+                let locator = crate::accessibility::ElementLocator {
+                    scope,
+                    app: non_empty(&app),
+                    title_contains: non_empty(&title),
+                    name: non_empty(&name),
+                    role: non_empty(&role),
+                };
+                Ok(match op {
+                    Op::ElementText => Evaluated::Text(crate::accessibility::element_text(&locator).unwrap_or_default()),
+                    Op::ElementExists => Evaluated::Bool(crate::accessibility::element_exists(&locator)),
+                    Op::ElementEnabled => Evaluated::Bool(crate::accessibility::element_enabled(&locator)),
+                    _ => unreachable!("matched above"),
+                })
+            }
             Value::Op { op: Op::ClipboardText, .. } => Ok(Evaluated::Text(crate::clipboard::get_text()?)),
             Value::Op { op: Op::ClipboardHasImage, .. } => Ok(Evaluated::Bool(crate::clipboard::has_image())),
             Value::Op { op: Op::ClipboardHasFiles, .. } => Ok(Evaluated::Bool(crate::clipboard::has_file_list())),
@@ -476,7 +601,9 @@ impl Value {
                     }
                     Op::Join | Op::NewLine | Op::Tab | Op::Length | Op::IndexOf | Op::LastIndexOf | Op::LetterOf | Op::Case
                     | Op::Round | Op::Math | Op::True | Op::False | Op::Not | Op::And | Op::Or | Op::Eq | Op::Neq | Op::Gt | Op::Lt
-                    | Op::Gte | Op::Lte | Op::BatteryPercentage | Op::PluggedIn | Op::ClipboardText | Op::ClipboardHasImage
+                    | Op::Gte | Op::Lte | Op::BatteryPercentage | Op::PluggedIn | Op::FocusedApplication | Op::FocusedWindowTitle
+                    | Op::ApplicationIsRunning | Op::WindowExists | Op::ElementText | Op::ElementExists | Op::ElementEnabled
+                    | Op::ClipboardText | Op::ClipboardHasImage
                     | Op::ClipboardHasFiles | Op::CurrentTime
                     | Op::ListItem | Op::ListItemNumber | Op::ListAmount | Op::ListLength | Op::ListContains | Op::ListItemExists | Op::ListIsEmpty => unreachable!("matched above"),
                 };
