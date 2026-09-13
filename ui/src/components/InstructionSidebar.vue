@@ -7,7 +7,7 @@ import PaletteCallBlock from './PaletteCallBlock.vue';
 import PaletteCallValueBlock from './PaletteCallValueBlock.vue';
 import MakeVariableDialog from './MakeVariableDialog.vue';
 import MakeBlockDialog from './MakeBlockDialog.vue';
-import { OPERATOR_KINDS } from '../valueOps';
+import { OPERATOR_KINDS, specForKind } from '../valueOps';
 import { applyPaletteValueEdit, paletteInstructions, paletteValueFor } from '../paletteState';
 import { state } from '../store';
 import { blockShapeReturnsValue, sortedVariableNames } from '../types';
@@ -34,6 +34,16 @@ const VALUE_KINDS: ValueKind[] = ['Number', 'Text', ...OPERATOR_KINDS.map(s => s
 
 // One reporter block per declared variable, alphabetical.
 const variableKinds = computed<ValueKind[]>(() => sortedVariableNames(state.current_macro).map(n => `Var:${n}` as ValueKind));
+
+// PaletteValueBlock derives its hexagon-vs-capsule shape from blockstitch's
+// own operator registry (via `specForKind(kind)`), but the canvas's
+// ValueBlock derives the same shape from `specForOp(op)` — drive the palette
+// explicitly from Blockwork's own registry instead, so the two can never
+// disagree (a boolean-returning operator must already look boolean here,
+// not only after it's dropped onto the canvas).
+function isBoolKind(kind: ValueKind): boolean {
+  return specForKind(kind)?.resultType === 'bool';
+}
 
 // blockstitch's PaletteValueBlock emits its own generic ValueNode shape (its
 // `op` is a plain string, since blockstitch doesn't know Blockwork's ValueOp
@@ -69,6 +79,7 @@ function onSidebarContextMenu(event: MouseEvent) {
           :key="kind"
           :kind="kind"
           :value="paletteValueFor(kind)"
+          :bool-override="isBoolKind(kind)"
           @update:value="v => onValueUpdate(kind, v)"
         />
       </div>
