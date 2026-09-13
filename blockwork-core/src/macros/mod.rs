@@ -132,6 +132,7 @@ impl BlockKind for InstructionKind {
             | InstructionKind::Return(value)
             | InstructionKind::WhenBatteryDischargedTo(value)
             | InstructionKind::WhenBatteryChargedTo(value)
+            | InstructionKind::SetClipboard(value)
             | InstructionKind::SetVariable(_, value)
             | InstructionKind::ChangeVariable(_, value)
             | InstructionKind::Repeat { count: value, .. } => f(value, InputValueType::Any),
@@ -163,6 +164,7 @@ impl BlockKind for InstructionKind {
             | InstructionKind::WhenTime(_)
             | InstructionKind::WhenPowerPluggedIn
             | InstructionKind::WhenPowerUnplugged
+            | InstructionKind::WhenClipboardChanged
             | InstructionKind::Forever { .. }
             | InstructionKind::OpenApp { .. }
             | InstructionKind::CloseApp { .. }
@@ -185,6 +187,7 @@ impl BlockKind for InstructionKind {
                 | InstructionKind::WhenTime(_)
                 | InstructionKind::WhenPowerPluggedIn
                 | InstructionKind::WhenPowerUnplugged
+                | InstructionKind::WhenClipboardChanged
         )
     }
 
@@ -295,6 +298,12 @@ pub enum InstructionKind {
     /// instead - never fires at all on a system with no battery/UPS, since
     /// `is_plugged_in` is always `true` there.
     WhenPowerUnplugged,
+    /// Header-only marker, no payload (like `WhenPowerPluggedIn`) - excluded
+    /// from Run/Loop and driven by a background watcher (`clipboard_watch`
+    /// in the desktop app), which fires this strand's body whenever the
+    /// clipboard's contents change. Edge-triggered like the other watcher
+    /// headers, but with no threshold to recover past - any change fires it.
+    WhenClipboardChanged,
     /// Launches an installed application, chosen via the desktop app's "Open
     /// App" picker (`src-tauri`'s `installed_apps` module lists candidates).
     /// `command` is the already-resolved, platform-specific launch string
@@ -325,6 +334,9 @@ pub enum InstructionKind {
     /// No-op if `value` isn't numeric; the variable is coerced to `0` first
     /// if it wasn't already numeric.
     ChangeVariable(String, Value),
+    /// `set clipboard to <value>` — overwrites the system clipboard with the
+    /// value's text. See `crate::clipboard::set_text`.
+    SetClipboard(Value),
     /// Appends a number/text value to a named list. Boolean values are ignored.
     AddToList {
         value: Value,
@@ -577,6 +589,13 @@ impl std::hash::Hash for InstructionKind {
                 30u8.hash(state);
                 name.hash(state);
             }
+            Self::SetClipboard(v) => {
+                31u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenClipboardChanged => {
+                32u8.hash(state);
+            }
         }
     }
 }
@@ -593,6 +612,7 @@ enum InstructionKindDe {
     WhenTime(TimeSchedule),
     WhenPowerPluggedIn,
     WhenPowerUnplugged,
+    WhenClipboardChanged,
     OpenApp {
         command: String,
         name: String,
@@ -605,6 +625,7 @@ enum InstructionKindDe {
     },
     SetVariable(String, Value),
     ChangeVariable(String, Value),
+    SetClipboard(Value),
     AddToList {
         value: Value,
         name: String,
@@ -726,6 +747,7 @@ impl From<InstructionKindDe> for InstructionKind {
             InstructionKindDe::WhenTime(s) => InstructionKind::WhenTime(s),
             InstructionKindDe::WhenPowerPluggedIn => InstructionKind::WhenPowerPluggedIn,
             InstructionKindDe::WhenPowerUnplugged => InstructionKind::WhenPowerUnplugged,
+            InstructionKindDe::WhenClipboardChanged => InstructionKind::WhenClipboardChanged,
             InstructionKindDe::OpenApp {
                 command,
                 name,
@@ -746,6 +768,7 @@ impl From<InstructionKindDe> for InstructionKind {
             },
             InstructionKindDe::SetVariable(n, v) => InstructionKind::SetVariable(n, v),
             InstructionKindDe::ChangeVariable(n, v) => InstructionKind::ChangeVariable(n, v),
+            InstructionKindDe::SetClipboard(v) => InstructionKind::SetClipboard(v),
             InstructionKindDe::AddToList { value, name } => {
                 InstructionKind::AddToList { value, name }
             }
@@ -861,6 +884,7 @@ impl InstructionKind {
             | InstructionKind::Return(value)
             | InstructionKind::WhenBatteryDischargedTo(value)
             | InstructionKind::WhenBatteryChargedTo(value) => rename_list_in_value(value, old, new),
+            InstructionKind::SetClipboard(value) => rename_list_in_value(value, old, new),
             InstructionKind::Token(token) => token.rename_list(old, new),
             InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
                 rename_list_in_value(value, old, new)
@@ -943,6 +967,7 @@ impl InstructionKind {
             | InstructionKind::WhenTime(_)
             | InstructionKind::WhenPowerPluggedIn
             | InstructionKind::WhenPowerUnplugged
+            | InstructionKind::WhenClipboardChanged
             | InstructionKind::OpenApp { .. }
             | InstructionKind::CloseApp { .. } => {}
         }

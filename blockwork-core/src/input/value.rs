@@ -3,9 +3,10 @@
 
 pub use blockstitch_core::value::*;
 
-/// Blockwork's own operators, in blockstitch's extension shape. Both read
-/// live system state, so neither takes operands - see [`crate::battery`].
-/// The wire names are what they serialized as before, so saves keep loading.
+/// Blockwork's own operators, in blockstitch's extension shape. They read
+/// live system state, so none takes operands - see [`crate::battery`] and
+/// [`crate::clipboard`]. The wire names are what they serialized as before,
+/// so saves keep loading.
 static OPERATORS: &[ExtOperator] = &[
     ExtOperator {
         kind: "BatteryPercentage",
@@ -20,6 +21,27 @@ static OPERATORS: &[ExtOperator] = &[
         arity: 0,
         default_args: Vec::new,
         eval: |_| Ok(Evaluated::Bool(crate::battery::is_plugged_in())),
+    },
+    ExtOperator {
+        kind: "ClipboardText",
+        op: "ClipboardText",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Text(crate::clipboard::get_text()?)),
+    },
+    ExtOperator {
+        kind: "ClipboardHasImage",
+        op: "ClipboardHasImage",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Bool(crate::clipboard::has_image())),
+    },
+    ExtOperator {
+        kind: "ClipboardHasFiles",
+        op: "ClipboardHasFiles",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Bool(crate::clipboard::has_file_list())),
     },
 ];
 

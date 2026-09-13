@@ -28,6 +28,7 @@ import WhenBatteryChargedToFields from './components/fields/WhenBatteryChargedTo
 import WhenTimeFields from './components/fields/WhenTimeFields.vue';
 import WhenPowerPluggedInFields from './components/fields/WhenPowerPluggedInFields.vue';
 import WhenPowerUnpluggedFields from './components/fields/WhenPowerUnpluggedFields.vue';
+import WhenClipboardChangedFields from './components/fields/WhenClipboardChangedFields.vue';
 import WaitFields from './components/fields/WaitFields.vue';
 import TextFields from './components/fields/TextFields.vue';
 import KeyFields from './components/fields/KeyFields.vue';
@@ -40,6 +41,7 @@ import CloseAppFields from './components/fields/CloseAppFields.vue';
 import CommentFields from './components/fields/CommentFields.vue';
 import SetVariableFields from './components/fields/SetVariableFields.vue';
 import ChangeVariableFields from './components/fields/ChangeVariableFields.vue';
+import SetClipboardFields from './components/fields/SetClipboardFields.vue';
 import ListCommandFields from './components/fields/ListCommandFields.vue';
 import BlockHeaderFields from './components/fields/BlockHeaderFields.vue';
 import CallBlockFields from './components/fields/CallBlockFields.vue';
@@ -60,6 +62,7 @@ import PaletteWhenBatteryChargedToFields from './components/fields/palette/Palet
 import PaletteWhenTimeFields from './components/fields/palette/PaletteWhenTimeFields.vue';
 import PaletteWhenPowerPluggedInFields from './components/fields/palette/PaletteWhenPowerPluggedInFields.vue';
 import PaletteWhenPowerUnpluggedFields from './components/fields/palette/PaletteWhenPowerUnpluggedFields.vue';
+import PaletteWhenClipboardChangedFields from './components/fields/palette/PaletteWhenClipboardChangedFields.vue';
 import PaletteWaitFields from './components/fields/palette/PaletteWaitFields.vue';
 import PaletteTextFields from './components/fields/palette/PaletteTextFields.vue';
 import PaletteKeyFields from './components/fields/palette/PaletteKeyFields.vue';
@@ -71,6 +74,7 @@ import PaletteOpenAppFields from './components/fields/palette/PaletteOpenAppFiel
 import PaletteCloseAppFields from './components/fields/palette/PaletteCloseAppFields.vue';
 import PaletteSetVariableFields from './components/fields/palette/PaletteSetVariableFields.vue';
 import PaletteChangeVariableFields from './components/fields/palette/PaletteChangeVariableFields.vue';
+import PaletteSetClipboardFields from './components/fields/palette/PaletteSetClipboardFields.vue';
 import PaletteListCommandFields from './components/fields/palette/PaletteListCommandFields.vue';
 import PaletteReturnFields from './components/fields/palette/PaletteReturnFields.vue';
 import PaletteIfFields from './components/fields/palette/PaletteIfFields.vue';
@@ -95,10 +99,10 @@ export function setupBlockstitch(): void {
 }
 
 // ── Shapes ───────────────────────────────────────────────────────────────────
-const HEADER_TYPES: InstructionType[] = ['WhenRan', 'BlockHeader', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged'];
-const ENTRY_TRIGGER_TYPES = new Set<InstructionType>(['WhenRan', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged']);
+const HEADER_TYPES: InstructionType[] = ['WhenRan', 'BlockHeader', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged', 'WhenClipboardChanged'];
+const ENTRY_TRIGGER_TYPES = new Set<InstructionType>(['WhenRan', 'WhenBatteryDischargedTo', 'WhenBatteryChargedTo', 'WhenTime', 'WhenPowerPluggedIn', 'WhenPowerUnplugged', 'WhenClipboardChanged']);
 const CAP_TYPES: InstructionType[] = ['Return', 'EscapeLoop', 'ContinueLoop'];
-const STACK_TYPES: InstructionType[] = ['Wait', 'Text', 'Key', 'Button', 'MoveMouse', 'Scroll', 'Command', 'Comment', 'OpenApp', 'CloseApp', 'SetVariable', 'ChangeVariable', 'AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList'];
+const STACK_TYPES: InstructionType[] = ['Wait', 'Text', 'Key', 'Button', 'MoveMouse', 'Scroll', 'Command', 'Comment', 'OpenApp', 'CloseApp', 'SetVariable', 'ChangeVariable', 'SetClipboard', 'AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList'];
 
 function registerShapes() {
   for (const type of HEADER_TYPES) {
@@ -173,6 +177,7 @@ function registerFields() {
   registerBlockField('WhenTime', WhenTimeFields);
   registerBlockField('WhenPowerPluggedIn', WhenPowerPluggedInFields);
   registerBlockField('WhenPowerUnplugged', WhenPowerUnpluggedFields);
+  registerBlockField('WhenClipboardChanged', WhenClipboardChangedFields);
   registerBlockField('Wait', WaitFields);
   registerBlockField('Text', TextFields);
   registerBlockField('Key', KeyFields);
@@ -185,6 +190,7 @@ function registerFields() {
   registerBlockField('Comment', CommentFields);
   registerBlockField('SetVariable', SetVariableFields);
   registerBlockField('ChangeVariable', ChangeVariableFields);
+  registerBlockField('SetClipboard', SetClipboardFields);
   for (const type of ['AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList'] as const) registerBlockField(type, ListCommandFields);
   registerBlockField('BlockHeader', BlockHeaderFields);
   registerBlockField('CallBlock', CallBlockFields);
@@ -209,6 +215,7 @@ function registerFields() {
   registerPaletteBlockField('WhenTime', PaletteWhenTimeFields);
   registerPaletteBlockField('WhenPowerPluggedIn', PaletteWhenPowerPluggedInFields);
   registerPaletteBlockField('WhenPowerUnplugged', PaletteWhenPowerUnpluggedFields);
+  registerPaletteBlockField('WhenClipboardChanged', PaletteWhenClipboardChangedFields);
   registerPaletteBlockField('Wait', PaletteWaitFields);
   registerPaletteBlockField('Text', PaletteTextFields);
   registerPaletteBlockField('Key', PaletteKeyFields);
@@ -220,6 +227,7 @@ function registerFields() {
   registerPaletteBlockField('CloseApp', PaletteCloseAppFields);
   registerPaletteBlockField('SetVariable', PaletteSetVariableFields);
   registerPaletteBlockField('ChangeVariable', PaletteChangeVariableFields);
+  registerPaletteBlockField('SetClipboard', PaletteSetClipboardFields);
   for (const type of ['AddToList', 'DeleteOfList', 'DeleteAllOfList', 'ShiftList', 'InsertIntoList', 'ReplaceItemOfList', 'ReverseList'] as const) registerPaletteBlockField(type, PaletteListCommandFields);
   registerPaletteBlockField('Return', PaletteReturnFields);
   registerPaletteBlockField('If', PaletteIfFields);

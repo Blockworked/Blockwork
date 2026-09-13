@@ -107,6 +107,12 @@ export const OPERATOR_KINDS: OperatorKindSpec[] = [
   { kind: 'False', op: 'False', arity: 0, argTypes: [], resultType: 'bool', prefix: 'false' },
   { kind: 'BatteryPercentage', op: 'BatteryPercentage', arity: 0, argTypes: [], resultType: 'number', prefix: 'battery percentage' },
   { kind: 'PluggedIn', op: 'PluggedIn', arity: 0, argTypes: [], resultType: 'bool', prefix: 'plugged in?' },
+  // Zero-arity, like BatteryPercentage - evaluates to the live clipboard text.
+  { kind: 'ClipboardText', op: 'ClipboardText', arity: 0, argTypes: [], resultType: 'text', prefix: 'clipboard text' },
+  // Zero-arity, like PluggedIn - evaluates to whether the clipboard currently
+  // holds image data or a file list, respectively.
+  { kind: 'ClipboardHasImage', op: 'ClipboardHasImage', arity: 0, argTypes: [], resultType: 'bool', prefix: 'clipboard has image' },
+  { kind: 'ClipboardHasFiles', op: 'ClipboardHasFiles', arity: 0, argTypes: [], resultType: 'bool', prefix: 'clipboard has files' },
   { kind: 'CurrentTime', op: 'CurrentTime', arity: 1, argTypes: ['text'], resultType: 'number', prefix: 'current', enumArg: { index: 0, options: CURRENT_TIME_OPTIONS } },
   { kind: 'ListItem', op: 'ListItem', arity: 2, argTypes: ['number', 'text'], resultType: 'text', prefix: 'item', infix: 'of', enumArg: { index: 1, options: LIST_NAME_OPTIONS } },
   { kind: 'ListItemNumber', op: 'ListItemNumber', arity: 2, argTypes: ['text', 'text'], resultType: 'number', prefix: 'item # of', infix: 'in', enumArg: { index: 1, options: LIST_NAME_OPTIONS } },

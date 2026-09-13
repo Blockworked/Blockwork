@@ -6,6 +6,7 @@
 //! local socket (see `blockwork-protocol`).
 
 pub(crate) mod battery_watch;
+pub(crate) mod clipboard_watch;
 pub(crate) mod commands;
 mod dispatch;
 pub(crate) mod installed_apps;
@@ -232,6 +233,9 @@ impl Backend {
 
         // ── Background time-event watcher (see time_watch.rs) ────────────
         time_watch::start(Arc::clone(&shared), app.clone());
+
+        // ── Background clipboard-event watcher (see clipboard_watch.rs) ───
+        clipboard_watch::start(Arc::clone(&shared), app.clone());
 
         // ── QueueSignal consumer (hotkeys and the recording stop key) ────
         {

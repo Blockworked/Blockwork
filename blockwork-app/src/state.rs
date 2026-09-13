@@ -321,6 +321,9 @@ pub(crate) enum InstructionDto {
     WhenPowerUnplugged {
         id: String,
     },
+    WhenClipboardChanged {
+        id: String,
+    },
     OpenApp {
         id: String,
         command: String,
@@ -341,6 +344,10 @@ pub(crate) enum InstructionDto {
     ChangeVariable {
         id: String,
         name: String,
+        value: Value,
+    },
+    SetClipboard {
+        id: String,
         value: Value,
     },
     AddToList { id: String, value: Value, name: String },
@@ -554,6 +561,7 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         },
         InstructionKind::WhenPowerPluggedIn => InstructionDto::WhenPowerPluggedIn { id },
         InstructionKind::WhenPowerUnplugged => InstructionDto::WhenPowerUnplugged { id },
+        InstructionKind::WhenClipboardChanged => InstructionDto::WhenClipboardChanged { id },
         InstructionKind::OpenApp {
             command,
             name,
@@ -582,6 +590,10 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         InstructionKind::ChangeVariable(name, value) => InstructionDto::ChangeVariable {
             id,
             name: name.clone(),
+            value: value.clone(),
+        },
+        InstructionKind::SetClipboard(value) => InstructionDto::SetClipboard {
+            id,
             value: value.clone(),
         },
         InstructionKind::AddToList { value, name } => InstructionDto::AddToList { id, value: value.clone(), name: name.clone() },
@@ -756,6 +768,7 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         InstructionDto::WhenTime { id, schedule } => (id, InstructionKind::WhenTime(*schedule)),
         InstructionDto::WhenPowerPluggedIn { id } => (id, InstructionKind::WhenPowerPluggedIn),
         InstructionDto::WhenPowerUnplugged { id } => (id, InstructionKind::WhenPowerUnplugged),
+        InstructionDto::WhenClipboardChanged { id } => (id, InstructionKind::WhenClipboardChanged),
         InstructionDto::OpenApp {
             id,
             command,
@@ -789,6 +802,10 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         InstructionDto::ChangeVariable { id, name, value } => (
             id,
             InstructionKind::ChangeVariable(name.clone(), value.clone()),
+        ),
+        InstructionDto::SetClipboard { id, value } => (
+            id,
+            InstructionKind::SetClipboard(value.clone()),
         ),
         InstructionDto::AddToList { id, value, name } => (id, InstructionKind::AddToList { value: value.clone(), name: name.clone() }),
         InstructionDto::DeleteOfList { id, index, name } => (id, InstructionKind::DeleteOfList { index: index.clone(), name: name.clone() }),

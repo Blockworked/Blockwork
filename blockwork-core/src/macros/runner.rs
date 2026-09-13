@@ -454,7 +454,8 @@ impl Macro {
                 | Some(InstructionKind::WhenBatteryChargedTo(_))
                 | Some(InstructionKind::WhenTime(_))
                 | Some(InstructionKind::WhenPowerPluggedIn)
-                | Some(InstructionKind::WhenPowerUnplugged) => {}
+                | Some(InstructionKind::WhenPowerUnplugged)
+                | Some(InstructionKind::WhenClipboardChanged) => {}
                 _ => {}
             }
         }
@@ -660,6 +661,7 @@ fn run_block(
             InstructionKind::WhenTime(_) => {}
             InstructionKind::WhenPowerPluggedIn => {}
             InstructionKind::WhenPowerUnplugged => {}
+            InstructionKind::WhenClipboardChanged => {}
             InstructionKind::OpenApp { command, .. } => {
                 println!("Opening app: {command}");
                 if let Err(e) = open_app(command) {
@@ -1013,6 +1015,16 @@ fn run_block(
                         }
                     }
                     Err(e) => warn!("Skipping Change Variable: {}", e),
+                }
+            }
+            InstructionKind::SetClipboard(value) => {
+                match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {
+                    Ok(text) => {
+                        if let Err(e) = crate::clipboard::set_text(text) {
+                            warn!("Failed to set clipboard: {}", e);
+                        }
+                    }
+                    Err(e) => warn!("Skipping Set Clipboard: {}", e),
                 }
             }
             InstructionKind::AddToList { value, name } => {
