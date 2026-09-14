@@ -30,10 +30,25 @@ pub struct UpdateInfo {
 }
 
 /// Release asset holding the macOS app bundle for the current architecture,
-/// e.g. `blockwork-macos-arm64.app.zip`.
+/// e.g. `blockwork-macos-arm64.app.zip`. Note the release uses Go-style arch
+/// names (`arm64`), not Rust's (`aarch64`), so the two are translated here.
 #[cfg(any(target_os = "macos", test))]
 fn macos_asset_name() -> String {
-    format!("blockwork-macos-{}.app.zip", std::env::consts::ARCH)
+    format!(
+        "blockwork-macos-{}.app.zip",
+        release_arch_name(std::env::consts::ARCH)
+    )
+}
+
+/// Release arch naming follows .github/workflows/release.yml, which uses
+/// Go-style names: `std::env::consts::ARCH` is `aarch64` on Apple Silicon,
+/// but that artifact is named `blockwork-macos-arm64`.
+#[cfg(any(target_os = "macos", test))]
+fn release_arch_name(rust_arch: &str) -> &str {
+    match rust_arch {
+        "aarch64" => "arm64",
+        arch => arch,
+    }
 }
 
 fn build_updater(current_version: &str) -> Result<Update, String> {
@@ -264,12 +279,24 @@ mod tests {
     #[test]
     fn macos_asset_name_matches_release_artifact() {
         // Must match the artifact_name values produced by
-        // .github/workflows/release.yml for the macOS matrix entries.
-        let name = macos_asset_name();
-        assert!(
-            name.starts_with("blockwork-macos-") && name.ends_with(".app.zip"),
-            "unexpected asset name: {name}"
+        // .github/workflows/release.yml for the macOS matrix entries, which
+        // use `arm64` (not Rust's `aarch64`).
+        assert_eq!(
+            macos_asset_name(),
+            format!(
+                "blockwork-macos-{}.app.zip",
+                release_arch_name(std::env::consts::ARCH)
+            )
         );
+    }
+
+    #[test]
+    fn release_arch_name_translates_aarch64_to_arm64() {
+        // The actual Apple Silicon release artifact is
+        // `blockwork-macos-arm64.app.zip`, while `std::env::consts::ARCH` on
+        // that machine is `aarch64` — the updater must emit the former.
+        assert_eq!(release_arch_name("aarch64"), "arm64");
+        assert_eq!(release_arch_name("x86_64"), "x86_64");
     }
 
     #[test]
