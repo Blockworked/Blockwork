@@ -12,8 +12,8 @@
 #ifndef OutputBaseFilename
   #define OutputBaseFilename "blockwork-windows-x86_64-setup"
 #endif
-#define MyAppPublisher "Ethan Stokes"
-#define MyAppURL "https://github.com/EthanRStokes/blockwork"
+#define MyAppPublisher "Blockworked"
+#define MyAppURL "https://github.com/Blockworked/Blockwork"
 #define CEFDir "..\target\" + TargetTriple + "\release"
 
 [Setup]

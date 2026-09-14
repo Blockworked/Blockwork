@@ -1,7 +1,7 @@
 [
     {
         "type": "git",
-        "url": "https://github.com/ethanrstokes/cef-rs",
+        "url": "https://github.com/blockworked/cef-rs",
         "commit": "b8fad9223f140f075a178a824de8a5e56e63d491",
         "dest": "flatpak-cargo/git/cef-rs-b8fad92"
     },
@@ -13,7 +13,7 @@
     },
     {
         "type": "git",
-        "url": "https://github.com/ethanrstokes/tauri",
+        "url": "https://github.com/blockworked/tauri",
         "commit": "a477e80d41111f411960db7d3d2782b75b7d9580",
         "dest": "flatpak-cargo/git/tauri-a477e80"
     },
@@ -8563,7 +8563,7 @@
     },
     {
         "type": "inline",
-        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/ethanrstokes/cef-rs\"]\ngit = \"https://github.com/ethanrstokes/cef-rs\"\nreplace-with = \"vendored-sources\"\nrev = \"b8fad92\"\n\n[source.\"https://github.com/tauri-apps/winit-gtk4\"]\ngit = \"https://github.com/tauri-apps/winit-gtk4\"\nreplace-with = \"vendored-sources\"\nbranch = \"master\"\n\n[source.\"https://github.com/ethanrstokes/tauri\"]\ngit = \"https://github.com/ethanrstokes/tauri\"\nreplace-with = \"vendored-sources\"\nrev = \"a477e80d\"\n",
+        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/blockworked/cef-rs\"]\ngit = \"https://github.com/blockworked/cef-rs\"\nreplace-with = \"vendored-sources\"\nrev = \"b8fad92\"\n\n[source.\"https://github.com/tauri-apps/winit-gtk4\"]\ngit = \"https://github.com/tauri-apps/winit-gtk4\"\nreplace-with = \"vendored-sources\"\nbranch = \"master\"\n\n[source.\"https://github.com/blockworked/tauri\"]\ngit = \"https://github.com/blockworked/tauri\"\nreplace-with = \"vendored-sources\"\nrev = \"a477e80d\"\n",
         "dest": "cargo",
         "dest-filename": "config"
     }

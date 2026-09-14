@@ -1,5 +1,5 @@
 name := "blockwork"
-appid := "dev.ethanstokes.Blockwork"
+appid := "com.blockworked.Blockwork"
 
 # Variables
 TARGET := "target/release/blockwork"
@@ -43,7 +43,7 @@ blockstitch-local path="../../blockstitch":
 blockstitch-published commit="":
     git update-index --no-skip-worktree ui/package.json ui/pnpm-lock.yaml
     git checkout -- ui/package.json ui/pnpm-lock.yaml
-    if [ -n "{{commit}}" ]; then cd ui && npm pkg set dependencies.blockstitch="github:EthanRStokes/blockstitch#{{commit}}"; fi
+    if [ -n "{{commit}}" ]; then cd ui && npm pkg set dependencies.blockstitch="github:Blockworked/blockstitch#{{commit}}"; fi
     cd ui && pnpm install
 
 # Install the project

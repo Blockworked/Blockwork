@@ -6,7 +6,7 @@ A Tauri app to visually create and run macros on Windows, Linux, and macOS.
 
 ### Build
 ```bash
-git clone https://github.com/EthanRStokes/blockwork.git blockwork && cd blockwork
+git clone https://github.com/Blockworked/blockwork.git blockwork && cd blockwork
 just
 ```
 

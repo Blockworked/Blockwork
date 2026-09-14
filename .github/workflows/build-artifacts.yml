@@ -294,11 +294,11 @@ jobs:
 
       - name: Build Flatpak
         # Builds the Rust workspace + frontend from source inside the sandbox,
-        # fully offline (see packaging/flatpak/dev.ethanstokes.Blockwork.yml) --
+        # fully offline (see packaging/flatpak/com.blockworked.Blockwork.yml) --
         # no host `cargo build` needed here.
         run: |
-          flatpak-builder --force-clean --user --repo=flatpak-repo flatpak-build packaging/flatpak/dev.ethanstokes.Blockwork.yml
-          flatpak build-bundle flatpak-repo ${{ matrix.artifact_name }}.flatpak dev.ethanstokes.Blockwork stable
+          flatpak-builder --force-clean --user --repo=flatpak-repo flatpak-build packaging/flatpak/com.blockworked.Blockwork.yml
+          flatpak build-bundle flatpak-repo ${{ matrix.artifact_name }}.flatpak com.blockworked.Blockwork stable
 
       - name: Upload Flatpak artifact
         uses: actions/upload-artifact@v4

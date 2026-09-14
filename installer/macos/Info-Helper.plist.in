@@ -5,7 +5,7 @@
     <key>CFBundleName</key>
     <string>__HELPER_NAME__</string>
     <key>CFBundleIdentifier</key>
-    <string>dev.ethanstokes.Blockwork.helper__SUFFIX__</string>
+    <string>com.blockworked.Blockwork.helper__SUFFIX__</string>
     <key>CFBundleVersion</key>
     <string>__VERSION__</string>
     <key>CFBundleShortVersionString</key>

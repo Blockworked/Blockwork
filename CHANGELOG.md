@@ -120,13 +120,13 @@ Initial release.
 - Global shortcuts (navigation, loop mode) on Linux; global keybinds on Windows.
 - App icons, updater and confirm dialogs, Wayland support.
 
-[Unreleased]: https://github.com/EthanRStokes/Blockwork/compare/0.5.2...HEAD
-[0.5.2]: https://github.com/EthanRStokes/Blockwork/compare/0.5.1...0.5.2
-[0.5.1]: https://github.com/EthanRStokes/Blockwork/compare/0.5.0...0.5.1
-[0.5.0]: https://github.com/EthanRStokes/Blockwork/compare/0.4.0...0.5.0
-[0.4.0]: https://github.com/EthanRStokes/Blockwork/compare/0.3.1...0.4.0
-[0.3.1]: https://github.com/EthanRStokes/Blockwork/compare/0.3.0...0.3.1
-[0.3.0]: https://github.com/EthanRStokes/Blockwork/compare/0.2.1...0.3.0
-[0.2.1]: https://github.com/EthanRStokes/Blockwork/compare/0.2.0...0.2.1
-[0.2.0]: https://github.com/EthanRStokes/Blockwork/compare/0.1.0...0.2.0
-[0.1.0]: https://github.com/EthanRStokes/Blockwork/releases/tag/0.1.0
+[Unreleased]: https://github.com/Blockworked/Blockwork/compare/0.5.2...HEAD
+[0.5.2]: https://github.com/Blockworked/Blockwork/compare/0.5.1...0.5.2
+[0.5.1]: https://github.com/Blockworked/Blockwork/compare/0.5.0...0.5.1
+[0.5.0]: https://github.com/Blockworked/Blockwork/compare/0.4.0...0.5.0
+[0.4.0]: https://github.com/Blockworked/Blockwork/compare/0.3.1...0.4.0
+[0.3.1]: https://github.com/Blockworked/Blockwork/compare/0.3.0...0.3.1
+[0.3.0]: https://github.com/Blockworked/Blockwork/compare/0.2.1...0.3.0
+[0.2.1]: https://github.com/Blockworked/Blockwork/compare/0.2.0...0.2.1
+[0.2.0]: https://github.com/Blockworked/Blockwork/compare/0.1.0...0.2.0
+[0.1.0]: https://github.com/Blockworked/Blockwork/releases/tag/0.1.0

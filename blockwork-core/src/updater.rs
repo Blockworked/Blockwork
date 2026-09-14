@@ -16,7 +16,7 @@ use self_update::backends::github::Update;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const REPO_OWNER: &str = "EthanRStokes";
+const REPO_OWNER: &str = "Blockworked";
 const REPO_NAME: &str = "blockwork";
 // Must match the artifact_name values produced by .github/workflows/release.yml.
 #[cfg(windows)]

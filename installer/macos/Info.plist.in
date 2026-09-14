@@ -7,7 +7,7 @@
     <key>CFBundleDisplayName</key>
     <string>Blockwork</string>
     <key>CFBundleIdentifier</key>
-    <string>dev.ethanstokes.Blockwork</string>
+    <string>com.blockworked.Blockwork</string>
     <key>CFBundleVersion</key>
     <string>__VERSION__</string>
     <key>CFBundleShortVersionString</key>

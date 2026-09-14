@@ -1,6 +1,6 @@
 {
   "productName": "Blockwork",
-  "identifier": "dev.ethanstokes.Blockwork",
+  "identifier": "com.blockworked.Blockwork",
   "build": {
     "frontendDist": "../ui/dist"
   },

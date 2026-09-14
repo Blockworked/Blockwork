@@ -1,4 +1,4 @@
-app-id: dev.ethanstokes.Blockwork
+app-id: com.blockworked.Blockwork
 # org.gnome.Platform (not org.freedesktop.Platform) for GTK3, which tao/wry needs
 # for the window itself. webkit2gtk is unused: the "cef" feature keeps wry from
 # ever linking webkit2gtk-sys.
@@ -167,9 +167,9 @@ modules:
       - cp -r target/release/locales /app/lib/blockwork/locales
       # 5. Desktop file, icon, AppStream metainfo. Icon= must match the app id
       # for flatpak export, hence the sed rename from res/blockwork.desktop's Icon=blockwork.
-      - sed 's/^Icon=blockwork$/Icon=dev.ethanstokes.Blockwork/' res/blockwork.desktop > dev.ethanstokes.Blockwork.desktop
-      - install -Dm644 dev.ethanstokes.Blockwork.desktop /app/share/applications/dev.ethanstokes.Blockwork.desktop
-      - install -Dm644 res/icons/blockwork.png /app/share/icons/hicolor/256x256/apps/dev.ethanstokes.Blockwork.png
+      - sed 's/^Icon=blockwork$/Icon=com.blockworked.Blockwork/' res/blockwork.desktop > com.blockworked.Blockwork.desktop
+      - install -Dm644 com.blockworked.Blockwork.desktop /app/share/applications/com.blockworked.Blockwork.desktop
+      - install -Dm644 res/icons/blockwork.png /app/share/icons/hicolor/256x256/apps/com.blockworked.Blockwork.png
     sources:
       # Local checkout including uncommitted changes, for `just flatpak-build`
       # iteration. Before a real Flathub submission, swap for a pinned `type: git`
