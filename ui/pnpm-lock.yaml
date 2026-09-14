@@ -12,8 +12,8 @@ importers:
         specifier: ^2.0.0
         version: 2.11.1
       blockstitch:
-        specifier: github:EthanRStokes/blockstitch#6b21e68d
-        version: https://codeload.github.com/EthanRStokes/blockstitch/tar.gz/6b21e68d8f230ae1963bffde92b8686f45296280(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3))
+        specifier: github:EthanRStokes/blockstitch#76e0e970
+        version: https://codeload.github.com/EthanRStokes/blockstitch/tar.gz/76e0e970e2201a4acfed9e73a1227d72bf2a128e(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3))
       lucide-vue-next:
         specifier: ^0.469.0
         version: 0.469.0(vue@3.5.39(typescript@5.9.3))
@@ -424,8 +424,8 @@ packages:
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
 
-  blockstitch@https://codeload.github.com/EthanRStokes/blockstitch/tar.gz/6b21e68d8f230ae1963bffde92b8686f45296280:
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/EthanRStokes/blockstitch/tar.gz/6b21e68d8f230ae1963bffde92b8686f45296280}
+  blockstitch@https://codeload.github.com/EthanRStokes/blockstitch/tar.gz/76e0e970e2201a4acfed9e73a1227d72bf2a128e:
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/EthanRStokes/blockstitch/tar.gz/76e0e970e2201a4acfed9e73a1227d72bf2a128e}
     version: 0.1.0
     peerDependencies:
       lucide-vue-next: ^0.469.0
@@ -854,7 +854,7 @@ snapshots:
 
   balanced-match@1.0.2: {}
 
-  blockstitch@https://codeload.github.com/EthanRStokes/blockstitch/tar.gz/6b21e68d8f230ae1963bffde92b8686f45296280(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3)):
+  blockstitch@https://codeload.github.com/EthanRStokes/blockstitch/tar.gz/76e0e970e2201a4acfed9e73a1227d72bf2a128e(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3)):
     dependencies:
       lucide-vue-next: 0.469.0(vue@3.5.39(typescript@5.9.3))
       vue: 3.5.39(typescript@5.9.3)

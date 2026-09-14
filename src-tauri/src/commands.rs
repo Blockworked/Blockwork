@@ -12,15 +12,15 @@ use blockwork_core::input::types::InputToken;
 use blockwork_core::input::value::{Evaluated, OPERATOR_KINDS, Value};
 use blockwork_core::macros::runner::VariableStore;
 use blockwork_core::macros::{
-    BlockPiece, BlockShape, Comment, FloatingValue, Instruction, InstructionKind, Macro,
-    SPEED_MULTIPLIER_RANGE, Strand, VariableDef, loop_control,
+    BlockPiece, BlockShape, Comment, FloatingValue, InputValueType, Instruction, InstructionKind,
+    Macro, SPEED_MULTIPLIER_RANGE, Strand, VariableDef, loop_control,
     normalize_block_color as normalize_persisted_block_color,
 };
 use blockwork_core::recording;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
-use tauri::{Runtime, State};
+use tauri::{Manager, Runtime, State};
 use tracing::warn;
 
 const CLEAR_CONFIRM_TIMEOUT_SECS: u64 = 3;
@@ -39,6 +39,7 @@ fn push_undo(s: &mut crate::state::AppState) {
             floating_values: mac.floating_values.clone(),
             comments: mac.comments.clone(),
             block_defs: mac.block_defs.clone(),
+            variables: mac.variables.clone(),
         });
         s.redo_stack.clear();
     }
@@ -288,8 +289,7 @@ fn rename_variable_in(mac: &mut Macro, old_name: &str, new_name: &str) -> Result
     Ok(trimmed)
 }
 
-/// Renames a declared variable and every reference to it. No `push_undo`,
-/// same as `create_variable`.
+/// Renames a declared variable and every reference to it.
 #[tauri::command]
 pub(crate) fn rename_variable<R: Runtime>(
     state: State<SharedState>,
@@ -298,13 +298,34 @@ pub(crate) fn rename_variable<R: Runtime>(
     new_name: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
-    let trimmed = rename_variable_in(mac, &old_name, &new_name)?;
-    if trimmed != old_name {
-        if let Ok(mut store) = s.variable_values.lock() {
-            if let Some(v) = store.remove(&old_name) {
-                store.insert(trimmed, v);
-            }
+    // Validate before checkpointing so rejected or no-op renames do not add
+    // useless undo entries.
+    let trimmed = new_name.trim().to_string();
+    {
+        let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+        if trimmed.is_empty() {
+            return Err("Variable name can't be empty".to_string());
+        }
+        if trimmed != old_name && mac.variables.iter().any(|var| var.name == trimmed) {
+            return Err(format!("A variable named \"{trimmed}\" already exists"));
+        }
+        if !mac.variables.iter().any(|var| var.name == old_name) {
+            return Err("Variable not found".to_string());
+        }
+    }
+    if trimmed == old_name {
+        return Ok(());
+    }
+
+    push_undo(&mut s);
+    rename_variable_in(
+        s.current_macro.as_mut().ok_or("No macro selected")?,
+        &old_name,
+        &trimmed,
+    )?;
+    if let Ok(mut store) = s.variable_values.lock() {
+        if let Some(v) = store.remove(&old_name) {
+            store.insert(trimmed, v);
         }
     }
     auto_save(&s);
@@ -1267,8 +1288,65 @@ pub(crate) fn set_value_kind<R: Runtime>(
     result
 }
 
+/// Returns the correct blank value for a top-level input field. In
+/// particular, a Boolean custom-block argument must restore its blank
+/// hexagon, rather than a generic numeric zero.
+fn default_value_for_location(mac: &Macro, location: &ValueLocation) -> Value {
+    let ValueLocation::Field {
+        strand_id,
+        index,
+        field_id,
+        path,
+    } = location
+    else {
+        return Value::number(0.0);
+    };
+    if !path.is_empty() {
+        return Value::number(0.0);
+    }
+    if matches!(field_id, FieldId::Condition) {
+        return Value::Bool;
+    }
+    let FieldId::CallArg(arg_index) = field_id else {
+        return Value::number(0.0);
+    };
+    let Some(strand) = mac.strand(strand_id) else {
+        return Value::number(0.0);
+    };
+    let Some((instructions, instruction_index)) = resolve_body(&strand.instructions, index) else {
+        return Value::number(0.0);
+    };
+    let Some(Instruction {
+        kind: InstructionKind::CallBlock { block_id, .. },
+        ..
+    }) = instructions.get(instruction_index)
+    else {
+        return Value::number(0.0);
+    };
+    let is_boolean = mac
+        .block_defs
+        .iter()
+        .find(|definition| definition.id.as_str() == block_id)
+        .and_then(|definition| {
+            definition
+                .pieces
+                .iter()
+                .filter_map(|piece| match piece {
+                    BlockPiece::Input { value_type, .. } => Some(*value_type),
+                    BlockPiece::Label { .. } => None,
+                })
+                .nth(*arg_index)
+        })
+        == Some(InputValueType::Bool);
+    if is_boolean {
+        Value::Bool
+    } else {
+        Value::number(0.0)
+    }
+}
+
 /// Removes the value at `location` and returns it, leaving a `Field`
-/// location holding whatever it was shadowing (or `0` for a plain leaf); a
+/// location holding whatever it was shadowing (or its typed blank value); a
 /// root `Floating` location is deleted entirely. Pairs with `put_value`/
 /// `create_floating_value` on the frontend side of a drag.
 #[tauri::command]
@@ -1291,10 +1369,11 @@ pub(crate) fn take_value<R: Runtime>(
                 return Some(mac.floating_values.remove(idx).value);
             }
         }
+        let fallback = default_value_for_location(mac, &loc);
         let node = resolve_location_mut(mac, &loc)?;
         let restored = match &*node {
-            Value::Op { saved, .. } => (**saved).clone(),
-            _ => Value::number(0.0),
+            Value::Op { saved, .. } | Value::Call { saved, .. } => (**saved).clone(),
+            _ => fallback,
         };
         Some(std::mem::replace(node, restored))
     })();
@@ -1323,7 +1402,7 @@ pub(crate) fn put_value<R: Runtime>(
     if let Some(mac) = &mut s.current_macro {
         if let Some(node) = resolve_location_mut(mac, &loc) {
             let mut incoming = dto_to_value(&value);
-            if let Value::Op { saved, .. } = &mut incoming {
+            if let Value::Op { saved, .. } | Value::Call { saved, .. } = &mut incoming {
                 *saved = Box::new(node.clone());
             }
             *node = incoming;
@@ -1768,6 +1847,7 @@ fn perform_undo<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>) -> R
             floating_values: m.floating_values.clone(),
             comments: m.comments.clone(),
             block_defs: m.block_defs.clone(),
+            variables: m.variables.clone(),
         });
         if let Some(cur) = current {
             s.redo_stack.push(cur);
@@ -1777,8 +1857,10 @@ fn perform_undo<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>) -> R
             mac.floating_values = prev.floating_values;
             mac.comments = prev.comments;
             mac.block_defs = prev.block_defs;
+            mac.variables = prev.variables;
             mac.ensure_id();
         }
+        sync_variable_values(&mut s);
         s.invalid_field_buffers.clear();
         // Without this, the next keystroke into the same field would see a
         // "continuing" session and skip pushing a new undo step.
@@ -1797,6 +1879,7 @@ fn perform_redo<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>) -> R
             floating_values: m.floating_values.clone(),
             comments: m.comments.clone(),
             block_defs: m.block_defs.clone(),
+            variables: m.variables.clone(),
         });
         if let Some(cur) = current {
             s.undo_stack.push(cur);
@@ -1806,8 +1889,10 @@ fn perform_redo<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>) -> R
             mac.floating_values = next.floating_values;
             mac.comments = next.comments;
             mac.block_defs = next.block_defs;
+            mac.variables = next.variables;
             mac.ensure_id();
         }
+        sync_variable_values(&mut s);
         s.invalid_field_buffers.clear();
         s.text_edit_session = None;
         auto_save(&s);
@@ -2419,6 +2504,22 @@ pub(crate) fn close_settings<R: Runtime>(
     s.combo_capture = None;
     s.pending_macro_hotkey = None;
     emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Resets Chromium page zoom to 100%. Handled here rather than by the
+/// browser's own Ctrl+0 accelerator, which this CEF runtime can't be relied
+/// on to deliver (opt-in per webview; absent entirely on Alloy-style
+/// webviews).
+#[tauri::command]
+pub(crate) fn reset_zoom<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
+    let windows = app.webview_windows();
+    if windows.is_empty() {
+        return Err("no app window".to_string());
+    }
+    for window in windows.values() {
+        window.set_zoom(1.0).map_err(|e| e.to_string())?;
+    }
     Ok(())
 }
 

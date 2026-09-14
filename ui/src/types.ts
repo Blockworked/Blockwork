@@ -24,7 +24,7 @@ import {
   isHeaderType as bsIsHeaderType,
   isWrapType as bsIsWrapType,
 } from 'blockstitch';
-import type { NodePath, PathStep, ValueLocation } from 'blockstitch';
+import type { BlockNode, NodePath, PathStep, ValueLocation } from 'blockstitch';
 
 export type KeyDirection = 'Click' | 'Press' | 'Release';
 export type MouseButton = 'Left' | 'Right' | 'Middle' | 'Side' | 'Extra';
@@ -91,7 +91,10 @@ export type ValueDto =
   | { kind: 'Op'; op: ValueOp; args: ValueDto[]; saved: ValueDto }
   | { kind: 'Var'; name: string }
   | { kind: 'Param'; name: string }
-  | { kind: 'Call'; block_id: string; args: ValueDto[]; saved: ValueDto };
+  // `branches` mirrors blockstitch's `ValueNode.Call` shape (used for a
+  // custom block with callback-body branches); Blockwork doesn't support
+  // that yet, so it's always empty.
+  | { kind: 'Call'; block_id: string; args: ValueDto[]; branches: BlockNode[][]; saved: ValueDto };
 
 export function numberValue(value: number): ValueDto {
   return bsNumberValue(value);
@@ -133,7 +136,7 @@ export function defaultValueForKind(kind: ValueKind): ValueDto {
   if (kind.startsWith('Param:')) return { kind: 'Param', name: parseParamKind(kind).name };
   // Normally blockDefs.ts's paletteCallValueFor handles `Call:` (it needs the
   // block's input count); this is just a safe zero-arg fallback.
-  if (kind.startsWith('Call:')) return { kind: 'Call', block_id: kind.slice('Call:'.length), args: [], saved: numberValue(0) };
+  if (kind.startsWith('Call:')) return { kind: 'Call', block_id: kind.slice('Call:'.length), args: [], branches: [], saved: numberValue(0) };
   const spec = specForKind(kind);
   if (!spec) throw new Error(`Unknown value kind: ${kind}`);
   return { kind: 'Op', op: spec.op, args: Array.from({ length: spec.arity }, (_, i) => defaultArgFor(spec, i)), saved: numberValue(0) };

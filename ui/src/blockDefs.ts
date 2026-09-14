@@ -45,7 +45,7 @@ function currentArgs(blockId: string): ValueDto[] {
 /** The `ValueDto` a "My Blocks" reporter prefab represents — mirrors
  * paletteState.ts's `paletteValueFor`, but for dynamic-arity `Call:<blockId>` kinds. */
 export function paletteCallValueFor(blockId: string): ValueDto {
-  return { kind: 'Call', block_id: blockId, args: currentArgs(blockId), saved: numberValue(0) };
+  return { kind: 'Call', block_id: blockId, args: currentArgs(blockId), branches: [], saved: numberValue(0) };
 }
 
 /** The `InstructionDto` a "My Blocks" command prefab represents —

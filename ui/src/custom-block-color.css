@@ -64,6 +64,27 @@ body:not(.bs-dragging) .instruction-row.blockwork-custom-block:hover::before {
   background: color-mix(in srgb, var(--blockwork-custom-block-color) 30%, var(--blockstitch-border));
 }
 
+/* ValueBlock has reactive class/style bindings of its own. A floating card's
+   wrapper is stable across those updates, so use it to retain the selected
+   custom-block color when a reporter is dragged back onto the canvas. Header
+   parameters stay neutral at rest (they only receive this color on hover);
+   actual custom reporter calls retain their full identity color. */
+.value-floating-card.blockwork-custom-floating-value > .value-card-shape:hover {
+  border-color: var(--blockwork-custom-block-color);
+}
+
+.value-floating-card.blockwork-custom-floating-value > .value-card-shape-bool:hover::before {
+  background: var(--blockwork-custom-block-color);
+}
+
+.value-floating-card.blockwork-custom-floating-operator > .value-card-shape {
+  border-color: var(--blockwork-custom-block-color);
+}
+
+.value-floating-card.blockwork-custom-floating-operator > .value-card-shape-bool::before {
+  background: var(--blockwork-custom-block-color);
+}
+
 /* A header parameter is a palette-style prefab, whose drag ghost is a clone
    rendered elsewhere in the document. While that clone is active, suppress
    the source header's hover treatment so the colored outline belongs only to

@@ -130,6 +130,11 @@ export const toggleRecordMouseMovement = (enabled: boolean) =>
 export const openSettings = () => invoke<void>('open_settings');
 export const closeSettings = () => invoke<void>('close_settings');
 
+// ─── View ───────────────────────────────────────────────────────────────────
+/** Resets Chromium page zoom to 100% (see `reset_zoom` — Ctrl/Cmd+0 can't
+ * rely on the browser's own accelerator in this CEF runtime). */
+export const resetZoom = () => invoke<void>('reset_zoom');
+
 // ─── Hotkeys ────────────────────────────────────────────────────────────────
 export const startComboCapture = (action: HotkeyActionDto) =>
   invoke<void>('start_combo_capture', { action });

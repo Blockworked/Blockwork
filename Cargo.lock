@@ -4876,7 +4876,7 @@ checksum = "61c41af27dd6d1e27b1b16b489db798443478cef1f06a660c96db617ba5de3b1"
 [[package]]
 name = "tauri"
 version = "2.11.5"
-source = "git+https://github.com/EthanRStokes/tauri?rev=e8458ba7#e8458ba70255f045901526b60eb490284d706612"
+source = "git+https://github.com/EthanRStokes/tauri?rev=f82b5b07#f82b5b0717b6f9d2b60c820230b15dbd1970d2f5"
 dependencies = [
  "anyhow",
  "bytes",
@@ -4923,7 +4923,7 @@ dependencies = [
 [[package]]
 name = "tauri-build"
 version = "2.6.3"
-source = "git+https://github.com/EthanRStokes/tauri?rev=e8458ba7#e8458ba70255f045901526b60eb490284d706612"
+source = "git+https://github.com/EthanRStokes/tauri?rev=f82b5b07#f82b5b0717b6f9d2b60c820230b15dbd1970d2f5"
 dependencies = [
  "anyhow",
  "cargo_toml",
@@ -4943,7 +4943,7 @@ dependencies = [
 [[package]]
 name = "tauri-codegen"
 version = "2.6.3"
-source = "git+https://github.com/EthanRStokes/tauri?rev=e8458ba7#e8458ba70255f045901526b60eb490284d706612"
+source = "git+https://github.com/EthanRStokes/tauri?rev=f82b5b07#f82b5b0717b6f9d2b60c820230b15dbd1970d2f5"
 dependencies = [
  "base64 0.22.1",
  "brotli",
@@ -4969,7 +4969,7 @@ dependencies = [
 [[package]]
 name = "tauri-macros"
 version = "2.6.3"
-source = "git+https://github.com/EthanRStokes/tauri?rev=e8458ba7#e8458ba70255f045901526b60eb490284d706612"
+source = "git+https://github.com/EthanRStokes/tauri?rev=f82b5b07#f82b5b0717b6f9d2b60c820230b15dbd1970d2f5"
 dependencies = [
  "heck 0.5.0",
  "proc-macro2",
@@ -4982,7 +4982,7 @@ dependencies = [
 [[package]]
 name = "tauri-runtime"
 version = "2.11.3"
-source = "git+https://github.com/EthanRStokes/tauri?rev=e8458ba7#e8458ba70255f045901526b60eb490284d706612"
+source = "git+https://github.com/EthanRStokes/tauri?rev=f82b5b07#f82b5b0717b6f9d2b60c820230b15dbd1970d2f5"
 dependencies = [
  "cookie",
  "dpi",
@@ -5003,7 +5003,7 @@ dependencies = [
 [[package]]
 name = "tauri-runtime-cef"
 version = "0.1.0"
-source = "git+https://github.com/EthanRStokes/tauri?rev=e8458ba7#e8458ba70255f045901526b60eb490284d706612"
+source = "git+https://github.com/EthanRStokes/tauri?rev=f82b5b07#f82b5b0717b6f9d2b60c820230b15dbd1970d2f5"
 dependencies = [
  "base64 0.22.1",
  "cef",
@@ -5032,6 +5032,8 @@ dependencies = [
  "tauri-runtime",
  "tauri-utils",
  "url",
+ "wayland-backend",
+ "wayland-client",
  "windows",
  "winit",
  "x11-dl",
@@ -5040,7 +5042,7 @@ dependencies = [
 [[package]]
 name = "tauri-utils"
 version = "2.9.3"
-source = "git+https://github.com/EthanRStokes/tauri?rev=e8458ba7#e8458ba70255f045901526b60eb490284d706612"
+source = "git+https://github.com/EthanRStokes/tauri?rev=f82b5b07#f82b5b0717b6f9d2b60c820230b15dbd1970d2f5"
 dependencies = [
  "anyhow",
  "brotli",

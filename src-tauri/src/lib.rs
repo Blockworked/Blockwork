@@ -138,6 +138,25 @@ pub fn run() {
                 }
                 s.macros_list = macros;
 
+                // The selected macro's live variable store backs reporter
+                // previews and execution. Populate it during startup as well
+                // as when a macro is selected through the UI, otherwise
+                // persisted variables appear in the editor but preview as
+                // empty until a reselect.
+                let variables = s
+                    .current_macro
+                    .as_ref()
+                    .map(|mac| {
+                        mac.variables
+                            .iter()
+                            .map(|variable| (variable.name.clone(), variable.value.clone()))
+                            .collect()
+                    })
+                    .unwrap_or_default();
+                if let Ok(mut store) = s.variable_values.lock() {
+                    *store = variables;
+                }
+
                 // macOS accessibility
                 #[cfg(target_os = "macos")]
                 {
@@ -309,6 +328,7 @@ pub fn run() {
             commands::toggle_record_mouse_movement,
             commands::open_settings,
             commands::close_settings,
+            commands::reset_zoom,
             commands::start_combo_capture,
             commands::start_pending_combo_capture,
             commands::combo_capture_event,

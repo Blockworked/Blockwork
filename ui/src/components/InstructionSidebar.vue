@@ -42,10 +42,17 @@ const variableKinds = computed<ValueKind[]>(() => sortedVariableNames(state.curr
 function onValueUpdate(kind: ValueKind, next: ValueNode) {
   applyPaletteValueEdit(kind, next as ValueDto);
 }
+
+// Empty palette space has no app action, so a browser menu there is just
+// distracting. Keep native text-input menus intact for normal copy/paste.
+function onSidebarContextMenu(event: MouseEvent) {
+  if ((event.target as Element | null)?.closest('input, textarea')) return;
+  event.preventDefault();
+}
 </script>
 
 <template>
-  <div class="instruction-sidebar" id="instruction-sidebar" :style="{ width: sidebarWidth + 'px' }">
+  <div class="instruction-sidebar" id="instruction-sidebar" :style="{ width: sidebarWidth + 'px' }" @contextmenu="onSidebarContextMenu">
     <div class="sidebar-trash-hint">
       <Trash2 />
       <span>Drag a block here to delete it</span>
