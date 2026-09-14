@@ -8,8 +8,8 @@
     {
         "type": "git",
         "url": "https://github.com/ethanrstokes/tauri",
-        "commit": "f82b5b0717b6f9d2b60c820230b15dbd1970d2f5",
-        "dest": "flatpak-cargo/git/tauri-f82b5b0"
+        "commit": "a477e80d41111f411960db7d3d2782b75b7d9580",
+        "dest": "flatpak-cargo/git/tauri-a477e80"
     },
     {
         "type": "archive",
@@ -6074,7 +6074,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-f82b5b0/crates/tauri\" \"cargo/vendor/tauri\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-a477e80/crates/tauri\" \"cargo/vendor/tauri\""
         ]
     },
     {
@@ -6092,7 +6092,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-f82b5b0/crates/tauri-build\" \"cargo/vendor/tauri-build\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-a477e80/crates/tauri-build\" \"cargo/vendor/tauri-build\""
         ]
     },
     {
@@ -6110,7 +6110,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-f82b5b0/crates/tauri-codegen\" \"cargo/vendor/tauri-codegen\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-a477e80/crates/tauri-codegen\" \"cargo/vendor/tauri-codegen\""
         ]
     },
     {
@@ -6128,7 +6128,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-f82b5b0/crates/tauri-macros\" \"cargo/vendor/tauri-macros\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-a477e80/crates/tauri-macros\" \"cargo/vendor/tauri-macros\""
         ]
     },
     {
@@ -6146,7 +6146,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-f82b5b0/crates/tauri-runtime\" \"cargo/vendor/tauri-runtime\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-a477e80/crates/tauri-runtime\" \"cargo/vendor/tauri-runtime\""
         ]
     },
     {
@@ -6164,7 +6164,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-f82b5b0/crates/tauri-runtime-cef\" \"cargo/vendor/tauri-runtime-cef\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-a477e80/crates/tauri-runtime-cef\" \"cargo/vendor/tauri-runtime-cef\""
         ]
     },
     {
@@ -6182,7 +6182,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-f82b5b0/crates/tauri-utils\" \"cargo/vendor/tauri-utils\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/tauri-a477e80/crates/tauri-utils\" \"cargo/vendor/tauri-utils\""
         ]
     },
     {
@@ -8565,7 +8565,7 @@
     },
     {
         "type": "inline",
-        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/ethanrstokes/cef-rs\"]\ngit = \"https://github.com/ethanrstokes/cef-rs\"\nreplace-with = \"vendored-sources\"\nrev = \"b8fad92\"\n\n[source.\"https://github.com/ethanrstokes/tauri\"]\ngit = \"https://github.com/ethanrstokes/tauri\"\nreplace-with = \"vendored-sources\"\nrev = \"f82b5b07\"\n",
+        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/ethanrstokes/cef-rs\"]\ngit = \"https://github.com/ethanrstokes/cef-rs\"\nreplace-with = \"vendored-sources\"\nrev = \"b8fad92\"\n\n[source.\"https://github.com/ethanrstokes/tauri\"]\ngit = \"https://github.com/ethanrstokes/tauri\"\nreplace-with = \"vendored-sources\"\nrev = \"a477e80d\"\n",
         "dest": "cargo",
         "dest-filename": "config"
     }
