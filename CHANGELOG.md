@@ -8,10 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Tag releases (`0.x.y`, see `.github/workflows/release.yml`) publish the matching
 section below as the GitHub release notes, followed by the downloads table.
 
-## [Unreleased]
-
-Add new entries here under `Added` / `Changed` / `Fixed`. On release, move them
-into a new `## [x.y.z] - YYYY-MM-DD` section and bump `version` in `Cargo.toml`.
+## [0.5.2] - 2026-09-14
 
 ### Added
 - macOS self-updater: downloads the latest release's `.app.zip`, swaps the new
@@ -123,7 +120,8 @@ Initial release.
 - Global shortcuts (navigation, loop mode) on Linux; global keybinds on Windows.
 - App icons, updater and confirm dialogs, Wayland support.
 
-[Unreleased]: https://github.com/EthanRStokes/Blockwork/compare/0.5.1...HEAD
+[Unreleased]: https://github.com/EthanRStokes/Blockwork/compare/0.5.2...HEAD
+[0.5.2]: https://github.com/EthanRStokes/Blockwork/compare/0.5.1...0.5.2
 [0.5.1]: https://github.com/EthanRStokes/Blockwork/compare/0.5.0...0.5.1
 [0.5.0]: https://github.com/EthanRStokes/Blockwork/compare/0.4.0...0.5.0
 [0.4.0]: https://github.com/EthanRStokes/Blockwork/compare/0.3.1...0.4.0
