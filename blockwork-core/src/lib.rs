@@ -7,6 +7,6 @@ pub mod ipc;
 pub mod key_mapping;
 pub mod macros;
 pub mod recording;
-#[cfg(all(windows, feature = "updater"))]
+#[cfg(all(feature = "updater", any(windows, target_os = "macos")))]
 pub mod updater;
 pub mod wire;

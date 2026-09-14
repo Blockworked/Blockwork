@@ -302,6 +302,9 @@ jobs:
       contents: write
 
     steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
       - name: Determine release tag
         id: tag
         run: |
@@ -319,6 +322,36 @@ jobs:
             NAME="${{ steps.tag.outputs.value }}"
           fi
           echo "value=$NAME" >> "$GITHUB_OUTPUT"
+
+      - name: Build release notes from CHANGELOG.md
+        env:
+          TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          VERSION="${TAG#v}"
+          awk -v ver="$VERSION" 'index($0, "## [" ver "]") == 1 {flag=1; print; next} flag && /^## \[/ {exit} flag' CHANGELOG.md > /tmp/changelog_section.md
+          if [ ! -s /tmp/changelog_section.md ]; then
+            echo "## $TAG" > /tmp/changelog_section.md
+            echo "" >> /tmp/changelog_section.md
+            echo "See commit history since the previous tag for details." >> /tmp/changelog_section.md
+          fi
+          {
+            cat /tmp/changelog_section.md
+            echo ""
+            echo "## Downloads"
+            echo ""
+            echo "| Platform | File |"
+            echo "|---|---|"
+            echo "| Windows x86_64 (installer) | \`blockwork-windows-x86_64-setup.exe\` |"
+            echo "| Windows x86_64 (portable exe) | \`blockwork-windows-x86_64.exe\` |"
+            echo "| Windows arm64 (installer) | \`blockwork-windows-arm64-setup.exe\` |"
+            echo "| Windows arm64 (portable exe) | \`blockwork-windows-arm64.exe\` |"
+            echo "| Linux x86_64 (AppImage) | \`blockwork-linux-x86_64.AppImage\` |"
+            echo "| Linux x86_64 (Flatpak) | \`blockwork-linux-x86_64.flatpak\` |"
+            echo "| Linux arm64 (AppImage) | \`blockwork-linux-arm64.AppImage\` |"
+            echo "| Linux arm64 (Flatpak) | \`blockwork-linux-arm64.flatpak\` |"
+            echo "| macOS arm64 (app bundle, unsigned) | \`blockwork-macos-arm64.app.zip\` |"
+          } > RELEASE_BODY.md
+          cat RELEASE_BODY.md
 
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -338,17 +371,4 @@ jobs:
           prerelease: false
           fail_on_unmatched_files: false
           files: ./release-artifacts/*
-          body: |
-            ## Downloads
-
-            | Platform | File |
-            |---|---|
-            | Windows x86_64 (installer) | `blockwork-windows-x86_64-setup.exe` |
-            | Windows x86_64 (portable exe) | `blockwork-windows-x86_64.exe` |
-            | Windows arm64 (installer) | `blockwork-windows-arm64-setup.exe` |
-            | Windows arm64 (portable exe) | `blockwork-windows-arm64.exe` |
-            | Linux x86_64 (AppImage) | `blockwork-linux-x86_64.AppImage` |
-            | Linux x86_64 (Flatpak) | `blockwork-linux-x86_64.flatpak` |
-            | Linux arm64 (AppImage) | `blockwork-linux-arm64.AppImage` |
-            | Linux arm64 (Flatpak) | `blockwork-linux-arm64.flatpak` |
-            | macOS arm64 (app bundle, unsigned) | `blockwork-macos-arm64.app.zip` |
+          body_path: RELEASE_BODY.md

@@ -2795,7 +2795,7 @@ pub(crate) fn set_close_to_tray(
     Ok(())
 }
 
-// ─── Updates (Windows) ─────────────────────────────────────────────────────
+// ─── Updates (Windows/macOS) ───────────────────────────────────────────────
 
 #[tauri::command]
 pub(crate) fn check_for_updates<R: Runtime>(
@@ -2819,7 +2819,7 @@ pub(crate) async fn check_for_updates_internal<R: Runtime>(
     state: &SharedState,
     app: &tauri::AppHandle<R>,
 ) {
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     {
         let version = env!("CARGO_PKG_VERSION").to_string();
         let result = tokio::task::spawn_blocking(move || {
@@ -2836,10 +2836,10 @@ pub(crate) async fn check_for_updates_internal<R: Runtime>(
             emit_state_updated(app, &s);
         }
     }
-    #[cfg(not(windows))]
+    #[cfg(not(any(windows, target_os = "macos")))]
     if let Ok(mut s) = state.lock() {
         s.update_check_state =
-            UpdateCheckState::Error("Updates are only supported on Windows".to_string());
+            UpdateCheckState::Error("Updates are only supported on Windows and macOS".to_string());
         emit_state_updated(app, &s);
     }
 }
@@ -2854,7 +2854,7 @@ pub(crate) fn apply_update<R: Runtime>(
         s.update_check_state = UpdateCheckState::Applying;
         emit_state_updated(&app, &s);
     }
-    #[cfg(windows)]
+    #[cfg(any(windows, target_os = "macos"))]
     {
         let state_clone = Arc::clone(&*state);
         let app_clone = app.clone();

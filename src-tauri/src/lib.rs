@@ -254,8 +254,8 @@ pub fn run() {
                 }
             });
 
-            // ── Delayed update check (Windows only) ────────────────────────
-            #[cfg(windows)]
+            // ── Delayed update check (Windows/macOS only) ──────────────────
+            #[cfg(any(windows, target_os = "macos"))]
             {
                 let state_w = Arc::clone(&shared);
                 let app_w = app.handle().clone();

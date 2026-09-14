@@ -47,3 +47,5 @@ http = { workspace = true, optional = true }
 core-graphics.workspace = true
 core-foundation.workspace = true
 foreign-types.workspace = true
+self_update = { workspace = true, optional = true }
+http = { workspace = true, optional = true }

@@ -53,3 +53,4 @@ tower-http = { version = "0.7.1", features = ["cors"] }
 [patch.crates-io]
 cef = { git = "https://github.com/EthanRStokes/cef-rs", rev = "b8fad92" }
 cef-dll-sys = { git = "https://github.com/EthanRStokes/cef-rs", rev = "b8fad92" }
+dpi = { git = "https://github.com/tauri-apps/winit-gtk4", branch = "master" }
