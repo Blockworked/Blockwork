@@ -211,7 +211,7 @@ modules:
       - type: file
         url: https://cloud.frozenblock.net/s/82X5EQQ2ZoiPLWs/download
         dest-filename: cef_binary_wayland_linux64.tar.zst
-        sha256: 970b867a865ca0a2f99c0f2ffe279fe58f36b169a8b485866c4eb687ab2871d0
+        sha256: 77215ed9b7828c19993518d154e841e8fd41d58138a2385c3f8ec4a0ae6dee16
         only-arches: [x86_64]
       # aarch64: official upstream build, since it doesn't need the Wayland
       # patch (see the build-commands comment above).
