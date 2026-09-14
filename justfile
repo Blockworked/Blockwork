@@ -105,6 +105,15 @@ flatpak-install:
 flatpak-test *args: (flatpak-build args) flatpak-install
     flatpak run {{appid}}
 
+# Build dist/Blockwork.app and install it to /Applications (macOS only).
+macos-install *args:
+    @if [ "$(uname)" != "Darwin" ]; then echo "error: macos-install only works on macOS" >&2; exit 1; fi
+    ./scripts/build-macos-bundle.sh {{args}}
+    sudo rm -rf "/Applications/Blockwork.app"
+    sudo ditto "dist/Blockwork.app" "/Applications/Blockwork.app"
+    sudo xattr -dr com.apple.quarantine "/Applications/Blockwork.app" || true
+    @echo "Installed to /Applications/Blockwork.app"
+
 # Remove the local test install (leaves flatpak-repo/flatpak-build in place).
 flatpak-uninstall:
     flatpak uninstall --user -y {{appid}}
