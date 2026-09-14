@@ -19,7 +19,7 @@ pub struct UpdateInfo {
     pub version: String,
 }
 
-fn build_updater(current_version: &str) -> Result<Box<dyn self_update::update::ReleaseUpdate>, String> {
+fn build_updater(current_version: &str) -> Result<Update, String> {
     Update::configure()
         .repo_owner(REPO_OWNER)
         .repo_name(REPO_NAME)
@@ -36,14 +36,19 @@ fn build_updater(current_version: &str) -> Result<Box<dyn self_update::update::R
 /// Blocking — call via `tokio::task::spawn_blocking`. `Ok(None)` means already up to date.
 pub fn check_for_update(current_version: &str) -> Result<Option<UpdateInfo>, String> {
     let updater = build_updater(current_version)?;
-    let release = updater
+    let releases = updater
         .get_latest_release()
         .map_err(|err| err.to_string())?;
+    let release = releases
+        .latest()
+        .ok_or_else(|| "no releases found".to_string())?;
 
-    let is_newer = self_update::version::bump_is_greater(current_version, &release.version)
+    let is_newer = self_update::version::bump_is_greater(current_version, release.version())
         .map_err(|err| err.to_string())?;
 
-    Ok(is_newer.then(|| UpdateInfo { version: release.version }))
+    Ok(is_newer.then(|| UpdateInfo {
+        version: release.version().to_owned(),
+    }))
 }
 
 /// Blocking — call via `tokio::task::spawn_blocking`. Downloads the latest release's installer
@@ -53,13 +58,16 @@ pub fn check_for_update(current_version: &str) -> Result<Option<UpdateInfo>, Str
 /// locking the install once this process exits.
 pub fn apply_update(current_version: &str) -> Result<PathBuf, String> {
     let updater = build_updater(current_version)?;
-    let release = updater
+    let releases = updater
         .get_latest_release()
         .map_err(|err| err.to_string())?;
+    let release = releases
+        .latest()
+        .ok_or_else(|| "no releases found".to_string())?;
     let installer_asset = release
-        .assets
+        .assets()
         .iter()
-        .find(|asset| asset.name == INSTALLER_ASSET_NAME)
+        .find(|asset| asset.name() == INSTALLER_ASSET_NAME)
         .ok_or_else(|| format!("no '{INSTALLER_ASSET_NAME}' asset in the latest release"))?;
 
     let temp_dir = std::env::temp_dir().join("blockwork-update");
@@ -69,11 +77,11 @@ pub fn apply_update(current_version: &str) -> Result<PathBuf, String> {
 
     // GitHub's API asset endpoint returns a JSON description instead of binary content
     // without this header, producing a garbage "exe" Windows can't recognize as a valid PE.
-    let mut download = Download::from_url(&installer_asset.download_url);
-    download.show_progress(false);
-    download.set_header(
+    let mut download = Download::from_url(installer_asset.download_url());
+    download.show_download_progress(false);
+    download.request_header(
         http::header::ACCEPT,
-        http::HeaderValue::from_static("application/octet-stream"),
+        "application/octet-stream",
     );
     download
         .download_to(&mut installer_file)
