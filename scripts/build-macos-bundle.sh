@@ -59,6 +59,9 @@ mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Frameworks"
 
 echo "Assembling bundle at $DIST..."
 cp "$RELEASE_DIR/blockwork" "$CONTENTS/MacOS/$APP_NAME"
+# The UI starts this sibling as its long-lived background process (hotkeys,
+# playback, tray icon); it has to sit next to the UI binary.
+cp "$RELEASE_DIR/blockwork-daemon" "$CONTENTS/MacOS/blockwork-daemon"
 sed -e "s/__VERSION__/$VERSION/g" installer/macos/Info.plist.in > "$CONTENTS/Info.plist"
 
 # Rebuild icon.icns from res/icons/blockwork.png -- the committed

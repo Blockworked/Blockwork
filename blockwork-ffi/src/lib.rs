@@ -1,12 +1,6 @@
-//! C ABI surface for embedding the recording/playback engine directly into
-//! a host process, replacing the loopback TCP control connection
-//! `blockwork_core::ipc` provides for the standalone desktop app. Every
-//! call here is synchronous and direct — no tokio runtime, no
-//! `AppState`/`QueueSignal` bridging, since there's no GUI event loop on
-//! the other side to hand off to.
-//!
-//! Every exported function is wrapped in `catch_unwind` so a Rust panic can
-//! never unwind across the FFI boundary into the host's C++ stack.
+//! C ABI for embedding recording/playback in a host process.
+//! Direct synchronous calls, no tokio runtime or GUI event loop.
+//! Every export catches panics at the FFI boundary.
 
 #[cfg(windows)]
 mod wine_bridge;
@@ -27,10 +21,7 @@ static EMULATOR: OnceLock<Arc<Mutex<dyn InputBackend>>> = OnceLock::new();
 #[cfg(windows)]
 static WINE_BRIDGE: OnceLock<wine_bridge::WineBridge> = OnceLock::new();
 
-/// A registered C callback that every `tracing::info!`/`warn!`/etc. call
-/// site in this crate (and in `blockwork-core`, when linked in) gets routed
-/// through — without this, `tracing` events have no subscriber and are
-/// silently dropped.
+/// C callback `tracing` events route through. Without it events are dropped.
 static LOG_CALLBACK: AtomicUsize = AtomicUsize::new(0);
 
 struct FfiLogWriter;
@@ -57,10 +48,8 @@ impl std::io::Write for FfiLogWriter {
     }
 }
 
-/// Registers the callback that formatted `tracing` events are routed
-/// through. Call once, before `blockwork_init`, from the host's main thread.
-/// `callback` receives one NUL-terminated line per event; null disables
-/// logging.
+/// Set the `tracing` log callback. Call once before `blockwork_init`.
+/// Null disables logging.
 #[no_mangle]
 pub extern "C" fn blockwork_set_log_callback(callback: Option<extern "C" fn(*const c_char)>) {
     let ptr = callback.map(|f| f as usize).unwrap_or(0);
@@ -81,8 +70,7 @@ fn catch(f: impl FnOnce() -> i32) -> i32 {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or(-99)
 }
 
-/// Same as `catch`, but for the string-returning functions below — a panic
-/// becomes null instead of a bogus pointer.
+/// `catch` for string returns: panic becomes null.
 fn catch_ptr(f: impl FnOnce() -> *mut c_char) -> *mut c_char {
     std::panic::catch_unwind(std::panic::AssertUnwindSafe(f)).unwrap_or(std::ptr::null_mut())
 }
@@ -101,17 +89,10 @@ unsafe fn cstr_to_owned(ptr: *const c_char) -> Option<String> {
     unsafe { CStr::from_ptr(ptr) }.to_str().ok().map(str::to_owned)
 }
 
-/// Must be called once, from the host's main thread, before any other
-/// `blockwork_*` function (macOS's Accessibility prompt requires the main
-/// thread). `config_dir_override_utf8` may be null/empty to use the OS
-/// config directory; pass a path to redirect macro/settings storage
-/// elsewhere (e.g. a Wine `Z:`-mapped path under Proton).
-/// `linux_bridge_resource_path_utf8` is the Windows-side path to the
-/// bundled `linux-input.so`, used only when running under Wine on a Linux
-/// host; ignored (may be null) otherwise.
-///
-/// Returns 0 on success, -1 if no input backend could be created for this
-/// platform.
+/// Call once on the host's main thread before other `blockwork_*` calls.
+/// Null/empty `config_dir_override_utf8` uses the OS config dir.
+/// `linux_bridge_resource_path_utf8` only matters under Wine on Linux.
+/// Returns 0 on success, -1 if no input backend exists for this platform.
 #[no_mangle]
 pub extern "C" fn blockwork_init(config_dir_override_utf8: *const c_char, linux_bridge_resource_path_utf8: *const c_char) -> i32 {
     let override_dir = unsafe { cstr_to_owned(config_dir_override_utf8) };
@@ -128,10 +109,7 @@ pub extern "C" fn blockwork_init(config_dir_override_utf8: *const c_char, linux_
             }
         }
 
-        // Deliberately not calling `recording::update_hotkey_table()`: the
-        // physical-hotkey combo system stays inert (every `push_queue_signal`
-        // call site in `recording` is gated behind a non-empty hotkey
-        // table), so control here is driven only by these FFI calls.
+        // Hotkey table stays empty, so control comes only from these FFI calls.
 
         #[cfg(windows)]
         if wine_bridge::detect_wine_linux() {
@@ -143,10 +121,7 @@ pub extern "C" fn blockwork_init(config_dir_override_utf8: *const c_char, linux_
                 Some(bridge) => {
                     wine_bridge::spawn_heartbeat_thread(bridge.region);
                     wine_bridge::spawn_capture_forwarder(bridge.region);
-                    // No local EMULATOR under Wine: blockwork_run_macro/
-                    // blockwork_stop_loop route through WINE_BRIDGE instead —
-                    // the whole timed run happens natively on the Linux
-                    // side now (see wire::WireControlCommand's docs for why).
+                    // No local EMULATOR under Wine; runs route through WINE_BRIDGE.
                     let _ = WINE_BRIDGE.set(bridge);
                     0
                 }
@@ -161,9 +136,7 @@ pub extern "C" fn blockwork_init(config_dir_override_utf8: *const c_char, linux_
     })
 }
 
-/// The non-Wine path: native OS hook capture + native emission backend.
-/// Always correct on real Windows/macOS; also the (known non-functional)
-/// fallback under Wine if the bridge can't be set up.
+/// Native path. Also the fallback under Wine if the bridge fails.
 fn native_init() -> i32 {
     recording::start_grab_thread();
     match runner::make_backend() {
@@ -216,14 +189,14 @@ pub extern "C" fn blockwork_stop_recording() -> i32 {
     })
 }
 
-/// Runs a macro on a background thread — the explicit `id_utf8` if given
+/// Runs a macro on a background thread - the explicit `id_utf8` if given
 /// (nullable), otherwise the currently-selected macro. Loop mode is read
 /// live from the shared settings file on every call. Returns immediately;
 /// interrupt with `blockwork_stop_loop`.
 ///
 /// `elapsed_overshoot_ms` (>= 0, milliseconds): how much real time had
 /// already passed, before this call, since playback was supposed to
-/// start — pass 0 if not applicable. Backdates the run's first `Wait`
+/// start - pass 0 if not applicable. Backdates the run's first `Wait`
 /// deadline to the intended start instant via `Macro::run_with_offset`.
 #[no_mangle]
 pub extern "C" fn blockwork_run_macro(id_utf8: *const c_char, elapsed_overshoot_ms: f64) -> i32 {
@@ -235,7 +208,7 @@ pub extern "C" fn blockwork_run_macro(id_utf8: *const c_char, elapsed_overshoot_
         let Some(mac) = mac else { return -1 };
 
         // Under Wine, the entire timed run happens natively on the Linux
-        // side instead — see wire::WireControlCommand's docs for why. Only
+        // side instead - see wire::WireControlCommand's docs for why. Only
         // the resolved id crosses the bridge, never the macro data.
         #[cfg(windows)]
         if let Some(bridge) = WINE_BRIDGE.get() {
@@ -373,7 +346,7 @@ pub extern "C" fn blockwork_get_selected_macro_id() -> *mut c_char {
     })
 }
 
-/// Marks the macro with the given id as the currently-selected one — the
+/// Marks the macro with the given id as the currently-selected one - the
 /// target `blockwork_run_macro(NULL)`, `blockwork_stop_recording`, and
 /// `blockwork_clear_recording_target_instructions` resolve against. Returns 0
 /// on success, -1 if no macro with that id exists.
@@ -476,7 +449,7 @@ pub extern "C" fn blockwork_free_string(ptr: *mut c_char) {
     }
 }
 
-/// True if input capture/emission couldn't be set up — on macOS this means
+/// True if input capture/emission couldn't be set up - on macOS this means
 /// Accessibility access hasn't been granted (to the host process); the
 /// caller should surface a UI prompt to check System Settings.
 #[no_mangle]

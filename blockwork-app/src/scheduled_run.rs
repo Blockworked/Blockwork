@@ -7,24 +7,24 @@ use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::runner::{run_instructions, VariableStore};
 use blockwork_core::macros::{run_registry, Instruction, VariableDef};
 use std::sync::{Arc, Mutex};
-use tauri::{AppHandle, Emitter, Runtime};
+use crate::AppHandle;
 use tracing::warn;
 
-/// Runs one watcher-triggered strand's body on its own thread — the
+/// Runs one watcher-triggered strand's body on its own thread - the
 /// watcher's own equivalent of `macros_thread::into_single_run_task`, for a
 /// strand fired by a background condition rather than the Run button.
 /// Variables start fresh from the macro's own declared defaults (there's no
 /// "live" store for a macro that isn't open/running) and are written back to
 /// that macro's saved variables once the fired strand finishes, same as a
 /// normal run does.
-pub(crate) fn fire<R: Runtime>(
+pub(crate) fn fire(
     macro_id: String,
     instructions: Vec<Instruction>,
     emulator: Arc<Mutex<dyn InputBackend>>,
     speed_multiplier: f64,
     variable_defs: &[VariableDef],
     shared_state: SharedState,
-    app: AppHandle<R>,
+    app: AppHandle,
 ) {
     let variables: VariableStore = Arc::new(Mutex::new(variable_defs.iter().map(|v| (v.name.clone(), v.value.clone())).collect()));
     std::thread::spawn(move || {
@@ -36,9 +36,9 @@ pub(crate) fn fire<R: Runtime>(
 }
 
 /// Like `macros_thread::persist_variables`, but looks the macro up by id
-/// across the whole macro list instead of only the currently-selected one —
+/// across the whole macro list instead of only the currently-selected one -
 /// a watcher-fired macro is very often not the one open in the editor.
-fn persist_fired_variables<R: Runtime>(shared_state: &SharedState, app: &AppHandle<R>, macro_id: &str, variables: &VariableStore) {
+fn persist_fired_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str, variables: &VariableStore) {
     let (mac_to_save, dto) = {
         let Ok(mut s) = shared_state.lock() else { return };
         let Some(mac) = s.macros_list.iter_mut().find(|m| m.id == macro_id) else { return };
@@ -54,5 +54,5 @@ fn persist_fired_variables<R: Runtime>(shared_state: &SharedState, app: &AppHand
     if let Err(e) = mac_to_save.save() {
         warn!("Failed to persist watcher-fired macro's variables: {e}");
     }
-    let _ = app.emit("state-updated", dto);
+    app.emit_state(&dto);
 }

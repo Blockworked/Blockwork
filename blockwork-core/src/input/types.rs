@@ -198,7 +198,7 @@ pub enum InputToken {
 }
 
 impl InputToken {
-    /// See `Value::rename_var` — walks every embedded `Value` tree.
+    /// See `Value::rename_var` - walks every embedded `Value` tree.
     pub fn rename_var(&mut self, old: &str, new: &str) {
         match self {
             InputToken::MoveMouse(x, y, _) => {
@@ -211,7 +211,7 @@ impl InputToken {
         }
     }
 
-    /// See `Value::rename_param` — walks every embedded `Value` tree.
+    /// See `Value::rename_param` - walks every embedded `Value` tree.
     pub fn rename_param(&mut self, old: &str, new: &str) {
         match self {
             InputToken::MoveMouse(x, y, _) => {
@@ -224,7 +224,7 @@ impl InputToken {
         }
     }
 
-    /// See `Value::for_each_call_args_mut` — walks every embedded `Value` tree.
+    /// See `Value::for_each_call_args_mut` - walks every embedded `Value` tree.
     pub fn for_each_call_args_mut(&mut self, block_id: &str, f: &mut dyn FnMut(&mut Vec<Value>)) {
         match self {
             InputToken::MoveMouse(x, y, _) => {
@@ -237,7 +237,7 @@ impl InputToken {
         }
     }
 
-    /// See `Value::scrub_block_calls` — walks every embedded `Value` tree.
+    /// See `Value::scrub_block_calls` - walks every embedded `Value` tree.
     pub fn scrub_block_calls(&mut self, block_id: &str) {
         match self {
             InputToken::MoveMouse(x, y, _) => {
@@ -250,7 +250,7 @@ impl InputToken {
         }
     }
 
-    /// See `Value::migrate_bool_slots` — walks every embedded `Value` tree.
+    /// See `Value::migrate_bool_slots` - walks every embedded `Value` tree.
     /// None of these fields are boolean-typed themselves.
     pub fn migrate_bool_slots(&mut self) {
         match self {

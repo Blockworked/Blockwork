@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Static preview only — mirrors PaletteIfFields.vue's split (see its
+// Static preview only - mirrors PaletteIfFields.vue's split (see its
 // comment) and RepeatFields.vue's own real-canvas shape.
 import { PaletteNumberField } from 'blockstitch';
 import type { InstructionDto } from '../../../types';

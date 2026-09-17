@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Static preview only — see PaletteIfFields.vue's header comment. Mirrors
+// Static preview only - see PaletteIfFields.vue's header comment. Mirrors
 // IfElseFields.vue's own 'head'/'body' split (then-mouth, "else" mid bar,
 // else-mouth).
 import type { InstructionDto } from '../../../types';

@@ -23,12 +23,22 @@ export const setMacroSpeedMultiplier = (multiplier: number) =>
 export const setMacroAlwaysListen = (enabled: boolean) =>
   invoke<void>('set_macro_always_listen', { enabled });
 export const saveMacro = () => invoke<void>('save_macro');
-export const exportMacro = (macroId: string) => invoke<void>('export_macro', { macroId });
+/** Asks where to save, then exports. Resolves without doing anything if the
+ * dialog was cancelled. */
+export async function exportMacro(macroId: string): Promise<void> {
+  const defaultName = await invoke<string>('export_macro_file_name', { macroId });
+  const path = await invoke<string | null>('pick_macro_file', { save: true, defaultName });
+  if (path) await invoke<void>('export_macro', { macroId, path });
+}
 /** Resolves the prompt to show the user before the staged import can be
- * committed (a Command warning and/or non-default settings to confirm —
+ * committed (a Command warning and/or non-default settings to confirm -
  * see `ImportPromptDto`), or `null` if the dialog was cancelled or the
  * macro imported immediately with nothing to confirm. */
-export const importMacro = () => invoke<ImportPromptDto | null>('import_macro');
+export async function importMacro(): Promise<ImportPromptDto | null> {
+  const path = await invoke<string | null>('pick_macro_file', { save: false });
+  if (!path) return null;
+  return invoke<ImportPromptDto | null>('import_macro', { path });
+}
 /** `keepSettings` maps each `ImportPromptDto.custom_settings` entry's `key`
  * to whether to keep its imported (non-default) value (`true`) or reset it
  * to the default (`false`). */
@@ -131,9 +141,13 @@ export const openSettings = () => invoke<void>('open_settings');
 export const closeSettings = () => invoke<void>('close_settings');
 
 // ─── View ───────────────────────────────────────────────────────────────────
-/** Resets Chromium page zoom to 100% (see `reset_zoom` — Ctrl/Cmd+0 can't
+/** Resets Chromium page zoom to 100% (see `reset_zoom` - Ctrl/Cmd+0 can't
  * rely on the browser's own accelerator in this CEF runtime). */
 export const resetZoom = () => invoke<void>('reset_zoom');
+/** Matches the native window's background to the theme, so no white shows
+ * before the page paints or while the window closes. */
+export const setThemeBackground = (theme: 'light' | 'dark') =>
+  invoke<void>('set_theme_background', { theme });
 
 // ─── Hotkeys ────────────────────────────────────────────────────────────────
 export const startComboCapture = (action: HotkeyActionDto) =>

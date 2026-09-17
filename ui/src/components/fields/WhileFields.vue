@@ -9,7 +9,7 @@ const props = defineProps<{
   strandId: string;
   path: InstrPath;
   instruction: Extract<InstructionDto, { type: 'While' }>;
-  // See IfFields.vue's comment on 'head'/'body' — same wrap-block split.
+  // See IfFields.vue's comment on 'head'/'body' - same wrap-block split.
   part: 'head' | 'body';
 }>();
 

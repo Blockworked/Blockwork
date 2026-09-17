@@ -22,6 +22,8 @@ finish-args:
   - --device=dri
   # Open App/Close App launch and kill host apps via flatpak-spawn --host.
   - --talk-name=org.freedesktop.Flatpak
+  # "Close to tray" icon (StatusNotifierItem); unreachable from the sandbox otherwise.
+  - --talk-name=org.kde.StatusNotifierWatcher
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node24/bin:/run/build/blockwork/pnpm-bin
@@ -91,6 +93,7 @@ modules:
       - ln -s flatpak-node/pnpm-store .pnpm-store
       - cargo --offline build --release
       - install -Dm755 target/release/blockwork /app/lib/blockwork/blockwork
+      - install -Dm755 target/release/blockwork-daemon /app/lib/blockwork/blockwork-daemon
       - mkdir -p /app/bin
       - |
         cat > /app/bin/blockwork <<'EOF'
@@ -105,6 +108,9 @@ modules:
             ;;
           aarch64) export GDK_BACKEND=x11 ;;
         esac
+        # The UI starts blockwork-daemon, which relaunches the UI from its tray
+        # icon through this wrapper rather than the bare binary.
+        export BLOCKWORK_UI_EXE=/app/bin/blockwork
         export ZYPAK_CEF_LIBRARY_PATH=/app/lib/blockwork/libcef.so
         exec zypak-wrapper /app/lib/blockwork/blockwork "$@"
         EOF

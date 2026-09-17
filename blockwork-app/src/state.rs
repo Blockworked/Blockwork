@@ -13,25 +13,19 @@ use blockwork_core::macros::{
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
+use crate::AppHandle;
 use std::sync::{Arc, Mutex};
 
 pub(crate) type SharedState = Arc<Mutex<AppState>>;
 
-/// One step of an [`InstrPath`] — `index` into the current instruction list,
-/// and (for every step but the last) which nested body of that instruction
-/// to descend into next: `0` for `If`'s body, `IfElse`'s `then_body`,
-/// `Repeat`/`Forever`/`While`'s body, `1` for `IfElse`'s `else_body`. The
-/// last step's `slot` is always `None`.
+/// One step of an [`InstrPath`].
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub(crate) struct PathStep {
     pub(crate) index: usize,
     pub(crate) slot: Option<u8>,
 }
 
-/// Addresses one instruction, possibly nested inside `If`/`IfElse` bodies —
-/// generalizes the old flat `index: usize` the same way `Value`'s `path:
-/// Vec<u8>` already addresses a nested value-tree node. Resolved by
-/// `commands::resolve_body_mut`.
+/// Addresses one instruction, possibly nested.
 pub(crate) type InstrPath = Vec<PathStep>;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -44,16 +38,10 @@ pub(crate) enum FieldId {
     SetVariableValue,
     ChangeVariableValue,
     ReturnValue,
-    /// One of `CallBlock`'s N argument slots, indexed positionally since a
-    /// call's arity is dynamic.
     CallArg(usize),
-    /// `If`/`IfElse`/`While`'s boolean condition.
     Condition,
-    /// `Repeat`'s iteration count.
     RepeatCount,
-    /// `WhenBatteryDischargedTo`'s battery-percentage threshold.
     BatteryDischargeThreshold,
-    /// `WhenBatteryChargedTo`'s battery-percentage threshold.
     BatteryChargeThreshold,
 }
 
@@ -141,7 +129,7 @@ pub(crate) enum KeyCaptureTarget {
     Standalone,
 }
 
-/// One undo/redo checkpoint — the structural macro state, including declared
+/// One undo/redo checkpoint - the structural macro state, including declared
 /// variables for renames.
 #[derive(Debug, Clone)]
 pub(crate) struct MacroSnapshot {
@@ -166,20 +154,11 @@ pub(crate) struct AppState {
     pub(crate) is_looping: Arc<Mutex<bool>>,
     pub(crate) loop_mode_enabled: bool,
     pub(crate) global_speed_multiplier: f64,
-    pub(crate) ipc_server: Option<tauri::async_runtime::JoinHandle<()>>,
+    pub(crate) ipc_server: Option<tokio::task::JoinHandle<()>>,
     pub(crate) ipc_shutdown_tx: Option<tokio::sync::watch::Sender<bool>>,
     pub(crate) ipc_active_port: Option<u16>,
     pub(crate) ipc_auto_start: bool,
     pub(crate) close_to_tray: bool,
-    pub(crate) tray_icon: Option<tauri::tray::TrayIcon>,
-    /// Label of the currently-live main webview window, or `None` while
-    /// `tray::quit_ui` has torn it down to save memory. The tauri-cef runtime
-    /// never reports a destroyed window's label back to the window manager
-    /// (see `tray::rebuild_main_window`), so a closed window's label can
-    /// never be reused -- each reopen gets a fresh one, tracked here.
-    /// Doubles as the `RunEvent::ExitRequested` handler's signal in `lib.rs`
-    /// to keep the app alive instead of letting the now-window-less app quit.
-    pub(crate) main_window_label: Option<String>,
     pub(crate) confirm_clear_instructions: bool,
     pub(crate) clear_confirm_remaining_secs: u8,
     pub(crate) clear_confirm_generation: u64,
@@ -201,7 +180,7 @@ pub(crate) struct AppState {
     pub(crate) ipc_port_invalid: bool,
     pub(crate) update_check_state: UpdateCheckState,
     /// A macro file the user just picked via `import_macro` but whose import
-    /// is paused on the "contains a Command instruction" warning popup —
+    /// is paused on the "contains a Command instruction" warning popup -
     /// `confirm_import_macro`/`cancel_import_macro` resolve it. `None` the
     /// rest of the time (including immediately after a no-warning-needed
     /// import, which commits inline instead of staging here).
@@ -254,18 +233,18 @@ pub(crate) struct MacroDto {
     pub(crate) recording_target_strand_id: Option<String>,
     pub(crate) speed_multiplier: f64,
     pub(crate) floating_values: Vec<FloatingValueDto>,
-    /// Floating/attached notes — see `CommentDto`.
+    /// Floating/attached notes - see `CommentDto`.
     pub(crate) comments: Vec<CommentDto>,
-    /// Declared variable names only, for the sidebar/dropdowns — current
+    /// Declared variable names only, for the sidebar/dropdowns - current
     /// values aren't surfaced to the frontend.
     pub(crate) variables: Vec<String>,
     /// User-defined custom blocks ("My Blocks").
     pub(crate) block_defs: Vec<BlockDefDto>,
-    /// Settings edited from the "Macro Settings" popup — see `MacroSettingsDto`.
+    /// Settings edited from the "Macro Settings" popup - see `MacroSettingsDto`.
     pub(crate) settings: MacroSettingsDto,
 }
 
-/// Wire shape for `MacroSettings` — see there for field meanings.
+/// Wire shape for `MacroSettings` - see there for field meanings.
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub(crate) struct MacroSettingsDto {
     pub(crate) always_listen: bool,
@@ -277,7 +256,7 @@ fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
     }
 }
 
-/// One non-default `MacroSettings` field an import wants confirmed — see
+/// One non-default `MacroSettings` field an import wants confirmed - see
 /// `commands::non_default_macro_settings`.
 #[derive(Serialize, Clone)]
 pub(crate) struct CustomMacroSettingDto {
@@ -416,7 +395,7 @@ pub(crate) struct FloatingValueDto {
     pub(crate) origin_block_id: Option<String>,
 }
 
-/// Addresses a single `Value` node — either inside an instruction's field
+/// Addresses a single `Value` node - either inside an instruction's field
 /// (`Field`) or inside a value block parked on canvas (`Floating`), at `path`
 /// within that root. Resolved against a `Macro` by `commands::resolve_location_mut`.
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -442,7 +421,7 @@ impl ValueLocation {
     }
 
     /// True if `self` and `other` address a node in the same tree (ignoring
-    /// `path`) — used to prune stale invalid-text buffers after a subtree is
+    /// `path`) - used to prune stale invalid-text buffers after a subtree is
     /// replaced wholesale.
     pub(crate) fn same_root(&self, other: &ValueLocation) -> bool {
         match (self, other) {
@@ -468,7 +447,7 @@ impl ValueLocation {
         }
     }
 
-    /// `Some(strand_id)` for a `Field` location, `None` for `Floating` — used
+    /// `Some(strand_id)` for a `Field` location, `None` for `Floating` - used
     /// to prune buffered entries when a whole strand is removed.
     pub(crate) fn strand_id(&self) -> Option<&str> {
         match self {
@@ -676,7 +655,7 @@ pub(crate) enum InstructionDto {
     },
 }
 
-/// A floating/attached note — see `blockwork_core::macros::Comment`.
+/// A floating/attached note - see `blockwork_core::macros::Comment`.
 #[derive(Serialize, Deserialize, Clone, Debug)]
 pub(crate) struct CommentDto {
     pub(crate) id: String,
@@ -687,7 +666,7 @@ pub(crate) struct CommentDto {
     pub(crate) attached_to: Option<String>,
 }
 
-/// One entry in the "Open App" picker's list — see `installed_apps`.
+/// One entry in the "Open App" picker's list - see `installed_apps`.
 /// `command` is the ready-to-launch string an `InstructionKind::OpenApp` stores
 /// as-is; `icon`, when present, is a `data:` URI.
 #[derive(Serialize, Clone)]
@@ -1443,8 +1422,7 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
     }
 }
 
-pub(crate) fn emit_state_updated<R: tauri::Runtime>(app: &tauri::AppHandle<R>, s: &AppState) {
-    use tauri::Emitter;
+pub(crate) fn emit_state_updated(app: &AppHandle, s: &AppState) {
     let dto = build_state_dto(s);
-    let _ = app.emit("state-updated", dto);
+    app.emit_state(&dto);
 }

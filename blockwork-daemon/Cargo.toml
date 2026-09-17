@@ -1,0 +1,25 @@
+[package]
+name = "blockwork-daemon"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+blockwork-app = { path = "../blockwork-app" }
+blockwork-protocol = { path = "../blockwork-protocol" }
+tracing.workspace = true
+tracing-subscriber.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net", "io-util", "time", "sync"] }
+dirs.workspace = true
+# libxdo only backs predefined Copy/Paste menu items, which the tray menu
+# doesn't use (and the Flatpak runtime doesn't ship).
+tray-icon = { version = "0.24.2", default-features = false, features = ["gtk"] }
+tao = "0.37"
+png = "0.18"
+axum = { workspace = true, optional = true }
+tower-http = { workspace = true, optional = true }
+
+[features]
+# Debug-only HTTP+WebSocket bridge that lets a plain browser tab (no Tauri
+# webview) drive the real running backend - see src/dev_bridge.rs.
+dev-bridge = ["dep:axum", "dep:tower-http"]

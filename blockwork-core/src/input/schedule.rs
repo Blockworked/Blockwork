@@ -1,4 +1,4 @@
-//! `TimeSchedule` — the payload of `InstructionKind::WhenTime`: a recurring
+//! `TimeSchedule` - the payload of `InstructionKind::WhenTime`: a recurring
 //! point in local time (daily, weekly, monthly, or yearly) plus a
 //! time-of-day. Backs the background time watcher (e.g. src-tauri's
 //! `time_watch` module), the same way `InstructionKind::WhenBatteryDischargedTo`/
@@ -33,7 +33,7 @@ impl Weekday {
     }
 }
 
-/// A recurring point in local time — the payload of `InstructionKind::WhenTime`.
+/// A recurring point in local time - the payload of `InstructionKind::WhenTime`.
 /// `hour`/`minute` are always 24-hour (0-23/0-59); which clock format the UI
 /// shows them in is purely a display concern, not part of the saved shape.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -44,7 +44,7 @@ pub enum TimeSchedule {
     /// Every week, on `weekday`, at `hour:minute`.
     Weekly { weekday: Weekday, hour: u8, minute: u8 },
     /// Every month, on the `day`th (1-31) at `hour:minute`. A month shorter
-    /// than `day` just never matches that month — no clamping/rollover.
+    /// than `day` just never matches that month - no clamping/rollover.
     Monthly { day: u8, hour: u8, minute: u8 },
     /// Every year, on `month`/`day` (1-12/1-31) at `hour:minute`.
     Yearly { month: u8, day: u8, hour: u8, minute: u8 },
@@ -70,7 +70,7 @@ impl TimeSchedule {
     }
 
     /// True if `now` (local time) satisfies both this schedule's recurrence
-    /// field (weekday/day-of-month/month+day) and its `hour:minute` — i.e.
+    /// field (weekday/day-of-month/month+day) and its `hour:minute` - i.e.
     /// this is a minute this schedule should fire on. Doesn't know or care
     /// whether it already *has* fired for this exact occurrence; callers
     /// (the time watcher) dedup that themselves so a schedule fires once per

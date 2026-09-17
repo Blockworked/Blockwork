@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // "Choose an App" popup, shared by the OpenApp and CloseApp instructions
 // (OpenAppFields.vue/PaletteOpenAppFields.vue and their CloseApp
-// counterparts) — a searchable grid of every installed app the backend's
+// counterparts) - a searchable grid of every installed app the backend's
 // `list_installed_apps` can find (see src-tauri/src/installed_apps.rs).
 // Teleported to <body> like the other dialogs (MacroSettingsDialog.vue, etc.),
 // but wider, since it's a grid rather than a form.

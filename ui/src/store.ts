@@ -2,9 +2,7 @@ import { reactive, ref } from 'vue';
 import { emptyState, type StateDto } from './types';
 import { getAppVersion, getState, onStateUpdated } from './tauri';
 
-// Single module-level reactive snapshot mirroring the backend 1:1 — matches
-// the original app.js architecture (one global `state` object), just with
-// Vue's fine-grained reactivity replacing the old full-DOM-rebuild `render()`.
+// Reactive backend state snapshot.
 export const state = reactive<StateDto>(emptyState());
 export const appVersion = ref('');
 

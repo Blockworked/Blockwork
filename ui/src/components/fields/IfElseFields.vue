@@ -9,7 +9,7 @@ const props = defineProps<{
   strandId: string;
   path: InstrPath;
   instruction: Extract<InstructionDto, { type: 'IfElse' }>;
-  // See IfFields.vue's header comment — rendered separately for the wrap
+  // See IfFields.vue's header comment - rendered separately for the wrap
   // block's head line vs. its mouth (nested body).
   part: 'head' | 'body';
 }>();
@@ -19,7 +19,7 @@ const elsePath = computed(() => bodyBasePath(props.path, 1));
 
 // The mid ("else") bar's top notch receives the bottom bump of the then-arm's
 // last row. A cap-type row there (Return/EscapeLoop/ContinueLoop) has no
-// bump, so the notch would otherwise carve an unfilled hole — see
+// bump, so the notch would otherwise carve an unfilled hole - see
 // `.wrap-bar-flat-notch` in blockstitch's theme CSS. InstructionRow.vue
 // handles this the same way for the foot bar, generically via getSlots(); the
 // mid bar can't go through that path since it's this component, not

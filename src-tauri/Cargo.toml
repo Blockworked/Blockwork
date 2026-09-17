@@ -8,38 +8,19 @@ name = "blockwork"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [dependencies]
-blockwork-core = { path = "../blockwork-core" }
-tauri = { workspace = true, features = ["tray-icon"] }
+blockwork-protocol = { path = "../blockwork-protocol" }
+tauri.workspace = true
 tauri-runtime-cef.workspace = true
 tracing.workspace = true
 tracing-log.workspace = true
 tracing-subscriber.workspace = true
-serde.workspace = true
-serde_json.workspace = true
-uuid.workspace = true
-tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net", "io-util", "time"] }
+serde_json = { workspace = true, features = ["raw_value"] }
+tokio = { workspace = true, features = ["rt", "macros", "io-util", "time", "sync"] }
 rfd.workspace = true
-chrono.workspace = true
 dirs.workspace = true
-axum = { workspace = true, optional = true }
-tower-http = { workspace = true, optional = true }
 
-[target.'cfg(target_os = "linux")'.dependencies]
-# tray-icon's Linux backend (muda + libappindicator) uses GTK for its context
-# menu but never calls `gtk::init()` itself -- the wry runtime gets this for
-# free from tao's EventLoop::new(), but our CEF runtime's winit EventLoop
-# doesn't touch GTK at all, so we have to initialize it ourselves before
-# building any tray menu.
-gtk = "0.18"
-# Encodes application icons found via .desktop entries as data: URIs for the
-# "Open App" picker (see src/installed_apps.rs) — Linux-only, since the
-# Windows/Mac listings there don't resolve icons at all yet.
-base64.workspace = true
-
-[features]
-# Debug-only HTTP+WebSocket bridge that lets a plain browser tab (no Tauri
-# webview) drive the real running backend — see src/dev_bridge.rs.
-dev-bridge = ["dep:axum", "dep:tower-http"]
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
 
 [build-dependencies]
 tauri-build.workspace = true

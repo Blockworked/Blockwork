@@ -14,7 +14,7 @@ const props = defineProps<{ instruction: Extract<InstructionDto, { type: 'Key' }
 const isCapturing = computed(() => state.key_capture?.kind === 'Standalone');
 
 // By the time this fires, the backend has already cleared key_capture back
-// to null in the same state snapshot — isCapturing is stale by then, so this
+// to null in the same state snapshot - isCapturing is stale by then, so this
 // can't gate on it. Standalone capture only ever has one consumer (this
 // prefab), so applying unconditionally is safe.
 watch(() => state.standalone_key, key => {

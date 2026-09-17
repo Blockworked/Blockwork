@@ -1,5 +1,5 @@
 //! Checks whether an installed `openrazer` daemon is reachable by the current
-//! user — Linux-only concern (like `installed_apps.rs`'s per-platform split),
+//! user - Linux-only concern (like `installed_apps.rs`'s per-platform split),
 //! surfaced as a `WarningBanners.vue` banner the same way `grab_available`
 //! surfaces evdev grab failures.
 
@@ -19,8 +19,8 @@ mod linux {
     use std::sync::OnceLock;
 
     /// Distro packaging disagrees on which group grants openrazer device
-    /// access — Arch/Fedora's package uses `openrazer`, Debian/Ubuntu's
-    /// instead piggybacks on `plugdev` — so pass if the user is in either.
+    /// access - Arch/Fedora's package uses `openrazer`, Debian/Ubuntu's
+    /// instead piggybacks on `plugdev` - so pass if the user is in either.
     const CANDIDATE_GROUPS: [&str; 2] = ["openrazer", "plugdev"];
 
     /// Installed-ness and group membership don't change over a running
@@ -38,7 +38,7 @@ mod linux {
 
     /// Resolves the candidate group names to gids via `/etc/group`, then
     /// checks those against this process's actual supplementary gids from
-    /// `/proc/self/status`'s `Groups:` line — the list the kernel enforces,
+    /// `/proc/self/status`'s `Groups:` line - the list the kernel enforces,
     /// rather than re-deriving it from `/etc/group` alone.
     fn in_any_group(names: &[&str]) -> bool {
         let target_gids = gids_for_names(names);

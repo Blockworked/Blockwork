@@ -1,11 +1,11 @@
 <script setup lang="ts">
-// Variable name popup — a name textbox plus Cancel/OK, teleported to <body>
+// Variable name popup - a name textbox plus Cancel/OK, teleported to <body>
 // so it sits above the sidebar/canvas regardless of where the triggering
 // button lives. Doubles as both "Make a Variable" (no `renameTarget`) and
 // "Rename variable" (`renameTarget` set, from the per-variable context
-// menu — see variableDialogs.ts, which coordinates both triggers since they
+// menu - see variableDialogs.ts, which coordinates both triggers since they
 // live in different components). Duplicate/empty names are rejected by the
-// backend (`create_variable_in`/`rename_variable_in` — see commands.rs); the
+// backend (`create_variable_in`/`rename_variable_in` - see commands.rs); the
 // error is shown inline and the dialog stays open so the user can fix it.
 import { computed, nextTick, ref, watch } from 'vue';
 import { createVariable, renameVariable } from '../tauri';

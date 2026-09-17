@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // "Recording Settings" popup, opened from the sliders button next to the
 // Record button (RunControls.vue). Controls how mouse movement gets
-// captured while recording, app-wide — unlike MacroSettingsDialog.vue's
+// captured while recording, app-wide - unlike MacroSettingsDialog.vue's
 // per-macro settings, this is a session-wide preference persisted like
 // loop mode or global speed.
 import { state } from '../store';

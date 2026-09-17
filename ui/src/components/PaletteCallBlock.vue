@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Sidebar prefab for one user-defined `Normal`/`Ending`-shaped custom block —
+// Sidebar prefab for one user-defined `Normal`/`Ending`-shaped custom block -
 // same role as PaletteInstructionBlock.vue, but keyed by `BlockDef` instead
 // of a fixed `InstructionType` (a block's shape is dynamic/per-macro, so
 // there's no static FIELD_COMPONENTS entry to look up). Editable in place
@@ -43,7 +43,7 @@ function onContextMenu(e: MouseEvent) {
       <div class="instruction-content">
         <template v-for="piece in def.pieces" :key="piece.kind === 'Label' ? piece.text : piece.name">
           <span v-if="piece.kind === 'Label'" class="instruction-label">{{ piece.text }}</span>
-          <!-- Boolean inputs have no editable palette leaf — a static blank
+          <!-- Boolean inputs have no editable palette leaf - a static blank
                hexagon placeholder, same as a built-in operator's bool arg
                (see paletteState.ts's paletteValueFor) and a real unfilled
                boolean slot. -->

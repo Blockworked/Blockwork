@@ -1,5 +1,4 @@
-// Lucide icons (https://lucide.dev) via lucide-vue-next — Vue component
-// versions replacing the old lucide-static raw-SVG imports.
+// Lucide icons via lucide-vue-next.
 import type { Component } from 'vue';
 import {
   ChevronUp,
@@ -139,7 +138,7 @@ export const INSTRUCTION_TYPE_ICONS: Record<InstructionType, IconName> = {
   SetVariable: 'equal',
   ChangeVariable: 'trending-up',
   BlockHeader: 'blocks',
-  // Same icon as BlockHeader — a call site is the same custom block, just
+  // Same icon as BlockHeader - a call site is the same custom block, just
   // invoked rather than defined.
   CallBlock: 'blocks',
   Return: 'corner-up-left',

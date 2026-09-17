@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Thin wrapper around blockstitch's generic <ContextMenuPanel> — this is where
+// Thin wrapper around blockstitch's generic <ContextMenuPanel> - this is where
 // Blockwork's own menu content (what each menu variant offers, and what each
 // item does) lives; the panel itself only handles positioning, outside-click/
 // Escape/scroll close, and rendering the item list.
@@ -18,14 +18,14 @@ import { detailsForBlockDef, detailsForInstructionType, detailsForValueKind, typ
 import { openDetailsDialog } from '../detailsDialog';
 
 // Default offset (canvas units) a freshly-attached comment spawns at,
-// relative to its block — clear of the block itself, matching the spirit of
+// relative to its block - clear of the block itself, matching the spirit of
 // commands.rs's next_strand_position ("offset from the existing thing").
 const ATTACHED_COMMENT_OFFSET = { dx: 220, dy: 0 };
 
 const strand = computed(() => state.current_macro?.strands.find(s => s.id === contextMenu.strandId) ?? null);
 const instruction = computed(() => resolveInstructionAt(strand.value, contextMenu.path));
 const headerBlockId = computed(() => (instruction.value?.type === 'BlockHeader' ? instruction.value.block_id : null));
-// A block/header can carry at most one attached comment (Scratch-style) —
+// A block/header can carry at most one attached comment (Scratch-style) -
 // this is that comment, if one already exists, so the menu can offer
 // "Comment" (focus it) instead of creating a duplicate.
 const attachedComment = computed(() => {
@@ -37,7 +37,7 @@ const isRecordingTarget = computed(
   () => contextMenu.strandId !== '' && contextMenu.strandId === state.current_macro?.recording_target_strand_id,
 );
 
-// What the "Details" item shows for the current 'value' menu target — a
+// What the "Details" item shows for the current 'value' menu target - a
 // placed operator or "My Blocks" reporter call on the canvas (openValueMenu
 // in contextMenu.ts already declines to open for anything else, e.g. a
 // Var/Param reporter with no fixed behavior to explain).
@@ -51,7 +51,7 @@ const valueDetails = computed<BlockDetails | null>(() => {
   return detailsForValueKind(v.kind === 'Op' ? v.op : v.kind);
 });
 
-// What the "Details" item shows for the current 'block' menu target — a
+// What the "Details" item shows for the current 'block' menu target - a
 // BlockHeader row or a CallBlock instruction both describe a custom block
 // (the "My Blocks" definition itself), everything else is a fixed built-in
 // instruction type.
@@ -88,7 +88,7 @@ function onDeleteBlock() {
   // A custom block's header row: delete the block definition (which also
   // removes this body strand and every call site referencing it) rather
   // than just detaching the strand and leaving an orphaned "My Blocks"
-  // prefab behind — mirrors the drag-to-trash handling in blockstitch's
+  // prefab behind - mirrors the drag-to-trash handling in blockstitch's
   // canvas/canvasDrag.ts.
   if (headerBlockId.value) {
     deleteBlock(headerBlockId.value);
@@ -134,7 +134,7 @@ async function onAddCanvasComment() {
   closeContextMenu();
 }
 function onDeleteAllBlocks() {
-  // Deliberately doesn't close the menu — the two-click confirm (armed on
+  // Deliberately doesn't close the menu - the two-click confirm (armed on
   // first click, executed on second, matching the toolbar button this
   // replaced) needs the menu to stay open so the label/icon can update in
   // between; it closes via the normal outside-click/Escape handling once

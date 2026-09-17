@@ -1,7 +1,7 @@
 <script setup lang="ts">
 // "Macro Settings" popup, opened from the gear button next to the "Select
 // macro" dropdown (MacroSelector.vue). Edits settings for the currently
-// selected macro only — each field here is persisted on the macro itself
+// selected macro only - each field here is persisted on the macro itself
 // (MacroDto.settings) and travels with it on export/import, unlike the
 // app-wide preferences in SettingsPage.vue. Teleported to <body> like the
 // other dialogs (MakeVariableDialog.vue, RemoveMacroDialog.vue, etc.).

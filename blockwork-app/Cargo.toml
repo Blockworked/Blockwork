@@ -1,0 +1,20 @@
+[package]
+name = "blockwork-app"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+blockwork-core = { path = "../blockwork-core" }
+tracing.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net", "io-util", "time"] }
+chrono.workspace = true
+dirs.workspace = true
+
+[target.'cfg(target_os = "linux")'.dependencies]
+# Encodes application icons found via .desktop entries as data: URIs for the
+# "Open App" picker (see src/installed_apps.rs) - Linux-only, since the
+# Windows/Mac listings there don't resolve icons at all yet.
+base64.workspace = true

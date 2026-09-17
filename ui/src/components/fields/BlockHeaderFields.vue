@@ -1,15 +1,15 @@
 <script setup lang="ts">
-// The hat row for a custom block's own body strand — renders its prototype
+// The hat row for a custom block's own body strand - renders its prototype
 // (labels as plain text, one draggable input oval per declared parameter).
 // Dragging an oval reuses PaletteValueBlock's existing `Var:`-style prefab
 // drag machinery wholesale (see `ValueKind`'s `Param:${string}` case in
-// types.ts/paletteState.ts) with kind `Param:<name>` — the only new part is
+// types.ts/paletteState.ts) with kind `Param:<name>` - the only new part is
 // *where* it renders (here, not the sidebar), since a param reporter is
 // only meaningful within its own block's body. `dragKind` additionally packs
 // this block's own id in (`Param:<blockId>:<name>`, parsed by
 // types.ts's parseParamKind) purely so blockstitchSetup.ts's
 // `createFloatingValue` can record it if this drag ends up parked as a
-// floating value with no strand of its own to trace back to — see
+// floating value with no strand of its own to trace back to - see
 // `paramIsBool` there.
 import { computed } from 'vue';
 import { Blocks } from 'lucide-vue-next';

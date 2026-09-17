@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Read-only popup shown by a block's right-click "Details" item — explains
+// Read-only popup shown by a block's right-click "Details" item - explains
 // what the block does and shows its wire identifier. Mounted once alongside
 // ContextMenu.vue; content comes from blockDetails.ts via detailsDialog.ts.
 import { Info } from 'lucide-vue-next';

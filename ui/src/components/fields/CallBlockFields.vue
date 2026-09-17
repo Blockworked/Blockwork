@@ -1,6 +1,6 @@
 <script setup lang="ts">
 // Renders a `CallBlock` instruction's prototype dynamically from its
-// `BlockDef` (labels as plain text, one `ValueBlock` per declared input) —
+// `BlockDef` (labels as plain text, one `ValueBlock` per declared input) -
 // there's no fixed shape to hardcode, unlike every other instruction's
 // *Fields component, since it depends on whichever block this call names.
 import { computed } from 'vue';
@@ -14,8 +14,8 @@ const props = defineProps<{ strandId: string; path: InstrPath; instruction: Extr
 const def = computed(() => findBlockDef(state.current_macro, props.instruction.block_id));
 
 // Pairs each prototype piece with the arg index it addresses (labels get
-// -1 — nothing to look up in `args`) and the blank fallback that index
-// should show if `args` came up short (matches blockDefs.ts's blankArgFor —
+// -1 - nothing to look up in `args`) and the blank fallback that index
+// should show if `args` came up short (matches blockDefs.ts's blankArgFor -
 // a boolean input falls back to an empty hexagon, not a number). Mirrors
 // ValueBlock.vue's `callPieces`.
 const pieces = computed(() => {

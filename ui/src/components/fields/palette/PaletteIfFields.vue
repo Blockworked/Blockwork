@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// Static preview only — no live editable condition (the sidebar is never a
-// valid value-drop target) and no real nested body — but shaped as the
+// Static preview only - no live editable condition (the sidebar is never a
+// valid value-drop target) and no real nested body - but shaped as the
 // actual hollow bracket the real canvas block renders as (see
 // PaletteInstructionBlock.vue and style.css's .instruction-row-wrap), not a
 // flattened single-line stand-in, so the prefab reads as what it actually

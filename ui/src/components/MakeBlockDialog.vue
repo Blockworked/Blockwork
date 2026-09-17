@@ -1,9 +1,9 @@
 <script setup lang="ts">
-// "Make a Block"/"Edit Block" popup — a centered live prototype preview
+// "Make a Block"/"Edit Block" popup - a centered live prototype preview
 // (labels + input ovals) the user builds up by inserting pieces, plus a
 // return-type choice, teleported to <body> like MakeVariableDialog.vue.
 // Doubles as both "Make a Block" (no `editTarget`) and "Edit Block" (from a
-// prefab's context menu, see ContextMenu.vue/blockDialogs.ts) — editing
+// prefab's context menu, see ContextMenu.vue/blockDialogs.ts) - editing
 // works on a local copy of `pieces`/`shape` and only writes back via
 // createBlock/editBlock on OK, so Cancel is a true no-op.
 import type { ComponentPublicInstance } from 'vue';
@@ -18,7 +18,7 @@ const emit = defineEmits<{ close: [] }>();
 
 const isEdit = computed(() => !!props.editTarget);
 
-// Stable per-piece id — preserved verbatim for every existing piece (so
+// Stable per-piece id - preserved verbatim for every existing piece (so
 // `edit_block` can tell a rename apart from a remove+add, see types.ts's
 // BlockPieceDto comment), freshly generated only for a piece created in
 // this session (`addPiece`).
@@ -86,11 +86,11 @@ function updateCustomColor() {
   color.value = customColor.value;
 }
 // The "returns a value" checkbox is a view over `shape`, not separate state
-// of its own — it just picks which pair of mutually-exclusive shapes the two
+// of its own - it just picks which pair of mutually-exclusive shapes the two
 // wide buttons below offer (Normal/Ending vs ReturnsValue/ReturnsBool).
 const isValueMode = computed(() => blockShapeReturnsValue(shape.value));
 // Toggling the checkbox always lands on the *first* option of whichever pair
-// it switches to, per the dialog's spec — never tries to preserve e.g. an
+// it switches to, per the dialog's spec - never tries to preserve e.g. an
 // Ending block's "endingness" as a boolean-return choice, since the two
 // pairs don't correspond piece-for-piece.
 function onToggleReturnsValue(e: Event) {

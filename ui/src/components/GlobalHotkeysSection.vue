@@ -27,7 +27,7 @@ function isAtDefault(type: NamedActionType) {
       <div v-for="{ label, type } in NAMED_ACTIONS" :key="type" class="settings-row">
         <span class="settings-row-label">
           {{ label }}
-          <span v-if="NO_COMBO_ACTIONS.has(type)" class="settings-row-hint" title="Single key only, no modifiers — modifier keys held while this fires would be captured as macro steps">(single key)</span>
+          <span v-if="NO_COMBO_ACTIONS.has(type)" class="settings-row-hint" title="Single key only, no modifiers - modifier keys held while this fires would be captured as macro steps">(single key)</span>
         </span>
         <button
           class="btn-chip"

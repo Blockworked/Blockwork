@@ -1,12 +1,5 @@
-//! Wire format for the shared-memory bridge between the embedded engine
-//! (inside a Windows host process under Wine/Proton) and
-//! `blockwork-linux-bridge` (native Linux process doing real input
-//! capture/emission — Windows' `WH_KEYBOARD_LL`/`WH_MOUSE_LL` hooks don't
-//! see real host input under Wine, and `SendInput` emission is unreliable
-//! there).
-//!
-//! Always compiled (no platform gate): both ends depend on this module
-//! directly, so they can never disagree about the encoding.
+//! Shared-memory wire format between the Wine-hosted embedder and
+//! `blockwork-linux-bridge`.
 
 use crate::input::types::{MacroButton, MacroKey};
 use serde::{Deserialize, Serialize};
@@ -27,7 +20,7 @@ pub enum WireCaptureEvent {
 }
 
 /// A `CaptureTimestamp::Hardware` value can't cross the wire directly
-/// (`SystemTime` isn't `#[repr(C)]`-portable) — split into seconds+nanos
+/// (`SystemTime` isn't `#[repr(C)]`-portable) - split into seconds+nanos
 /// since `UNIX_EPOCH` and reconstructed on the other side.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct WireTimestamp {
@@ -67,25 +60,10 @@ impl From<WireCaptureEvent> for crate::macros::backend::CaptureEvent {
     }
 }
 
-/// Control-plane commands, sent Windows (Wine-hosted embedder) → Linux
-/// (`blockwork-linux-bridge`). Playback used to be paced on the Windows
-/// side, one `WireEmitCommand` per input event fired by `runner::run()`'s
-/// Wait-based deadline loop — but that loop ran inside Wine, where
-/// `SetThreadPriority` emulation is much weaker than real `SCHED_FIFO`, so
-/// under load it could get preempted long enough to throw macro timing off
-/// (confirmed: inputs drifted mid-run, never reproduced over the native
-/// desktop app's plain TCP socket).
-///
-/// Now the whole timed run happens natively on the Linux side: only these
-/// two commands cross the wire, never per-event emission.
-/// `blockwork-linux-bridge` loads the macro itself (same config dir the
-/// Windows side's `macros-dir` override reaches via its `Z:` mapping — no
-/// macro data crosses the wire) and runs `Macro::run` exactly as the
-/// desktop app does, including its own `raise_current_thread_priority()`
-/// — real `SCHED_FIFO` on Linux, not Wine's emulation.
+/// Control commands, Windows -> Linux. Runs happen on the Linux side.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WireControlCommand {
-    /// Run the macro with this id — fire-and-forget, same contract as
+    /// Run the macro with this id - fire-and-forget, same contract as
     /// `blockwork_run_macro`. The `f64` is `elapsed_overshoot_ms`: real time
     /// already elapsed before this command was sent, since playback was
     /// supposed to start. Fed into `Macro::run_with_offset` so the first
@@ -97,13 +75,9 @@ pub enum WireControlCommand {
     StopLoop,
 }
 
-/// Generous relative to a bincode-encoded `WireCapture`/`WireControlCommand`
-/// (small enums over primitives/short strings; `RunMacro`'s id, a UUID, is
-/// the largest) — checked against actual encoded size in tests below.
+/// Max encoded message size.
 pub const SLOT_SIZE: usize = 128;
-/// 512 wasn't enough: a real recording session filled it (dropping events)
-/// within ~14s against real Proton input. 16384 costs ~2MB per ring and
-/// gives ~30x the margin at the same observed rate.
+/// Ring capacity.
 pub const RING_CAPACITY: usize = 16384;
 
 #[repr(C)]
@@ -116,12 +90,7 @@ pub struct RingSlot {
 pub struct RingBuffer {
     pub head: AtomicU32,
     pub tail: AtomicU32,
-    /// Cross-process spinlock guarding `try_push` — `blockwork-linux-bridge`
-    /// spawns one reader thread per input device, all pushing into the same
-    /// ring. Without it, two threads can read the same `head` and only one
-    /// push ends up counted (a real race, confirmed on Proton: recording
-    /// dropped events inconsistently). `try_pop` stays single-consumer on
-    /// both ends, so it needs no lock.
+    /// Lock for multi-producer pushes.
     push_lock: AtomicU32,
     pub slots: [RingSlot; RING_CAPACITY],
 }
@@ -229,7 +198,7 @@ mod tests {
 
     #[test]
     fn control_roundtrips_and_fits_slot() {
-        // A real macro id (uuid::Uuid::new_v4().simple()) is 32 hex chars —
+        // A real macro id (uuid::Uuid::new_v4().simple()) is 32 hex chars -
         // exercises the actual worst-case length rather than a short literal.
         let id = "0123456789abcdef0123456789abcdef".to_string();
         let msg = WireControlCommand::RunMacro(id.clone(), 37.5);

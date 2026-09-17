@@ -8,12 +8,12 @@ pub enum CaptureDecision {
 
 #[derive(Clone, Copy)]
 pub enum CaptureTimestamp {
-    /// No better timestamp available than "right now" (Windows — low-level
+    /// No better timestamp available than "right now" (Windows - low-level
     /// hooks are delivered synchronously enough, and the hook's own `time`
     /// field is lower-resolution than `Instant::now()`/QPC anyway).
     Now,
     /// Kernel/OS-supplied hardware timestamp (Linux evdev; macOS CGEvent).
-    /// Not guaranteed to be wall-clock/Unix time — only meaningful as a
+    /// Not guaranteed to be wall-clock/Unix time - only meaningful as a
     /// relative delta between two values from the same backend/session.
     Hardware(std::time::SystemTime),
 }
@@ -66,7 +66,7 @@ pub fn start_capture(
 
 /// Called the instant a hotkey combo matches, before the action is
 /// dispatched. Lets a backend snapshot state only meaningful at that
-/// moment — on Windows, the foreground window to type the macro back into.
+/// moment - on Windows, the foreground window to type the macro back into.
 /// No-op elsewhere.
 pub fn note_hotkey_matched() {
     #[cfg(windows)]

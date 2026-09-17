@@ -23,10 +23,10 @@ pub enum Op {
     /// fresh on every `eval`. Picks an integer if both bounds are whole
     /// numbers, otherwise a float.
     Random,
-    /// Concatenates all of `args` as text — the only variable-arity operator
+    /// Concatenates all of `args` as text - the only variable-arity operator
     /// (2 or 3 args depending on which palette entry it came from).
     Join,
-    /// Zero-arity text constants — `args` is always empty.
+    /// Zero-arity text constants - `args` is always empty.
     NewLine,
     Tab,
     /// 1-based index of `args[0]` (needle) in `args[1]` (haystack), or `0` if
@@ -39,11 +39,11 @@ pub enum Op {
     LetterOf,
     /// Character count of `args[0]` (as text).
     Length,
-    /// Upper/lowercases `args[0]` based on `args[1]` (`"Upper"`/`"Lower"`) —
+    /// Upper/lowercases `args[0]` based on `args[1]` (`"Upper"`/`"Lower"`) -
     /// a plain `Value::Text` leaf, but driven by an in-place dropdown rather
     /// than the drag/drop machinery.
     Case,
-    /// `args[0] == args[1]` — numeric if both sides parse as a number,
+    /// `args[0] == args[1]` - numeric if both sides parse as a number,
     /// otherwise a text comparison (mirrors Scratch's loose `=`).
     Eq,
     /// Negation of [`Op::Eq`].
@@ -62,26 +62,26 @@ pub enum Op {
     Or,
     /// `!args[0]`.
     Not,
-    /// Zero-arity `true` literal — a standalone block, not a toggle.
+    /// Zero-arity `true` literal - a standalone block, not a toggle.
     True,
-    /// Zero-arity `false` literal — a standalone block, not a toggle.
+    /// Zero-arity `false` literal - a standalone block, not a toggle.
     False,
-    /// Zero-arity — the system's current battery charge, 0-100. See
+    /// Zero-arity - the system's current battery charge, 0-100. See
     /// `crate::battery::percentage`.
     BatteryPercentage,
-    /// Zero-arity boolean — whether the system is currently receiving
+    /// Zero-arity boolean - whether the system is currently receiving
     /// external power. See `crate::battery::is_plugged_in`.
     PluggedIn,
     /// `args[0]` (a fixed dropdown, like `Case`'s upper/lowercase toggle) is
     /// one of `"Year"`/`"Month"`/`"Date"`/`"DayOfWeek"`/`"Hour"`/`"Minute"`/
     /// `"Second"`, naming which local-clock component to read right now.
-    /// Always numeric — `DayOfWeek` is 1 (Sunday) through 7 (Saturday),
+    /// Always numeric - `DayOfWeek` is 1 (Sunday) through 7 (Saturday),
     /// `Hour` is always 24-hour (0-23) regardless of the UI's display
     /// format, matching Scratch's own "current ()" sensing block.
     CurrentTime,
 }
 
-/// Recursive expression tree backing a numeric/text instruction field — a
+/// Recursive expression tree backing a numeric/text instruction field - a
 /// number, text, or an operator over nested `args` (e.g. `5 + 3`).
 ///
 /// `saved` holds the value an operator displaced when it took over the slot
@@ -92,7 +92,7 @@ pub enum Op {
 pub enum Value {
     Number { value: f64 },
     Text { value: String },
-    /// Bare boolean leaf with no value of its own — the "nothing plugged in
+    /// Bare boolean leaf with no value of its own - the "nothing plugged in
     /// here" state of a boolean-typed slot (an `If`'s condition, an
     /// `And`/`Or`/`Not` operand). Evaluates as `false`, same as Scratch's
     /// empty hexagon. Distinct from the standalone `Op::True`/`Op::False`
@@ -104,17 +104,17 @@ pub enum Value {
     /// macro's variable store by [`Value::resolve_vars`] before `eval` sees it.
     Var { name: String },
     /// A read of the current custom-block invocation's bound parameter by
-    /// name — resolved against that invocation's local parameter scope (not
+    /// name - resolved against that invocation's local parameter scope (not
     /// the macro-wide variable store), so nested/concurrent invocations of
     /// the same block don't share a slot.
     Param { name: String },
-    /// Value-position invocation of a `ReturnsValue`/`ReturnsBool`-shaped custom block —
+    /// Value-position invocation of a `ReturnsValue`/`ReturnsBool`-shaped custom block -
     /// mirrors `Op`'s shape (including `saved`) but names a block instead of
     /// a fixed [`Op`]. Resolved before `eval` sees it, like `Var`/`Param`.
     Call { block_id: String, args: Vec<Value>, saved: Box<Value> },
 }
 
-/// Result of evaluating a [`Value`] tree — a number or text. Also doubles as
+/// Result of evaluating a [`Value`] tree - a number or text. Also doubles as
 /// the persisted representation of a variable's current value, hence the
 /// extra derives.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -125,7 +125,7 @@ pub enum Evaluated {
     Bool(bool),
 }
 
-/// Manual impl mirroring `Value`'s own — `f64` isn't `Hash`, so its bit
+/// Manual impl mirroring `Value`'s own - `f64` isn't `Hash`, so its bit
 /// pattern stands in.
 impl std::hash::Hash for Evaluated {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
@@ -157,7 +157,7 @@ impl Evaluated {
         }
     }
 
-    /// Coerces to a boolean — always succeeds, same "loose" spirit as
+    /// Coerces to a boolean - always succeeds, same "loose" spirit as
     /// `as_number`: a nonzero number or a nonempty, non-`"false"` string
     /// counts as true.
     pub fn as_bool(&self) -> bool {
@@ -168,7 +168,7 @@ impl Evaluated {
         }
     }
 
-    /// Stringifies for display/comparison — like `eval_text`, but from an
+    /// Stringifies for display/comparison - like `eval_text`, but from an
     /// already-evaluated result (no re-evaluation).
     fn as_text(&self) -> String {
         match self {
@@ -178,7 +178,7 @@ impl Evaluated {
         }
     }
 
-    /// Rebuilds a `Value` leaf holding this result — `Bool` becomes a
+    /// Rebuilds a `Value` leaf holding this result - `Bool` becomes a
     /// `True`/`False` op node, since there's no bare boolean `Value` leaf.
     pub fn into_value(self) -> Value {
         match self {
@@ -200,7 +200,7 @@ pub struct OperatorKindSpec {
     pub kind: &'static str,
     pub op: Op,
     pub arity: usize,
-    /// Builds the default `args` vec — a function (not a fixed `Vec`, since
+    /// Builds the default `args` vec - a function (not a fixed `Vec`, since
     /// `Value` isn't `Const`) so mixed-type operators like `LetterOf` can
     /// give each slot its own default.
     pub default_args: fn() -> Vec<Value>,
@@ -210,7 +210,7 @@ fn text_default() -> Value {
     Value::Text { value: String::new() }
 }
 
-/// Default for a boolean-typed operand slot — blank (`Value::Bool`), same
+/// Default for a boolean-typed operand slot - blank (`Value::Bool`), same
 /// spirit as `text_default`, not a pre-filled `false`.
 fn bool_default() -> Value {
     Value::Bool
@@ -227,14 +227,14 @@ pub const OPERATOR_KINDS: &[OperatorKindSpec] = &[
     OperatorKindSpec { kind: "Random", op: Op::Random, arity: 2, default_args: || vec![Value::number(0.0), Value::number(0.0)] },
     OperatorKindSpec { kind: "Join", op: Op::Join, arity: 2, default_args: || vec![text_default(), text_default()] },
     OperatorKindSpec { kind: "Join3", op: Op::Join, arity: 3, default_args: || vec![text_default(), text_default(), text_default()] },
-    // `default_args` is unused for these — arity 0 means it's never called.
+    // `default_args` is unused for these - arity 0 means it's never called.
     OperatorKindSpec { kind: "NewLine", op: Op::NewLine, arity: 0, default_args: Vec::new },
     OperatorKindSpec { kind: "Tab", op: Op::Tab, arity: 0, default_args: Vec::new },
     OperatorKindSpec { kind: "IndexOf", op: Op::IndexOf, arity: 2, default_args: || vec![text_default(), text_default()] },
     OperatorKindSpec { kind: "LastIndexOf", op: Op::LastIndexOf, arity: 2, default_args: || vec![text_default(), text_default()] },
     OperatorKindSpec { kind: "LetterOf", op: Op::LetterOf, arity: 2, default_args: || vec![Value::number(1.0), text_default()] },
     OperatorKindSpec { kind: "Length", op: Op::Length, arity: 1, default_args: || vec![text_default()] },
-    // `args[1]` defaults to the dropdown's "uppercase" option — see
+    // `args[1]` defaults to the dropdown's "uppercase" option - see
     // `Op::Case`'s doc comment.
     OperatorKindSpec {
         kind: "Case",
@@ -251,15 +251,15 @@ pub const OPERATOR_KINDS: &[OperatorKindSpec] = &[
     OperatorKindSpec { kind: "And", op: Op::And, arity: 2, default_args: || vec![bool_default(), bool_default()] },
     OperatorKindSpec { kind: "Or", op: Op::Or, arity: 2, default_args: || vec![bool_default(), bool_default()] },
     OperatorKindSpec { kind: "Not", op: Op::Not, arity: 1, default_args: || vec![bool_default()] },
-    // Zero-arity, like NewLine/Tab — a standalone "true"/"false" block, not a toggle.
+    // Zero-arity, like NewLine/Tab - a standalone "true"/"false" block, not a toggle.
     OperatorKindSpec { kind: "True", op: Op::True, arity: 0, default_args: Vec::new },
     OperatorKindSpec { kind: "False", op: Op::False, arity: 0, default_args: Vec::new },
-    // Zero-arity, like NewLine/Tab — evaluates to the live system battery percentage.
+    // Zero-arity, like NewLine/Tab - evaluates to the live system battery percentage.
     OperatorKindSpec { kind: "BatteryPercentage", op: Op::BatteryPercentage, arity: 0, default_args: Vec::new },
-    // Zero-arity, like True/False — evaluates to whether the system is
+    // Zero-arity, like True/False - evaluates to whether the system is
     // currently on external power.
     OperatorKindSpec { kind: "PluggedIn", op: Op::PluggedIn, arity: 0, default_args: Vec::new },
-    // `args[0]` defaults to the dropdown's first ("Year") option — same
+    // `args[0]` defaults to the dropdown's first ("Year") option - same
     // shape as `Case`, and matching valueOps.ts's CURRENT_TIME_OPTIONS order
     // (the frontend's own default for a freshly-dragged block always picks
     // the enumArg's first option).
@@ -311,7 +311,7 @@ impl Value {
             // only fires if that step was skipped (a bug, not something a
             // macro can trigger).
             Value::Var { .. } => Err("unresolved variable reference".to_string()),
-            // Same invariant as `Var` — only the runner can resolve these
+            // Same invariant as `Var` - only the runner can resolve these
             // (resolving `Call` requires actually executing instructions,
             // which this module can't do). That also keeps preview's
             // best-effort `resolve_vars().eval()` safe: a block call just
@@ -445,13 +445,13 @@ impl Value {
         }
     }
 
-    /// Evaluates the tree and coerces the result to a number — the entry
+    /// Evaluates the tree and coerces the result to a number - the entry
     /// point every numeric instruction field actually calls.
     pub fn eval_number(&self) -> Result<f64, String> {
         self.eval()?.as_number()
     }
 
-    /// Evaluates the tree to a string — the entry point the `Text`
+    /// Evaluates the tree to a string - the entry point the `Text`
     /// instruction calls. Text results pass through verbatim; numeric
     /// results get stringified.
     pub fn eval_text(&self) -> Result<String, String> {
@@ -494,7 +494,7 @@ impl Value {
     }
 
     /// Renames every `Value::Param` leaf reading `old` to `new` (including in
-    /// `saved`) — counterpart to `rename_var`, for when a block input is renamed.
+    /// `saved`) - counterpart to `rename_var`, for when a block input is renamed.
     pub fn rename_param(&mut self, old: &str, new: &str) {
         match self {
             Value::Param { name } => {
@@ -513,7 +513,7 @@ impl Value {
     }
 
     /// Applies `f` to the `args` of every `Value::Call` node referencing
-    /// `block_id` (including nested calls) — keeps call sites' argument
+    /// `block_id` (including nested calls) - keeps call sites' argument
     /// lists aligned with the block's current pieces.
     pub fn for_each_call_args_mut(&mut self, block_id: &str, f: &mut dyn FnMut(&mut Vec<Value>)) {
         match self {
@@ -564,15 +564,15 @@ impl Value {
     /// Repairs a "poisoned" boolean slot left by a historical bug: before
     /// `Value::Bool` existed, a boolean-typed slot's blank state was a
     /// standalone `False` op whose `saved` fallback was a plain `Number(0)`
-    /// — so dragging that (or any other block) out of an `If`/`IfElse`
+    /// - so dragging that (or any other block) out of an `If`/`IfElse`
     /// condition or an `And`/`Or`/`Not` operand could reveal a raw number
     /// leaf instead of the blank hexagon it should be. `expects_bool` is
-    /// true exactly at the positions a boolean value belongs — the caller
+    /// true exactly at the positions a boolean value belongs - the caller
     /// (an `Instruction`'s own `migrate_bool_slots`) passes `true` for an
     /// `If`/`IfElse` condition, `false` everywhere else; from there this
     /// threads it into `And`/`Or`/`Not` operands (and along every `saved`
     /// chain, which occupies the same slot as whatever displaced it) on its
-    /// own. Only a bare `Number` gets converted — anything else already has
+    /// own. Only a bare `Number` gets converted - anything else already has
     /// a real shape, boolean-looking or not, so there's nothing to fix.
     pub fn migrate_bool_slots(&mut self, expects_bool: bool) {
         if expects_bool && matches!(self, Value::Number { .. }) {
@@ -614,7 +614,7 @@ impl Value {
                 Some(e) => e.clone().into_value(),
                 None => Value::number(0.0),
             },
-            // Left untouched — `Param`/`Call` need execution capability this
+            // Left untouched - `Param`/`Call` need execution capability this
             // module doesn't have; only their nested `args` (which may
             // contain `Var` reads) get recursed into.
             Value::Param { name } => Value::Param { name: name.clone() },
@@ -628,7 +628,7 @@ impl Value {
 }
 
 /// Manual impl mirroring `Instruction`'s own manual `Hash` impl
-/// (`macros/mod.rs`) — `f64` isn't `Hash`, so its bit pattern stands in.
+/// (`macros/mod.rs`) - `f64` isn't `Hash`, so its bit pattern stands in.
 impl std::hash::Hash for Value {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
@@ -667,7 +667,7 @@ impl std::hash::Hash for Value {
     }
 }
 
-/// Accepts either the tagged `{"kind": ...}` shape or a bare number/string —
+/// Accepts either the tagged `{"kind": ...}` shape or a bare number/string -
 /// old save files have plain values in slots `Value` now occupies, so this
 /// keeps them loading. Mirrors the `WaitDe`/`InstructionDe` untagged-enum
 /// pattern in `macros/mod.rs`.
@@ -689,7 +689,7 @@ impl<'de> Deserialize<'de> for Value {
             Op {
                 op: Op,
                 args: Vec<Value>,
-                // Older save files predate `saved` entirely — falls back to
+                // Older save files predate `saved` entirely - falls back to
                 // a plain zero, same spirit as `ValueDe::Legacy` below.
                 #[serde(default = "default_saved")]
                 saved: Box<Value>,
@@ -702,7 +702,7 @@ impl<'de> Deserialize<'de> for Value {
                 #[serde(default = "default_saved")]
                 saved: Box<Value>,
             },
-            // Legacy tags predating the `BinaryOp`/`Join` → `Op` unification —
+            // Legacy tags predating the `BinaryOp`/`Join` → `Op` unification -
             // kept so old saves still load, migrated into `Value::Op` below.
             BinaryOp {
                 op: Op,
@@ -722,7 +722,7 @@ impl<'de> Deserialize<'de> for Value {
         #[serde(untagged)]
         enum ValueDe {
             Legacy(f64),
-            // Pre-`Value` shape of `InputToken::Text` — a bare JSON string,
+            // Pre-`Value` shape of `InputToken::Text` - a bare JSON string,
             // from when it held a plain `String` rather than a tree.
             LegacyText(String),
             Current(Tagged),
@@ -757,7 +757,7 @@ mod tests {
     #[test]
     fn legacy_bare_string_deserializes_to_text() {
         // Pre-`Value` save shape of `InputToken::Text`, from back when it
-        // held a plain `String` — must keep loading old macros.
+        // held a plain `String` - must keep loading old macros.
         let v: Value = serde_json::from_str("\"hello\"").unwrap();
         assert_eq!(v, Value::Text { value: "hello".into() });
     }

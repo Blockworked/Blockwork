@@ -7,7 +7,7 @@ fn main() {
 
 // `frontendDist` (`../ui/dist`) doesn't exist until Vite runs, and plain
 // `cargo build`/`cargo run` never go through the Tauri CLI to trigger that
-// — so build it here instead.
+// - so build it here instead.
 fn build_frontend() {
     let ui_dir = std::path::Path::new("..").join("ui");
 
@@ -31,7 +31,7 @@ fn build_frontend() {
     let run = |args: &[&str]| {
         let mut command = std::process::Command::new(pnpm);
         command.args(args).current_dir(&ui_dir);
-        // BLOCKWORK_PNPM_OFFLINE=1 (set by packaging/flatpak — deliberately
+        // BLOCKWORK_PNPM_OFFLINE=1 (set by packaging/flatpak - deliberately
         // not FLATPAK, which cef-dll-sys's own build script already keys off
         // for its CEF lookup) needs pnpm to trust the lockfile offline; pnpm
         // 11 only honors that via CLI flags, not the env-var config.

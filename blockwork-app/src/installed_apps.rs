@@ -1,5 +1,5 @@
 //! Enumerates locally installed applications for the "Open App" instruction's
-//! picker popup — desktop-app-only concern (the cross-platform
+//! picker popup - desktop-app-only concern (the cross-platform
 //! `InstructionKind::OpenApp` just launches whatever `command` string this
 //! produced, never re-scans), so this lives here rather than in
 //! `blockwork-core`.
@@ -7,7 +7,7 @@
 //! Icon support is currently Linux-only: freedesktop `.desktop` entries name
 //! an icon theme lookup key, which resolves fairly reliably to a `.png`/
 //! `.svg` file we can inline as a `data:` URI. Windows/macOS listings below
-//! are best-effort (name + launch target only, no icon) — resolving a Start
+//! are best-effort (name + launch target only, no icon) - resolving a Start
 //! Menu shortcut's icon or a `.icns` bundle icon needs real image decoding
 //! this app has no other reason to depend on.
 
@@ -46,7 +46,7 @@ mod linux {
 
     /// Every `applications/` directory the freedesktop menu spec says to
     /// search. `seen_ids` just dedupes by app id (first `.desktop` file
-    /// wins) — no override semantics needed here.
+    /// wins) - no override semantics needed here.
     fn application_dirs() -> Vec<PathBuf> {
         let mut dirs = Vec::new();
         match std::env::var("XDG_DATA_DIRS") {
@@ -63,7 +63,7 @@ mod linux {
     }
 
     /// A parsed `.desktop` entry whose `Icon=` value hasn't been resolved to
-    /// a file yet — resolution differs between native and Flatpak listings.
+    /// a file yet - resolution differs between native and Flatpak listings.
     struct DesktopEntry {
         name: String,
         command: String,
@@ -102,7 +102,7 @@ mod linux {
     }
 
     /// Reads the handful of keys we care about out of a `.desktop` file's
-    /// `[Desktop Entry]` section — a purpose-built scan rather than a general
+    /// `[Desktop Entry]` section - a purpose-built scan rather than a general
     /// INI parser, since that's all this needs.
     fn parse_desktop_entry(content: &str) -> Option<DesktopEntry> {
         let mut in_main_section = false;
@@ -151,7 +151,7 @@ mod linux {
     }
 
     /// Strips freedesktop field codes (`%f`/`%F`/`%u`/`%U`/etc.) from an
-    /// `Exec=` line — those stand for file/URL args a launch from this
+    /// `Exec=` line - those stand for file/URL args a launch from this
     /// picker never has, so they're dropped rather than substituted.
     fn clean_exec_command(exec: &str) -> String {
         let mut result = String::new();
@@ -391,7 +391,7 @@ mod windows {
     use super::AppEntry;
     use std::path::Path;
 
-    /// Start Menu shortcuts, for the current user and "all users" — no icon
+    /// Start Menu shortcuts, for the current user and "all users" - no icon
     /// (see module doc comment); `command` is the `.lnk` path itself, which
     /// `runner::open_app`'s `cmd /C start "" <path>` launches directly.
     pub(crate) fn list_apps() -> Vec<AppEntry> {
@@ -439,7 +439,7 @@ mod macos {
     use super::AppEntry;
     use std::path::Path;
 
-    /// Top-level `.app` bundles in `/Applications` and `~/Applications` — no
+    /// Top-level `.app` bundles in `/Applications` and `~/Applications` - no
     /// icon (see module doc comment); `command` is the bundle path itself,
     /// which `runner::open_app`'s `open <path>` launches directly.
     pub(crate) fn list_apps() -> Vec<AppEntry> {

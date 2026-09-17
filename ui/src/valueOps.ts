@@ -1,30 +1,17 @@
-// Single source of truth for every operator value-block kind — mirrors
-// src-tauri/src/input/value.rs's OPERATOR_KINDS. Add a new operator (or
-// arity variant, like Join/Join3) as one row here.
-//
-// Type-only import below avoids a circular-init hazard with types.ts.
+// Operator value-block kinds.
 import type { ValueDto, ValueKind, ValueOp } from './types';
 
-/** Every operator `ValueKind` (excludes the `Number`/`Text` leaves) — lets
- * `Record<OperatorValueKind, ...>` state stay in sync automatically. */
+/** Every operator `ValueKind` (excludes the `Number`/`Text` leaves). */
 export type OperatorValueKind = Exclude<ValueKind, 'Number' | 'Text'>;
 
 export interface OperatorKindSpec {
   kind: OperatorValueKind;
   op: ValueOp;
   arity: number;
-  /** One entry per arg, in order — lets an operator mix types (e.g.
-   * LetterOf's number-then-text pair). */
   argTypes: ('number' | 'text' | 'bool')[];
-  /** What this operator's result "is" — drives shape (booleans render as a
-   * hexagon, see ValueBlock.vue). */
   resultType: 'number' | 'text' | 'bool';
-  /** Rendered before the first arg (word-phrase operators like Random/Join). */
   prefix?: string;
-  /** Rendered between each consecutive pair of args, symbol or word alike. */
   infix?: string;
-  /** If set, `args[enumArg.index]` is a fixed dropdown choice, not a
-   * draggable Value slot — e.g. Case's upper/lowercase toggle. */
   enumArg?: { index: number; options: { value: string; label: string }[] };
 }
 
@@ -33,10 +20,6 @@ const CASE_OPTIONS = [
   { value: 'Lower', label: 'lowercase' },
 ];
 
-// Scratch's `([abs v] of ())` number reporter. Trig values use degrees; the
-// backend owns that behavior, while these strings are the serialized dropdown
-// values it matches on. `log2` appears in the supplied Scratch menu alongside
-// the standard base-10 `log`.
 const MATH_OPTIONS = [
   { value: 'Abs', label: 'abs' },
   { value: 'Floor', label: 'floor' },
@@ -56,9 +39,6 @@ const MATH_OPTIONS = [
   { value: 'TenPower', label: '10 ^' },
 ];
 
-// Mirrors blockwork-core's `Value::eval`'s `Op::CurrentTime` match arm — always
-// numeric (`DayOfWeek` is 1=Sunday..7=Saturday, `Hour` is always 24-hour),
-// matching Scratch's own "current ()" sensing block.
 const CURRENT_TIME_OPTIONS = [
   { value: 'Year', label: 'year' },
   { value: 'Month', label: 'month' },
@@ -80,7 +60,6 @@ export const OPERATOR_KINDS: OperatorKindSpec[] = [
   { kind: 'Random', op: 'Random', arity: 2, argTypes: ['number', 'number'], resultType: 'number', prefix: 'pick random from', infix: 'to' },
   { kind: 'Join', op: 'Join', arity: 2, argTypes: ['text', 'text'], resultType: 'text', prefix: 'join' },
   { kind: 'Join3', op: 'Join', arity: 3, argTypes: ['text', 'text', 'text'], resultType: 'text', prefix: 'join' },
-  // Zero-arity text constants — argTypes is unused (no args to render).
   { kind: 'NewLine', op: 'NewLine', arity: 0, argTypes: [], resultType: 'text', prefix: 'new line' },
   { kind: 'Tab', op: 'Tab', arity: 0, argTypes: [], resultType: 'text', prefix: 'tab character' },
   { kind: 'IndexOf', op: 'IndexOf', arity: 2, argTypes: ['text', 'text'], resultType: 'number', prefix: 'index of', infix: 'in' },
@@ -88,8 +67,6 @@ export const OPERATOR_KINDS: OperatorKindSpec[] = [
   { kind: 'LetterOf', op: 'LetterOf', arity: 2, argTypes: ['number', 'text'], resultType: 'text', prefix: 'letter', infix: 'of' },
   { kind: 'Length', op: 'Length', arity: 1, argTypes: ['text'], resultType: 'number', prefix: 'length of' },
   { kind: 'Case', op: 'Case', arity: 2, argTypes: ['text', 'text'], resultType: 'text', infix: 'to', enumArg: { index: 1, options: CASE_OPTIONS } },
-  // Boolean: comparisons, logic, and two standalone true/false literal
-  // blocks (separate blocks per design, not a toggle).
   { kind: 'Eq', op: 'Eq', arity: 2, argTypes: ['number', 'number'], resultType: 'bool', infix: '=' },
   { kind: 'Neq', op: 'Neq', arity: 2, argTypes: ['number', 'number'], resultType: 'bool', infix: '≠' },
   { kind: 'Gt', op: 'Gt', arity: 2, argTypes: ['number', 'number'], resultType: 'bool', infix: '>' },
@@ -101,11 +78,8 @@ export const OPERATOR_KINDS: OperatorKindSpec[] = [
   { kind: 'Not', op: 'Not', arity: 1, argTypes: ['bool'], resultType: 'bool', prefix: 'not' },
   { kind: 'True', op: 'True', arity: 0, argTypes: [], resultType: 'bool', prefix: 'true' },
   { kind: 'False', op: 'False', arity: 0, argTypes: [], resultType: 'bool', prefix: 'false' },
-  // Zero-arity, like NewLine/Tab — evaluates to the live system battery percentage.
   { kind: 'BatteryPercentage', op: 'BatteryPercentage', arity: 0, argTypes: [], resultType: 'number', prefix: 'battery percentage' },
   { kind: 'PluggedIn', op: 'PluggedIn', arity: 0, argTypes: [], resultType: 'bool', prefix: 'plugged in?' },
-  // One arg, entirely a fixed dropdown (no draggable operand) — same enumArg
-  // shape as Case, just with nothing else alongside it.
   { kind: 'CurrentTime', op: 'CurrentTime', arity: 1, argTypes: ['text'], resultType: 'number', prefix: 'current', enumArg: { index: 0, options: CURRENT_TIME_OPTIONS } },
 ];
 
@@ -113,8 +87,6 @@ export function specForKind(kind: ValueKind): OperatorKindSpec | undefined {
   return OPERATOR_KINDS.find(s => s.kind === kind);
 }
 
-/** An existing `Op` node only carries `op`, not which palette kind built it —
- * returns the first spec matching `op` (labels match across arities, e.g. Join/Join3). */
 export function specForOp(op: ValueOp): OperatorKindSpec | undefined {
   return OPERATOR_KINDS.find(s => s.op === op);
 }

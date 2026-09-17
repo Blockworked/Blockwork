@@ -1,7 +1,4 @@
-// Reactive singleton coordinating the variable name popup (MakeVariableDialog.vue)
-// between its two triggers — the sidebar's "Make a Variable" button and the
-// per-variable context menu's "Rename variable" — which live in different
-// components (InstructionSidebar.vue and ContextMenu.vue respectively).
+// State for the variable name popup.
 import { reactive } from 'vue';
 
 type VariableDialogMode = 'create' | 'rename' | null;

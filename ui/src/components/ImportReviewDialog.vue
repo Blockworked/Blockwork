@@ -1,6 +1,6 @@
 <script setup lang="ts">
-// ImportReviewDialog.vue — review popup shown before finishing an import
-// that needs confirmation —
+// ImportReviewDialog.vue - review popup shown before finishing an import
+// that needs confirmation -
 // either the macro contains a Command instruction (runs arbitrary shell
 // commands, so a malicious macro maker could use one to do real damage)
 // and/or it requests non-default Macro Settings (see MacroSettingsDialog.vue)
@@ -20,7 +20,7 @@ const emit = defineEmits<{ close: [] }>();
 
 const submitting = ref(false);
 
-// Defaults to keeping every offered custom setting's imported value —
+// Defaults to keeping every offered custom setting's imported value -
 // unchecking one in the popup is what resets it back to the default instead.
 const keepSettings = reactive<Record<string, boolean>>(
   Object.fromEntries(props.prompt.custom_settings.map(s => [s.key, true])),

@@ -1,0 +1,19 @@
+[package]
+name = "blockwork-protocol"
+version.workspace = true
+edition.workspace = true
+
+[dependencies]
+serde.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
+tokio = { workspace = true, features = ["net", "io-util", "time"] }
+dirs.workspace = true
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true
+
+[target.'cfg(windows)'.dependencies]
+windows-sys = { workspace = true, features = ["Win32_Security_Authorization", "Win32_System_Pipes"] }
+
+[dev-dependencies]
+tokio = { workspace = true, features = ["macros", "rt"] }

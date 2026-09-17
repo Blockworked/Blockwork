@@ -31,6 +31,7 @@ install:
     # GL/Vulkan shims, *.pak, icudtl.dat, locales/, ...) has to live alongside
     # it in a private libdir, not /usr/bin.
     sudo install -Dm0755 {{TARGET}} {{LIBDIR}}/blockwork
+    sudo install -Dm0755 {{CEF_DIR}}/blockwork-daemon {{LIBDIR}}/blockwork-daemon
     sudo install -Dm0755 {{CEF_DIR}}/libcef.so {{LIBDIR}}/libcef.so
     sudo install -Dm0755 {{CEF_DIR}}/libEGL.so {{LIBDIR}}/libEGL.so
     sudo install -Dm0755 {{CEF_DIR}}/libGLESv2.so {{LIBDIR}}/libGLESv2.so

@@ -14,7 +14,7 @@ pub fn is_flatpak() -> bool {
 }
 
 /// A `Command` that runs `program` on the host when sandboxed, or directly
-/// otherwise — so callers can add args and spawn it the same way either way.
+/// otherwise - so callers can add args and spawn it the same way either way.
 pub fn host_command(program: &str) -> Command {
     if is_flatpak() {
         let mut command = Command::new("flatpak-spawn");

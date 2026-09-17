@@ -41,18 +41,18 @@ static CALLBACK: OnceLock<Mutex<Box<dyn FnMut(CaptureEvent, CaptureTimestamp) ->
 /// guard against.
 ///
 /// (`HOTKEY_FOREGROUND_HWND` below stays an atomic because a different
-/// thread — macro playback — does read it.)
+/// thread - macro playback - does read it.)
 struct HookThreadState {
     /// VK codes currently held down, indexed directly (0..256) rather than
     /// hashed. Needed because `KBDLLHOOKSTRUCT` carries no repeat flag of its
-    /// own — that's only synthesized later, downstream of where this hook runs.
+    /// own - that's only synthesized later, downstream of where this hook runs.
     key_held: [bool; 256],
     /// VK codes whose key-down was swallowed, so the matching key-up is
     /// swallowed too rather than reaching the focused window unpaired.
     key_suppressed: [bool; 256],
     /// Last absolute cursor position, used to turn `WM_MOUSEMOVE`'s absolute
     /// coords into relative deltas. `None` until the first move, rather than
-    /// a sentinel — a magic `i32::MIN` here previously caused an overflow
+    /// a sentinel - a magic `i32::MIN` here previously caused an overflow
     /// panic on startup.
     last_cursor: Option<(i32, i32)>,
 }
@@ -311,10 +311,10 @@ pub(super) fn start_capture_thread(
                 }
                 // Surfaced in the UI like a failed evdev grab (Linux) or
                 // refused event tap (macOS). Keyed on the two hooks that
-                // carry input — without them there's no recording or hotkeys.
+                // carry input - without them there's no recording or hotkeys.
                 crate::recording::set_grab_failed(kb_hook.is_null() || ms_hook.is_null());
 
-                // This loop only pumps the queue — hooks deliver via
+                // This loop only pumps the queue - hooks deliver via
                 // callbacks from inside GetMessageW, and hotkeys are matched
                 // in `keyboard_proc`, not dispatched as messages.
                 let mut msg: MSG = std::mem::zeroed();
@@ -328,7 +328,7 @@ pub(super) fn start_capture_thread(
 }
 
 /// Windows silently uninstalls a low-level hook whose procedure exceeds
-/// `LowLevelHooksTimeout` (~300ms default) — no error, just hotkeys and
+/// `LowLevelHooksTimeout` (~300ms default) - no error, just hotkeys and
 /// recording quietly dying. Every hook routes through here so approaching
 /// that budget (set to a third of it, as a warning margin) shows up in the
 /// log; if it ever fires, move the callback onto a dispatch thread the way
@@ -369,7 +369,7 @@ static FOCUSED_KEY_LAST_PRESS: Mutex<[Option<std::time::Instant>; 256]> = Mutex:
 const FOCUSED_KEY_REPEAT_WINDOW: std::time::Duration = std::time::Duration::from_millis(60);
 
 /// Feeds a key event from the app's own webview into the same hotkey
-/// pipeline the global hook uses — needed because Chromium grabs raw
+/// pipeline the global hook uses - needed because Chromium grabs raw
 /// keyboard input for its focused window, starving `WH_KEYBOARD_LL` while
 /// our window has focus. Returns whether to suppress the key.
 pub(crate) fn dispatch_from_focused_window(vk: u16, pressed: bool) -> bool {
@@ -402,7 +402,7 @@ pub(crate) fn dispatch_from_focused_window(vk: u16, pressed: bool) -> bool {
 
 /// A key held across a desktop switch (UAC prompt, Ctrl+Alt+Del, lock
 /// screen) has its key-up delivered to the secure desktop, invisible to our
-/// hook — so every tracker is cleared here to avoid wedging on the missed
+/// hook - so every tracker is cleared here to avoid wedging on the missed
 /// key-up. Safe: the user isn't mid-combo across a switch, and anything
 /// still held re-registers on its next press.
 unsafe extern "system" fn desktop_switch_event_proc(
@@ -479,7 +479,7 @@ unsafe extern "system" fn keyboard_proc(
                     cb_suppress
                 } else {
                     // A key-up whose key-down was swallowed is swallowed too,
-                    // regardless of the callback's answer — otherwise the
+                    // regardless of the callback's answer - otherwise the
                     // focused window sees an unpaired release.
                     std::mem::replace(&mut s.key_suppressed[vk], false) || cb_suppress
                 }
@@ -516,7 +516,7 @@ unsafe extern "system" fn mouse_proc(
         let high_word = (ms.mouseData >> 16) as i16;
         let capture_ev: Option<CaptureEvent> = match w_param as u32 {
             // `None` means no position has been seen yet, so this event only
-            // establishes the origin — there's no delta to report.
+            // establishes the origin - there's no delta to report.
             WM_MOUSEMOVE => last.and_then(|(lx, ly)| {
                 let (dx, dy) = (ms.pt.x - lx, ms.pt.y - ly);
                 (dx != 0 || dy != 0).then_some(CaptureEvent::MouseMoveRel(dx, dy))
@@ -579,7 +579,7 @@ pub(crate) fn vk_to_macro_key(vk: VIRTUAL_KEY) -> Option<MacroKey> {
         VK_LWIN => MacroKey::Meta,
         VK_RWIN => MacroKey::Meta,
         // Low-level hooks report the side-specific VK, so these generic ones
-        // are rare — but they're mapped anyway since the hotkey matcher
+        // are rare - but they're mapped anyway since the hotkey matcher
         // derives held modifiers from `MacroKey::modifier_bit`, and
         // `Other(vk)` has no modifier bit.
         VK_SHIFT => MacroKey::Shift,
@@ -624,7 +624,7 @@ pub(crate) fn vk_to_macro_key(vk: VIRTUAL_KEY) -> Option<MacroKey> {
 // ── Pre-macro focus + modifier cleanup ───────────────────────────────────────
 
 /// True for a window that can actually be brought to the foreground right
-/// now. Our own windows count too — a hotkey pressed while Blockwork itself
+/// now. Our own windows count too - a hotkey pressed while Blockwork itself
 /// is focused should still type back into whichever of our windows had it.
 fn is_usable_target(hwnd: HWND) -> bool {
     if hwnd.is_null() {
@@ -634,7 +634,7 @@ fn is_usable_target(hwnd: HWND) -> bool {
 }
 
 /// The window a hotkey-triggered macro should type into: whatever was
-/// foreground when the hotkey fired. `None` means leave focus alone — e.g.
+/// foreground when the hotkey fired. `None` means leave focus alone - e.g.
 /// that window has since closed or been minimized.
 fn macro_target_window() -> Option<HWND> {
     let stored: HWND = HOTKEY_FOREGROUND_HWND.load(Ordering::Relaxed) as HWND;

@@ -13,25 +13,16 @@ extern "C" {
 #endif // __cplusplus
 
 /**
- * Registers the callback that formatted `tracing` events are routed
- * through. Call once, before `blockwork_init`, from the host's main thread.
- * `callback` receives one NUL-terminated line per event; null disables
- * logging.
+ * Set the `tracing` log callback. Call once before `blockwork_init`.
+ * Null disables logging.
  */
 void blockwork_set_log_callback(void (*callback)(const char*));
 
 /**
- * Must be called once, from the host's main thread, before any other
- * `blockwork_*` function (macOS's Accessibility prompt requires the main
- * thread). `config_dir_override_utf8` may be null/empty to use the OS
- * config directory; pass a path to redirect macro/settings storage
- * elsewhere (e.g. a Wine `Z:`-mapped path under Proton).
- * `linux_bridge_resource_path_utf8` is the Windows-side path to the
- * bundled `linux-input.so`, used only when running under Wine on a Linux
- * host; ignored (may be null) otherwise.
- *
- * Returns 0 on success, -1 if no input backend could be created for this
- * platform.
+ * Call once on the host's main thread before other `blockwork_*` calls.
+ * Null/empty `config_dir_override_utf8` uses the OS config dir.
+ * `linux_bridge_resource_path_utf8` only matters under Wine on Linux.
+ * Returns 0 on success, -1 if no input backend exists for this platform.
  */
 int32_t blockwork_init(const char *config_dir_override_utf8,
                        const char *linux_bridge_resource_path_utf8);
@@ -51,14 +42,14 @@ int32_t blockwork_start_recording(void);
 int32_t blockwork_stop_recording(void);
 
 /**
- * Runs a macro on a background thread — the explicit `id_utf8` if given
+ * Runs a macro on a background thread - the explicit `id_utf8` if given
  * (nullable), otherwise the currently-selected macro. Loop mode is read
  * live from the shared settings file on every call. Returns immediately;
  * interrupt with `blockwork_stop_loop`.
  *
  * `elapsed_overshoot_ms` (>= 0, milliseconds): how much real time had
  * already passed, before this call, since playback was supposed to
- * start — pass 0 if not applicable. Backdates the run's first `Wait`
+ * start - pass 0 if not applicable. Backdates the run's first `Wait`
  * deadline to the intended start instant via `Macro::run_with_offset`.
  */
 int32_t blockwork_run_macro(const char *id_utf8, double elapsed_overshoot_ms);
@@ -100,7 +91,7 @@ char *blockwork_list_macros(void);
 char *blockwork_get_selected_macro_id(void);
 
 /**
- * Marks the macro with the given id as the currently-selected one — the
+ * Marks the macro with the given id as the currently-selected one - the
  * target `blockwork_run_macro(NULL)`, `blockwork_stop_recording`, and
  * `blockwork_clear_recording_target_instructions` resolve against. Returns 0
  * on success, -1 if no macro with that id exists.
@@ -143,7 +134,7 @@ int32_t blockwork_clear_recording_target_instructions(void);
 void blockwork_free_string(char *ptr);
 
 /**
- * True if input capture/emission couldn't be set up — on macOS this means
+ * True if input capture/emission couldn't be set up - on macOS this means
  * Accessibility access hasn't been granted (to the host process); the
  * caller should surface a UI prompt to check System Settings.
  */

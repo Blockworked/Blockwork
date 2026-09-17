@@ -4,7 +4,7 @@ include_guard = "BLOCKWORK_FFI_H"
 tab_width = 4
 style = "type"
 no_includes = false
-# Wraps declarations in `#ifdef __cplusplus extern "C" { ... }` — without
+# Wraps declarations in `#ifdef __cplusplus extern "C" { ... }` - without
 # this, main.cpp (compiled as C++) mangles calls to these functions while
 # Rust exports plain C symbols, and the two don't match at link time.
 cpp_compat = true

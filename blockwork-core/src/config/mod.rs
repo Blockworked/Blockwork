@@ -7,7 +7,7 @@ pub use selection::{get_macro_by_id, get_selected_macro_id, set_selected_macro_i
 pub use settings::{load_settings, save_settings, update_settings, AppSettings};
 
 pub const APP_ID: &str = "Blockwork";
-/// The app's previous identifier, back when it was named "Macros" — the OS
+/// The app's previous identifier, back when it was named "Macros" - the OS
 /// config directory this crate reads/writes moved from `<config_root>/Macros`
 /// to `<config_root>/Blockwork` (see `APP_ID`) when the app was renamed.
 /// Kept only for `migrate_legacy_app_id`.
@@ -22,7 +22,7 @@ use std::sync::OnceLock;
 static CONFIG_DIR_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 
 /// Redirects every `config::*`/`Macro::save`/`Macro::remove` file lookup to
-/// `dir/Blockwork` instead of the OS config directory — for an embedder
+/// `dir/Blockwork` instead of the OS config directory - for an embedder
 /// (e.g. a host process loading blockwork-ffi) whose process sees a
 /// different filesystem namespace than wherever the macro files actually
 /// live. First caller wins; must be called, if at all, before any other

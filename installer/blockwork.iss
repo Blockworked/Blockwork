@@ -52,6 +52,8 @@ Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription
 [Files]
 ; Main binary
 Source: "{#CEFDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
+; Background core process the UI starts (hotkeys, playback, tray icon)
+Source: "{#CEFDir}\blockwork-daemon.exe"; DestDir: "{app}"; Flags: ignoreversion
 ; CEF runtime
 Source: "{#CEFDir}\libcef.dll"; DestDir: "{app}"; Flags: ignoreversion
 Source: "{#CEFDir}\chrome_elf.dll"; DestDir: "{app}"; Flags: ignoreversion

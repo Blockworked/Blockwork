@@ -28,8 +28,8 @@ fn default_speed_multiplier() -> f64 {
 /// Kept only so loading an old save file can find and migrate that strand.
 const LEGACY_ROOT_STRAND_ID: &str = "root";
 
-/// One draggable stack of instructions on the canvas. It's an entry point —
-/// one of the possibly-many things a macro runs concurrently — when its
+/// One draggable stack of instructions on the canvas. It's an entry point -
+/// one of the possibly-many things a macro runs concurrently - when its
 /// first instruction is `InstructionKind::WhenRan`; otherwise it stays persisted
 /// but inert until dragged under a "When Ran" block.
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
@@ -45,7 +45,7 @@ pub struct Strand {
 }
 
 /// A value block sitting free on the canvas, not embedded in any
-/// instruction's field — the drag-and-drop "parking spot" for a value block
+/// instruction's field - the drag-and-drop "parking spot" for a value block
 /// before/after it's placed into a field's slot.
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub struct FloatingValue {
@@ -57,11 +57,11 @@ pub struct FloatingValue {
     pub y: i32,
     pub value: Value,
     /// Which custom block's own header this value was dragged out of, if
-    /// any — set only when the value came from a `Value::Param` reporter
+    /// any - set only when the value came from a `Value::Param` reporter
     /// (see `commands::create_floating_value`), since that's the one value
     /// kind meaningless outside its declaring block. A floating value with
     /// no such origin (a plain number/operator/variable, or an older save
-    /// from before this field existed — hence `#[serde(default)]`) is just
+    /// from before this field existed - hence `#[serde(default)]`) is just
     /// `None`. Lets the frontend render a floating `Param` reporter with
     /// its real declared shape (e.g. a boolean hexagon) instead of guessing
     /// from name alone.
@@ -73,11 +73,11 @@ fn default_floating_value_id() -> String {
     Uuid::new_v4().simple().to_string()
 }
 
-/// A floating, collapsible note on the canvas — freestanding (`attached_to:
+/// A floating, collapsible note on the canvas - freestanding (`attached_to:
 /// None`, `x`/`y` an absolute canvas position, same convention as
 /// `FloatingValue`) or pinned to an instruction (`attached_to: Some(id)`,
 /// `x`/`y` an *offset* from that instruction's currently-rendered position
-/// instead — the desktop app has no idea where a given instruction renders
+/// instead - the desktop app has no idea where a given instruction renders
 /// on screen, that's purely a frontend DOM-measurement fact, so an attached
 /// note's absolute position is computed frontend-side each render as anchor
 /// row position + this offset, never stored as an absolute coordinate here).
@@ -115,12 +115,12 @@ pub struct VariableDef {
     pub value: Evaluated,
 }
 
-/// What kind of value an input slot expects — drives the blank default a
+/// What kind of value an input slot expects - drives the blank default a
 /// fresh call site's argument gets (`Value::number(0.0)` vs `Value::Bool`,
 /// see `reconcile_block_call_args`) and, transitively, whether that slot
 /// renders as the ordinary rounded capsule or a boolean hexagon (purely a
 /// function of the `Value` actually sitting there, same as every built-in
-/// boolean slot — see `blockstitch`'s `ValueBlock.vue`'s `isBool`). `Any`
+/// boolean slot - see `blockstitch`'s `ValueBlock.vue`'s `isBool`). `Any`
 /// (number-or-text, free-typed) is the long-standing default; `#[serde(default)]`
 /// on `BlockPiece::Input::value_type` lets an older save missing this field
 /// deserialize as `Any` instead of failing.
@@ -131,7 +131,7 @@ pub enum InputValueType {
     Bool,
 }
 
-/// One piece of a custom block's prototype, in declaration order — either
+/// One piece of a custom block's prototype, in declaration order - either
 /// static label text or a named input slot (read in the body via
 /// `Value::Param`). `id` is a stable identifier assigned once and never
 /// regenerated, since `name` changes on rename and can't serve as identity
@@ -161,14 +161,14 @@ impl BlockPiece {
 
 /// What a custom block's own call site looks like: a plain stackable
 /// instruction (`Normal`), a stackable instruction with no bottom notch so
-/// nothing can be placed below it (`Ending` — same shape family as the
+/// nothing can be placed below it (`Ending` - same shape family as the
 /// built-in `Return`/`EscapeLoop`/`ContinueLoop`), or a value-position
 /// reporter returning either a number-or-text (`ReturnsValue`, an oval,
 /// today's long-standing `returns_value: true`) or a boolean (`ReturnsBool`,
-/// a hexagon — see `BlockPiece`'s `InputValueType` for the same oval/hexagon
+/// a hexagon - see `BlockPiece`'s `InputValueType` for the same oval/hexagon
 /// split on an *input*). `Normal`/`Ending` and `ReturnsValue`/`ReturnsBool`
 /// are each a mutually-exclusive pair in the "Make a Block" UI (a "returns a
-/// value" checkbox swaps which pair the two shape buttons offer) — there's
+/// value" checkbox swaps which pair the two shape buttons offer) - there's
 /// no such thing as an `Ending` reporter or a `Normal` block that also
 /// returns a boolean.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Default)]
@@ -181,12 +181,12 @@ pub enum BlockShape {
 }
 
 impl BlockShape {
-    /// True for either reporter shape — gates whether `Value::Call` nodes
+    /// True for either reporter shape - gates whether `Value::Call` nodes
     /// referencing this block are meaningful and whether a `Return` inside
     /// its body is valid placement (see `commands::check_return_placement`).
     /// Boolean-vs-number/text is a pure rendering concern (which shape the
     /// reporter draws as, and what a fresh call-site arg defaults to) with
-    /// no effect on execution — `Value::eval`/`Evaluated` are already
+    /// no effect on execution - `Value::eval`/`Evaluated` are already
     /// dynamically typed regardless of which reporter shape produced them.
     pub fn returns_value(self) -> bool {
         matches!(self, BlockShape::ReturnsValue | BlockShape::ReturnsBool)
@@ -234,7 +234,7 @@ impl<'de> Deserialize<'de> for BlockShape {
     }
 }
 
-/// A user-defined custom block ("My Blocks") — just the prototype/signature;
+/// A user-defined custom block ("My Blocks") - just the prototype/signature;
 /// its body lives in a separate `Strand` whose `instructions[0]` is
 /// `InstructionKind::BlockHeader(id)`.
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
@@ -266,7 +266,7 @@ pub fn normalize_block_color(color: &str) -> Option<String> {
 }
 
 impl BlockDef {
-    /// Declared input names, in prototype order — the positional key `Call`/
+    /// Declared input names, in prototype order - the positional key `Call`/
     /// `CallBlock`'s `args` line up against.
     pub fn input_names(&self) -> impl Iterator<Item = &str> {
         self.pieces.iter().filter_map(|p| match p {
@@ -282,7 +282,7 @@ fn default_block_id() -> String {
 
 impl InstructionKind {
     /// True for "header" blocks (`WhenRan`, `BlockHeader`, and the
-    /// `WhenBattery*To` entry points) — must be first in their strand,
+    /// `WhenBattery*To` entry points) - must be first in their strand,
     /// nothing may stack above them, and they render with a flat top edge.
     pub fn is_header(&self) -> bool {
         matches!(
@@ -366,7 +366,7 @@ impl InstructionKind {
     }
 
     /// Repairs boolean slots poisoned by the historical `Value::Bool`-less
-    /// bug (see `Value::migrate_bool_slots`) — run once over every
+    /// bug (see `Value::migrate_bool_slots`) - run once over every
     /// instruction when a macro loads (`From<MacroDe>`). An `If`/`IfElse`
     /// condition is the one position this module knows is boolean-typed by
     /// construction; everything else starts `false` and lets `Value::migrate_bool_slots`
@@ -645,7 +645,7 @@ impl InstructionKind {
         }
     }
 
-    /// The nested instruction list for compound-instruction `slot` — `If`'s
+    /// The nested instruction list for compound-instruction `slot` - `If`'s
     /// single body (`slot == 0`), or `IfElse`'s `then_body`/`else_body`
     /// (`slot == 0`/`1`); `Repeat`/`Forever`/`While` each have a single body
     /// at `slot == 0`, same as `If`. `None` for anything else (including an
@@ -688,20 +688,20 @@ pub struct Macro {
     /// 1.0 is normal, 2.0 is twice as fast. Clamped to `SPEED_MULTIPLIER_RANGE`.
     #[serde(default = "default_speed_multiplier")]
     pub speed_multiplier: f64,
-    /// Value blocks parked on open canvas — see `FloatingValue`.
+    /// Value blocks parked on open canvas - see `FloatingValue`.
     #[serde(default)]
     pub floating_values: Vec<FloatingValue>,
-    /// Floating/attached notes — see `Comment`.
+    /// Floating/attached notes - see `Comment`.
     #[serde(default)]
     pub comments: Vec<Comment>,
-    /// User-declared macro-wide variables — see `VariableDef`.
+    /// User-declared macro-wide variables - see `VariableDef`.
     #[serde(default)]
     pub variables: Vec<VariableDef>,
-    /// User-defined custom blocks ("My Blocks") — see `BlockDef`. Each
+    /// User-defined custom blocks ("My Blocks") - see `BlockDef`. Each
     /// def's body lives in its own header strand within `strands`.
     #[serde(default)]
     pub block_defs: Vec<BlockDef>,
-    /// Settings edited from the "Macro Settings" popup — see `MacroSettings`.
+    /// Settings edited from the "Macro Settings" popup - see `MacroSettings`.
     #[serde(default)]
     pub settings: MacroSettings,
 }
@@ -711,7 +711,7 @@ pub struct Macro {
 pub const SPEED_MULTIPLIER_RANGE: std::ops::RangeInclusive<f64> = 0.1..=10.0;
 
 /// Per-macro settings edited from the "Macro Settings" popup next to the
-/// macro dropdown — not part of the macro's own behavior, but affecting how
+/// macro dropdown - not part of the macro's own behavior, but affecting how
 /// the app treats it. Persisted and exported/imported with the macro like
 /// everything else in `Macro`, so a new field here needs no separate wiring
 /// to survive a save/export round-trip.
@@ -830,7 +830,7 @@ impl From<MacroDe> for Macro {
             }
         };
         // Repairs boolean slots poisoned by the historical `Value::Bool`-less
-        // bug (see `Value::migrate_bool_slots`) — a save from before that fix
+        // bug (see `Value::migrate_bool_slots`) - a save from before that fix
         // may have a raw number leaf sitting where a blank hexagon belongs.
         for strand in mac.strands.iter_mut() {
             for ins in strand.instructions.iter_mut() {
@@ -958,7 +958,7 @@ impl Macro {
     }
 
     /// Every instruction id currently reachable from any strand, including
-    /// nested bodies (If/IfElse/Repeat/Forever/While) — the "still alive" set
+    /// nested bodies (If/IfElse/Repeat/Forever/While) - the "still alive" set
     /// `prune_orphaned_comments` checks attachments against.
     fn all_instruction_ids(&self) -> std::collections::HashSet<String> {
         fn walk(list: &[Instruction], out: &mut std::collections::HashSet<String>) {
@@ -978,7 +978,7 @@ impl Macro {
         out
     }
 
-    /// Drops any comment attached to an instruction that no longer exists —
+    /// Drops any comment attached to an instruction that no longer exists -
     /// "if the block gets deleted, the comment is deleted." Call after any
     /// mutation that can remove instructions or whole strands.
     pub fn prune_orphaned_comments(&mut self) {
@@ -993,7 +993,7 @@ impl Macro {
     /// One-time upgrade for saves from before floating/attached comments
     /// existed: pulls every legacy inline `Comment` instruction out of the
     /// instruction stream and re-homes it as a freestanding `Comment` parked
-    /// near its old strand. Idempotent — a save with no legacy `Comment`
+    /// near its old strand. Idempotent - a save with no legacy `Comment`
     /// instructions left is a no-op.
     fn migrate_legacy_comments(&mut self) {
         fn extract(list: &mut Vec<Instruction>, out: &mut Vec<String>) {
@@ -1102,7 +1102,7 @@ impl Macro {
     /// `BlockPiece::id` (identity survives a rename); removed inputs drop
     /// their value, added ones get a fresh blank matching their declared
     /// `value_type` (`0` for `Any`, an empty `Value::Bool` hexagon for
-    /// `Bool`). Call before overwriting `BlockDef::pieces` — `old_pieces`
+    /// `Bool`). Call before overwriting `BlockDef::pieces` - `old_pieces`
     /// must be the pieces beforehand.
     pub fn reconcile_block_call_args(
         &mut self,
@@ -1221,7 +1221,7 @@ pub enum InstructionKind {
     /// Header-only marker (like `WhenRan`/`BlockHeader`) for a strand whose
     /// body should run whenever the system's battery charge drops to (or
     /// below) the given percentage. Unlike `WhenRan`, this is *not* an
-    /// entry point Run/Loop invokes — `runner::run_with_offset` skips these
+    /// entry point Run/Loop invokes - `runner::run_with_offset` skips these
     /// strands entirely. Instead they're driven independently by a
     /// long-running background watcher outside a macro run altogether (in
     /// the desktop app, `src-tauri`'s `battery_watch` module), which polls
@@ -1233,25 +1233,25 @@ pub enum InstructionKind {
     /// rises to (or above) the given percentage instead.
     WhenBatteryChargedTo(Value),
     /// Header-only marker, same shape/semantics as `WhenBatteryDischargedTo`
-    /// (excluded from Run/Loop, driven by a background watcher — `time_watch`
+    /// (excluded from Run/Loop, driven by a background watcher - `time_watch`
     /// in the desktop app) but for a recurring point in local time instead
     /// of a battery level. See `TimeSchedule` for the recurrence shapes.
     WhenTime(TimeSchedule),
-    /// Header-only marker, no payload (like `WhenRan`) — excluded from
+    /// Header-only marker, no payload (like `WhenRan`) - excluded from
     /// Run/Loop and driven by the same background watcher as
     /// `WhenBattery*To` (`battery_watch` in the desktop app), which fires
     /// this strand's body the moment the system starts receiving external
     /// power. See `crate::battery::is_plugged_in`.
     WhenPowerPluggedIn,
     /// Same as `WhenPowerPluggedIn`, but fires when external power is lost
-    /// instead — never fires at all on a system with no battery/UPS, since
+    /// instead - never fires at all on a system with no battery/UPS, since
     /// `is_plugged_in` is always `true` there.
     WhenPowerUnplugged,
     /// Launches an installed application, chosen via the desktop app's "Open
     /// App" picker (`src-tauri`'s `installed_apps` module lists candidates).
     /// `command` is the already-resolved, platform-specific launch string
     /// (a cleaned freedesktop `Exec=` line on Linux, a `.lnk` path on
-    /// Windows, an `.app` bundle path on macOS) captured at pick time —
+    /// Windows, an `.app` bundle path on macOS) captured at pick time -
     /// running it later never re-queries the installed-app list. `name` and
     /// `icon` (a `data:` URI, when one was found) are cached at the same
     /// time purely for display, so the block keeps showing the right label
@@ -1262,7 +1262,7 @@ pub enum InstructionKind {
         icon: Option<String>,
     },
     /// Same picker/payload shape as `OpenApp`, but terminates the app
-    /// instead of launching it — `runner::close_app` derives a process
+    /// instead of launching it - `runner::close_app` derives a process
     /// matcher from `command` (and, on macOS, `name`) rather than executing
     /// it directly. `command`/`name`/`icon` are cached at pick time for the
     /// exact same reason `OpenApp`'s are.
@@ -1271,14 +1271,14 @@ pub enum InstructionKind {
         name: String,
         icon: Option<String>,
     },
-    /// `set <name> to <value>` — overwrites the named variable.
+    /// `set <name> to <value>` - overwrites the named variable.
     SetVariable(String, Value),
-    /// `change <name> by <value>` — adds `value` to the named variable.
+    /// `change <name> by <value>` - adds `value` to the named variable.
     /// No-op if `value` isn't numeric; the variable is coerced to `0` first
     /// if it wasn't already numeric.
     ChangeVariable(String, Value),
     /// Marks a strand as a custom block's body; the `String` is the
-    /// `BlockDef::id`. Header-only, like `WhenRan`, but never auto-runs —
+    /// `BlockDef::id`. Header-only, like `WhenRan`, but never auto-runs -
     /// only invoked via `CallBlock`/`Value::Call`.
     BlockHeader(String),
     /// Command-position invocation of a `Normal`/`Ending`-shaped custom
@@ -1291,7 +1291,7 @@ pub enum InstructionKind {
     /// body: evaluates `Value` and halts execution, returning the result to
     /// the caller.
     Return(Value),
-    /// `if <condition> then { body }` — runs `body` inline (same strand,
+    /// `if <condition> then { body }` - runs `body` inline (same strand,
     /// same depth) when `condition` evaluates truthy.
     If {
         condition: Value,
@@ -1303,18 +1303,18 @@ pub enum InstructionKind {
         then_body: Vec<Instruction>,
         else_body: Vec<Instruction>,
     },
-    /// `repeat <count> { body }` — runs `body` `count` times (rounded,
+    /// `repeat <count> { body }` - runs `body` `count` times (rounded,
     /// clamped to non-negative).
     Repeat {
         count: Value,
         body: Vec<Instruction>,
     },
-    /// `forever { body }` — runs `body` in an unconditional loop; only ends
+    /// `forever { body }` - runs `body` in an unconditional loop; only ends
     /// via `EscapeLoop`, a `Return` inside it, or the run being stopped.
     Forever {
         body: Vec<Instruction>,
     },
-    /// `while <condition> { body }` — re-evaluates `condition` before every
+    /// `while <condition> { body }` - re-evaluates `condition` before every
     /// iteration, running `body` for as long as it's truthy.
     While {
         condition: Value,
@@ -1630,11 +1630,11 @@ fn default_instruction_id() -> String {
     Uuid::new_v4().simple().to_string()
 }
 
-/// The wrapper every instruction is actually stored as — `id` is a stable
+/// The wrapper every instruction is actually stored as - `id` is a stable
 /// identity (unlike position/path, survives drags/splits/merges/reorders)
 /// that comments attach to (`Comment::attached_to`); `kind` is the actual
 /// instruction data, unchanged in shape from before this wrapper existed.
-/// Equality/hashing deliberately ignore `id` and compare `kind` only — the
+/// Equality/hashing deliberately ignore `id` and compare `kind` only - the
 /// rest of this module (block-header lookups, dedup, tests) all compare
 /// instructions structurally, the same as when there was no id at all.
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -1692,7 +1692,7 @@ impl std::hash::Hash for Instruction {
 
 /// Wire shape for `Instruction`: today's shape (`{"id": "...", "kind": ...}`)
 /// or, for a save from before ids existed, the bare `InstructionKind` value
-/// with no envelope at all — same "try new shape, fall back to old" pattern
+/// with no envelope at all - same "try new shape, fall back to old" pattern
 /// as `WaitDe` above, just one level up. A legacy instruction gets a fresh id
 /// generated on load; harmless since nothing could have referenced it by id yet.
 #[derive(Deserialize)]
@@ -1872,7 +1872,7 @@ mod tests {
             attached_to: None,
         });
 
-        // Remove the Wait instruction (index 1 — index 0 is the WhenRan header).
+        // Remove the Wait instruction (index 1 - index 0 is the WhenRan header).
         mac.strands[0].instructions.remove(1);
         mac.prune_orphaned_comments();
 
@@ -1942,7 +1942,7 @@ mod tests {
 
     #[test]
     fn migrate_bool_slots_repairs_poisoned_operand_nested_inside_condition() {
-        // The poisoned `Number` can be arbitrarily deep — here inside an
+        // The poisoned `Number` can be arbitrarily deep - here inside an
         // `And` that itself is the `If`'s condition. Its sibling (a real
         // comparison) must survive untouched.
         let json = r#"{"id":"m1","name":"Old","description":"","strands":[
@@ -2005,7 +2005,7 @@ mod tests {
 
     #[test]
     fn migrate_bool_slots_leaves_legitimately_numeric_fields_alone() {
-        // A `Wait` duration is never boolean-typed — a `Number` there is
+        // A `Wait` duration is never boolean-typed - a `Number` there is
         // always legitimate and must not be touched.
         let json = r#"{"id":"m1","name":"Old","description":"","strands":[
             {"id":"root","x":0,"y":0,"instructions":["WhenRan",{"Wait":{"kind":"Number","value":0.0}}]}

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Static preview only — mirrors PaletteIfFields.vue's split (see its
+// Static preview only - mirrors PaletteIfFields.vue's split (see its
 // comment) and WhileFields.vue's own real-canvas shape.
 import type { InstructionDto } from '../../../types';
 

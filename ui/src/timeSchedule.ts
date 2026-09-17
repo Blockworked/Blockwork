@@ -1,4 +1,4 @@
-// Helpers for `TimeScheduleDto` (types.ts) — the recurrence + time-of-day
+// Helpers for `TimeScheduleDto` (types.ts) - the recurrence + time-of-day
 // picked by a "When [time]" block. Kept separate from types.ts the same way
 // valueOps.ts's operator registry is kept separate from the ValueDto shapes
 // it operates on.
@@ -26,10 +26,10 @@ const MONTH_NAMES = [
   'July', 'August', 'September', 'October', 'November', 'December',
 ];
 // `value` is the 1-based month number as a string (AppDropdown's Option is
-// always string-valued) — parsed back with `Number(...)` in withMonth.
+// always string-valued) - parsed back with `Number(...)` in withMonth.
 export const MONTH_OPTIONS: { value: string; label: string }[] = MONTH_NAMES.map((label, i) => ({ value: String(i + 1), label }));
 
-// "HH:MM", 24-hour, zero-padded — the wire/value format `<input type="time">`
+// "HH:MM", 24-hour, zero-padded - the wire/value format `<input type="time">`
 // always uses regardless of what it *displays* (12h AM/PM or 24h follows the
 // browser/OS locale automatically; the value itself is locale-independent).
 export function scheduleTimeValue(s: TimeScheduleDto): string {
@@ -38,7 +38,7 @@ export function scheduleTimeValue(s: TimeScheduleDto): string {
 
 // Rebuilds `s` with a new hour/minute parsed from an `<input type="time">`
 // change event's value, keeping every other field as-is. A no-op (returns
-// `s` unchanged) if the browser ever hands back something unparseable — a
+// `s` unchanged) if the browser ever hands back something unparseable - a
 // cleared time input fires an empty string, not a valid "HH:MM".
 export function withTimeValue(s: TimeScheduleDto, hhmm: string): TimeScheduleDto {
   const [h, m] = hhmm.split(':').map(Number);

@@ -2,7 +2,7 @@
 # Builds a universal (arm64 + x86_64) blockwork_ffi static library for macOS,
 # for hosts built with `CMAKE_OSX_ARCHITECTURES "arm64;x86_64"`.
 #
-# Must run on an actual Mac (or macOS CI runner) — cross-compiling for
+# Must run on an actual Mac (or macOS CI runner) - cross-compiling for
 # Apple targets needs the Apple SDK sysroot, which can't be redistributed
 # and isn't available on Linux dev boxes.
 #
@@ -31,7 +31,7 @@ echo "  -DBLOCKWORK_FFI_INCLUDE_DIR=$(pwd)/include"
 echo
 echo "If the link step reports missing symbols, blockwork-core's macOS backend"
 echo "(backend/macos.rs) may need another framework linked beyond"
-echo "CoreFoundation/ApplicationServices — Security"
+echo "CoreFoundation/ApplicationServices - Security"
 echo "is the most likely candidate (core-foundation/core-graphics sometimes"
 echo "pull it in transitively). Verify against the actual linker error rather"
 echo "than adding it speculatively."

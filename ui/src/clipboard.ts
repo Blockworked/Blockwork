@@ -1,6 +1,4 @@
-// Right-click copy/paste clipboard — in-memory only (not the OS clipboard),
-// module-level singleton same as dropdownRegistry.ts. Lives for the app
-// session; there's no need for it to survive a reload.
+// In-memory copy/paste clipboard (not the OS clipboard).
 import type { InstrPath, InstructionDto, StrandDto } from './types';
 import { resolveInstructionAt, resolveInstructionList } from './types';
 

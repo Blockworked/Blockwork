@@ -6,13 +6,13 @@ use blockwork_core::macros::thread_pool::ThreadPool;
 use blockwork_core::macros::Macro;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use tauri::{AppHandle, Runtime};
+use crate::AppHandle;
 use tracing::warn;
 
 /// Writes the run's final variable values back into the (still-selected)
 /// macro and saves it to disk. Called once per run/loop finish rather than
 /// per-instruction, and a no-op if the macro was switched away mid-run.
-fn persist_variables<R: Runtime>(shared_state: &SharedState, app: &AppHandle<R>, macro_id: &str, variables: &VariableStore) {
+fn persist_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str, variables: &VariableStore) {
     let (mac_to_save, dto) = {
         let Ok(mut s) = shared_state.lock() else { return };
         let Some(mac) = s.current_macro.as_mut() else { return };
@@ -30,18 +30,17 @@ fn persist_variables<R: Runtime>(shared_state: &SharedState, app: &AppHandle<R>,
     if let Err(e) = mac_to_save.save() {
         warn!("Failed to persist variable values: {e}");
     }
-    use tauri::Emitter;
-    let _ = app.emit("state-updated", dto);
+    app.emit_state(&dto);
 }
 
-pub(crate) fn into_loop_task<R: Runtime>(
+pub(crate) fn into_loop_task(
     mac: Macro,
     emulator: Arc<Mutex<dyn InputBackend>>,
     loop_flag: Arc<Mutex<bool>>,
     speed_multiplier: f64,
     variables: VariableStore,
     shared_state: SharedState,
-    app: AppHandle<R>,
+    app: AppHandle,
 ) -> impl FnOnce() + Send + 'static {
     move || {
         println!("Starting macro loop: {}", mac.name);
@@ -67,20 +66,20 @@ pub(crate) fn into_loop_task<R: Runtime>(
     }
 }
 
-pub(crate) fn into_single_run_task<R: Runtime>(
+pub(crate) fn into_single_run_task(
     mac: Macro,
     emulator: Arc<Mutex<dyn InputBackend>>,
     stop_flag: Arc<Mutex<bool>>,
     speed_multiplier: f64,
     variables: VariableStore,
     shared_state: SharedState,
-    app: AppHandle<R>,
+    app: AppHandle,
 ) -> impl FnOnce() + Send + 'static {
     move || {
         println!("Running macro: {}", mac.name);
         let macro_id = mac.id.clone();
         // A stop flag of this run's own, not the shared `is_looping` `stop_flag`
-        // refers to — that one gets cleared by whichever run finishes first,
+        // refers to - that one gets cleared by whichever run finishes first,
         // which would spuriously cut a concurrently-started run short.
         let run_flag = run_registry::begin_run();
         mac.run(emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables));

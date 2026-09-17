@@ -47,7 +47,7 @@ impl IpcResponse {
 }
 
 /// Binds a loopback-only listener and serves connections until `shutdown` is
-/// set to `true`. 127.0.0.1 only — this interface trusts any local process,
+/// set to `true`. 127.0.0.1 only - this interface trusts any local process,
 /// same as the global-hotkey grab. `shutdown` is forwarded into each
 /// per-connection task too, not just the accept loop, so already-connected
 /// clients get closed rather than serviced forever.

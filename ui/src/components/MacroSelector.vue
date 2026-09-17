@@ -39,7 +39,7 @@ const showMacroSettings = ref(false);
         <AppDropdown
           :options="macroOptions"
           :model-value="selectedValue"
-          placeholder="— no macro selected —"
+          placeholder="- no macro selected -"
           class-name="macro-select-trigger"
           aria-label="Select macro"
           aria-labelledby="macro-dropdown-label"

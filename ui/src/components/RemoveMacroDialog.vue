@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Delete-macro confirmation popup — replaces the old "click again within a
+// Delete-macro confirmation popup - replaces the old "click again within a
 // countdown" pattern on the toolbar's Delete button with a plain modal,
 // mirroring ImportCommandWarningDialog.vue's shape. Teleported to <body>
 // like the other dialogs (MakeVariableDialog.vue, etc.).

@@ -1,4 +1,4 @@
-// The single startup wiring point between Blockwork and blockstitch — registers
+// The single startup wiring point between Blockwork and blockstitch - registers
 // Blockwork's instruction vocabulary (shapes, field forms, icons, operators) and
 // builds the CanvasBackend/CanvasHost blockstitch's canvas drives. Call
 // `setupBlockstitch()` once, before mounting the app (see main.ts).
@@ -107,7 +107,7 @@ function registerShapes() {
     registerBlockShape(type, { kind: 'stack', icon: iconFor(type) });
   }
   // Every custom block shares this one instruction type regardless of which
-  // BlockDef it calls, so — unlike CAP_TYPES above — "no bottom notch" can't
+  // BlockDef it calls, so - unlike CAP_TYPES above - "no bottom notch" can't
   // be a static per-type registration here; `isCap` asks the specific block
   // being called instead (see shapeRegistry.ts's BlockShapeDescriptor).
   registerBlockShape<InstructionDto>('CallBlock', {
@@ -115,7 +115,7 @@ function registerShapes() {
     icon: iconFor('CallBlock'),
     isCap: n => n.type === 'CallBlock' && findBlockDef(state.current_macro, n.block_id)?.shape === 'Ending',
   });
-  // TNode is `InstructionDto` (the full union), not just the wrap variants —
+  // TNode is `InstructionDto` (the full union), not just the wrap variants -
   // a wrap block's own body/slots hold arbitrary instructions, not only
   // other wrap blocks, so getSlots/mapSlots must operate over the whole
   // union and narrow `n` themselves via `n.type === '...'`.
@@ -186,7 +186,7 @@ function registerFields() {
   registerBlockField('EscapeLoop', EscapeLoopFields);
   registerBlockField('ContinueLoop', ContinueLoopFields);
 
-  // Palette variants — BlockHeader/CallBlock/Comment are never a fixed
+  // Palette variants - BlockHeader/CallBlock/Comment are never a fixed
   // sidebar prefab (see components/PaletteCallBlock.vue and
   // components/InstructionSidebar.vue for how CallBlock/BlockHeader are
   // actually offered), so they have no palette field component.
@@ -232,7 +232,7 @@ function buildCanvasHost(): CanvasHost<InstructionDto> {
     putValue: tauri.putValue,
     previewValue: tauri.previewValue,
     // `sourceKind` is only set for a fresh sidebar/header drag (see
-    // host.ts's doc comment) — recover the origin block id a `Param:`
+    // host.ts's doc comment) - recover the origin block id a `Param:`
     // header oval packed into its `dragKind` (see BlockHeaderFields.vue's
     // `paramDragKind`) so paramIsBool can resolve the resulting floating
     // value exactly instead of guessing.
@@ -277,7 +277,7 @@ function buildCanvasHost(): CanvasHost<InstructionDto> {
       };
       // Exact: a Param sitting in an instruction field lives in a specific
       // strand, and a block's body strand always starts with its own
-      // BlockHeader — walk straight to that block's own declared type.
+      // BlockHeader - walk straight to that block's own declared type.
       if (location.kind === 'Field') {
         const strand = state.current_macro?.strands.find(s => s.id === location.strand_id);
         const header = strand?.instructions[0];
@@ -287,14 +287,14 @@ function buildCanvasHost(): CanvasHost<InstructionDto> {
       // trace back to, but createFloatingValue records which block a
       // freshly-dropped `Param` reporter came from (see this file's
       // `createFloatingValue` and BlockHeaderFields.vue's `paramDragKind`)
-      // — use that exact origin when present.
+      // - use that exact origin when present.
       if (location.kind === 'Floating') {
         const fv = state.current_macro?.floating_values.find(f => f.id === location.floating_id);
         if (fv?.origin_block_id) return pieceIsBool(fv.origin_block_id);
       }
       // No recorded origin (an older save from before that field existed,
       // or an existing placed param picked back up and re-floated rather
-      // than freshly dragged from its header) — fall back to "every custom
+      // than freshly dragged from its header) - fall back to "every custom
       // block with an input named this agrees it's boolean". Exact for the
       // common case (one block currently being edited) and never worse than
       // the plain-capsule default on a genuine cross-block name collision.

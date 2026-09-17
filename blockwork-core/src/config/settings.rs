@@ -79,7 +79,7 @@ pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
         .map_err(|e| format!("Failed to write settings: {e}"))?;
     std::fs::rename(&tmp, &path)
         .map_err(|e| format!("Failed to finalize settings: {e}"))?;
-    // Same belt-and-suspenders as `Macro::save` — avoids a stale read if a
+    // Same belt-and-suspenders as `Macro::save` - avoids a stale read if a
     // save and reload land within the same mtime tick.
     *settings_cache().lock().unwrap() = None;
     Ok(())

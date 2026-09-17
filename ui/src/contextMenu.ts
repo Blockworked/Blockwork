@@ -1,7 +1,4 @@
-// Right-click context menu state — reactive singleton, same module-level
-// pattern as dropdownRegistry.ts, but holds enough info (position + what was
-// clicked) for a single <ContextMenu> component to render either the
-// block-menu or canvas-menu item list.
+// Right-click context menu state.
 import { reactive } from 'vue';
 import { registerOpen, unregisterOpen, clientToCanvas } from 'blockstitch';
 import type { InstrPath, ValueDto } from './types';
@@ -90,7 +87,7 @@ export function openPaletteValueMenu(e: MouseEvent, kind: string): void {
 }
 
 // Var/Param reporters placed on canvas have no Details to show (they're not
-// a fixed block with fixed behavior) — silently declining to open here, same
+// a fixed block with fixed behavior) - silently declining to open here, same
 // as before this menu existed, is better than opening one with nothing in it.
 export function openValueMenu(e: MouseEvent, value: ValueDto): void {
   if (value.kind !== 'Op' && value.kind !== 'Call' && value.kind !== 'Number' && value.kind !== 'Text') return;

@@ -1,5 +1,5 @@
 <script setup lang="ts">
-// Sidebar prefab preview — like PaletteNumberField, always a literal (never
+// Sidebar prefab preview - like PaletteNumberField, always a literal (never
 // an operator or dropped-in block): the sidebar refuses value drops outright
 // (see canvasDrag.ts's isOverSidebar), so this only ever edits the plain
 // `Text` leaf `defaultInstruction('Text')` seeds.

@@ -8,6 +8,22 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Tag releases (`0.x.y`, see `.github/workflows/release.yml`) publish the matching
 section below as the GitHub release notes, followed by the downloads table.
 
+## [Unreleased]
+
+### Added
+- Flatpak packaging for Flathub.
+- Open App and Close App work in the Flatpak.
+
+### Changed
+- Split into a background daemon and the editor window; closing the window
+  frees its memory.
+
+### Fixed
+- Freeze when closing to tray on Wayland.
+- Missing maximize button on KDE.
+- Crash when closing the window on Wayland.
+- White flash when opening and closing the window.
+
 ## [0.5.3] - 2026-09-14
 
 ### Changed

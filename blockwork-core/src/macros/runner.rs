@@ -34,7 +34,7 @@ const MAX_CALL_DEPTH: u32 = 64;
 /// `If`/`IfElse` forward every non-`Normal` variant unchanged (not loops,
 /// nothing to catch); `Repeat`/`Forever`/`While` catch `Break`/`Continue`
 /// but let `Return` keep unwinding. `call_block` absorbs `Break`/`Continue`
-/// at its own boundary — a custom block's body is a separate context, so
+/// at its own boundary - a custom block's body is a separate context, so
 /// loop control can't cross into or out of it.
 #[derive(Debug, Clone, PartialEq)]
 enum Flow {
@@ -151,7 +151,7 @@ fn call_block(
     let result = run_block(&runtime.body, ctx, depth, Instant::now());
     ctx.param_env = saved_env;
     // A stray Break/Continue reaching a custom block's own top level (no
-    // enclosing loop within its body) is absorbed here, same as Normal —
+    // enclosing loop within its body) is absorbed here, same as Normal -
     // a custom block is its own execution context, not an extension of the
     // caller's loop.
     result.map(|flow| match flow {
@@ -184,7 +184,7 @@ fn stop_requested(flag: &Arc<Mutex<bool>>) -> bool {
 impl Macro {
     /// Runs every "When Ran" entry-point strand concurrently on its own
     /// thread, sharing one `stop_flag`. A custom block's header strand isn't
-    /// run directly — its body is extracted into `block_table` and only
+    /// run directly - its body is extracted into `block_table` and only
     /// executes via `CallBlock`/`Value::Call`. Blocks until every strand
     /// finishes or is stopped.
     pub fn run(
@@ -204,7 +204,7 @@ impl Macro {
     }
 
     /// Same as `run`, but backdates every entry strand's `Wait` deadline
-    /// anchor by `initial_offset` — pretends this run started
+    /// anchor by `initial_offset` - pretends this run started
     /// `initial_offset` ago rather than right now. For callers where real
     /// time has already passed between the event this run should be synced
     /// to and the moment this actually gets called (dispatch latency, or an
@@ -235,7 +235,7 @@ impl Macro {
                     }
                 }
                 Some(InstructionKind::WhenRan) => entry_strands.push(strand.instructions),
-                // Battery/time-triggered strands aren't run here at all —
+                // Battery/time-triggered strands aren't run here at all -
                 // they're driven by the app's own background watchers (e.g.
                 // src-tauri's `battery_watch`/`time_watch` modules), which
                 // fire just their body directly once their own condition
@@ -301,7 +301,7 @@ impl Macro {
 
 /// Per-thread entry point for one strand: runs it via `run_block`, then
 /// releases any keys/buttons still held, whether the strand finished,
-/// stopped, or errored. The returned `Result`/`Option` is discarded — a
+/// stopped, or errored. The returned `Result`/`Option` is discarded - a
 /// `Return` reaching strand level has nowhere to hand its value, and resolve
 /// errors are already `warn!`-logged at their source.
 fn run_strand(
@@ -406,7 +406,7 @@ fn run_block(
     // independently; the caller's deadline re-anchors on its next Wait.
     // `start` is `Instant::now()` at every call site except the outermost
     // one (`run_strand`'s top-level call), backdated by that strand's
-    // `initial_offset` — see `Macro::run_with_offset`.
+    // `initial_offset` - see `Macro::run_with_offset`.
     let mut deadline = start;
 
     let normalize_modifier_key = |key: MacroKey| -> MacroKey {
@@ -432,7 +432,7 @@ fn run_block(
             InstructionKind::Comment(_) => {}
             InstructionKind::WhenRan => {}
             InstructionKind::BlockHeader(_) => {}
-            // Header-only markers, same as `WhenRan`/`BlockHeader` — never
+            // Header-only markers, same as `WhenRan`/`BlockHeader` - never
             // actually reached (`run_with_offset` excludes these strands
             // from `entry_strands`, and the background watcher that fires
             // them starts from `strand.instructions[1..]`). Handled here
@@ -696,7 +696,7 @@ fn run_block(
                                 }
                             }
                             Direction::Release => ctx.pressed_buttons.retain(|b| b != button),
-                            // Press+release in one call — nothing left held.
+                            // Press+release in one call - nothing left held.
                             Direction::Click => {}
                         },
                         Err(err) => {
@@ -769,7 +769,7 @@ fn run_block(
             }
             InstructionKind::ChangeVariable(name, value) => {
                 match ctx.resolve(value, depth).and_then(|v| v.eval()) {
-                    // The delta must be numeric — text/bool are a deliberate no-op.
+                    // The delta must be numeric - text/bool are a deliberate no-op.
                     Ok(Evaluated::Text(_) | Evaluated::Bool(_)) => {}
                     Ok(Evaluated::Number(delta)) => {
                         if let Ok(mut vars) = ctx.variables.lock() {
@@ -791,7 +791,7 @@ fn run_block(
     Ok(Flow::Normal)
 }
 
-/// Launches `command` — the already-resolved, platform-specific launch
+/// Launches `command` - the already-resolved, platform-specific launch
 /// string an `InstructionKind::OpenApp` carries. Each platform needs a
 /// different launcher: Windows' `start` handles a `.lnk` path directly;
 /// macOS' `open` handles an `.app` bundle path; a plain `sh -c` covers
@@ -868,7 +868,7 @@ fn close_app(_command: &str, name: &str) -> std::io::Result<()> {
     if name.is_empty() {
         return Ok(());
     }
-    // AppleScript string literal — strip quotes/backslashes rather than
+    // AppleScript string literal - strip quotes/backslashes rather than
     // escaping them, since `name` only ever comes from the picker's own app
     // list (never freeform user text) and doesn't need real escaping support.
     let sanitized: String = name.chars().filter(|c| *c != '"' && *c != '\\').collect();
@@ -992,7 +992,7 @@ mod tests {
     }
 
     /// `run_with_offset` should backdate the first `Wait`'s deadline anchor
-    /// by `initial_offset` — a macro whose only strand waits 200ms should
+    /// by `initial_offset` - a macro whose only strand waits 200ms should
     /// return in roughly (200ms - offset) wall-clock time, proving the
     /// anchor is `Instant::now() - initial_offset`, not just `Instant::now()`
     /// with the offset silently ignored.
@@ -1649,7 +1649,7 @@ mod tests {
 
     /// A `Return` inside an `If` branch, within a custom block called via
     /// `Value::Call`, should halt the block's body and hand its value back
-    /// to the caller — proving `run_block`'s `Ok(Some(_))` bubbles up
+    /// to the caller - proving `run_block`'s `Ok(Some(_))` bubbles up
     /// through nested `If` the same way it already does through `CallBlock`.
     #[test]
     fn return_inside_if_branch_bubbles_up_through_reporter_block() {
@@ -1788,7 +1788,7 @@ mod tests {
                         Value::number(1.0),
                     )),
                     Instruction::new(InstructionKind::ContinueLoop),
-                    // Never reached — proves ContinueLoop halted this iteration.
+                    // Never reached - proves ContinueLoop halted this iteration.
                     Instruction::new(InstructionKind::ChangeVariable(
                         "x".to_string(),
                         Value::number(100.0),
@@ -1915,7 +1915,7 @@ mod tests {
     }
 
     /// `Return` inside a `Repeat` must unwind straight through the loop,
-    /// same as it already does through `If` — proving loop instructions
+    /// same as it already does through `If` - proving loop instructions
     /// forward `Flow::Return` rather than swallowing it like `Break`.
     #[test]
     fn return_inside_repeat_bubbles_up_through_reporter_block() {
@@ -1997,7 +1997,7 @@ mod tests {
             Arc::clone(&vars),
         );
         // EscapeLoop with nothing to catch it halts the whole strand, same as
-        // Return does today — the SetVariable after it never runs.
+        // Return does today - the SetVariable after it never runs.
         assert_eq!(vars.lock().unwrap().get("x"), None);
     }
 }

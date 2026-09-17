@@ -9,6 +9,7 @@
     "enableGTKAppId": true,
     "windows": [
       {
+        "create": false,
         "title": "Blockwork",
         "width": 1024,
         "height": 768,

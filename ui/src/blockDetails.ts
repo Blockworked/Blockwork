@@ -1,4 +1,4 @@
-// Content for the right-click "Details" popup — a plain-language explainer
+// Content for the right-click "Details" popup - a plain-language explainer
 // of what a block does, plus its name and wire identifier (the `type`/`kind`
 // string, or a custom block's id). Purely descriptive/static data; nothing
 // here reads live state.
@@ -15,7 +15,7 @@ const INSTRUCTION_EXPLAINERS: Record<InstructionType, string> = {
   WhenRan: 'Runs this strand as soon as the macro starts (Run button, hotkey, or command).',
   WhenBatteryDischargedTo: 'Runs this strand the moment the battery level drops to (or below) the given percentage.',
   WhenBatteryChargedTo: 'Runs this strand the moment the battery level rises to (or above) the given percentage.',
-  WhenTime: 'Runs this strand at a recurring point in local time — daily, weekly, monthly, or yearly.',
+  WhenTime: 'Runs this strand at a recurring point in local time - daily, weekly, monthly, or yearly.',
   WhenPowerPluggedIn: 'Runs this strand the moment the system is connected to external power.',
   WhenPowerUnplugged: 'Runs this strand the moment the system is disconnected from external power.',
   Wait: 'Pauses this strand for the given number of milliseconds before continuing.',
@@ -27,10 +27,10 @@ const INSTRUCTION_EXPLAINERS: Record<InstructionType, string> = {
   Command: 'Runs a shell command in the background.',
   OpenApp: 'Launches the chosen application.',
   CloseApp: 'Closes the chosen application.',
-  Comment: 'A free-form note left on the canvas — has no effect when the macro runs.',
+  Comment: 'A free-form note left on the canvas - has no effect when the macro runs.',
   SetVariable: "Sets a variable to the given value, replacing whatever it held before.",
   ChangeVariable: "Adds the given number to a variable's current value.",
-  BlockHeader: 'The definition header of one of your custom "My Blocks" — everything below it runs each time the block is called.',
+  BlockHeader: 'The definition header of one of your custom "My Blocks" - everything below it runs each time the block is called.',
   CallBlock: 'Calls one of your own custom "My Blocks" definitions, running its body inline.',
   Return: "Ends a custom block's body immediately, handing the given value back to whoever called it.",
   If: 'Runs the blocks inside only if the condition is true.',
@@ -111,10 +111,10 @@ export function detailsForValueKind(kind: string): BlockDetails {
 }
 
 const BLOCK_SHAPE_EXPLAINERS: Record<BlockDefDto['shape'], string> = {
-  Normal: 'A custom block you defined — drag it onto a strand to call it, running the blocks under its "My Blocks" definition.',
-  Ending: 'A custom block you defined that ends a strand — drag it onto a strand to call it; nothing can be placed below it.',
-  ReturnsValue: 'A custom block you defined that returns a number or text — drag it into a value slot to call it and use its result.',
-  ReturnsBool: 'A custom block you defined that returns a boolean — drag it into a boolean slot to call it and use its result.',
+  Normal: 'A custom block you defined - drag it onto a strand to call it, running the blocks under its "My Blocks" definition.',
+  Ending: 'A custom block you defined that ends a strand - drag it onto a strand to call it; nothing can be placed below it.',
+  ReturnsValue: 'A custom block you defined that returns a number or text - drag it into a value slot to call it and use its result.',
+  ReturnsBool: 'A custom block you defined that returns a boolean - drag it into a boolean slot to call it and use its result.',
 };
 
 export function detailsForBlockDef(def: BlockDefDto): BlockDetails {

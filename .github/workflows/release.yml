@@ -245,23 +245,22 @@ jobs:
           wget -q -O linuxdeploy.AppImage "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.linux_arch }}.AppImage"
           wget -q -O linuxdeploy-plugin-appimage.AppImage "https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-${{ matrix.linux_arch }}.AppImage"
           chmod +x linuxdeploy.AppImage linuxdeploy-plugin-appimage.AppImage
-          # linuxdeploy expects the binary name to match the Exec entry in the desktop file
+          # Exec entry wants a binary named blockwork.
           cp ${{ matrix.artifact_name }} blockwork
 
-          # cef-dll-sys' build script drops the whole CEF runtime (libcef.so, GL/Vulkan
-          # shims, *.pak, icudtl.dat, locales/, ...) next to the compiled binary in
-          # target/<triple>/release. libcef.so has to sit beside `blockwork` for linuxdeploy
-          # to resolve the NEEDED entry via ldd; the rest of the payload isn't linked
-          # (some is dlopen'd, the data files aren't ELF at all), so it has to be copied
-          # in by hand wherever libcef.so ends up (usr/lib, once linuxdeploy deploys it).
+          # CEF runtime sits next to the binary in target/<triple>/release.
+          # linuxdeploy only finds libcef.so via ldd, so copy the rest by hand.
           CEF_DIR="target/${{ matrix.target }}/release"
           cp "$CEF_DIR/libcef.so" .
+          # Daemon ships next to blockwork in usr/bin.
+          cp "$CEF_DIR/blockwork-daemon" .
 
           export LINUXDEPLOY_EXCLUDED_LIBRARIES="libnspr4.so;libplc4.so;libplds4.so;libnss3.so;libnssutil3.so;libsmime3.so"
 
           ./linuxdeploy.AppImage \
             --appdir AppDir \
             --executable ./blockwork \
+            --executable ./blockwork-daemon \
             --desktop-file res/blockwork.desktop \
             --icon-file res/icons/blockwork.png
 
@@ -313,9 +312,7 @@ jobs:
             org.freedesktop.Sdk.Extension.rust-stable//25.08 org.freedesktop.Sdk.Extension.node20//25.08
 
       - name: Build Flatpak
-        # Builds the Rust workspace + frontend from source inside the sandbox,
-        # fully offline (see packaging/flatpak/com.blockworked.Blockwork.yml) --
-        # no host `cargo build` needed here.
+        # Offline sandbox build, no host cargo build needed.
         run: |
           flatpak-builder --force-clean --user --repo=flatpak-repo flatpak-build packaging/flatpak/com.blockworked.Blockwork.yml
           flatpak build-bundle flatpak-repo ${{ matrix.artifact_name }}.flatpak com.blockworked.Blockwork stable

@@ -20,7 +20,7 @@ use blockwork_core::recording;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
-use tauri::{Manager, Runtime, State};
+use crate::AppHandle;
 use tracing::warn;
 
 const CLEAR_CONFIRM_TIMEOUT_SECS: u64 = 3;
@@ -69,7 +69,7 @@ fn refresh_macro_list(s: &mut crate::state::AppState) {
     s.macros_list = macros;
 }
 
-/// Resyncs the live variable store to `current_macro`'s declared variables —
+/// Resyncs the live variable store to `current_macro`'s declared variables -
 /// called after `current_macro` is (re)assigned, so stale entries don't linger.
 fn sync_variable_values(s: &mut crate::state::AppState) {
     let values = match &s.current_macro {
@@ -97,18 +97,16 @@ fn auto_save(s: &crate::state::AppState) {
 
 // ─── Read ──────────────────────────────────────────────────────────────────
 
-#[tauri::command]
-pub(crate) fn get_state(state: State<SharedState>) -> Result<StateDto, String> {
+pub(crate) fn get_state(state: &SharedState) -> Result<StateDto, String> {
     let s = state.lock().map_err(|e| e.to_string())?;
     Ok(build_state_dto(&s))
 }
 
 // ─── Macro library ─────────────────────────────────────────────────────────
 
-#[tauri::command]
-pub(crate) fn select_macro<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn select_macro(
+    state: &SharedState,
+    app: &AppHandle,
     index: usize,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -130,10 +128,9 @@ pub(crate) fn select_macro<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn new_macro<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn new_macro(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let new_macro = Macro::new("New Macro".into(), "".into(), vec![]);
     let new_id = new_macro.id.clone();
@@ -163,10 +160,9 @@ pub(crate) fn new_macro<R: Runtime>(
 /// Deletes the current macro. The frontend confirms with the user via a
 /// popup (`RemoveMacroDialog.vue`) before ever calling this, so it deletes
 /// unconditionally.
-#[tauri::command]
-pub(crate) fn remove_macro<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn remove_macro(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = s.current_macro.take() {
@@ -182,10 +178,9 @@ pub(crate) fn remove_macro<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn set_title<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn set_title(
+    state: &SharedState,
+    app: &AppHandle,
     title: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -201,10 +196,9 @@ pub(crate) fn set_title<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn set_macro_speed_multiplier<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn set_macro_speed_multiplier(
+    state: &SharedState,
+    app: &AppHandle,
     multiplier: f64,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -220,12 +214,11 @@ pub(crate) fn set_macro_speed_multiplier<R: Runtime>(
 }
 
 /// Sets the current macro's "always listen for events even when a different
-/// macro is selected" setting — see `MacroSettings::always_listen`. Edited
+/// macro is selected" setting - see `MacroSettings::always_listen`. Edited
 /// from the "Macro Settings" popup next to the macro dropdown.
-#[tauri::command]
-pub(crate) fn set_macro_always_listen<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn set_macro_always_listen(
+    state: &SharedState,
+    app: &AppHandle,
     enabled: bool,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -255,12 +248,11 @@ fn create_variable_in(mac: &mut Macro, name: &str) -> Result<String, String> {
     Ok(trimmed)
 }
 
-/// Declares a new macro-wide variable, starting at `0`. No `push_undo` —
+/// Declares a new macro-wide variable, starting at `0`. No `push_undo` -
 /// a naming/creation action, not an undoable structural edit.
-#[tauri::command]
-pub(crate) fn create_variable<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn create_variable(
+    state: &SharedState,
+    app: &AppHandle,
     name: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -290,10 +282,9 @@ fn rename_variable_in(mac: &mut Macro, old_name: &str, new_name: &str) -> Result
 }
 
 /// Renames a declared variable and every reference to it.
-#[tauri::command]
-pub(crate) fn rename_variable<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn rename_variable(
+    state: &SharedState,
+    app: &AppHandle,
     old_name: String,
     new_name: String,
 ) -> Result<(), String> {
@@ -334,17 +325,16 @@ pub(crate) fn rename_variable<R: Runtime>(
 }
 
 /// Removes `name` from `mac.variables`. Existing references to it are left
-/// in place — `resolve_vars` defaults an unknown name to `0`.
+/// in place - `resolve_vars` defaults an unknown name to `0`.
 fn delete_variable_in(mac: &mut Macro, name: &str) {
     mac.variables.retain(|v| v.name != name);
 }
 
-/// Deletes a declared variable. No `push_undo` — same precedent as
+/// Deletes a declared variable. No `push_undo` - same precedent as
 /// `create_variable`.
-#[tauri::command]
-pub(crate) fn delete_variable<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn delete_variable(
+    state: &SharedState,
+    app: &AppHandle,
     name: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -400,10 +390,9 @@ fn normalize_block_color(color: &str) -> Result<String, String> {
 /// Defines a new custom block, creating its (initially empty) header strand
 /// next to the macro's other strands. Pushes undo, since it has real canvas
 /// footprint.
-#[tauri::command]
-pub(crate) fn create_block<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn create_block(
+    state: &SharedState,
+    app: &AppHandle,
     pieces: Vec<BlockPieceDto>,
     shape: BlockShape,
     color: String,
@@ -424,10 +413,9 @@ pub(crate) fn create_block<R: Runtime>(
 /// Updates a block's prototype/return-type, reconciling every call site's
 /// `args` to the new input list and renaming body params that kept their
 /// identity but changed name. Pushes undo.
-#[tauri::command]
-pub(crate) fn edit_block<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn edit_block(
+    state: &SharedState,
+    app: &AppHandle,
     block_id: String,
     pieces: Vec<BlockPieceDto>,
     shape: BlockShape,
@@ -485,10 +473,9 @@ pub(crate) fn edit_block<R: Runtime>(
 
 /// Deletes a custom block entirely (see `Macro::remove_block`). Pushes
 /// undo, same reasoning as `create_block`.
-#[tauri::command]
-pub(crate) fn delete_block<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn delete_block(
+    state: &SharedState,
+    app: &AppHandle,
     block_id: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -505,10 +492,9 @@ pub(crate) fn delete_block<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn save_macro<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn save_macro(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &s.current_macro {
@@ -542,37 +528,35 @@ fn sanitize_filename(name: &str) -> String {
     }
 }
 
-/// Exports a single macro to a user-chosen `.macro` file (same JSON shape as
-/// the app's own on-disk storage, just under a different extension so it
-/// reads as a portable macro file rather than an app-internal one).
-#[tauri::command]
-pub(crate) async fn export_macro(macro_id: String) -> Result<(), String> {
+/// Default file name offered by the UI's save dialog when exporting a macro.
+pub(crate) fn export_macro_file_name(macro_id: String) -> Result<String, String> {
+    let mac = config::get_macros_from_config()
+        .into_iter()
+        .find(|m| m.id == macro_id)
+        .ok_or("Macro not found")?;
+    Ok(format!("{}.macro", sanitize_filename(&mac.name)))
+}
+
+/// Exports a single macro to a `.macro` file the user picked in the UI (same
+/// JSON shape as the app's own on-disk storage, just under a different
+/// extension so it reads as a portable macro file rather than an app-internal
+/// one).
+pub(crate) fn export_macro(macro_id: String, path: String) -> Result<(), String> {
     let macros = config::get_macros_from_config();
     let mac = macros
         .into_iter()
         .find(|m| m.id == macro_id)
         .ok_or("Macro not found")?;
-
-    let file = rfd::AsyncFileDialog::new()
-        .set_title("Export Macro")
-        .set_file_name(&format!("{}.macro", sanitize_filename(&mac.name)))
-        .add_filter("Macro", &["macro"])
-        .save_file()
-        .await;
-
-    let Some(file) = file else {
-        return Ok(());
-    };
-    config::write_macro_file(file.path(), &mac)
+    config::write_macro_file(std::path::Path::new(&path), &mac)
 }
 
 /// Whether `body` (or anything nested inside its `If`/`IfElse`/`Repeat`/
-/// `Forever`/`While` blocks) contains a `Command` instruction — the check
+/// `Forever`/`While` blocks) contains a `Command` instruction - the check
 /// behind `import_macro`'s "this macro can run arbitrary commands" warning.
 fn body_contains_command(body: &[Instruction]) -> bool {
     body.iter().any(|ins| match &ins.kind {
         // `OpenApp`'s `command` is just as capable of running arbitrary
-        // shell as a plain `Command` — a hand-edited macro file could carry
+        // shell as a plain `Command` - a hand-edited macro file could carry
         // any string there, not just what the picker would produce.
         InstructionKind::Command(_) | InstructionKind::OpenApp { .. } => true,
         InstructionKind::If { body, .. }
@@ -594,7 +578,7 @@ fn macro_contains_command(mac: &Macro) -> bool {
         .any(|strand| body_contains_command(&strand.instructions))
 }
 
-/// One (key, label, getter, setter) entry per `MacroSettings` field — the
+/// One (key, label, getter, setter) entry per `MacroSettings` field - the
 /// single place a new setting needs registering to participate in the
 /// "review custom settings on import" flow below. `key` is the wire
 /// identifier the frontend's toggle list and `confirm_import_macro`'s
@@ -613,7 +597,7 @@ const SETTING_ACCESSORS: &[SettingAccessor] = &[(
     |s, v| s.always_listen = v,
 )];
 
-/// Every `MacroSettings` field on `settings` that differs from its default —
+/// Every `MacroSettings` field on `settings` that differs from its default -
 /// shown to the user by `import_macro` for confirmation, since non-default
 /// behavior deserves a second look before it's silently applied.
 fn non_default_macro_settings(
@@ -651,10 +635,10 @@ fn apply_setting_overrides(
 /// Assigns a fresh id to `mac` (so importing never collides with or
 /// overwrites an existing macro), saves it, and makes it the
 /// selected/current macro.
-fn commit_imported_macro<R: Runtime>(
+fn commit_imported_macro(
     mut mac: Macro,
     state: &SharedState,
-    app: &tauri::AppHandle<R>,
+    app: &AppHandle,
 ) -> Result<(), String> {
     mac.id = uuid::Uuid::new_v4().simple().to_string();
     let new_id = mac.id.clone();
@@ -679,27 +663,18 @@ fn commit_imported_macro<R: Runtime>(
     Ok(())
 }
 
-/// Picks a `.macro` file and reads it. If it needs a confirmation prompt
-/// before it can be committed — a `Command` instruction, and/or non-default
-/// macro settings (see `non_default_macro_settings`) — the parsed macro is
+/// Reads the `.macro` file the user picked in the UI. If it needs a confirmation prompt
+/// before it can be committed - a `Command` instruction, and/or non-default
+/// macro settings (see `non_default_macro_settings`) - the parsed macro is
 /// staged in `pending_import` and the prompt to show is returned; the
 /// frontend resolves it via `confirm_import_macro`/`cancel_import_macro`.
 /// Otherwise the macro is imported immediately and `None` is returned.
-#[tauri::command]
-pub(crate) async fn import_macro<R: Runtime>(
-    state: State<'_, SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn import_macro(
+    state: &SharedState,
+    app: &AppHandle,
+    path: String,
 ) -> Result<Option<crate::state::ImportPromptDto>, String> {
-    let file = rfd::AsyncFileDialog::new()
-        .set_title("Import Macro")
-        .add_filter("Macro", &["macro"])
-        .pick_file()
-        .await;
-
-    let Some(file) = file else {
-        return Ok(None);
-    };
-    let mac = config::read_macro_file(file.path())?;
+    let mac = config::read_macro_file(std::path::Path::new(&path))?;
 
     let needs_command_warning = macro_contains_command(&mac);
     let custom_settings = non_default_macro_settings(&mac.settings);
@@ -723,10 +698,9 @@ pub(crate) async fn import_macro<R: Runtime>(
 /// entry's `key` to whether the user kept its imported value (`true`) or
 /// reset it to default (`false`); a key the popup never showed is absent,
 /// which `apply_setting_overrides` treats as "keep".
-#[tauri::command]
-pub(crate) async fn confirm_import_macro<R: Runtime>(
-    state: State<'_, SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) async fn confirm_import_macro(
+    state: &SharedState,
+    app: &AppHandle,
     keep_settings: HashMap<String, bool>,
 ) -> Result<(), String> {
     let mac = {
@@ -745,8 +719,7 @@ pub(crate) async fn confirm_import_macro<R: Runtime>(
 
 /// Discards an import staged by `import_macro` after the user declines the
 /// Command warning popup.
-#[tauri::command]
-pub(crate) fn cancel_import_macro(state: State<SharedState>) -> Result<(), String> {
+pub(crate) fn cancel_import_macro(state: &SharedState) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.pending_import = None;
     Ok(())
@@ -754,10 +727,9 @@ pub(crate) fn cancel_import_macro(state: State<SharedState>) -> Result<(), Strin
 
 // ─── Instructions ──────────────────────────────────────────────────────────
 
-#[tauri::command]
-pub(crate) fn add_instruction<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn add_instruction(
+    state: &SharedState,
+    app: &AppHandle,
     strand_id: String,
     path: Vec<PathStep>,
     instruction: InstructionDto,
@@ -789,7 +761,7 @@ pub(crate) fn add_instruction<R: Runtime>(
     Ok(())
 }
 
-/// Resolves an `InstrPath` to `(parent_list, local_index)` — read-only
+/// Resolves an `InstrPath` to `(parent_list, local_index)` - read-only
 /// counterpart to `resolve_body_mut`, for placement checks that only need to
 /// look, not mutate.
 fn resolve_body<'a>(
@@ -804,7 +776,7 @@ fn resolve_body<'a>(
     resolve_body(body, rest)
 }
 
-/// Resolves an `InstrPath` to `(parent_list, local_index)` — every
+/// Resolves an `InstrPath` to `(parent_list, local_index)` - every
 /// instruction command does its actual `Vec` op (`insert`/`remove`/`swap`/
 /// `split_off`/indexing) on the returned list at the returned index, exactly
 /// as it did directly on `strand.instructions` before nesting existed.
@@ -821,7 +793,7 @@ fn resolve_body_mut<'a>(
 }
 
 /// A header block ("When Ran"/`BlockHeader`) must always be first in its
-/// strand — nothing may attach above or in front of one, and a header can
+/// strand - nothing may attach above or in front of one, and a header can
 /// only ever live at a strand's own top level, never nested inside an
 /// `If`/`IfElse` body.
 fn check_when_ran_attachment(
@@ -843,7 +815,7 @@ fn check_when_ran_attachment(
 }
 
 /// A `Return` block only makes sense inside a value-returning custom
-/// block's body — enforced here so it can't be placed somewhere confusing
+/// block's body - enforced here so it can't be placed somewhere confusing
 /// (the interpreter otherwise tolerates a stray one harmlessly).
 fn check_return_placement(mac: &Macro, strand: &Strand, ins: &Instruction) -> Result<(), String> {
     if !matches!(&ins.kind, InstructionKind::Return(_)) {
@@ -862,7 +834,7 @@ fn check_return_placement(mac: &Macro, strand: &Strand, ins: &Instruction) -> Re
 }
 
 /// `escape loop`/`continue loop` only make sense inside a `Repeat`/`Forever`/
-/// `While` body — enforced by walking every ancestor bracket named in
+/// `While` body - enforced by walking every ancestor bracket named in
 /// `path` and checking whether any of them is a loop instruction.
 fn check_loop_control_placement(
     strand: &Strand,
@@ -1043,10 +1015,9 @@ mod loop_control_placement_tests {
     }
 }
 
-#[tauri::command]
-pub(crate) fn edit_instruction<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn edit_instruction(
+    state: &SharedState,
+    app: &AppHandle,
     strand_id: String,
     path: Vec<PathStep>,
     instruction: InstructionDto,
@@ -1135,7 +1106,7 @@ fn location_requires_integer(location: &ValueLocation) -> bool {
             | FieldId::BatteryDischargeThreshold | FieldId::BatteryChargeThreshold))
 }
 
-/// Drops buffered invalid-text entries at or beneath `location` — used
+/// Drops buffered invalid-text entries at or beneath `location` - used
 /// after a subtree is replaced wholesale, so stale text doesn't linger
 /// against the wrong node.
 fn prune_value_buffers(buffers: &mut HashMap<ValueLocation, String>, location: &ValueLocation) {
@@ -1143,7 +1114,7 @@ fn prune_value_buffers(buffers: &mut HashMap<ValueLocation, String>, location: &
     buffers.retain(|loc, _| !(loc.same_root(location) && loc.path().starts_with(path)));
 }
 
-/// Applies `kind`'s default construction to `node` in place — used when
+/// Applies `kind`'s default construction to `node` in place - used when
 /// dropping a fresh block onto an occupied slot. Best-effort keeps the old
 /// value rather than discarding it.
 fn apply_value_kind(
@@ -1171,7 +1142,7 @@ fn apply_value_kind(
             *node = Value::Text { value: text };
         }
         _ if kind.starts_with("Var:") => {
-            // A variable reporter is a plain leaf — restores to `0` on take-out.
+            // A variable reporter is a plain leaf - restores to `0` on take-out.
             let name = kind["Var:".len()..].to_string();
             *node = Value::Var { name };
         }
@@ -1212,10 +1183,9 @@ fn apply_value_kind(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn edit_value_field<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn edit_value_field(
+    state: &SharedState,
+    app: &AppHandle,
     location: ValueLocationDto,
     text: String,
 ) -> Result<(), String> {
@@ -1230,7 +1200,7 @@ pub(crate) fn edit_value_field<R: Runtime>(
     if let Some(mac) = &mut s.current_macro {
         if let Some(node) = resolve_location_mut(mac, &loc) {
             if matches!(node, Value::Text { .. }) {
-                // Text leaves are always valid — no invalid-buffer bookkeeping needed.
+                // Text leaves are always valid - no invalid-buffer bookkeeping needed.
                 *node = Value::Text { value: text };
                 auto_save(&s);
             } else {
@@ -1251,10 +1221,9 @@ pub(crate) fn edit_value_field<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn set_value_kind<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn set_value_kind(
+    state: &SharedState,
+    app: &AppHandle,
     location: ValueLocationDto,
     kind: String,
 ) -> Result<(), String> {
@@ -1341,10 +1310,9 @@ fn default_value_for_location(mac: &Macro, location: &ValueLocation) -> Value {
 /// location holding whatever it was shadowing (or its typed blank value); a
 /// root `Floating` location is deleted entirely. Pairs with `put_value`/
 /// `create_floating_value` on the frontend side of a drag.
-#[tauri::command]
-pub(crate) fn take_value<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn take_value(
+    state: &SharedState,
+    app: &AppHandle,
     location: ValueLocationDto,
 ) -> Result<ValueDto, String> {
     let loc = location.to_location()?;
@@ -1378,13 +1346,12 @@ pub(crate) fn take_value<R: Runtime>(
     }
 }
 
-/// Overwrites the node at `location` with `value` — the "put" half of
+/// Overwrites the node at `location` with `value` - the "put" half of
 /// moving a block into a field/subfield slot. An incoming operator's
 /// shadowed value is overwritten with the destination's prior content.
-#[tauri::command]
-pub(crate) fn put_value<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn put_value(
+    state: &SharedState,
+    app: &AppHandle,
     location: ValueLocationDto,
     value: ValueDto,
 ) -> Result<(), String> {
@@ -1407,10 +1374,9 @@ pub(crate) fn put_value<R: Runtime>(
 }
 
 /// One-shot sample evaluation of a value tree, for the click-to-preview
-/// tooltip on operator blocks — stateless. Uses `eval_text` so text-only
+/// tooltip on operator blocks - stateless. Uses `eval_text` so text-only
 /// ops (`Join`/`NewLine`/`Tab`) preview without erroring as "not a number".
-#[tauri::command]
-pub(crate) fn preview_value(state: State<SharedState>, value: ValueDto) -> Result<String, String> {
+pub(crate) fn preview_value(state: &SharedState, value: ValueDto) -> Result<String, String> {
     let s = state.lock().map_err(|e| e.to_string())?;
     let env: HashMap<String, Evaluated> = s
         .variable_values
@@ -1429,16 +1395,15 @@ fn preview_value_with_env(
     dto_to_value(value).resolve_vars(env).eval_text()
 }
 
-/// Creates a new value block parked on open canvas — for a sidebar drop, or
+/// Creates a new value block parked on open canvas - for a sidebar drop, or
 /// the "create" half of dragging an existing block out onto canvas.
 /// `origin_block_id` is set only when `value` is a `Param` reporter dragged
 /// straight out of its declaring block's header (see blockstitchSetup.ts's
-/// `createFloatingValue`) — lets a floating param render with its real
+/// `createFloatingValue`) - lets a floating param render with its real
 /// declared shape instead of a guess.
-#[tauri::command]
-pub(crate) fn create_floating_value<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn create_floating_value(
+    state: &SharedState,
+    app: &AppHandle,
     x: i32,
     y: i32,
     value: ValueDto,
@@ -1461,11 +1426,10 @@ pub(crate) fn create_floating_value<R: Runtime>(
 }
 
 /// Repositions a floating value block dropped on open canvas. No
-/// `push_undo` — pure repositioning, same as `move_strand`.
-#[tauri::command]
-pub(crate) fn move_floating_value<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+/// `push_undo` - pure repositioning, same as `move_strand`.
+pub(crate) fn move_floating_value(
+    state: &SharedState,
+    app: &AppHandle,
     floating_id: String,
     x: i32,
     y: i32,
@@ -1482,12 +1446,11 @@ pub(crate) fn move_floating_value<R: Runtime>(
     Ok(())
 }
 
-/// Deletes a floating value block outright (dropped on the sidebar trash) —
+/// Deletes a floating value block outright (dropped on the sidebar trash) -
 /// mirrors `remove_strand`.
-#[tauri::command]
-pub(crate) fn remove_floating_value<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn remove_floating_value(
+    state: &SharedState,
+    app: &AppHandle,
     floating_id: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -1500,12 +1463,11 @@ pub(crate) fn remove_floating_value<R: Runtime>(
     Ok(())
 }
 
-/// Creates a freestanding note parked on open canvas — the "Add Comment"
+/// Creates a freestanding note parked on open canvas - the "Add Comment"
 /// canvas-context-menu item. Mirrors `create_floating_value`.
-#[tauri::command]
-pub(crate) fn create_comment<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn create_comment(
+    state: &SharedState,
+    app: &AppHandle,
     x: i32,
     y: i32,
     text: String,
@@ -1527,14 +1489,13 @@ pub(crate) fn create_comment<R: Runtime>(
     Ok(id)
 }
 
-/// Creates a note pinned to `instruction_id` — the "Add Comment" block/header
+/// Creates a note pinned to `instruction_id` - the "Add Comment" block/header
 /// context-menu item. `dx`/`dy` are an offset from that instruction's
 /// on-screen position, not an absolute canvas coordinate (see `Comment`'s
 /// doc comment); the frontend picks a default that clears the block.
-#[tauri::command]
-pub(crate) fn create_attached_comment<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn create_attached_comment(
+    state: &SharedState,
+    app: &AppHandle,
     instruction_id: String,
     dx: i32,
     dy: i32,
@@ -1557,15 +1518,14 @@ pub(crate) fn create_attached_comment<R: Runtime>(
     Ok(id)
 }
 
-/// Repositions a note — `x`/`y` are the same value the frontend already
+/// Repositions a note - `x`/`y` are the same value the frontend already
 /// tracks for it (an absolute canvas position if freestanding, an offset
 /// from its attached instruction if not), plus the pointer's drag delta; see
-/// `Comment`'s doc comment. No `push_undo` — pure repositioning, same as
+/// `Comment`'s doc comment. No `push_undo` - pure repositioning, same as
 /// `move_floating_value`.
-#[tauri::command]
-pub(crate) fn move_comment<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn move_comment(
+    state: &SharedState,
+    app: &AppHandle,
     comment_id: String,
     x: i32,
     y: i32,
@@ -1582,11 +1542,10 @@ pub(crate) fn move_comment<R: Runtime>(
     Ok(())
 }
 
-/// Deletes a note outright (its own "×" button) — mirrors `remove_floating_value`.
-#[tauri::command]
-pub(crate) fn remove_comment<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+/// Deletes a note outright (its own "×" button) - mirrors `remove_floating_value`.
+pub(crate) fn remove_comment(
+    state: &SharedState,
+    app: &AppHandle,
     comment_id: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -1599,12 +1558,11 @@ pub(crate) fn remove_comment<R: Runtime>(
     Ok(())
 }
 
-/// Edits a note's text — coalesces keystrokes into one undo group, same as
+/// Edits a note's text - coalesces keystrokes into one undo group, same as
 /// `edit_instruction`'s freeform-text instructions.
-#[tauri::command]
-pub(crate) fn edit_comment_text<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn edit_comment_text(
+    state: &SharedState,
+    app: &AppHandle,
     comment_id: String,
     text: String,
 ) -> Result<(), String> {
@@ -1626,12 +1584,11 @@ pub(crate) fn edit_comment_text<R: Runtime>(
     Ok(())
 }
 
-/// Toggles a note's collapsed state — view state, not content, so no
+/// Toggles a note's collapsed state - view state, not content, so no
 /// `push_undo` (same reasoning as `move_comment`).
-#[tauri::command]
-pub(crate) fn set_comment_collapsed<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn set_comment_collapsed(
+    state: &SharedState,
+    app: &AppHandle,
     comment_id: String,
     collapsed: bool,
 ) -> Result<(), String> {
@@ -1646,10 +1603,9 @@ pub(crate) fn set_comment_collapsed<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn remove_instruction<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn remove_instruction(
+    state: &SharedState,
+    app: &AppHandle,
     strand_id: String,
     path: Vec<PathStep>,
 ) -> Result<(), String> {
@@ -1678,13 +1634,12 @@ pub(crate) fn remove_instruction<R: Runtime>(
 }
 
 /// Deletes the instruction at `path`, splitting anything below it (in the
-/// same body list) off into a new top-level strand at `(x, y)` — atomic
+/// same body list) off into a new top-level strand at `(x, y)` - atomic
 /// with the removal, so it's one undo step. Returns the new strand's id, or
 /// `None` if nothing was split off.
-#[tauri::command]
-pub(crate) fn delete_instruction<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn delete_instruction(
+    state: &SharedState,
+    app: &AppHandle,
     strand_id: String,
     path: Vec<PathStep>,
     x: i32,
@@ -1721,7 +1676,7 @@ pub(crate) fn delete_instruction<R: Runtime>(
     } else {
         None
     };
-    // A strand left with no blocks is dead weight — drop it instead of
+    // A strand left with no blocks is dead weight - drop it instead of
     // leaving an empty card behind.
     if now_empty {
         mac.strands.retain(|s| s.id != strand_id);
@@ -1733,10 +1688,9 @@ pub(crate) fn delete_instruction<R: Runtime>(
     Ok(new_id)
 }
 
-#[tauri::command]
-pub(crate) fn reorder_instruction<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn reorder_instruction(
+    state: &SharedState,
+    app: &AppHandle,
     strand_id: String,
     path: Vec<PathStep>,
     direction: i32,
@@ -1755,7 +1709,7 @@ pub(crate) fn reorder_instruction<R: Runtime>(
                     index
                 };
                 // Swapping either end into position 0 would move a When Ran
-                    // block out of (or something else into) the head slot — only
+                    // block out of (or something else into) the head slot - only
                     // relevant at a strand's own top level, never a nested body.
                     let starts_with_header = list.first().map_or(false, Instruction::is_header);
                     let touches_when_ran_slot =
@@ -1782,10 +1736,9 @@ pub(crate) fn reorder_instruction<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn clear_instructions<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn clear_instructions(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if !s.confirm_clear_instructions {
@@ -1798,7 +1751,7 @@ pub(crate) fn clear_instructions<R: Runtime>(
 
         let state_clone = Arc::clone(&*state);
         let app_clone = app.clone();
-        tauri::async_runtime::spawn(async move {
+        crate::async_runtime::spawn(async move {
             for remaining in (1..=CLEAR_CONFIRM_TIMEOUT_SECS).rev() {
                 tokio::time::sleep(std::time::Duration::from_secs(1)).await;
                 if let Ok(mut s) = state_clone.lock() {
@@ -1816,7 +1769,7 @@ pub(crate) fn clear_instructions<R: Runtime>(
     } else {
         push_undo(&mut s);
         if let Some(mac) = &mut s.current_macro {
-            // Clearing wipes every strand, including "When Ran" blocks —
+            // Clearing wipes every strand, including "When Ran" blocks -
             // "start this macro over from scratch".
             mac.strands.clear();
             mac.prune_orphaned_comments();
@@ -1830,7 +1783,7 @@ pub(crate) fn clear_instructions<R: Runtime>(
     Ok(())
 }
 
-fn perform_undo<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>) -> Result<(), String> {
+fn perform_undo(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(prev) = s.undo_stack.pop() {
         let current = s.current_macro.as_ref().map(|m| MacroSnapshot {
@@ -1862,7 +1815,7 @@ fn perform_undo<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>) -> R
     Ok(())
 }
 
-fn perform_redo<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>) -> Result<(), String> {
+fn perform_redo(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(next) = s.redo_stack.pop() {
         let current = s.current_macro.as_ref().map(|m| MacroSnapshot {
@@ -1892,18 +1845,16 @@ fn perform_redo<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>) -> R
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn undo<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn undo(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     perform_undo(&state, &app)
 }
 
-#[tauri::command]
-pub(crate) fn redo<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn redo(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     perform_redo(&state, &app)
 }
@@ -1913,10 +1864,9 @@ pub(crate) fn redo<R: Runtime>(
 /// Creates a new detached strand. `x`/`y` default to an auto-picked spot
 /// next to the farthest-right strand; an explicit position and initial
 /// `instruction` are passed for a palette-block drop, as one atomic call.
-#[tauri::command]
-pub(crate) fn add_strand<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn add_strand(
+    state: &SharedState,
+    app: &AppHandle,
     x: Option<i32>,
     y: Option<i32>,
     instruction: Option<InstructionDto>,
@@ -1941,10 +1891,9 @@ pub(crate) fn add_strand<R: Runtime>(
     Ok(new_id)
 }
 
-#[tauri::command]
-pub(crate) fn remove_strand<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn remove_strand(
+    state: &SharedState,
+    app: &AppHandle,
     strand_id: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -1960,12 +1909,11 @@ pub(crate) fn remove_strand<R: Runtime>(
     Ok(())
 }
 
-/// Repositions a strand on the canvas — used while dragging a stack that
+/// Repositions a strand on the canvas - used while dragging a stack that
 /// ends up dropped on empty space rather than snapped onto another strand.
-#[tauri::command]
-pub(crate) fn move_strand<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn move_strand(
+    state: &SharedState,
+    app: &AppHandle,
     strand_id: String,
     x: i32,
     y: i32,
@@ -1986,10 +1934,9 @@ pub(crate) fn move_strand<R: Runtime>(
 /// into a new top-level strand at `(x, y)`, returning its id. This is how
 /// the frontend "picks up" a block: split first, then drop as a stray strand
 /// or re-merge elsewhere.
-#[tauri::command]
-pub(crate) fn split_strand<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn split_strand(
+    state: &SharedState,
+    app: &AppHandle,
     strand_id: String,
     path: Vec<PathStep>,
     x: i32,
@@ -2019,12 +1966,11 @@ pub(crate) fn split_strand<R: Runtime>(
 }
 
 /// Splices `dragged_id`'s instructions into `target_id` at `path` and
-/// deletes the (now empty) dragged strand — how two stacks snap together.
+/// deletes the (now empty) dragged strand - how two stacks snap together.
 /// A "When Ran" strand can only be a merge target, never the dragged side.
-#[tauri::command]
-pub(crate) fn merge_strand<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn merge_strand(
+    state: &SharedState,
+    app: &AppHandle,
     dragged_id: String,
     target_id: String,
     path: Vec<PathStep>,
@@ -2057,7 +2003,7 @@ pub(crate) fn merge_strand<R: Runtime>(
         .ok_or("Unknown dragged strand")?;
     let dragged = mac.strands.remove(dragged_pos);
     let Some(target) = mac.strand_mut(&target_id) else {
-        // Target vanished (e.g. concurrent edit) — put the dragged
+        // Target vanished (e.g. concurrent edit) - put the dragged
         // strand back rather than silently dropping its instructions.
         mac.strands.push(dragged);
         return Err("Unknown target strand".to_string());
@@ -2076,11 +2022,10 @@ pub(crate) fn merge_strand<R: Runtime>(
 }
 
 /// Creates a new detached strand at `(x, y)` holding `instructions`
-/// verbatim — how "Paste" drops previously-copied blocks onto the canvas.
-#[tauri::command]
-pub(crate) fn paste_instructions<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+/// verbatim - how "Paste" drops previously-copied blocks onto the canvas.
+pub(crate) fn paste_instructions(
+    state: &SharedState,
+    app: &AppHandle,
     x: i32,
     y: i32,
     instructions: Vec<InstructionDto>,
@@ -2108,10 +2053,9 @@ pub(crate) fn paste_instructions<R: Runtime>(
 /// Sets the strand that freshly-recorded input is appended to. Not part of
 /// the undo/redo stacks, so it survives undo/redo untouched; no-ops if
 /// `strand_id` doesn't exist.
-#[tauri::command]
-pub(crate) fn set_recording_target<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn set_recording_target(
+    state: &SharedState,
+    app: &AppHandle,
     strand_id: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2127,10 +2071,9 @@ pub(crate) fn set_recording_target<R: Runtime>(
 
 // ─── Key capture ───────────────────────────────────────────────────────────
 
-#[tauri::command]
-pub(crate) fn start_key_capture<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn start_key_capture(
+    state: &SharedState,
+    app: &AppHandle,
     strand_id: String,
     path: Vec<PathStep>,
 ) -> Result<(), String> {
@@ -2141,12 +2084,11 @@ pub(crate) fn start_key_capture<R: Runtime>(
 }
 
 /// Same capture flow, but for a key field with no backing strand/instruction
-/// (the sidebar's Key prefab) — the result lands in `pending_standalone_key`
+/// (the sidebar's Key prefab) - the result lands in `pending_standalone_key`
 /// instead of being written into a strand.
-#[tauri::command]
-pub(crate) fn start_standalone_key_capture<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn start_standalone_key_capture(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.key_capture = Some(KeyCaptureTarget::Standalone);
@@ -2154,10 +2096,9 @@ pub(crate) fn start_standalone_key_capture<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn key_capture_event<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn key_capture_event(
+    state: &SharedState,
+    app: &AppHandle,
     code: String,
     key: String,
 ) -> Result<(), String> {
@@ -2201,10 +2142,9 @@ pub(crate) fn key_capture_event<R: Runtime>(
 
 /// Consumes `pending_standalone_key` once the frontend has copied it, so a
 /// stale value can't leak into the next capture.
-#[tauri::command]
-pub(crate) fn clear_standalone_key_capture<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn clear_standalone_key_capture(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.pending_standalone_key = None;
@@ -2214,10 +2154,9 @@ pub(crate) fn clear_standalone_key_capture<R: Runtime>(
 
 // ─── Execution ─────────────────────────────────────────────────────────────
 
-#[tauri::command]
-pub(crate) fn run_macro<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn run_macro(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let (mac, emulator, is_looping, loop_mode, speed_multiplier, variables) = {
         let s = state.lock().map_err(|e| e.to_string())?;
@@ -2292,10 +2231,9 @@ pub(crate) fn run_macro<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn toggle_loop_mode<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn toggle_loop_mode(
+    state: &SharedState,
+    app: &AppHandle,
     enabled: bool,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2305,10 +2243,9 @@ pub(crate) fn toggle_loop_mode<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn set_global_speed_multiplier<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn set_global_speed_multiplier(
+    state: &SharedState,
+    app: &AppHandle,
     multiplier: f64,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2325,7 +2262,7 @@ pub(crate) fn set_global_speed_multiplier<R: Runtime>(
 // ─── Recording ─────────────────────────────────────────────────────────────
 
 /// Seeds the recorder's tracked cursor position from the real, current
-/// cursor position so the first captured move has a baseline — needed for
+/// cursor position so the first captured move has a baseline - needed for
 /// absolute-move recording, which adds each relative delta the backend
 /// reports onto a known starting point. Best-effort: if the backend can't
 /// report a position, absolute recording waits for a later seed.
@@ -2339,10 +2276,9 @@ fn seed_recording_mouse_pos(s: &crate::state::AppState) {
     }
 }
 
-#[tauri::command]
-pub(crate) fn start_recording<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn start_recording(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if s.current_macro.is_none() {
@@ -2356,7 +2292,7 @@ pub(crate) fn start_recording<R: Runtime>(
 
     let state_clone = Arc::clone(&*state);
     let app_clone = app.clone();
-    tauri::async_runtime::spawn(async move {
+    crate::async_runtime::spawn(async move {
         for n in (0u8..3).rev() {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             let mut s = match state_clone.lock() {
@@ -2381,10 +2317,9 @@ pub(crate) fn start_recording<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn stop_recording<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn stop_recording(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     stop_recording_impl(&mut s);
@@ -2393,7 +2328,7 @@ pub(crate) fn stop_recording<R: Runtime>(
 }
 
 /// Returns the macro to auto-save (an owned clone), if recorded instructions
-/// actually got appended — saving itself happens after the state lock is
+/// actually got appended - saving itself happens after the state lock is
 /// released, see `stop_recording_internal`.
 fn stop_recording_impl(s: &mut crate::state::AppState) -> Option<Macro> {
     recording::RECORDING_ACTIVE.store(false, Ordering::Relaxed);
@@ -2416,7 +2351,7 @@ fn stop_recording_impl(s: &mut crate::state::AppState) -> Option<Macro> {
 }
 
 /// Called from the QueueSignal background task when the OS-level hook signals stop.
-pub(crate) fn stop_recording_internal<R: Runtime>(state: &SharedState, app: &tauri::AppHandle<R>) {
+pub(crate) fn stop_recording_internal(state: &SharedState, app: &AppHandle) {
     let (to_save, dto) = {
         let Ok(mut s) = state.lock() else { return };
         let to_save = stop_recording_impl(&mut s);
@@ -2433,14 +2368,12 @@ pub(crate) fn stop_recording_internal<R: Runtime>(state: &SharedState, app: &tau
             config::set_selected_macro_id(Some(&mac.id));
         }
     }
-    use tauri::Emitter;
-    let _ = app.emit("state-updated", dto);
+    app.emit_state(&dto);
 }
 
-#[tauri::command]
-pub(crate) fn toggle_record_mouse_relative<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn toggle_record_mouse_relative(
+    state: &SharedState,
+    app: &AppHandle,
     relative: bool,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2451,10 +2384,9 @@ pub(crate) fn toggle_record_mouse_relative<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn toggle_record_mouse_movement<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn toggle_record_mouse_movement(
+    state: &SharedState,
+    app: &AppHandle,
     enabled: bool,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2467,10 +2399,9 @@ pub(crate) fn toggle_record_mouse_movement<R: Runtime>(
 
 // ─── Navigation ────────────────────────────────────────────────────────────
 
-#[tauri::command]
-pub(crate) fn open_settings<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn open_settings(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.page = Page::Settings;
@@ -2481,10 +2412,9 @@ pub(crate) fn open_settings<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn close_settings<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn close_settings(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.page = Page::Main;
@@ -2494,28 +2424,12 @@ pub(crate) fn close_settings<R: Runtime>(
     Ok(())
 }
 
-/// Resets Chromium page zoom to 100%. Handled here rather than by the
-/// browser's own Ctrl+0 accelerator, which this CEF runtime can't be relied
-/// on to deliver (opt-in per webview; absent entirely on Alloy-style
-/// webviews).
-#[tauri::command]
-pub(crate) fn reset_zoom<R: Runtime>(app: tauri::AppHandle<R>) -> Result<(), String> {
-    let windows = app.webview_windows();
-    if windows.is_empty() {
-        return Err("no app window".to_string());
-    }
-    for window in windows.values() {
-        window.set_zoom(1.0).map_err(|e| e.to_string())?;
-    }
-    Ok(())
-}
 
 // ─── Hotkey bindings ───────────────────────────────────────────────────────
 
-#[tauri::command]
-pub(crate) fn start_combo_capture<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn start_combo_capture(
+    state: &SharedState,
+    app: &AppHandle,
     action: HotkeyActionDto,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2524,10 +2438,9 @@ pub(crate) fn start_combo_capture<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn start_pending_combo_capture<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn start_pending_combo_capture(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.combo_capture = Some(ComboCapture::Pending);
@@ -2535,10 +2448,9 @@ pub(crate) fn start_pending_combo_capture<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn combo_capture_event<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn combo_capture_event(
+    state: &SharedState,
+    app: &AppHandle,
     code: String,
     modifiers: u8,
 ) -> Result<(), String> {
@@ -2582,10 +2494,9 @@ pub(crate) fn combo_capture_event<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn cancel_combo_capture<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn cancel_combo_capture(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.combo_capture = None;
@@ -2593,10 +2504,9 @@ pub(crate) fn cancel_combo_capture<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn set_pending_macro_idx<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn set_pending_macro_idx(
+    state: &SharedState,
+    app: &AppHandle,
     index: Option<usize>,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2606,10 +2516,9 @@ pub(crate) fn set_pending_macro_idx<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn add_macro_hotkey<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn add_macro_hotkey(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some((Some(idx), Some(combo))) = s.pending_macro_hotkey.take() {
@@ -2627,10 +2536,9 @@ pub(crate) fn add_macro_hotkey<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn remove_hotkey_binding<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn remove_hotkey_binding(
+    state: &SharedState,
+    app: &AppHandle,
     index: usize,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2642,10 +2550,9 @@ pub(crate) fn remove_hotkey_binding<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn clear_named_hotkey<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn clear_named_hotkey(
+    state: &SharedState,
+    app: &AppHandle,
     action: HotkeyActionDto,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2656,10 +2563,9 @@ pub(crate) fn clear_named_hotkey<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn reset_hotkey_to_default<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn reset_hotkey_to_default(
+    state: &SharedState,
+    app: &AppHandle,
     action: HotkeyActionDto,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2686,10 +2592,9 @@ fn save_hotkey_bindings_impl(s: &mut crate::state::AppState) {
 
 // ─── IPC server ────────────────────────────────────────────────────────────
 
-#[tauri::command]
-pub(crate) fn set_ipc_port_text<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn set_ipc_port_text(
+    state: &SharedState,
+    app: &AppHandle,
     text: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2707,16 +2612,15 @@ pub(crate) fn set_ipc_port_text<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) async fn start_ipc_server<R: Runtime>(
-    state: State<'_, SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) async fn start_ipc_server(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if s.ipc_server.is_none() {
         if let Ok(port) = s.ipc_port_text.trim().parse::<u16>() {
             let (tx, rx) = tokio::sync::watch::channel(false);
-            s.ipc_server = Some(tauri::async_runtime::spawn(
+            s.ipc_server = Some(crate::async_runtime::spawn(
                 blockwork_core::ipc::run_server(port, rx),
             ));
             s.ipc_shutdown_tx = Some(tx);
@@ -2727,10 +2631,9 @@ pub(crate) async fn start_ipc_server<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn stop_ipc_server<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn stop_ipc_server(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(tx) = s.ipc_shutdown_tx.take() {
@@ -2744,10 +2647,9 @@ pub(crate) fn stop_ipc_server<R: Runtime>(
     Ok(())
 }
 
-#[tauri::command]
-pub(crate) fn set_ipc_auto_start<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn set_ipc_auto_start(
+    state: &SharedState,
+    app: &AppHandle,
     enabled: bool,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2759,35 +2661,24 @@ pub(crate) fn set_ipc_auto_start<R: Runtime>(
 
 // ─── System tray ────────────────────────────────────────────────────────────
 
-#[tauri::command]
 pub(crate) fn set_close_to_tray(
-    state: State<SharedState>,
-    app: tauri::AppHandle,
+    state: &SharedState,
+    app: &AppHandle,
     enabled: bool,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.close_to_tray = enabled;
     config::update_settings(|settings| settings.close_to_tray = Some(enabled));
-    if enabled {
-        if s.tray_icon.is_none() {
-            match crate::tray::build(&app) {
-                Ok(icon) => s.tray_icon = Some(icon),
-                Err(e) => warn!("Failed to create tray icon: {e}"),
-            }
-        }
-    } else {
-        s.tray_icon = None;
-    }
-    emit_state_updated(&app, &s);
+    app.send(crate::Event::CloseToTray(enabled));
+    emit_state_updated(app, &s);
     Ok(())
 }
 
 // ─── Updates (Windows/macOS) ───────────────────────────────────────────────
 
-#[tauri::command]
-pub(crate) fn check_for_updates<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn check_for_updates(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     {
         let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2796,15 +2687,15 @@ pub(crate) fn check_for_updates<R: Runtime>(
     }
     let state_clone = Arc::clone(&*state);
     let app_clone = app.clone();
-    tauri::async_runtime::spawn(async move {
+    crate::async_runtime::spawn(async move {
         check_for_updates_internal(&state_clone, &app_clone).await;
     });
     Ok(())
 }
 
-pub(crate) async fn check_for_updates_internal<R: Runtime>(
+pub(crate) async fn check_for_updates_internal(
     state: &SharedState,
-    app: &tauri::AppHandle<R>,
+    app: &AppHandle,
 ) {
     #[cfg(any(windows, target_os = "macos"))]
     {
@@ -2831,10 +2722,9 @@ pub(crate) async fn check_for_updates_internal<R: Runtime>(
     }
 }
 
-#[tauri::command]
-pub(crate) fn apply_update<R: Runtime>(
-    state: State<SharedState>,
-    app: tauri::AppHandle<R>,
+pub(crate) fn apply_update(
+    state: &SharedState,
+    app: &AppHandle,
 ) -> Result<(), String> {
     {
         let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -2845,7 +2735,7 @@ pub(crate) fn apply_update<R: Runtime>(
     {
         let state_clone = Arc::clone(&*state);
         let app_clone = app.clone();
-        tauri::async_runtime::spawn(async move {
+        crate::async_runtime::spawn(async move {
             let version = env!("CARGO_PKG_VERSION").to_string();
             let result = tokio::task::spawn_blocking(move || {
                 blockwork_core::updater::apply_update(&version)
@@ -2853,7 +2743,7 @@ pub(crate) fn apply_update<R: Runtime>(
             .await
             .unwrap_or_else(|e| Err(e.to_string()));
             match result {
-                Ok(_) => std::process::exit(0),
+                Ok(_) => app_clone.send(crate::Event::Quit),
                 Err(e) => {
                     if let Ok(mut s) = state_clone.lock() {
                         s.update_check_state = UpdateCheckState::Error(e);
@@ -2868,9 +2758,9 @@ pub(crate) fn apply_update<R: Runtime>(
 
 // ─── Hotkey action handler (called from QueueSignal task) ──────────────────
 
-pub(crate) fn handle_hotkey_action<R: Runtime>(
+pub(crate) fn handle_hotkey_action(
     state: &SharedState,
-    app: &tauri::AppHandle<R>,
+    app: &AppHandle,
     action: HotkeyAction,
 ) {
     match &action {
@@ -2918,7 +2808,7 @@ pub(crate) fn handle_hotkey_action<R: Runtime>(
             }
         }
         HotkeyAction::StopLoop => {
-            // Clears every in-flight run's stop flag, not just loop mode's —
+            // Clears every in-flight run's stop flag, not just loop mode's -
             // a single run has its own stop flag that `is_looping` doesn't reach.
             let cleared = blockwork_core::macros::run_registry::stop_all();
             tracing::info!(cleared, "StopLoop hotkey handled");
@@ -2992,7 +2882,7 @@ pub(crate) fn handle_hotkey_action<R: Runtime>(
         }
         HotkeyAction::StopRecording => {
             // Handled directly in recording::start_grab_thread while active;
-            // reached here only if pressed while idle — no-op.
+            // reached here only if pressed while idle - no-op.
         }
         HotkeyAction::Undo => {
             let _ = perform_undo(state, app);
@@ -3003,7 +2893,7 @@ pub(crate) fn handle_hotkey_action<R: Runtime>(
     }
 }
 
-fn run_macro_task<R: Runtime>(
+fn run_macro_task(
     mac: Macro,
     emulator: Arc<std::sync::Mutex<dyn blockwork_core::macros::backend::InputBackend>>,
     is_looping: Arc<std::sync::Mutex<bool>>,
@@ -3011,7 +2901,7 @@ fn run_macro_task<R: Runtime>(
     speed_multiplier: f64,
     variables: VariableStore,
     state: SharedState,
-    app: tauri::AppHandle<R>,
+    app: AppHandle,
 ) {
     // Kept alive past the move into the task so the pre-run focus/modifier
     // cleanup can play its releases through the very backend the run will use.
@@ -3024,7 +2914,7 @@ fn run_macro_task<R: Runtime>(
         }
         let loop_flag = Arc::clone(&is_looping);
         // `into_loop_task` already loops until `loop_flag` clears and
-        // persists final variable values — no need to hand-roll it here.
+        // persists final variable values - no need to hand-roll it here.
         let task = macros_thread::into_loop_task(
             mac,
             emulator,
@@ -3071,11 +2961,10 @@ fn run_macro_task<R: Runtime>(
 // ─── Open App picker ────────────────────────────────────────────────────────
 
 /// Lists installed applications for the "Open App" instruction's picker
-/// popup — see `installed_apps`. `async` so scanning `.desktop`/icon-theme
+/// popup - see `installed_apps`. `async` so scanning `.desktop`/icon-theme
 /// files (Linux) or walking the Start Menu (Windows) doesn't block the main
 /// thread; stateless, so unlike almost every other command here it doesn't
 /// take `State<SharedState>` at all.
-#[tauri::command]
 pub(crate) async fn list_installed_apps() -> Vec<crate::state::AppEntryDto> {
     crate::installed_apps::list_apps()
         .into_iter()
@@ -3094,7 +2983,7 @@ mod value_location_tests {
     use blockwork_core::input::value::Op;
     use blockwork_core::macros::{BlockShape, InputValueType};
 
-    /// A flat, non-nested `InstrPath` — the shape every location was
+    /// A flat, non-nested `InstrPath` - the shape every location was
     /// addressed by before nested `If`/`IfElse` bodies existed.
     fn top(index: usize) -> Vec<PathStep> {
         vec![PathStep { index, slot: None }]

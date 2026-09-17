@@ -5,7 +5,7 @@ import { state } from '../store';
 
 // Vue only creates each banner's DOM node once when it flips from hidden to
 // shown (v-if), so applying the entrance animation class unconditionally
-// still only plays it once per appearance — no manual "already shown"
+// still only plays it once per appearance - no manual "already shown"
 // bookkeeping needed here (unlike the original's full-rebuild-per-render
 // vanilla version, which had to track this by hand).
 const grabMissing = computed(() => !state.grab_available);

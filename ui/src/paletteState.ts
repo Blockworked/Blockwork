@@ -1,7 +1,4 @@
-// Ephemeral, client-only state for the sidebar's "prefab" blocks — what an
-// instruction/value block looks like while it sits in the palette. Never
-// touches the backend or persists, and isn't macro-scoped. Cloned onto the
-// canvas via clonePaletteInstruction/paletteValueFor when dragged out.
+// Sidebar prefab state. Cloned onto the canvas when dragged out.
 import { reactive } from 'vue';
 import { defaultInstruction, defaultValueForKind, newId, numberValue, textValue } from './types';
 import type { InstructionDto, InstructionType, ValueDto, ValueKind } from './types';
@@ -18,8 +15,6 @@ export const paletteInstructions: Record<InstructionType, InstructionDto> = reac
   Object.fromEntries(INSTRUCTION_TYPES.map(t => [t, defaultInstruction(t)])) as Record<InstructionType, InstructionDto>,
 );
 
-/** Deep snapshot of a prefab's current state — later palette edits must not
- * retroactively mutate blocks already dropped onto the canvas. */
 export function clonePaletteInstruction(type: InstructionType): InstructionDto {
   return { ...JSON.parse(JSON.stringify(paletteInstructions[type])), id: newId() };
 }
@@ -31,7 +26,7 @@ function argsFor(spec: OperatorKindSpec): (number | string)[] {
 }
 
 // Every operator prefab carries its own editable arg list (numbers or text
-// per its `argTypes`) — no nesting, since the sidebar is never a valid drop
+// per its `argTypes`) - no nesting, since the sidebar is never a valid drop
 // target (see isOverSidebar), so these always stay plain leaves.
 export const paletteOperatorArgs: Record<OperatorValueKind, (number | string)[]> = reactive(
   Object.fromEntries(OPERATOR_KINDS.map(s => [s.kind, argsFor(s)])) as Record<OperatorValueKind, (number | string)[]>,
@@ -43,7 +38,7 @@ export const paletteNumber = reactive({ value: numberSeed.kind === 'Number' ? nu
 export const paletteText = reactive({ value: textSeed.kind === 'Text' ? textSeed.value : '' });
 
 /** Applies an edit blockstitch's generic `PaletteValueBlock` made (via its
- * `update:value` emit) back onto this kind's own persisted draft state —
+ * `update:value` emit) back onto this kind's own persisted draft state -
  * the inverse of `paletteValueFor`. No-op for `Var:`/`Param:` kinds, which
  * have nothing to edit. */
 export function applyPaletteValueEdit(kind: ValueKind, next: ValueDto): void {
@@ -67,7 +62,7 @@ export function applyPaletteValueEdit(kind: ValueKind, next: ValueDto): void {
 }
 
 /** The ValueDto a value-palette entry currently represents, built from its
- * live edited state — what lands on the canvas when dragged out. */
+ * live edited state - what lands on the canvas when dragged out. */
 export function paletteValueFor(kind: ValueKind): ValueDto {
   if (kind === 'Number') return numberValue(paletteNumber.value);
   if (kind === 'Text') return textValue(paletteText.value);
@@ -81,7 +76,7 @@ export function paletteValueFor(kind: ValueKind): ValueDto {
     args: args.map((v, i) => {
       const argType = spec.argTypes[i];
       if (argType === 'text') return textValue(String(v));
-      // No editable palette leaf for booleans — blank, same as
+      // No editable palette leaf for booleans - blank, same as
       // defaultArgFor's fallback for a bool-typed slot.
       if (argType === 'bool') return { kind: 'Bool' };
       return numberValue(Number(v));

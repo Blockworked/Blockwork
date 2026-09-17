@@ -12,6 +12,11 @@
       } catch (e) {}
     })();
   </script>
+  <!-- Theme background before any CSS loads (matches --blockstitch-bg). -->
+  <style>
+    html { background: #1c1c1e; }
+    html[data-theme="light"] { background: #f2f2f5; }
+  </style>
 </head>
 <body>
 <div id="app"></div>

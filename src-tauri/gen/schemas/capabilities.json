@@ -1,1 +1,1 @@
-{"main":{"identifier":"main","description":"Main window capability — grants access to core IPC and all app commands.","local":true,"windows":["main*"],"permissions":["core:default"]}}
+{"main":{"identifier":"main","description":"Main window capability - grants access to core IPC and all app commands.","local":true,"windows":["main*"],"permissions":["core:default"]}}

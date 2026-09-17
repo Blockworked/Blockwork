@@ -10,7 +10,7 @@ const props = defineProps<{
   path: InstrPath;
   instruction: Extract<InstructionDto, { type: 'If' }>;
   // 'head' renders into InstructionRow.vue's `.wrap-head-line`; 'body' is
-  // this component's own `.wrap-mouth` — see the big comment on
+  // this component's own `.wrap-mouth` - see the big comment on
   // .instruction-row-wrap in style.css for why a wrap block is a stack of
   // independently-shaped bars around hollow mice, not one filled row.
   part: 'head' | 'body';

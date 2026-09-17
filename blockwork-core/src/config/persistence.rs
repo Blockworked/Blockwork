@@ -11,7 +11,7 @@ const MACRO_FILE_EXTENSION: &str = "json";
 
 /// Per-id cache of the last parse, keyed off the file's mtime at parse time.
 /// Exists so a long-lived, stateless reader (the Linux Wine bridge process,
-/// which re-resolves the active macro on every single `RunMacro` dispatch —
+/// which re-resolves the active macro on every single `RunMacro` dispatch -
 /// i.e. every level attempt) doesn't re-read-and-reparse the same JSON file
 /// from disk on every attempt. A `stat()` to check mtime still happens every
 /// call (cheap, low-variance) so an external edit (the desktop app saving a
@@ -50,7 +50,7 @@ pub fn read_macro_file(path: &Path) -> Result<Macro, String> {
 }
 
 /// Reads and parses the single macro file for `id` directly, without
-/// scanning or parsing every other macro in the directory — `get_macro_by_id`
+/// scanning or parsing every other macro in the directory - `get_macro_by_id`
 /// used to go through `get_macros_from_config()`, which does exactly that
 /// fan-out for what's ultimately a single lookup. Backed by `MACRO_CACHE`:
 /// skips the read+parse entirely when the file's mtime matches what's

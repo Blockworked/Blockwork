@@ -11,7 +11,7 @@ use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 pub static RECORDING_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// Whether mouse movement is captured into the recording at all. Off by
-/// default — most recordings care about clicks/keys, and movement floods
+/// default - most recordings care about clicks/keys, and movement floods
 /// the instruction list with a token per pixel of travel.
 pub static RECORD_MOUSE_MOVEMENT: AtomicBool = AtomicBool::new(false);
 pub static RECORD_MOUSE_RELATIVE: AtomicBool = AtomicBool::new(false);
@@ -61,7 +61,7 @@ static HW_ELAPSED_OFFSET: OnceLock<Mutex<Duration>> = OnceLock::new();
 static HOTKEY_TABLE: OnceLock<RwLock<Vec<HotkeyBinding>>> = OnceLock::new();
 
 /// Armed when a `StartRecordingImmediate` combo is pressed, so recording waits
-/// until every key in the combo releases — otherwise those key-ups get recorded.
+/// until every key in the combo releases - otherwise those key-ups get recorded.
 struct PendingRecordStart {
     mods_mask: u8,
     trigger_key: MacroKey,
@@ -141,7 +141,7 @@ pub fn update_hotkey_table(bindings: Vec<HotkeyBinding>) {
 }
 
 /// Anchors both clocks to the moment recording actually starts, rather than
-/// lazily to the first event — so the gap before the first captured input
+/// lazily to the first event - so the gap before the first captured input
 /// becomes a leading `Wait` instead of being dropped.
 pub fn reset_timing() {
     if let Ok(mut t) = BASELINE_NOW.get_or_init(|| Mutex::new(None)).lock() {
@@ -242,7 +242,7 @@ fn stop_recording_key() -> Option<String> {
 /// instead (e.g. the Wine bridge, which gets real input from a native
 /// Linux helper process rather than from `WH_KEYBOARD_LL`/`WH_MOUSE_LL`,
 /// which don't see real host input under Wine). Identical recording-queue
-/// bookkeeping and cursor tracking either way — this is the one place that
+/// bookkeeping and cursor tracking either way - this is the one place that
 /// logic lives.
 pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp) -> CaptureDecision + Send + 'static> {
     Box::new(move |event: CaptureEvent, ts: CaptureTimestamp| {
@@ -281,7 +281,7 @@ pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp)
 
             if RECORDING_ACTIVE.load(Ordering::Relaxed) {
                 // The configured (combo-less) StopRecording key stops recording.
-                // Escape has no special status — it's just the shipped default binding.
+                // Escape has no special status - it's just the shipped default binding.
                 if let CaptureEvent::KeyPress(key) = &event {
                     let is_stop_key = key
                         .hotkey_name()
@@ -316,7 +316,7 @@ pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp)
             }
 
             // Hotkey detection (only when not recording), against the physical
-            // keys the backend reports — no OS-level hotkey registration involved.
+            // keys the backend reports - no OS-level hotkey registration involved.
             if let CaptureEvent::KeyPress(key) = &event {
                 if !key.is_modifier() {
                     if let Some(name) = key.hotkey_name() {
@@ -348,7 +348,7 @@ pub fn start_grab_thread() {
 }
 
 /// `prev_pos` is the tracked absolute cursor position from just before this
-/// event was applied (see `build_capture_callback`) — used to convert
+/// event was applied (see `build_capture_callback`) - used to convert
 /// between relative deltas and absolute coordinates, whichever the event
 /// itself isn't already expressed in, based on `RECORD_MOUSE_RELATIVE`.
 /// Mouse movement is dropped entirely unless `RECORD_MOUSE_MOVEMENT` is set.
@@ -389,7 +389,7 @@ fn capture_event_to_instruction(event: &CaptureEvent, prev_pos: Option<(f64, f64
                 // `CaptureEvent` doc comment), so absolute recording is built
                 // by walking this delta against the tracked cursor position.
                 // Without a seeded baseline yet, there's nothing to add the
-                // delta onto — drop rather than record a bogus position.
+                // delta onto - drop rather than record a bogus position.
                 let (x, y) = prev_pos?;
                 InstructionKind::Token(InputToken::MoveMouse(Value::number(x + *dx as f64), Value::number(y + *dy as f64), Coordinate::Abs))
             }
