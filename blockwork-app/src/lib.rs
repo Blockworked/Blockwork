@@ -104,6 +104,8 @@ impl Backend {
         let app = AppHandle { events };
 
         let settings = config::load_settings();
+        let absolute_mouse_position_available =
+            blockwork_core::macros::backend::absolute_mouse_position_available();
         let initial_state = AppState {
             macro_selected: None,
             current_macro: None,
@@ -130,8 +132,16 @@ impl Backend {
             text_edit_session: None,
             recording_phase: RecordingPhase::Idle,
             recording_countdown_generation: 0,
-            record_mouse_relative: settings.record_mouse_relative.unwrap_or(true),
+            // Without XWayland, Linux has no accurate global position source.
+            // Keep a saved absolute preference for a future supported session,
+            // but force this one to record relative movement instead.
+            record_mouse_relative: if absolute_mouse_position_available {
+                settings.record_mouse_relative.unwrap_or(true)
+            } else {
+                true
+            },
             record_mouse_movement: settings.record_mouse_movement.unwrap_or(false),
+            absolute_mouse_position_available,
             page: Page::Main,
             combo_capture: None,
             hotkey_bindings: vec![],

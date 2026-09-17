@@ -42,6 +42,20 @@ pub trait InputBackend: Send + 'static {
     fn cursor_pos(&self) -> Option<(i32, i32)>;
 }
 
+/// Whether this session has an accurate global cursor-position source for
+/// absolute mouse recording. Linux currently uses XWayland for that source.
+pub fn absolute_mouse_position_available() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        x11_cursor::is_available()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        true
+    }
+}
+
 /// Start the global input capture thread for the current platform. The
 /// callback is called for each input event and returns whether to suppress it.
 pub fn start_capture(

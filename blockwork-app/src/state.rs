@@ -171,6 +171,7 @@ pub(crate) struct AppState {
     pub(crate) recording_countdown_generation: u64,
     pub(crate) record_mouse_relative: bool,
     pub(crate) record_mouse_movement: bool,
+    pub(crate) absolute_mouse_position_available: bool,
     pub(crate) page: Page,
     pub(crate) combo_capture: Option<ComboCapture>,
     pub(crate) hotkey_bindings: Vec<HotkeyBinding>,
@@ -210,6 +211,7 @@ pub(crate) struct StateDto {
     pub(crate) recording_phase: RecordingPhaseDto,
     pub(crate) record_mouse_relative: bool,
     pub(crate) record_mouse_movement: bool,
+    pub(crate) absolute_mouse_position_available: bool,
     pub(crate) page: String,
     pub(crate) combo_capture: Option<ComboCaptureDto>,
     pub(crate) hotkey_bindings: Vec<HotkeyBindingDto>,
@@ -1404,6 +1406,7 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         recording_phase,
         record_mouse_relative: s.record_mouse_relative,
         record_mouse_movement: s.record_mouse_movement,
+        absolute_mouse_position_available: s.absolute_mouse_position_available,
         page: match s.page {
             Page::Main => "Main".to_string(),
             Page::Settings => "Settings".to_string(),

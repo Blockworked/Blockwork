@@ -38,9 +38,6 @@ fn validate_dir(dir: &Path) -> io::Result<()> {
             continue;
         }
         let m = parent.symlink_metadata()?;
-        if m.file_type().is_symlink() && m.uid() != 0 {
-            return Err(denied());
-        }
         if m.uid() != 0 && m.uid() != uid() {
             return Err(denied());
         }
@@ -215,7 +212,7 @@ mod tests {
     }
 
     #[tokio::test]
-    async fn rejects_public_directory_and_symlink() {
+    async fn rejects_public_directory_but_allows_private_ancestor_symlink() {
         let tmp = Temp::new();
         std::fs::set_permissions(&tmp.0, std::fs::Permissions::from_mode(0o777)).unwrap();
         assert_eq!(
@@ -223,9 +220,16 @@ mod tests {
             io::ErrorKind::PermissionDenied
         );
         std::fs::set_permissions(&tmp.0, std::fs::Permissions::from_mode(0o700)).unwrap();
-        let link = tmp.0.join("link");
-        std::os::unix::fs::symlink(&tmp.0, &link).unwrap();
-        assert!(Listener::bind_path(link.join("daemon.sock")).await.is_err());
+        let real = tmp.0.join("real");
+        std::fs::DirBuilder::new()
+            .mode(0o700)
+            .create(&real)
+            .unwrap();
+        let link = tmp.0.join("app");
+        std::os::unix::fs::symlink(&real, &link).unwrap();
+        Listener::bind_path(link.join("runtime").join("daemon.sock"))
+            .await
+            .unwrap();
     }
 
     #[tokio::test]

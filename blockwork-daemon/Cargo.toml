@@ -11,9 +11,10 @@ tracing-subscriber.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net", "io-util", "time", "sync"] }
 dirs.workspace = true
-# libxdo only backs predefined Copy/Paste menu items, which the tray menu
-# doesn't use (and the Flatpak runtime doesn't ship).
-tray-icon = { version = "0.24.2", default-features = false, features = ["gtk"] }
+# Native Linux builds use libappindicator. Flatpak uses ksni directly because
+# it must avoid owning a well-known D-Bus name inside the sandbox.
+tray-icon = { version = "0.25", default-features = false, features = ["libappindicator"] }
+ksni = { version = "0.3.6", default-features = false, features = ["blocking", "tokio"] }
 tao = "0.37"
 png = "0.18"
 axum = { workspace = true, optional = true }

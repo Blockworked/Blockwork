@@ -26,6 +26,11 @@ fn connection() -> Option<&'static (RustConnection, usize)> {
     CONN.get_or_init(|| x11rb::connect(None).ok()).as_ref()
 }
 
+/// Whether an X server is reachable for accurate global cursor queries.
+pub fn is_available() -> bool {
+    connection().is_some()
+}
+
 pub fn query_cursor_pos() -> Option<(i32, i32)> {
     let (conn, screen_num) = connection()?;
     let root = conn.setup().roots.get(*screen_num)?.root;

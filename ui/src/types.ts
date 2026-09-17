@@ -400,6 +400,7 @@ export interface StateDto {
   recording_phase: RecordingPhaseDto;
   record_mouse_relative: boolean;
   record_mouse_movement: boolean;
+  absolute_mouse_position_available: boolean;
   page: PageName;
   combo_capture: ComboCaptureDto | null;
   hotkey_bindings: HotkeyBindingDto[];
@@ -435,6 +436,7 @@ export function emptyState(): StateDto {
     recording_phase: { phase: 'Idle', countdown: null },
     record_mouse_relative: true,
     record_mouse_movement: false,
+    absolute_mouse_position_available: true,
     page: 'Main',
     combo_capture: null,
     hotkey_bindings: [],

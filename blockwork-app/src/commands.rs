@@ -2377,6 +2377,9 @@ pub(crate) fn toggle_record_mouse_relative(
     relative: bool,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
+    if !relative && !s.absolute_mouse_position_available {
+        return Err("Absolute mouse recording requires an available XWayland display.".to_string());
+    }
     s.record_mouse_relative = relative;
     recording::RECORD_MOUSE_RELATIVE.store(relative, Ordering::Relaxed);
     config::update_settings(|settings| settings.record_mouse_relative = Some(relative));
