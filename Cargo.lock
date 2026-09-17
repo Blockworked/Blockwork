@@ -382,7 +382,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "blockwork-protocol",
  "dirs 7.0.0",
@@ -400,7 +400,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-app"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "base64 0.23.1",
  "blockwork-core",
@@ -415,7 +415,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-core"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "bincode",
  "chrono",
@@ -442,7 +442,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-daemon"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "axum",
  "blockwork-app",
@@ -460,7 +460,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-ffi"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "blockwork-core",
  "cbindgen",
@@ -473,7 +473,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-linux-bridge"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "blockwork-core",
  "evdev",
@@ -484,7 +484,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-protocol"
-version = "0.5.3"
+version = "0.5.4"
 dependencies = [
  "dirs 7.0.0",
  "libc",
