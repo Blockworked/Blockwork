@@ -1,0 +1,129 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<!-- Copyright 2026 Ethan Stokes -->
+<component type="desktop-application">
+  <id>com.blockworked.Blockwork</id>
+
+  <metadata_license>CC0-1.0</metadata_license>
+  <project_license>GPL-3.0-only</project_license>
+
+  <name>Blockwork</name>
+  <summary>Create and manage macros</summary>
+
+  <developer id="com.blockworked">
+    <name>Blockworked</name>
+  </developer>
+
+  <description>
+    <p>
+      Blockwork lets you build keyboard and mouse macros by snapping blocks
+      together, without writing any code. Record your input and turn it into
+      editable blocks, or assemble a sequence by hand, then play it back with
+      a global hotkey.
+    </p>
+    <ul>
+      <li>Record keyboard and mouse input, including mouse movement</li>
+      <li>Loops, If / If-Else blocks, variables, and operators</li>
+      <li>Wait blocks with randomized timing</li>
+      <li>Reusable custom blocks with custom colors</li>
+      <li>Global hotkeys to start and stop macros</li>
+    </ul>
+    <p>
+      **Recording input and hotkeys requires your user to be in the input group. See the Help link for setup steps.**
+    </p>
+  </description>
+
+  <launchable type="desktop-id">com.blockworked.Blockwork.desktop</launchable>
+
+  <url type="homepage">https://github.com/Blockworked/Blockwork</url>
+  <url type="bugtracker">https://github.com/Blockworked/Blockwork/issues</url>
+  <url type="vcs-browser">https://github.com/Blockworked/Blockwork</url>
+  <url type="help">https://github.com/Blockworked/Blockwork#linux</url>
+
+  <content_rating type="oars-1.1" />
+
+  <branding>
+    <color type="primary" scheme_preference="light">#f7c77e</color>
+    <color type="primary" scheme_preference="dark">#7a4a12</color>
+  </branding>
+
+  <requires>
+    <control>keyboard</control>
+    <control>pointing</control>
+    <display_length compare="ge">768</display_length>
+  </requires>
+
+  <screenshots>
+    <screenshot type="default">
+      <image>https://raw.githubusercontent.com/Blockworked/Blockwork/0.5.4/res/screenshots/editor.png</image>
+      <caption>Building a macro in the block editor</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Blockworked/Blockwork/0.5.4/res/screenshots/recording.png</image>
+      <caption>Recording keyboard and mouse input</caption>
+    </screenshot>
+    <screenshot>
+      <image>https://raw.githubusercontent.com/Blockworked/Blockwork/0.5.4/res/screenshots/settings.png</image>
+      <caption>Configuring global and per-macro hotkeys</caption>
+    </screenshot>
+  </screenshots>
+
+  <releases>
+    <release version="0.5.3" date="2026-09-14">
+      <description>
+        <p>The project has moved to the Blockworked organization on GitHub.</p>
+      </description>
+    </release>
+    <release version="0.5.2" date="2026-09-14">
+      <description>
+        <p>Blockwork can now update itself on macOS.</p>
+      </description>
+    </release>
+    <release version="0.5.1" date="2026-09-13">
+      <description>
+        <p>Custom blocks were reworked and can now be given their own colors. The sidebar shows the correct operator type.</p>
+      </description>
+    </release>
+    <release version="0.5.0" date="2026-09-04">
+      <description>
+        <p>The app is now called Blockwork, with a new logo and a smoother block editor with better pan, zoom, and dragging.</p>
+        <ul>
+          <li>Loops, booleans, and If / If-Else blocks</li>
+          <li>Time and date blocks, app open and quit blocks, and a battery event</li>
+          <li>Mouse movement recording</li>
+          <li>A system tray icon</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.4.0" date="2026-07-30">
+      <description>
+        <p>Macros are now built in a Scratch-like block editor. Variables show a live preview of their value, and new operators include Join, Random, and text blocks.</p>
+        <p>Hotkeys no longer stop working after switching windows with Alt+Tab.</p>
+      </description>
+    </release>
+    <release version="0.3.1" date="2026-07-07">
+      <description>
+        <p>Settings and macros are stored in a new config directory layout.</p>
+      </description>
+    </release>
+    <release version="0.3.0" date="2026-06-20">
+      <description>
+        <p>Global hotkeys can now be recorded, macros can be force-quit, and playback timing is more precise. Wait blocks accept fractional seconds and an optional random variance.</p>
+      </description>
+    </release>
+    <release version="0.2.1" date="2026-06-05">
+      <description>
+        <p>The run-script block can now run any command, and you are warned if your user is not in the input group.</p>
+      </description>
+    </release>
+    <release version="0.2.0" date="2026-05-20">
+      <description>
+        <p>Added input recording, custom hotkey settings, undo and redo, comments, and relative mouse movement. Large macros are faster to edit.</p>
+      </description>
+    </release>
+    <release version="0.1.0" date="2026-05-15">
+      <description>
+        <p>First release.</p>
+      </description>
+    </release>
+  </releases>
+</component>

@@ -1,5 +1,6 @@
 pub mod battery;
 pub mod config;
+pub mod flatpak;
 pub mod hotkey_types;
 pub mod input;
 #[cfg(feature = "ipc")]

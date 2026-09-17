@@ -24,11 +24,9 @@ fn persist_variables<R: Runtime>(shared_state: &SharedState, app: &AppHandle<R>,
         }
         (mac.clone(), build_state_dto(&s))
     };
-    // Saved after the state lock is released. This runs every time a macro
-    // run or loop finishes — right when GD is likely to fire the next
-    // start/run command over IPC — and that command needs this same lock
-    // just to touch its own state, so holding it through a disk write here
-    // was enough to make the next command's timing land inconsistently.
+    // Saved after the state lock is released: this runs right when an IPC
+    // client is likely to fire the next start/run command, which needs this
+    // same lock, so holding it through a disk write made timing inconsistent.
     if let Err(e) = mac_to_save.save() {
         warn!("Failed to persist variable values: {e}");
     }

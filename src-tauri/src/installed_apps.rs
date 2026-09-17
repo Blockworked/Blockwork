@@ -1,8 +1,8 @@
 //! Enumerates locally installed applications for the "Open App" instruction's
-//! picker popup — desktop-app-only concern (unlike the cross-platform
-//! `InstructionKind::OpenApp` itself, which just launches whatever `command`
-//! string this produced and never re-scans anything), so this lives here
-//! rather than in `blockwork-core`.
+//! picker popup — desktop-app-only concern (the cross-platform
+//! `InstructionKind::OpenApp` just launches whatever `command` string this
+//! produced, never re-scans), so this lives here rather than in
+//! `blockwork-core`.
 //!
 //! Icon support is currently Linux-only: freedesktop `.desktop` entries name
 //! an icon theme lookup key, which resolves fairly reliably to a `.png`/
@@ -45,11 +45,8 @@ mod linux {
     use std::path::{Path, PathBuf};
 
     /// Every `applications/` directory the freedesktop menu spec says to
-    /// search, most-specific (user overrides) last so `seen_ids` lets an
-    /// earlier, more sensitive-in-priority terms win — but as of writing we
-    /// just take the first `.desktop` file we see per id and skip the rest,
-    /// which is the opposite; that's fine here since we don't need override
-    /// semantics, just "don't list the same app id twice".
+    /// search. `seen_ids` just dedupes by app id (first `.desktop` file
+    /// wins) — no override semantics needed here.
     fn application_dirs() -> Vec<PathBuf> {
         let mut dirs = Vec::new();
         match std::env::var("XDG_DATA_DIRS") {
@@ -65,7 +62,21 @@ mod linux {
         dirs
     }
 
+    /// A parsed `.desktop` entry whose `Icon=` value hasn't been resolved to
+    /// a file yet — resolution differs between native and Flatpak listings.
+    struct DesktopEntry {
+        name: String,
+        command: String,
+        icon: Option<String>,
+    }
+
     pub(crate) fn list_apps() -> Vec<AppEntry> {
+        let mut apps = if blockwork_core::flatpak::is_flatpak() { host::list_apps() } else { list_local_apps() };
+        apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        apps
+    }
+
+    fn list_local_apps() -> Vec<AppEntry> {
         let mut seen_ids = HashSet::new();
         let mut apps = Vec::new();
         for dir in application_dirs() {
@@ -79,20 +90,21 @@ mod linux {
                 if !seen_ids.insert(id) {
                     continue;
                 }
-                if let Some(app) = parse_desktop_entry(&path) {
-                    apps.push(app);
-                }
+                let Some(entry) = fs::read_to_string(&path).ok().and_then(|c| parse_desktop_entry(&c)) else { continue };
+                apps.push(AppEntry {
+                    name: entry.name,
+                    command: entry.command,
+                    icon: entry.icon.and_then(|i| resolve_icon(&i)),
+                });
             }
         }
-        apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         apps
     }
 
     /// Reads the handful of keys we care about out of a `.desktop` file's
     /// `[Desktop Entry]` section — a purpose-built scan rather than a general
     /// INI parser, since that's all this needs.
-    fn parse_desktop_entry(path: &Path) -> Option<AppEntry> {
-        let content = fs::read_to_string(path).ok()?;
+    fn parse_desktop_entry(content: &str) -> Option<DesktopEntry> {
         let mut in_main_section = false;
         let mut name = None;
         let mut exec = None;
@@ -135,8 +147,7 @@ mod linux {
         if command.is_empty() {
             return None;
         }
-        let icon = icon.and_then(|i| resolve_icon(&i));
-        Some(AppEntry { name, command, icon })
+        Some(DesktopEntry { name, command, icon })
     }
 
     /// Strips freedesktop field codes (`%f`/`%F`/`%u`/`%U`/etc.) from an
@@ -212,16 +223,166 @@ mod linux {
     }
 
     fn icon_file_to_data_uri(path: &Path) -> Option<String> {
-        let mime = match path.extension().and_then(|e| e.to_str()) {
-            Some("svg") => "image/svg+xml",
-            Some("png") => "image/png",
-            // .xpm and other legacy formats aren't natively displayable by
-            // an <img> tag without decoding/re-encoding first.
-            _ => return None,
-        };
+        let mime = icon_mime(path.extension().and_then(|e| e.to_str())?)?;
         let bytes = fs::read(path).ok()?;
         use base64::Engine;
         Some(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
+    }
+
+    fn icon_mime(extension: &str) -> Option<&'static str> {
+        match extension {
+            "svg" => Some("image/svg+xml"),
+            "png" => Some("image/png"),
+            // .xpm and other legacy formats aren't natively displayable by
+            // an <img> tag without decoding/re-encoding first.
+            _ => None,
+        }
+    }
+
+    /// Listing from inside a Flatpak sandbox, where the host's desktop files
+    /// and icon themes aren't mounted. Everything is read on the host
+    /// through `flatpak-spawn --host` instead, in two batched calls (all
+    /// desktop files, then all icons) rather than one spawn per file. Using
+    /// the host's own `XDG_DATA_DIRS` also picks up apps installed as
+    /// Flatpaks that the native listing only sees if exported.
+    mod host {
+        use super::{AppEntry, icon_mime, parse_desktop_entry};
+        use std::collections::{HashMap, HashSet};
+
+        /// Separates records in the scripts' output: an ASCII record
+        /// separator can't appear in a desktop file or base64.
+        const RECORD: char = '\x1e';
+
+        /// Prints every `applications/*.desktop` file in the host's data dirs
+        /// as `RECORD <file name>\n<contents>`, in the same order as the
+        /// native `application_dirs()`.
+        const LIST_DESKTOP_FILES: &str = r#"
+data_home=${XDG_DATA_HOME:-$HOME/.local/share}
+IFS=:
+for dir in ${XDG_DATA_DIRS:-/usr/local/share:/usr/share} $data_home; do
+    for file in "$dir"/applications/*.desktop; do
+        [ -f "$file" ] || continue
+        printf '\036%s\n' "${file##*/}"
+        cat "$file"
+        echo
+    done
+done
+"#;
+
+        /// For each icon name argument, prints `RECORD <name>\n<ext>\n<base64>`
+        /// for the first file found, probing the same theme/size layout as
+        /// the native `find_icon_file`.
+        const READ_ICONS: &str = r#"
+nl='
+'
+data_home=${XDG_DATA_HOME:-$HOME/.local/share}
+bases="$data_home/icons$nl$HOME/.icons"
+IFS=:
+for dir in ${XDG_DATA_DIRS:-/usr/local/share:/usr/share}; do
+    bases="$bases$nl$dir/icons"
+done
+IFS=$nl
+
+find_icon() {
+    case $1 in
+        /*) [ -f "$1" ] && printf '%s' "$1"; return ;;
+    esac
+    for base in $bases; do
+        for theme in hicolor Adwaita gnome breeze Papirus; do
+            for size in scalable 256x256 128x128 96x96 64x64 48x48 32x32; do
+                for ext in svg png; do
+                    if [ -f "$base/$theme/$size/apps/$1.$ext" ]; then
+                        printf '%s' "$base/$theme/$size/apps/$1.$ext"
+                        return
+                    fi
+                done
+            done
+        done
+    done
+    for dir in /usr/share/pixmaps /usr/local/share/pixmaps; do
+        for ext in svg png; do
+            if [ -f "$dir/$1.$ext" ]; then
+                printf '%s' "$dir/$1.$ext"
+                return
+            fi
+        done
+    done
+}
+
+for name in "$@"; do
+    file=$(find_icon "$name")
+    [ -n "$file" ] || continue
+    printf '\036%s\n%s\n' "$name" "${file##*.}"
+    base64 "$file" | tr -d '\n'
+done
+"#;
+
+        pub(super) fn list_apps() -> Vec<AppEntry> {
+            let Some(output) = run_host_script(LIST_DESKTOP_FILES, &[]) else { return Vec::new() };
+
+            let mut seen_ids = HashSet::new();
+            let mut entries = Vec::new();
+            for record in output.split(RECORD).skip(1) {
+                let Some((id, content)) = record.split_once('\n') else { continue };
+                if !seen_ids.insert(id) {
+                    continue;
+                }
+                if let Some(entry) = parse_desktop_entry(content) {
+                    entries.push(entry);
+                }
+            }
+
+            let icon_names: Vec<&str> = entries
+                .iter()
+                .filter_map(|e| e.icon.as_deref())
+                .collect::<HashSet<_>>()
+                .into_iter()
+                .collect();
+            let icons = read_icons(&icon_names);
+
+            entries
+                .into_iter()
+                .map(|entry| AppEntry {
+                    icon: entry.icon.and_then(|i| icons.get(&i).cloned()),
+                    name: entry.name,
+                    command: entry.command,
+                })
+                .collect()
+        }
+
+        /// Icon name → `data:` URI, for every name the host had a usable file for.
+        fn read_icons(names: &[&str]) -> HashMap<String, String> {
+            let mut icons = HashMap::new();
+            if names.is_empty() {
+                return icons;
+            }
+            let Some(output) = run_host_script(READ_ICONS, names) else { return icons };
+            for record in output.split(RECORD).skip(1) {
+                let mut lines = record.splitn(3, '\n');
+                let (Some(name), Some(ext), Some(data)) = (lines.next(), lines.next(), lines.next()) else { continue };
+                if let Some(mime) = icon_mime(ext) {
+                    icons.insert(name.to_string(), format!("data:{mime};base64,{data}"));
+                }
+            }
+            icons
+        }
+
+        fn run_host_script(script: &str, args: &[&str]) -> Option<String> {
+            let output = blockwork_core::flatpak::host_command("sh")
+                .args(["-c", script, "sh"])
+                .args(args)
+                .output()
+                .inspect_err(|e| tracing::warn!("Failed to list host apps: {e}"))
+                .ok()?;
+            if !output.status.success() {
+                tracing::warn!(
+                    "Listing host apps failed ({}): {}",
+                    output.status,
+                    String::from_utf8_lossy(&output.stderr).trim()
+                );
+            }
+            Some(String::from_utf8_lossy(&output.stdout).into_owned())
+        }
     }
 }
 

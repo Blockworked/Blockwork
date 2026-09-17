@@ -23,10 +23,9 @@ static CONFIG_DIR_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 
 /// Redirects every `config::*`/`Macro::save`/`Macro::remove` file lookup to
 /// `dir/Blockwork` instead of the OS config directory — for an embedder
-/// (e.g. the Geode mod) whose process sees a different filesystem namespace
-/// than wherever the macro files actually live (a Wine prefix's `Z:` mapping
-/// notwithstanding, this keeps the path explicit rather than assumed).
-/// First caller wins; must be called, if at all, before any other
+/// (e.g. a host process loading blockwork-ffi) whose process sees a
+/// different filesystem namespace than wherever the macro files actually
+/// live. First caller wins; must be called, if at all, before any other
 /// `config::*` or `recording::*` function.
 pub fn set_config_dir_override(dir: PathBuf) {
     let _ = CONFIG_DIR_OVERRIDE.set(dir);
@@ -43,11 +42,10 @@ pub(crate) fn config_root() -> Result<PathBuf, String> {
 
 /// One-time migration for the Macros→Blockwork rename: if the new config
 /// directory (`APP_ID`) doesn't exist yet but the old one (`LEGACY_APP_ID`)
-/// does, moves it wholesale so every saved macro/setting/hotkey survives the
-/// rename untouched. A no-op on every launch after the first (new dir
-/// already exists), and skipped entirely under `CONFIG_DIR_OVERRIDE` (the
-/// Geode-embedder path, which was never on the OS config directory to begin
-/// with). Must run before any other `config::*`/`recording::*` call.
+/// does, moves it wholesale so every saved macro/setting/hotkey survives.
+/// A no-op after the first launch, and skipped under `CONFIG_DIR_OVERRIDE`
+/// (the embedder path was never on the OS config directory). Must run
+/// before any other `config::*`/`recording::*` call.
 pub fn migrate_legacy_app_id() {
     if CONFIG_DIR_OVERRIDE.get().is_some() {
         return;

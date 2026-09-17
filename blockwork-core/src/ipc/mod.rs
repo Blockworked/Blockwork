@@ -1,5 +1,5 @@
-//! Loopback TCP control interface so external processes (e.g. a Geode mod
-//! running Geometry Dash under Proton) can trigger recording/playback at a
+//! Loopback TCP control interface so external processes (e.g. a game running
+//! under Proton) can trigger recording/playback at a
 //! precise moment without a physical hotkey press. Commands translate 1:1
 //! onto the existing hotkey `QueueSignal` pipeline.
 
@@ -66,11 +66,10 @@ pub async fn run_server(port: u16, mut shutdown: watch::Receiver<bool>) {
             accept_result = listener.accept() => {
                 match accept_result {
                     Ok((socket, _addr)) => {
-                        // Loopback commands are small (a JSON line or two) and
-                        // latency-sensitive (game triggers a recording at an
-                        // exact frame); Nagle's algorithm buffering them
-                        // against delayed ACKs is what causes intermittent
-                        // tens-of-ms stalls otherwise.
+                        // Commands are small and latency-sensitive (a game
+                        // triggers recording at an exact frame); Nagle's
+                        // algorithm otherwise causes intermittent tens-of-ms
+                        // stalls buffering them against delayed ACKs.
                         if let Err(err) = socket.set_nodelay(true) {
                             warn!("IPC: failed to set TCP_NODELAY: {err}");
                         }

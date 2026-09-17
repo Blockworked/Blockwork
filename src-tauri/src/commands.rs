@@ -572,9 +572,8 @@ pub(crate) async fn export_macro(macro_id: String) -> Result<(), String> {
 fn body_contains_command(body: &[Instruction]) -> bool {
     body.iter().any(|ins| match &ins.kind {
         // `OpenApp`'s `command` is just as capable of running arbitrary
-        // shell as a plain `Command` (see `runner::open_app`'s Linux/macOS
-        // launchers) — a hand-edited macro file could carry any string
-        // there, not just what the picker itself would ever produce.
+        // shell as a plain `Command` — a hand-edited macro file could carry
+        // any string there, not just what the picker would produce.
         InstructionKind::Command(_) | InstructionKind::OpenApp { .. } => true,
         InstructionKind::If { body, .. }
         | InstructionKind::Repeat { body, .. }
@@ -596,11 +595,10 @@ fn macro_contains_command(mac: &Macro) -> bool {
 }
 
 /// One (key, label, getter, setter) entry per `MacroSettings` field — the
-/// single place a new setting needs registering for it to participate in the
+/// single place a new setting needs registering to participate in the
 /// "review custom settings on import" flow below. `key` is the wire
 /// identifier the frontend's toggle list and `confirm_import_macro`'s
-/// `keep_settings` map address it by; `label` is the human-readable text
-/// shown in that list.
+/// `keep_settings` map address it by; `label` is the human-readable text.
 type SettingAccessor = (
     &'static str,
     &'static str,
@@ -616,9 +614,8 @@ const SETTING_ACCESSORS: &[SettingAccessor] = &[(
 )];
 
 /// Every `MacroSettings` field on `settings` that differs from its default —
-/// what `import_macro` shows the user for confirmation, since an imported
-/// macro asking for non-default behavior deserves a second look before it's
-/// silently applied.
+/// shown to the user by `import_macro` for confirmation, since non-default
+/// behavior deserves a second look before it's silently applied.
 fn non_default_macro_settings(
     settings: &blockwork_core::macros::MacroSettings,
 ) -> Vec<crate::state::CustomMacroSettingDto> {
@@ -652,8 +649,7 @@ fn apply_setting_overrides(
 }
 
 /// Assigns a fresh id to `mac` (so importing never collides with or
-/// overwrites an existing macro — even a re-imported copy of one already in
-/// the library lands as a separate entry), saves it, and makes it the
+/// overwrites an existing macro), saves it, and makes it the
 /// selected/current macro.
 fn commit_imported_macro<R: Runtime>(
     mut mac: Macro,
@@ -684,12 +680,11 @@ fn commit_imported_macro<R: Runtime>(
 }
 
 /// Picks a `.macro` file and reads it. If it needs a confirmation prompt
-/// before it can be committed — it contains a `Command` instruction (which
-/// can run arbitrary system commands) and/or requests non-default macro
-/// settings (see `non_default_macro_settings`) — the parsed macro is staged
-/// in `pending_import` and the prompt to show is returned; the frontend
-/// resolves it via `confirm_import_macro`/`cancel_import_macro`. Otherwise
-/// the macro is imported immediately and `None` is returned.
+/// before it can be committed — a `Command` instruction, and/or non-default
+/// macro settings (see `non_default_macro_settings`) — the parsed macro is
+/// staged in `pending_import` and the prompt to show is returned; the
+/// frontend resolves it via `confirm_import_macro`/`cancel_import_macro`.
+/// Otherwise the macro is imported immediately and `None` is returned.
 #[tauri::command]
 pub(crate) async fn import_macro<R: Runtime>(
     state: State<'_, SharedState>,
@@ -725,10 +720,9 @@ pub(crate) async fn import_macro<R: Runtime>(
 
 /// Finishes an import staged by `import_macro` after the user resolves its
 /// prompt. `keep_settings` maps each `ImportPromptDto::custom_settings`
-/// entry's `key` to whether the user chose to keep its imported (non-default)
-/// value (`true`) or reset it to the default (`false`); a key the popup never
-/// showed (because there was nothing to confirm) is simply absent, which
-/// `apply_setting_overrides` treats as "keep".
+/// entry's `key` to whether the user kept its imported value (`true`) or
+/// reset it to default (`false`); a key the popup never showed is absent,
+/// which `apply_setting_overrides` treats as "keep".
 #[tauri::command]
 pub(crate) async fn confirm_import_macro<R: Runtime>(
     state: State<'_, SharedState>,
@@ -868,8 +862,7 @@ fn check_return_placement(mac: &Macro, strand: &Strand, ins: &Instruction) -> Re
 }
 
 /// `escape loop`/`continue loop` only make sense inside a `Repeat`/`Forever`/
-/// `While` body — enforced here (unlike `check_return_placement`, which only
-/// looks at the strand's header) by walking every ancestor bracket named in
+/// `While` body — enforced by walking every ancestor bracket named in
 /// `path` and checking whether any of them is a loop instruction.
 fn check_loop_control_placement(
     strand: &Strand,
@@ -1184,10 +1177,9 @@ fn apply_value_kind(
         }
         _ => {
             // Any other kind is an operator, looked up in `OPERATOR_KINDS`.
-            // Swapping between operators resizes `args` to the new arity,
-            // keeping whatever it shadowed; otherwise the old value is
-            // tucked away as `saved` so it comes back untouched if dragged
-            // back out.
+            // Swapping operators resizes `args` to the new arity, keeping
+            // whatever it shadowed; otherwise the old value is tucked away
+            // as `saved` so it returns untouched if dragged back out.
             let spec = OPERATOR_KINDS
                 .iter()
                 .find(|s| s.kind == kind)
@@ -1440,10 +1432,9 @@ fn preview_value_with_env(
 /// Creates a new value block parked on open canvas — for a sidebar drop, or
 /// the "create" half of dragging an existing block out onto canvas.
 /// `origin_block_id` is set only when `value` is a `Param` reporter dragged
-/// straight out of its declaring block's header (the frontend recovers this
-/// from the drag's own palette kind, see blockstitchSetup.ts's
-/// `createFloatingValue` wrapper) — lets a floating param still render with
-/// its real declared shape instead of a guess.
+/// straight out of its declaring block's header (see blockstitchSetup.ts's
+/// `createFloatingValue`) — lets a floating param render with its real
+/// declared shape instead of a guess.
 #[tauri::command]
 pub(crate) fn create_floating_value<R: Runtime>(
     state: State<SharedState>,
@@ -2334,11 +2325,10 @@ pub(crate) fn set_global_speed_multiplier<R: Runtime>(
 // ─── Recording ─────────────────────────────────────────────────────────────
 
 /// Seeds the recorder's tracked cursor position from the real, current
-/// cursor position so the first captured move has a baseline to work from —
-/// needed for absolute-move recording, which has to add each relative delta
-/// the backend reports onto a known starting point (see `recording::
-/// capture_event_to_instruction`). Best-effort: if the backend can't report
-/// a position, absolute recording just waits for one via a later seed.
+/// cursor position so the first captured move has a baseline — needed for
+/// absolute-move recording, which adds each relative delta the backend
+/// reports onto a known starting point. Best-effort: if the backend can't
+/// report a position, absolute recording waits for a later seed.
 fn seed_recording_mouse_pos(s: &crate::state::AppState) {
     if let Some((x, y)) = s
         .emulator
@@ -2432,13 +2422,10 @@ pub(crate) fn stop_recording_internal<R: Runtime>(state: &SharedState, app: &tau
         let to_save = stop_recording_impl(&mut s);
         (to_save, build_state_dto(&s))
     };
-    // The disk write (and the JSON-serialize-plus-emit below) run after the
-    // state lock is released. GD's IPC commands go through this same lock
-    // (`StartRecordingImmediate` needs it just to capture its timing
-    // baseline via `reset_timing()`), so holding it across a save here was
-    // enough to make the *next* attempt's start signal land inconsistently
-    // whenever it followed close behind this one — exactly the pattern
-    // rapid retries produce.
+    // The disk write (and the emit below) run after the state lock is
+    // released. IPC commands go through this same lock (`StartRecordingImmediate`
+    // needs it for `reset_timing()`), so holding it across a save made a
+    // closely-following next attempt's start signal land inconsistently.
     if let Some(mac) = to_save {
         if let Err(e) = mac.save() {
             warn!("Failed to auto-save macro: {e}");

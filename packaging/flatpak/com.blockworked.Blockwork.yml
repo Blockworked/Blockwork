@@ -1,79 +1,55 @@
 app-id: com.blockworked.Blockwork
-# org.gnome.Platform (not org.freedesktop.Platform) for GTK3, which tao/wry needs
-# for the window itself. webkit2gtk is unused: the "cef" feature keeps wry from
-# ever linking webkit2gtk-sys.
 runtime: org.gnome.Platform
 runtime-version: '50'
 sdk: org.gnome.Sdk
+command: blockwork
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
-  - org.freedesktop.Sdk.Extension.node20
-command: blockwork
-branch: stable
+  - org.freedesktop.Sdk.Extension.node24
+# Upstream ships res/blockwork.desktop with Icon=blockwork; these rename both
+# to the app id at export.
+rename-desktop-file: blockwork.desktop
+rename-icon: blockwork
 
-# rust-stable/node20 are declared above via sdk-extensions only (build-time:
-# mounted at /usr/lib/sdk/<name> inside the build sandbox, see
-# build-options.append-path below) -- deliberately NOT also duplicated here
-# via add-extensions, which instead bakes an extension point into the
-# *exported app's* own metadata and makes flatpak try to mount them at
-# /app/sdk/<name> on every launch. Neither extension is actually installed
-# as a runtime-available extension on a user's system, so that mount failed
-# outright ("Read-only file system" / "ldconfig failed") and the app never
-# started.
-
-# Builds the Rust workspace and pnpm/Vite frontend from source inside the
-# sandbox, fully offline, rather than reusing a host-built binary -- a host
-# build links against the host's glibc, which can be newer than the runtime's
-# on a rolling-release distro and fails to start under `flatpak run`.
-
-build-options:
-  # build.rs shells out to bare `pnpm`, so pnpm-bin needs to be on PATH, not just
-  # invoked by relative path in build-commands.
-  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node20/bin:/run/build/blockwork/pnpm-bin
-  env:
-    # cargo-sources.json's vendor config lives at cargo/config, not .cargo/config.toml;
-    # cargo only picks it up if CARGO_HOME points there.
-    CARGO_HOME: /run/build/blockwork/cargo
-    CARGO_NET_OFFLINE: 'true'
-    CEF_PATH: /run/build/blockwork/cef-prebuilt
-    # Full nproc alongside a from-scratch CEF wrapper cmake/ninja build OOM-kills
-    # the sandbox; cap cargo (and, transitively via $NUM_JOBS, ninja) instead.
-    CARGO_BUILD_JOBS: '6'
-    # Tells build.rs to pass pnpm --offline/--frozen-lockfile/--trust-lockfile --
-    # pnpm ignores the env-var equivalents for these, only the CLI flags work.
-    # Not named FLATPAK: cef-dll-sys's build script keys off that name to look
-    # for CEF at /usr/lib instead of $CEF_PATH.
-    BLOCKWORK_PNPM_OFFLINE: '1'
 
 finish-args:
   - --share=ipc
-  # No --share=network: nothing in the default "cef" build touches the network.
-  # x86_64: the custom CEF build supports Wayland natively, so grant both
-  # sockets and let the wrapper script (see below) pick GDK_BACKEND=wayland.
-  # aarch64: no Wayland patch exists, so the wrapper forces
-  # GDK_BACKEND=x11 instead.  fallback-x11 ensures DISPLAY is always
-  # exported so XWayland works when needed.
   - --socket=wayland
   - --socket=fallback-x11
-  - --socket=pulseaudio # CEF's Chromium renderer wants audio output access.
-  - --device=all # /dev/uinput + /dev/input/event* for evdev hotkeys & synthetic input.
+  # /dev/uinput (synthetic input) + /dev/input/event* (hotkeys, recording).
+  # --device=input is not enough: it exposes /dev/input but not /dev/uinput.
+  - --device=all
   - --device=dri
-  # No --talk-name=org.freedesktop.DBus: CEF's "Failed to connect to the bus" (it
-  # wants UPower) is harmless without it.
-  # --filesystem=home is for blockwork-core's Command instruction, which shells out
-  # via `bash -c` with no path restriction -- not for rfd dialogs (portal-routed,
-  # need nothing) or config persistence (XDG dir, auto-redirected).
-  - --filesystem=home
+  # Open App/Close App launch and kill host apps via flatpak-spawn --host.
+  - --talk-name=org.freedesktop.Flatpak
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node24/bin:/run/build/blockwork/pnpm-bin
+  env:
+    CARGO_HOME: /run/build/blockwork/cargo
+    CARGO_NET_OFFLINE: 'true'
+    CEF_PATH: /run/build/blockwork/cef-prebuilt
+    CARGO_BUILD_JOBS: '6'
+    BLOCKWORK_PNPM_OFFLINE: '1'
 
 modules:
+  # System tray icon
+  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
+
+  # Chromium sandbox
+  - name: zypak
+    sources:
+      - type: git
+        url: https://github.com/refi64/zypak
+        tag: v2025.09
+        commit: 693a71c5ffa80ec9c9ce2ae03b1ccc493c698e53
+        x-checker-data:
+          type: git
+          tag-pattern: ^v([\d.]+)$
+
   - name: blockwork
     buildsystem: simple
     build-commands:
-      # 1. Stage CEF where cef-dll-sys's build.rs expects it via $CEF_PATH (see
-      # download-cef's extract_target_archive()), so it never tries to fetch it.
-      # CEF_VERSION must match the "+<version>" build metadata in cef-dll-sys's
-      # Cargo.toml version (see download_cef::default_version) -- bump it
-      # whenever that changes, alongside the source archives below.
       - |
         set -e
         CEF_VERSION="151.3.24"
@@ -81,11 +57,7 @@ modules:
           x86_64)
             # Custom Wayland-patched build from cloud.frozenblock.net (see
             # ../cef-rs/sys/build.rs's DEFAULT_LINUX_X64_ARCHIVE_URL, only used
-            # for x86_64-unknown-linux-gnu). Unlike the official minimal
-            # distribution below, this archive's single top-level directory is
-            # already the complete, flattened cef_dir -- build-time headers/cmake
-            # and runtime files together, plus its own valid archive.json -- so
-            # it just needs extracting and renaming, no Release/Resources merge.
+            # for x86_64-unknown-linux-gnu).
             DEST="$CEF_PATH/$CEF_VERSION/cef_linux_x86_64"
             mkdir -p "$CEF_PATH/$CEF_VERSION"
             ARCHIVE=cef_binary_wayland_linux64.tar.zst
@@ -94,10 +66,8 @@ modules:
             mv "$EXTRACTED_DIR" "$DEST"
             ;;
           aarch64)
-            # Official upstream CEF minimal distribution -- no Wayland patch
-            # exists for aarch64, which is why window_info.rs's
-            # set_as_child_wayland is gated to x86_64 only. Split
-            # Release/Resources layout, same as x86_64 used to be.
+            # Official upstream CEF minimal distribution
+            # (No Wayland-patched CEF was built for aarch64)
             DEST="$CEF_PATH/$CEF_VERSION/cef_linux_aarch64"
             mkdir -p "$CEF_PATH/$CEF_VERSION"
             ARCHIVE=$(ls cef_binary_*_linuxarm64_minimal.tar.bz2)
@@ -117,25 +87,11 @@ modules:
             ;;
           *) echo "unsupported arch for CEF staging: $(uname -m)" >&2; exit 1 ;;
         esac
-      # 2. Stage pnpm (node20 extension has node/npm/corepack but not pnpm, and
-      # corepack needs network on first use). Pinned to ui/package.json's
-      # packageManager version.
       - mkdir -p pnpm-bin && tar -xzf pnpm-linux-*.tar.gz -C pnpm-bin
-      # pnpm ignores npm_config_store_dir and always resolves ./.pnpm-store by
-      # walking up from cwd to the nearest pnpm-workspace.yaml (ui/'s own) --
-      # so point that at the store node-sources.json populated at the build root.
       - ln -s flatpak-node/pnpm-store .pnpm-store
-      # 3. Rust workspace + frontend (via build.rs), vendored via cargo/node-sources.json.
       - cargo --offline build --release
-      # 4. Install the binary plus the CEF runtime payload build.rs drops next to
-      # it in target/release. RUNPATH is $ORIGIN, so everything lives together in
-      # a private libdir, not /usr/bin.
       - install -Dm755 target/release/blockwork /app/lib/blockwork/blockwork
       - mkdir -p /app/bin
-      # Wrapper, not a symlink: tauri-runtime-cef's "sandbox" feature is on by
-      # default and can't be disabled downstream, which builds a chrome-sandbox
-      # expecting root+setuid -- Flatpak's export can't do that. --no-sandbox is
-      # the standard workaround (redundant with Flatpak's own bwrap anyway).
       - |
         cat > /app/bin/blockwork <<'EOF'
         #!/bin/sh
@@ -149,72 +105,53 @@ modules:
             ;;
           aarch64) export GDK_BACKEND=x11 ;;
         esac
-        exec /app/lib/blockwork/blockwork --no-sandbox "$@"
+        export ZYPAK_CEF_LIBRARY_PATH=/app/lib/blockwork/libcef.so
+        exec zypak-wrapper /app/lib/blockwork/blockwork "$@"
         EOF
         chmod +x /app/bin/blockwork
       - install -Dm755 target/release/libcef.so /app/lib/blockwork/libcef.so
+      - install -Dm755 target/release/chrome-sandbox /app/lib/blockwork/chrome-sandbox
       - install -Dm755 target/release/libEGL.so /app/lib/blockwork/libEGL.so
       - install -Dm755 target/release/libGLESv2.so /app/lib/blockwork/libGLESv2.so
       - install -Dm755 target/release/libvk_swiftshader.so /app/lib/blockwork/libvk_swiftshader.so
       - install -Dm755 target/release/libvulkan.so.1 /app/lib/blockwork/libvulkan.so.1
       - install -Dm644 target/release/vk_swiftshader_icd.json /app/lib/blockwork/vk_swiftshader_icd.json
-      - install -Dm755 target/release/chrome-sandbox /app/lib/blockwork/chrome-sandbox
       - install -Dm644 target/release/icudtl.dat /app/lib/blockwork/icudtl.dat
       - install -Dm644 target/release/v8_context_snapshot.bin /app/lib/blockwork/v8_context_snapshot.bin
       - install -Dm644 target/release/chrome_100_percent.pak /app/lib/blockwork/chrome_100_percent.pak
       - install -Dm644 target/release/chrome_200_percent.pak /app/lib/blockwork/chrome_200_percent.pak
       - install -Dm644 target/release/resources.pak /app/lib/blockwork/resources.pak
       - cp -r target/release/locales /app/lib/blockwork/locales
-      # 5. Desktop file, icon, AppStream metainfo. Icon= must match the app id
-      # for flatpak export, hence the sed rename from res/blockwork.desktop's Icon=blockwork.
-      - sed 's/^Icon=blockwork$/Icon=com.blockworked.Blockwork/' res/blockwork.desktop > com.blockworked.Blockwork.desktop
-      - install -Dm644 com.blockworked.Blockwork.desktop /app/share/applications/com.blockworked.Blockwork.desktop
-      - install -Dm644 res/icons/blockwork.png /app/share/icons/hicolor/256x256/apps/com.blockworked.Blockwork.png
+      - install -Dm644 res/blockwork.desktop /app/share/applications/blockwork.desktop
+      - install -Dm644 res/icons/blockwork.png /app/share/icons/hicolor/512x512/apps/blockwork.png
+      - install -Dm644 res/com.blockworked.Blockwork.metainfo.xml /app/share/metainfo/com.blockworked.Blockwork.metainfo.xml
+      - install -Dm644 "$CEF_PATH"/*/cef_linux_*/CREDITS.html /app/share/licenses/com.blockworked.Blockwork/cef/CREDITS.html
     sources:
-      # Local checkout including uncommitted changes, for `just flatpak-build`
-      # iteration. Before a real Flathub submission, swap for a pinned `type: git`
-      # source -- Flathub requires reproducible sources, not a live working tree.
-      - type: dir
-        path: ../..
-        skip: [target, .git, .flatpak-builder, flatpak-build, flatpak-repo, node_modules, ui/node_modules, ui/dist, packaging/flatpak]
+      # BEGIN app-source
+      - type: git
+        url: https://github.com/Blockworked/Blockwork.git
+        tag: 0.5.3
+        commit: 01783624af9a5a4f241647de989bbe8a2652fe59
+      # END app-source
 
-      # Regenerate with `just flatpak-sources` whenever Cargo.lock changes.
       - cargo-sources.json
 
-      # Regenerate with `just flatpak-sources` whenever ui/pnpm-lock.yaml changes.
-      # --pnpm-store-version v11 matches pnpm 11.3.0's store layout (the
-      # generator's default v10 layout is unreadable by pnpm 11).
       - node-sources.json
 
-      # Standalone pnpm binary, pinned to ui/package.json's packageManager version.
       - type: file
-        url: https://github.com/pnpm/pnpm/releases/download/v11.3.0/pnpm-linux-x64.tar.gz
-        sha256: 6eb506b53297eb1186ba0cbff1577bb26d17713835a01a5342dcafae550827ce
+        url: https://github.com/pnpm/pnpm/releases/download/v11.27.0/pnpm-linux-x64.tar.gz
+        sha256: 14ed04e631e4563abf3570dda1a365316683149a482b741a2db37e495f6b9cdb
         only-arches: [x86_64]
       - type: file
-        url: https://github.com/pnpm/pnpm/releases/download/v11.3.0/pnpm-linux-arm64.tar.gz
-        sha256: 383f644f50667e9c1752791173d274ba414117262b09c1b027c2d297bf520662
+        url: https://github.com/pnpm/pnpm/releases/download/v11.27.0/pnpm-linux-arm64.tar.gz
+        sha256: 1f3c5dbdfe20b011ea86950b4fd61b5918cbde874c099032fe9064f7a53816bf
         only-arches: [aarch64]
 
-      # Pinned CEF prebuilt runtime matching cef-dll-sys 151.8.0+151.3.24. No
-      # source build: Flathub allows a pinned, hash-verified prebuilt binary as a
-      # source (as with Electron apps bundling Chromium); what it disallows is
-      # fetching it during the sandboxed build, which step 1 above avoids.
-      #
-      # x86_64: our own Wayland-patched build (chromiumembedded/cef#4233, built
-      # from ~/cef-wayland-build), hosted at a personal Nextcloud share -- there
-      # is no upstream equivalent. dest-filename is required since the URL
-      # itself has no filename/extension for flatpak-builder to infer one from.
-      # If this file is ever rebuilt at the same share link, its sha256 (and
-      # CEF_VERSION above, if the underlying CEF/Chromium version changes too)
-      # must be updated to match.
       - type: file
         url: https://cloud.frozenblock.net/s/82X5EQQ2ZoiPLWs/download
-        dest-filename: cef_binary_wayland_linux64.tar.zst
         sha256: 77215ed9b7828c19993518d154e841e8fd41d58138a2385c3f8ec4a0ae6dee16
+        dest-filename: cef_binary_wayland_linux64.tar.zst
         only-arches: [x86_64]
-      # aarch64: official upstream build, since it doesn't need the Wayland
-      # patch (see the build-commands comment above).
       - type: file
         url: https://cef-builds.spotifycdn.com/cef_binary_151.3.24+g2384915+chromium-151.0.7922.174_linuxarm64_minimal.tar.bz2
         sha256: 47965b9c36a5958bdd6d6fdb3fe3360f38d17d65914ef636abade14881cdc59b

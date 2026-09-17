@@ -2,7 +2,7 @@
   "name": "blockwork-ui",
   "private": true,
   "type": "module",
-  "packageManager": "pnpm@11.3.0",
+  "packageManager": "pnpm@11.27.0",
   "scripts": {
     "dev": "vite",
     "build": "vue-tsc --noEmit && vite build",
@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
-    "blockstitch": "github:Blockworked/blockstitch#76e0e970",
+    "blockstitch": "github:Blockworked/blockstitch#2aef89e",
     "lucide-vue-next": "^0.469.0",
     "vue": "^3.5.0"
   },

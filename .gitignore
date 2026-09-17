@@ -28,6 +28,7 @@ packaging/flatpak/chrome_200_percent.pak
 packaging/flatpak/resources.pak
 packaging/flatpak/locales/
 packaging/flatpak/.flatpak-builder/
+packaging/flatpak/*.local.yml
 flatpak-build/
 flatpak-repo/
 

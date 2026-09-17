@@ -29,15 +29,13 @@ pub struct BlockRuntime {
 /// execution threads don't get an enlarged stack.
 const MAX_CALL_DEPTH: u32 = 64;
 
-/// What a `run_block` invocation is telling its caller to do next — the
-/// generalized form of the old `Option<Evaluated>` "did a Return happen"
-/// signal, now also carrying loop control. `If`/`IfElse` forward every
-/// non-`Normal` variant straight up unchanged (they aren't loops and don't
-/// catch anything); `Repeat`/`Forever`/`While` are the only instructions that
-/// catch `Break`/`Continue`, and let `Return` keep unwinding through them.
-/// `call_block` fully absorbs `Break`/`Continue` at its own boundary — a
-/// custom block's body is a separate context, so loop control can't cross
-/// into or out of it.
+/// What a `run_block` invocation is telling its caller to do next: the
+/// "did a Return happen" signal, generalized to also carry loop control.
+/// `If`/`IfElse` forward every non-`Normal` variant unchanged (not loops,
+/// nothing to catch); `Repeat`/`Forever`/`While` catch `Break`/`Continue`
+/// but let `Return` keep unwinding. `call_block` absorbs `Break`/`Continue`
+/// at its own boundary — a custom block's body is a separate context, so
+/// loop control can't cross into or out of it.
 #[derive(Debug, Clone, PartialEq)]
 enum Flow {
     Normal,
@@ -206,19 +204,14 @@ impl Macro {
     }
 
     /// Same as `run`, but backdates every entry strand's `Wait` deadline
-    /// anchor by `initial_offset` — i.e. pretends this run actually started
-    /// `initial_offset` ago rather than right now. Exists for callers that
-    /// know real time has already passed between the event this run is
-    /// supposed to be synced to and the moment this function actually gets
-    /// called (dispatch latency, or — the caller this was added for —
-    /// `blockwork-gd`'s attempt-start trigger, which only fires once per game
-    /// frame and so always overshoots its own target instant by however
-    /// much that frame's `dt` was; passing that overshoot back here keeps
-    /// the macro's timeline anchored to the *intended* start instant instead
-    /// of whichever frame the trigger happened to land on). Without this,
-    /// that overshoot — which grows with frame-time variance, i.e. exactly
-    /// when Proton is stuttering — just becomes unrecoverable drift baked
-    /// into the whole run.
+    /// anchor by `initial_offset` — pretends this run started
+    /// `initial_offset` ago rather than right now. For callers where real
+    /// time has already passed between the event this run should be synced
+    /// to and the moment this actually gets called (dispatch latency, or an
+    /// embedder whose trigger fires once per frame and overshoots by that
+    /// frame's `dt`), so the macro's timeline anchors to the intended start
+    /// instant rather than whichever frame the trigger landed on. Without
+    /// this, that overshoot becomes unrecoverable drift baked into the run.
     pub fn run_with_offset(
         self,
         emulator: Arc<Mutex<dyn InputBackend>>,
@@ -321,12 +314,10 @@ fn run_strand(
     initial_offset: Duration,
 ) {
     raise_current_thread_priority();
-    // Priority-raise happens first (its own latency shouldn't eat into the
-    // offset), *then* anchor "now" for this strand's Wait chain — backdated
-    // by initial_offset if the caller knows real time already elapsed
-    // before this call happened. `checked_sub` guards the (only
-    // theoretically reachable) case of an offset larger than the process's
-    // own monotonic clock has been running.
+    // Priority-raise happens first (its latency shouldn't eat into the
+    // offset), then anchor "now" for this strand's Wait chain, backdated by
+    // initial_offset. `checked_sub` guards the (only theoretically
+    // reachable) case of an offset larger than the process's own uptime.
     let start = Instant::now()
         .checked_sub(initial_offset)
         .unwrap_or_else(Instant::now);
@@ -412,10 +403,10 @@ fn run_block(
     }
 
     // Local to this invocation (not in `ctx`) so a nested call's waits pace
-    // independently; the caller's deadline just re-anchors on its next Wait.
-    // `start` is `Instant::now()` at every call site except the very
-    // outermost one (`run_strand`'s top-level call), which backdates it by
-    // that strand's `initial_offset` — see `Macro::run_with_offset`.
+    // independently; the caller's deadline re-anchors on its next Wait.
+    // `start` is `Instant::now()` at every call site except the outermost
+    // one (`run_strand`'s top-level call), backdated by that strand's
+    // `initial_offset` — see `Macro::run_with_offset`.
     let mut deadline = start;
 
     let normalize_modifier_key = |key: MacroKey| -> MacroKey {
@@ -442,10 +433,9 @@ fn run_block(
             InstructionKind::WhenRan => {}
             InstructionKind::BlockHeader(_) => {}
             // Header-only markers, same as `WhenRan`/`BlockHeader` — never
-            // actually reached in practice (`run_with_offset` excludes these
-            // strands from `entry_strands` entirely, and the background
-            // watcher that does fire them starts from
-            // `strand.instructions[1..]`, skipping the header). Handled here
+            // actually reached (`run_with_offset` excludes these strands
+            // from `entry_strands`, and the background watcher that fires
+            // them starts from `strand.instructions[1..]`). Handled here
             // defensively so the match stays total.
             InstructionKind::WhenBatteryDischargedTo(_) => {}
             InstructionKind::WhenBatteryChargedTo(_) => {}
@@ -802,11 +792,11 @@ fn run_block(
 }
 
 /// Launches `command` — the already-resolved, platform-specific launch
-/// string an `InstructionKind::OpenApp` carries (see its doc comment). Each
-/// platform needs a different launcher: Windows' `start` shell built-in
-/// handles a `.lnk` path directly; macOS' `open` handles an `.app` bundle
-/// path; a plain `sh -c` covers Linux's cleaned `Exec=` line (which may
-/// still carry shell-meaningful syntax the desktop entry relied on).
+/// string an `InstructionKind::OpenApp` carries. Each platform needs a
+/// different launcher: Windows' `start` handles a `.lnk` path directly;
+/// macOS' `open` handles an `.app` bundle path; a plain `sh -c` covers
+/// Linux's cleaned `Exec=` line (may still carry shell syntax), run on the
+/// host when sandboxed since the app lives outside the Flatpak.
 #[cfg(target_os = "windows")]
 fn open_app(command: &str) -> std::io::Result<()> {
     Command::new("cmd")
@@ -822,7 +812,7 @@ fn open_app(command: &str) -> std::io::Result<()> {
 
 #[cfg(target_os = "linux")]
 fn open_app(command: &str) -> std::io::Result<()> {
-    Command::new("sh")
+    crate::flatpak::host_command("sh")
         .arg("-c")
         .arg(command)
         .spawn()
@@ -837,13 +827,12 @@ fn open_app(_command: &str) -> std::io::Result<()> {
     ))
 }
 
-/// Terminates the app an `InstructionKind::CloseApp` names — there's no
-/// cross-platform "close this specific launch string" API the way there is
-/// for opening one, so each platform instead derives a best-effort process
-/// matcher from whatever `OpenApp`'s picker happened to capture: the
-/// executable basename out of a Linux `Exec=` line or a Windows `.lnk`
-/// path, or (macOS) the app's own display name, since `open`/Launch
-/// Services address running apps by name rather than by bundle path.
+/// Terminates the app an `InstructionKind::CloseApp` names. No cross-platform
+/// "close this launch string" API exists, so each platform derives a
+/// best-effort process matcher from whatever `OpenApp`'s picker captured:
+/// the executable basename from a Linux `Exec=` line or a Windows `.lnk`
+/// path, or (macOS) the app's display name, since Launch Services addresses
+/// running apps by name.
 #[cfg(target_os = "linux")]
 fn close_app(command: &str, _name: &str) -> std::io::Result<()> {
     let proc_name = command
@@ -854,7 +843,7 @@ fn close_app(command: &str, _name: &str) -> std::io::Result<()> {
     if proc_name.is_empty() {
         return Ok(());
     }
-    Command::new("killall").arg(proc_name).status().map(|_| ())
+    crate::flatpak::host_command("killall").arg(proc_name).status().map(|_| ())
 }
 
 #[cfg(target_os = "windows")]

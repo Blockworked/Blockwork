@@ -624,8 +624,8 @@ pub(crate) fn vk_to_macro_key(vk: VIRTUAL_KEY) -> Option<MacroKey> {
 // ── Pre-macro focus + modifier cleanup ───────────────────────────────────────
 
 /// True for a window that can actually be brought to the foreground right
-/// now. Our own windows count too — a hotkey pressed while Macros itself is
-/// focused should still type back into whichever of our windows had it.
+/// now. Our own windows count too — a hotkey pressed while Blockwork itself
+/// is focused should still type back into whichever of our windows had it.
 fn is_usable_target(hwnd: HWND) -> bool {
     if hwnd.is_null() {
         return false;

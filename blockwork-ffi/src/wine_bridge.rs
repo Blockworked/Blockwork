@@ -1,15 +1,13 @@
 //! Wine detection, shared-memory setup, and launching the native Linux
 //! helper (`blockwork-linux-bridge`) — needed because `WH_KEYBOARD_LL`/
 //! `WH_MOUSE_LL` don't see real host input under Wine, and `SendInput`
-//! emission is unreliable there too (both confirmed empirically against a
-//! real Proton/GD session; see the project plan for the diagnostic
-//! history). Mirrors Click Between Frames' proven mechanism
-//! (`theyareonit/Click-Between-Frames`, `src/windows.cpp`) — same API
-//! calls, same `Z:` drive trick, extended with a second ring buffer (CBF
-//! only needs capture) carrying `WireControlCommand`s: macro playback
-//! itself (not just input capture) runs natively on the Linux side too,
-//! since that's the only way its timing gets real `SCHED_FIFO` scheduling
-//! instead of Wine's much weaker `SetThreadPriority` emulation.
+//! emission is unreliable there too. Mirrors Click Between Frames' proven
+//! mechanism (`theyareonit/Click-Between-Frames`, `src/windows.cpp`) — same
+//! API calls, same `Z:` drive trick, extended with a second ring buffer
+//! (CBF only needs capture) carrying `WireControlCommand`s: macro playback
+//! itself runs natively on the Linux side too, the only way it gets real
+//! `SCHED_FIFO` scheduling instead of Wine's weaker `SetThreadPriority`
+//! emulation.
 #![cfg(windows)]
 
 use blockwork_core::wire::{self, SharedRegion, WireCapture, WireControlCommand};
@@ -84,9 +82,8 @@ fn wine_unix_path(windows_path: &str) -> Option<String> {
 }
 
 /// Owns the shared-memory mapping and the handles behind it. Kept alive in
-/// `blockwork-ffi`'s static state for the process lifetime — there is no
-/// clean-shutdown path today (matches how `EMULATOR`/the capture thread are
-/// already never torn down).
+/// `blockwork-ffi`'s static state for the process lifetime — no
+/// clean-shutdown path today (same as `EMULATOR`/the capture thread).
 #[allow(dead_code)] // fields exist to keep the handles/mapping alive, never read again
 pub struct WineBridge {
     shm_file: HANDLE,
@@ -96,7 +93,7 @@ pub struct WineBridge {
 }
 
 // SAFETY: the raw handles/pointer are only ever touched to bump the
-// heartbeat (from `macros_init`'s caller thread) and read via `region`
+// heartbeat (from `blockwork_init`'s caller thread) and read via `region`
 // (itself all-atomics/lock-free ring buffers) — no interior mutation of
 // the handles themselves after setup.
 unsafe impl Send for WineBridge {}
@@ -104,7 +101,7 @@ unsafe impl Sync for WineBridge {}
 
 /// The Linux helper's watchdog exits once `windows_heartbeat` goes stale
 /// for a few seconds — this keeps it alive for as long as this process
-/// runs, so a real GD/mod crash (not just quitting) still lets the helper
+/// runs, so a real host crash (not just quitting) still lets the helper
 /// notice and exit rather than orphaning itself.
 pub fn spawn_heartbeat_thread(region: &'static SharedRegion) {
     std::thread::spawn(move || loop {
@@ -215,12 +212,9 @@ pub fn setup_and_launch(linux_bridge_resource_path: &str) -> Option<WineBridge> 
 pub fn spawn_capture_forwarder(region: &'static SharedRegion) {
     tracing::info!("wine_bridge: capture forwarder thread starting");
     std::thread::spawn(move || {
-        // A panic in here would otherwise kill this thread silently — Rust
-        // prints "thread panicked" to stderr by default, which (like every
-        // tracing:: call before macros_set_log_callback existed) goes
-        // nowhere observable from inside a console-less DLL. Catching per
-        // event means one bad event can't permanently stop draining the
-        // ring the way a thread-ending panic would.
+        // A panic here would otherwise kill this thread silently (its
+        // stderr output goes nowhere observable from a console-less DLL).
+        // Catch per event so one bad event can't stop draining the ring.
         let mut callback = blockwork_core::recording::build_capture_callback();
         let mut buf = [0u8; wire::SLOT_SIZE - 4];
         let mut processed: u64 = 0;
@@ -231,13 +225,10 @@ pub fn spawn_capture_forwarder(region: &'static SharedRegion) {
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         if let Some(WireCapture { event, ts }) = wire::decode_capture(&buf[..len]) {
                             let timestamp = blockwork_core::macros::backend::CaptureTimestamp::Hardware(ts.to_system_time());
-                            // Discarded: `CaptureDecision::Suppress` is
-                            // never actually returned here — the embedded
-                            // engine's hotkey table is always empty (see
-                            // `macros_init`), so there's nothing this
-                            // callback would ever ask to suppress, and the
-                            // Linux side doesn't grab devices anyway
-                            // (nothing to suppress there either).
+                            // Discarded: `CaptureDecision::Suppress` never
+                            // fires here — the hotkey table is always empty
+                            // (see `blockwork_init`), and the Linux side
+                            // doesn't grab devices anyway.
                             let _ = callback(event.into(), timestamp);
                         }
                     }));
@@ -257,11 +248,9 @@ pub fn spawn_capture_forwarder(region: &'static SharedRegion) {
 }
 
 /// Pushes a control command into the bridge's control ring for
-/// `blockwork-linux-bridge` to act on. Same bounded-retry contract the old
-/// per-event `RemoteEvdevBackend::push` used: a full ring means the Linux
-/// side has fallen behind, and this is called at a bounded rate (once per
-/// `macros_run_macro`/`macros_stop_loop` call), not in a tight loop, so a
-/// short retry window is enough headroom for a momentarily full ring.
+/// `blockwork-linux-bridge` to act on. Retries briefly on a full ring —
+/// this is only called once per `blockwork_run_macro`/`blockwork_stop_loop`
+/// call, not in a tight loop, so a short retry window is enough headroom.
 fn push_control(region: &SharedRegion, cmd: &WireControlCommand) -> Result<(), String> {
     let bytes = wire::encode_control(cmd);
     for _ in 0..1000 {
@@ -274,10 +263,8 @@ fn push_control(region: &SharedRegion, cmd: &WireControlCommand) -> Result<(), S
 }
 
 /// Tells `blockwork-linux-bridge` to run the macro with this id — the entire
-/// timed run (loading the macro, pacing Waits, emitting input) happens
-/// natively over there now; see `wire::WireControlCommand`'s docs for why.
-/// `elapsed_overshoot_ms` is forwarded as-is — see `WireControlCommand::
-/// RunMacro`'s docs for what it corrects for.
+/// timed run happens natively over there now; see `wire::WireControlCommand`'s
+/// docs for why. `elapsed_overshoot_ms` is forwarded as-is.
 pub fn send_run_macro(region: &SharedRegion, macro_id: &str, elapsed_overshoot_ms: f64) -> Result<(), String> {
     push_control(region, &WireControlCommand::RunMacro(macro_id.to_string(), elapsed_overshoot_ms))
 }

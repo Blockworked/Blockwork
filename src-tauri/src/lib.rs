@@ -26,10 +26,10 @@ pub fn run() {
     let _ = tracing_log::LogTracer::init();
 
     // CEF re-execs this same binary for its helper processes (renderer, GPU,
-    // zygote, ...), tagged with a `--type=` switch -- those must fall
-    // straight through to `tauri::Builder::run`, which hands them to
-    // `cef::execute_process` and exits. The single-instance activation-port
-    // check below only makes sense for the real browser process.
+    // zygote, ...), tagged with a `--type=` switch -- those fall straight
+    // through to `tauri::Builder::run`, which hands them to
+    // `cef::execute_process` and exits. The single-instance check below only
+    // makes sense for the real browser process.
     let is_cef_subprocess = std::env::args().any(|a| a.starts_with("--type="));
 
     if !is_cef_subprocess {
@@ -56,15 +56,17 @@ pub fn run() {
             if let tauri::WindowEvent::CloseRequested { api, .. } = event {
                 let close_to_tray = window.state::<SharedState>().lock().map(|s| s.close_to_tray).unwrap_or(false);
                 if close_to_tray {
-                    api.prevent_close();
                     if tauri_runtime_cef::is_wayland() {
-                        // `window.hide()` is a no-op under Wayland (winit has no
-                        // protocol-level way to unmap and remap a toplevel), so
-                        // the decoration Close button would otherwise do nothing
-                        // at all. Fall back to the same destroy-and-rebuild path
-                        // `quit_ui` already uses for "Quit UI" from the tray.
-                        tray::quit_ui(window.app_handle());
+                        // `window.hide()` is a no-op under Wayland (no
+                        // protocol-level way to unmap/remap a toplevel), so
+                        // let the close go ahead and treat it like "Quit UI"
+                        // from the tray. Calling `quit_ui` directly here
+                        // would deadlock: the runtime still holds this
+                        // window's listener lock while dispatching
+                        // `CloseRequested`.
+                        tray::mark_ui_closed(window.app_handle());
                     } else {
+                        api.prevent_close();
                         let _ = window.hide();
                     }
                 }
@@ -139,9 +141,8 @@ pub fn run() {
                 s.macros_list = macros;
 
                 // The selected macro's live variable store backs reporter
-                // previews and execution. Populate it during startup as well
-                // as when a macro is selected through the UI, otherwise
-                // persisted variables appear in the editor but preview as
+                // previews and execution. Populate it at startup too, not
+                // just on UI selection, or persisted variables preview as
                 // empty until a reselect.
                 let variables = s
                     .current_macro
@@ -173,8 +174,8 @@ pub fn run() {
                 // Chromium grabs raw keyboard input for its own focused
                 // window on Windows (chromiumembedded/cef#2609), starving the
                 // WH_KEYBOARD_LL hook `start_grab_thread` installs. This CEF
-                // client callback still sees every keystroke in that case, so
-                // it's wired to feed the same hotkey pipeline as a fallback.
+                // callback still sees every keystroke, so it's wired to feed
+                // the same hotkey pipeline as a fallback.
                 tauri_runtime_cef::set_focused_key_hook(|vk, pressed| {
                     blockwork_core::macros::backend::dispatch_from_focused_window(vk as u16, pressed)
                 });
@@ -204,10 +205,10 @@ pub fn run() {
             }
 
             // ── Single-instance activation listener ─────────────────────────
-            // A later launch of the app (e.g. from a desktop shortcut) that
-            // finds this instance already running connects to the activation
-            // port instead of starting its own window; any connection here is
-            // that later launch asking us to come to the foreground.
+            // A later launch that finds this instance already running
+            // connects to the activation port instead of starting its own
+            // window; any connection here is that launch asking us to come
+            // to the foreground.
             if let Some(listener) = activation_listener {
                 let app_handle = app.handle().clone();
                 std::thread::spawn(move || {
@@ -350,13 +351,12 @@ pub fn run() {
         .build(tauri::generate_context!())
         .expect("error while running tauri application")
         .run(|app, event| {
-            // `code` is `None` when the exit was requested because the last
-            // window closed rather than via an explicit `AppHandle::exit`.
-            // That happens both for a genuine "close the last window" (which
-            // should quit normally) and for `tray::quit_ui` destroying the
-            // main window to save memory (which should not) -- `quit_ui`
-            // clears `main_window_label` right before destroying the window,
-            // so its absence tells these two cases apart.
+            // `code` is `None` when exit was requested by the last window
+            // closing rather than an explicit `AppHandle::exit`. That covers
+            // both a genuine "close the last window" (should quit) and
+            // `tray::quit_ui` destroying the main window to save memory
+            // (should not) -- `quit_ui` clears `main_window_label` right
+            // before destroying the window, distinguishing the two.
             if let tauri::RunEvent::ExitRequested { code: None, api, .. } = event {
                 let ui_quit = app
                     .state::<SharedState>()

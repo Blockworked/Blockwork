@@ -5,12 +5,12 @@ use tauri::{AppHandle, Manager, WebviewWindowBuilder};
 
 /// Builds the tray icon shown while "close to tray" is enabled: left click
 /// opens the main window, right click shows the Open/Quit menu ("Quit UI"
-/// only shown while the UI is actually running -- see `refresh_menu`).
+/// only shown while the UI is running — see `refresh_menu`).
 ///
-/// Both call sites (startup, and the `set_close_to_tray` command) only ever
-/// run while holding the `SharedState` lock with the main window still up,
-/// so the initial menu can just assume the UI is open -- don't lock state
-/// here to check, that would deadlock against the caller's own lock.
+/// Both call sites (startup, and `set_close_to_tray`) run while holding the
+/// `SharedState` lock with the main window still up, so the initial menu
+/// can assume the UI is open — don't lock state here, that would deadlock
+/// against the caller's own lock.
 pub(crate) fn build(app: &AppHandle) -> tauri::Result<TrayIcon> {
     ensure_gtk_init(app);
 
@@ -89,14 +89,11 @@ pub(crate) fn show_main_window(app: &AppHandle) {
 
 /// Builds a fresh main window from the `main` entry in `tauri.conf.json`.
 ///
-/// It gets a never-before-used label rather than reusing `"main"`: the
-/// tauri-cef runtime removes a destroyed window from its own bookkeeping
-/// before the OS confirms the destruction, so the later confirmation has
-/// nothing left to look up and never reaches the window manager -- the
-/// manager keeps thinking `"main"` is still alive forever, and handles to it
-/// (like the one `show_main_window` would otherwise get from
-/// `get_webview_window`) silently do nothing. Reusing the label would also
-/// make this `build()` fail outright with `WindowLabelAlreadyExists`.
+/// Gets a never-before-used label rather than reusing `"main"`: the
+/// tauri-cef runtime removes a destroyed window from its bookkeeping before
+/// the OS confirms the destruction, so the manager keeps thinking `"main"`
+/// is still alive and handles to it silently do nothing. Reusing the label
+/// would also make this `build()` fail with `WindowLabelAlreadyExists`.
 /// `capabilities/main.json` scopes its permissions to `main*` to cover
 /// whatever label ends up live.
 fn rebuild_main_window(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
@@ -128,23 +125,27 @@ fn rebuild_main_window(app: &AppHandle) -> tauri::Result<tauri::WebviewWindow> {
 /// everything. Opening the app again re-inits the tauri window (see
 /// `show_main_window`), reusing the same core process.
 pub(crate) fn quit_ui(app: &AppHandle) {
-    let shared = app.state::<SharedState>();
-    let Some(label) = shared.lock().ok().and_then(|s| s.main_window_label.clone()) else {
-        return;
-    };
-    if let Some(window) = app.get_webview_window(&label) {
-        if let Ok(mut s) = shared.lock() {
-            s.main_window_label = None;
-        }
-        refresh_menu(app);
+    let label = app.state::<SharedState>().lock().ok().and_then(|s| s.main_window_label.clone());
+    if let Some(window) = label.and_then(|label| app.get_webview_window(&label)) {
+        mark_ui_closed(app);
         let _ = window.destroy();
     }
 }
 
+/// Records that the main window is going away without keeping the app from
+/// running: clearing `main_window_label` is what makes the `ExitRequested`
+/// handler in `lib.rs` keep the process alive once the last window closes.
+pub(crate) fn mark_ui_closed(app: &AppHandle) {
+    if let Ok(mut s) = app.state::<SharedState>().lock() {
+        s.main_window_label = None;
+    }
+    refresh_menu(app);
+}
+
 /// tray-icon's Linux backend (muda + libappindicator) needs GTK initialized
-/// before it can build a menu. The wry runtime gets this for free from tao's
+/// before it can build a menu. wry gets this for free from tao's
 /// `EventLoop::new()`, but our CEF runtime's winit event loop never touches
-/// GTK, so nothing else in the app will have called `gtk::init()` yet.
+/// GTK, so nothing else will have called `gtk::init()` yet.
 #[cfg(target_os = "linux")]
 fn ensure_gtk_init(app: &AppHandle) {
     static INIT: std::sync::Once = std::sync::Once::new();
