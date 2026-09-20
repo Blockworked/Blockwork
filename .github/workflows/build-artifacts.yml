@@ -333,7 +333,20 @@ jobs:
       - name: Build Flatpak
         # Offline sandbox build, no host cargo build needed.
         run: |
-          flatpak-builder --force-clean --user --repo=flatpak-repo flatpak-build packaging/flatpak/com.blockworked.Blockwork.yml
+          manifest=packaging/flatpak/com.blockworked.Blockwork
+          awk '
+            /# BEGIN app-source/ {
+              print
+              print "      - type: dir"
+              print "        path: ../.."
+              print "        skip: [target, .git, .flatpak-builder, flatpak-build, flatpak-repo, node_modules, ui/node_modules, ui/dist, packaging/flatpak]"
+              skip = 1
+              next
+            }
+            /# END app-source/ { skip = 0 }
+            !skip
+          ' "$manifest.yml" > "$manifest.local.yml"
+          flatpak-builder --force-clean --user --repo=flatpak-repo flatpak-build "$manifest.local.yml"
           flatpak build-bundle flatpak-repo ${{ matrix.artifact_name }}.flatpak com.blockworked.Blockwork stable
 
       - name: Upload Flatpak artifact
