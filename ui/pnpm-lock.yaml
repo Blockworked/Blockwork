@@ -12,8 +12,8 @@ importers:
         specifier: ^2.0.0
         version: 2.11.1
       blockstitch:
-        specifier: github:Blockworked/blockstitch#2aef89e
-        version: https://codeload.github.com/Blockworked/blockstitch/tar.gz/2aef89eb716af8baf2fe63c1b5571b3c269d53a9(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3))
+        specifier: github:Blockworked/blockstitch#45bec2f8
+        version: https://codeload.github.com/Blockworked/blockstitch/tar.gz/45bec2f8b615c7ca636c905441c5571a4ea8c2cf(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3))
       lucide-vue-next:
         specifier: ^0.469.0
         version: 0.469.0(vue@3.5.39(typescript@5.9.3))
@@ -377,6 +377,11 @@ packages:
 
   '@volar/typescript@2.4.15':
     resolution: {integrity: sha512-2aZ8i0cqPGjXb4BhkMsPYDkkuc2ZQ6yOpqwAuNwUoncELqoy5fRgOQtLR9gB0g902iS0NAkvpIzs27geVyVdPg==}
+    peerDependencies:
+      typescript: '*'
+    peerDependenciesMeta:
+      typescript:
+        optional: true
 
   '@vue/compiler-core@3.5.39':
     resolution: {integrity: sha512-16KBTEXAJCpDr0mwlw+AZyhu8iyC7R3S2vBwsI7QnWJU6X3WKc9VKeNEZpiMdZ569qWhz9574L3vV55qRL0Vtw==}
@@ -424,8 +429,8 @@ packages:
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
 
-  blockstitch@https://codeload.github.com/Blockworked/blockstitch/tar.gz/2aef89eb716af8baf2fe63c1b5571b3c269d53a9:
-    resolution: {gitHosted: true, tarball: https://codeload.github.com/Blockworked/blockstitch/tar.gz/2aef89eb716af8baf2fe63c1b5571b3c269d53a9}
+  blockstitch@https://codeload.github.com/Blockworked/blockstitch/tar.gz/45bec2f8b615c7ca636c905441c5571a4ea8c2cf:
+    resolution: {gitHosted: true, integrity: sha512-xH7oVMxmjdeFoB/eJ5yh+oUPWlqfjiwY/2BPVPLooFIQKvEoKdvsQBg4Ox/dBVLVNIN49ZFmb/swUWVGHp6hRA==, tarball: https://codeload.github.com/Blockworked/blockstitch/tar.gz/45bec2f8b615c7ca636c905441c5571a4ea8c2cf}
     version: 0.1.0
     peerDependencies:
       lucide-vue-next: ^0.469.0
@@ -772,11 +777,13 @@ snapshots:
 
   '@volar/source-map@2.4.15': {}
 
-  '@volar/typescript@2.4.15':
+  '@volar/typescript@2.4.15(typescript@5.9.3)':
     dependencies:
       '@volar/language-core': 2.4.15
       path-browserify: 1.0.1
       vscode-uri: 3.1.0
+    optionalDependencies:
+      typescript: 5.9.3
 
   '@vue/compiler-core@3.5.39':
     dependencies:
@@ -854,7 +861,7 @@ snapshots:
 
   balanced-match@1.0.2: {}
 
-  blockstitch@https://codeload.github.com/Blockworked/blockstitch/tar.gz/2aef89eb716af8baf2fe63c1b5571b3c269d53a9(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3)):
+  blockstitch@https://codeload.github.com/Blockworked/blockstitch/tar.gz/45bec2f8b615c7ca636c905441c5571a4ea8c2cf(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3)):
     dependencies:
       lucide-vue-next: 0.469.0(vue@3.5.39(typescript@5.9.3))
       vue: 3.5.39(typescript@5.9.3)
@@ -995,7 +1002,7 @@ snapshots:
 
   vue-tsc@2.2.12(typescript@5.9.3):
     dependencies:
-      '@volar/typescript': 2.4.15
+      '@volar/typescript': 2.4.15(typescript@5.9.3)
       '@vue/language-core': 2.2.12(typescript@5.9.3)
       typescript: 5.9.3
 

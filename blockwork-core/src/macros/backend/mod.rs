@@ -40,18 +40,39 @@ pub trait InputBackend: Send + 'static {
     fn scroll(&mut self, amount: i32, axis: Axis) -> Result<(), String>;
     fn text(&mut self, s: &str) -> Result<(), String>;
     fn cursor_pos(&self) -> Option<(i32, i32)>;
+    /// Called when absolute recording starts, so `cursor_pos` is exact for it.
+    /// Only Wayland has work to do here (see `cursor_track`).
+    fn anchor_cursor(&mut self) -> Option<(i32, i32)> {
+        self.cursor_pos()
+    }
     /// Requests any platform permission needed for absolute mouse movement.
     fn ensure_absolute_mouse_support(&mut self) -> Result<(), String> {
         Ok(())
     }
 }
 
-/// Whether this session can read an absolute cursor position (checked before
-/// asking for a libei portal session on Linux).
+/// Whether this is a Wayland session, where absolute recording tracks the
+/// cursor rather than querying it (see `cursor_track`).
+pub fn is_wayland_session() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        wayland_display::is_wayland_session()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        false
+    }
+}
+
+/// Whether this session can report an absolute cursor position at all
+/// (checked before asking for a libei portal session on Linux).
 pub fn absolute_mouse_position_source_available() -> bool {
     #[cfg(target_os = "linux")]
     {
-        x11_cursor::is_available()
+        // Wayland has no cursor query, so the position is tracked instead;
+        // X11 answers `XQueryPointer` directly.
+        wayland_display::is_wayland_session() || x11_cursor::is_available()
     }
 
     #[cfg(not(target_os = "linux"))]
@@ -79,27 +100,12 @@ pub fn absolute_mouse_position_available() -> bool {
 pub fn absolute_mouse_position() -> Option<(i32, i32)> {
     #[cfg(target_os = "linux")]
     {
-        return x11_cursor::query_cursor_pos();
+        return cursor_track::current();
     }
 
     #[cfg(not(target_os = "linux"))]
     {
         None
-    }
-}
-
-/// (x, y) ratio from raw device-pixel deltas to the space
-/// `absolute_mouse_position` uses (logical pixels under Wayland). `(1.0, 1.0)`
-/// when they match or it can't be determined.
-pub fn absolute_delta_scale() -> (f64, f64) {
-    #[cfg(target_os = "linux")]
-    {
-        return x11_cursor::logical_delta_scale();
-    }
-
-    #[cfg(not(target_os = "linux"))]
-    {
-        (1.0, 1.0)
     }
 }
 
@@ -196,6 +202,8 @@ pub fn create_backend() -> Option<Arc<Mutex<dyn InputBackend>>> {
 pub mod evdev_mapping;
 #[cfg(target_os = "linux")]
 pub mod evdev;
+#[cfg(target_os = "linux")]
+mod cursor_track;
 #[cfg(target_os = "linux")]
 mod x11_cursor;
 #[cfg(target_os = "linux")]

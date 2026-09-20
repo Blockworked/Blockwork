@@ -135,8 +135,8 @@ impl Backend {
             text_edit_session: None,
             recording_phase: RecordingPhase::Idle,
             recording_countdown_generation: 0,
-            // Linux absolute recording needs XWayland for position reads and
-            // libei for absolute replay.
+            // Linux absolute recording needs libei, both to replay absolute
+            // moves and to place the cursor while recording.
             // Keep a saved absolute preference for a future supported session,
             // but force this one to record relative movement instead.
             record_mouse_relative: if absolute_mouse_position_available {
@@ -146,6 +146,7 @@ impl Backend {
             },
             record_mouse_movement: settings.record_mouse_movement.unwrap_or(false),
             absolute_mouse_position_available,
+            wayland_session: blockwork_core::macros::backend::is_wayland_session(),
             page: Page::Main,
             combo_capture: None,
             hotkey_bindings: vec![],

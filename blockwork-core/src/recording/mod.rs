@@ -57,9 +57,6 @@ static LAST_ELAPSED: OnceLock<Mutex<Option<Duration>>> = OnceLock::new();
 // pointer event.
 static LAST_RECORDED_MOUSE_MOVE: OnceLock<Mutex<Option<Duration>>> = OnceLock::new();
 static LAST_MOUSE_POS: OnceLock<Mutex<Option<(f64, f64)>>> = OnceLock::new();
-// The last raw XWayland cursor query. Keep this separate from LAST_MOUSE_POS:
-// the latter advances from evdev deltas while a query is stale.
-static LAST_CURSOR_QUERY: OnceLock<Mutex<Option<(i32, i32)>>> = OnceLock::new();
 // libei pauses after each pointer update while it services the portal. Do not
 // duplicate that time in a recorded wait.
 #[cfg(target_os = "linux")]
@@ -174,9 +171,6 @@ pub fn reset_timing() {
     if let Ok(mut p) = LAST_MOUSE_POS.get_or_init(|| Mutex::new(None)).lock() {
         *p = None;
     }
-    if let Ok(mut p) = LAST_CURSOR_QUERY.get_or_init(|| Mutex::new(None)).lock() {
-        *p = None;
-    }
     if let Ok(mut o) = HW_ELAPSED_OFFSET.get_or_init(|| Mutex::new(Duration::ZERO)).lock() {
         *o = Duration::ZERO;
     }
@@ -282,10 +276,10 @@ pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp)
             }
 
             // Always track the cursor so absolute recording and relative playback
-            // have a baseline. XWayland's query can go stale mid-re-emit, so
-            // keep integrating deltas until it changes.
+            // have a baseline. A real position source wins; integrating deltas is
+            // the fallback for platforms that report none.
             let prev_pos = get_last_mouse_pos();
-            let queried_absolute_pos = if RECORDING_ACTIVE.load(Ordering::Relaxed)
+            let absolute_pos = if RECORDING_ACTIVE.load(Ordering::Relaxed)
                 && !RECORD_MOUSE_RELATIVE.load(Ordering::Relaxed)
                 && matches!(event, CaptureEvent::MouseMoveRel(_, _))
             {
@@ -293,24 +287,12 @@ pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp)
             } else {
                 None
             };
-            let effective_absolute_pos = queried_absolute_pos.filter(|position| {
-                let last_query = LAST_CURSOR_QUERY.get_or_init(|| Mutex::new(None));
-                let Ok(mut last_query) = last_query.lock() else {
-                    return false;
-                };
-                let changed = *last_query != Some(*position);
-                *last_query = Some(*position);
-                changed
-            });
             match &event {
                 CaptureEvent::MouseMoveRel(dx, dy) => {
-                    if let Some((x, y)) = effective_absolute_pos {
+                    if let Some((x, y)) = absolute_pos {
                         set_last_mouse_pos(x as f64, y as f64);
                     } else if let Some((lx, ly)) = prev_pos {
-                        // `dx`/`dy` are device pixels but `prev_pos` is scaled logical
-                        // space; scale down or the estimate outruns the cursor.
-                        let (scale_x, scale_y) = backend::absolute_delta_scale();
-                        set_last_mouse_pos(lx + *dx as f64 * scale_x, ly + *dy as f64 * scale_y);
+                        set_last_mouse_pos(lx + *dx as f64, ly + *dy as f64);
                     }
                 }
                 CaptureEvent::MouseMoveAbs(x, y) => {
@@ -334,8 +316,8 @@ pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp)
                 }
 
                 let elapsed = elapsed_since_session_start(ts);
-                let absolute_event = effective_absolute_pos
-                    .map(|(x, y)| CaptureEvent::MouseMoveAbs(x as f64, y as f64));
+                let absolute_event =
+                    absolute_pos.map(|(x, y)| CaptureEvent::MouseMoveAbs(x as f64, y as f64));
                 let event_for_instruction = absolute_event.as_ref().unwrap_or(&event);
                 let instr = capture_event_to_instruction(event_for_instruction, prev_pos);
                 if let Some(instr) = instr {

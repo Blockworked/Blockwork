@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::io;
-use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
-use std::sync::{Mutex, OnceLock};
+use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::{Condvar, Mutex, OnceLock};
 
 use enigo::{Coordinate as EnigoCoordinate, Enigo, Mouse, Settings};
 use evdev::{
@@ -11,7 +11,9 @@ use evdev::{
 use tracing::warn;
 
 use crate::input::types::{Axis, Direction, MacroButton, MacroKey};
-use crate::macros::backend::{CaptureDecision, CaptureEvent, CaptureTimestamp, InputBackend};
+use crate::macros::backend::{
+    cursor_track, wayland_display, CaptureDecision, CaptureEvent, CaptureTimestamp, InputBackend,
+};
 
 use super::evdev_mapping::{
     char_to_evdev, evdev_button_from_code, evdev_key_to_macro_key, macro_button_to_evdev,
@@ -19,9 +21,13 @@ use super::evdev_mapping::{
 };
 
 static VIRTUAL_DEVICE: OnceLock<Mutex<VirtualDevice>> = OnceLock::new();
-static CURSOR_X: AtomicI32 = AtomicI32::new(0);
-static CURSOR_Y: AtomicI32 = AtomicI32::new(0);
+/// One libei connection per process, shared by absolute playback and the
+/// pointer driver below, so the portal only asks once.
+static LIBEI: OnceLock<Mutex<LibeiState>> = OnceLock::new();
 static LIBEI_AVAILABLE: AtomicBool = AtomicBool::new(false);
+/// Latched when a driven move fails, so a broken portal session degrades to
+/// plain re-emitted motion instead of a frozen cursor.
+static DRIVE_FAILED: AtomicBool = AtomicBool::new(false);
 
 pub(super) fn libei_available() -> bool {
     LIBEI_AVAILABLE.load(Ordering::Relaxed)
@@ -227,46 +233,152 @@ fn emit_key_click(key: KeyCode, needs_shift: bool) -> Result<(), String> {
     vd.emit(&events).map_err(|e| e.to_string())
 }
 
-pub struct EvdevBackend {
-    libei: LibeiState,
-}
+pub struct EvdevBackend;
 
 impl EvdevBackend {
     pub fn new() -> Result<Self, io::Error> {
         get_or_init_virtual_device()?;
-        Ok(Self {
-            libei: LibeiState::Unrequested,
-        })
+        Ok(Self)
     }
+}
 
-    fn move_mouse_abs_libei(&mut self, x: i32, y: i32) -> Result<(), String> {
-        let libei = self.ensure_libei()?;
-        libei
-            .move_mouse(x, y, EnigoCoordinate::Abs)
-            .map_err(|err| err.to_string())
-    }
+fn libei() -> &'static Mutex<LibeiState> {
+    LIBEI.get_or_init(|| Mutex::new(LibeiState::Unrequested))
+}
 
-    fn ensure_libei(&mut self) -> Result<&mut Enigo, String> {
-        if matches!(self.libei, LibeiState::Unrequested) {
-            self.libei = match create_libei() {
-                Ok(libei) => {
-                    LIBEI_AVAILABLE.store(true, Ordering::Relaxed);
-                    LibeiState::Available(libei)
-                }
-                Err(err) => {
-                    warn!("libei is unavailable: {}", err);
-                    LIBEI_AVAILABLE.store(false, Ordering::Relaxed);
-                    LibeiState::Unavailable
-                }
-            };
-        }
-        match &mut self.libei {
-            LibeiState::Available(libei) => Ok(libei),
-            LibeiState::Unrequested | LibeiState::Unavailable => {
-                Err("Absolute mouse movement isn't available.".to_string())
+/// Moves the cursor through libei and pins the tracked position to it, the
+/// one moment Wayland knows it exactly.
+fn move_mouse_abs_libei(x: i32, y: i32) -> Result<(), String> {
+    let mut state = libei().lock().map_err(|err| err.to_string())?;
+    ensure_libei(&mut state)?
+        .move_mouse(x, y, EnigoCoordinate::Abs)
+        .map_err(|err| err.to_string())?;
+    cursor_track::set_exact(f64::from(x), f64::from(y));
+    Ok(())
+}
+
+/// Opens the libei connection (and so the portal permission dialog) if it
+/// hasn't been opened yet.
+fn request_libei() -> Result<(), String> {
+    let mut state = libei().lock().map_err(|err| err.to_string())?;
+    ensure_libei(&mut state).map(|_| ())
+}
+
+fn ensure_libei(state: &mut LibeiState) -> Result<&mut Enigo, String> {
+    if matches!(state, LibeiState::Unrequested) {
+        *state = match create_libei() {
+            Ok(libei) => {
+                LIBEI_AVAILABLE.store(true, Ordering::Relaxed);
+                LibeiState::Available(libei)
             }
+            Err(err) => {
+                warn!("libei is unavailable: {}", err);
+                LIBEI_AVAILABLE.store(false, Ordering::Relaxed);
+                LibeiState::Unavailable
+            }
+        };
+    }
+    match state {
+        LibeiState::Available(libei) => Ok(libei),
+        LibeiState::Unrequested | LibeiState::Unavailable => {
+            Err("Absolute mouse movement isn't available.".to_string())
         }
     }
+}
+
+/// Pins the cursor to a known position so absolute recording starts from an
+/// exact origin rather than an integrated guess. Returns where it landed.
+pub(super) fn anchor_absolute_cursor() -> Option<(i32, i32)> {
+    DRIVE_FAILED.store(false, Ordering::Relaxed);
+    // Already exact, so don't jog the cursor. Still open libei: the driver
+    // is about to need it.
+    if cursor_track::is_exact()
+        && request_libei().is_ok()
+        && let Some((x, y)) = cursor_track::position()
+    {
+        return Some((round(x), round(y)));
+    }
+    let (x, y) = cursor_track::anchor_target()?;
+    let (x, y) = (round(x), round(y));
+    match move_mouse_abs_libei(x, y) {
+        Ok(()) => Some((x, y)),
+        Err(err) => {
+            warn!("could not pin the cursor for absolute recording: {}", err);
+            None
+        }
+    }
+}
+
+fn round(v: f64) -> i32 {
+    v.round() as i32
+}
+
+/// Absolute recording drives the cursor through libei rather than re-emitting
+/// raw deltas, so it records what it commanded. Targets coalesce: libei is
+/// slower per update than a mouse reports.
+#[derive(Default)]
+struct PointerDrive {
+    target: Mutex<Option<(i32, i32)>>,
+    posted: Condvar,
+}
+
+fn pointer_drive() -> &'static PointerDrive {
+    static DRIVE: OnceLock<PointerDrive> = OnceLock::new();
+    static THREAD: OnceLock<()> = OnceLock::new();
+    let drive = DRIVE.get_or_init(PointerDrive::default);
+    THREAD.get_or_init(|| {
+        std::thread::Builder::new()
+            .name("libei-pointer".into())
+            .spawn(move || drive_pointer(drive))
+            .ok();
+    });
+    drive
+}
+
+fn drive_pointer(drive: &'static PointerDrive) {
+    loop {
+        let target = {
+            let Ok(mut target) = drive.target.lock() else {
+                return;
+            };
+            while target.is_none() {
+                let Ok(next) = drive.posted.wait(target) else {
+                    return;
+                };
+                target = next;
+            }
+            target.take()
+        };
+        let Some((x, y)) = target else { continue };
+        if let Err(err) = move_mouse_abs_libei(x, y) {
+            warn!("absolute recording could not move the cursor: {}", err);
+            DRIVE_FAILED.store(true, Ordering::Relaxed);
+        }
+    }
+}
+
+/// Hands the cursor to the driver while absolute recording owns it. True
+/// means the raw event was consumed and must not also be re-emitted.
+fn drive_to(x: f64, y: f64) -> bool {
+    if !driving() {
+        return false;
+    }
+    let drive = pointer_drive();
+    let Ok(mut target) = drive.target.lock() else {
+        return false;
+    };
+    *target = Some((round(x), round(y)));
+    drive.posted.notify_one();
+    true
+}
+
+fn driving() -> bool {
+    crate::recording::RECORDING_ACTIVE.load(Ordering::Relaxed)
+        && crate::recording::RECORD_MOUSE_MOVEMENT.load(Ordering::Relaxed)
+        && !crate::recording::RECORD_MOUSE_RELATIVE.load(Ordering::Relaxed)
+        && !DRIVE_FAILED.load(Ordering::Relaxed)
+        && libei_available()
+        && wayland_display::is_wayland_session()
 }
 
 fn create_libei() -> Result<Enigo, String> {
@@ -347,8 +459,7 @@ impl InputBackend for EvdevBackend {
     }
 
     fn move_mouse_rel(&mut self, dx: i32, dy: i32) -> Result<(), String> {
-        CURSOR_X.fetch_add(dx, Ordering::Relaxed);
-        CURSOR_Y.fetch_add(dy, Ordering::Relaxed);
+        cursor_track::apply_device_delta(dx, dy);
         let vd = get_or_init_virtual_device().map_err(|e| e.to_string())?;
         let mut vd = vd.lock().unwrap();
         vd.emit(&[
@@ -360,12 +471,8 @@ impl InputBackend for EvdevBackend {
     }
 
     fn move_mouse_abs(&mut self, x: i32, y: i32) -> Result<(), String> {
-        // XWayland's pointer position goes stale after compositor-side moves,
-        // so a libei move can't be verified by reading the cursor back.
-        if let Err(err) = self.move_mouse_abs_libei(x, y) {
-            if std::env::var_os("WAYLAND_DISPLAY").is_some()
-                || std::env::var_os("WAYLAND_SOCKET").is_some()
-            {
+        if let Err(err) = move_mouse_abs_libei(x, y) {
+            if wayland_display::is_wayland_session() {
                 return Err(format!("Absolute mouse movement failed: {err}"));
             }
             warn!(
@@ -376,11 +483,8 @@ impl InputBackend for EvdevBackend {
             return Ok(());
         }
 
-        // uinput has no absolute-positioning axis for a virtual mouse, so
-        // this has to land on an exact pixel by computing a relative delta
-        // from the real current position (re-queried fresh, not the
-        // free-running CURSOR_X/Y estimate - see `cursor_pos`) and emitting
-        // that.
+        // X11 only: a virtual uinput mouse has no absolute axis, so hitting an
+        // exact pixel means querying the cursor and emitting the delta.
         let (cur_x, cur_y) = self.cursor_pos().unwrap_or((0, 0));
         let dx = x - cur_x;
         let dy = y - cur_y;
@@ -425,24 +529,18 @@ impl InputBackend for EvdevBackend {
     }
 
     fn cursor_pos(&self) -> Option<(i32, i32)> {
-        // Prefer the real, compositor-tracked position (via XWayland) when
-        // reachable - see `x11_cursor`'s doc comment for why the free-running
-        // CURSOR_X/Y sum can't be trusted as ground truth. Re-anchor that sum
-        // to what we just learned so it stays a reasonable estimate for the
-        // (rarer) case a later call has no X11 to query.
-        if let Some(pos) = super::x11_cursor::query_cursor_pos() {
-            CURSOR_X.store(pos.0, Ordering::Relaxed);
-            CURSOR_Y.store(pos.1, Ordering::Relaxed);
-            return Some(pos);
+        cursor_track::current()
+    }
+
+    fn anchor_cursor(&mut self) -> Option<(i32, i32)> {
+        if wayland_display::is_wayland_session() {
+            return anchor_absolute_cursor().or_else(|| self.cursor_pos());
         }
-        Some((
-            CURSOR_X.load(Ordering::Relaxed),
-            CURSOR_Y.load(Ordering::Relaxed),
-        ))
+        self.cursor_pos()
     }
 
     fn ensure_absolute_mouse_support(&mut self) -> Result<(), String> {
-        self.ensure_libei().map(|_| ())
+        request_libei()
     }
 }
 
@@ -778,10 +876,12 @@ pub(super) fn start_capture_thread(
                                     .map(|e| e.timestamp())
                                     .unwrap_or_else(std::time::SystemTime::now),
                             );
-                            CURSOR_X.fetch_add(dx, Ordering::Relaxed);
-                            CURSOR_Y.fetch_add(dy, Ordering::Relaxed);
+                            // Absolute recording steers the cursor itself, so
+                            // the raw motion is swallowed rather than re-emitted.
+                            let driven = cursor_track::apply_device_delta(dx, dy)
+                                .is_some_and(|(x, y)| drive_to(x, y));
                             match callback(CaptureEvent::MouseMoveRel(dx, dy), ts) {
-                                CaptureDecision::Passthrough => {
+                                CaptureDecision::Passthrough if !driven => {
                                     let mut events: Vec<InputEvent> = Vec::with_capacity(3);
                                     if let Some(e) = raw_x { events.push(e); }
                                     if let Some(e) = raw_y { events.push(e); }
@@ -789,7 +889,7 @@ pub(super) fn start_capture_thread(
                                         reemit(vd, &events);
                                     }
                                 }
-                                CaptureDecision::Suppress => {}
+                                _ => {}
                             }
                         }
                         DeviceMsg::Scroll { v, h, raw_v, raw_h } => {
@@ -819,8 +919,9 @@ pub(super) fn start_capture_thread(
                             reemit(vd, &events);
                         }
                         DeviceMsg::TouchpadMove { dx, dy, ts } => {
-                            CURSOR_X.fetch_add(dx, Ordering::Relaxed);
-                            CURSOR_Y.fetch_add(dy, Ordering::Relaxed);
+                            // Not grabbed, so the compositor moved the cursor
+                            // already: track it, never drive it.
+                            cursor_track::apply_device_delta(dx, dy);
                             // Never grabbed, so its real motion already
                             // reached the desktop untouched - nothing to
                             // suppress or re-emit, only observe.

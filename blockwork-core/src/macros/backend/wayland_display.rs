@@ -1,8 +1,6 @@
 //! Read the desktop's logical coordinate bounds through XDG Output.
 //!
-//! XWayland exposes its own pixel-sized virtual root. libei uses the Wayland
-//! desktop's logical coordinate space, which differs when outputs have a
-//! scale factor or a non-trivial layout.
+//! libei places the cursor in this space, and `cursor_track` clamps to it.
 
 use std::sync::OnceLock;
 
@@ -21,6 +19,12 @@ pub struct DesktopBounds {
     pub height: i32,
 }
 
+/// Whether this session talks to a Wayland compositor, which decides where
+/// the cursor position comes from (see `cursor_track`).
+pub fn is_wayland_session() -> bool {
+    std::env::var_os("WAYLAND_DISPLAY").is_some() || std::env::var_os("WAYLAND_SOCKET").is_some()
+}
+
 pub fn logical_desktop_bounds() -> Option<DesktopBounds> {
     static BOUNDS: OnceLock<Option<DesktopBounds>> = OnceLock::new();
     *BOUNDS.get_or_init(query_logical_desktop_bounds)
@@ -28,7 +32,6 @@ pub fn logical_desktop_bounds() -> Option<DesktopBounds> {
 
 #[derive(Clone)]
 pub struct LogicalOutput {
-    pub name: String,
     pub bounds: DesktopBounds,
 }
 
@@ -48,7 +51,6 @@ fn query_logical_outputs() -> Option<Vec<LogicalOutput>> {
         .into_iter()
         .filter_map(|output| {
             Some(LogicalOutput {
-                name: output.name?,
                 bounds: DesktopBounds {
                     x: output.logical_position?.0,
                     y: output.logical_position?.1,
@@ -63,8 +65,7 @@ fn query_logical_outputs() -> Option<Vec<LogicalOutput>> {
 }
 
 fn desktop_state() -> Option<OutputState> {
-    if std::env::var_os("WAYLAND_DISPLAY").is_none() && std::env::var_os("WAYLAND_SOCKET").is_none()
-    {
+    if !is_wayland_session() {
         return None;
     }
 
@@ -89,7 +90,6 @@ struct Output {
     output: wl_output::WlOutput,
     logical_position: Option<(i32, i32)>,
     logical_size: Option<(i32, i32)>,
-    name: Option<String>,
 }
 
 impl OutputState {
@@ -166,7 +166,6 @@ impl Dispatch<wl_registry::WlRegistry, ()> for OutputState {
                 output,
                 logical_position: None,
                 logical_size: None,
-                name: None,
             });
         } else if interface == zxdg_output_manager_v1::ZxdgOutputManagerV1::interface().name {
             state.manager = Some(
@@ -201,7 +200,6 @@ impl Dispatch<zxdg_output_v1::ZxdgOutputV1, wl_output::WlOutput> for OutputState
             zxdg_output_v1::Event::LogicalSize { width, height } => {
                 entry.logical_size = Some((width, height))
             }
-            zxdg_output_v1::Event::Name { name } => entry.name = Some(name),
             _ => {}
         }
     }

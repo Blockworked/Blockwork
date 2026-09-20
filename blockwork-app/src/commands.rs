@@ -2314,11 +2314,20 @@ pub(crate) fn set_global_speed_multiplier(
 /// reports onto a known starting point. Best-effort: if the backend can't
 /// report a position, absolute recording waits for a later seed.
 fn seed_recording_mouse_pos(s: &crate::state::AppState) {
-    if let Some((x, y)) = s
-        .emulator
-        .as_ref()
-        .and_then(|e| e.lock().ok()?.cursor_pos())
-    {
+    let Some(emulator) = s.emulator.as_ref() else {
+        return;
+    };
+    let Ok(mut emulator) = emulator.lock() else {
+        return;
+    };
+    // Absolute recording needs an exact origin, which on Wayland means placing
+    // the cursor rather than asking where it is.
+    let pos = if s.record_mouse_relative || !s.record_mouse_movement {
+        emulator.cursor_pos()
+    } else {
+        emulator.anchor_cursor()
+    };
+    if let Some((x, y)) = pos {
         recording::set_last_mouse_pos(x as f64, y as f64);
     }
 }
@@ -2424,7 +2433,7 @@ pub(crate) async fn toggle_record_mouse_relative(
     relative: bool,
 ) -> Result<(), String> {
     if !relative && !blockwork_core::macros::backend::absolute_mouse_position_source_available() {
-        return Err("Absolute mouse recording requires an available XWayland display.".to_string());
+        return Err("Absolute mouse recording isn't available in this session.".to_string());
     }
     if !relative && !blockwork_core::macros::backend::absolute_mouse_position_available() {
         request_absolute_mouse_support(state, app).await?;

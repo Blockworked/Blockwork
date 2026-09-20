@@ -401,6 +401,7 @@ export interface StateDto {
   record_mouse_relative: boolean;
   record_mouse_movement: boolean;
   absolute_mouse_position_available: boolean;
+  wayland_session: boolean;
   page: PageName;
   combo_capture: ComboCaptureDto | null;
   hotkey_bindings: HotkeyBindingDto[];
@@ -437,6 +438,7 @@ export function emptyState(): StateDto {
     record_mouse_relative: true,
     record_mouse_movement: false,
     absolute_mouse_position_available: true,
+    wayland_session: false,
     page: 'Main',
     combo_capture: null,
     hotkey_bindings: [],
