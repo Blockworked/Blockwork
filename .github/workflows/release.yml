@@ -259,22 +259,23 @@ jobs:
           wget -q -O linuxdeploy.AppImage "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.linux_arch }}.AppImage"
           wget -q -O linuxdeploy-plugin-appimage.AppImage "https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-${{ matrix.linux_arch }}.AppImage"
           chmod +x linuxdeploy.AppImage linuxdeploy-plugin-appimage.AppImage
+          mkdir -p appimage-staging
           # Exec entry wants a binary named blockwork.
-          cp ${{ matrix.artifact_name }} blockwork
+          cp ${{ matrix.artifact_name }} appimage-staging/blockwork
 
           # CEF runtime sits next to the binary in target/<triple>/release.
           # linuxdeploy only finds libcef.so via ldd, so copy the rest by hand.
           CEF_DIR="target/${{ matrix.target }}/release"
-          cp "$CEF_DIR/libcef.so" .
+          cp "$CEF_DIR/libcef.so" appimage-staging/
           # Daemon ships next to blockwork in usr/bin.
-          cp "$CEF_DIR/blockwork-daemon" .
+          cp "$CEF_DIR/blockwork-daemon" appimage-staging/
 
           export LINUXDEPLOY_EXCLUDED_LIBRARIES="libnspr4.so;libplc4.so;libplds4.so;libnss3.so;libnssutil3.so;libsmime3.so"
 
           ./linuxdeploy.AppImage \
             --appdir AppDir \
-            --executable ./blockwork \
-            --executable ./blockwork-daemon \
+            --executable ./appimage-staging/blockwork \
+            --executable ./appimage-staging/blockwork-daemon \
             --desktop-file res/blockwork.desktop \
             --icon-file res/icons/blockwork.png
 
