@@ -343,7 +343,7 @@ jobs:
             /# END app-source/ { skip = 0 }
             !skip
           ' "$manifest.yml" > "$manifest.local.yml"
-          flatpak-builder --force-clean --user --repo=flatpak-repo flatpak-build "$manifest.local.yml"
+          flatpak-builder --force-clean --user --default-branch=stable --repo=flatpak-repo flatpak-build "$manifest.local.yml"
           flatpak build-bundle flatpak-repo ${{ matrix.artifact_name }}.flatpak com.blockworked.Blockwork stable
 
       - name: Upload Flatpak artifact

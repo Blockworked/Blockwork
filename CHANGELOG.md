@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Tag releases (`0.x.y`, see `.github/workflows/release.yml`) publish the matching
 section below as the GitHub release notes, followed by the downloads table.
 
-## [Unreleased]
+## [0.5.4] - 2026-09-20
 
 ### Added
 - Flatpak packaging for Flathub.
@@ -17,6 +17,7 @@ section below as the GitHub release notes, followed by the downloads table.
 ### Changed
 - Split into a background daemon and the editor window; closing the window
   frees its memory.
+- The linux backend now uses libei for absolute mouse positions.
 
 ### Fixed
 - Freeze when closing to tray on Wayland.
@@ -142,7 +143,8 @@ Initial release.
 - Global shortcuts (navigation, loop mode) on Linux; global keybinds on Windows.
 - App icons, updater and confirm dialogs, Wayland support.
 
-[Unreleased]: https://github.com/Blockworked/Blockwork/compare/0.5.3...HEAD
+[Unreleased]: https://github.com/Blockworked/Blockwork/compare/0.5.4...HEAD
+[0.5.4]: https://github.com/Blockworked/Blockwork/compare/0.5.3...0.5.4
 [0.5.3]: https://github.com/Blockworked/Blockwork/compare/0.5.2...0.5.3
 [0.5.2]: https://github.com/Blockworked/Blockwork/compare/0.5.1...0.5.2
 [0.5.1]: https://github.com/Blockworked/Blockwork/compare/0.5.0...0.5.1
