@@ -105,7 +105,7 @@ fn main() {
                 MainThreadEvent::SetTrayVisible(visible) => tray.set_visible(visible),
                 MainThreadEvent::OpenUi => {
                     if !clients.focus_ui() {
-                        server::spawn_ui();
+                        server::spawn_ui(&clients);
                     }
                 }
                 MainThreadEvent::Quit => {

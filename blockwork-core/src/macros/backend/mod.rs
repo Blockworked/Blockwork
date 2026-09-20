@@ -40,11 +40,15 @@ pub trait InputBackend: Send + 'static {
     fn scroll(&mut self, amount: i32, axis: Axis) -> Result<(), String>;
     fn text(&mut self, s: &str) -> Result<(), String>;
     fn cursor_pos(&self) -> Option<(i32, i32)>;
+    /// Requests any platform permission needed for absolute mouse movement.
+    fn ensure_absolute_mouse_support(&mut self) -> Result<(), String> {
+        Ok(())
+    }
 }
 
-/// Whether this session has an accurate global cursor-position source for
-/// absolute mouse recording. Linux currently uses XWayland for that source.
-pub fn absolute_mouse_position_available() -> bool {
+/// Whether this session can read an absolute cursor position (checked before
+/// asking for a libei portal session on Linux).
+pub fn absolute_mouse_position_source_available() -> bool {
     #[cfg(target_os = "linux")]
     {
         x11_cursor::is_available()
@@ -53,6 +57,49 @@ pub fn absolute_mouse_position_available() -> bool {
     #[cfg(not(target_os = "linux"))]
     {
         true
+    }
+}
+
+/// Whether absolute movement is ready to use, including any required portal
+/// permission. This remains false until the first absolute-mouse request.
+pub fn absolute_mouse_position_available() -> bool {
+    #[cfg(target_os = "linux")]
+    {
+        evdev::libei_available()
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        true
+    }
+}
+
+/// Returns the current cursor position in the coordinate space used by
+/// absolute playback, when the active platform can provide one.
+pub fn absolute_mouse_position() -> Option<(i32, i32)> {
+    #[cfg(target_os = "linux")]
+    {
+        return x11_cursor::query_cursor_pos();
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        None
+    }
+}
+
+/// (x, y) ratio from raw device-pixel deltas to the space
+/// `absolute_mouse_position` uses (logical pixels under Wayland). `(1.0, 1.0)`
+/// when they match or it can't be determined.
+pub fn absolute_delta_scale() -> (f64, f64) {
+    #[cfg(target_os = "linux")]
+    {
+        return x11_cursor::logical_delta_scale();
+    }
+
+    #[cfg(not(target_os = "linux"))]
+    {
+        (1.0, 1.0)
     }
 }
 
@@ -151,6 +198,8 @@ pub mod evdev_mapping;
 pub mod evdev;
 #[cfg(target_os = "linux")]
 mod x11_cursor;
+#[cfg(target_os = "linux")]
+mod wayland_display;
 
 #[cfg(windows)]
 pub mod windows;

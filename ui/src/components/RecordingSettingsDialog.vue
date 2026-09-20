@@ -28,11 +28,7 @@ const emit = defineEmits<{ close: [] }>();
           class="settings-row"
           :class="{
             'row-disabled': !state.record_mouse_movement,
-            'row-unavailable': !state.absolute_mouse_position_available,
           }"
-          :title="!state.absolute_mouse_position_available
-            ? 'Absolute mouse recording requires XWayland in the current session.'
-            : undefined"
         >
           <SwitchControl
             :model-value="state.record_mouse_relative"
@@ -44,8 +40,6 @@ const emit = defineEmits<{ close: [] }>();
         <p class="settings-row-hint">
           {{ !state.record_mouse_movement
             ? 'Mouse movement isn’t recorded; only clicks, scrolls, and keys are.'
-            : !state.absolute_mouse_position_available
-              ? 'Absolute recording is unavailable because XWayland is not running. Movement is recorded as relative motion.'
             : state.record_mouse_relative
               ? 'Movement is recorded as deltas from the cursor’s previous position.'
               : 'Movement is recorded as absolute positions on screen.' }}
@@ -70,8 +64,4 @@ const emit = defineEmits<{ close: [] }>();
   pointer-events: none;
 }
 
-.row-unavailable {
-  opacity: 0.5;
-  pointer-events: none;
-}
 </style>

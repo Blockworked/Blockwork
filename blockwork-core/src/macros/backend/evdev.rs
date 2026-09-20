@@ -1,9 +1,13 @@
 use std::collections::HashSet;
 use std::io;
-use std::sync::atomic::{AtomicI32, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicI32, Ordering};
 use std::sync::{Mutex, OnceLock};
 
-use evdev::{AbsoluteAxisCode, AttributeSet, EventType, InputEvent, KeyCode, PropType, RelativeAxisCode, uinput::VirtualDevice, uinput::VirtualDeviceBuilder};
+use enigo::{Coordinate as EnigoCoordinate, Enigo, Mouse, Settings};
+use evdev::{
+    uinput::VirtualDevice, uinput::VirtualDeviceBuilder, AbsoluteAxisCode, AttributeSet, EventType,
+    InputEvent, KeyCode, PropType, RelativeAxisCode,
+};
 use tracing::warn;
 
 use crate::input::types::{Axis, Direction, MacroButton, MacroKey};
@@ -17,6 +21,11 @@ use super::evdev_mapping::{
 static VIRTUAL_DEVICE: OnceLock<Mutex<VirtualDevice>> = OnceLock::new();
 static CURSOR_X: AtomicI32 = AtomicI32::new(0);
 static CURSOR_Y: AtomicI32 = AtomicI32::new(0);
+static LIBEI_AVAILABLE: AtomicBool = AtomicBool::new(false);
+
+pub(super) fn libei_available() -> bool {
+    LIBEI_AVAILABLE.load(Ordering::Relaxed)
+}
 
 fn syn_event() -> InputEvent {
     InputEvent::new(EventType::SYNCHRONIZATION.0, 0, 0)
@@ -29,48 +38,138 @@ fn get_or_init_virtual_device() -> Result<&'static Mutex<VirtualDevice>, io::Err
     let vd = build_virtual_device()?;
     // Ignore error if another thread initialized it first.
     let _ = VIRTUAL_DEVICE.set(Mutex::new(vd));
-    VIRTUAL_DEVICE.get().ok_or_else(|| io::Error::other("virtual device init race"))
+    VIRTUAL_DEVICE
+        .get()
+        .ok_or_else(|| io::Error::other("virtual device init race"))
 }
 
 fn build_virtual_device() -> io::Result<VirtualDevice> {
     let mut keys = AttributeSet::<KeyCode>::new();
     for k in [
-        KeyCode::KEY_A, KeyCode::KEY_B, KeyCode::KEY_C, KeyCode::KEY_D, KeyCode::KEY_E,
-        KeyCode::KEY_F, KeyCode::KEY_G, KeyCode::KEY_H, KeyCode::KEY_I, KeyCode::KEY_J,
-        KeyCode::KEY_K, KeyCode::KEY_L, KeyCode::KEY_M, KeyCode::KEY_N, KeyCode::KEY_O,
-        KeyCode::KEY_P, KeyCode::KEY_Q, KeyCode::KEY_R, KeyCode::KEY_S, KeyCode::KEY_T,
-        KeyCode::KEY_U, KeyCode::KEY_V, KeyCode::KEY_W, KeyCode::KEY_X, KeyCode::KEY_Y,
+        KeyCode::KEY_A,
+        KeyCode::KEY_B,
+        KeyCode::KEY_C,
+        KeyCode::KEY_D,
+        KeyCode::KEY_E,
+        KeyCode::KEY_F,
+        KeyCode::KEY_G,
+        KeyCode::KEY_H,
+        KeyCode::KEY_I,
+        KeyCode::KEY_J,
+        KeyCode::KEY_K,
+        KeyCode::KEY_L,
+        KeyCode::KEY_M,
+        KeyCode::KEY_N,
+        KeyCode::KEY_O,
+        KeyCode::KEY_P,
+        KeyCode::KEY_Q,
+        KeyCode::KEY_R,
+        KeyCode::KEY_S,
+        KeyCode::KEY_T,
+        KeyCode::KEY_U,
+        KeyCode::KEY_V,
+        KeyCode::KEY_W,
+        KeyCode::KEY_X,
+        KeyCode::KEY_Y,
         KeyCode::KEY_Z,
-        KeyCode::KEY_1, KeyCode::KEY_2, KeyCode::KEY_3, KeyCode::KEY_4, KeyCode::KEY_5,
-        KeyCode::KEY_6, KeyCode::KEY_7, KeyCode::KEY_8, KeyCode::KEY_9, KeyCode::KEY_0,
-        KeyCode::KEY_MINUS, KeyCode::KEY_EQUAL, KeyCode::KEY_LEFTBRACE, KeyCode::KEY_RIGHTBRACE,
-        KeyCode::KEY_BACKSLASH, KeyCode::KEY_SEMICOLON, KeyCode::KEY_APOSTROPHE, KeyCode::KEY_GRAVE,
-        KeyCode::KEY_COMMA, KeyCode::KEY_DOT, KeyCode::KEY_SLASH,
-        KeyCode::KEY_ENTER, KeyCode::KEY_BACKSPACE, KeyCode::KEY_TAB, KeyCode::KEY_SPACE,
-        KeyCode::KEY_ESC, KeyCode::KEY_DELETE, KeyCode::KEY_INSERT,
-        KeyCode::KEY_HOME, KeyCode::KEY_END, KeyCode::KEY_PAGEUP, KeyCode::KEY_PAGEDOWN,
-        KeyCode::KEY_UP, KeyCode::KEY_DOWN, KeyCode::KEY_LEFT, KeyCode::KEY_RIGHT,
-        KeyCode::KEY_LEFTSHIFT, KeyCode::KEY_RIGHTSHIFT,
-        KeyCode::KEY_LEFTCTRL, KeyCode::KEY_RIGHTCTRL,
-        KeyCode::KEY_LEFTALT, KeyCode::KEY_RIGHTALT,
-        KeyCode::KEY_LEFTMETA, KeyCode::KEY_RIGHTMETA,
-        KeyCode::KEY_CAPSLOCK, KeyCode::KEY_NUMLOCK, KeyCode::KEY_SCROLLLOCK,
-        KeyCode::KEY_PAUSE, KeyCode::KEY_SYSRQ,
-        KeyCode::KEY_F1, KeyCode::KEY_F2, KeyCode::KEY_F3, KeyCode::KEY_F4,
-        KeyCode::KEY_F5, KeyCode::KEY_F6, KeyCode::KEY_F7, KeyCode::KEY_F8,
-        KeyCode::KEY_F9, KeyCode::KEY_F10, KeyCode::KEY_F11, KeyCode::KEY_F12,
-        KeyCode::KEY_F13, KeyCode::KEY_F14, KeyCode::KEY_F15, KeyCode::KEY_F16,
-        KeyCode::KEY_F17, KeyCode::KEY_F18, KeyCode::KEY_F19, KeyCode::KEY_F20,
-        KeyCode::KEY_F21, KeyCode::KEY_F22, KeyCode::KEY_F23, KeyCode::KEY_F24,
-        KeyCode::KEY_KP0, KeyCode::KEY_KP1, KeyCode::KEY_KP2, KeyCode::KEY_KP3,
-        KeyCode::KEY_KP4, KeyCode::KEY_KP5, KeyCode::KEY_KP6, KeyCode::KEY_KP7,
-        KeyCode::KEY_KP8, KeyCode::KEY_KP9,
-        KeyCode::KEY_KPPLUS, KeyCode::KEY_KPMINUS, KeyCode::KEY_KPASTERISK,
-        KeyCode::KEY_KPSLASH, KeyCode::KEY_KPDOT, KeyCode::KEY_KPENTER,
-        KeyCode::KEY_VOLUMEDOWN, KeyCode::KEY_MUTE, KeyCode::KEY_VOLUMEUP,
+        KeyCode::KEY_1,
+        KeyCode::KEY_2,
+        KeyCode::KEY_3,
+        KeyCode::KEY_4,
+        KeyCode::KEY_5,
+        KeyCode::KEY_6,
+        KeyCode::KEY_7,
+        KeyCode::KEY_8,
+        KeyCode::KEY_9,
+        KeyCode::KEY_0,
+        KeyCode::KEY_MINUS,
+        KeyCode::KEY_EQUAL,
+        KeyCode::KEY_LEFTBRACE,
+        KeyCode::KEY_RIGHTBRACE,
+        KeyCode::KEY_BACKSLASH,
+        KeyCode::KEY_SEMICOLON,
+        KeyCode::KEY_APOSTROPHE,
+        KeyCode::KEY_GRAVE,
+        KeyCode::KEY_COMMA,
+        KeyCode::KEY_DOT,
+        KeyCode::KEY_SLASH,
+        KeyCode::KEY_ENTER,
+        KeyCode::KEY_BACKSPACE,
+        KeyCode::KEY_TAB,
+        KeyCode::KEY_SPACE,
+        KeyCode::KEY_ESC,
+        KeyCode::KEY_DELETE,
+        KeyCode::KEY_INSERT,
+        KeyCode::KEY_HOME,
+        KeyCode::KEY_END,
+        KeyCode::KEY_PAGEUP,
+        KeyCode::KEY_PAGEDOWN,
+        KeyCode::KEY_UP,
+        KeyCode::KEY_DOWN,
+        KeyCode::KEY_LEFT,
+        KeyCode::KEY_RIGHT,
+        KeyCode::KEY_LEFTSHIFT,
+        KeyCode::KEY_RIGHTSHIFT,
+        KeyCode::KEY_LEFTCTRL,
+        KeyCode::KEY_RIGHTCTRL,
+        KeyCode::KEY_LEFTALT,
+        KeyCode::KEY_RIGHTALT,
+        KeyCode::KEY_LEFTMETA,
+        KeyCode::KEY_RIGHTMETA,
+        KeyCode::KEY_CAPSLOCK,
+        KeyCode::KEY_NUMLOCK,
+        KeyCode::KEY_SCROLLLOCK,
+        KeyCode::KEY_PAUSE,
+        KeyCode::KEY_SYSRQ,
+        KeyCode::KEY_F1,
+        KeyCode::KEY_F2,
+        KeyCode::KEY_F3,
+        KeyCode::KEY_F4,
+        KeyCode::KEY_F5,
+        KeyCode::KEY_F6,
+        KeyCode::KEY_F7,
+        KeyCode::KEY_F8,
+        KeyCode::KEY_F9,
+        KeyCode::KEY_F10,
+        KeyCode::KEY_F11,
+        KeyCode::KEY_F12,
+        KeyCode::KEY_F13,
+        KeyCode::KEY_F14,
+        KeyCode::KEY_F15,
+        KeyCode::KEY_F16,
+        KeyCode::KEY_F17,
+        KeyCode::KEY_F18,
+        KeyCode::KEY_F19,
+        KeyCode::KEY_F20,
+        KeyCode::KEY_F21,
+        KeyCode::KEY_F22,
+        KeyCode::KEY_F23,
+        KeyCode::KEY_F24,
+        KeyCode::KEY_KP0,
+        KeyCode::KEY_KP1,
+        KeyCode::KEY_KP2,
+        KeyCode::KEY_KP3,
+        KeyCode::KEY_KP4,
+        KeyCode::KEY_KP5,
+        KeyCode::KEY_KP6,
+        KeyCode::KEY_KP7,
+        KeyCode::KEY_KP8,
+        KeyCode::KEY_KP9,
+        KeyCode::KEY_KPPLUS,
+        KeyCode::KEY_KPMINUS,
+        KeyCode::KEY_KPASTERISK,
+        KeyCode::KEY_KPSLASH,
+        KeyCode::KEY_KPDOT,
+        KeyCode::KEY_KPENTER,
+        KeyCode::KEY_VOLUMEDOWN,
+        KeyCode::KEY_MUTE,
+        KeyCode::KEY_VOLUMEUP,
         KeyCode::KEY_SELECT,
-        KeyCode::BTN_LEFT, KeyCode::BTN_RIGHT, KeyCode::BTN_MIDDLE,
-        KeyCode::BTN_BACK, KeyCode::BTN_FORWARD,
+        KeyCode::BTN_LEFT,
+        KeyCode::BTN_RIGHT,
+        KeyCode::BTN_MIDDLE,
+        KeyCode::BTN_BACK,
+        KeyCode::BTN_FORWARD,
     ] {
         keys.insert(k);
     }
@@ -109,24 +208,82 @@ fn emit_key_click(key: KeyCode, needs_shift: bool) -> Result<(), String> {
     let mut vd = vd.lock().unwrap();
     let mut events: Vec<InputEvent> = Vec::with_capacity(6);
     if needs_shift {
-        events.push(InputEvent::new(EventType::KEY.0, KeyCode::KEY_LEFTSHIFT.0, 1));
+        events.push(InputEvent::new(
+            EventType::KEY.0,
+            KeyCode::KEY_LEFTSHIFT.0,
+            1,
+        ));
     }
     events.push(InputEvent::new(EventType::KEY.0, key.0, 1));
     events.push(InputEvent::new(EventType::KEY.0, key.0, 0));
     if needs_shift {
-        events.push(InputEvent::new(EventType::KEY.0, KeyCode::KEY_LEFTSHIFT.0, 0));
+        events.push(InputEvent::new(
+            EventType::KEY.0,
+            KeyCode::KEY_LEFTSHIFT.0,
+            0,
+        ));
     }
     events.push(syn_event());
     vd.emit(&events).map_err(|e| e.to_string())
 }
 
-pub struct EvdevBackend;
+pub struct EvdevBackend {
+    libei: LibeiState,
+}
 
 impl EvdevBackend {
     pub fn new() -> Result<Self, io::Error> {
         get_or_init_virtual_device()?;
-        Ok(Self)
+        Ok(Self {
+            libei: LibeiState::Unrequested,
+        })
     }
+
+    fn move_mouse_abs_libei(&mut self, x: i32, y: i32) -> Result<(), String> {
+        let libei = self.ensure_libei()?;
+        libei
+            .move_mouse(x, y, EnigoCoordinate::Abs)
+            .map_err(|err| err.to_string())
+    }
+
+    fn ensure_libei(&mut self) -> Result<&mut Enigo, String> {
+        if matches!(self.libei, LibeiState::Unrequested) {
+            self.libei = match create_libei() {
+                Ok(libei) => {
+                    LIBEI_AVAILABLE.store(true, Ordering::Relaxed);
+                    LibeiState::Available(libei)
+                }
+                Err(err) => {
+                    warn!("libei is unavailable: {}", err);
+                    LIBEI_AVAILABLE.store(false, Ordering::Relaxed);
+                    LibeiState::Unavailable
+                }
+            };
+        }
+        match &mut self.libei {
+            LibeiState::Available(libei) => Ok(libei),
+            LibeiState::Unrequested | LibeiState::Unavailable => {
+                Err("Absolute mouse movement isn't available.".to_string())
+            }
+        }
+    }
+}
+
+fn create_libei() -> Result<Enigo, String> {
+    // The portal implementation lives outside this process and enigo's
+    // libei setup currently unwraps a few portal replies. Treat a rejected
+    // or unavailable portal as an input failure, never a daemon crash.
+    std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
+        Enigo::new(&Settings::default())
+    }))
+    .map_err(|_| "Absolute mouse movement isn't available.".to_string())?
+    .map_err(|err| err.to_string())
+}
+
+enum LibeiState {
+    Unrequested,
+    Available(Enigo),
+    Unavailable,
 }
 
 impl InputBackend for EvdevBackend {
@@ -173,7 +330,10 @@ impl InputBackend for EvdevBackend {
             let vd = get_or_init_virtual_device().map_err(|e| e.to_string())?;
             let mut vd = vd.lock().unwrap();
             return vd
-                .emit(&[InputEvent::new(EventType::RELATIVE.0, axis.0, amount), syn_event()])
+                .emit(&[
+                    InputEvent::new(EventType::RELATIVE.0, axis.0, amount),
+                    syn_event(),
+                ])
                 .map_err(|e| e.to_string());
         }
 
@@ -200,6 +360,22 @@ impl InputBackend for EvdevBackend {
     }
 
     fn move_mouse_abs(&mut self, x: i32, y: i32) -> Result<(), String> {
+        // XWayland's pointer position goes stale after compositor-side moves,
+        // so a libei move can't be verified by reading the cursor back.
+        if let Err(err) = self.move_mouse_abs_libei(x, y) {
+            if std::env::var_os("WAYLAND_DISPLAY").is_some()
+                || std::env::var_os("WAYLAND_SOCKET").is_some()
+            {
+                return Err(format!("Absolute mouse movement failed: {err}"));
+            }
+            warn!(
+                "libei is unavailable, falling back to relative motion: {}",
+                err
+            );
+        } else {
+            return Ok(());
+        }
+
         // uinput has no absolute-positioning axis for a virtual mouse, so
         // this has to land on an exact pixel by computing a relative delta
         // from the real current position (re-queried fresh, not the
@@ -218,8 +394,11 @@ impl InputBackend for EvdevBackend {
         };
         let vd = get_or_init_virtual_device().map_err(|e| e.to_string())?;
         let mut vd = vd.lock().unwrap();
-        vd.emit(&[InputEvent::new(EventType::RELATIVE.0, rel.0, val), syn_event()])
-            .map_err(|e| e.to_string())
+        vd.emit(&[
+            InputEvent::new(EventType::RELATIVE.0, rel.0, val),
+            syn_event(),
+        ])
+        .map_err(|e| e.to_string())
     }
 
     fn text(&mut self, s: &str) -> Result<(), String> {
@@ -261,28 +440,64 @@ impl InputBackend for EvdevBackend {
             CURSOR_Y.load(Ordering::Relaxed),
         ))
     }
+
+    fn ensure_absolute_mouse_support(&mut self) -> Result<(), String> {
+        self.ensure_libei().map(|_| ())
+    }
 }
 
 // ── Capture ───────────────────────────────────────────────────────────────────
 
 enum DeviceMsg {
-    KeyPress { key: KeyCode, raw: InputEvent },
-    KeyRelease { key: KeyCode, raw: InputEvent },
-    ButtonPress { key: KeyCode, raw: InputEvent },
-    ButtonRelease { key: KeyCode, raw: InputEvent },
-    MouseMove { dx: i32, dy: i32, raw_x: Option<InputEvent>, raw_y: Option<InputEvent> },
-    Scroll { v: i32, h: i32, raw_v: Option<InputEvent>, raw_h: Option<InputEvent> },
+    KeyPress {
+        key: KeyCode,
+        raw: InputEvent,
+    },
+    KeyRelease {
+        key: KeyCode,
+        raw: InputEvent,
+    },
+    ButtonPress {
+        key: KeyCode,
+        raw: InputEvent,
+    },
+    ButtonRelease {
+        key: KeyCode,
+        raw: InputEvent,
+    },
+    MouseMove {
+        dx: i32,
+        dy: i32,
+        raw_x: Option<InputEvent>,
+        raw_y: Option<InputEvent>,
+    },
+    Scroll {
+        v: i32,
+        h: i32,
+        raw_v: Option<InputEvent>,
+        raw_h: Option<InputEvent>,
+    },
     OtherBatch(Vec<InputEvent>),
     /// Single-finger drag distance on a touchpad, read non-exclusively (see
     /// `spawn_touchpad_reader`) - there's no raw event to suppress or
     /// re-emit here, the physical device was never grabbed.
-    TouchpadMove { dx: i32, dy: i32, ts: std::time::SystemTime },
-    TouchpadButtonPress { ts: std::time::SystemTime },
-    TouchpadButtonRelease { ts: std::time::SystemTime },
+    TouchpadMove {
+        dx: i32,
+        dy: i32,
+        ts: std::time::SystemTime,
+    },
+    TouchpadButtonPress {
+        ts: std::time::SystemTime,
+    },
+    TouchpadButtonRelease {
+        ts: std::time::SystemTime,
+    },
 }
 
 pub(super) fn start_capture_thread(
-    mut callback: Box<dyn FnMut(CaptureEvent, CaptureTimestamp) -> CaptureDecision + Send + 'static>,
+    mut callback: Box<
+        dyn FnMut(CaptureEvent, CaptureTimestamp) -> CaptureDecision + Send + 'static,
+    >,
 ) {
     static STARTED: OnceLock<()> = OnceLock::new();
     STARTED.get_or_init(|| {
@@ -694,7 +909,11 @@ fn spawn_touchpad_reader(mut device: evdev::Device, tx: std::sync::mpsc::SyncSen
                                     if let (Some(lx), Some(ly)) = (last_x, last_y) {
                                         let (dx, dy) = (cx - lx, cy - ly);
                                         if dx != 0 || dy != 0 {
-                                            let _ = tx.send(DeviceMsg::TouchpadMove { dx, dy, ts: event.timestamp() });
+                                            let _ = tx.send(DeviceMsg::TouchpadMove {
+                                                dx,
+                                                dy,
+                                                ts: event.timestamp(),
+                                            });
                                         }
                                     }
                                     last_x = Some(cx);

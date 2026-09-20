@@ -131,6 +131,7 @@ export const setGlobalSpeedMultiplier = (multiplier: number) =>
   invoke<void>('set_global_speed_multiplier', { multiplier });
 export const startRecording = () => invoke<void>('start_recording');
 export const stopRecording = () => invoke<void>('stop_recording');
+export const requestAbsoluteMouseSupport = () => invoke<void>('request_absolute_mouse_support');
 export const toggleRecordMouseRelative = (relative: boolean) =>
   invoke<void>('toggle_record_mouse_relative', { relative });
 export const toggleRecordMouseMovement = (enabled: boolean) =>

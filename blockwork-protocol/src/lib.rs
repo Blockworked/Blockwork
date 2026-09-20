@@ -24,8 +24,12 @@ pub enum ClientMessage {
     /// First message on every connection. The daemon answers with
     /// [`DaemonMessage::hello`]; `accepted: false` means another UI is
     /// already open (and has been asked to come to the front), so this one
-    /// should exit.
-    Hello,
+    /// should exit. Carries the UI's `--ozone-platform` choice so the daemon
+    /// can reuse it when relaunching the UI from the tray.
+    Hello {
+        #[serde(default)]
+        ozone_platform: Option<String>,
+    },
     /// Runs a backend command; answered by a reply with the same `id`.
     Call {
         id: u64,
@@ -33,6 +37,49 @@ pub enum ClientMessage {
         #[serde(default)]
         args: serde_json::Value,
     },
+}
+
+/// CLI switch the UI accepts to force an Ozone platform (currently only
+/// `x11` is acted on). The daemon remembers it from the UI's `Hello` and
+/// replays it on tray relaunches.
+pub const OZONE_PLATFORM_ARG: &str = "--ozone-platform";
+
+/// Parses `--ozone-platform=x11` (or `--ozone-platform x11`) out of an
+/// argument list. The last occurrence wins, matching Chromium.
+pub fn parse_ozone_platform<I>(args: I) -> Option<String>
+where
+    I: IntoIterator<Item = String>,
+{
+    let args: Vec<String> = args.into_iter().collect();
+    let mut result = None;
+    let mut i = 0;
+    while i < args.len() {
+        let arg = &args[i];
+        if let Some(value) = arg.strip_prefix(&format!("{OZONE_PLATFORM_ARG}=")) {
+            if !value.is_empty() {
+                result = Some(value.to_string());
+            }
+        } else if arg == OZONE_PLATFORM_ARG {
+            if let Some(next) = args.get(i + 1) {
+                if !next.starts_with('-') && !next.is_empty() {
+                    result = Some(next.clone());
+                    i += 1;
+                }
+            }
+        }
+        i += 1;
+    }
+    result
+}
+
+/// Reads the current process's `--ozone-platform` choice, if any.
+pub fn current_ozone_platform() -> Option<String> {
+    parse_ozone_platform(std::env::args().skip(1))
+}
+
+/// Formats an `--ozone-platform` argument for a child process.
+pub fn ozone_platform_arg(value: &str) -> String {
+    format!("{OZONE_PLATFORM_ARG}={value}")
 }
 
 /// A message from the daemon to the UI. Kept as one flat struct rather than

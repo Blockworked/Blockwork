@@ -15,7 +15,8 @@ use tauri::{Manager, State};
 
 pub fn run() {
     // `blockwork --daemon` runs the daemon instead (see `daemon::exec_daemon`).
-    if std::env::args().nth(1).as_deref() == Some(daemon::DAEMON_ARG) {
+    // Checked anywhere in argv so `--ozone-platform` may come first.
+    if std::env::args().any(|a| a == daemon::DAEMON_ARG) {
         daemon::exec_daemon();
     }
 
@@ -28,6 +29,22 @@ pub fn run() {
     // `cef::execute_process` and exits. Only the real browser process talks
     // to the daemon.
     let is_cef_subprocess = std::env::args().any(|a| a.starts_with("--type="));
+
+    // `--ozone-platform=x11` forces the X11 Ozone platform. The CEF runtime
+    // picks Wayland whenever `WAYLAND_DISPLAY` is set, so clear it to keep
+    // CEF and winit agreeing on X11; the switch below covers Chromium itself.
+    let ozone_platform = if is_cef_subprocess {
+        None
+    } else {
+        blockwork_protocol::current_ozone_platform()
+    };
+    if ozone_platform.as_deref() == Some("x11") {
+        // SAFETY: cleared before any thread using the env spawns; the CEF
+        // runtime only reads it during init on this thread.
+        unsafe {
+            std::env::remove_var("WAYLAND_DISPLAY");
+        }
+    }
 
     let connection = if is_cef_subprocess {
         None
@@ -47,9 +64,12 @@ pub fn run() {
         }
     };
 
-    let mut builder = tauri::Builder::default().runtime(
-        tauri_runtime_cef::Cef::default().command_line_args([("--use-mock-keychain", None::<String>)]),
-    );
+    let mut cef = tauri_runtime_cef::Cef::default()
+        .command_line_args([("--use-mock-keychain", None::<String>)]);
+    if let Some(platform) = &ozone_platform {
+        cef = cef.command_line_arg("--ozone-platform", Some(platform.clone()));
+    }
+    let mut builder = tauri::Builder::default().runtime(cef);
 
     if let Some((daemon, reader)) = connection {
         // Chromium grabs raw keyboard input for its own focused window on

@@ -45,6 +45,41 @@ fn push_undo(s: &mut crate::state::AppState) {
     }
 }
 
+/// Max wait for the libei permission prompt; a portal that never replies
+/// would otherwise hang the request forever.
+const LIBEI_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(25);
+
+/// Starts the libei portal session without holding the app-state lock, which
+/// would stall the daemon while the prompt is open.
+///
+/// Runs on `spawn_blocking`: the blocking portal call wedged every other
+/// connection when run on an async worker. The emulator stays locked until
+/// it returns, so the timeout only bounds this request, not playback.
+pub(crate) async fn request_absolute_mouse_support(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let emulator = state
+        .lock()
+        .map_err(|e| e.to_string())?
+        .emulator
+        .clone()
+        .ok_or_else(|| "The input backend is unavailable.".to_string())?;
+    let task = tokio::task::spawn_blocking(move || {
+        let mut emulator = emulator.lock().map_err(|e| e.to_string())?;
+        emulator.ensure_absolute_mouse_support()
+    });
+    let result = match tokio::time::timeout(LIBEI_REQUEST_TIMEOUT, task).await {
+        Ok(joined) => joined.map_err(|e| e.to_string())?,
+        Err(_) => Err("timed out waiting for the permission dialog".to_string()),
+    };
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.absolute_mouse_position_available = result.is_ok()
+        && blockwork_core::macros::backend::absolute_mouse_position_available();
+    emit_state_updated(app, &s);
+    result
+}
+
 /// Picks a default spawn position for a newly created/detached strand,
 /// offset from the farthest-right strand so new stacks don't pile up on top
 /// of existing ones.
@@ -727,15 +762,21 @@ pub(crate) fn cancel_import_macro(state: &SharedState) -> Result<(), String> {
 
 // ─── Instructions ──────────────────────────────────────────────────────────
 
-pub(crate) fn add_instruction(
+pub(crate) async fn add_instruction(
     state: &SharedState,
     app: &AppHandle,
     strand_id: String,
     path: Vec<PathStep>,
     instruction: InstructionDto,
 ) -> Result<(), String> {
-    let mut s = state.lock().map_err(|e| e.to_string())?;
     let ins = dto_to_instruction(&instruction).ok_or("Unknown instruction type")?;
+    if matches!(
+        &ins.kind,
+        InstructionKind::Token(InputToken::MoveMouse(_, _, blockwork_core::input::types::Coordinate::Abs))
+    ) {
+        request_absolute_mouse_support(state, app).await?;
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &s.current_macro {
         if let Some(strand) = mac.strand(&strand_id) {
             if let Some((list, idx)) = resolve_body(&strand.instructions, &path) {
@@ -1015,15 +1056,21 @@ mod loop_control_placement_tests {
     }
 }
 
-pub(crate) fn edit_instruction(
+pub(crate) async fn edit_instruction(
     state: &SharedState,
     app: &AppHandle,
     strand_id: String,
     path: Vec<PathStep>,
     instruction: InstructionDto,
 ) -> Result<(), String> {
-    let mut s = state.lock().map_err(|e| e.to_string())?;
     let ins = dto_to_instruction(&instruction).ok_or("Unknown instruction type")?;
+    if matches!(
+        &ins.kind,
+        InstructionKind::Token(InputToken::MoveMouse(_, _, blockwork_core::input::types::Coordinate::Abs))
+    ) {
+        request_absolute_mouse_support(state, app).await?;
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
     // Freeform text fields coalesce keystrokes into one undo group, like
     // `edit_value_field`; every other kind gets its own undo step.
     let session = matches!(
@@ -2371,15 +2418,18 @@ pub(crate) fn stop_recording_internal(state: &SharedState, app: &AppHandle) {
     app.emit_state(&dto);
 }
 
-pub(crate) fn toggle_record_mouse_relative(
+pub(crate) async fn toggle_record_mouse_relative(
     state: &SharedState,
     app: &AppHandle,
     relative: bool,
 ) -> Result<(), String> {
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    if !relative && !s.absolute_mouse_position_available {
+    if !relative && !blockwork_core::macros::backend::absolute_mouse_position_source_available() {
         return Err("Absolute mouse recording requires an available XWayland display.".to_string());
     }
+    if !relative && !blockwork_core::macros::backend::absolute_mouse_position_available() {
+        request_absolute_mouse_support(state, app).await?;
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
     s.record_mouse_relative = relative;
     recording::RECORD_MOUSE_RELATIVE.store(relative, Ordering::Relaxed);
     config::update_settings(|settings| settings.record_mouse_relative = Some(relative));

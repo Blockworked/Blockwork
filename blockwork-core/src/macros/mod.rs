@@ -935,6 +935,27 @@ impl Macro {
         }
     }
 
+    /// Whether any instruction, including nested bodies, moves to an
+    /// absolute screen position.
+    pub fn has_absolute_mouse_move(&self) -> bool {
+        fn contains_absolute_move(instructions: &[Instruction]) -> bool {
+            instructions.iter().any(|instruction| {
+                matches!(
+                    &instruction.kind,
+                    InstructionKind::Token(InputToken::MoveMouse(_, _, crate::input::types::Coordinate::Abs))
+                ) || (0..2).any(|slot| {
+                    instruction
+                        .body(slot)
+                        .is_some_and(|body| contains_absolute_move(body))
+                })
+            })
+        }
+
+        self.strands
+            .iter()
+            .any(|strand| contains_absolute_move(&strand.instructions))
+    }
+
     pub fn ensure_id(&mut self) {
         if self.id.trim().is_empty() {
             self.id = default_macro_id();
@@ -1778,6 +1799,21 @@ mod tests {
         let mac = Macro::new("Test".into(), "".into(), vec![]);
         assert_eq!(mac.strands.len(), 1);
         assert!(mac.strands[0].starts_with_when_ran());
+    }
+
+    #[test]
+    fn detects_absolute_mouse_moves_in_nested_bodies() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        mac.strands[0].instructions.push(Instruction::new(InstructionKind::If {
+            condition: Value::Bool,
+            body: vec![Instruction::new(InstructionKind::Token(InputToken::MoveMouse(
+                Value::number(10.0),
+                Value::number(20.0),
+                Coordinate::Abs,
+            )))],
+        }));
+
+        assert!(mac.has_absolute_mouse_move());
     }
 
     #[test]

@@ -83,7 +83,9 @@ pub(crate) async fn connect() -> std::io::Result<Connected> {
     let (outgoing, rx) = mpsc::channel(32);
     tokio::spawn(write_loop(writer, rx));
 
-    let _ = outgoing.try_send(encode(&ClientMessage::Hello));
+    let _ = outgoing.try_send(encode(&ClientMessage::Hello {
+        ozone_platform: blockwork_protocol::current_ozone_platform(),
+    }));
     let line = tokio::time::timeout(
         blockwork_protocol::HANDSHAKE_TIMEOUT,
         blockwork_protocol::read_line(&mut reader),
@@ -243,19 +245,20 @@ fn daemon_exe() -> std::io::Result<std::path::PathBuf> {
 /// the mount would lose its own binary once the UI exits. Starting it as
 /// `$APPIMAGE --daemon` instead gives it a mount of its own.
 pub(crate) fn exec_daemon() -> ! {
+    // Forwards everything except `--daemon` itself, so `--ozone-platform`
+    // survives regardless of where it sits in argv.
+    let forwarded: Vec<std::ffi::OsString> = std::env::args_os()
+        .skip(1)
+        .filter(|a| a != DAEMON_ARG)
+        .collect();
     let error = match daemon_exe() {
         #[cfg(unix)]
         Ok(exe) => {
             use std::os::unix::process::CommandExt;
-            std::process::Command::new(&exe)
-                .args(std::env::args_os().skip(2))
-                .exec()
+            std::process::Command::new(&exe).args(&forwarded).exec()
         }
         #[cfg(not(unix))]
-        Ok(exe) => match std::process::Command::new(&exe)
-            .args(std::env::args_os().skip(2))
-            .status()
-        {
+        Ok(exe) => match std::process::Command::new(&exe).args(&forwarded).status() {
             Ok(status) => std::process::exit(status.code().unwrap_or(1)),
             Err(e) => e,
         },
@@ -279,6 +282,12 @@ fn spawn_daemon() -> std::io::Result<()> {
         }
         None => std::process::Command::new(&daemon_exe),
     };
+    // Forwards the Ozone choice so the daemon can replay it when relaunching
+    // the UI from the tray. The UI also reports it in its `Hello`, which
+    // covers a daemon that was already running.
+    if let Some(ozone) = blockwork_protocol::current_ozone_platform() {
+        command.arg(blockwork_protocol::ozone_platform_arg(&ozone));
+    }
 
     // Tells the daemon how to relaunch this UI from the tray: the AppImage
     // itself when running from one, and the Flatpak wrapper sets this to

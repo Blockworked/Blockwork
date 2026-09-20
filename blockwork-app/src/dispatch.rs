@@ -78,25 +78,19 @@ impl Backend {
                 let strand_id: String = arg(&args, "strandId")?;
                 let path: Vec<PathStep> = arg(&args, "path")?;
                 let instruction: InstructionDto = arg(&args, "instruction")?;
-                to_json(commands::add_instruction(
-                    &self.state,
-                    &self.app,
-                    strand_id,
-                    path,
-                    instruction,
-                )?)
+                to_json(
+                    commands::add_instruction(&self.state, &self.app, strand_id, path, instruction)
+                        .await?,
+                )
             }
             "edit_instruction" => {
                 let strand_id: String = arg(&args, "strandId")?;
                 let path: Vec<PathStep> = arg(&args, "path")?;
                 let instruction: InstructionDto = arg(&args, "instruction")?;
-                to_json(commands::edit_instruction(
-                    &self.state,
-                    &self.app,
-                    strand_id,
-                    path,
-                    instruction,
-                )?)
+                to_json(
+                    commands::edit_instruction(&self.state, &self.app, strand_id, path, instruction)
+                        .await?,
+                )
             }
             "create_variable" => {
                 let name: String = arg(&args, "name")?;
@@ -440,13 +434,15 @@ impl Backend {
             }
             "start_recording" => to_json(commands::start_recording(&self.state, &self.app)?),
             "stop_recording" => to_json(commands::stop_recording(&self.state, &self.app)?),
+            "request_absolute_mouse_support" => to_json(
+                commands::request_absolute_mouse_support(&self.state, &self.app).await?,
+            ),
             "toggle_record_mouse_relative" => {
                 let relative: bool = arg(&args, "relative")?;
-                to_json(commands::toggle_record_mouse_relative(
-                    &self.state,
-                    &self.app,
-                    relative,
-                )?)
+                to_json(
+                    commands::toggle_record_mouse_relative(&self.state, &self.app, relative)
+                        .await?,
+                )
             }
             "toggle_record_mouse_movement" => {
                 let enabled: bool = arg(&args, "enabled")?;

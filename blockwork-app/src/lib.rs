@@ -104,6 +104,9 @@ impl Backend {
         let app = AppHandle { events };
 
         let settings = config::load_settings();
+        // The Linux backend defers the libei portal until an absolute move is
+        // selected, so startup itself remains silent.
+        let emulator = make_backend();
         let absolute_mouse_position_available =
             blockwork_core::macros::backend::absolute_mouse_position_available();
         let initial_state = AppState {
@@ -111,7 +114,7 @@ impl Backend {
             current_macro: None,
             macros_list: vec![],
             macro_strs: vec![],
-            emulator: make_backend(),
+            emulator,
             variable_values: Arc::new(Mutex::new(HashMap::new())),
             thread_pool: ThreadPool::new(),
             is_looping: Arc::new(Mutex::new(false)),
@@ -132,7 +135,8 @@ impl Backend {
             text_edit_session: None,
             recording_phase: RecordingPhase::Idle,
             recording_countdown_generation: 0,
-            // Without XWayland, Linux has no accurate global position source.
+            // Linux absolute recording needs XWayland for position reads and
+            // libei for absolute replay.
             // Keep a saved absolute preference for a future supported session,
             // but force this one to record relative movement instead.
             record_mouse_relative: if absolute_mouse_position_available {
