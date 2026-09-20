@@ -88,5 +88,30 @@ macos-install *args:
     sudo xattr -dr com.apple.quarantine "/Applications/Blockwork.app" || true
     @echo "Installed to /Applications/Blockwork.app"
 
+# Windows only: build, stage the CEF runtime and pack an unsigned MSIX into dist/
+msix target="x86_64-pc-windows-msvc" arch="x64":
+    #!/usr/bin/env pwsh
+    $ErrorActionPreference = "Stop"
+    cargo build --release --target {{target}} --workspace --exclude blockwork-linux-bridge
+    if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
+    $releaseDir = "target/{{target}}/release"
+    $cefDir = if ("{{target}}" -like "aarch64*") { "cef_windows_aarch64" } else { "cef_windows_x86_64" }
+    $cefBuildDir = Get-ChildItem "$releaseDir/build" -Directory -Filter "cef-dll-sys-*" |
+      Sort-Object LastWriteTime -Descending | Select-Object -First 1
+    $cefRuntimeDir = Get-ChildItem (Join-Path $cefBuildDir.FullName "out") -Recurse -Directory -Filter $cefDir |
+      Select-Object -First 1
+    Get-ChildItem $cefRuntimeDir.FullName -File | Copy-Item -Destination $releaseDir -Force
+    Copy-Item (Join-Path $cefRuntimeDir.FullName "locales") $releaseDir -Recurse -Force
+    $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
+    ./scripts/build-msix.ps1 -Version $version -Target {{target}} -Arch {{arch}}
+
+# Windows only: build the MSIX, sign it with a test cert and install it (run from an elevated shell)
+msix-install: msix
+    #!/usr/bin/env pwsh
+    $ErrorActionPreference = "Stop"
+    ./scripts/sign-msix-test.ps1 -Msix dist/blockwork-windows-x86_64.msix
+    Import-Certificate -FilePath dist/blockwork-msix-test.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+    Add-AppxPackage -Path dist/blockwork-windows-x86_64.msix -ForceUpdateFromAnyVersion
+
 flatpak-uninstall:
     flatpak uninstall --user -y {{appid}}

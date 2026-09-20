@@ -125,20 +125,12 @@ jobs:
           $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
           ./scripts/build-msix.ps1 -Version $version -Target ${{ matrix.target }} -Arch x64
 
-      # An unsigned MSIX won't install locally, so sign a test copy with a throwaway cert
-      # whose subject matches the manifest publisher. The Store re-signs the release build.
+      # An unsigned MSIX won't install locally, so sign a test copy with a throwaway cert.
+      # The Store re-signs the release build.
       - name: Sign MSIX with test certificate
         if: matrix.name == 'windows-x86_64'
         shell: pwsh
-        run: |
-          $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=C52AE2E4-FA2D-4A12-9608-85DF74763E33" `
-            -KeyUsage DigitalSignature -FriendlyName "Blockwork MSIX test" -CertStoreLocation Cert:\CurrentUser\My `
-            -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
-          Export-Certificate -Cert $cert -FilePath dist/blockwork-msix-test.cer | Out-Null
-          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
-            Sort-Object FullName -Descending | Select-Object -First 1
-          & $signtool.FullName sign /fd SHA256 /sha1 $cert.Thumbprint dist/blockwork-windows-x86_64.msix
-          if ($LASTEXITCODE -ne 0) { throw "signtool failed" }
+        run: ./scripts/sign-msix-test.ps1 -Msix dist/blockwork-windows-x86_64.msix
 
       - name: Upload MSIX artifact
         if: matrix.name == 'windows-x86_64'
