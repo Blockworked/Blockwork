@@ -36,11 +36,12 @@ evdev.workspace = true
 # Read-only cursor-position query via XWayland (see backend/x11_cursor.rs) -
 # not the removed XTest emission backend; core X11 protocol only.
 x11rb.workspace = true
-enigo.workspace = true
+enigo = { workspace = true, features = ["x11rb", "libei", "smol"] }
 wayland-client.workspace = true
 wayland-protocols.workspace = true
 
 [target.'cfg(windows)'.dependencies]
+enigo.workspace = true
 windows-sys.workspace = true
 self_update = { workspace = true, optional = true }
 http = { workspace = true, optional = true }

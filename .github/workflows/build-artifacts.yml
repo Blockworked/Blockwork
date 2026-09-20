@@ -118,6 +118,39 @@ jobs:
           if-no-files-found: error
           retention-days: 14
 
+      - name: Build MSIX
+        if: matrix.name == 'windows-x86_64'
+        shell: pwsh
+        run: |
+          $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
+          ./scripts/build-msix.ps1 -Version $version -Target ${{ matrix.target }} -Arch x64
+
+      # An unsigned MSIX won't install locally, so sign a test copy with a throwaway cert
+      # whose subject matches the manifest publisher. The Store re-signs the release build.
+      - name: Sign MSIX with test certificate
+        if: matrix.name == 'windows-x86_64'
+        shell: pwsh
+        run: |
+          $cert = New-SelfSignedCertificate -Type Custom -Subject "CN=C52AE2E4-FA2D-4A12-9608-85DF74763E33" `
+            -KeyUsage DigitalSignature -FriendlyName "Blockwork MSIX test" -CertStoreLocation Cert:\CurrentUser\My `
+            -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
+          Export-Certificate -Cert $cert -FilePath dist/blockwork-msix-test.cer | Out-Null
+          $signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+            Sort-Object FullName -Descending | Select-Object -First 1
+          & $signtool.FullName sign /fd SHA256 /sha1 $cert.Thumbprint dist/blockwork-windows-x86_64.msix
+          if ($LASTEXITCODE -ne 0) { throw "signtool failed" }
+
+      - name: Upload MSIX artifact
+        if: matrix.name == 'windows-x86_64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: blockwork-windows-x86_64-msix-test
+          path: |
+            dist/blockwork-windows-x86_64.msix
+            dist/blockwork-msix-test.cer
+          if-no-files-found: error
+          retention-days: 14
+
       - name: Build macOS app bundle
         if: runner.os == 'macOS'
         run: ./scripts/build-macos-bundle.sh ${{ matrix.target }}
@@ -225,22 +258,26 @@ jobs:
           wget -q -O linuxdeploy.AppImage "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.linux_arch }}.AppImage"
           wget -q -O linuxdeploy-plugin-appimage.AppImage "https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-${{ matrix.linux_arch }}.AppImage"
           chmod +x linuxdeploy.AppImage linuxdeploy-plugin-appimage.AppImage
+          # Stage under appimage-staging/: the repo root already contains a
+          # blockwork-daemon/ crate dir, so copying the daemon binary to "."
+          # collides with it ("cannot overwrite directory with non-directory").
+          mkdir -p appimage-staging
           # Exec entry wants a binary named blockwork.
-          cp ${{ matrix.artifact_name }} blockwork
+          cp ${{ matrix.artifact_name }} appimage-staging/blockwork
 
           # CEF runtime sits next to the binary in target/<triple>/release.
           # linuxdeploy only finds libcef.so via ldd, so copy the rest by hand.
           CEF_DIR="target/${{ matrix.target }}/release"
-          cp "$CEF_DIR/libcef.so" .
+          cp "$CEF_DIR/libcef.so" appimage-staging/
           # Daemon ships next to blockwork in usr/bin.
-          cp "$CEF_DIR/blockwork-daemon" .
+          cp "$CEF_DIR/blockwork-daemon" appimage-staging/
 
           export LINUXDEPLOY_EXCLUDED_LIBRARIES="libnspr4.so;libplc4.so;libplds4.so;libnss3.so;libnssutil3.so;libsmime3.so"
 
           ./linuxdeploy.AppImage \
             --appdir AppDir \
-            --executable ./blockwork \
-            --executable ./blockwork-daemon \
+            --executable ./appimage-staging/blockwork \
+            --executable ./appimage-staging/blockwork-daemon \
             --desktop-file res/blockwork.desktop \
             --icon-file res/icons/blockwork.png
 

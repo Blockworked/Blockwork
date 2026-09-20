@@ -155,6 +155,20 @@ jobs:
           if-no-files-found: error
           retention-days: 90
 
+      - name: Build MSIX (Microsoft Store)
+        if: matrix.name == 'windows-x86_64'
+        shell: pwsh
+        run: ./scripts/build-msix.ps1 -Version "${{ steps.installer_version.outputs.value }}" -Target ${{ matrix.target }} -Arch x64
+
+      - name: Upload MSIX artifact
+        if: matrix.name == 'windows-x86_64'
+        uses: actions/upload-artifact@v4
+        with:
+          name: blockwork-windows-x86_64.msix
+          path: dist/blockwork-windows-x86_64.msix
+          if-no-files-found: error
+          retention-days: 90
+
   linux-appimage:
     name: AppImage (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
@@ -377,6 +391,7 @@ jobs:
             echo "|---|---|"
             echo "| Windows x86_64 (installer) | \`blockwork-windows-x86_64-setup.exe\` |"
             echo "| Windows x86_64 (portable exe) | \`blockwork-windows-x86_64.exe\` |"
+            echo "| Windows x86_64 (MSIX, for the Microsoft Store) | \`blockwork-windows-x86_64.msix\` |"
             echo "| Windows arm64 (installer) | \`blockwork-windows-arm64-setup.exe\` |"
             echo "| Windows arm64 (portable exe) | \`blockwork-windows-arm64.exe\` |"
             echo "| Linux x86_64 (AppImage) | \`blockwork-linux-x86_64.AppImage\` |"
@@ -422,3 +437,21 @@ jobs:
     with:
       tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     secrets: inherit
+
+  winget:
+    name: Publish to winget
+    runs-on: windows-latest
+    needs: [release]
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+
+    steps:
+      # Updates an existing package; the first version is submitted by hand
+      - name: Open winget-pkgs PR
+        if: env.WINGET_TOKEN != ''
+        uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: Blockworked.Blockwork
+          release-tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+          installers-regex: '-setup\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}

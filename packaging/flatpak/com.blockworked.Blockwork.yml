@@ -27,6 +27,7 @@ finish-args:
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node24/bin:/run/build/blockwork/pnpm-bin
+  libdir: /app/lib
   env:
     CARGO_HOME: /run/build/blockwork/cargo
     CARGO_NET_OFFLINE: 'true'

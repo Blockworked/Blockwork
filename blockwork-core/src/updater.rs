@@ -51,6 +51,16 @@ fn release_arch_name(rust_arch: &str) -> &str {
     }
 }
 
+/// True when running from an MSIX package, where the Store owns updates.
+#[cfg(windows)]
+fn is_packaged() -> bool {
+    use windows_sys::Win32::Storage::Packaging::Appx::GetCurrentPackageFullName;
+    const APPMODEL_ERROR_NO_PACKAGE: u32 = 15700;
+    let mut len = 0u32;
+    // SAFETY: a null buffer with len 0 only asks for the required length
+    unsafe { GetCurrentPackageFullName(&mut len, std::ptr::null_mut()) != APPMODEL_ERROR_NO_PACKAGE }
+}
+
 fn build_updater(current_version: &str) -> Result<Update, String> {
     let mut configure = Update::configure();
     configure
@@ -68,6 +78,10 @@ fn build_updater(current_version: &str) -> Result<Update, String> {
 
 /// Blocking - call via `tokio::task::spawn_blocking`. `Ok(None)` means already up to date.
 pub fn check_for_update(current_version: &str) -> Result<Option<UpdateInfo>, String> {
+    #[cfg(windows)]
+    if is_packaged() {
+        return Ok(None);
+    }
     let updater = build_updater(current_version)?;
     let releases = updater
         .get_latest_release()
@@ -92,6 +106,10 @@ pub fn check_for_update(current_version: &str) -> Result<Option<UpdateInfo>, Str
 #[cfg(windows)]
 pub fn apply_update(current_version: &str) -> Result<PathBuf, String> {
     use std::os::windows::process::CommandExt;
+
+    if is_packaged() {
+        return Err("Updates are managed by the Microsoft Store".to_string());
+    }
 
     const DETACHED_PROCESS: u32 = 0x0000_0008;
 
