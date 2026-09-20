@@ -404,3 +404,11 @@ jobs:
           fail_on_unmatched_files: false
           files: ./release-artifacts/*
           body_path: RELEASE_BODY.md
+
+  chocolatey:
+    name: Chocolatey
+    needs: [release]
+    uses: ./.github/workflows/chocolatey.yml
+    with:
+      tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    secrets: inherit

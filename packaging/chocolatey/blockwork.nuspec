@@ -1,0 +1,24 @@
+<?xml version="1.0" encoding="utf-8"?>
+<package xmlns="http://schemas.microsoft.com/packaging/2015/06/nuspec.xsd">
+  <metadata>
+    <id>blockwork</id>
+    <version>__VERSION__</version>
+    <title>Blockwork</title>
+    <authors>Blockworked</authors>
+    <owners>Blockworked</owners>
+    <projectUrl>https://github.com/Blockworked/Blockwork</projectUrl>
+    <projectSourceUrl>https://github.com/Blockworked/Blockwork</projectSourceUrl>
+    <packageSourceUrl>https://github.com/Blockworked/Blockwork/tree/master/packaging/chocolatey</packageSourceUrl>
+    <bugTrackerUrl>https://github.com/Blockworked/Blockwork/issues</bugTrackerUrl>
+    <licenseUrl>https://github.com/Blockworked/Blockwork/blob/master/LICENSE</licenseUrl>
+    <requireLicenseAcceptance>false</requireLicenseAcceptance>
+    <iconUrl>https://raw.githubusercontent.com/Blockworked/Blockwork/master/res/icons/blockwork.png</iconUrl>
+    <releaseNotes>https://github.com/Blockworked/Blockwork/releases/tag/__TAG__</releaseNotes>
+    <tags>blockwork macro automation keyboard mouse hotkey</tags>
+    <summary>Visually build and run keyboard/mouse macros with a Scratch-style block editor.</summary>
+    <description>Blockwork is a desktop app for visually building and running keyboard and mouse macros. It has a Scratch-style block editor for instruction sequences, variables, and hotkey-triggered playback.</description>
+  </metadata>
+  <files>
+    <file src="tools\**" target="tools" />
+  </files>
+</package>

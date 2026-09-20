@@ -1,0 +1,78 @@
+name: Chocolatey
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      push:
+        description: "Only set by release.yml; manual runs never push"
+        type: boolean
+        default: true
+    secrets:
+      CHOCO_API_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to package (e.g. 0.5.4)"
+        required: true
+        type: string
+
+jobs:
+  chocolatey:
+    name: Package and publish
+    runs-on: windows-latest
+    env:
+      CHOCO_API_KEY: ${{ secrets.CHOCO_API_KEY }}
+      TAG: ${{ inputs.tag }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download installer from release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download $env:TAG --repo ${{ github.repository }} --pattern "blockwork-windows-x86_64-setup.exe" --dir installer-dl
+
+      - name: Render package
+        shell: pwsh
+        run: |
+          $version = $env:TAG -replace '^v', ''
+          $url = "https://github.com/${{ github.repository }}/releases/download/$($env:TAG)/blockwork-windows-x86_64-setup.exe"
+          $hash = (Get-FileHash installer-dl/blockwork-windows-x86_64-setup.exe -Algorithm SHA256).Hash
+          $files = Get-ChildItem packaging/chocolatey -Recurse -Include *.nuspec, *.ps1
+          foreach ($f in $files) {
+            (Get-Content $f.FullName -Raw).
+              Replace('__VERSION__', $version).
+              Replace('__TAG__', $env:TAG).
+              Replace('__URL__', $url).
+              Replace('__CHECKSUM__', $hash) | Set-Content $f.FullName -NoNewline
+          }
+
+      - name: Pack
+        shell: pwsh
+        working-directory: packaging/chocolatey
+        run: choco pack
+
+      - name: Test install and uninstall
+        shell: pwsh
+        working-directory: packaging/chocolatey
+        run: |
+          choco install blockwork -y --source . --no-progress
+          choco uninstall blockwork -y
+
+      - name: Push
+        if: inputs.push && env.CHOCO_API_KEY != ''
+        shell: pwsh
+        working-directory: packaging/chocolatey
+        run: choco push (Get-ChildItem *.nupkg).FullName --source https://push.chocolatey.org/ --api-key $env:CHOCO_API_KEY
+
+      - name: Upload nupkg
+        uses: actions/upload-artifact@v4
+        with:
+          name: blockwork.nupkg
+          path: packaging/chocolatey/*.nupkg
