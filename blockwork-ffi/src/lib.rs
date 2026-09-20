@@ -98,6 +98,8 @@ pub extern "C" fn blockwork_init(config_dir_override_utf8: *const c_char, linux_
     let override_dir = unsafe { cstr_to_owned(config_dir_override_utf8) };
     let linux_bridge_resource_path = unsafe { cstr_to_owned(linux_bridge_resource_path_utf8) };
     catch(move || {
+        // Registers Blockwork's own value operators before any macro loads.
+        blockwork_core::init();
         if let Some(dir) = override_dir.filter(|d| !d.is_empty()) {
             config::set_config_dir_override(PathBuf::from(dir));
         }

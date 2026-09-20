@@ -16,6 +16,7 @@ ipc = ["tokio/rt", "tokio/rt-multi-thread", "tokio/macros", "tokio/net", "tokio/
 updater = ["dep:self_update", "dep:http"]
 
 [dependencies]
+blockstitch-core.workspace = true
 tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -29,6 +29,10 @@ pub struct BlockRuntime {
 /// execution threads don't get an enlarged stack.
 const MAX_CALL_DEPTH: u32 = 64;
 
+/// Stack for each entry strand's thread. Interpreting a macro recurses per
+/// nested call and body, which the default 2 MiB can't hold to `MAX_CALL_DEPTH`.
+const STRAND_STACK_SIZE: usize = 8 * 1024 * 1024;
+
 /// What a `run_block` invocation is telling its caller to do next: the
 /// "did a Return happen" signal, generalized to also carry loop control.
 /// `If`/`IfElse` forward every non-`Normal` variant unchanged (not loops,
@@ -101,7 +105,7 @@ fn resolve_calls_and_params(value: &Value, ctx: &mut ExecCtx, depth: u32) -> Res
                 .map(|a| resolve_calls_and_params(a, ctx, depth))
                 .collect::<Result<Vec<_>, _>>()?;
             Ok(Value::Op {
-                op: *op,
+                op: op.clone(),
                 args,
                 saved: saved.clone(),
             })
@@ -220,11 +224,11 @@ impl Macro {
         variables: VariableStore,
         initial_offset: Duration,
     ) {
-        let block_defs = self.block_defs;
+        let block_defs = self.graph.block_defs;
         let mut block_table: HashMap<String, BlockRuntime> = HashMap::new();
         let mut entry_strands: Vec<Vec<Instruction>> = Vec::new();
 
-        for strand in self.strands {
+        for strand in self.graph.strands {
             match strand.instructions.first().map(|i| &i.kind) {
                 Some(InstructionKind::BlockHeader(id)) => {
                     if let Some(def) = block_defs.iter().find(|b| &b.id == id) {
@@ -251,50 +255,34 @@ impl Macro {
         }
         let block_table = Arc::new(block_table);
 
-        let mut iter = entry_strands.into_iter();
-        let Some(first) = iter.next() else { return };
-        let rest: Vec<_> = iter.collect();
-
-        if rest.is_empty() {
-            run_strand(
-                first,
-                emulator,
-                stop_flag,
-                speed_multiplier,
-                variables,
-                block_table,
-                initial_offset,
-            );
+        if entry_strands.is_empty() {
             return;
         }
-
+        // Every entry strand gets its own thread, including the first, so
+        // deep recursion errors out on a known stack instead of aborting.
         std::thread::scope(|scope| {
-            for instructions in rest {
+            for instructions in entry_strands {
                 let emulator = Arc::clone(&emulator);
                 let stop_flag = stop_flag.clone();
                 let variables = Arc::clone(&variables);
                 let block_table = Arc::clone(&block_table);
-                scope.spawn(move || {
-                    run_strand(
-                        instructions,
-                        emulator,
-                        stop_flag,
-                        speed_multiplier,
-                        variables,
-                        block_table,
-                        initial_offset,
-                    )
-                });
+                let spawned = std::thread::Builder::new()
+                    .stack_size(STRAND_STACK_SIZE)
+                    .spawn_scoped(scope, move || {
+                        run_strand(
+                            instructions,
+                            emulator,
+                            stop_flag,
+                            speed_multiplier,
+                            variables,
+                            block_table,
+                            initial_offset,
+                        )
+                    });
+                if let Err(e) = spawned {
+                    warn!("Failed to start a strand thread: {e}");
+                }
             }
-            run_strand(
-                first,
-                emulator,
-                stop_flag,
-                speed_multiplier,
-                variables,
-                block_table,
-                initial_offset,
-            );
         });
     }
 }
@@ -902,7 +890,8 @@ mod tests {
     use super::*;
     use crate::input::types::{Axis, Direction, MacroButton, MacroKey};
     use crate::macros::{
-        BlockDef, BlockPiece, BlockShape, InputValueType, Strand, default_block_color,
+        BlockDef, BlockPiece, BlockShape, InputValueType, MacroGraph, Strand,
+        default_block_color,
     };
 
     struct NoopBackend;
@@ -962,25 +951,27 @@ mod tests {
             id: "m".into(),
             name: "Concurrent".into(),
             description: "".into(),
-            strands: vec![
-                when_ran_strand("a", 150.0),
-                when_ran_strand("b", 150.0),
-                when_ran_strand("c", 150.0),
-                Strand {
-                    id: "inert".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![Instruction::new(InstructionKind::Wait(Value::number(
-                        150.0,
-                    )))],
-                },
-            ],
+            graph: MacroGraph {
+                strands: vec![
+                    when_ran_strand("a", 150.0),
+                    when_ran_strand("b", 150.0),
+                    when_ran_strand("c", 150.0),
+                    Strand {
+                        id: "inert".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![Instruction::new(InstructionKind::Wait(Value::number(
+                            150.0,
+                        )))],
+                    },
+                ],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![],
+            },
             recording_target: None,
             speed_multiplier: 1.0,
-            floating_values: vec![],
-            comments: vec![],
-            variables: vec![],
-            block_defs: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         let start = Instant::now();
@@ -1002,13 +993,15 @@ mod tests {
             id: "m".into(),
             name: "Offset".into(),
             description: "".into(),
-            strands: vec![when_ran_strand("a", 200.0)],
+            graph: MacroGraph {
+                strands: vec![when_ran_strand("a", 200.0)],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![],
+            },
             recording_target: None,
             speed_multiplier: 1.0,
-            floating_values: vec![],
-            comments: vec![],
-            variables: vec![],
-            block_defs: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         let start = Instant::now();
@@ -1039,16 +1032,18 @@ mod tests {
             id: "m".into(),
             name: "Stoppable".into(),
             description: "".into(),
-            strands: vec![
-                when_ran_strand("a", long_wait),
-                when_ran_strand("b", long_wait),
-            ],
+            graph: MacroGraph {
+                strands: vec![
+                    when_ran_strand("a", long_wait),
+                    when_ran_strand("b", long_wait),
+                ],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![],
+            },
             recording_target: None,
             speed_multiplier: 1.0,
-            floating_values: vec![],
-            comments: vec![],
-            variables: vec![],
-            block_defs: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         let stop_flag = Arc::new(Mutex::new(true));
@@ -1175,52 +1170,54 @@ mod tests {
             id: "m".into(),
             name: "Double".into(),
             description: "".into(),
-            strands: vec![
-                Strand {
-                    id: "caller".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: {
-                        let mut ins = vec![Instruction::new(InstructionKind::WhenRan)];
-                        ins.extend(caller_instructions);
-                        ins
+            graph: MacroGraph {
+                strands: vec![
+                    Strand {
+                        id: "caller".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: {
+                            let mut ins = vec![Instruction::new(InstructionKind::WhenRan)];
+                            ins.extend(caller_instructions);
+                            ins
+                        },
                     },
-                },
-                Strand {
-                    id: "double_body".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
-                        Instruction::new(InstructionKind::Return(Value::Op {
-                            op: crate::input::value::Op::Mul,
-                            args: vec![Value::Param { name: "n".into() }, Value::number(2.0)],
-                            saved: Box::new(Value::number(0.0)),
-                        })),
-                    ],
-                },
-            ],
-            recording_target: None,
-            speed_multiplier: 1.0,
-            floating_values: vec![],
-            comments: vec![],
-            variables: vec![],
-            block_defs: vec![BlockDef {
-                id: block_id,
-                pieces: vec![
-                    BlockPiece::Label {
-                        id: "p1".into(),
-                        text: "double".into(),
-                    },
-                    BlockPiece::Input {
-                        id: "p2".into(),
-                        name: "n".into(),
-                        value_type: InputValueType::Any,
+                    Strand {
+                        id: "double_body".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
+                            Instruction::new(InstructionKind::Return(Value::Op {
+                                op: crate::input::value::Op::Mul,
+                                args: vec![Value::Param { name: "n".into() }, Value::number(2.0)],
+                                saved: Box::new(Value::number(0.0)),
+                            })),
+                        ],
                     },
                 ],
-                shape: BlockShape::ReturnsValue,
-                color: default_block_color(),
-            }],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![BlockDef {
+                    id: block_id,
+                    pieces: vec![
+                        BlockPiece::Label {
+                            id: "p1".into(),
+                            text: "double".into(),
+                        },
+                        BlockPiece::Input {
+                            id: "p2".into(),
+                            name: "n".into(),
+                            value_type: InputValueType::Any,
+                        },
+                    ],
+                    shape: BlockShape::ReturnsValue,
+                    color: default_block_color(),
+                }],
+            },
+            recording_target: None,
+            speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
         }
     }
@@ -1254,43 +1251,45 @@ mod tests {
             id: "m".into(),
             name: "Empty".into(),
             description: "".into(),
-            strands: vec![
-                Strand {
-                    id: "caller".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::WhenRan),
-                        Instruction::new(InstructionKind::SetVariable(
-                            "x".to_string(),
-                            Value::Call {
-                                block_id: block_id.clone(),
-                                args: vec![],
-                                saved: Box::new(Value::number(0.0)),
-                            },
-                        )),
-                    ],
-                },
-                Strand {
-                    id: "empty_body".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![Instruction::new(InstructionKind::BlockHeader(
-                        block_id.clone(),
-                    ))],
-                },
-            ],
+            graph: MacroGraph {
+                strands: vec![
+                    Strand {
+                        id: "caller".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::WhenRan),
+                            Instruction::new(InstructionKind::SetVariable(
+                                "x".to_string(),
+                                Value::Call {
+                                    block_id: block_id.clone(),
+                                    args: vec![],
+                                    saved: Box::new(Value::number(0.0)),
+                                },
+                            )),
+                        ],
+                    },
+                    Strand {
+                        id: "empty_body".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![Instruction::new(InstructionKind::BlockHeader(
+                            block_id.clone(),
+                        ))],
+                    },
+                ],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![BlockDef {
+                    id: block_id,
+                    pieces: vec![],
+                    shape: BlockShape::ReturnsValue,
+                    color: default_block_color(),
+                }],
+            },
             recording_target: None,
             speed_multiplier: 1.0,
-            floating_values: vec![],
-            comments: vec![],
-            variables: vec![],
-            block_defs: vec![BlockDef {
-                id: block_id,
-                pieces: vec![],
-                shape: BlockShape::ReturnsValue,
-                color: default_block_color(),
-            }],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -1306,40 +1305,42 @@ mod tests {
             id: "m".into(),
             name: "Waiter".into(),
             description: "".into(),
-            strands: vec![
-                Strand {
-                    id: "caller".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::WhenRan),
-                        Instruction::new(InstructionKind::CallBlock {
-                            block_id: block_id.clone(),
-                            args: vec![],
-                        }),
-                    ],
-                },
-                Strand {
-                    id: "waiter_body".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
-                        Instruction::new(InstructionKind::Wait(Value::number(150.0))),
-                    ],
-                },
-            ],
+            graph: MacroGraph {
+                strands: vec![
+                    Strand {
+                        id: "caller".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::WhenRan),
+                            Instruction::new(InstructionKind::CallBlock {
+                                block_id: block_id.clone(),
+                                args: vec![],
+                            }),
+                        ],
+                    },
+                    Strand {
+                        id: "waiter_body".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
+                            Instruction::new(InstructionKind::Wait(Value::number(150.0))),
+                        ],
+                    },
+                ],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![BlockDef {
+                    id: block_id,
+                    pieces: vec![],
+                    shape: BlockShape::Normal,
+                    color: default_block_color(),
+                }],
+            },
             recording_target: None,
             speed_multiplier: 1.0,
-            floating_values: vec![],
-            comments: vec![],
-            variables: vec![],
-            block_defs: vec![BlockDef {
-                id: block_id,
-                pieces: vec![],
-                shape: BlockShape::Normal,
-                color: default_block_color(),
-            }],
             settings: crate::macros::MacroSettings::default(),
         };
         let start = Instant::now();
@@ -1360,48 +1361,50 @@ mod tests {
             id: "m".into(),
             name: "Loop".into(),
             description: "".into(),
-            strands: vec![
-                Strand {
-                    id: "caller".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::WhenRan),
-                        Instruction::new(InstructionKind::SetVariable(
-                            "x".to_string(),
-                            Value::Call {
+            graph: MacroGraph {
+                strands: vec![
+                    Strand {
+                        id: "caller".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::WhenRan),
+                            Instruction::new(InstructionKind::SetVariable(
+                                "x".to_string(),
+                                Value::Call {
+                                    block_id: block_id.clone(),
+                                    args: vec![],
+                                    saved: Box::new(Value::number(0.0)),
+                                },
+                            )),
+                        ],
+                    },
+                    Strand {
+                        id: "loop_body".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
+                            Instruction::new(InstructionKind::Return(Value::Call {
                                 block_id: block_id.clone(),
                                 args: vec![],
                                 saved: Box::new(Value::number(0.0)),
-                            },
-                        )),
-                    ],
-                },
-                Strand {
-                    id: "loop_body".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
-                        Instruction::new(InstructionKind::Return(Value::Call {
-                            block_id: block_id.clone(),
-                            args: vec![],
-                            saved: Box::new(Value::number(0.0)),
-                        })),
-                    ],
-                },
-            ],
+                            })),
+                        ],
+                    },
+                ],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![BlockDef {
+                    id: block_id,
+                    pieces: vec![],
+                    shape: BlockShape::ReturnsValue,
+                    color: default_block_color(),
+                }],
+            },
             recording_target: None,
             speed_multiplier: 1.0,
-            floating_values: vec![],
-            comments: vec![],
-            variables: vec![],
-            block_defs: vec![BlockDef {
-                id: block_id,
-                pieces: vec![],
-                shape: BlockShape::ReturnsValue,
-                color: default_block_color(),
-            }],
             settings: crate::macros::MacroSettings::default(),
         };
         // Should return promptly (erroring out at MAX_CALL_DEPTH) rather than
@@ -1422,85 +1425,87 @@ mod tests {
             id: "m".into(),
             name: "Compose".into(),
             description: "".into(),
-            strands: vec![
-                Strand {
-                    id: "caller".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::WhenRan),
-                        Instruction::new(InstructionKind::SetVariable(
-                            "x".to_string(),
-                            Value::Call {
-                                block_id: triple_id.clone(),
-                                args: vec![Value::number(2.0)],
-                                saved: Box::new(Value::number(0.0)),
-                            },
-                        )),
-                    ],
-                },
-                Strand {
-                    id: "double_body".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::BlockHeader(double_id.clone())),
-                        Instruction::new(InstructionKind::Return(Value::Op {
-                            op: crate::input::value::Op::Mul,
-                            args: vec![Value::Param { name: "n".into() }, Value::number(2.0)],
-                            saved: Box::new(Value::number(0.0)),
-                        })),
-                    ],
-                },
-                Strand {
-                    id: "triple_body".into(),
-                    x: 0,
-                    y: 0,
-                    // triple(n) = double(n) + n  =>  triple(2) = 4 + 2 = 6
-                    instructions: vec![
-                        Instruction::new(InstructionKind::BlockHeader(triple_id.clone())),
-                        Instruction::new(InstructionKind::Return(Value::Op {
-                            op: crate::input::value::Op::Add,
-                            args: vec![
+            graph: MacroGraph {
+                strands: vec![
+                    Strand {
+                        id: "caller".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::WhenRan),
+                            Instruction::new(InstructionKind::SetVariable(
+                                "x".to_string(),
                                 Value::Call {
-                                    block_id: double_id.clone(),
-                                    args: vec![Value::Param { name: "n".into() }],
+                                    block_id: triple_id.clone(),
+                                    args: vec![Value::number(2.0)],
                                     saved: Box::new(Value::number(0.0)),
                                 },
-                                Value::Param { name: "n".into() },
-                            ],
-                            saved: Box::new(Value::number(0.0)),
-                        })),
-                    ],
-                },
-            ],
+                            )),
+                        ],
+                    },
+                    Strand {
+                        id: "double_body".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::BlockHeader(double_id.clone())),
+                            Instruction::new(InstructionKind::Return(Value::Op {
+                                op: crate::input::value::Op::Mul,
+                                args: vec![Value::Param { name: "n".into() }, Value::number(2.0)],
+                                saved: Box::new(Value::number(0.0)),
+                            })),
+                        ],
+                    },
+                    Strand {
+                        id: "triple_body".into(),
+                        x: 0,
+                        y: 0,
+                        // triple(n) = double(n) + n  =>  triple(2) = 4 + 2 = 6
+                        instructions: vec![
+                            Instruction::new(InstructionKind::BlockHeader(triple_id.clone())),
+                            Instruction::new(InstructionKind::Return(Value::Op {
+                                op: crate::input::value::Op::Add,
+                                args: vec![
+                                    Value::Call {
+                                        block_id: double_id.clone(),
+                                        args: vec![Value::Param { name: "n".into() }],
+                                        saved: Box::new(Value::number(0.0)),
+                                    },
+                                    Value::Param { name: "n".into() },
+                                ],
+                                saved: Box::new(Value::number(0.0)),
+                            })),
+                        ],
+                    },
+                ],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![
+                    BlockDef {
+                        id: double_id,
+                        pieces: vec![BlockPiece::Input {
+                            id: "p1".into(),
+                            name: "n".into(),
+                            value_type: InputValueType::Any,
+                        }],
+                        shape: BlockShape::ReturnsValue,
+                        color: default_block_color(),
+                    },
+                    BlockDef {
+                        id: triple_id,
+                        pieces: vec![BlockPiece::Input {
+                            id: "p1".into(),
+                            name: "n".into(),
+                            value_type: InputValueType::Any,
+                        }],
+                        shape: BlockShape::ReturnsValue,
+                        color: default_block_color(),
+                    },
+                ],
+            },
             recording_target: None,
             speed_multiplier: 1.0,
-            floating_values: vec![],
-            comments: vec![],
-            variables: vec![],
-            block_defs: vec![
-                BlockDef {
-                    id: double_id,
-                    pieces: vec![BlockPiece::Input {
-                        id: "p1".into(),
-                        name: "n".into(),
-                        value_type: InputValueType::Any,
-                    }],
-                    shape: BlockShape::ReturnsValue,
-                    color: default_block_color(),
-                },
-                BlockDef {
-                    id: triple_id,
-                    pieces: vec![BlockPiece::Input {
-                        id: "p1".into(),
-                        name: "n".into(),
-                        value_type: InputValueType::Any,
-                    }],
-                    shape: BlockShape::ReturnsValue,
-                    color: default_block_color(),
-                },
-            ],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -1659,51 +1664,53 @@ mod tests {
             id: "m".into(),
             name: "CondReturn".into(),
             description: "".into(),
-            strands: vec![
-                Strand {
-                    id: "caller".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::WhenRan),
-                        Instruction::new(InstructionKind::SetVariable(
-                            "x".to_string(),
-                            Value::Call {
-                                block_id: block_id.clone(),
-                                args: vec![],
-                                saved: Box::new(Value::number(0.0)),
-                            },
-                        )),
-                    ],
-                },
-                Strand {
-                    id: "body".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
-                        Instruction::new(InstructionKind::If {
-                            condition: true_cond(),
-                            body: vec![Instruction::new(InstructionKind::Return(Value::number(
-                                42.0,
-                            )))],
-                        }),
-                        // Never reached if the branch's Return correctly halted the body.
-                        Instruction::new(InstructionKind::Return(Value::number(0.0))),
-                    ],
-                },
-            ],
+            graph: MacroGraph {
+                strands: vec![
+                    Strand {
+                        id: "caller".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::WhenRan),
+                            Instruction::new(InstructionKind::SetVariable(
+                                "x".to_string(),
+                                Value::Call {
+                                    block_id: block_id.clone(),
+                                    args: vec![],
+                                    saved: Box::new(Value::number(0.0)),
+                                },
+                            )),
+                        ],
+                    },
+                    Strand {
+                        id: "body".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
+                            Instruction::new(InstructionKind::If {
+                                condition: true_cond(),
+                                body: vec![Instruction::new(InstructionKind::Return(Value::number(
+                                    42.0,
+                                )))],
+                            }),
+                            // Never reached if the branch's Return correctly halted the body.
+                            Instruction::new(InstructionKind::Return(Value::number(0.0))),
+                        ],
+                    },
+                ],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![BlockDef {
+                    id: block_id,
+                    pieces: vec![],
+                    shape: BlockShape::ReturnsValue,
+                    color: default_block_color(),
+                }],
+            },
             recording_target: None,
             speed_multiplier: 1.0,
-            floating_values: vec![],
-            comments: vec![],
-            variables: vec![],
-            block_defs: vec![BlockDef {
-                id: block_id,
-                pieces: vec![],
-                shape: BlockShape::ReturnsValue,
-                color: default_block_color(),
-            }],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -1925,51 +1932,53 @@ mod tests {
             id: "m".into(),
             name: "LoopReturn".into(),
             description: "".into(),
-            strands: vec![
-                Strand {
-                    id: "caller".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::WhenRan),
-                        Instruction::new(InstructionKind::SetVariable(
-                            "x".to_string(),
-                            Value::Call {
-                                block_id: block_id.clone(),
-                                args: vec![],
-                                saved: Box::new(Value::number(0.0)),
-                            },
-                        )),
-                    ],
-                },
-                Strand {
-                    id: "body".into(),
-                    x: 0,
-                    y: 0,
-                    instructions: vec![
-                        Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
-                        Instruction::new(InstructionKind::Repeat {
-                            count: Value::number(10.0),
-                            body: vec![Instruction::new(InstructionKind::Return(Value::number(
-                                7.0,
-                            )))],
-                        }),
-                        // Never reached if Return correctly halted the loop and the body.
-                        Instruction::new(InstructionKind::Return(Value::number(0.0))),
-                    ],
-                },
-            ],
+            graph: MacroGraph {
+                strands: vec![
+                    Strand {
+                        id: "caller".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::WhenRan),
+                            Instruction::new(InstructionKind::SetVariable(
+                                "x".to_string(),
+                                Value::Call {
+                                    block_id: block_id.clone(),
+                                    args: vec![],
+                                    saved: Box::new(Value::number(0.0)),
+                                },
+                            )),
+                        ],
+                    },
+                    Strand {
+                        id: "body".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
+                            Instruction::new(InstructionKind::Repeat {
+                                count: Value::number(10.0),
+                                body: vec![Instruction::new(InstructionKind::Return(Value::number(
+                                    7.0,
+                                )))],
+                            }),
+                            // Never reached if Return correctly halted the loop and the body.
+                            Instruction::new(InstructionKind::Return(Value::number(0.0))),
+                        ],
+                    },
+                ],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![BlockDef {
+                    id: block_id,
+                    pieces: vec![],
+                    shape: BlockShape::ReturnsValue,
+                    color: default_block_color(),
+                }],
+            },
             recording_target: None,
             speed_multiplier: 1.0,
-            floating_values: vec![],
-            comments: vec![],
-            variables: vec![],
-            block_defs: vec![BlockDef {
-                id: block_id,
-                pieces: vec![],
-                shape: BlockShape::ReturnsValue,
-                color: default_block_color(),
-            }],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));

@@ -10,7 +10,7 @@
   },
   "dependencies": {
     "@tauri-apps/api": "^2.0.0",
-    "blockstitch": "github:Blockworked/blockstitch#45bec2f8",
+    "blockstitch": "github:Blockworked/blockstitch#cbde6c0a",
     "lucide-vue-next": "^0.469.0",
     "vue": "^3.5.0"
   },

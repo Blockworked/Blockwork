@@ -11,3 +11,9 @@ pub mod recording;
 #[cfg(all(feature = "updater", any(windows, target_os = "macos")))]
 pub mod updater;
 pub mod wire;
+
+/// Registers Blockwork's own value operators with blockstitch, so a saved
+/// macro using them evaluates. Every entry point calls it; twice is fine.
+pub fn init() {
+    input::value::register_blockwork_operators();
+}

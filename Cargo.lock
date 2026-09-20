@@ -539,6 +539,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "blockstitch-core"
+version = "0.1.0"
+source = "git+https://github.com/Blockworked/blockstitch?rev=cbde6c0a#cbde6c0a851d25da91c413ce3f624744305f1643"
+dependencies = [
+ "chrono",
+ "rand 0.10.2",
+ "serde",
+ "serde_json",
+ "uuid",
+]
+
+[[package]]
 name = "blockwork"
 version = "0.5.4"
 dependencies = [
@@ -561,6 +573,7 @@ name = "blockwork-app"
 version = "0.5.4"
 dependencies = [
  "base64 0.23.1",
+ "blockstitch-core",
  "blockwork-core",
  "chrono",
  "dirs 7.0.0",
@@ -576,6 +589,7 @@ name = "blockwork-core"
 version = "0.5.4"
 dependencies = [
  "bincode",
+ "blockstitch-core",
  "chrono",
  "core-foundation",
  "core-graphics",

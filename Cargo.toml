@@ -20,6 +20,7 @@ version = "0.5.4"
 edition = "2024"
 
 [workspace.dependencies]
+blockstitch-core = { git = "https://github.com/Blockworked/blockstitch", rev = "cbde6c0a" }
 tauri = { git = "https://github.com/Blockworked/tauri", rev = "769171ab" }
 tracing = "0.1.44"
 tracing-log = "0.2.0"

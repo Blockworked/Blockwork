@@ -4,6 +4,7 @@ version.workspace = true
 edition.workspace = true
 
 [dependencies]
+blockstitch-core.workspace = true
 blockwork-core = { path = "../blockwork-core" }
 tracing.workspace = true
 serde.workspace = true

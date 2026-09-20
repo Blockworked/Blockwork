@@ -4,9 +4,8 @@
 
 use crate::Backend;
 use crate::commands;
-use crate::state::{
-    BlockPieceDto, HotkeyActionDto, InstructionDto, PathStep, ValueDto, ValueLocationDto,
-};
+use crate::state::{BlockPiece, HotkeyActionDto, InstructionDto, PathStep, ValueLocation};
+use blockwork_core::input::value::Value as BlockValue;
 use blockwork_core::macros::BlockShape;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -111,7 +110,7 @@ impl Backend {
                 to_json(commands::delete_variable(&self.state, &self.app, name)?)
             }
             "create_block" => {
-                let pieces: Vec<BlockPieceDto> = arg(&args, "pieces")?;
+                let pieces: Vec<BlockPiece> = arg(&args, "pieces")?;
                 let shape: BlockShape = arg(&args, "shape")?;
                 let color: String = arg(&args, "color")?;
                 to_json(commands::create_block(
@@ -124,7 +123,7 @@ impl Backend {
             }
             "edit_block" => {
                 let block_id: String = arg(&args, "blockId")?;
-                let pieces: Vec<BlockPieceDto> = arg(&args, "pieces")?;
+                let pieces: Vec<BlockPiece> = arg(&args, "pieces")?;
                 let shape: BlockShape = arg(&args, "shape")?;
                 let color: String = arg(&args, "color")?;
                 to_json(commands::edit_block(
@@ -141,7 +140,7 @@ impl Backend {
                 to_json(commands::delete_block(&self.state, &self.app, block_id)?)
             }
             "edit_value_field" => {
-                let location: ValueLocationDto = arg(&args, "location")?;
+                let location: ValueLocation = arg(&args, "location")?;
                 let text: String = arg(&args, "text")?;
                 to_json(commands::edit_value_field(
                     &self.state,
@@ -151,7 +150,7 @@ impl Backend {
                 )?)
             }
             "set_value_kind" => {
-                let location: ValueLocationDto = arg(&args, "location")?;
+                let location: ValueLocation = arg(&args, "location")?;
                 let kind: String = arg(&args, "kind")?;
                 to_json(commands::set_value_kind(
                     &self.state,
@@ -161,12 +160,12 @@ impl Backend {
                 )?)
             }
             "take_value" => {
-                let location: ValueLocationDto = arg(&args, "location")?;
+                let location: ValueLocation = arg(&args, "location")?;
                 to_json(commands::take_value(&self.state, &self.app, location)?)
             }
             "put_value" => {
-                let location: ValueLocationDto = arg(&args, "location")?;
-                let value: ValueDto = arg(&args, "value")?;
+                let location: ValueLocation = arg(&args, "location")?;
+                let value: BlockValue = arg(&args, "value")?;
                 to_json(commands::put_value(
                     &self.state,
                     &self.app,
@@ -175,13 +174,13 @@ impl Backend {
                 )?)
             }
             "preview_value" => {
-                let value: ValueDto = arg(&args, "value")?;
+                let value: BlockValue = arg(&args, "value")?;
                 to_json(commands::preview_value(&self.state, value)?)
             }
             "create_floating_value" => {
                 let x: i32 = arg(&args, "x")?;
                 let y: i32 = arg(&args, "y")?;
-                let value: ValueDto = arg(&args, "value")?;
+                let value: BlockValue = arg(&args, "value")?;
                 let origin_block_id: Option<String> = arg(&args, "originBlockId")?;
                 to_json(commands::create_floating_value(
                     &self.state,

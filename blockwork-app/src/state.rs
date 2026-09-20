@@ -1,15 +1,19 @@
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
 use blockwork_core::input::schedule::TimeSchedule;
-use blockwork_core::input::types::{
-    Axis, Coordinate, Direction, InputToken, MacroButton, MacroKey,
-};
-use blockwork_core::input::value::{Evaluated, Op, Value};
+use blockwork_core::input::types::{Axis, Coordinate, Direction, InputToken};
 use blockwork_core::input::{get_mouse_button_names, key_to_string, mouse_button_to_index};
+use blockwork_core::macros::MacroGraph;
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::thread_pool::ThreadPool;
-use blockwork_core::macros::{
-    BlockDef, BlockPiece, BlockShape, Comment, FloatingValue, InputValueType, Instruction,
-    InstructionKind, Macro, MacroSettings, Strand, VariableDef, default_block_color,
+// Canvas addressing and undo come from blockstitch. Both these groups are
+// re-exported so the rest of the crate still reaches them via `crate::state`.
+pub(crate) use blockstitch_core::editor::{
+    EditSession, History, InstrPath, PathStep, ValueBuffers, ValueLocation,
+};
+pub(crate) use blockwork_core::input::value::{Evaluated, Value};
+pub(crate) use blockwork_core::macros::{
+    BlockDef, BlockPiece, Comment, FloatingValue, Instruction, InstructionKind, Macro,
+    MacroSettings, Strand,
 };
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
@@ -18,77 +22,8 @@ use std::sync::{Arc, Mutex};
 
 pub(crate) type SharedState = Arc<Mutex<AppState>>;
 
-/// One step of an [`InstrPath`].
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) struct PathStep {
-    pub(crate) index: usize,
-    pub(crate) slot: Option<u8>,
-}
-
-/// Addresses one instruction, possibly nested.
-pub(crate) type InstrPath = Vec<PathStep>;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub(crate) enum FieldId {
-    WaitDuration,
-    MoveMouseX,
-    MoveMouseY,
-    ScrollAmount,
-    TextValue,
-    SetVariableValue,
-    ChangeVariableValue,
-    ReturnValue,
-    CallArg(usize),
-    Condition,
-    RepeatCount,
-    BatteryDischargeThreshold,
-    BatteryChargeThreshold,
-}
-
-impl std::fmt::Display for FieldId {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            FieldId::WaitDuration => write!(f, "WaitDuration"),
-            FieldId::MoveMouseX => write!(f, "MoveMouseX"),
-            FieldId::MoveMouseY => write!(f, "MoveMouseY"),
-            FieldId::ScrollAmount => write!(f, "ScrollAmount"),
-            FieldId::TextValue => write!(f, "TextValue"),
-            FieldId::SetVariableValue => write!(f, "SetVariableValue"),
-            FieldId::ChangeVariableValue => write!(f, "ChangeVariableValue"),
-            FieldId::ReturnValue => write!(f, "ReturnValue"),
-            FieldId::CallArg(i) => write!(f, "CallArg:{i}"),
-            FieldId::Condition => write!(f, "Condition"),
-            FieldId::RepeatCount => write!(f, "RepeatCount"),
-            FieldId::BatteryDischargeThreshold => write!(f, "BatteryDischargeThreshold"),
-            FieldId::BatteryChargeThreshold => write!(f, "BatteryChargeThreshold"),
-        }
-    }
-}
-
-impl std::str::FromStr for FieldId {
-    type Err = String;
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "WaitDuration" => Ok(FieldId::WaitDuration),
-            "MoveMouseX" => Ok(FieldId::MoveMouseX),
-            "MoveMouseY" => Ok(FieldId::MoveMouseY),
-            "ScrollAmount" => Ok(FieldId::ScrollAmount),
-            "TextValue" => Ok(FieldId::TextValue),
-            "SetVariableValue" => Ok(FieldId::SetVariableValue),
-            "ChangeVariableValue" => Ok(FieldId::ChangeVariableValue),
-            "ReturnValue" => Ok(FieldId::ReturnValue),
-            "Condition" => Ok(FieldId::Condition),
-            "RepeatCount" => Ok(FieldId::RepeatCount),
-            "BatteryDischargeThreshold" => Ok(FieldId::BatteryDischargeThreshold),
-            "BatteryChargeThreshold" => Ok(FieldId::BatteryChargeThreshold),
-            _ if s.starts_with("CallArg:") => s["CallArg:".len()..]
-                .parse::<usize>()
-                .map(FieldId::CallArg)
-                .map_err(|_| format!("Unknown FieldId: {s}")),
-            _ => Err(format!("Unknown FieldId: {s}")),
-        }
-    }
-}
+/// How many undo steps the editor keeps.
+pub(crate) const UNDO_STACK_LIMIT: usize = 50;
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum RecordingPhase {
@@ -129,17 +64,6 @@ pub(crate) enum KeyCaptureTarget {
     Standalone,
 }
 
-/// One undo/redo checkpoint - the structural macro state, including declared
-/// variables for renames.
-#[derive(Debug, Clone)]
-pub(crate) struct MacroSnapshot {
-    pub(crate) strands: Vec<Strand>,
-    pub(crate) floating_values: Vec<FloatingValue>,
-    pub(crate) comments: Vec<Comment>,
-    pub(crate) block_defs: Vec<BlockDef>,
-    pub(crate) variables: Vec<VariableDef>,
-}
-
 pub(crate) struct AppState {
     pub(crate) macro_selected: Option<usize>,
     pub(crate) current_macro: Option<Macro>,
@@ -164,9 +88,9 @@ pub(crate) struct AppState {
     pub(crate) clear_confirm_generation: u64,
     pub(crate) key_capture: Option<KeyCaptureTarget>,
     pub(crate) pending_standalone_key: Option<String>,
-    pub(crate) undo_stack: Vec<MacroSnapshot>,
-    pub(crate) redo_stack: Vec<MacroSnapshot>,
-    pub(crate) text_edit_session: Option<TextEditSession>,
+    /// Undo/redo over whole-canvas snapshots, plus the key that keeps a run
+    /// of keystrokes to one step.
+    pub(crate) history: History<MacroGraph>,
     pub(crate) recording_phase: RecordingPhase,
     pub(crate) recording_countdown_generation: u64,
     pub(crate) record_mouse_relative: bool,
@@ -177,7 +101,7 @@ pub(crate) struct AppState {
     pub(crate) combo_capture: Option<ComboCapture>,
     pub(crate) hotkey_bindings: Vec<HotkeyBinding>,
     pub(crate) pending_macro_hotkey: Option<(Option<usize>, Option<KeyCombo>)>,
-    pub(crate) invalid_field_buffers: HashMap<ValueLocation, String>,
+    pub(crate) invalid_field_buffers: ValueBuffers,
     pub(crate) ipc_port_text: String,
     pub(crate) ipc_port_invalid: bool,
     pub(crate) update_check_state: UpdateCheckState,
@@ -236,14 +160,14 @@ pub(crate) struct MacroDto {
     pub(crate) strands: Vec<StrandDto>,
     pub(crate) recording_target_strand_id: Option<String>,
     pub(crate) speed_multiplier: f64,
-    pub(crate) floating_values: Vec<FloatingValueDto>,
-    /// Floating/attached notes - see `CommentDto`.
-    pub(crate) comments: Vec<CommentDto>,
+    pub(crate) floating_values: Vec<FloatingValue>,
+    /// Floating/attached notes - see `Comment`.
+    pub(crate) comments: Vec<Comment>,
     /// Declared variable names only, for the sidebar/dropdowns - current
     /// values aren't surfaced to the frontend.
     pub(crate) variables: Vec<String>,
     /// User-defined custom blocks ("My Blocks").
-    pub(crate) block_defs: Vec<BlockDefDto>,
+    pub(crate) block_defs: Vec<BlockDef>,
     /// Settings edited from the "Macro Settings" popup - see `MacroSettingsDto`.
     pub(crate) settings: MacroSettingsDto,
 }
@@ -277,76 +201,6 @@ pub(crate) struct ImportPromptDto {
     pub(crate) custom_settings: Vec<CustomMacroSettingDto>,
 }
 
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(tag = "kind")]
-pub(crate) enum BlockPieceDto {
-    Label {
-        id: String,
-        text: String,
-    },
-    Input {
-        id: String,
-        name: String,
-        #[serde(default)]
-        value_type: InputValueType,
-    },
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub(crate) struct BlockDefDto {
-    pub(crate) id: String,
-    pub(crate) pieces: Vec<BlockPieceDto>,
-    #[serde(alias = "returns_value")]
-    pub(crate) shape: BlockShape,
-    #[serde(default = "default_block_color")]
-    pub(crate) color: String,
-}
-
-pub(crate) fn block_piece_to_dto(piece: &BlockPiece) -> BlockPieceDto {
-    match piece {
-        BlockPiece::Label { id, text } => BlockPieceDto::Label {
-            id: id.clone(),
-            text: text.clone(),
-        },
-        BlockPiece::Input {
-            id,
-            name,
-            value_type,
-        } => BlockPieceDto::Input {
-            id: id.clone(),
-            name: name.clone(),
-            value_type: *value_type,
-        },
-    }
-}
-
-pub(crate) fn dto_to_block_piece(dto: &BlockPieceDto) -> BlockPiece {
-    match dto {
-        BlockPieceDto::Label { id, text } => BlockPiece::Label {
-            id: id.clone(),
-            text: text.clone(),
-        },
-        BlockPieceDto::Input {
-            id,
-            name,
-            value_type,
-        } => BlockPiece::Input {
-            id: id.clone(),
-            name: name.clone(),
-            value_type: *value_type,
-        },
-    }
-}
-
-pub(crate) fn block_def_to_dto(def: &BlockDef) -> BlockDefDto {
-    BlockDefDto {
-        id: def.id.clone(),
-        pieces: def.pieces.iter().map(block_piece_to_dto).collect(),
-        shape: def.shape,
-        color: def.color.clone(),
-    }
-}
-
 #[derive(Serialize, Clone)]
 pub(crate) struct StrandDto {
     pub(crate) id: String,
@@ -363,183 +217,15 @@ pub(crate) struct KeyCaptureDto {
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(tag = "kind")]
-pub(crate) enum ValueDto {
-    Number {
-        value: f64,
-    },
-    Text {
-        value: String,
-    },
-    Bool,
-    Op {
-        op: Op,
-        args: Vec<ValueDto>,
-        saved: Box<ValueDto>,
-    },
-    Var {
-        name: String,
-    },
-    Param {
-        name: String,
-    },
-    Call {
-        block_id: String,
-        args: Vec<ValueDto>,
-        saved: Box<ValueDto>,
-    },
-}
-
-#[derive(Serialize, Clone)]
-pub(crate) struct FloatingValueDto {
-    pub(crate) id: String,
-    pub(crate) x: i32,
-    pub(crate) y: i32,
-    pub(crate) value: ValueDto,
-    pub(crate) origin_block_id: Option<String>,
-}
-
-/// Addresses a single `Value` node - either inside an instruction's field
-/// (`Field`) or inside a value block parked on canvas (`Floating`), at `path`
-/// within that root. Resolved against a `Macro` by `commands::resolve_location_mut`.
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub(crate) enum ValueLocation {
-    Field {
-        strand_id: String,
-        index: InstrPath,
-        field_id: FieldId,
-        path: Vec<u8>,
-    },
-    Floating {
-        floating_id: String,
-        path: Vec<u8>,
-    },
-}
-
-impl ValueLocation {
-    pub(crate) fn path(&self) -> &[u8] {
-        match self {
-            ValueLocation::Field { path, .. } => path,
-            ValueLocation::Floating { path, .. } => path,
-        }
-    }
-
-    /// True if `self` and `other` address a node in the same tree (ignoring
-    /// `path`) - used to prune stale invalid-text buffers after a subtree is
-    /// replaced wholesale.
-    pub(crate) fn same_root(&self, other: &ValueLocation) -> bool {
-        match (self, other) {
-            (
-                ValueLocation::Field {
-                    strand_id: s1,
-                    index: i1,
-                    field_id: f1,
-                    ..
-                },
-                ValueLocation::Field {
-                    strand_id: s2,
-                    index: i2,
-                    field_id: f2,
-                    ..
-                },
-            ) => s1 == s2 && i1 == i2 && f1 == f2,
-            (
-                ValueLocation::Floating { floating_id: a, .. },
-                ValueLocation::Floating { floating_id: b, .. },
-            ) => a == b,
-            _ => false,
-        }
-    }
-
-    /// `Some(strand_id)` for a `Field` location, `None` for `Floating` - used
-    /// to prune buffered entries when a whole strand is removed.
-    pub(crate) fn strand_id(&self) -> Option<&str> {
-        match self {
-            ValueLocation::Field { strand_id, .. } => Some(strand_id),
-            ValueLocation::Floating { .. } => None,
-        }
-    }
-}
-
-/// Identifies the field currently being typed into, so `commands::push_undo`
-/// can skip keystrokes that continue an edit already in progress rather than
-/// giving each its own undo step. Any other mutation resets this to `None`.
-#[derive(Debug, Clone, PartialEq, Eq)]
-pub(crate) enum TextEditSession {
-    Value(ValueLocation),
-    Instruction { strand_id: String, index: InstrPath },
-    Comment { comment_id: String },
-}
-
-/// Wire shape for `ValueLocation`, used for both incoming command params and
-/// outgoing `InvalidFieldDto` entries.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-#[serde(tag = "kind")]
-pub(crate) enum ValueLocationDto {
-    Field {
-        strand_id: String,
-        index: InstrPath,
-        field_id: String,
-        path: Vec<u8>,
-    },
-    Floating {
-        floating_id: String,
-        path: Vec<u8>,
-    },
-}
-
-impl ValueLocationDto {
-    pub(crate) fn to_location(&self) -> Result<ValueLocation, String> {
-        Ok(match self {
-            ValueLocationDto::Field {
-                strand_id,
-                index,
-                field_id,
-                path,
-            } => ValueLocation::Field {
-                strand_id: strand_id.clone(),
-                index: index.clone(),
-                field_id: field_id.parse()?,
-                path: path.clone(),
-            },
-            ValueLocationDto::Floating { floating_id, path } => ValueLocation::Floating {
-                floating_id: floating_id.clone(),
-                path: path.clone(),
-            },
-        })
-    }
-}
-
-pub(crate) fn location_to_dto(loc: &ValueLocation) -> ValueLocationDto {
-    match loc {
-        ValueLocation::Field {
-            strand_id,
-            index,
-            field_id,
-            path,
-        } => ValueLocationDto::Field {
-            strand_id: strand_id.clone(),
-            index: index.clone(),
-            field_id: field_id.to_string(),
-            path: path.clone(),
-        },
-        ValueLocation::Floating { floating_id, path } => ValueLocationDto::Floating {
-            floating_id: floating_id.clone(),
-            path: path.clone(),
-        },
-    }
-}
-
-#[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "type")]
 pub(crate) enum InstructionDto {
     Wait {
         id: String,
-        duration: ValueDto,
+        duration: Value,
     },
     Text {
         id: String,
-        text: ValueDto,
+        text: Value,
     },
     Key {
         id: String,
@@ -553,13 +239,13 @@ pub(crate) enum InstructionDto {
     },
     MoveMouse {
         id: String,
-        x: ValueDto,
-        y: ValueDto,
+        x: Value,
+        y: Value,
         coordinate: String,
     },
     Scroll {
         id: String,
-        amount: ValueDto,
+        amount: Value,
         axis: String,
     },
     Command {
@@ -575,11 +261,11 @@ pub(crate) enum InstructionDto {
     },
     WhenBatteryDischargedTo {
         id: String,
-        threshold: ValueDto,
+        threshold: Value,
     },
     WhenBatteryChargedTo {
         id: String,
-        threshold: ValueDto,
+        threshold: Value,
     },
     WhenTime {
         id: String,
@@ -606,12 +292,12 @@ pub(crate) enum InstructionDto {
     SetVariable {
         id: String,
         name: String,
-        value: ValueDto,
+        value: Value,
     },
     ChangeVariable {
         id: String,
         name: String,
-        value: ValueDto,
+        value: Value,
     },
     BlockHeader {
         id: String,
@@ -620,26 +306,26 @@ pub(crate) enum InstructionDto {
     CallBlock {
         id: String,
         block_id: String,
-        args: Vec<ValueDto>,
+        args: Vec<Value>,
     },
     Return {
         id: String,
-        value: ValueDto,
+        value: Value,
     },
     If {
         id: String,
-        condition: ValueDto,
+        condition: Value,
         body: Vec<InstructionDto>,
     },
     IfElse {
         id: String,
-        condition: ValueDto,
+        condition: Value,
         then_body: Vec<InstructionDto>,
         else_body: Vec<InstructionDto>,
     },
     Repeat {
         id: String,
-        count: ValueDto,
+        count: Value,
         body: Vec<InstructionDto>,
     },
     Forever {
@@ -648,7 +334,7 @@ pub(crate) enum InstructionDto {
     },
     While {
         id: String,
-        condition: ValueDto,
+        condition: Value,
         body: Vec<InstructionDto>,
     },
     EscapeLoop {
@@ -657,17 +343,6 @@ pub(crate) enum InstructionDto {
     ContinueLoop {
         id: String,
     },
-}
-
-/// A floating/attached note - see `blockwork_core::macros::Comment`.
-#[derive(Serialize, Deserialize, Clone, Debug)]
-pub(crate) struct CommentDto {
-    pub(crate) id: String,
-    pub(crate) x: i32,
-    pub(crate) y: i32,
-    pub(crate) text: String,
-    pub(crate) collapsed: bool,
-    pub(crate) attached_to: Option<String>,
 }
 
 /// One entry in the "Open App" picker's list - see `installed_apps`.
@@ -729,7 +404,7 @@ pub(crate) struct PendingMacroHotkeyDto {
 
 #[derive(Serialize, Clone)]
 pub(crate) struct InvalidFieldDto {
-    pub(crate) location: ValueLocationDto,
+    pub(crate) location: ValueLocation,
     pub(crate) text: String,
 }
 
@@ -786,64 +461,12 @@ fn str_to_axis(s: &str) -> Axis {
     }
 }
 
-pub(crate) fn value_to_dto(value: &Value) -> ValueDto {
-    match value {
-        Value::Number { value } => ValueDto::Number { value: *value },
-        Value::Text { value } => ValueDto::Text {
-            value: value.clone(),
-        },
-        Value::Bool => ValueDto::Bool,
-        Value::Op { op, args, saved } => ValueDto::Op {
-            op: *op,
-            args: args.iter().map(value_to_dto).collect(),
-            saved: Box::new(value_to_dto(saved)),
-        },
-        Value::Var { name } => ValueDto::Var { name: name.clone() },
-        Value::Param { name } => ValueDto::Param { name: name.clone() },
-        Value::Call {
-            block_id,
-            args,
-            saved,
-        } => ValueDto::Call {
-            block_id: block_id.clone(),
-            args: args.iter().map(value_to_dto).collect(),
-            saved: Box::new(value_to_dto(saved)),
-        },
-    }
-}
-
-pub(crate) fn dto_to_value(dto: &ValueDto) -> Value {
-    match dto {
-        ValueDto::Number { value } => Value::Number { value: *value },
-        ValueDto::Text { value } => Value::Text {
-            value: value.clone(),
-        },
-        ValueDto::Bool => Value::Bool,
-        ValueDto::Op { op, args, saved } => Value::Op {
-            op: *op,
-            args: args.iter().map(dto_to_value).collect(),
-            saved: Box::new(dto_to_value(saved)),
-        },
-        ValueDto::Var { name } => Value::Var { name: name.clone() },
-        ValueDto::Param { name } => Value::Param { name: name.clone() },
-        ValueDto::Call {
-            block_id,
-            args,
-            saved,
-        } => Value::Call {
-            block_id: block_id.clone(),
-            args: args.iter().map(dto_to_value).collect(),
-            saved: Box::new(dto_to_value(saved)),
-        },
-    }
-}
-
 pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
     let id = ins.id.clone();
     match &ins.kind {
         InstructionKind::Wait(dur) => InstructionDto::Wait {
             id,
-            duration: value_to_dto(dur),
+            duration: dur.clone(),
         },
         InstructionKind::Command(cmd) => InstructionDto::Command {
             id,
@@ -857,12 +480,12 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         InstructionKind::WhenBatteryDischargedTo(threshold) => {
             InstructionDto::WhenBatteryDischargedTo {
                 id,
-                threshold: value_to_dto(threshold),
+                threshold: threshold.clone(),
             }
         }
         InstructionKind::WhenBatteryChargedTo(threshold) => InstructionDto::WhenBatteryChargedTo {
             id,
-            threshold: value_to_dto(threshold),
+            threshold: threshold.clone(),
         },
         InstructionKind::WhenTime(schedule) => InstructionDto::WhenTime {
             id,
@@ -893,12 +516,12 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         InstructionKind::SetVariable(name, value) => InstructionDto::SetVariable {
             id,
             name: name.clone(),
-            value: value_to_dto(value),
+            value: value.clone(),
         },
         InstructionKind::ChangeVariable(name, value) => InstructionDto::ChangeVariable {
             id,
             name: name.clone(),
-            value: value_to_dto(value),
+            value: value.clone(),
         },
         InstructionKind::BlockHeader(block_id) => InstructionDto::BlockHeader {
             id,
@@ -907,15 +530,15 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         InstructionKind::CallBlock { block_id, args } => InstructionDto::CallBlock {
             id,
             block_id: block_id.clone(),
-            args: args.iter().map(value_to_dto).collect(),
+            args: args.clone(),
         },
         InstructionKind::Return(value) => InstructionDto::Return {
             id,
-            value: value_to_dto(value),
+            value: value.clone(),
         },
         InstructionKind::If { condition, body } => InstructionDto::If {
             id,
-            condition: value_to_dto(condition),
+            condition: condition.clone(),
             body: body.iter().map(instruction_to_dto).collect(),
         },
         InstructionKind::IfElse {
@@ -924,13 +547,13 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             else_body,
         } => InstructionDto::IfElse {
             id,
-            condition: value_to_dto(condition),
+            condition: condition.clone(),
             then_body: then_body.iter().map(instruction_to_dto).collect(),
             else_body: else_body.iter().map(instruction_to_dto).collect(),
         },
         InstructionKind::Repeat { count, body } => InstructionDto::Repeat {
             id,
-            count: value_to_dto(count),
+            count: count.clone(),
             body: body.iter().map(instruction_to_dto).collect(),
         },
         InstructionKind::Forever { body } => InstructionDto::Forever {
@@ -939,7 +562,7 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         },
         InstructionKind::While { condition, body } => InstructionDto::While {
             id,
-            condition: value_to_dto(condition),
+            condition: condition.clone(),
             body: body.iter().map(instruction_to_dto).collect(),
         },
         InstructionKind::EscapeLoop => InstructionDto::EscapeLoop { id },
@@ -947,7 +570,7 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         InstructionKind::Token(token) => match token {
             InputToken::Text(t) => InstructionDto::Text {
                 id,
-                text: value_to_dto(t),
+                text: t.clone(),
             },
             InputToken::Key(k, d) => InstructionDto::Key {
                 id,
@@ -961,13 +584,13 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             },
             InputToken::MoveMouse(x, y, coord) => InstructionDto::MoveMouse {
                 id,
-                x: value_to_dto(x),
-                y: value_to_dto(y),
+                x: x.clone(),
+                y: y.clone(),
                 coordinate: coordinate_to_str(coord).to_string(),
             },
             InputToken::Scroll(amt, axis) => InstructionDto::Scroll {
                 id,
-                amount: value_to_dto(amt),
+                amount: amt.clone(),
                 axis: axis_to_str(axis).to_string(),
             },
             InputToken::Raw(_, _) => InstructionDto::Comment {
@@ -982,11 +605,11 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
     use blockwork_core::input::{index_to_mouse_button, key_names::string_to_key};
     let (id, kind) = match dto {
         InstructionDto::Wait { id, duration } => {
-            (id, InstructionKind::Wait(dto_to_value(duration)))
+            (id, InstructionKind::Wait(duration.clone()))
         }
         InstructionDto::Text { id, text } => (
             id,
-            InstructionKind::Token(InputToken::Text(dto_to_value(text))),
+            InstructionKind::Token(InputToken::Text(text.clone())),
         ),
         InstructionDto::Key { id, key, direction } => {
             let mk = string_to_key(key).ok()?;
@@ -1021,25 +644,25 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         } => (
             id,
             InstructionKind::Token(InputToken::MoveMouse(
-                dto_to_value(x),
-                dto_to_value(y),
+                x.clone(),
+                y.clone(),
                 str_to_coordinate(coordinate),
             )),
         ),
         InstructionDto::Scroll { id, amount, axis } => (
             id,
-            InstructionKind::Token(InputToken::Scroll(dto_to_value(amount), str_to_axis(axis))),
+            InstructionKind::Token(InputToken::Scroll(amount.clone(), str_to_axis(axis))),
         ),
         InstructionDto::Command { id, command } => (id, InstructionKind::Command(command.clone())),
         InstructionDto::Comment { id, comment } => (id, InstructionKind::Comment(comment.clone())),
         InstructionDto::WhenRan { id } => (id, InstructionKind::WhenRan),
         InstructionDto::WhenBatteryDischargedTo { id, threshold } => (
             id,
-            InstructionKind::WhenBatteryDischargedTo(dto_to_value(threshold)),
+            InstructionKind::WhenBatteryDischargedTo(threshold.clone()),
         ),
         InstructionDto::WhenBatteryChargedTo { id, threshold } => (
             id,
-            InstructionKind::WhenBatteryChargedTo(dto_to_value(threshold)),
+            InstructionKind::WhenBatteryChargedTo(threshold.clone()),
         ),
         InstructionDto::WhenTime { id, schedule } => (id, InstructionKind::WhenTime(*schedule)),
         InstructionDto::WhenPowerPluggedIn { id } => (id, InstructionKind::WhenPowerPluggedIn),
@@ -1072,11 +695,11 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         ),
         InstructionDto::SetVariable { id, name, value } => (
             id,
-            InstructionKind::SetVariable(name.clone(), dto_to_value(value)),
+            InstructionKind::SetVariable(name.clone(), value.clone()),
         ),
         InstructionDto::ChangeVariable { id, name, value } => (
             id,
-            InstructionKind::ChangeVariable(name.clone(), dto_to_value(value)),
+            InstructionKind::ChangeVariable(name.clone(), value.clone()),
         ),
         InstructionDto::BlockHeader { id, block_id } => {
             (id, InstructionKind::BlockHeader(block_id.clone()))
@@ -1085,10 +708,10 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
             id,
             InstructionKind::CallBlock {
                 block_id: block_id.clone(),
-                args: args.iter().map(dto_to_value).collect(),
+                args: args.clone(),
             },
         ),
-        InstructionDto::Return { id, value } => (id, InstructionKind::Return(dto_to_value(value))),
+        InstructionDto::Return { id, value } => (id, InstructionKind::Return(value.clone())),
         InstructionDto::If {
             id,
             condition,
@@ -1096,7 +719,7 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         } => (
             id,
             InstructionKind::If {
-                condition: dto_to_value(condition),
+                condition: condition.clone(),
                 body: body
                     .iter()
                     .map(dto_to_instruction)
@@ -1111,7 +734,7 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         } => (
             id,
             InstructionKind::IfElse {
-                condition: dto_to_value(condition),
+                condition: condition.clone(),
                 then_body: then_body
                     .iter()
                     .map(dto_to_instruction)
@@ -1125,7 +748,7 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         InstructionDto::Repeat { id, count, body } => (
             id,
             InstructionKind::Repeat {
-                count: dto_to_value(count),
+                count: count.clone(),
                 body: body
                     .iter()
                     .map(dto_to_instruction)
@@ -1148,7 +771,7 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         } => (
             id,
             InstructionKind::While {
-                condition: dto_to_value(condition),
+                condition: condition.clone(),
                 body: body
                     .iter()
                     .map(dto_to_instruction)
@@ -1173,27 +796,6 @@ fn strand_to_dto(strand: &Strand) -> StrandDto {
     }
 }
 
-fn floating_value_to_dto(fv: &FloatingValue) -> FloatingValueDto {
-    FloatingValueDto {
-        id: fv.id.clone(),
-        x: fv.x,
-        y: fv.y,
-        value: value_to_dto(&fv.value),
-        origin_block_id: fv.origin_block_id.clone(),
-    }
-}
-
-fn comment_to_dto(c: &Comment) -> CommentDto {
-    CommentDto {
-        id: c.id.clone(),
-        x: c.x,
-        y: c.y,
-        text: c.text.clone(),
-        collapsed: c.collapsed,
-        attached_to: c.attached_to.clone(),
-    }
-}
-
 fn macro_to_dto(mac: &Macro) -> MacroDto {
     MacroDto {
         id: mac.id.clone(),
@@ -1202,14 +804,10 @@ fn macro_to_dto(mac: &Macro) -> MacroDto {
         strands: mac.strands.iter().map(strand_to_dto).collect(),
         recording_target_strand_id: mac.recording_target_id(),
         speed_multiplier: mac.speed_multiplier,
-        floating_values: mac
-            .floating_values
-            .iter()
-            .map(floating_value_to_dto)
-            .collect(),
-        comments: mac.comments.iter().map(comment_to_dto).collect(),
+        floating_values: mac.floating_values.clone(),
+        comments: mac.comments.clone(),
         variables: mac.variables.iter().map(|v| v.name.clone()).collect(),
-        block_defs: mac.block_defs.iter().map(block_def_to_dto).collect(),
+        block_defs: mac.block_defs.clone(),
         settings: macro_settings_to_dto(&mac.settings),
     }
 }
@@ -1335,7 +933,7 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         .invalid_field_buffers
         .iter()
         .map(|(location, text)| InvalidFieldDto {
-            location: location_to_dto(location),
+            location: location.clone(),
             text: text.clone(),
         })
         .collect();
@@ -1403,8 +1001,8 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         confirm_clear_instructions_remaining_secs: s.clear_confirm_remaining_secs,
         key_capture,
         standalone_key: s.pending_standalone_key.clone(),
-        can_undo: !s.undo_stack.is_empty(),
-        can_redo: !s.redo_stack.is_empty(),
+        can_undo: s.history.can_undo(),
+        can_redo: s.history.can_redo(),
         recording_phase,
         record_mouse_relative: s.record_mouse_relative,
         record_mouse_movement: s.record_mouse_movement,

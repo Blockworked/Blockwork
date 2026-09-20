@@ -15,7 +15,7 @@ pub(crate) mod scheduled_run;
 pub(crate) mod state;
 pub(crate) mod time_watch;
 
-use crate::state::{AppState, Page, RecordingPhase, SharedState, UpdateCheckState};
+use crate::state::{AppState, History, UNDO_STACK_LIMIT, Page, RecordingPhase, SharedState, UpdateCheckState};
 use blockwork_core::macros::runner::make_backend;
 use blockwork_core::macros::thread_pool::ThreadPool;
 use blockwork_core::recording::QueueSignal;
@@ -99,6 +99,8 @@ impl Backend {
     /// check). Must be called from within `runtime`'s context or with a
     /// handle to it.
     pub fn start(runtime: tokio::runtime::Handle) -> Backend {
+        // Registers Blockwork's own value operators before any macro loads.
+        blockwork_core::init();
         async_runtime::init(runtime);
         let (events, _) = broadcast::channel(256);
         let app = AppHandle { events };
@@ -130,9 +132,7 @@ impl Backend {
             clear_confirm_generation: 0,
             key_capture: None,
             pending_standalone_key: None,
-            undo_stack: vec![],
-            redo_stack: vec![],
-            text_edit_session: None,
+            history: History::new(UNDO_STACK_LIMIT),
             recording_phase: RecordingPhase::Idle,
             recording_countdown_generation: 0,
             // Linux absolute recording needs libei, both to replay absolute

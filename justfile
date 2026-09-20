@@ -20,12 +20,17 @@ clean:
 blockstitch-local path="../../blockstitch":
     cd ui && npm pkg set dependencies.blockstitch="link:{{path}}" && pnpm install
     git update-index --skip-worktree ui/package.json ui/pnpm-lock.yaml
+    mkdir -p .cargo
+    printf 'paths = ["%s/crates/blockstitch-core"]\n' "$(realpath ui/{{path}})" > .cargo/config.toml
 
 blockstitch-published commit="":
+    rm -f .cargo/config.toml
     git update-index --no-skip-worktree ui/package.json ui/pnpm-lock.yaml
     git checkout -- ui/package.json ui/pnpm-lock.yaml
     if [ -n "{{commit}}" ]; then cd ui && npm pkg set dependencies.blockstitch="github:Blockworked/blockstitch#{{commit}}"; fi
     cd ui && pnpm install
+    if [ -n "{{commit}}" ]; then sed -i 's|\(blockstitch-core = { git = "https://github.com/Blockworked/blockstitch", rev = "\)[^"]*\(" }\)|\1{{commit}}\2|' Cargo.toml; fi
+    cargo fetch
 
 install:
     # Binary's RUNPATH is `$ORIGIN`, so the CEF runtime payload (libcef.so,

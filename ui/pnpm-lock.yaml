@@ -12,8 +12,8 @@ importers:
         specifier: ^2.0.0
         version: 2.11.1
       blockstitch:
-        specifier: github:Blockworked/blockstitch#45bec2f8
-        version: https://codeload.github.com/Blockworked/blockstitch/tar.gz/45bec2f8b615c7ca636c905441c5571a4ea8c2cf(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3))
+        specifier: github:Blockworked/blockstitch#cbde6c0a
+        version: https://codeload.github.com/Blockworked/blockstitch/tar.gz/cbde6c0a851d25da91c413ce3f624744305f1643(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3))
       lucide-vue-next:
         specifier: ^0.469.0
         version: 0.469.0(vue@3.5.39(typescript@5.9.3))
@@ -429,8 +429,8 @@ packages:
   balanced-match@1.0.2:
     resolution: {integrity: sha512-3oSeUO0TMV67hN1AmbXsK4yaqU7tjiHlbxRDZOpH0KW9+CeX4bRAaX0Anxt0tx2MrpRpWwQaPwIlISEJhYU5Pw==}
 
-  blockstitch@https://codeload.github.com/Blockworked/blockstitch/tar.gz/45bec2f8b615c7ca636c905441c5571a4ea8c2cf:
-    resolution: {gitHosted: true, integrity: sha512-xH7oVMxmjdeFoB/eJ5yh+oUPWlqfjiwY/2BPVPLooFIQKvEoKdvsQBg4Ox/dBVLVNIN49ZFmb/swUWVGHp6hRA==, tarball: https://codeload.github.com/Blockworked/blockstitch/tar.gz/45bec2f8b615c7ca636c905441c5571a4ea8c2cf}
+  blockstitch@https://codeload.github.com/Blockworked/blockstitch/tar.gz/cbde6c0a851d25da91c413ce3f624744305f1643:
+    resolution: {gitHosted: true, tarball: https://codeload.github.com/Blockworked/blockstitch/tar.gz/cbde6c0a851d25da91c413ce3f624744305f1643}
     version: 0.1.0
     peerDependencies:
       lucide-vue-next: ^0.469.0
@@ -861,7 +861,7 @@ snapshots:
 
   balanced-match@1.0.2: {}
 
-  blockstitch@https://codeload.github.com/Blockworked/blockstitch/tar.gz/45bec2f8b615c7ca636c905441c5571a4ea8c2cf(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3)):
+  blockstitch@https://codeload.github.com/Blockworked/blockstitch/tar.gz/cbde6c0a851d25da91c413ce3f624744305f1643(lucide-vue-next@0.469.0(vue@3.5.39(typescript@5.9.3)))(vue@3.5.39(typescript@5.9.3)):
     dependencies:
       lucide-vue-next: 0.469.0(vue@3.5.39(typescript@5.9.3))
       vue: 3.5.39(typescript@5.9.3)

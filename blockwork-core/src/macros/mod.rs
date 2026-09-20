@@ -1,22 +1,37 @@
+//! Blockwork's block vocabulary - the instructions its canvas speaks - and
+//! the `Macro` document wrapped around blockstitch's [`BlockGraph`].
+//! [`InstructionKind`]'s [`BlockKind`] impl is the hinge between the two.
+
 use crate::input::schedule::TimeSchedule;
 use crate::input::types::InputToken;
-use crate::input::value::{Evaluated, Op, Value};
+use crate::input::value::{Op, Value};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use uuid::Uuid;
 
 pub mod backend;
+pub mod fields;
 pub mod loop_control;
 pub mod priority;
 pub mod run_registry;
 pub mod runner;
 pub mod thread_pool;
 
-fn default_macro_id() -> String {
-    Uuid::new_v4().simple().to_string()
-}
+pub use blockstitch_core::graph::{
+    BlockDef, BlockGraph, BlockKind, BlockPiece, BlockShape, Comment, FloatingValue,
+    InputValueType, VariableDef, default_block_color, normalize_block_color,
+};
+pub use fields::FieldId;
 
-fn default_strand_id() -> String {
+/// One instruction on the canvas: Blockwork's [`InstructionKind`] plus the
+/// stable id blockstitch tracks it by.
+pub type Instruction = blockstitch_core::graph::Instruction<InstructionKind>;
+/// One draggable stack of Blockwork instructions.
+pub type Strand = blockstitch_core::graph::Strand<InstructionKind>;
+/// Everything on a macro's canvas - see [`Macro`], which owns one.
+pub type MacroGraph = BlockGraph<InstructionKind>;
+
+fn default_macro_id() -> String {
     Uuid::new_v4().simple().to_string()
 }
 
@@ -28,263 +43,51 @@ fn default_speed_multiplier() -> f64 {
 /// Kept only so loading an old save file can find and migrate that strand.
 const LEGACY_ROOT_STRAND_ID: &str = "root";
 
-/// One draggable stack of instructions on the canvas. It's an entry point -
-/// one of the possibly-many things a macro runs concurrently - when its
-/// first instruction is `InstructionKind::WhenRan`; otherwise it stays persisted
-/// but inert until dragged under a "When Ran" block.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-pub struct Strand {
-    #[serde(default = "default_strand_id")]
-    pub id: String,
-    #[serde(default)]
-    pub x: i32,
-    #[serde(default)]
-    pub y: i32,
-    #[serde(default)]
-    pub instructions: Vec<Instruction>,
-}
+/// Blockwork's half of the block-editor contract: where its instructions
+/// keep values and bodies, which are headers, and how field ids map onto
+/// their slots. Every traversal built on this lives in blockstitch.
+impl BlockKind for InstructionKind {
+    const HEADER_LABEL: &'static str = "When Ran/Block Definition";
 
-/// A value block sitting free on the canvas, not embedded in any
-/// instruction's field - the drag-and-drop "parking spot" for a value block
-/// before/after it's placed into a field's slot.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-pub struct FloatingValue {
-    #[serde(default = "default_floating_value_id")]
-    pub id: String,
-    #[serde(default)]
-    pub x: i32,
-    #[serde(default)]
-    pub y: i32,
-    pub value: Value,
-    /// Which custom block's own header this value was dragged out of, if
-    /// any - set only when the value came from a `Value::Param` reporter
-    /// (see `commands::create_floating_value`), since that's the one value
-    /// kind meaningless outside its declaring block. A floating value with
-    /// no such origin (a plain number/operator/variable, or an older save
-    /// from before this field existed - hence `#[serde(default)]`) is just
-    /// `None`. Lets the frontend render a floating `Param` reporter with
-    /// its real declared shape (e.g. a boolean hexagon) instead of guessing
-    /// from name alone.
-    #[serde(default)]
-    pub origin_block_id: Option<String>,
-}
-
-fn default_floating_value_id() -> String {
-    Uuid::new_v4().simple().to_string()
-}
-
-/// A floating, collapsible note on the canvas - freestanding (`attached_to:
-/// None`, `x`/`y` an absolute canvas position, same convention as
-/// `FloatingValue`) or pinned to an instruction (`attached_to: Some(id)`,
-/// `x`/`y` an *offset* from that instruction's currently-rendered position
-/// instead - the desktop app has no idea where a given instruction renders
-/// on screen, that's purely a frontend DOM-measurement fact, so an attached
-/// note's absolute position is computed frontend-side each render as anchor
-/// row position + this offset, never stored as an absolute coordinate here).
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-pub struct Comment {
-    #[serde(default = "default_comment_id")]
-    pub id: String,
-    #[serde(default)]
-    pub x: i32,
-    #[serde(default)]
-    pub y: i32,
-    #[serde(default)]
-    pub text: String,
-    #[serde(default)]
-    pub collapsed: bool,
-    #[serde(default)]
-    pub attached_to: Option<String>,
-}
-
-fn default_comment_id() -> String {
-    Uuid::new_v4().simple().to_string()
-}
-
-fn default_variable_value() -> Evaluated {
-    Evaluated::Number(0.0)
-}
-
-/// A user-declared macro-wide variable and its current value, mutated by
-/// `SetVariable`/`ChangeVariable` at runtime and persisted with the macro so
-/// it survives an app restart.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-pub struct VariableDef {
-    pub name: String,
-    #[serde(default = "default_variable_value")]
-    pub value: Evaluated,
-}
-
-/// What kind of value an input slot expects - drives the blank default a
-/// fresh call site's argument gets (`Value::number(0.0)` vs `Value::Bool`,
-/// see `reconcile_block_call_args`) and, transitively, whether that slot
-/// renders as the ordinary rounded capsule or a boolean hexagon (purely a
-/// function of the `Value` actually sitting there, same as every built-in
-/// boolean slot - see `blockstitch`'s `ValueBlock.vue`'s `isBool`). `Any`
-/// (number-or-text, free-typed) is the long-standing default; `#[serde(default)]`
-/// on `BlockPiece::Input::value_type` lets an older save missing this field
-/// deserialize as `Any` instead of failing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-pub enum InputValueType {
-    #[default]
-    Any,
-    Bool,
-}
-
-/// One piece of a custom block's prototype, in declaration order - either
-/// static label text or a named input slot (read in the body via
-/// `Value::Param`). `id` is a stable identifier assigned once and never
-/// regenerated, since `name` changes on rename and can't serve as identity
-/// when reconciling call sites in `reconcile_block_call_args`.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-#[serde(tag = "kind")]
-pub enum BlockPiece {
-    Label {
-        id: String,
-        text: String,
-    },
-    Input {
-        id: String,
-        name: String,
-        #[serde(default)]
-        value_type: InputValueType,
-    },
-}
-
-impl BlockPiece {
-    fn id(&self) -> &str {
+    fn visit_values_mut(&mut self, f: &mut dyn FnMut(&mut Value, InputValueType)) {
         match self {
-            BlockPiece::Label { id, .. } | BlockPiece::Input { id, .. } => id,
-        }
-    }
-}
-
-/// What a custom block's own call site looks like: a plain stackable
-/// instruction (`Normal`), a stackable instruction with no bottom notch so
-/// nothing can be placed below it (`Ending` - same shape family as the
-/// built-in `Return`/`EscapeLoop`/`ContinueLoop`), or a value-position
-/// reporter returning either a number-or-text (`ReturnsValue`, an oval,
-/// today's long-standing `returns_value: true`) or a boolean (`ReturnsBool`,
-/// a hexagon - see `BlockPiece`'s `InputValueType` for the same oval/hexagon
-/// split on an *input*). `Normal`/`Ending` and `ReturnsValue`/`ReturnsBool`
-/// are each a mutually-exclusive pair in the "Make a Block" UI (a "returns a
-/// value" checkbox swaps which pair the two shape buttons offer) - there's
-/// no such thing as an `Ending` reporter or a `Normal` block that also
-/// returns a boolean.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Default)]
-pub enum BlockShape {
-    #[default]
-    Normal,
-    Ending,
-    ReturnsValue,
-    ReturnsBool,
-}
-
-impl BlockShape {
-    /// True for either reporter shape - gates whether `Value::Call` nodes
-    /// referencing this block are meaningful and whether a `Return` inside
-    /// its body is valid placement (see `commands::check_return_placement`).
-    /// Boolean-vs-number/text is a pure rendering concern (which shape the
-    /// reporter draws as, and what a fresh call-site arg defaults to) with
-    /// no effect on execution - `Value::eval`/`Evaluated` are already
-    /// dynamically typed regardless of which reporter shape produced them.
-    pub fn returns_value(self) -> bool {
-        matches!(self, BlockShape::ReturnsValue | BlockShape::ReturnsBool)
-    }
-
-    /// True only for the no-bottom-notch command shape.
-    pub fn is_ending(self) -> bool {
-        matches!(self, BlockShape::Ending)
-    }
-}
-
-/// Old saves only ever had a `returns_value: bool` field; this decodes
-/// either that (`true` migrating to `ReturnsValue`, `false` to `Normal`) or
-/// the current `shape: "Normal" | "Ending" | "ReturnsValue" | "ReturnsBool"`
-/// tag, whichever `BlockDef`'s `#[serde(alias = "returns_value")]` field
-/// actually finds on disk. Mirrors `Value`'s own legacy-tolerant
-/// `Deserialize` impl further down this crate (`input/value.rs`).
-impl<'de> Deserialize<'de> for BlockShape {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum ShapeDe {
-            Legacy(bool),
-            Current(String),
-        }
-        Ok(match ShapeDe::deserialize(deserializer)? {
-            ShapeDe::Legacy(true) => BlockShape::ReturnsValue,
-            ShapeDe::Legacy(false) => BlockShape::Normal,
-            ShapeDe::Current(s) => match s.as_str() {
-                "Normal" => BlockShape::Normal,
-                "Ending" => BlockShape::Ending,
-                "ReturnsValue" => BlockShape::ReturnsValue,
-                "ReturnsBool" => BlockShape::ReturnsBool,
-                other => {
-                    return Err(serde::de::Error::unknown_variant(
-                        other,
-                        &["Normal", "Ending", "ReturnsValue", "ReturnsBool"],
-                    ));
+            InstructionKind::Token(token) => token.visit_values_mut(f),
+            InstructionKind::Wait(value)
+            | InstructionKind::Return(value)
+            | InstructionKind::WhenBatteryDischargedTo(value)
+            | InstructionKind::WhenBatteryChargedTo(value)
+            | InstructionKind::SetVariable(_, value)
+            | InstructionKind::ChangeVariable(_, value)
+            | InstructionKind::Repeat { count: value, .. } => f(value, InputValueType::Any),
+            // A call site's declared Boolean inputs live on the `BlockDef`,
+            // not here - `BlockGraph::migrate_bool_slots` handles those.
+            InstructionKind::CallBlock { args, .. } => {
+                for arg in args {
+                    f(arg, InputValueType::Any);
                 }
-            },
-        })
+            }
+            InstructionKind::If { condition, .. }
+            | InstructionKind::IfElse { condition, .. }
+            | InstructionKind::While { condition, .. } => f(condition, InputValueType::Bool),
+            InstructionKind::Command(_)
+            | InstructionKind::Comment(_)
+            | InstructionKind::WhenRan
+            | InstructionKind::BlockHeader(_)
+            | InstructionKind::EscapeLoop
+            | InstructionKind::ContinueLoop
+            | InstructionKind::WhenTime(_)
+            | InstructionKind::WhenPowerPluggedIn
+            | InstructionKind::WhenPowerUnplugged
+            | InstructionKind::Forever { .. }
+            | InstructionKind::OpenApp { .. }
+            | InstructionKind::CloseApp { .. } => {}
+        }
     }
-}
 
-/// A user-defined custom block ("My Blocks") - just the prototype/signature;
-/// its body lives in a separate `Strand` whose `instructions[0]` is
-/// `InstructionKind::BlockHeader(id)`.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-pub struct BlockDef {
-    pub id: String,
-    pub pieces: Vec<BlockPiece>,
-    #[serde(alias = "returns_value")]
-    pub shape: BlockShape,
-    /// User-selected accent for the block's icon and hover outline. The
-    /// default preserves the established blue treatment for older macros.
-    #[serde(default = "default_block_color")]
-    pub color: String,
-}
-
-/// The legacy/default custom-block accent. Kept as a function so serde can
-/// supply it when loading macros saved before custom colors existed.
-pub fn default_block_color() -> String {
-    "#4C97FF".to_string()
-}
-
-/// Canonicalizes the one color format Blockwork persists and exposes to CSS.
-/// `None` means the supplied value cannot safely be used as a block accent.
-pub fn normalize_block_color(color: &str) -> Option<String> {
-    let color = color.trim();
-    (color.len() == 7
-        && color.starts_with('#')
-        && color[1..].bytes().all(|b| b.is_ascii_hexdigit()))
-    .then(|| color.to_ascii_uppercase())
-}
-
-impl BlockDef {
-    /// Declared input names, in prototype order - the positional key `Call`/
-    /// `CallBlock`'s `args` line up against.
-    pub fn input_names(&self) -> impl Iterator<Item = &str> {
-        self.pieces.iter().filter_map(|p| match p {
-            BlockPiece::Input { name, .. } => Some(name.as_str()),
-            BlockPiece::Label { .. } => None,
-        })
-    }
-}
-
-fn default_block_id() -> String {
-    Uuid::new_v4().simple().to_string()
-}
-
-impl InstructionKind {
-    /// True for "header" blocks (`WhenRan`, `BlockHeader`, and the
-    /// `WhenBattery*To` entry points) - must be first in their strand,
-    /// nothing may stack above them, and they render with a flat top edge.
-    pub fn is_header(&self) -> bool {
+    /// True for "header" blocks (`WhenRan`, `BlockHeader`, and the event
+    /// entry points) - must be first in their strand, nothing may stack
+    /// above them, and they render with a flat top edge.
+    fn is_header(&self) -> bool {
         matches!(
             self,
             InstructionKind::WhenRan
@@ -297,343 +100,7 @@ impl InstructionKind {
         )
     }
 
-    /// Renames `Value::Var` reads, plus a `SetVariable`/`ChangeVariable`
-    /// instruction's own target name.
-    pub fn rename_var(&mut self, old: &str, new: &str) {
-        match self {
-            InstructionKind::Wait(value)
-            | InstructionKind::Return(value)
-            | InstructionKind::WhenBatteryDischargedTo(value)
-            | InstructionKind::WhenBatteryChargedTo(value) => value.rename_var(old, new),
-            InstructionKind::Token(token) => token.rename_var(old, new),
-            InstructionKind::SetVariable(name, value)
-            | InstructionKind::ChangeVariable(name, value) => {
-                if name == old {
-                    *name = new.to_string();
-                }
-                value.rename_var(old, new);
-            }
-            InstructionKind::CallBlock { args, .. } => {
-                for a in args.iter_mut() {
-                    a.rename_var(old, new);
-                }
-            }
-            InstructionKind::If { condition, body } => {
-                condition.rename_var(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_var(old, new);
-                }
-            }
-            InstructionKind::IfElse {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                condition.rename_var(old, new);
-                for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
-                    ins.rename_var(old, new);
-                }
-            }
-            InstructionKind::Repeat { count, body } => {
-                count.rename_var(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_var(old, new);
-                }
-            }
-            InstructionKind::Forever { body } => {
-                for ins in body.iter_mut() {
-                    ins.rename_var(old, new);
-                }
-            }
-            InstructionKind::While { condition, body } => {
-                condition.rename_var(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_var(old, new);
-                }
-            }
-            InstructionKind::Command(_)
-            | InstructionKind::Comment(_)
-            | InstructionKind::WhenRan
-            | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop
-            | InstructionKind::ContinueLoop
-            | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn
-            | InstructionKind::WhenPowerUnplugged
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => {}
-        }
-    }
-
-    /// Repairs boolean slots poisoned by the historical `Value::Bool`-less
-    /// bug (see `Value::migrate_bool_slots`) - run once over every
-    /// instruction when a macro loads (`From<MacroDe>`). An `If`/`IfElse`
-    /// condition is the one position this module knows is boolean-typed by
-    /// construction; everything else starts `false` and lets `Value::migrate_bool_slots`
-    /// find any `And`/`Or`/`Not` operands nested further in on its own.
-    pub fn migrate_bool_slots(&mut self) {
-        match self {
-            InstructionKind::Wait(value)
-            | InstructionKind::Return(value)
-            | InstructionKind::WhenBatteryDischargedTo(value)
-            | InstructionKind::WhenBatteryChargedTo(value) => value.migrate_bool_slots(false),
-            InstructionKind::Token(token) => token.migrate_bool_slots(),
-            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
-                value.migrate_bool_slots(false)
-            }
-            InstructionKind::CallBlock { args, .. } => {
-                for a in args.iter_mut() {
-                    a.migrate_bool_slots(false);
-                }
-            }
-            InstructionKind::If { condition, body } => {
-                condition.migrate_bool_slots(true);
-                for ins in body.iter_mut() {
-                    ins.migrate_bool_slots();
-                }
-            }
-            InstructionKind::IfElse {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                condition.migrate_bool_slots(true);
-                for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
-                    ins.migrate_bool_slots();
-                }
-            }
-            InstructionKind::Repeat { count, body } => {
-                count.migrate_bool_slots(false);
-                for ins in body.iter_mut() {
-                    ins.migrate_bool_slots();
-                }
-            }
-            InstructionKind::Forever { body } => {
-                for ins in body.iter_mut() {
-                    ins.migrate_bool_slots();
-                }
-            }
-            InstructionKind::While { condition, body } => {
-                condition.migrate_bool_slots(true);
-                for ins in body.iter_mut() {
-                    ins.migrate_bool_slots();
-                }
-            }
-            InstructionKind::Command(_)
-            | InstructionKind::Comment(_)
-            | InstructionKind::WhenRan
-            | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop
-            | InstructionKind::ContinueLoop
-            | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn
-            | InstructionKind::WhenPowerUnplugged
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => {}
-        }
-    }
-
-    /// Renames every `Value::Param` leaf reading `old` to `new`, keeping a
-    /// block's body working after one of its inputs is renamed.
-    pub fn rename_param(&mut self, old: &str, new: &str) {
-        match self {
-            InstructionKind::Wait(value)
-            | InstructionKind::Return(value)
-            | InstructionKind::WhenBatteryDischargedTo(value)
-            | InstructionKind::WhenBatteryChargedTo(value) => value.rename_param(old, new),
-            InstructionKind::Token(token) => token.rename_param(old, new),
-            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
-                value.rename_param(old, new)
-            }
-            InstructionKind::CallBlock { args, .. } => {
-                for a in args.iter_mut() {
-                    a.rename_param(old, new);
-                }
-            }
-            InstructionKind::If { condition, body } => {
-                condition.rename_param(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_param(old, new);
-                }
-            }
-            InstructionKind::IfElse {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                condition.rename_param(old, new);
-                for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
-                    ins.rename_param(old, new);
-                }
-            }
-            InstructionKind::Repeat { count, body } => {
-                count.rename_param(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_param(old, new);
-                }
-            }
-            InstructionKind::Forever { body } => {
-                for ins in body.iter_mut() {
-                    ins.rename_param(old, new);
-                }
-            }
-            InstructionKind::While { condition, body } => {
-                condition.rename_param(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_param(old, new);
-                }
-            }
-            InstructionKind::Command(_)
-            | InstructionKind::Comment(_)
-            | InstructionKind::WhenRan
-            | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop
-            | InstructionKind::ContinueLoop
-            | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn
-            | InstructionKind::WhenPowerUnplugged
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => {}
-        }
-    }
-
-    /// Applies `f` to the `args` of every `CallBlock`/`Value::Call` node
-    /// referencing `block_id`, wherever nested. Used to keep call sites'
-    /// argument lists aligned after a block's inputs change.
-    pub fn for_each_call_args_mut(&mut self, block_id: &str, f: &mut dyn FnMut(&mut Vec<Value>)) {
-        match self {
-            InstructionKind::Wait(value)
-            | InstructionKind::Return(value)
-            | InstructionKind::WhenBatteryDischargedTo(value)
-            | InstructionKind::WhenBatteryChargedTo(value) => {
-                value.for_each_call_args_mut(block_id, f)
-            }
-            InstructionKind::Token(token) => token.for_each_call_args_mut(block_id, f),
-            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
-                value.for_each_call_args_mut(block_id, f)
-            }
-            InstructionKind::CallBlock { block_id: id, args } => {
-                if id == block_id {
-                    f(args);
-                }
-                for a in args.iter_mut() {
-                    a.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::If { condition, body } => {
-                condition.for_each_call_args_mut(block_id, f);
-                for ins in body.iter_mut() {
-                    ins.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::IfElse {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                condition.for_each_call_args_mut(block_id, f);
-                for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
-                    ins.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::Repeat { count, body } => {
-                count.for_each_call_args_mut(block_id, f);
-                for ins in body.iter_mut() {
-                    ins.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::Forever { body } => {
-                for ins in body.iter_mut() {
-                    ins.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::While { condition, body } => {
-                condition.for_each_call_args_mut(block_id, f);
-                for ins in body.iter_mut() {
-                    ins.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::Command(_)
-            | InstructionKind::Comment(_)
-            | InstructionKind::WhenRan
-            | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop
-            | InstructionKind::ContinueLoop
-            | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn
-            | InstructionKind::WhenPowerUnplugged
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => {}
-        }
-    }
-
-    /// Replaces every `Value::Call` node referencing `block_id` with a plain
-    /// `0` leaf (a `CallBlock` referencing it is left for the caller to drop
-    /// entirely), so deleting a custom block never leaves a dangling ref.
-    pub fn scrub_block_calls(&mut self, block_id: &str) {
-        match self {
-            InstructionKind::Wait(value)
-            | InstructionKind::Return(value)
-            | InstructionKind::WhenBatteryDischargedTo(value)
-            | InstructionKind::WhenBatteryChargedTo(value) => value.scrub_block_calls(block_id),
-            InstructionKind::Token(token) => token.scrub_block_calls(block_id),
-            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
-                value.scrub_block_calls(block_id)
-            }
-            InstructionKind::CallBlock { args, .. } => {
-                for a in args.iter_mut() {
-                    a.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::If { condition, body } => {
-                condition.scrub_block_calls(block_id);
-                for ins in body.iter_mut() {
-                    ins.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::IfElse {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                condition.scrub_block_calls(block_id);
-                for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
-                    ins.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::Repeat { count, body } => {
-                count.scrub_block_calls(block_id);
-                for ins in body.iter_mut() {
-                    ins.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::Forever { body } => {
-                for ins in body.iter_mut() {
-                    ins.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::While { condition, body } => {
-                condition.scrub_block_calls(block_id);
-                for ins in body.iter_mut() {
-                    ins.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::Command(_)
-            | InstructionKind::Comment(_)
-            | InstructionKind::WhenRan
-            | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop
-            | InstructionKind::ContinueLoop
-            | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn
-            | InstructionKind::WhenPowerUnplugged
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => {}
-        }
-    }
-
-    /// Read-only counterpart to `body_mut`.
-    pub fn body(&self, slot: u8) -> Option<&Vec<Instruction>> {
+    fn body(&self, slot: u8) -> Option<&Vec<Instruction>> {
         match (self, slot) {
             (InstructionKind::If { body, .. }, 0) => Some(body),
             (InstructionKind::IfElse { then_body, .. }, 0) => Some(then_body),
@@ -645,13 +112,7 @@ impl InstructionKind {
         }
     }
 
-    /// The nested instruction list for compound-instruction `slot` - `If`'s
-    /// single body (`slot == 0`), or `IfElse`'s `then_body`/`else_body`
-    /// (`slot == 0`/`1`); `Repeat`/`Forever`/`While` each have a single body
-    /// at `slot == 0`, same as `If`. `None` for anything else (including an
-    /// out-of-range slot). The one primitive nested-instruction addressing
-    /// builds on.
-    pub fn body_mut(&mut self, slot: u8) -> Option<&mut Vec<Instruction>> {
+    fn body_mut(&mut self, slot: u8) -> Option<&mut Vec<Instruction>> {
         match (self, slot) {
             (InstructionKind::If { body, .. }, 0) => Some(body),
             (InstructionKind::IfElse { then_body, .. }, 0) => Some(then_body),
@@ -662,570 +123,46 @@ impl InstructionKind {
             _ => None,
         }
     }
-}
 
-impl Strand {
-    pub fn starts_with_when_ran(&self) -> bool {
-        self.instructions
-            .first()
-            .map_or(false, Instruction::is_header)
-    }
-}
-
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(from = "MacroDe")]
-pub struct Macro {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub strands: Vec<Strand>,
-    /// Strand explicitly chosen to receive freshly-recorded input; `None`
-    /// falls back to the "first When Ran strand, else first strand" rule.
-    /// Kept out of undo/redo (it's a preference, not an instruction edit).
-    #[serde(default)]
-    pub recording_target: Option<String>,
-    /// Playback speed: every `Wait` duration is divided by this at runtime.
-    /// 1.0 is normal, 2.0 is twice as fast. Clamped to `SPEED_MULTIPLIER_RANGE`.
-    #[serde(default = "default_speed_multiplier")]
-    pub speed_multiplier: f64,
-    /// Value blocks parked on open canvas - see `FloatingValue`.
-    #[serde(default)]
-    pub floating_values: Vec<FloatingValue>,
-    /// Floating/attached notes - see `Comment`.
-    #[serde(default)]
-    pub comments: Vec<Comment>,
-    /// User-declared macro-wide variables - see `VariableDef`.
-    #[serde(default)]
-    pub variables: Vec<VariableDef>,
-    /// User-defined custom blocks ("My Blocks") - see `BlockDef`. Each
-    /// def's body lives in its own header strand within `strands`.
-    #[serde(default)]
-    pub block_defs: Vec<BlockDef>,
-    /// Settings edited from the "Macro Settings" popup - see `MacroSettings`.
-    #[serde(default)]
-    pub settings: MacroSettings,
-}
-
-/// Valid range for both the per-macro and global speed multipliers, enforced
-/// wherever either is set from user input.
-pub const SPEED_MULTIPLIER_RANGE: std::ops::RangeInclusive<f64> = 0.1..=10.0;
-
-/// Per-macro settings edited from the "Macro Settings" popup next to the
-/// macro dropdown - not part of the macro's own behavior, but affecting how
-/// the app treats it. Persisted and exported/imported with the macro like
-/// everything else in `Macro`, so a new field here needs no separate wiring
-/// to survive a save/export round-trip.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-pub struct MacroSettings {
-    /// When `true`, this macro's `WhenBattery*`/`WhenTime`/`WhenPower*`
-    /// strands are watched by the background watchers (`battery_watch`/
-    /// `time_watch` in the desktop app) even while a different macro is
-    /// selected. By default only the currently selected macro's event
-    /// strands are live.
-    #[serde(default)]
-    pub always_listen: bool,
-}
-
-/// Deserialization shape supporting both the current multi-strand format and
-/// the legacy flat `code: Vec<Instruction>` format from older saves; legacy
-/// macros become a single root strand.
-#[derive(Deserialize)]
-#[serde(untagged)]
-enum MacroDe {
-    Current {
-        #[serde(default = "default_macro_id")]
-        id: String,
-        name: String,
-        description: String,
-        strands: Vec<Strand>,
-        #[serde(default)]
-        recording_target: Option<String>,
-        #[serde(default = "default_speed_multiplier")]
-        speed_multiplier: f64,
-        #[serde(default)]
-        floating_values: Vec<FloatingValue>,
-        #[serde(default)]
-        comments: Vec<Comment>,
-        #[serde(default)]
-        variables: Vec<VariableDef>,
-        #[serde(default)]
-        block_defs: Vec<BlockDef>,
-        #[serde(default)]
-        settings: MacroSettings,
-    },
-    Legacy {
-        #[serde(default = "default_macro_id")]
-        id: String,
-        name: String,
-        description: String,
-        code: Vec<Instruction>,
-    },
-}
-
-impl From<MacroDe> for Macro {
-    fn from(de: MacroDe) -> Self {
-        let mut mac = match de {
-            MacroDe::Current {
-                id,
-                name,
-                description,
-                mut strands,
-                recording_target,
-                speed_multiplier,
-                floating_values,
-                comments,
-                variables,
-                block_defs,
-                settings,
-            } => {
-                // Pre-"When Ran" saves have a strand id=="root" that was the
-                // implicit entry point; give it a real WhenRan on upgrade.
-                if let Some(legacy) = strands.iter_mut().find(|s| s.id == LEGACY_ROOT_STRAND_ID) {
-                    if !legacy.starts_with_when_ran() {
-                        legacy
-                            .instructions
-                            .insert(0, Instruction::new(InstructionKind::WhenRan));
-                    }
-                }
-                Self {
-                    id,
-                    name,
-                    description,
-                    strands,
-                    recording_target,
-                    speed_multiplier,
-                    floating_values,
-                    comments,
-                    variables,
-                    block_defs,
-                    settings,
-                }
+    fn variable_target_mut(&mut self) -> Option<&mut String> {
+        match self {
+            InstructionKind::SetVariable(name, _) | InstructionKind::ChangeVariable(name, _) => {
+                Some(name)
             }
-            MacroDe::Legacy {
-                id,
-                name,
-                description,
-                mut code,
-            } => {
-                code.insert(0, Instruction::new(InstructionKind::WhenRan));
-                let strand = Strand {
-                    id: default_strand_id(),
-                    x: 0,
-                    y: 0,
-                    instructions: code,
-                };
-                Self {
-                    id,
-                    name,
-                    description,
-                    strands: vec![strand],
-                    recording_target: None,
-                    speed_multiplier: default_speed_multiplier(),
-                    floating_values: Vec::new(),
-                    comments: Vec::new(),
-                    variables: Vec::new(),
-                    block_defs: Vec::new(),
-                    settings: MacroSettings::default(),
-                }
-            }
-        };
-        // Repairs boolean slots poisoned by the historical `Value::Bool`-less
-        // bug (see `Value::migrate_bool_slots`) - a save from before that fix
-        // may have a raw number leaf sitting where a blank hexagon belongs.
-        for strand in mac.strands.iter_mut() {
-            for ins in strand.instructions.iter_mut() {
-                ins.migrate_bool_slots();
-            }
-        }
-        mac.migrate_custom_block_bool_args();
-        for fv in mac.floating_values.iter_mut() {
-            fv.value.migrate_bool_slots(false);
-        }
-        // A macro file may have been created before this field existed (in
-        // which case serde supplied blue), or hand-edited/imported with an
-        // invalid color. Keep all persisted values safe to place in a CSS
-        // custom property before the frontend ever sees them.
-        for def in mac.block_defs.iter_mut() {
-            def.color = normalize_block_color(&def.color).unwrap_or_else(default_block_color);
-        }
-        mac.migrate_legacy_comments();
-        mac
-    }
-}
-
-impl Macro {
-    /// Repairs legacy numeric blanks at `CallBlock` argument positions whose
-    /// declared custom-block input is Boolean. Unlike built-in `If`/`While`
-    /// slots, the expected type lives in the referenced `BlockDef`, so the
-    /// generic `InstructionKind::migrate_bool_slots` cannot determine it on
-    /// its own.
-    fn migrate_custom_block_bool_args(&mut self) {
-        let boolean_inputs: HashMap<String, Vec<bool>> = self
-            .block_defs
-            .iter()
-            .map(|definition| {
-                let inputs = definition
-                    .pieces
-                    .iter()
-                    .filter_map(|piece| match piece {
-                        BlockPiece::Input { value_type, .. } => {
-                            Some(*value_type == InputValueType::Bool)
-                        }
-                        BlockPiece::Label { .. } => None,
-                    })
-                    .collect();
-                (definition.id.clone(), inputs)
-            })
-            .collect();
-
-        fn repair(instructions: &mut [Instruction], boolean_inputs: &HashMap<String, Vec<bool>>) {
-            for instruction in instructions {
-                match &mut instruction.kind {
-                    InstructionKind::CallBlock { block_id, args } => {
-                        if let Some(expected) = boolean_inputs.get(block_id) {
-                            for (arg, expects_bool) in args.iter_mut().zip(expected) {
-                                if *expects_bool {
-                                    arg.migrate_bool_slots(true);
-                                }
-                            }
-                        }
-                    }
-                    InstructionKind::If { body, .. }
-                    | InstructionKind::Repeat { body, .. }
-                    | InstructionKind::Forever { body }
-                    | InstructionKind::While { body, .. } => repair(body, boolean_inputs),
-                    InstructionKind::IfElse {
-                        then_body,
-                        else_body,
-                        ..
-                    } => {
-                        repair(then_body, boolean_inputs);
-                        repair(else_body, boolean_inputs);
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        for strand in &mut self.strands {
-            repair(&mut strand.instructions, &boolean_inputs);
+            _ => None,
         }
     }
 
-    pub fn new(name: String, description: String, mut code: Vec<Instruction>) -> Self {
-        code.insert(0, Instruction::new(InstructionKind::WhenRan));
-        let strand = Strand {
-            id: default_strand_id(),
-            x: 0,
-            y: 0,
-            instructions: code,
-        };
-        Self {
-            id: default_macro_id(),
-            name,
-            description,
-            strands: vec![strand],
-            recording_target: None,
-            speed_multiplier: default_speed_multiplier(),
-            floating_values: Vec::new(),
-            comments: Vec::new(),
-            variables: Vec::new(),
-            block_defs: Vec::new(),
-            settings: MacroSettings::default(),
+    fn calls_block(&self, block_id: &str) -> bool {
+        matches!(self, InstructionKind::CallBlock { block_id: id, .. } if id == block_id)
+    }
+
+    fn call_args_mut(&mut self, block_id: &str) -> Option<&mut Vec<Value>> {
+        match self {
+            InstructionKind::CallBlock { block_id: id, args } if id == block_id => Some(args),
+            _ => None,
         }
     }
 
-    /// Whether any instruction, including nested bodies, moves to an
-    /// absolute screen position.
-    pub fn has_absolute_mouse_move(&self) -> bool {
-        fn contains_absolute_move(instructions: &[Instruction]) -> bool {
-            instructions.iter().any(|instruction| {
-                matches!(
-                    &instruction.kind,
-                    InstructionKind::Token(InputToken::MoveMouse(_, _, crate::input::types::Coordinate::Abs))
-                ) || (0..2).any(|slot| {
-                    instruction
-                        .body(slot)
-                        .is_some_and(|body| contains_absolute_move(body))
-                })
-            })
-        }
-
-        self.strands
-            .iter()
-            .any(|strand| contains_absolute_move(&strand.instructions))
-    }
-
-    pub fn ensure_id(&mut self) {
-        if self.id.trim().is_empty() {
-            self.id = default_macro_id();
+    fn block_header_id(&self) -> Option<&str> {
+        match self {
+            InstructionKind::BlockHeader(id) => Some(id),
+            _ => None,
         }
     }
 
-    pub fn strand(&self, id: &str) -> Option<&Strand> {
-        self.strands.iter().find(|s| s.id == id)
+    fn value_slot_mut(&mut self, field: &str) -> Option<&mut Value> {
+        fields::value_slot_mut(self, field.parse().ok()?)
     }
 
-    pub fn strand_mut(&mut self, id: &str) -> Option<&mut Strand> {
-        self.strands.iter_mut().find(|s| s.id == id)
+    fn blank_field_value(&self, field: &str, blocks: &[BlockDef]) -> Option<Value> {
+        fields::blank_field_value(self, field.parse().ok()?, blocks)
     }
 
-    pub fn floating_value_mut(&mut self, id: &str) -> Option<&mut FloatingValue> {
-        self.floating_values.iter_mut().find(|f| f.id == id)
-    }
-
-    pub fn comment_mut(&mut self, id: &str) -> Option<&mut Comment> {
-        self.comments.iter_mut().find(|c| c.id == id)
-    }
-
-    /// Every instruction id currently reachable from any strand, including
-    /// nested bodies (If/IfElse/Repeat/Forever/While) - the "still alive" set
-    /// `prune_orphaned_comments` checks attachments against.
-    fn all_instruction_ids(&self) -> std::collections::HashSet<String> {
-        fn walk(list: &[Instruction], out: &mut std::collections::HashSet<String>) {
-            for ins in list {
-                out.insert(ins.id.clone());
-                for slot in 0..2u8 {
-                    if let Some(body) = ins.body(slot) {
-                        walk(body, out);
-                    }
-                }
-            }
-        }
-        let mut out = std::collections::HashSet::new();
-        for strand in &self.strands {
-            walk(&strand.instructions, &mut out);
-        }
-        out
-    }
-
-    /// Drops any comment attached to an instruction that no longer exists -
-    /// "if the block gets deleted, the comment is deleted." Call after any
-    /// mutation that can remove instructions or whole strands.
-    pub fn prune_orphaned_comments(&mut self) {
-        let live = self.all_instruction_ids();
-        self.comments.retain(|c| {
-            c.attached_to
-                .as_deref()
-                .map_or(true, |id| live.contains(id))
-        });
-    }
-
-    /// One-time upgrade for saves from before floating/attached comments
-    /// existed: pulls every legacy inline `Comment` instruction out of the
-    /// instruction stream and re-homes it as a freestanding `Comment` parked
-    /// near its old strand. Idempotent - a save with no legacy `Comment`
-    /// instructions left is a no-op.
-    fn migrate_legacy_comments(&mut self) {
-        fn extract(list: &mut Vec<Instruction>, out: &mut Vec<String>) {
-            list.retain_mut(|ins| {
-                for slot in 0..2u8 {
-                    if let Some(body) = ins.body_mut(slot) {
-                        extract(body, out);
-                    }
-                }
-                if let InstructionKind::Comment(text) = &ins.kind {
-                    out.push(text.clone());
-                    false
-                } else {
-                    true
-                }
-            });
-        }
-        for strand in &mut self.strands {
-            let mut texts = Vec::new();
-            extract(&mut strand.instructions, &mut texts);
-            for (i, text) in texts.into_iter().enumerate() {
-                self.comments.push(Comment {
-                    id: default_comment_id(),
-                    x: strand.x + 40,
-                    y: strand.y + 40 + i as i32 * 30,
-                    text,
-                    collapsed: false,
-                    attached_to: None,
-                });
-            }
-        }
-    }
-
-    /// Writes live runtime variable values back into this macro's
-    /// `variables` before it's saved to disk, once a run finishes.
-    pub fn sync_variables_from(&mut self, values: &HashMap<String, Evaluated>) {
-        for var in &mut self.variables {
-            if let Some(v) = values.get(&var.name) {
-                var.value = v.clone();
-            }
-        }
-    }
-
-    /// Renames a declared variable and every reference to it (`Value::Var`
-    /// reads, `SetVariable`/`ChangeVariable` targets) across all strands and
-    /// floating values. No-op if `old` isn't declared.
-    pub fn rename_variable(&mut self, old: &str, new: &str) {
-        if let Some(var) = self.variables.iter_mut().find(|v| v.name == old) {
-            var.name = new.to_string();
-        } else {
-            return;
-        }
-        for strand in &mut self.strands {
-            for ins in &mut strand.instructions {
-                ins.rename_var(old, new);
-            }
-        }
-        for fv in &mut self.floating_values {
-            fv.value.rename_var(old, new);
-        }
-    }
-
-    /// Defines a new custom block: appends the `BlockDef` and creates its
-    /// (initially empty) header strand at `(x, y)`. Caller validates
-    /// `pieces` beforehand.
-    pub fn create_block(
-        &mut self,
-        pieces: Vec<BlockPiece>,
-        shape: BlockShape,
-        color: String,
-        x: i32,
-        y: i32,
-    ) -> String {
-        let id = default_block_id();
-        self.block_defs.push(BlockDef {
-            id: id.clone(),
-            pieces,
-            shape,
-            color,
-        });
-        self.strands.push(Strand {
-            id: default_strand_id(),
-            x,
-            y,
-            instructions: vec![Instruction::new(InstructionKind::BlockHeader(id.clone()))],
-        });
-        id
-    }
-
-    /// Renames every `Value::Param` leaf reading `old` to `new`, scoped to
-    /// `block_id`'s own body. The body-side half of reconciling a renamed
-    /// input; caller still needs to update `BlockDef::pieces` separately.
-    pub fn rename_block_input_body(&mut self, block_id: &str, old: &str, new: &str) {
-        for strand in &mut self.strands {
-            if matches!(strand.instructions.first().map(|i| &i.kind), Some(InstructionKind::BlockHeader(id)) if id == block_id)
-            {
-                for ins in &mut strand.instructions {
-                    ins.rename_param(old, new);
-                }
-            }
-        }
-    }
-
-    /// Rebuilds every call site's `args` to line up with `new_pieces`' input
-    /// order, carrying over each surviving input's value by matching
-    /// `BlockPiece::id` (identity survives a rename); removed inputs drop
-    /// their value, added ones get a fresh blank matching their declared
-    /// `value_type` (`0` for `Any`, an empty `Value::Bool` hexagon for
-    /// `Bool`). Call before overwriting `BlockDef::pieces` - `old_pieces`
-    /// must be the pieces beforehand.
-    pub fn reconcile_block_call_args(
-        &mut self,
-        block_id: &str,
-        old_pieces: &[BlockPiece],
-        new_pieces: &[BlockPiece],
-    ) {
-        let old_input_ids: Vec<&str> = old_pieces
-            .iter()
-            .filter(|p| matches!(p, BlockPiece::Input { .. }))
-            .map(BlockPiece::id)
-            .collect();
-        let new_inputs: Vec<(&str, InputValueType)> = new_pieces
-            .iter()
-            .filter_map(|p| match p {
-                BlockPiece::Input { id, value_type, .. } => Some((id.as_str(), *value_type)),
-                BlockPiece::Label { .. } => None,
-            })
-            .collect();
-        // For each new input slot, which old slot (if any) it carries over from.
-        let mapping: Vec<(Option<usize>, InputValueType)> = new_inputs
-            .iter()
-            .map(|(id, value_type)| (old_input_ids.iter().position(|old| old == id), *value_type))
-            .collect();
-
-        let mut rebuild = |args: &mut Vec<Value>| {
-            *args = mapping
-                .iter()
-                .map(|(old_idx, value_type)| {
-                    old_idx
-                        .and_then(|i| args.get(i).cloned())
-                        .unwrap_or_else(|| match value_type {
-                            InputValueType::Any => Value::number(0.0),
-                            InputValueType::Bool => Value::Bool,
-                        })
-                })
-                .collect();
-        };
-        for strand in &mut self.strands {
-            for ins in &mut strand.instructions {
-                ins.for_each_call_args_mut(block_id, &mut rebuild);
-            }
-        }
-        for fv in &mut self.floating_values {
-            fv.value.for_each_call_args_mut(block_id, &mut rebuild);
-        }
-    }
-
-    /// Deletes a custom block entirely: its `BlockDef`, its header strand,
-    /// every `CallBlock` instruction calling it, and every `Value::Call`
-    /// node calling it (collapsed to a plain `0` leaf) so nothing is left
-    /// dangling.
-    pub fn remove_block(&mut self, block_id: &str) {
-        self.block_defs.retain(|b| b.id != block_id);
-        self.strands.retain(|s| !matches!(s.instructions.first().map(|i| &i.kind), Some(InstructionKind::BlockHeader(id)) if id == block_id));
-        for strand in &mut self.strands {
-            strand.instructions.retain(|ins| !matches!(&ins.kind, InstructionKind::CallBlock { block_id: id, .. } if id == block_id));
-            for ins in &mut strand.instructions {
-                ins.scrub_block_calls(block_id);
-            }
-        }
-        for fv in &mut self.floating_values {
-            fv.value.scrub_block_calls(block_id);
-        }
-        self.prune_orphaned_comments();
-    }
-
-    /// Strand that freshly-recorded input gets appended to: the explicit
-    /// `recording_target` if it still exists, else the first "When Ran"
-    /// strand, else the first strand (creating one if the macro is empty).
-    pub fn recording_target_mut(&mut self) -> &mut Strand {
-        if let Some(id) = &self.recording_target {
-            if let Some(pos) = self.strands.iter().position(|s| &s.id == id) {
-                return &mut self.strands[pos];
-            }
-        }
-        if let Some(pos) = self.strands.iter().position(Strand::starts_with_when_ran) {
-            return &mut self.strands[pos];
-        }
-        if self.strands.is_empty() {
-            self.strands.push(Strand {
-                id: default_strand_id(),
-                x: 0,
-                y: 0,
-                instructions: vec![],
-            });
-        }
-        &mut self.strands[0]
-    }
-
-    /// Read-only counterpart to `recording_target_mut`: same resolution
-    /// order, but never creates a strand.
-    pub fn recording_target_id(&self) -> Option<String> {
-        if let Some(id) = &self.recording_target {
-            if self.strands.iter().any(|s| &s.id == id) {
-                return Some(id.clone());
-            }
-        }
-        if let Some(strand) = self.strands.iter().find(|s| s.starts_with_when_ran()) {
-            return Some(strand.id.clone());
-        }
-        self.strands.first().map(|s| s.id.clone())
+    fn field_requires_integer(&self, field: &str) -> bool {
+        field
+            .parse()
+            .is_ok_and(|field: FieldId| field.requires_integer())
     }
 }
 
@@ -1347,22 +284,6 @@ pub enum InstructionKind {
     /// Skips straight to the next iteration of the nearest enclosing
     /// `Repeat`/`Forever`/`While`. A no-op if not inside a loop.
     ContinueLoop,
-}
-
-impl std::hash::Hash for Macro {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-        self.name.hash(state);
-        self.description.hash(state);
-        self.strands.hash(state);
-        self.recording_target.hash(state);
-        self.speed_multiplier.to_bits().hash(state);
-        self.floating_values.hash(state);
-        self.comments.hash(state);
-        self.variables.hash(state);
-        self.block_defs.hash(state);
-        self.settings.hash(state);
-    }
 }
 
 impl std::hash::Hash for InstructionKind {
@@ -1647,94 +568,322 @@ impl From<InstructionKindDe> for InstructionKind {
     }
 }
 
-fn default_instruction_id() -> String {
-    Uuid::new_v4().simple().to_string()
-}
-
-/// The wrapper every instruction is actually stored as - `id` is a stable
-/// identity (unlike position/path, survives drags/splits/merges/reorders)
-/// that comments attach to (`Comment::attached_to`); `kind` is the actual
-/// instruction data, unchanged in shape from before this wrapper existed.
-/// Equality/hashing deliberately ignore `id` and compare `kind` only - the
-/// rest of this module (block-header lookups, dedup, tests) all compare
-/// instructions structurally, the same as when there was no id at all.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(from = "InstructionEnvelope")]
-pub struct Instruction {
+/// One saved macro: a [`MacroGraph`] canvas plus what only Blockwork cares
+/// about - its name, playback speed and recording target. `graph` is
+/// flattened on the wire and [`Deref`]ed, so both shapes are unchanged.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(from = "MacroDe")]
+pub struct Macro {
     pub id: String,
-    pub kind: InstructionKind,
+    pub name: String,
+    pub description: String,
+    #[serde(flatten)]
+    pub graph: MacroGraph,
+    /// Strand explicitly chosen to receive freshly-recorded input; `None`
+    /// falls back to the "first When Ran strand, else first strand" rule.
+    /// Kept out of undo/redo (it's a preference, not an instruction edit).
+    #[serde(default)]
+    pub recording_target: Option<String>,
+    /// Playback speed: every `Wait` duration is divided by this at runtime.
+    /// 1.0 is normal, 2.0 is twice as fast. Clamped to [`SPEED_MULTIPLIER_RANGE`].
+    #[serde(default = "default_speed_multiplier")]
+    pub speed_multiplier: f64,
+    /// Settings edited from the "Macro Settings" popup - see [`MacroSettings`].
+    #[serde(default)]
+    pub settings: MacroSettings,
 }
 
-impl Instruction {
-    pub fn new(kind: InstructionKind) -> Self {
-        Self {
-            id: default_instruction_id(),
-            kind,
-        }
-    }
+impl Deref for Macro {
+    type Target = MacroGraph;
 
-    pub fn is_header(&self) -> bool {
-        self.kind.is_header()
-    }
-    pub fn rename_var(&mut self, old: &str, new: &str) {
-        self.kind.rename_var(old, new)
-    }
-    pub fn migrate_bool_slots(&mut self) {
-        self.kind.migrate_bool_slots()
-    }
-    pub fn rename_param(&mut self, old: &str, new: &str) {
-        self.kind.rename_param(old, new)
-    }
-    pub fn for_each_call_args_mut(&mut self, block_id: &str, f: &mut dyn FnMut(&mut Vec<Value>)) {
-        self.kind.for_each_call_args_mut(block_id, f)
-    }
-    pub fn scrub_block_calls(&mut self, block_id: &str) {
-        self.kind.scrub_block_calls(block_id)
-    }
-    pub fn body(&self, slot: u8) -> Option<&Vec<Instruction>> {
-        self.kind.body(slot)
-    }
-    pub fn body_mut(&mut self, slot: u8) -> Option<&mut Vec<Instruction>> {
-        self.kind.body_mut(slot)
+    fn deref(&self) -> &MacroGraph {
+        &self.graph
     }
 }
 
-impl PartialEq for Instruction {
-    fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind
+impl DerefMut for Macro {
+    fn deref_mut(&mut self) -> &mut MacroGraph {
+        &mut self.graph
     }
 }
 
-impl std::hash::Hash for Instruction {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.kind.hash(state);
-    }
+/// Valid range for both the per-macro and global speed multipliers, enforced
+/// wherever either is set from user input.
+pub const SPEED_MULTIPLIER_RANGE: std::ops::RangeInclusive<f64> = 0.1..=10.0;
+
+/// Per-macro settings edited from the "Macro Settings" popup next to the
+/// macro dropdown - not part of the macro's own behavior, but affecting how
+/// the app treats it. Persisted and exported/imported with the macro like
+/// everything else in `Macro`, so a new field here needs no separate wiring
+/// to survive a save/export round-trip.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub struct MacroSettings {
+    /// When `true`, this macro's `WhenBattery*`/`WhenTime`/`WhenPower*`
+    /// strands are watched by the background watchers (`battery_watch`/
+    /// `time_watch` in the desktop app) even while a different macro is
+    /// selected. By default only the currently selected macro's event
+    /// strands are live.
+    #[serde(default)]
+    pub always_listen: bool,
 }
 
-/// Wire shape for `Instruction`: today's shape (`{"id": "...", "kind": ...}`)
-/// or, for a save from before ids existed, the bare `InstructionKind` value
-/// with no envelope at all - same "try new shape, fall back to old" pattern
-/// as `WaitDe` above, just one level up. A legacy instruction gets a fresh id
-/// generated on load; harmless since nothing could have referenced it by id yet.
+/// Deserialization shape supporting both the current multi-strand format and
+/// the legacy flat `code: Vec<Instruction>` format from older saves; legacy
+/// macros become a single root strand. The canvas collections are listed out
+/// rather than flattened, so the untagged split stays a field-by-field match.
 #[derive(Deserialize)]
 #[serde(untagged)]
-enum InstructionEnvelope {
-    Current { id: String, kind: InstructionKind },
-    Legacy(InstructionKind),
+enum MacroDe {
+    Current {
+        #[serde(default = "default_macro_id")]
+        id: String,
+        name: String,
+        description: String,
+        strands: Vec<Strand>,
+        #[serde(default)]
+        recording_target: Option<String>,
+        #[serde(default = "default_speed_multiplier")]
+        speed_multiplier: f64,
+        #[serde(default)]
+        floating_values: Vec<FloatingValue>,
+        #[serde(default)]
+        comments: Vec<Comment>,
+        #[serde(default)]
+        variables: Vec<VariableDef>,
+        #[serde(default)]
+        block_defs: Vec<BlockDef>,
+        #[serde(default)]
+        settings: MacroSettings,
+    },
+    Legacy {
+        #[serde(default = "default_macro_id")]
+        id: String,
+        name: String,
+        description: String,
+        code: Vec<Instruction>,
+    },
 }
 
-impl From<InstructionEnvelope> for Instruction {
-    fn from(env: InstructionEnvelope) -> Self {
-        match env {
-            InstructionEnvelope::Current { id, kind } => Instruction { id, kind },
-            InstructionEnvelope::Legacy(kind) => Instruction::new(kind),
+impl From<MacroDe> for Macro {
+    fn from(de: MacroDe) -> Self {
+        let mut mac = match de {
+            MacroDe::Current {
+                id,
+                name,
+                description,
+                mut strands,
+                recording_target,
+                speed_multiplier,
+                floating_values,
+                comments,
+                variables,
+                block_defs,
+                settings,
+            } => {
+                // Pre-"When Ran" saves have a strand id=="root" that was the
+                // implicit entry point; give it a real WhenRan on upgrade.
+                if let Some(legacy) = strands.iter_mut().find(|s| s.id == LEGACY_ROOT_STRAND_ID)
+                    && !legacy.starts_with_header()
+                {
+                    legacy
+                        .instructions
+                        .insert(0, Instruction::new(InstructionKind::WhenRan));
+                }
+                Self {
+                    id,
+                    name,
+                    description,
+                    graph: MacroGraph {
+                        strands,
+                        floating_values,
+                        comments,
+                        variables,
+                        block_defs,
+                    },
+                    recording_target,
+                    speed_multiplier,
+                    settings,
+                }
+            }
+            MacroDe::Legacy {
+                id,
+                name,
+                description,
+                mut code,
+            } => {
+                code.insert(0, Instruction::new(InstructionKind::WhenRan));
+                Self {
+                    id,
+                    name,
+                    description,
+                    graph: MacroGraph {
+                        strands: vec![Strand::with_instructions(0, 0, code)],
+                        ..MacroGraph::new()
+                    },
+                    recording_target: None,
+                    speed_multiplier: default_speed_multiplier(),
+                    settings: MacroSettings::default(),
+                }
+            }
+        };
+        // Repairs boolean slots poisoned by the historical `Value::Bool`-less
+        // bug (see `Value::migrate_bool_slots`) - a save from before that fix
+        // may have a raw number leaf sitting where a blank hexagon belongs.
+        mac.graph.migrate_bool_slots();
+        // A macro file may have been created before block colors existed (in
+        // which case serde supplied blue), or hand-edited/imported with an
+        // invalid color. Keep all persisted values safe to place in a CSS
+        // custom property before the frontend ever sees them.
+        mac.graph.normalize_block_colors();
+        mac.migrate_legacy_comments();
+        mac
+    }
+}
+
+impl Macro {
+    pub fn new(name: String, description: String, mut code: Vec<Instruction>) -> Self {
+        code.insert(0, Instruction::new(InstructionKind::WhenRan));
+        Self {
+            id: default_macro_id(),
+            name,
+            description,
+            graph: MacroGraph {
+                strands: vec![Strand::with_instructions(0, 0, code)],
+                ..MacroGraph::new()
+            },
+            recording_target: None,
+            speed_multiplier: default_speed_multiplier(),
+            settings: MacroSettings::default(),
         }
+    }
+
+    /// Whether any instruction, including nested bodies, moves to an
+    /// absolute screen position.
+    pub fn has_absolute_mouse_move(&self) -> bool {
+        let mut found = false;
+        self.graph.walk_instructions(&mut |ins| {
+            found |= matches!(
+                &ins.kind,
+                InstructionKind::Token(InputToken::MoveMouse(
+                    _,
+                    _,
+                    crate::input::types::Coordinate::Abs
+                ))
+            );
+        });
+        found
+    }
+
+    pub fn ensure_id(&mut self) {
+        if self.id.trim().is_empty() {
+            self.id = default_macro_id();
+        }
+    }
+
+    /// Defines a new custom block, with Blockwork's own header instruction
+    /// at the top of its body strand.
+    pub fn create_block(
+        &mut self,
+        pieces: Vec<BlockPiece>,
+        shape: BlockShape,
+        color: String,
+        x: i32,
+        y: i32,
+    ) -> String {
+        self.graph.create_block(pieces, shape, color, x, y, |id| {
+            InstructionKind::BlockHeader(id.to_string())
+        })
+    }
+
+    /// One-time upgrade for saves from before floating/attached comments
+    /// existed: pulls every legacy inline `Comment` instruction out of the
+    /// instruction stream and re-homes it as a freestanding `Comment` parked
+    /// near its old strand. Idempotent - a save with no legacy `Comment`
+    /// instructions left is a no-op.
+    fn migrate_legacy_comments(&mut self) {
+        fn extract(list: &mut Vec<Instruction>, out: &mut Vec<String>) {
+            list.retain_mut(|ins| {
+                for slot in 0..2u8 {
+                    if let Some(body) = ins.body_mut(slot) {
+                        extract(body, out);
+                    }
+                }
+                if let InstructionKind::Comment(text) = &ins.kind {
+                    out.push(text.clone());
+                    false
+                } else {
+                    true
+                }
+            });
+        }
+        for strand in &mut self.graph.strands {
+            let mut texts = Vec::new();
+            extract(&mut strand.instructions, &mut texts);
+            for (i, text) in texts.into_iter().enumerate() {
+                self.graph.comments.push(Comment::new(
+                    strand.x + 40,
+                    strand.y + 40 + i as i32 * 30,
+                    text,
+                    None,
+                ));
+            }
+        }
+    }
+
+    /// Strand that freshly-recorded input gets appended to: the explicit
+    /// `recording_target` if it still exists, else the first "When Ran"
+    /// strand, else the first strand (creating one if the macro is empty).
+    pub fn recording_target_mut(&mut self) -> &mut Strand {
+        if let Some(id) = &self.recording_target
+            && let Some(pos) = self.graph.strands.iter().position(|s| &s.id == id)
+        {
+            return &mut self.graph.strands[pos];
+        }
+        if let Some(pos) = self
+            .graph
+            .strands
+            .iter()
+            .position(Strand::starts_with_header)
+        {
+            return &mut self.graph.strands[pos];
+        }
+        if self.graph.strands.is_empty() {
+            self.graph.strands.push(Strand::new(0, 0));
+        }
+        &mut self.graph.strands[0]
+    }
+
+    /// Read-only counterpart to `recording_target_mut`: same resolution
+    /// order, but never creates a strand.
+    pub fn recording_target_id(&self) -> Option<String> {
+        if let Some(id) = &self.recording_target
+            && self.graph.strands.iter().any(|s| &s.id == id)
+        {
+            return Some(id.clone());
+        }
+        if let Some(strand) = self.graph.strands.iter().find(|s| s.starts_with_header()) {
+            return Some(strand.id.clone());
+        }
+        self.graph.strands.first().map(|s| s.id.clone())
+    }
+}
+
+impl std::hash::Hash for Macro {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+        self.name.hash(state);
+        self.description.hash(state);
+        self.graph.hash(state);
+        self.recording_target.hash(state);
+        self.speed_multiplier.to_bits().hash(state);
+        self.settings.hash(state);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::input::value::Evaluated;
     use crate::input::types::Coordinate;
 
     #[test]
@@ -1798,20 +947,24 @@ mod tests {
     fn new_macro_defaults_to_one_when_ran_strand() {
         let mac = Macro::new("Test".into(), "".into(), vec![]);
         assert_eq!(mac.strands.len(), 1);
-        assert!(mac.strands[0].starts_with_when_ran());
+        assert!(mac.strands[0].starts_with_header());
     }
 
     #[test]
     fn detects_absolute_mouse_moves_in_nested_bodies() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
-        mac.strands[0].instructions.push(Instruction::new(InstructionKind::If {
-            condition: Value::Bool,
-            body: vec![Instruction::new(InstructionKind::Token(InputToken::MoveMouse(
-                Value::number(10.0),
-                Value::number(20.0),
-                Coordinate::Abs,
-            )))],
-        }));
+        mac.strands[0]
+            .instructions
+            .push(Instruction::new(InstructionKind::If {
+                condition: Value::Bool,
+                body: vec![Instruction::new(InstructionKind::Token(
+                    InputToken::MoveMouse(
+                        Value::number(10.0),
+                        Value::number(20.0),
+                        Coordinate::Abs,
+                    ),
+                ))],
+            }));
 
         assert!(mac.has_absolute_mouse_move());
     }
@@ -1840,7 +993,7 @@ mod tests {
         ]}"#;
         let mac: Macro = serde_json::from_str(json).unwrap();
         let root = mac.strand("root").unwrap();
-        assert!(root.starts_with_when_ran());
+        assert!(root.starts_with_header());
         assert_eq!(
             root.instructions,
             vec![Instruction::new(InstructionKind::WhenRan)]
@@ -2147,7 +1300,7 @@ mod tests {
             origin_block_id: None,
         });
 
-        mac.rename_variable("x", "y");
+        mac.rename_variable("x", "y").unwrap();
 
         assert_eq!(mac.variables[0].name, "y");
         let strand = &mac.strands[0];
@@ -2182,7 +1335,7 @@ mod tests {
     }
 
     #[test]
-    fn rename_variable_is_a_no_op_for_undeclared_name() {
+    fn rename_variable_rejects_an_undeclared_name_and_changes_nothing() {
         let mut mac = Macro::new(
             "Test".into(),
             "".into(),
@@ -2192,7 +1345,7 @@ mod tests {
                 },
             )))],
         );
-        mac.rename_variable("x", "y");
+        assert!(mac.rename_variable("x", "y").is_err());
         assert_eq!(
             mac.strands[0].instructions[1],
             Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var {
@@ -2203,7 +1356,7 @@ mod tests {
 
     #[test]
     fn rename_var_reaches_into_if_body_and_condition() {
-        let mut ins = InstructionKind::If {
+        let mut ins = Instruction::new(InstructionKind::If {
             condition: Value::Var {
                 name: "x".to_string(),
             },
@@ -2213,9 +1366,9 @@ mod tests {
                     name: "x".to_string(),
                 },
             ))],
-        };
+        });
         ins.rename_var("x", "y");
-        match &ins {
+        match &ins.kind {
             InstructionKind::If { condition, body } => {
                 assert_eq!(
                     *condition,
@@ -2239,7 +1392,7 @@ mod tests {
 
     #[test]
     fn rename_var_reaches_into_if_else_both_branches() {
-        let mut ins = InstructionKind::IfElse {
+        let mut ins = Instruction::new(InstructionKind::IfElse {
             condition: Value::Var {
                 name: "x".to_string(),
             },
@@ -2251,9 +1404,9 @@ mod tests {
                 "x".to_string(),
                 Value::number(2.0),
             ))],
-        };
+        });
         ins.rename_var("x", "y");
-        match &ins {
+        match &ins.kind {
             InstructionKind::IfElse {
                 then_body,
                 else_body,
@@ -2280,7 +1433,7 @@ mod tests {
 
     #[test]
     fn scrub_block_calls_reaches_into_nested_if_body() {
-        let mut ins = InstructionKind::If {
+        let mut ins = Instruction::new(InstructionKind::If {
             condition: Value::number(1.0),
             body: vec![Instruction::new(InstructionKind::SetVariable(
                 "x".to_string(),
@@ -2290,9 +1443,9 @@ mod tests {
                     saved: Box::new(Value::number(0.0)),
                 },
             ))],
-        };
+        });
         ins.scrub_block_calls("gone");
-        match &ins {
+        match &ins.kind {
             InstructionKind::If { body, .. } => {
                 assert_eq!(
                     body[0],
@@ -2379,3 +1532,4 @@ mod tests {
         assert_eq!(InstructionKind::ContinueLoop.body_mut(0), None);
     }
 }
+
