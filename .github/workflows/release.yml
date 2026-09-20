@@ -412,3 +412,11 @@ jobs:
     with:
       tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     secrets: inherit
+
+  homebrew:
+    name: Homebrew
+    needs: [release]
+    uses: ./.github/workflows/homebrew.yml
+    with:
+      tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    secrets: inherit
