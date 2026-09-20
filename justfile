@@ -11,6 +11,7 @@ build *args:
     cargo build --release {{args}}
 
 run: build
+    cargo build -p blockwork-daemon
     {{TARGET}}
 
 clean:
@@ -90,7 +91,7 @@ macos-install *args:
 
 # Windows only: build, stage the CEF runtime and pack an unsigned MSIX into dist/
 msix target="x86_64-pc-windows-msvc" arch="x64":
-    #!/usr/bin/env pwsh
+    #!pwsh
     $ErrorActionPreference = "Stop"
     cargo build --release --target {{target}} --workspace --exclude blockwork-linux-bridge
     if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
@@ -105,12 +106,24 @@ msix target="x86_64-pc-windows-msvc" arch="x64":
     $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
     ./scripts/build-msix.ps1 -Version $version -Target {{target}} -Arch {{arch}}
 
-# Windows only: build the MSIX, sign it with a test cert and install it (run from an elevated shell)
+# Windows only: build the MSIX, sign it with a test cert and install it. The
+# cert import targets the LocalMachine store, so it needs elevation; this is
+# handled automatically via Windows sudo (11 24H2+) when run un-elevated.
 msix-install: msix
-    #!/usr/bin/env pwsh
+    #!pwsh
     $ErrorActionPreference = "Stop"
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) {
+        if (-not (Get-Command sudo.exe -ErrorAction SilentlyContinue)) {
+            throw "sudo.exe not found, so elevation is unavailable; run `just msix-install` from an elevated shell instead"
+        }
+        Write-Host "Elevating via sudo to install the MSIX..."
+        sudo.exe pwsh -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
+        exit $LASTEXITCODE
+    }
     ./scripts/sign-msix-test.ps1 -Msix dist/blockwork-windows-x86_64.msix
     Import-Certificate -FilePath dist/blockwork-msix-test.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+    Get-AppxPackage -Name "Blockworked.Blockwork" | Remove-AppxPackage
     Add-AppxPackage -Path dist/blockwork-windows-x86_64.msix -ForceUpdateFromAnyVersion
 
 flatpak-uninstall:

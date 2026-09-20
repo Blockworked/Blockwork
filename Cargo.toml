@@ -10,6 +10,11 @@ members = [
 ]
 resolver = "2"
 
+default-members = [
+    "blockwork-app",
+    "src-tauri",
+]
+
 [workspace.package]
 version = "0.5.4"
 edition = "2024"
