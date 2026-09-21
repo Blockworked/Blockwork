@@ -7,7 +7,7 @@ on:
         type: string
         required: true
       push:
-        description: "Only set by release.yml; manual runs never push"
+        description: "Set by release.yml; manual runs must opt in"
         type: boolean
         default: true
     secrets:
@@ -19,6 +19,10 @@ on:
         description: "Existing release tag to package (e.g. 0.5.4)"
         required: true
         type: string
+      push:
+        description: "Push to chocolatey.org"
+        type: boolean
+        default: false
 
 jobs:
   chocolatey:

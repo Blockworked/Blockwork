@@ -12,8 +12,9 @@
     <bugTrackerUrl>https://github.com/Blockworked/Blockwork/issues</bugTrackerUrl>
     <licenseUrl>https://github.com/Blockworked/Blockwork/blob/master/LICENSE</licenseUrl>
     <requireLicenseAcceptance>false</requireLicenseAcceptance>
-    <iconUrl>https://raw.githubusercontent.com/Blockworked/Blockwork/master/res/icons/blockwork.png</iconUrl>
+    <iconUrl>https://cdn.jsdelivr.net/gh/Blockworked/Blockwork@__TAG__/res/icons/blockwork.png</iconUrl>
     <releaseNotes>https://github.com/Blockworked/Blockwork/releases/tag/__TAG__</releaseNotes>
+    <copyright>Copyright 2026 Ethan Stokes</copyright>
     <tags>blockwork macro automation keyboard mouse hotkey</tags>
     <summary>Visually build and run keyboard/mouse macros with a Scratch-style block editor.</summary>
     <description>Blockwork is a desktop app for visually building and running keyboard and mouse macros. It has a Scratch-style block editor for instruction sequences, variables, and hotkey-triggered playback.</description>
