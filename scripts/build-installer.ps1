@@ -34,6 +34,8 @@ try {
     cargo build --release --target x86_64-pc-windows-msvc --workspace --exclude blockwork-linux-bridge
     if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
 
+    & (Join-Path $PSScriptRoot "deploy-qt-windows.ps1") -Target "x86_64-pc-windows-msvc"
+
     $iscc = "C:\Program Files (x86)\Inno Setup 6\ISCC.exe"
     if (-not (Test-Path $iscc)) {
         throw "ISCC.exe not found at '$iscc'. Install Inno Setup 6: https://jrsoftware.org/isdl.php"

@@ -2,7 +2,6 @@ name := "blockwork"
 appid := "com.blockworked.Blockwork"
 
 TARGET := "target/release/blockwork"
-CEF_DIR := "target/release"
 LIBDIR := "/usr/lib/blockwork"
 
 default: build
@@ -33,25 +32,8 @@ blockstitch-published commit="":
     cargo fetch
 
 install:
-    # Binary's RUNPATH is `$ORIGIN`, so the CEF runtime payload (libcef.so,
-    # GL/Vulkan shims, *.pak, icudtl.dat, locales/, ...) has to live alongside
-    # it in a private libdir, not /usr/bin.
     sudo install -Dm0755 {{TARGET}} {{LIBDIR}}/blockwork
-    sudo install -Dm0755 {{CEF_DIR}}/blockwork-daemon {{LIBDIR}}/blockwork-daemon
-    sudo install -Dm0755 {{CEF_DIR}}/libcef.so {{LIBDIR}}/libcef.so
-    sudo install -Dm0755 {{CEF_DIR}}/libEGL.so {{LIBDIR}}/libEGL.so
-    sudo install -Dm0755 {{CEF_DIR}}/libGLESv2.so {{LIBDIR}}/libGLESv2.so
-    sudo install -Dm0755 {{CEF_DIR}}/libvk_swiftshader.so {{LIBDIR}}/libvk_swiftshader.so
-    sudo install -Dm0755 {{CEF_DIR}}/libvulkan.so.1 {{LIBDIR}}/libvulkan.so.1
-    sudo install -Dm0755 {{CEF_DIR}}/chrome-sandbox {{LIBDIR}}/chrome-sandbox
-    sudo install -Dm0644 {{CEF_DIR}}/vk_swiftshader_icd.json {{LIBDIR}}/vk_swiftshader_icd.json
-    sudo install -Dm0644 {{CEF_DIR}}/icudtl.dat {{LIBDIR}}/icudtl.dat
-    sudo install -Dm0644 {{CEF_DIR}}/v8_context_snapshot.bin {{LIBDIR}}/v8_context_snapshot.bin
-    sudo install -Dm0644 {{CEF_DIR}}/chrome_100_percent.pak {{LIBDIR}}/chrome_100_percent.pak
-    sudo install -Dm0644 {{CEF_DIR}}/chrome_200_percent.pak {{LIBDIR}}/chrome_200_percent.pak
-    sudo install -Dm0644 {{CEF_DIR}}/resources.pak {{LIBDIR}}/resources.pak
-    sudo rm -rf {{LIBDIR}}/locales
-    sudo cp -r {{CEF_DIR}}/locales {{LIBDIR}}/locales
+    sudo install -Dm0755 target/release/blockwork-daemon {{LIBDIR}}/blockwork-daemon
     sudo ln -sf {{LIBDIR}}/blockwork /usr/bin/blockwork
     sudo install -Dm0644 res/blockwork.desktop /usr/share/applications/blockwork.desktop
     sudo install -Dm0644 res/icons/blockwork.png /usr/share/icons/hicolor/256x256/apps/blockwork.png
@@ -64,7 +46,6 @@ replace: build uninstall install
 
 flatpak-sources:
     flatpak run --command=flatpak-cargo-generator org.flatpak.Builder -o packaging/flatpak/cargo-sources.json Cargo.lock
-    flatpak run --command=flatpak-node-generator org.flatpak.Builder pnpm ui/pnpm-lock.yaml --pnpm-store-version v11 -o packaging/flatpak/node-sources.json
 
 flatpak-build *args:
     awk '/# BEGIN app-source/ { print; print "      - type: dir"; print "        path: ../.."; print "        skip: [target, .git, .flatpak-builder, flatpak-build, flatpak-repo, node_modules, ui/node_modules, ui/dist, packaging/flatpak]"; skip = 1; next } /# END app-source/ { skip = 0 } !skip' packaging/flatpak/{{appid}}.yml > packaging/flatpak/{{appid}}.local.yml
@@ -94,20 +75,12 @@ macos-install *args:
     sudo xattr -dr com.apple.quarantine "/Applications/Blockwork.app" || true
     @echo "Installed to /Applications/Blockwork.app"
 
-# Windows only: build, stage the CEF runtime and pack an unsigned MSIX into dist/
+# Windows only: build the Qt UI, deploy its runtime, and pack an unsigned MSIX.
 msix target="x86_64-pc-windows-msvc" arch="x64":
     #!pwsh
     $ErrorActionPreference = "Stop"
     cargo build --release --target {{target}} --workspace --exclude blockwork-linux-bridge
     if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
-    $releaseDir = "target/{{target}}/release"
-    $cefDir = if ("{{target}}" -like "aarch64*") { "cef_windows_aarch64" } else { "cef_windows_x86_64" }
-    $cefBuildDir = Get-ChildItem "$releaseDir/build" -Directory -Filter "cef-dll-sys-*" |
-      Sort-Object LastWriteTime -Descending | Select-Object -First 1
-    $cefRuntimeDir = Get-ChildItem (Join-Path $cefBuildDir.FullName "out") -Recurse -Directory -Filter $cefDir |
-      Select-Object -First 1
-    Get-ChildItem $cefRuntimeDir.FullName -File | Copy-Item -Destination $releaseDir -Force
-    Copy-Item (Join-Path $cefRuntimeDir.FullName "locales") $releaseDir -Recurse -Force
     $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
     ./scripts/build-msix.ps1 -Version $version -Target {{target}} -Arch {{arch}}
 

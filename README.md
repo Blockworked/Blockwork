@@ -1,14 +1,24 @@
 # Blockwork
 
-A Tauri app to visually create and run macros on Windows, Linux, and macOS.
+A native Qt 6/QML app, backed by Rust through CXX-Qt, for visually creating
+and running macros on Windows, Linux, and macOS.
 
 ## Building
 
 ### Build
 ```bash
-git clone https://github.com/Blockworked/blockwork.git blockwork && cd blockwork
+git clone https://github.com/Blockworked/blockstitch.git blockstitch
+git clone https://github.com/Blockworked/blockwork.git Blockwork && cd Blockwork
 just
 ```
+
+Keep the two repositories as siblings: Blockwork consumes Blockstitch's native
+QML module directly while Blockstitch keeps its browser frontend intact. The
+build uses an installed Qt 6 when one is available; otherwise CXX-Qt's Qt
+Minimal integration downloads the required Qt SDK. Release packaging uses
+`windeployqt`/`macdeployqt` to include the dynamic Qt runtime. The old
+Tauri/Vue sources remain in `src-tauri/` and `ui/` only as a migration
+reference; they are no longer workspace members or release inputs.
 
 ### Installation
 

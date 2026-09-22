@@ -19,17 +19,8 @@ if ($Version -notmatch '^v?(\d+)\.(\d+)\.(\d+)') { throw "Bad version '$Version'
 $msixVersion = "$($Matches[1]).$($Matches[2]).$($Matches[3]).0"
 
 Remove-Item $stage -Recurse -Force -ErrorAction SilentlyContinue
-New-Item -ItemType Directory -Path "$stage/Assets" | Out-Null
-
-# Same file set as installer/blockwork.iss
-$files = @(
-  "blockwork.exe", "blockwork-daemon.exe", "libcef.dll", "chrome_elf.dll", "libEGL.dll",
-  "libGLESv2.dll", "vk_swiftshader.dll", "vulkan-1.dll", "vk_swiftshader_icd.json",
-  "icudtl.dat", "v8_context_snapshot.bin", "chrome_100_percent.pak", "chrome_200_percent.pak",
-  "resources.pak"
-)
-foreach ($f in $files) { Copy-Item (Join-Path $release $f) $stage }
-Copy-Item (Join-Path $release "locales") (Join-Path $stage "locales") -Recurse
+& (Join-Path $PSScriptRoot "deploy-qt-windows.ps1") -Target $Target -Destination $stage
+New-Item -ItemType Directory -Path "$stage/Assets" -Force | Out-Null
 
 # Store logos, resized from the app icon
 Add-Type -AssemblyName System.Drawing

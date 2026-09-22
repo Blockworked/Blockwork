@@ -1,0 +1,32 @@
+[package]
+name = "blockwork-qt"
+version.workspace = true
+edition.workspace = true
+build = "build.rs"
+
+[[bin]]
+name = "blockwork"
+path = "src/main.rs"
+test = false
+
+[dependencies]
+blockwork-protocol = { path = "../blockwork-protocol" }
+blockstitch-qml = { path = "../../blockstitch" }
+cxx = "1.0"
+cxx-qt = "0.10"
+cxx-qt-lib = { version = "0.10", features = ["qt_full"] }
+dirs.workspace = true
+serde.workspace = true
+serde_json = { workspace = true, features = ["raw_value"] }
+tokio = { workspace = true, features = ["rt-multi-thread", "macros", "io-util", "time", "sync"] }
+tracing.workspace = true
+tracing-log.workspace = true
+tracing-subscriber.workspace = true
+
+[build-dependencies]
+cxx-qt-build = { version = "0.10", features = ["link_qt_object_files"] }
+qt-build-utils = { version = "0.10", features = ["qt_minimal"] }
+qt-version = { version = "0.1", features = ["qt_version_at_least_6_10"] }
+
+[target.'cfg(unix)'.dependencies]
+libc.workspace = true

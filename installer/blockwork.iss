@@ -14,7 +14,7 @@
 #endif
 #define MyAppPublisher "Blockworked"
 #define MyAppURL "https://github.com/Blockworked/Blockwork"
-#define CEFDir "..\target\" + TargetTriple + "\release"
+#define DeployDir "..\dist\windows-" + TargetTriple
 
 [Setup]
 AppId={{0F7D9CCE-3F15-4AE6-B10B-209D104AC2CC}
@@ -50,24 +50,8 @@ Name: "english"; MessagesFile: "compiler:Default.isl"
 Name: "desktopicon"; Description: "Create a &desktop shortcut"; GroupDescription: "Additional shortcuts:"; Flags: unchecked
 
 [Files]
-; Main binary
-Source: "{#CEFDir}\{#MyAppExeName}"; DestDir: "{app}"; Flags: ignoreversion
-; Background core process the UI starts (hotkeys, playback, tray icon)
-Source: "{#CEFDir}\blockwork-daemon.exe"; DestDir: "{app}"; Flags: ignoreversion
-; CEF runtime
-Source: "{#CEFDir}\libcef.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\chrome_elf.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\libEGL.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\libGLESv2.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\vk_swiftshader.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\vulkan-1.dll"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\vk_swiftshader_icd.json"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\icudtl.dat"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\v8_context_snapshot.bin"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\chrome_100_percent.pak"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\chrome_200_percent.pak"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\resources.pak"; DestDir: "{app}"; Flags: ignoreversion
-Source: "{#CEFDir}\locales\*"; DestDir: "{app}\locales"; Flags: ignoreversion
+; UI, background daemon, and the windeployqt-selected Qt runtime.
+Source: "{#DeployDir}\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
 
 [Icons]
 Name: "{autoprograms}\{#MyAppName}"; Filename: "{app}\{#MyAppExeName}"
