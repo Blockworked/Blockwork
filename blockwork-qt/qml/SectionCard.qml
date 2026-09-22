@@ -1,10 +1,11 @@
 import QtQuick
 import QtQuick.Layouts
+import com.blockworked.Blockstitch 1.0
 
 Rectangle {
     id: root
     property string title: ""
-    property string glyph: ""
+    property string iconName: ""
     default property alias content: body.data
     implicitHeight: header.height + body.implicitHeight + 20
     radius: 16
@@ -19,7 +20,7 @@ Rectangle {
         radius: root.radius
         Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: root.radius; color: parent.color }
         Row { anchors.left: parent.left; anchors.leftMargin: 18; anchors.verticalCenter: parent.verticalCenter; spacing: 9
-            Text { text: root.glyph; color: "#9da0a8"; font.pixelSize: 16 }
+            LucideIcon { name: root.iconName; color: "#9da0a8"; width: 16; height: 16 }
             Text { text: root.title.toUpperCase(); color: "#a7a8ae"; font.pixelSize: 12; font.weight: Font.Bold; font.letterSpacing: 1.2 }
         }
     }

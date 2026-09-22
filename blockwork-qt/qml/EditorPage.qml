@@ -10,7 +10,7 @@ Item {
     required property var invoke
     readonly property var macro: appState.current_macro
     readonly property bool recording: appState.recording_phase && appState.recording_phase.phase === "Active"
-    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"]
+    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "SetVariable", "ChangeVariable", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"]
 
     function uuid() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }); }
     function numberValue(n) { return { kind: "Number", value: n }; }
@@ -33,6 +33,9 @@ Item {
         else if (type === "Repeat") { i.count = numberValue(10); i.body = []; }
         else if (type === "Forever") i.body = [];
         else if (type === "While") { i.condition = { kind: "Bool" }; i.body = []; }
+        else if (type === "SetVariable") { i.name = root.macro && root.macro.variables.length ? root.macro.variables[0] : "variable"; i.value = numberValue(0); }
+        else if (type === "ChangeVariable") { i.name = root.macro && root.macro.variables.length ? root.macro.variables[0] : "variable"; i.value = numberValue(1); }
+        else if (type === "Return") i.value = numberValue(0);
         return i;
     }
     function addBlock(type, x, y) { root.invoke("add_strand", { x: x, y: y, instruction: defaultInstruction(type) }); }
@@ -47,6 +50,12 @@ Item {
         if (phase.phase === "Active") return "Stop recording";
         return "Record";
     }
+    function refreshIds(instruction) {
+        const copy = JSON.parse(JSON.stringify(instruction)); copy.id = uuid();
+        ["body","then_body","else_body"].forEach(k => { if (copy[k]) copy[k] = copy[k].map(refreshIds); });
+        return copy;
+    }
+    function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
 
     ColumnLayout {
         anchors.fill: parent; spacing: 0
@@ -55,30 +64,30 @@ Item {
             RowLayout {
                 anchors.fill: parent; anchors.margins: 14; spacing: 10
                 ColumnLayout {
-                    Layout.preferredWidth: 300; spacing: 5
+                    Layout.preferredWidth: 280; spacing: 5
                     Text { text: "Select macro"; color: "#a1a2a7"; font.pixelSize: 12 }
-                    ComboBox {
+                    BwComboBox {
                         id: macroPicker
                         Layout.fillWidth: true; model: appState.macro_names || []
                         currentIndex: appState.macro_selected === null || appState.macro_selected === undefined ? -1 : appState.macro_selected
                         onActivated: index => root.invoke("select_macro", { index: index })
                     }
                 }
-                BwButton { text: "⌘"; enabled: !!root.macro; onClicked: macroSettings.open() }
+                BwButton { iconName: "sliders"; text: ""; enabled: !!root.macro; onClicked: macroSettings.open() }
                 Item { Layout.fillWidth: true }
-                BwButton { glyph: "+"; text: "New macro"; onClicked: root.invoke("new_macro") }
-                BwButton { glyph: "⌫"; text: "Delete"; danger: true; enabled: !!root.macro; onClicked: removeDialog.open() }
-                BwButton { glyph: "⚙"; text: "Settings"; onClicked: root.invoke("open_settings") }
+                BwButton { iconName: "plus"; text: "New macro"; onClicked: root.invoke("new_macro") }
+                BwButton { iconName: "trash"; text: "Delete"; danger: true; enabled: !!root.macro; onClicked: removeDialog.open() }
+                BwButton { iconName: "settings"; text: "Settings"; onClicked: root.invoke("open_settings") }
             }
         }
         Rectangle {
             Layout.fillWidth: true; Layout.preferredHeight: 66; color: "#292a2d"; border.color: "#38393d"
             RowLayout { anchors.fill: parent; anchors.margins: 14
-                BwButton { primary: true; glyph: appState.loop_mode_enabled ? "⟳" : "▷"; text: appState.loop_mode_enabled ? "Start loop" : "Run macro"; enabled: appState.macro_selected !== null; onClicked: root.invoke("run_macro") }
+                BwButton { primary: true; iconName: appState.loop_mode_enabled ? "repeat" : "play"; text: appState.loop_mode_enabled ? "Start loop" : "Run macro"; enabled: appState.macro_selected !== null; onClicked: root.invoke("run_macro") }
                 BwSwitch { Accessible.name: "Loop mode"; checked: appState.loop_mode_enabled; onToggled: checked => root.invoke("toggle_loop_mode", { enabled: checked }) }
                 Item { Layout.fillWidth: true }
-                BwButton { danger: true; glyph: root.recording ? "■" : "●"; text: root.recordingLabel(); enabled: appState.macro_selected !== null; onClicked: root.invoke(root.recording ? "stop_recording" : "start_recording") }
-                BwButton { text: "⌘"; onClicked: recordingSettings.open() }
+                BwButton { danger: true; iconName: root.recording ? "square" : "circle"; text: root.recordingLabel(); enabled: appState.macro_selected !== null; onClicked: root.invoke(root.recording ? "stop_recording" : "start_recording") }
+                BwButton { iconName: "sliders"; text: ""; onClicked: recordingSettings.open() }
             }
         }
         Rectangle {
@@ -86,10 +95,10 @@ Item {
             Layout.fillWidth: true; Layout.preferredHeight: 54; color: "#292a2d"; border.color: "#38393d"
             RowLayout { anchors.fill: parent; anchors.margins: 12; spacing: 10
                 Text { text: "Title"; color: "#a1a2a7"; font.pixelSize: 13 }
-                TextField { Layout.fillWidth: true; text: root.macro ? root.macro.name : ""; selectByMouse: true; onEditingFinished: root.invoke("set_title", { title: text }) }
+                BwTextField { Layout.fillWidth: true; text: root.macro ? root.macro.name : ""; onEditingFinished: root.invoke("set_title", { title: text }) }
                 Text { text: "Speed"; color: "#a1a2a7"; font.pixelSize: 13 }
                 Slider { id: speed; from: 0.1; to: 10; value: root.macro ? root.macro.speed_multiplier : 1; Layout.preferredWidth: 160; onMoved: root.invoke("set_macro_speed_multiplier", { multiplier: value }) }
-                TextField { text: Number(speed.value).toFixed(2); Layout.preferredWidth: 62; horizontalAlignment: Text.AlignRight; onEditingFinished: root.invoke("set_macro_speed_multiplier", { multiplier: Number(text) }) }
+                BwTextField { text: Number(speed.value).toFixed(2); Layout.preferredWidth: 62; horizontalAlignment: Text.AlignRight; onEditingFinished: root.invoke("set_macro_speed_multiplier", { multiplier: Number(text) }) }
                 Text { text: "x"; color: "#a1a2a7" }
             }
         }
@@ -106,16 +115,27 @@ Item {
                     onCustomBlockActivated: definition => root.addCustomBlock(definition, 120, 120)
                     onMakeVariableRequested: variableDialog.open()
                     onMakeBlockRequested: blockDialog.open()
+                    onValueActivated: value => root.invoke("create_floating_value", { x: 160, y: 140, value: value, originBlockId: null })
                 }
                 BlockCanvas {
                     Layout.fillWidth: true; Layout.fillHeight: true
                     strands: root.macro ? root.macro.strands : []
                     comments: root.macro ? root.macro.comments : []
                     floatingValues: root.macro ? root.macro.floating_values : []
+                    variables: root.macro ? root.macro.variables : []
+                    blockDefinitions: root.macro ? root.macro.block_defs : []
                     locked: root.recording
                     onStrandMoved: (strandId, x, y) => root.invoke("move_strand", { strandId: strandId, x: x, y: y })
+                    onInstructionSplit: (strandId, path, x, y) => root.invoke("split_strand", { strandId: strandId, path: path, x: x, y: y })
                     onBlockDropped: (type, x, y) => root.addBlock(type, x, y)
                     onInstructionRemoved: (strandId, path) => root.invoke("remove_instruction", { strandId: strandId, path: path })
+                    onInstructionDuplicated: (strandId, path, instruction) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: root.refreshIds(instruction) })
+                    onInstructionEdited: (strandId, path, instruction) => root.invoke("edit_instruction", { strandId: strandId, path: path, instruction: instruction })
+                    onValueEdited: (location, text) => root.invoke("edit_value_field", { location: location, text: text })
+                    onCommentForInstructionRequested: instruction => root.invoke("create_attached_comment", { instructionId: instruction.id, dx: 48, dy: 18, text: "" })
+                    onRecordingTargetRequested: strandId => root.invoke("set_recording_target", { strandId: strandId })
+                    onCanvasNoteRequested: (x, y) => root.invoke("create_comment", { x: x, y: y, text: "" })
+                    onClearRequested: root.invoke("clear_instructions")
                     onCommentMoved: (commentId, x, y) => root.invoke("move_comment", { commentId: commentId, x: x, y: y })
                     onCommentEdited: (commentId, text) => root.invoke("edit_comment_text", { commentId: commentId, text: text })
                     onCommentCollapseChanged: (commentId, collapsed) => root.invoke("set_comment_collapsed", { commentId: commentId, collapsed: collapsed })
@@ -128,7 +148,7 @@ Item {
                 visible: root.recording
                 anchors.fill: parent; color: "#d8222326"; z: 20
                 Column { anchors.centerIn: parent; spacing: 10
-                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: "●"; color: "#ff4a4a"; font.pixelSize: 45 }
+                    LucideIcon { anchors.horizontalCenter: parent.horizontalCenter; name: "circle"; color: "#ff4a4a"; width: 48; height: 48; strokeWidth: 7 }
                     Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Recording…"; color: "#ededee"; font.pixelSize: 17; font.weight: Font.Bold }
                     Text { text: "Adding and removing instructions is disabled while recording."; color: "#a5a6ab"; font.pixelSize: 14; font.weight: Font.DemiBold }
                 }
@@ -138,7 +158,7 @@ Item {
             visible: !root.macro
             Layout.fillWidth: true; Layout.fillHeight: true
             Column { anchors.centerIn: parent; spacing: 8
-                Text { anchors.horizontalCenter: parent.horizontalCenter; text: "▦"; color: "#777980"; font.pixelSize: 48 }
+                LucideIcon { anchors.horizontalCenter: parent.horizontalCenter; name: "blocks"; color: "#777980"; width: 48; height: 48 }
                 Text { anchors.horizontalCenter: parent.horizontalCenter; text: "No macro selected"; color: "#e7e7e8"; font.pixelSize: 16; font.weight: Font.DemiBold }
                 Text { text: "Choose a macro above or create a new one."; color: "#9fa0a6"; font.pixelSize: 13 }
             }
@@ -147,10 +167,9 @@ Item {
             visible: !!root.macro
             Layout.fillWidth: true; Layout.preferredHeight: 58; color: "#292a2d"; border.color: "#38393d"
             Row { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; anchors.leftMargin: 14; spacing: 8
-                BwButton { glyph: "↶"; text: "Undo"; enabled: appState.can_undo; onClicked: root.invoke("undo") }
-                BwButton { glyph: "↷"; text: "Redo"; enabled: appState.can_redo; onClicked: root.invoke("redo") }
-                BwButton { glyph: "▣"; text: "Save macro"; primary: true; onClicked: root.invoke("save_macro") }
-                BwButton { glyph: "+"; text: "Note"; onClicked: root.invoke("create_comment", { x: 360, y: 180, text: "New note" }) }
+                BwButton { iconName: "undo"; text: "Undo"; enabled: appState.can_undo; onClicked: root.invoke("undo") }
+                BwButton { iconName: "redo"; text: "Redo"; enabled: appState.can_redo; onClicked: root.invoke("redo") }
+                BwButton { iconName: "save"; text: "Save macro"; primary: true; onClicked: root.invoke("save_macro") }
             }
         }
     }
@@ -179,7 +198,7 @@ Item {
         id: variableDialog; anchors.centerIn: parent; modal: true; title: "Make a Variable"; standardButtons: Dialog.Ok | Dialog.Cancel
         Column { width: 340; spacing: 8
             Text { text: "Variable name"; color: "#e7e7e8" }
-            TextField { id: variableName; width: parent.width; placeholderText: "score"; selectByMouse: true }
+            BwTextField { id: variableName; width: parent.width; placeholderText: "score" }
         }
         onAccepted: {
             const name = variableName.text.trim();
@@ -187,24 +206,5 @@ Item {
             variableName.clear();
         }
     }
-    Dialog {
-        id: blockDialog; anchors.centerIn: parent; modal: true; title: "Make a Block"; standardButtons: Dialog.Ok | Dialog.Cancel
-        Column { width: 380; spacing: 10
-            Text { text: "Block label"; color: "#e7e7e8" }
-            TextField { id: blockName; width: parent.width; placeholderText: "do something"; selectByMouse: true }
-            Text { text: "Shape"; color: "#e7e7e8" }
-            ComboBox { id: blockShape; width: parent.width; model: ["Normal", "Ending", "ReturnsValue", "ReturnsBool"] }
-            Text { text: "Accent color"; color: "#e7e7e8" }
-            TextField { id: blockColor; width: parent.width; text: "#1594ff"; selectByMouse: true }
-        }
-        onAccepted: {
-            const label = blockName.text.trim();
-            if (label.length) root.invoke("create_block", {
-                pieces: [{ kind: "Label", id: root.uuid(), text: label }],
-                shape: blockShape.currentText,
-                color: blockColor.text
-            });
-            blockName.clear();
-        }
-    }
+    MakeBlockDialog { id:blockDialog; onCreateRequested:(pieces,shape,color)=>root.invoke("create_block",{pieces:pieces,shape:shape,color:color}) }
 }

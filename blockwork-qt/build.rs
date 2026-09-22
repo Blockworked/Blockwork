@@ -6,6 +6,7 @@ fn main() {
         "qml/EditorPage.qml",
         "qml/SettingsPage.qml",
         "qml/SectionCard.qml",
+        "qml/MakeBlockDialog.qml",
     ];
 
     let builder = CxxQtBuilder::new_qml_module(

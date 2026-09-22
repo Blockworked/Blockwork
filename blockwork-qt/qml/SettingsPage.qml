@@ -14,7 +14,7 @@ Item {
         Rectangle {
             Layout.fillWidth: true; Layout.preferredHeight: 68; color: "#292a2d"; border.color: "#3a3b3f"
             RowLayout { anchors.fill: parent; anchors.margins: 14
-                BwButton { glyph: "←"; text: "Back"; onClicked: root.invoke("close_settings") }
+                BwButton { iconName: "arrow-left"; text: "Back"; onClicked: root.invoke("close_settings") }
                 Text { text: "Settings"; color: "#e7e7e8"; font.pixelSize: 17; font.weight: Font.Bold }
                 Item { Layout.fillWidth: true }
             }
@@ -25,7 +25,7 @@ Item {
                 width: Math.max(760, root.width - 36); x: Math.max(18, (root.width - width) / 2); spacing: 16; padding: 0
                 Item { width: 1; height: 4 }
                 SectionCard {
-                    width: parent.width; title: "Global hotkeys"; glyph: "⌨"
+                    width: parent.width; title: "Global hotkeys"; iconName: "keyboard"
                     Repeater {
                         model: appState.named_hotkey_defaults || []
                         delegate: RowLayout {
@@ -37,12 +37,12 @@ Item {
                                 Text { anchors.centerIn: parent; text: parent.parent.binding ? parent.parent.binding.combo_display : (modelData.combo_display || "Not set"); color: "#a4a5aa"; font.pixelSize: 13 }
                                 TapHandler { onTapped: root.invoke("start_combo_capture", { action: modelData.action }) }
                             }
-                            BwButton { text: "×"; danger: true; implicitWidth: 42; onClicked: root.invoke("clear_named_hotkey", { action: modelData.action }) }
+                            BwButton { iconName: "x"; text: ""; danger: true; implicitWidth: 42; onClicked: root.invoke("clear_named_hotkey", { action: modelData.action }) }
                         }
                     }
                 }
                 SectionCard {
-                    width: parent.width; title: "Per-macro hotkeys"; glyph: "⌘"
+                    width: parent.width; title: "Per-macro hotkeys"; iconName: "keyboard"
                     Repeater {
                         model: (appState.hotkey_bindings || []).filter(b => b.action && b.action.type === "RunSpecificMacro")
                         delegate: RowLayout {
@@ -50,19 +50,19 @@ Item {
                             Layout.fillWidth: true
                             Text { Layout.fillWidth: true; text: modelData.macro_name || "Macro"; color: "#e7e7e8"; font.pixelSize: 14 }
                             Text { text: modelData.combo_display; color: "#a4a5aa"; font.pixelSize: 13 }
-                            BwButton { text: "×"; danger: true; implicitWidth: 42; onClicked: root.invoke("remove_hotkey_binding", { index: modelData.binding_index }) }
+                            BwButton { iconName: "x"; text: ""; danger: true; implicitWidth: 42; onClicked: root.invoke("remove_hotkey_binding", { index: modelData.binding_index }) }
                         }
                     }
                     RowLayout { Layout.fillWidth: true
                         Text { text: "Add hotkey:"; color: "#e7e7e8" }
                         Item { Layout.fillWidth: true }
-                        ComboBox { id: macroBox; model: appState.macro_names || []; implicitWidth: 210; onActivated: index => root.invoke("set_pending_macro_idx", { index: index }) }
+                        BwComboBox { id: macroBox; model: appState.macro_names || []; implicitWidth: 210; onActivated: index => root.invoke("set_pending_macro_idx", { index: index }) }
                         BwButton { text: "Set combo"; onClicked: root.invoke("start_pending_combo_capture") }
-                        BwButton { glyph: "+"; text: "Add"; onClicked: root.invoke("add_macro_hotkey") }
+                        BwButton { iconName: "plus"; text: "Add"; onClicked: root.invoke("add_macro_hotkey") }
                     }
                 }
                 SectionCard {
-                    width: parent.width; title: "Import and export"; glyph: "⇄"
+                    width: parent.width; title: "Import and export"; iconName: "layers"
                     RowLayout { Layout.fillWidth: true
                         ColumnLayout { Layout.fillWidth: true
                             Text { text: "Portable macro files"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
@@ -73,19 +73,19 @@ Item {
                     }
                 }
                 SectionCard {
-                    width: parent.width; title: "TCP server"; glyph: "⌁"
+                    width: parent.width; title: "TCP server"; iconName: "terminal"
                     RowLayout { Layout.fillWidth: true
                         ColumnLayout { Layout.fillWidth: true
                             Text { text: appState.ipc_active_port === null ? "Server stopped" : "Listening on port " + appState.ipc_active_port; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
                             Text { text: "Allow local integrations to run Blockwork macros."; color: "#9fa0a6"; font.pixelSize: 12 }
                         }
-                        TextField { id: port; text: appState.ipc_port_text || "47821"; validator: IntValidator { bottom: 1; top: 65535 } implicitWidth: 100; onEditingFinished: root.invoke("set_ipc_port_text", { text: text }) }
+                        BwTextField { id: port; text: appState.ipc_port_text || "47821"; validator: IntValidator { bottom: 1; top: 65535 } implicitWidth: 100; onEditingFinished: root.invoke("set_ipc_port_text", { text: text }) }
                         BwButton { text: appState.ipc_active_port === null ? "Start" : "Stop"; primary: appState.ipc_active_port === null; onClicked: root.invoke(appState.ipc_active_port === null ? "start_ipc_server" : "stop_ipc_server") }
                     }
                     BwSwitch { Accessible.name: "Start TCP server automatically"; checked: appState.ipc_auto_start; onToggled: checked => root.invoke("set_ipc_auto_start", { enabled: checked }) }
                 }
                 SectionCard {
-                    width: parent.width; title: "System"; glyph: "⚙"
+                    width: parent.width; title: "System"; iconName: "settings"
                     RowLayout { Layout.fillWidth: true
                         ColumnLayout { Layout.fillWidth: true
                             Text { text: "Close to tray"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
@@ -95,7 +95,7 @@ Item {
                     }
                 }
                 SectionCard {
-                    width: parent.width; title: "Updates"; glyph: "↻"
+                    width: parent.width; title: "Updates"; iconName: "rotate"
                     RowLayout { Layout.fillWidth: true
                         ColumnLayout { Layout.fillWidth: true
                             Text { text: root.updateTitle(); color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
@@ -135,7 +135,7 @@ Item {
         standardButtons: Dialog.Ok | Dialog.Cancel
         Column { width: 480; spacing: 8
             Text { text: "File path"; color: "#e7e7e8" }
-            TextField { id: filePath; width: parent.width; placeholderText: "C:/path/to/macro.macro"; selectByMouse: true }
+            BwTextField { id: filePath; width: parent.width; placeholderText: "C:/path/to/macro.macro" }
         }
         onAccepted: {
             if (mode === "import") root.invoke("import_macro", { path: filePath.text });
