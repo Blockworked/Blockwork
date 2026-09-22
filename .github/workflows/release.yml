@@ -29,16 +29,14 @@ jobs:
           - name: windows-x86_64
             runner: windows-latest
             target: x86_64-pc-windows-msvc
-            artifact_name: blockwork-windows-x86_64.exe
-            cef_windows_dir: cef_windows_x86_64
+            artifact_name: blockwork-windows-x86_64.zip
             installer_arch: x64compatible
             experimental: false
 
           - name: windows-arm64
             runner: windows-11-arm
             target: aarch64-pc-windows-msvc
-            artifact_name: blockwork-windows-arm64.exe
-            cef_windows_dir: cef_windows_aarch64
+            artifact_name: blockwork-windows-arm64.zip
             installer_arch: arm64
             experimental: true
 
@@ -52,6 +50,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout Blockstitch QML module
+        shell: bash
+        run: |
+          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/Blockworked/blockstitch.git "$ref" >/dev/null; then
+            git clone --depth 1 --branch "$ref" https://github.com/Blockworked/blockstitch.git ../blockstitch
+          else
+            git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
+          fi
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -62,38 +70,16 @@ jobs:
         with:
           key: ${{ matrix.target }}
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          package_json_file: ui/package.json
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
-
       - name: Build (release, Windows)
         if: runner.os == 'Windows'
         run: cargo build --release --target ${{ matrix.target }} --workspace --exclude blockwork-linux-bridge
 
-      - name: Stage CEF runtime files (Windows)
+      - name: Stage Qt application (Windows)
         if: runner.os == 'Windows'
         shell: pwsh
         run: |
-          $releaseDir = "target/${{ matrix.target }}/release"
-          $cefBuildDir = Get-ChildItem "$releaseDir/build" -Directory -Filter "cef-dll-sys-*" |
-            Sort-Object LastWriteTime -Descending | Select-Object -First 1
-          $cefRuntimeDir = Get-ChildItem (Join-Path $cefBuildDir.FullName "out") -Recurse -Directory -Filter "${{ matrix.cef_windows_dir }}" |
-            Select-Object -First 1
-          Get-ChildItem $cefRuntimeDir.FullName -File | Copy-Item -Destination $releaseDir -Force
-          Copy-Item (Join-Path $cefRuntimeDir.FullName "locales") $releaseDir -Recurse -Force
-
-      - name: Rename binary (Windows)
-        if: runner.os == 'Windows'
-        shell: pwsh
-        run: Copy-Item target/${{ matrix.target }}/release/blockwork.exe ${{ matrix.artifact_name }}
+          ./scripts/deploy-qt-windows.ps1 -Target ${{ matrix.target }}
+          Compress-Archive -Path "dist/windows-${{ matrix.target }}/*" -DestinationPath "${{ matrix.artifact_name }}" -Force
 
       - name: Upload artifact
         if: runner.os == 'Windows'
@@ -193,6 +179,16 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Checkout Blockstitch QML module
+        shell: bash
+        run: |
+          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/Blockworked/blockstitch.git "$ref" >/dev/null; then
+            git clone --depth 1 --branch "$ref" https://github.com/Blockworked/blockstitch.git ../blockstitch
+          else
+            git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
+          fi
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -216,7 +212,6 @@ jobs:
             libxdo-dev \
             libayatana-appindicator3-dev \
             librsvg2-dev \
-            libwebkit2gtk-4.1-dev \
             libdbus-1-dev \
             libxkbcommon-dev \
             libxkbcommon-x11-0 \
@@ -227,66 +222,33 @@ jobs:
             wayland-protocols \
             libclang-dev
 
-      - name: Install pnpm
-        uses: pnpm/action-setup@v4
-        with:
-          package_json_file: ui/package.json
-
-      - name: Install Node.js
-        uses: actions/setup-node@v4
-        with:
-          node-version: 22
-          cache: pnpm
-          cache-dependency-path: ui/pnpm-lock.yaml
-
       - name: Build (release)
         run: cargo build --release --target ${{ matrix.target }}
-
-      - name: Stage CEF runtime files
-        run: |
-          releaseDir="target/${{ matrix.target }}/release"
-          cefBuildDir=$(ls -dt "$releaseDir"/build/cef-dll-sys-*/ | head -1)
-          cefRuntimeDir=$(find "${cefBuildDir}out" -maxdepth 2 -type d -name "cef_linux_${{ matrix.linux_arch }}" | head -1)
-          find "$cefRuntimeDir" -maxdepth 1 -type f -exec cp -f {} "$releaseDir/" \;
-          cp -r "$cefRuntimeDir/locales" "$releaseDir/"
-
-      - name: Rename binary
-        run: cp target/${{ matrix.target }}/release/blockwork ${{ matrix.artifact_name }}
 
       - name: Build AppImage
         run: |
           export APPIMAGE_EXTRACT_AND_RUN=1
           wget -q -O linuxdeploy.AppImage "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.linux_arch }}.AppImage"
           wget -q -O linuxdeploy-plugin-appimage.AppImage "https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-${{ matrix.linux_arch }}.AppImage"
-          chmod +x linuxdeploy.AppImage linuxdeploy-plugin-appimage.AppImage
-          mkdir -p appimage-staging
-          # Exec entry wants a binary named blockwork.
-          cp ${{ matrix.artifact_name }} appimage-staging/blockwork
+          wget -q -O linuxdeploy-plugin-qt.AppImage "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${{ matrix.linux_arch }}.AppImage"
+          chmod +x linuxdeploy.AppImage linuxdeploy-plugin-appimage.AppImage linuxdeploy-plugin-qt.AppImage
 
-          # CEF runtime sits next to the binary in target/<triple>/release.
-          # linuxdeploy only finds libcef.so via ldd, so copy the rest by hand.
-          CEF_DIR="target/${{ matrix.target }}/release"
-          cp "$CEF_DIR/libcef.so" appimage-staging/
-          # Daemon ships next to blockwork in usr/bin.
-          cp "$CEF_DIR/blockwork-daemon" appimage-staging/
+          QMAKE_PATH=$(find "$HOME" -path '*qt_minimal_download*' -type f -name qmake -print -quit)
+          test -n "$QMAKE_PATH"
+          export QMAKE="$QMAKE_PATH"
+          export LD_LIBRARY_PATH="$($QMAKE -query QT_INSTALL_LIBS):${LD_LIBRARY_PATH:-}"
+          export QML_SOURCES_PATHS="$PWD/blockwork-qt/qml:$PWD/../blockstitch/qml"
 
-          export LINUXDEPLOY_EXCLUDED_LIBRARIES="libnspr4.so;libplc4.so;libplds4.so;libnss3.so;libnssutil3.so;libsmime3.so"
+          RELEASE_DIR="target/${{ matrix.target }}/release"
 
           ./linuxdeploy.AppImage \
             --appdir AppDir \
-            --executable ./appimage-staging/blockwork \
-            --executable ./appimage-staging/blockwork-daemon \
+            --executable "$RELEASE_DIR/blockwork" \
+            --executable "$RELEASE_DIR/blockwork-daemon" \
             --desktop-file res/blockwork.desktop \
-            --icon-file res/icons/blockwork.png
-
-          cp "$CEF_DIR"/libEGL.so "$CEF_DIR"/libGLESv2.so "$CEF_DIR"/libvk_swiftshader.so \
-             "$CEF_DIR"/libvulkan.so.1 "$CEF_DIR"/vk_swiftshader_icd.json "$CEF_DIR"/chrome-sandbox \
-             "$CEF_DIR"/icudtl.dat "$CEF_DIR"/v8_context_snapshot.bin "$CEF_DIR"/chrome_100_percent.pak \
-             "$CEF_DIR"/chrome_200_percent.pak "$CEF_DIR"/resources.pak \
-             AppDir/usr/lib/
-          cp -r "$CEF_DIR/locales" AppDir/usr/lib/
-
-          ./linuxdeploy.AppImage --appdir AppDir --output appimage
+            --icon-file res/icons/blockwork.png \
+            --plugin qt \
+            --output appimage
           mv Blockwork*.AppImage ${{ matrix.artifact_name }}.AppImage
 
       - name: Upload AppImage artifact
@@ -319,14 +281,30 @@ jobs:
         with:
           submodules: recursive
 
+      - name: Checkout Blockstitch QML module
+        shell: bash
+        run: |
+          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/Blockworked/blockstitch.git "$ref" >/dev/null; then
+            git clone --depth 1 --branch "$ref" https://github.com/Blockworked/blockstitch.git ../blockstitch
+          else
+            git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
+          fi
+
       - name: Install Flatpak tooling
         run: |
           sudo apt-get update -qq
           sudo apt-get install -y --no-install-recommends flatpak flatpak-builder elfutils
           flatpak remote-add --if-not-exists --user flathub https://flathub.org/repo/flathub.flatpakrepo
           flatpak install --user --noninteractive flathub \
-            org.gnome.Platform//50 org.gnome.Sdk//50 \
-            org.freedesktop.Sdk.Extension.rust-stable//25.08 org.freedesktop.Sdk.Extension.node24//25.08
+            org.kde.Platform//6.10 org.kde.Sdk//6.10 \
+            org.freedesktop.Sdk.Extension.rust-stable//25.08 \
+            org.flatpak.Builder
+
+      - name: Generate offline Cargo sources
+        run: |
+          flatpak run --filesystem="$PWD" --command=flatpak-cargo-generator \
+            org.flatpak.Builder -o packaging/flatpak/cargo-sources.json Cargo.lock
 
       - name: Build Flatpak
         # Offline sandbox build, no host cargo build needed.
@@ -338,10 +316,20 @@ jobs:
               print "      - type: dir"
               print "        path: ../.."
               print "        skip: [target, .git, .flatpak-builder, flatpak-build, flatpak-repo, node_modules, ui/node_modules, ui/dist, packaging/flatpak]"
-              skip = 1
+              skip = "app"
               next
             }
-            /# END app-source/ { skip = 0 }
+            /# END app-source/ { skip = ""; print; next }
+            /# BEGIN blockstitch-source/ {
+              print
+              print "      - type: dir"
+              print "        path: ../../../blockstitch"
+              print "        dest: .flatpak-blockstitch"
+              print "        skip: [target, .git, node_modules, dist]"
+              skip = "blockstitch"
+              next
+            }
+            /# END blockstitch-source/ { skip = ""; print; next }
             !skip
           ' "$manifest.yml" > "$manifest.local.yml"
           flatpak-builder --force-clean --user --default-branch=stable --repo=flatpak-repo flatpak-build "$manifest.local.yml"
@@ -404,10 +392,10 @@ jobs:
             echo "| Platform | File |"
             echo "|---|---|"
             echo "| Windows x86_64 (installer) | \`blockwork-windows-x86_64-setup.exe\` |"
-            echo "| Windows x86_64 (portable exe) | \`blockwork-windows-x86_64.exe\` |"
+            echo "| Windows x86_64 (portable Qt bundle) | \`blockwork-windows-x86_64.zip\` |"
             echo "| Windows x86_64 (MSIX, for the Microsoft Store) | \`blockwork-windows-x86_64.msix\` |"
             echo "| Windows arm64 (installer) | \`blockwork-windows-arm64-setup.exe\` |"
-            echo "| Windows arm64 (portable exe) | \`blockwork-windows-arm64.exe\` |"
+            echo "| Windows arm64 (portable Qt bundle) | \`blockwork-windows-arm64.zip\` |"
             echo "| Linux x86_64 (AppImage) | \`blockwork-linux-x86_64.AppImage\` |"
             echo "| Linux x86_64 (Flatpak) | \`blockwork-linux-x86_64.flatpak\` |"
             echo "| Linux arm64 (AppImage) | \`blockwork-linux-arm64.AppImage\` |"

@@ -1,6 +1,6 @@
 //! Maps a command name plus its JSON arguments onto the matching function in
-//! `commands.rs`. Argument names are the camelCase spelling the frontend
-//! already used with Tauri's `invoke`, so `ui/src/tauri.ts` is unchanged.
+//! `commands.rs`. Argument names retain the original camelCase wire format so
+//! old browser clients and the Qt frontend use the same daemon protocol.
 
 use crate::Backend;
 use crate::commands;

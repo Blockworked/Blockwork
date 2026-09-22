@@ -17,6 +17,13 @@ if (-not ($Destination + [IO.Path]::DirectorySeparatorChar).StartsWith($distRoot
 }
 
 $qmakePath = if ($env:QMAKE) { $env:QMAKE } else { (Get-Command qmake6, qmake -ErrorAction SilentlyContinue | Select-Object -First 1).Source }
+if (-not $qmakePath) {
+  $minimalRoot = Join-Path $env:LOCALAPPDATA "qt_minimal_download"
+  if (Test-Path $minimalRoot) {
+    $qmakePath = (Get-ChildItem -LiteralPath $minimalRoot -Recurse -File -Filter qmake.exe |
+      Sort-Object LastWriteTime -Descending | Select-Object -First 1).FullName
+  }
+}
 if (-not $qmakePath) { throw "qmake was not found; set QMAKE to the Qt 6 qmake executable" }
 $deploy = Join-Path (Split-Path $qmakePath) "windeployqt.exe"
 if (-not (Test-Path $deploy)) { throw "windeployqt.exe was not found next to $qmakePath" }

@@ -55,6 +55,9 @@ rm -rf "$ICONSET_PARENT"
 
 QMAKE_BIN="${QMAKE:-$(command -v qmake6 || command -v qmake || true)}"
 if [[ -z "$QMAKE_BIN" ]]; then
+  QMAKE_BIN="$(find "$HOME" -path '*qt_minimal_download*' -type f -name qmake -print -quit 2>/dev/null || true)"
+fi
+if [[ -z "$QMAKE_BIN" ]]; then
   echo "error: qmake not found; set QMAKE to the Qt 6 qmake executable" >&2
   exit 1
 fi

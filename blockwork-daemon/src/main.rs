@@ -3,10 +3,8 @@
 //! watchers, the macro-control IPC server) plus the tray icon, and serves the
 //! editor UI over a local socket (see `blockwork-protocol`).
 //!
-//! The UI (`blockwork`, which embeds CEF) is a separate process so closing the
-//! window frees Chromium's browser, GPU, network and renderer processes
-//! entirely; this process stays small and keeps hotkeys working while "close
-//! to tray" is on.
+//! The Qt Quick UI (`blockwork`) is a separate process, so this process can
+//! keep hotkeys and schedules working while "close to tray" is on.
 //!
 //! Lifecycle:
 //! - Started by the first `blockwork` launch; a second daemon exits

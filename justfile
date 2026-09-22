@@ -48,7 +48,21 @@ flatpak-sources:
     flatpak run --command=flatpak-cargo-generator org.flatpak.Builder -o packaging/flatpak/cargo-sources.json Cargo.lock
 
 flatpak-build *args:
-    awk '/# BEGIN app-source/ { print; print "      - type: dir"; print "        path: ../.."; print "        skip: [target, .git, .flatpak-builder, flatpak-build, flatpak-repo, node_modules, ui/node_modules, ui/dist, packaging/flatpak]"; skip = 1; next } /# END app-source/ { skip = 0 } !skip' packaging/flatpak/{{appid}}.yml > packaging/flatpak/{{appid}}.local.yml
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -f ../blockstitch/Cargo.toml ]]; then
+        echo "error: the sibling ../blockstitch QML module is required" >&2
+        exit 1
+    fi
+    flatpak run --command=flatpak-cargo-generator org.flatpak.Builder \
+        -o packaging/flatpak/cargo-sources.json Cargo.lock
+    awk '
+      /# BEGIN app-source/ { print; print "      - type: dir"; print "        path: ../.."; print "        skip: [target, .git, .flatpak-builder, flatpak-build, flatpak-repo, node_modules, ui/node_modules, ui/dist, packaging/flatpak]"; skip = 1; next }
+      /# END app-source/ { skip = 0; print; next }
+      /# BEGIN blockstitch-source/ { print; print "      - type: dir"; print "        path: ../../../blockstitch"; print "        dest: .flatpak-blockstitch"; print "        skip: [target, .git, node_modules, dist]"; skip = 1; next }
+      /# END blockstitch-source/ { skip = 0; print; next }
+      !skip
+    ' packaging/flatpak/{{appid}}.yml > packaging/flatpak/{{appid}}.local.yml
     flatpak-builder --force-clean --user --disable-rofiles-fuse --repo=flatpak-repo flatpak-build packaging/flatpak/{{appid}}.local.yml {{args}}
 
 flatpak-lint:

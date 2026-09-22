@@ -36,6 +36,11 @@ Item {
         return i;
     }
     function addBlock(type, x, y) { root.invoke("add_strand", { x: x, y: y, instruction: defaultInstruction(type) }); }
+    function addCustomBlock(definition, x, y) {
+        const args = (definition.pieces || []).filter(piece => piece.kind === "Input")
+            .map(piece => piece.value_type === "Bool" ? { kind: "Bool" } : numberValue(0));
+        root.invoke("add_strand", { x: x, y: y, instruction: { id: uuid(), type: "CallBlock", block_id: definition.id, args: args } });
+    }
     function recordingLabel() {
         const phase = appState.recording_phase || { phase: "Idle" };
         if (phase.phase === "Countdown") return "Recording in " + phase.countdown + "s…";
@@ -98,6 +103,9 @@ Item {
                     variables: root.macro ? root.macro.variables : []
                     blockDefinitions: root.macro ? root.macro.block_defs : []
                     onBlockActivated: type => root.addBlock(type, 120, 120)
+                    onCustomBlockActivated: definition => root.addCustomBlock(definition, 120, 120)
+                    onMakeVariableRequested: variableDialog.open()
+                    onMakeBlockRequested: blockDialog.open()
                 }
                 BlockCanvas {
                     Layout.fillWidth: true; Layout.fillHeight: true
@@ -108,6 +116,12 @@ Item {
                     onStrandMoved: (strandId, x, y) => root.invoke("move_strand", { strandId: strandId, x: x, y: y })
                     onBlockDropped: (type, x, y) => root.addBlock(type, x, y)
                     onInstructionRemoved: (strandId, path) => root.invoke("remove_instruction", { strandId: strandId, path: path })
+                    onCommentMoved: (commentId, x, y) => root.invoke("move_comment", { commentId: commentId, x: x, y: y })
+                    onCommentEdited: (commentId, text) => root.invoke("edit_comment_text", { commentId: commentId, text: text })
+                    onCommentCollapseChanged: (commentId, collapsed) => root.invoke("set_comment_collapsed", { commentId: commentId, collapsed: collapsed })
+                    onCommentRemoved: commentId => root.invoke("remove_comment", { commentId: commentId })
+                    onFloatingValueMoved: (floatingId, x, y) => root.invoke("move_floating_value", { floatingId: floatingId, x: x, y: y })
+                    onFloatingValueRemoved: floatingId => root.invoke("remove_floating_value", { floatingId: floatingId })
                 }
             }
             Rectangle {
@@ -136,6 +150,7 @@ Item {
                 BwButton { glyph: "↶"; text: "Undo"; enabled: appState.can_undo; onClicked: root.invoke("undo") }
                 BwButton { glyph: "↷"; text: "Redo"; enabled: appState.can_redo; onClicked: root.invoke("redo") }
                 BwButton { glyph: "▣"; text: "Save macro"; primary: true; onClicked: root.invoke("save_macro") }
+                BwButton { glyph: "+"; text: "Note"; onClicked: root.invoke("create_comment", { x: 360, y: 180, text: "New note" }) }
             }
         }
     }
@@ -158,6 +173,38 @@ Item {
             BwSwitch { Accessible.name: "Record mouse movement"; checked: appState.record_mouse_movement; onToggled: checked => root.invoke("toggle_record_mouse_movement", { enabled: checked }) }
             BwSwitch { Accessible.name: "Use relative mouse movement"; checked: appState.record_mouse_relative; onToggled: checked => root.invoke("toggle_record_mouse_relative", { relative: checked }) }
             Text { width: parent.width; wrapMode: Text.WordWrap; text: appState.absolute_mouse_position_available ? "Absolute positioning is available on this system." : "Absolute positioning is unavailable; relative movement will be used."; color: "#9fa0a6"; font.pixelSize: 12 }
+        }
+    }
+    Dialog {
+        id: variableDialog; anchors.centerIn: parent; modal: true; title: "Make a Variable"; standardButtons: Dialog.Ok | Dialog.Cancel
+        Column { width: 340; spacing: 8
+            Text { text: "Variable name"; color: "#e7e7e8" }
+            TextField { id: variableName; width: parent.width; placeholderText: "score"; selectByMouse: true }
+        }
+        onAccepted: {
+            const name = variableName.text.trim();
+            if (name.length) root.invoke("create_variable", { name: name });
+            variableName.clear();
+        }
+    }
+    Dialog {
+        id: blockDialog; anchors.centerIn: parent; modal: true; title: "Make a Block"; standardButtons: Dialog.Ok | Dialog.Cancel
+        Column { width: 380; spacing: 10
+            Text { text: "Block label"; color: "#e7e7e8" }
+            TextField { id: blockName; width: parent.width; placeholderText: "do something"; selectByMouse: true }
+            Text { text: "Shape"; color: "#e7e7e8" }
+            ComboBox { id: blockShape; width: parent.width; model: ["Normal", "Ending", "ReturnsValue", "ReturnsBool"] }
+            Text { text: "Accent color"; color: "#e7e7e8" }
+            TextField { id: blockColor; width: parent.width; text: "#1594ff"; selectByMouse: true }
+        }
+        onAccepted: {
+            const label = blockName.text.trim();
+            if (label.length) root.invoke("create_block", {
+                pieces: [{ kind: "Label", id: root.uuid(), text: label }],
+                shape: blockShape.currentText,
+                color: blockColor.text
+            });
+            blockName.clear();
         }
     }
 }

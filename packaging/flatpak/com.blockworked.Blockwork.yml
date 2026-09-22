@@ -1,165 +1,76 @@
 app-id: com.blockworked.Blockwork
-runtime: org.gnome.Platform
-runtime-version: '50'
-sdk: org.gnome.Sdk
+runtime: org.kde.Platform
+runtime-version: '6.10'
+sdk: org.kde.Sdk
 command: blockwork
 sdk-extensions:
   - org.freedesktop.Sdk.Extension.rust-stable
-  - org.freedesktop.Sdk.Extension.node24
+
 # Upstream ships res/blockwork.desktop with Icon=blockwork; these rename both
 # to the app id at export.
 rename-desktop-file: blockwork.desktop
 rename-icon: blockwork
-
 
 finish-args:
   - --share=ipc
   - --socket=wayland
   - --socket=fallback-x11
   # /dev/uinput (synthetic input) + /dev/input/event* (hotkeys, recording).
-  # --device=input is not enough: it exposes /dev/input but not /dev/uinput.
   - --device=all
   - --device=dri
   # Open App/Close App launch and kill host apps via flatpak-spawn --host.
   - --talk-name=org.freedesktop.Flatpak
-  # "Close to tray" icon (StatusNotifierItem); unreachable from the sandbox otherwise.
+  # "Close to tray" icon (StatusNotifierItem).
   - --talk-name=org.kde.StatusNotifierWatcher
 
 build-options:
-  append-path: /usr/lib/sdk/rust-stable/bin:/usr/lib/sdk/node24/bin:/run/build/blockwork/pnpm-bin
+  append-path: /usr/lib/sdk/rust-stable/bin
   libdir: /app/lib
   env:
     CARGO_HOME: /run/build/blockwork/cargo
     CARGO_NET_OFFLINE: 'true'
-    CEF_PATH: /run/build/blockwork/cef-prebuilt
     CARGO_BUILD_JOBS: '6'
-    BLOCKWORK_PNPM_OFFLINE: '1'
 
 modules:
-  # System tray icon
+  # The daemon's tray icon uses AppIndicator; the UI itself is Qt Quick.
   - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
-
-  # Chromium sandbox
-  - name: zypak
-    sources:
-      - type: git
-        url: https://github.com/refi64/zypak
-        tag: v2025.09
-        commit: 693a71c5ffa80ec9c9ce2ae03b1ccc493c698e53
-        x-checker-data:
-          type: git
-          tag-pattern: ^v([\d.]+)$
 
   - name: blockwork
     buildsystem: simple
     build-commands:
-      - |
-        set -e
-        CEF_VERSION="151.3.24"
-        case "$(uname -m)" in
-          x86_64)
-            # Custom Wayland-patched build from cloud.frozenblock.net (see
-            # ../cef-rs/sys/build.rs's DEFAULT_LINUX_X64_ARCHIVE_URL, only used
-            # for x86_64-unknown-linux-gnu).
-            DEST="$CEF_PATH/$CEF_VERSION/cef_linux_x86_64"
-            mkdir -p "$CEF_PATH/$CEF_VERSION"
-            ARCHIVE=cef_binary_wayland_linux64.tar.zst
-            EXTRACTED_DIR=$(tar --zstd -tf "$ARCHIVE" | head -1 | cut -d/ -f1)
-            tar --zstd -xf "$ARCHIVE"
-            mv "$EXTRACTED_DIR" "$DEST"
-            ;;
-          aarch64)
-            # Official upstream CEF minimal distribution
-            # (No Wayland-patched CEF was built for aarch64)
-            DEST="$CEF_PATH/$CEF_VERSION/cef_linux_aarch64"
-            mkdir -p "$CEF_PATH/$CEF_VERSION"
-            ARCHIVE=$(ls cef_binary_*_linuxarm64_minimal.tar.bz2)
-            ARCHIVE_NAME=$(basename "$ARCHIVE")
-            SHA1=$(sha1sum "$ARCHIVE" | cut -d' ' -f1)
-            EXTRACTED_DIR="${ARCHIVE_NAME%.tar.bz2}"
-            tar -xjf "$ARCHIVE"
-            mv "$EXTRACTED_DIR/Release" "$DEST"
-            mv "$EXTRACTED_DIR"/Resources/* "$DEST/"
-            mv "$EXTRACTED_DIR/CMakeLists.txt" "$DEST/"
-            mv "$EXTRACTED_DIR/cmake" "$DEST/"
-            mv "$EXTRACTED_DIR/include" "$DEST/"
-            mv "$EXTRACTED_DIR/libcef_dll" "$DEST/"
-            mv "$EXTRACTED_DIR/CREDITS.html" "$DEST/"
-            rm -rf "$EXTRACTED_DIR"
-            printf '{"type":"minimal","name":"%s","sha1":"%s"}' "$ARCHIVE_NAME" "$SHA1" > "$DEST/archive.json"
-            ;;
-          *) echo "unsupported arch for CEF staging: $(uname -m)" >&2; exit 1 ;;
-        esac
-      - mkdir -p pnpm-bin && tar -xzf pnpm-linux-*.tar.gz -C pnpm-bin
-      - ln -s flatpak-node/pnpm-store .pnpm-store
-      - cargo --offline build --release
+      # blockwork-qt intentionally consumes the QML module from the sibling
+      # Blockstitch repository. Sources are placed beside this build directory
+      # to preserve the same ../../blockstitch path used by local development.
+      - cp -a .flatpak-blockstitch ../blockstitch
+      - cargo --offline build --release --workspace --exclude blockwork-linux-bridge
       - install -Dm755 target/release/blockwork /app/lib/blockwork/blockwork
       - install -Dm755 target/release/blockwork-daemon /app/lib/blockwork/blockwork-daemon
       - mkdir -p /app/bin
       - |
         cat > /app/bin/blockwork <<'EOF'
         #!/bin/sh
-        case "$(uname -m)" in
-          x86_64)
-            if [ -n "${WAYLAND_DISPLAY:-}" ]; then
-              export GDK_BACKEND=wayland
-            else
-              export GDK_BACKEND=x11
-            fi
-            ;;
-          aarch64) export GDK_BACKEND=x11 ;;
-        esac
-        # The UI starts blockwork-daemon, which relaunches the UI from its tray
-        # icon through this wrapper rather than the bare binary.
+        # The daemon relaunches the UI from its tray icon through this wrapper.
         export BLOCKWORK_UI_EXE=/app/bin/blockwork
-        export ZYPAK_CEF_LIBRARY_PATH=/app/lib/blockwork/libcef.so
-        exec zypak-wrapper /app/lib/blockwork/blockwork "$@"
+        exec /app/lib/blockwork/blockwork "$@"
         EOF
         chmod +x /app/bin/blockwork
-      - install -Dm755 target/release/libcef.so /app/lib/blockwork/libcef.so
-      - install -Dm755 target/release/chrome-sandbox /app/lib/blockwork/chrome-sandbox
-      - install -Dm755 target/release/libEGL.so /app/lib/blockwork/libEGL.so
-      - install -Dm755 target/release/libGLESv2.so /app/lib/blockwork/libGLESv2.so
-      - install -Dm755 target/release/libvk_swiftshader.so /app/lib/blockwork/libvk_swiftshader.so
-      - install -Dm755 target/release/libvulkan.so.1 /app/lib/blockwork/libvulkan.so.1
-      - install -Dm644 target/release/vk_swiftshader_icd.json /app/lib/blockwork/vk_swiftshader_icd.json
-      - install -Dm644 target/release/icudtl.dat /app/lib/blockwork/icudtl.dat
-      - install -Dm644 target/release/v8_context_snapshot.bin /app/lib/blockwork/v8_context_snapshot.bin
-      - install -Dm644 target/release/chrome_100_percent.pak /app/lib/blockwork/chrome_100_percent.pak
-      - install -Dm644 target/release/chrome_200_percent.pak /app/lib/blockwork/chrome_200_percent.pak
-      - install -Dm644 target/release/resources.pak /app/lib/blockwork/resources.pak
-      - cp -r target/release/locales /app/lib/blockwork/locales
       - install -Dm644 res/blockwork.desktop /app/share/applications/blockwork.desktop
       - install -Dm644 res/icons/blockwork.png /app/share/icons/hicolor/512x512/apps/blockwork.png
       - install -Dm644 res/com.blockworked.Blockwork.metainfo.xml /app/share/metainfo/com.blockworked.Blockwork.metainfo.xml
-      - install -Dm644 "$CEF_PATH"/*/cef_linux_*/CREDITS.html /app/share/licenses/com.blockworked.Blockwork/cef/CREDITS.html
     sources:
       # BEGIN app-source
       - type: git
         url: https://github.com/Blockworked/Blockwork.git
-        tag: 0.5.3
-        commit: 01783624af9a5a4f241647de989bbe8a2652fe59
+        branch: main
       # END app-source
 
+      # CI replaces this with the checked-out sibling so coordinated branches
+      # can be tested before both repositories are merged.
+      # BEGIN blockstitch-source
+      - type: git
+        url: https://github.com/Blockworked/blockstitch.git
+        branch: main
+        dest: .flatpak-blockstitch
+      # END blockstitch-source
+
       - cargo-sources.json
-
-      - node-sources.json
-
-      - type: file
-        url: https://github.com/pnpm/pnpm/releases/download/v11.27.0/pnpm-linux-x64.tar.gz
-        sha256: 14ed04e631e4563abf3570dda1a365316683149a482b741a2db37e495f6b9cdb
-        only-arches: [x86_64]
-      - type: file
-        url: https://github.com/pnpm/pnpm/releases/download/v11.27.0/pnpm-linux-arm64.tar.gz
-        sha256: 1f3c5dbdfe20b011ea86950b4fd61b5918cbde874c099032fe9064f7a53816bf
-        only-arches: [aarch64]
-
-      - type: file
-        url: https://cloud.frozenblock.net/s/82X5EQQ2ZoiPLWs/download
-        sha256: 77215ed9b7828c19993518d154e841e8fd41d58138a2385c3f8ec4a0ae6dee16
-        dest-filename: cef_binary_wayland_linux64.tar.zst
-        only-arches: [x86_64]
-      - type: file
-        url: https://cef-builds.spotifycdn.com/cef_binary_151.3.24+g2384915+chromium-151.0.7922.174_linuxarm64_minimal.tar.bz2
-        sha256: 47965b9c36a5958bdd6d6fdb3fe3360f38d17d65914ef636abade14881cdc59b
-        only-arches: [aarch64]

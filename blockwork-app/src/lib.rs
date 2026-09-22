@@ -1,8 +1,8 @@
 //! Blockwork's backend: every piece of app state and every command the editor
-//! UI can issue, with no dependency on Tauri or CEF. It runs inside
+//! UI can issue, with no dependency on a UI toolkit. It runs inside
 //! `blockwork-daemon`, which outlives the UI so hotkeys, recording and
-//! scheduled macros keep working while the (memory-hungry) CEF window is
-//! closed. The UI reaches it through [`Backend::dispatch`] over the daemon's
+//! scheduled macros keep working while the Qt window is closed. The UI
+//! reaches it through [`Backend::dispatch`] over the daemon's
 //! local socket (see `blockwork-protocol`).
 
 pub(crate) mod battery_watch;
@@ -26,8 +26,8 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
-/// Feeds a key event CEF saw in the focused UI window into the hotkey
-/// pipeline (Windows only; see `ClientMessage::KeyHook`).
+/// Feeds a key event observed in the focused UI window into the hotkey
+/// pipeline (Windows only; see `blockwork_protocol::FOCUSED_KEY_EVENT`).
 pub use blockwork_core::macros::backend::dispatch_from_focused_window;
 
 pub use blockwork_core::config::migrate_legacy_app_id;

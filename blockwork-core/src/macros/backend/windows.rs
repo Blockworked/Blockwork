@@ -294,10 +294,9 @@ pub(super) fn start_capture_thread(
                     WINEVENT_OUTOFCONTEXT,
                 );
 
-                // CEF re-executes this binary for helper processes; a helper
-                // that reached this code would install a competing hook
-                // nobody's queue drains. Exactly one of these lines should
-                // ever appear.
+                // Only the long-lived daemon should install these hooks. A
+                // second owner would install a competing hook whose queue is
+                // never drained. Exactly one of these lines should appear.
                 if kb_hook.is_null() || ms_hook.is_null() || ds_hook.is_null() {
                     warn!(
                         pid = std::process::id(),
@@ -356,11 +355,9 @@ fn dispatch(event: CaptureEvent) -> CaptureDecision {
 }
 
 /// Repeat-tracking for `dispatch_from_focused_window`, kept separate from
-/// `HOOK_STATE` since this path runs on CEF's UI thread, not `winapi-hook`.
-/// Timestamp-based rather than held/released flags: CEF doesn't reliably
-/// deliver a matching `KEYUP` once a key-down was reported handled, so a flag
-/// could get stuck "held" forever and silently swallow every later press. An
-/// elapsed-time check can't get stuck the same way.
+/// `HOOK_STATE` since this compatibility path runs on the UI thread, not
+/// `winapi-hook`. Timestamp tracking also remains safe if a UI client fails to
+/// deliver a matching `KEYUP` after handling a key-down.
 static FOCUSED_KEY_LAST_PRESS: Mutex<[Option<std::time::Instant>; 256]> = Mutex::new([None; 256]);
 
 /// Auto-repeat delivers the next `RAWKEYDOWN` well under this apart (Windows'

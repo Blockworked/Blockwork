@@ -1,5 +1,5 @@
 //! Wire protocol between `blockwork-daemon` (owns all state, hotkeys and
-//! playback) and the `blockwork` CEF UI process.
+//! playback) and the `blockwork` Qt Quick UI process.
 //!
 //! Transport is a per-user local socket - a Unix domain socket, or a named
 //! pipe on Windows - carrying newline-delimited JSON, one message per line.
@@ -12,8 +12,8 @@ use tokio::io::{AsyncRead, AsyncWrite};
 
 // ─── Messages ──────────────────────────────────────────────────────────────
 
-/// Command the UI calls for each key event CEF saw in its focused window
-/// (Windows only; see `tauri_runtime_cef::set_focused_key_hook`). Args:
+/// Compatibility command for forwarding a key event observed in the focused
+/// UI window on Windows. Args:
 /// `{"vk": u16, "pressed": bool}`; replies whether to suppress the key.
 pub const FOCUSED_KEY_EVENT: &str = "focused_key_event";
 
