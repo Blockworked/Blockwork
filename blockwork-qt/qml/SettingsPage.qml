@@ -30,15 +30,20 @@ Item {
                     Repeater {
                         model: appState.named_hotkey_defaults || []
                         delegate: RowLayout {
+                            id: hotkeyRow
                             required property var modelData
-                            Layout.fillWidth: true
-                            property var binding: (appState.hotkey_bindings || []).find(b => JSON.stringify(b.action) === JSON.stringify(modelData.action))
+                            Layout.fillWidth: true; spacing: 8
+                            readonly property var binding: (appState.hotkey_bindings || []).find(b => JSON.stringify(b.action) === JSON.stringify(modelData.action))
+                            readonly property bool capturing: root.capturingAction(modelData.action)
+                            readonly property bool atDefault: modelData.combo_display == null || (binding ? binding.combo_display : null) === modelData.combo_display
                             Text { Layout.fillWidth: true; text: root.actionLabel(modelData.action); color: "#e7e7e8"; font.pixelSize: 14 }
-                            Rectangle { width: 138; height: 36; radius: 7; color: "#303136"; border.color: "#4a4b50"
-                                Text { anchors.centerIn: parent; text: root.capturingAction(modelData.action)?"Press shortcut…":(parent.parent.binding ? parent.parent.binding.combo_display : (modelData.combo_display || "Not set")); color: root.capturingAction(modelData.action)?Theme.accent:"#a4a5aa"; font.pixelSize: 13 }
-                                TapHandler { onTapped: root.invoke("start_combo_capture", { action: modelData.action }) }
+                            BwButton {
+                                text: hotkeyRow.capturing ? "Press shortcut…" : (hotkeyRow.binding ? hotkeyRow.binding.combo_display : "Not set")
+                                primary: hotkeyRow.capturing; implicitWidth: 150; implicitHeight: 36
+                                onClicked: if (!hotkeyRow.capturing) root.invoke("start_combo_capture", { action: hotkeyRow.modelData.action })
                             }
-                            BwButton { iconName: "x"; text: ""; danger: true; implicitWidth: 42; onClicked: root.invoke("clear_named_hotkey", { action: modelData.action }) }
+                            BwButton { visible: !hotkeyRow.capturing && !hotkeyRow.atDefault; text: "Default"; implicitHeight: 36; onClicked: root.invoke("reset_hotkey_to_default", { action: hotkeyRow.modelData.action }) }
+                            BwButton { visible: !hotkeyRow.capturing && !!hotkeyRow.binding; iconName: "x"; text: ""; danger: true; implicitWidth: 42; implicitHeight: 36; onClicked: root.invoke("clear_named_hotkey", { action: hotkeyRow.modelData.action }) }
                         }
                     }
                 }
@@ -128,13 +133,11 @@ Item {
         return u.error || "Check for a new release of Blockwork.";
     }
 
-    Dialog {
+    BwDialog {
         id: pathDialog
         property string mode: "import"
-        anchors.centerIn: parent; modal: true
         title: mode === "import" ? "Import macro" : "Export macro"
         standardButtons: Dialog.Ok | Dialog.Cancel
-        background:Rectangle{radius:10;color:Theme.panel;border.color:Theme.border}
         Column { width: 480; spacing: 8
             Text { text: "File path"; color: "#e7e7e8" }
             BwTextField { id: filePath; width: parent.width; placeholderText: "C:/path/to/macro.macro" }

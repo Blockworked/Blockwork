@@ -11,6 +11,9 @@ Item {
     readonly property var macro: appState.current_macro
     readonly property bool recording: appState.recording_phase && appState.recording_phase.phase === "Active"
     property string sidebarKey: "a"
+    property real sidebarWidth: 348
+    readonly property real minSidebarWidth: 180
+    readonly property real maxSidebarWidth: 600
     readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"]
     readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList"]
 
@@ -74,6 +77,38 @@ Item {
         const x={WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a keyboard key.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
         return x[type]||"A Blockwork instruction block.";
     }
+    // ---- dragging a palette entry onto the canvas ----
+    property var paletteDrag: null   // { spec, offsetX, offsetY }
+    function beginPaletteDrag(spec, ox, oy, sx, sy) {
+        paletteDrag = { spec: spec, offsetX: ox, offsetY: oy };
+        ghost.spec = spec;
+        movePaletteDrag(sx, sy);
+        ghost.visible = true;
+    }
+    function movePaletteDrag(sx, sy) {
+        if (!paletteDrag) return;
+        const p = ghostLayer.mapFromItem(null, sx, sy);
+        ghost.x = p.x - paletteDrag.offsetX; ghost.y = p.y - paletteDrag.offsetY;
+    }
+    function endPaletteDrag(sx, sy) {
+        const drag = paletteDrag;
+        cancelPaletteDrag();
+        if (!drag || recording) return;
+        const at = canvas.workspacePoint(sx, sy);
+        if (!at) return;
+        const x = Math.round(at.x - drag.offsetX / canvas.zoom), y = Math.round(at.y - drag.offsetY / canvas.zoom);
+        const spec = drag.spec;
+        if (spec.kind === "value") root.invoke("create_floating_value", { x: x, y: y, value: spec.value, originBlockId: null });
+        else if (spec.kind === "custom") root.addCustomBlock(spec.definition, x, y);
+        else root.addBlock(spec.type, x, y);
+    }
+    function cancelPaletteDrag() { paletteDrag = null; ghost.visible = false; ghost.spec = null; }
+    // A canvas block dropped on the sidebar deletes it and everything below it in its stack.
+    function trashDraggedBlocks(strandId, path, tailCount, sx, sy) {
+        if (!palette.contains(palette.mapFromItem(null, sx, sy))) return;
+        if (path.length === 1 && path[0].index === 0) { root.invoke("remove_strand", { strandId: strandId }); return; }
+        for (let i = 0; i < tailCount; ++i) root.invoke("remove_instruction", { strandId: strandId, path: path });
+    }
     onAppStateChanged: {
         if (appState.standalone_key !== null && appState.standalone_key !== undefined) {
             sidebarKey = appState.standalone_key;
@@ -124,6 +159,7 @@ Item {
                 Slider {
                     id:speed;from:.1;to:10;value:root.macro?root.macro.speed_multiplier:1;Layout.preferredWidth:160;implicitHeight:30
                     onMoved:root.invoke("set_macro_speed_multiplier",{multiplier:value})
+                    HoverHandler{cursorShape:Qt.PointingHandCursor}
                     background:Rectangle{x:speed.leftPadding;y:speed.topPadding+speed.availableHeight/2-height/2;width:speed.availableWidth;height:5;radius:3;color:"#45474d";Rectangle{width:speed.visualPosition*parent.width;height:parent.height;radius:3;color:Theme.accent}}
                     handle:Rectangle{x:speed.leftPadding+speed.visualPosition*(speed.availableWidth-width);y:speed.topPadding+speed.availableHeight/2-height/2;width:16;height:16;radius:8;color:"white";border.width:2;border.color:Theme.accent}
                 }
@@ -136,7 +172,14 @@ Item {
             Layout.fillWidth: true; Layout.fillHeight: true
             RowLayout { anchors.fill: parent; spacing: 0
                 PalettePanel {
-                    Layout.preferredWidth: 330; Layout.fillHeight: true
+                    id: palette
+                    trashArmed: canvas.dragging && palette.contains(palette.mapFromItem(null, canvas.dragSceneX, canvas.dragSceneY))
+                    Layout.preferredWidth: root.sidebarWidth; Layout.fillHeight: true
+                    onResizeRequested: width => root.sidebarWidth = Math.max(root.minSidebarWidth, Math.min(root.maxSidebarWidth, width))
+                    onDragStarted: (spec, sx, sy, ox, oy) => root.beginPaletteDrag(spec, ox, oy, sx, sy)
+                    onDragMoved: (sx, sy) => root.movePaletteDrag(sx, sy)
+                    onDragEnded: (sx, sy) => root.endPaletteDrag(sx, sy)
+                    onDragCanceled: root.cancelPaletteDrag()
                     instructionTypes: root.instructionTypes
                     listInstructionTypes: root.listInstructionTypes
                     variables: root.macro ? root.macro.variables : []
@@ -157,6 +200,7 @@ Item {
                     onValueActivated: value => root.invoke("create_floating_value", { x: 160, y: 140, value: value, originBlockId: null })
                 }
                 BlockCanvas {
+                    id: canvas
                     Layout.fillWidth: true; Layout.fillHeight: true
                     strands: root.macro ? root.macro.strands : []
                     comments: root.macro ? root.macro.comments : []
@@ -168,11 +212,7 @@ Item {
                     locked: root.recording
                     onStrandMoved: (strandId, x, y) => root.invoke("move_strand", { strandId: strandId, x: x, y: y })
                     onInstructionSplit: (strandId, path, x, y) => root.invoke("split_strand", { strandId: strandId, path: path, x: x, y: y })
-                    onBlockDropped: (type, x, y) => {
-                        if(type.indexOf("__custom:")===0){const id=type.substring(9);const def=(root.macro.block_defs||[]).find(d=>d.id===id);if(def)root.addCustomBlock(def,x,y);}
-                        else root.addBlock(type,x,y);
-                    }
-                    onValueDropped:(value,x,y)=>root.invoke("create_floating_value",{x:x,y:y,value:value,originBlockId:null})
+                    onBlockDragOutside: (strandId, path, tailCount, sx, sy) => root.trashDraggedBlocks(strandId, path, tailCount, sx, sy)
                     onInstructionRemoved: (strandId, path) => root.invoke("remove_instruction", { strandId: strandId, path: path })
                     onInstructionDuplicated: (strandId, path, instruction) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: root.refreshIds(instruction) })
                     onInstructionEdited: (strandId, path, instruction) => root.invoke("edit_instruction", { strandId: strandId, path: path, instruction: instruction })
@@ -224,29 +264,28 @@ Item {
         }
     }
 
-    Dialog {
-        id: removeDialog; anchors.centerIn: parent; modal: true; title: "Delete macro?"; standardButtons: Dialog.Yes | Dialog.Cancel
+    BwDialog {
+        id: removeDialog; title: "Delete macro?"; standardButtons: Dialog.Yes | Dialog.Cancel
         Text { text: "This removes the selected macro from Blockwork."; color: "#e7e7e8" }
         onAccepted: root.invoke("remove_macro")
     }
-    Dialog {
-        id: macroSettings; anchors.centerIn: parent; modal: true; title: "Macro settings"; standardButtons: Dialog.Close
+    BwDialog {
+        id: macroSettings; title: "Macro settings"; standardButtons: Dialog.Close
         Column { spacing: 14; width: 360
             Text { text: "Controls behavior specific to this macro."; color: "#a5a6ab" }
             BwSwitch { Accessible.name: "Listen for triggers while Blockwork is open"; checked: root.macro && root.macro.settings ? root.macro.settings.always_listen : false; onToggled: checked => root.invoke("set_macro_always_listen", { enabled: checked }) }
         }
     }
-    Dialog {
-        id: recordingSettings; anchors.centerIn: parent; modal: true; title: "Recording settings"; standardButtons: Dialog.Close
+    BwDialog {
+        id: recordingSettings; title: "Recording settings"; standardButtons: Dialog.Close
         Column { spacing: 14; width: 390
             BwSwitch { Accessible.name: "Record mouse movement"; checked: appState.record_mouse_movement; onToggled: checked => root.invoke("toggle_record_mouse_movement", { enabled: checked }) }
             BwSwitch { Accessible.name: "Use relative mouse movement"; checked: appState.record_mouse_relative; onToggled: checked => root.invoke("toggle_record_mouse_relative", { relative: checked }) }
             Text { width: parent.width; wrapMode: Text.WordWrap; text: appState.absolute_mouse_position_available ? "Absolute positioning is available on this system." : "Absolute positioning is unavailable; relative movement will be used."; color: "#9fa0a6"; font.pixelSize: 12 }
         }
     }
-    Dialog {
-        id: variableDialog; anchors.centerIn: parent; modal: true; title: "Make a Variable"; standardButtons: Dialog.Ok | Dialog.Cancel
-        background:Rectangle{radius:10;color:Theme.panel;border.color:Theme.border}
+    BwDialog {
+        id: variableDialog; title: "Make a Variable"; standardButtons: Dialog.Ok | Dialog.Cancel
         Column { width: 340; spacing: 8
             Text { text: "Variable name"; color: "#e7e7e8" }
             BwTextField { id: variableName; width: parent.width; placeholderText: "score" }
@@ -257,13 +296,11 @@ Item {
             variableName.clear();
         }
     }
-    Dialog {
+    BwDialog {
         id: listDialog
-        anchors.centerIn: parent; modal: true
         property string renameTarget: ""
         title: renameTarget.length ? "Rename List" : "Make a List"
         standardButtons: Dialog.Ok | Dialog.Cancel
-        background:Rectangle{radius:10;color:Theme.panel;border.color:Theme.border}
         function openForCreate() { renameTarget = ""; listName.text = ""; open(); listName.forceActiveFocus(); }
         function openForRename(name) { renameTarget = name; listName.text = name; open(); listName.forceActiveFocus(); listName.selectAll(); }
         Column { width: 340; spacing: 8
@@ -278,19 +315,17 @@ Item {
             renameTarget = ""; listName.clear();
         }
     }
-    Dialog {
+    BwDialog {
         id: deleteListDialog
-        anchors.centerIn: parent; modal: true; title: "Delete list?"; standardButtons: Dialog.Yes | Dialog.Cancel
+        title: "Delete list?"; standardButtons: Dialog.Yes | Dialog.Cancel
         property string listName: ""
-        background:Rectangle{radius:10;color:Theme.panel;border.color:Theme.border}
         Text { text: "Delete “" + deleteListDialog.listName + "” and its saved items?"; color: "#e7e7e8" }
         onAccepted: root.invoke("delete_list", { name: listName })
     }
-    Dialog {
-        id:detailsDialog;anchors.centerIn:parent;modal:true;standardButtons:Dialog.NoButton;width:430
+    BwDialog {
+        id:detailsDialog;standardButtons:Dialog.NoButton;width:430;padding:0;topPadding:0;bottomPadding:0;showClose:false
         property string detailName:"";property string detailIdentifier:"";property string detailExplainer:""
         function show(name,identifier,explainer){detailName=name;detailIdentifier=identifier;detailExplainer=explainer;open()}
-        background:Rectangle{radius:10;color:Theme.panel;border.color:Theme.border}
         contentItem:Column{spacing:12;padding:18
             Row{spacing:9;LucideIcon{name:"info";width:20;height:20;color:Theme.accent;anchors.verticalCenter:parent.verticalCenter}Text{text:detailsDialog.detailName;color:Theme.text;font.pixelSize:17;font.weight:Font.Bold;anchors.verticalCenter:parent.verticalCenter}}
             Rectangle{width:parent.width-36;height:30;radius:5;color:Theme.field;border.color:Theme.border;Text{anchors.centerIn:parent;text:detailsDialog.detailIdentifier;color:Theme.accent;font.family:"monospace";font.pixelSize:12}}
@@ -299,4 +334,35 @@ Item {
         }
     }
     MakeBlockDialog { id:blockDialog; onCreateRequested:(pieces,shape,color)=>root.invoke("create_block",{pieces:pieces,shape:shape,color:color}) }
+
+    // Follows the pointer while a palette entry is dragged.
+    Item {
+        id: ghostLayer
+        anchors.fill: parent; z: 500; enabled: false
+        Item {
+            id: ghost
+            property var spec: null
+            visible: false; opacity: 0.92
+            width: ghostBlock.active ? ghostBlock.item.width : (ghostValue.active ? ghostValue.item.width : 0)
+            height: ghostBlock.active ? ghostBlock.item.height : (ghostValue.active ? ghostValue.item.height : 0)
+            Loader {
+                id: ghostBlock
+                active: ghost.visible && !!ghost.spec && ghost.spec.kind !== "value"
+                sourceComponent: InstructionBlock {
+                    instruction: ghost.spec.instruction; paletteMode: true; locked: true
+                    blockColor: ghost.spec.color || Theme.block
+                    variables: root.macro ? root.macro.variables : []; lists: root.macro && root.macro.lists ? root.macro.lists : []
+                    blockDefinitions: root.macro ? root.macro.block_defs : []
+                }
+            }
+            Loader {
+                id: ghostValue
+                active: ghost.visible && !!ghost.spec && ghost.spec.kind === "value"
+                sourceComponent: ValueChip {
+                    valueData: ghost.spec.value; boxed: true; editable: false
+                    forceBoolean: !!ghost.spec.forceBoolean; callDisplayLabel: ghost.spec.label || "custom block"
+                }
+            }
+        }
+    }
 }

@@ -4,15 +4,12 @@ import QtQuick.Layouts
 import QtQuick.Dialogs
 import com.blockworked.Blockstitch 1.0
 
-Dialog {
+BwDialog {
     id: root
-    modal: true
-    anchors.centerIn: parent
     title: "Make a Block"
     width: 720
     height: Math.min(760, parent ? parent.height - 32 : 760)
     standardButtons: Dialog.NoButton
-    background: Rectangle { radius:12;color:Theme.panel;border.color:Theme.border }
 
     signal createRequested(var pieces, string shape, string color)
 
@@ -30,6 +27,25 @@ Dialog {
     ]
 
     ListModel { id: pieces }
+    // One entry per branch piece: its model index, name and the separator label shown below it.
+    property var branchInfo: []
+    function refreshBranches() {
+        const out = [];
+        for (let i = 0; i < pieces.count; ++i) {
+            if (pieces.get(i).pieceKind !== "Branch") continue;
+            let sep = "";
+            for (let j = i + 1; j < pieces.count && pieces.get(j).pieceKind !== "Branch"; ++j)
+                if (pieces.get(j).pieceKind === "Label") { sep = pieces.get(j).pieceName; break; }
+            out.push({ index: i, name: pieces.get(i).pieceName, sep: sep, sepIndex: -1 });
+        }
+        branchInfo = out;
+    }
+    Connections {
+        target: pieces
+        function onCountChanged() { root.refreshBranches(); }
+        function onDataChanged() { root.refreshBranches(); }
+        function onRowsMoved() { root.refreshBranches(); }
+    }
 
     function uuid() {
         return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
@@ -121,7 +137,7 @@ Dialog {
         spacing: 12
 
         Rectangle {
-            Layout.fillWidth: true; Layout.preferredHeight: 260
+            Layout.fillWidth: true; Layout.fillHeight: true; Layout.preferredHeight: 260; Layout.minimumHeight: 170
             radius: Theme.radius; color: Theme.canvas; border.color: Theme.border; clip: true
             Canvas {
                 anchors.fill: parent
@@ -135,6 +151,7 @@ Dialog {
 
             Column {
                 anchors.centerIn: parent; spacing: 8
+                scale: Math.min(1, (parent.height - 16) / implicitHeight)
                 Row {
                     anchors.horizontalCenter: parent.horizontalCenter; spacing: 2
                     BwButton { iconName: "arrow-left"; text: ""; implicitWidth: 28; implicitHeight: 27; enabled: root.selectedPiece > 0; onClicked: root.moveSelected(-1) }
@@ -178,46 +195,54 @@ Dialog {
                     }
                 }
 
-                Column {
-                    visible: root.hasBranches; width: Math.max(270, branchHead.implicitWidth + 70); spacing: 0
-                    Rectangle {
-                        width: parent.width; height: 48; radius: 6; color: root.blockColor; border.color: Qt.lighter(root.blockColor, 1.25)
-                        Row {
-                            id: branchHead; x: 18; anchors.verticalCenter: parent.verticalCenter; spacing: 5
-                            LucideIcon { name: "blocks"; color: Theme.text; width: 16; height: 16; anchors.verticalCenter: parent.verticalCenter }
-                            Repeater {
-                                model: pieces
-                                delegate: Rectangle {
-                                    required property int index; required property string pieceKind; required property string pieceName; required property string valueType
-                                    visible: index < root.firstBranchIndex() || pieceKind === "Input"
-                                    width: visible ? label.implicitWidth + (pieceKind === "Label" ? 8 : 18) : 0; height: 27; radius: 5
-                                    color: pieceKind === "Input" ? Theme.field : "transparent"
-                                    border.width: root.selectedPiece === index ? 2 : (pieceKind === "Input" ? 1 : 0)
-                                    border.color: root.selectedPiece === index ? Theme.accent : Theme.border
-                                    Text { id: label; anchors.centerIn: parent; text: pieceName || "Add label"; color: pieceKind === "Input" ? Theme.accent : Theme.text; font.pixelSize: 12 }
-                                    TapHandler { onTapped: root.selectPiece(index) }
-                                }
+                Item {
+                    id: wrapPreview
+                    visible: root.hasBranches
+                    readonly property real mouthHeight: 46
+                    width: Math.max(270, branchHead.implicitWidth + 70)
+                    height: visible ? 50 + root.branchInfo.length * mouthHeight + Math.max(0, root.branchInfo.length - 1) * 34 + 26 + 8 : 0
+                    BlockSurface {
+                        anchors.fill: parent; shape: "wrap"; fill: root.blockColor
+                        headHeight: 50; midHeight: 34; footHeight: 26; spine: 20
+                        mouthHeights: root.branchInfo.map(() => wrapPreview.mouthHeight)
+                    }
+                    Row {
+                        id: branchHead; x: 18; y: 12; spacing: 5
+                        LucideIcon { name: "blocks"; color: Theme.textDim; width: 16; height: 16; anchors.verticalCenter: parent.verticalCenter }
+                        Repeater {
+                            model: pieces
+                            delegate: Rectangle {
+                                required property int index; required property string pieceKind; required property string pieceName; required property string valueType
+                                visible: index < root.firstBranchIndex() || pieceKind === "Input"
+                                width: visible ? label.implicitWidth + (pieceKind === "Label" ? 8 : 18) : 0; height: 27; radius: valueType === "Bool" ? 13 : 5
+                                color: pieceKind === "Input" ? Theme.field : "transparent"
+                                border.width: root.selectedPiece === index ? 2 : (pieceKind === "Input" ? 1 : 0)
+                                border.color: root.selectedPiece === index ? Theme.accent : Theme.border
+                                Text { id: label; anchors.centerIn: parent; text: pieceName || "Add label"; color: pieceKind === "Input" ? Theme.accent : Theme.text; font.pixelSize: 12 }
+                                TapHandler { onTapped: root.selectPiece(index) }
                             }
                         }
                     }
                     Repeater {
-                        model: pieces
-                        delegate: Column {
-                            required property int index; required property string pieceKind; required property string pieceName
-                            visible: pieceKind === "Branch"; width: parent.width; height: visible ? 64 : 0; spacing: 0
+                        model: root.branchInfo
+                        delegate: Item {
+                            required property var modelData; required property int index
+                            readonly property real rowTop: 50 + index * (wrapPreview.mouthHeight + 34)
                             Rectangle {
-                                width: parent.width; height: 64; color: Theme.canvas; border.color: Qt.lighter(root.blockColor, 1.25)
-                                Rectangle { width: 18; height: parent.height; color: root.blockColor }
-                                Rectangle {
-                                    x: 18; y: 8; width: branchName.implicitWidth + 18; height: 28; radius: 5; color: root.blockColor
-                                    border.width: root.selectedPiece === index ? 2 : 1; border.color: root.selectedPiece === index ? Theme.accent : Qt.lighter(root.blockColor, 1.25)
-                                    Text { id: branchName; anchors.centerIn: parent; text: pieceName; color: Theme.text; font.pixelSize: 12; font.weight: Font.DemiBold }
-                                    TapHandler { onTapped: root.selectPiece(index) }
-                                }
+                                x: 30; y: parent.rowTop + 9; width: branchName.implicitWidth + 18; height: 28; radius: 5
+                                color: Qt.darker(root.blockColor, 1.25)
+                                border.width: root.selectedPiece === modelData.index ? 2 : 1
+                                border.color: root.selectedPiece === modelData.index ? Theme.accent : Theme.border
+                                Text { id: branchName; anchors.centerIn: parent; text: modelData.name; color: Theme.text; font.pixelSize: 12; font.weight: Font.DemiBold }
+                                TapHandler { onTapped: root.selectPiece(modelData.index) }
+                            }
+                            Text {
+                                visible: index < root.branchInfo.length - 1
+                                x: 28; y: parent.rowTop + wrapPreview.mouthHeight + 9
+                                text: modelData.sep; color: Theme.textDim; font.pixelSize: 12
                             }
                         }
                     }
-                    Rectangle { width: parent.width; height: 24; radius: 5; color: root.blockColor; border.color: Qt.lighter(root.blockColor, 1.25) }
                 }
             }
         }
@@ -237,12 +262,14 @@ Dialog {
                     width: 30; height: 30; radius: 15; color: modelData
                     border.width: root.blockColor === modelData ? 3 : 1
                     border.color: root.blockColor === modelData ? Theme.text : Theme.border
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
                     TapHandler { onTapped: root.blockColor = modelData }
                 }
             }
             Rectangle {
                 width:30;height:30;radius:15;color:Theme.panelRaised;border.width:root.colorPresets.indexOf(root.blockColor)<0?3:1;border.color:root.colorPresets.indexOf(root.blockColor)<0?Theme.text:Theme.border
                 LucideIcon{anchors.centerIn:parent;width:15;height:15;name:"pipette";color:Theme.text}
+                HoverHandler{cursorShape:Qt.PointingHandCursor}
                 TapHandler{onTapped:customColor.open()}
             }
         }
@@ -260,6 +287,7 @@ Dialog {
                     required property var modelData
                     Layout.fillWidth: true; implicitHeight: 58
                     onClicked: root.addPiece(modelData.kind, modelData.valueType)
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
                     contentItem: Row {
                         spacing: 8
                         Text { text: modelData.sample; color: modelData.kind === "Input" || modelData.kind === "Branch" ? Theme.accent : Theme.text; font.pixelSize: modelData.kind === "Branch" ? 26 : 13; font.weight: Font.DemiBold; width: 32; anchors.verticalCenter: parent.verticalCenter; horizontalAlignment: Text.AlignHCenter }

@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Controls
+import com.blockworked.Blockstitch 1.0
 import com.blockworked.Blockwork 1.0
 
 ApplicationWindow {
@@ -11,6 +12,15 @@ ApplicationWindow {
     visible: true
     title: "Blockwork"
     color: "#202124"
+    property real sidebarWidth: 348
+
+    // Keep every control on the app theme instead of the system light/dark palette.
+    palette {
+        window: Theme.panel; windowText: Theme.text; base: Theme.field; text: Theme.text
+        button: Theme.panelRaised; buttonText: Theme.text; highlight: Theme.accent; highlightedText: "white"
+        placeholderText: Theme.textDim; toolTipBase: Theme.panelRaised; toolTipText: Theme.text
+        mid: Theme.border; dark: Theme.borderSoft; light: Theme.panelRaised; shadow: "#000000"
+    }
 
     property var appState: ({
         macro_names: [], macro_selected: null, current_macro: null, macros_data: [],
@@ -88,7 +98,7 @@ ApplicationWindow {
             sourceComponent: root.appState.page === "Settings" ? settingsComponent : editorComponent
         }
     }
-    Component { id: editorComponent; EditorPage { appState: root.appState; invoke: root.invoke } }
+    Component { id: editorComponent; EditorPage { appState: root.appState; invoke: root.invoke; sidebarWidth: root.sidebarWidth; onSidebarWidthChanged: root.sidebarWidth = sidebarWidth } }
     Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke } }
 
     Rectangle {

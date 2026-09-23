@@ -12,6 +12,13 @@ use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QQmlEngine, QUrl};
 use std::pin::Pin;
 
 fn main() {
+    // Every control is drawn from the app's own theme; pin the Basic style so the
+    // platform style (e.g. Fluent on Windows 11) doesn't add native chrome, shadows
+    // or light/dark palettes underneath it. Must be set before the first control.
+    if std::env::var_os("QT_QUICK_CONTROLS_STYLE").is_none() {
+        // SAFETY: still single-threaded; nothing else has started or reads the environment yet.
+        unsafe { std::env::set_var("QT_QUICK_CONTROLS_STYLE", "Basic") };
+    }
     qt_diagnostics::install();
     tracing_subscriber::fmt::init();
     let _ = tracing_log::LogTracer::init();
