@@ -122,20 +122,54 @@ Item {
         if (!paletteDrag) return;
         const p = ghostLayer.mapFromItem(null, sx, sy);
         ghost.x = p.x - paletteDrag.offsetX; ghost.y = p.y - paletteDrag.offsetY;
+        // Live attach preview, just like canvas drags: the canvas opens the
+        // hovered gap and shows where the new block will land.
+        const spec = paletteDrag.spec;
+        if (spec && spec.kind !== "value" && spec.instruction) {
+            const at = canvas.workspacePoint(sx, sy);
+            if (at) canvas.updatePaletteSnap(at.x - paletteDrag.offsetX / canvas.zoom, at.y - paletteDrag.offsetY / canvas.zoom, spec.instruction, ghost.width, ghost.height);
+            else canvas.clearSnap();
+        } else if (spec && (spec.kind === "custom" || spec.type)) {
+            const at = canvas.workspacePoint(sx, sy);
+            if (at) {
+                const ins = spec.kind === "custom"
+                    ? { id: "palette-new", type: ((spec.definition.pieces || []).filter(piece => piece.kind === "Branch").length ? "BranchCallBlock" : "CallBlock"), branches: (spec.definition.pieces || []).filter(piece => piece.kind === "Branch").map(() => []) }
+                    : { id: "palette-new", type: spec.type, body: [], then_body: [], else_body: [], branches: [] };
+                canvas.updatePaletteSnap(at.x - paletteDrag.offsetX / canvas.zoom, at.y - paletteDrag.offsetY / canvas.zoom, ins, ghost.width, ghost.height);
+            } else canvas.clearSnap();
+        } else canvas.clearSnap();
     }
     function endPaletteDrag(sx, sy) {
         const drag = paletteDrag;
+        const snapValid = canvas.paletteSnapValid;
+        const snapTargetId = canvas.paletteSnapTargetId;
+        const snapPath = JSON.parse(JSON.stringify(canvas.paletteSnapPath || []));
         cancelPaletteDrag();
         if (!drag || recording) return;
         const at = canvas.workspacePoint(sx, sy);
         if (!at) return;
         const x = Math.round(at.x - drag.offsetX / canvas.zoom), y = Math.round(at.y - drag.offsetY / canvas.zoom);
         const spec = drag.spec;
-        if (spec.kind === "value") root.invoke("create_floating_value", { x: x, y: y, value: spec.value, originBlockId: null });
-        else if (spec.kind === "custom") root.addCustomBlock(spec.definition, x, y);
+        if (spec.kind === "value") { root.invoke("create_floating_value", { x: x, y: y, value: spec.value, originBlockId: null }); return; }
+        // Attach into the previewed gap when one is showing, else park as a
+        // new detached strand - mirrors the webapp palette drop.
+        if (snapValid && snapTargetId) {
+            if (spec.kind === "custom") {
+                const args = (spec.definition.pieces || []).filter(piece => piece.kind === "Input")
+                    .map(piece => piece.value_type === "Bool" ? { kind: "Bool" } : numberValue(0));
+                const branchCount = (spec.definition.pieces || []).filter(piece => piece.kind === "Branch").length;
+                const instruction = { id: uuid(), type: branchCount ? "BranchCallBlock" : "CallBlock", block_id: spec.definition.id, args: args };
+                if (branchCount) instruction.branches = Array.from({ length: branchCount }, () => []);
+                root.invoke("add_instruction", { strandId: snapTargetId, path: snapPath, instruction: instruction });
+            } else {
+                root.invoke("add_instruction", { strandId: snapTargetId, path: snapPath, instruction: defaultInstruction(spec.type) });
+            }
+            return;
+        }
+        if (spec.kind === "custom") root.addCustomBlock(spec.definition, x, y);
         else root.addBlock(spec.type, x, y);
     }
-    function cancelPaletteDrag() { paletteDrag = null; ghost.visible = false; ghost.spec = null; }
+    function cancelPaletteDrag() { paletteDrag = null; ghost.visible = false; ghost.spec = null; canvas.clearSnap(); }
     // A canvas block dropped on the sidebar deletes it and everything below it in its stack.
     function trashDraggedBlocks(strandId, path, tailCount, sx, sy) {
         if (!palette.contains(palette.mapFromItem(null, sx, sy))) return;
@@ -156,30 +190,30 @@ Item {
             RowLayout {
                 anchors.fill: parent; anchors.margins: 14; spacing: 10
                 ColumnLayout {
-                    Layout.preferredWidth: 280; spacing: 5
+                    Layout.preferredWidth: 240; Layout.minimumWidth: 240; Layout.maximumWidth: 240; Layout.alignment: Qt.AlignBottom; spacing: 5
                     Text { text: "Select macro"; color: "#a1a2a7"; font.pixelSize: 12 }
                     BwComboBox {
                         id: macroPicker
-                        Layout.fillWidth: true; model: appState.macro_names || []
+                        Layout.fillWidth: true; Layout.preferredHeight: 38; model: appState.macro_names || []
                         currentIndex: appState.macro_selected === null || appState.macro_selected === undefined ? -1 : appState.macro_selected
                         onActivated: index => root.invoke("select_macro", { index: index })
                     }
                 }
-                BwButton { iconName: "sliders"; text: ""; enabled: !!root.macro; onClicked: macroSettings.open() }
+                BwButton { Layout.alignment: Qt.AlignBottom; iconName: "sliders"; text: ""; enabled: !!root.macro; onClicked: macroSettings.open() }
                 Item { Layout.fillWidth: true }
-                BwButton { iconName: "plus"; text: "New macro"; onClicked: root.invoke("new_macro") }
-                BwButton { iconName: "trash"; text: "Delete"; danger: true; enabled: !!root.macro; onClicked: removeDialog.open() }
-                BwButton { iconName: "settings"; text: "Settings"; onClicked: root.invoke("open_settings") }
+                BwButton { Layout.alignment: Qt.AlignBottom; iconName: "plus"; text: "New macro"; onClicked: root.invoke("new_macro") }
+                BwButton { Layout.alignment: Qt.AlignBottom; iconName: "trash"; text: "Delete"; danger: true; enabled: !!root.macro; onClicked: removeDialog.open() }
+                BwButton { Layout.alignment: Qt.AlignBottom; iconName: "settings"; text: "Settings"; onClicked: root.invoke("open_settings") }
             }
         }
         Rectangle {
             Layout.fillWidth: true; Layout.preferredHeight: 66; color: "#292a2d"; border.color: "#38393d"
-            RowLayout { anchors.fill: parent; anchors.margins: 14
-                BwButton { primary: true; iconName: appState.loop_mode_enabled ? "repeat" : "play"; text: appState.loop_mode_enabled ? "Start loop" : "Run macro"; enabled: appState.macro_selected !== null; onClicked: root.invoke("run_macro") }
-                BwSwitch { Accessible.name: "Loop mode"; checked: appState.loop_mode_enabled; onToggled: checked => root.invoke("toggle_loop_mode", { enabled: checked }) }
+            RowLayout { anchors.fill: parent; anchors.margins: 14; spacing: 10
+                BwButton { Layout.alignment: Qt.AlignVCenter; Layout.preferredWidth: 128; Layout.minimumWidth: 128; Layout.maximumWidth: 128; primary: true; iconName: appState.loop_mode_enabled ? "repeat" : "play"; text: appState.loop_mode_enabled ? "Start loop" : "Run macro"; enabled: appState.macro_selected !== null; onClicked: root.invoke("run_macro") }
+                BwSwitch { Layout.alignment: Qt.AlignVCenter; Accessible.name: "Loop mode"; checked: appState.loop_mode_enabled; onToggled: checked => root.invoke("toggle_loop_mode", { enabled: checked }) }
                 Item { Layout.fillWidth: true }
-                BwButton { danger: true; iconName: root.recording ? "square" : "circle"; iconFilled: !root.recording; text: root.recordingLabel(); enabled: appState.macro_selected !== null; onClicked: root.invoke(root.recording ? "stop_recording" : "start_recording") }
-                BwButton { iconName: "sliders"; text: ""; onClicked: recordingSettings.open() }
+                BwButton { Layout.alignment: Qt.AlignVCenter; danger: true; iconName: root.recording ? "square" : "circle"; iconFilled: !root.recording; text: root.recordingLabel(); enabled: appState.macro_selected !== null; onClicked: root.invoke(root.recording ? "stop_recording" : "start_recording") }
+                BwButton { Layout.alignment: Qt.AlignVCenter; iconName: "sliders"; text: ""; onClicked: recordingSettings.open() }
             }
         }
         Rectangle {
@@ -246,6 +280,8 @@ Item {
                     locked: root.recording
                     onStrandMoved: (strandId, x, y) => root.invoke("move_strand", { strandId: strandId, x: x, y: y })
                     onInstructionSplit: (strandId, path, x, y) => root.invoke("split_strand", { strandId: strandId, path: path, x: x, y: y })
+                    onStrandsMerged: (draggedId, targetId, path) => root.invoke("merge_strand", { draggedId: draggedId, targetId: targetId, path: path })
+                    onTailMerged: (strandId, path, targetId, targetPath) => root.invoke("merge_tail", { strandId: strandId, path: path, targetId: targetId, targetPath: targetPath })
                     onBlockDragOutside: (strandId, path, tailCount, sx, sy) => root.trashDraggedBlocks(strandId, path, tailCount, sx, sy)
                     onInstructionRemoved: (strandId, path) => root.invoke("remove_instruction", { strandId: strandId, path: path })
                     onInstructionDuplicated: (strandId, path, instruction) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: root.refreshIds(instruction) })

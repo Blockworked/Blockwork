@@ -1673,6 +1673,35 @@ pub(crate) fn merge_strand(
     Ok(())
 }
 
+/// Moves the tail at and after `path` in `strand_id` into `target_id` at
+/// `target_path` atomically - the Qt canvas's attach-on-drop for a partial
+/// stack drag, without a split-then-merge round trip (the Qt bridge drops
+/// backend replies, so it can't chain the new split id into a merge).
+pub(crate) fn merge_tail(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    path: Vec<PathStep>,
+    target_id: String,
+    target_path: Vec<PathStep>,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mut graph = s
+        .current_macro
+        .as_ref()
+        .map(|mac| mac.graph.clone())
+        .ok_or("No macro selected")?;
+    graph.merge_tail(&strand_id, &path, &target_id, &target_path)?;
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.graph = graph;
+    }
+    s.invalid_field_buffers.clear();
+    auto_save(&s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
 /// Creates a new detached strand at `(x, y)` holding `instructions`
 /// verbatim - how "Paste" drops previously-copied blocks onto the canvas.
 pub(crate) fn paste_instructions(

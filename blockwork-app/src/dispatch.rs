@@ -396,6 +396,20 @@ impl Backend {
                     path,
                 )?)
             }
+            "merge_tail" => {
+                let strand_id: String = arg(&args, "strandId")?;
+                let path: Vec<PathStep> = arg(&args, "path")?;
+                let target_id: String = arg(&args, "targetId")?;
+                let target_path: Vec<PathStep> = arg(&args, "targetPath")?;
+                to_json(commands::merge_tail(
+                    &self.state,
+                    &self.app,
+                    strand_id,
+                    path,
+                    target_id,
+                    target_path,
+                )?)
+            }
             "delete_instruction" => {
                 let strand_id: String = arg(&args, "strandId")?;
                 let path: Vec<PathStep> = arg(&args, "path")?;
