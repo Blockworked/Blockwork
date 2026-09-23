@@ -29,8 +29,8 @@ fn main() {
     .file("src/app_bridge.rs")
     .file("src/app_icon.rs")
     .file("src/qt_diagnostics.rs")
-    // Runtime window icon (see src/app_icon.cpp); kept under /icons so its
-    // qrc URL stays stable: qrc:/icons/blockwork.png.
+    // Runtime window icon (see src/app_icon.cpp, addressed as ":/icons/..."
+    // in C++); kept under /icons so its resource path stays stable.
     .qrc_resources(QResources::new().resource(
         QResource::new().prefix("/icons").file(
             QResourceFile::new("../res/icons/blockwork.png").alias("blockwork.png"),

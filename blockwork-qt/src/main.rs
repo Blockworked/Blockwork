@@ -43,6 +43,9 @@ fn main() {
         engine.load(&QUrl::from(
             "qrc:/qt/qml/com/blockworked/Blockwork/qml/Main.qml",
         ));
+        // The QML root is a plain ApplicationWindow with no icon of its own,
+        // so give every existing top-level window the application icon.
+        app_icon::apply_to_windows();
     }
     if let Some(engine) = engine.as_mut() {
         let engine: Pin<&mut QQmlEngine> = engine.upcast_pin();
