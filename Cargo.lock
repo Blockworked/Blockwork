@@ -562,7 +562,6 @@ dependencies = [
 [[package]]
 name = "blockstitch-core"
 version = "0.1.0"
-source = "git+https://github.com/Blockworked/blockstitch?rev=6e4f3026#6e4f3026ba278151981d2f115daa9db1faf54ba8"
 dependencies = [
  "chrono",
  "rand 0.10.2",

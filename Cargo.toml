@@ -21,8 +21,9 @@ edition = "2024"
 
 [workspace.dependencies]
 blockstitch-core = {
-    git = "https://github.com/Blockworked/blockstitch",
-    rev = "6e4f3026"
+    #git = "https://github.com/Blockworked/blockstitch",
+    #rev = "6e4f3026",
+    path = "../blockstitch/crates/blockstitch-core"
 }
 tauri = { git = "https://github.com/Blockworked/tauri", rev = "769171ab" }
 tracing = "0.1.44"
