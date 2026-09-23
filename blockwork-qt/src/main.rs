@@ -4,6 +4,7 @@
 )]
 
 mod app_bridge;
+mod app_icon;
 mod daemon_client;
 mod qt_diagnostics;
 
@@ -29,6 +30,8 @@ fn main() {
     cxx_qt::init_qml_module!("com.blockworked.Blockwork");
 
     let mut app = QGuiApplication::new();
+    // Title-bar, taskbar and dock fallback icon (see src/app_icon.cpp).
+    app_icon::apply();
     let mut engine = QQmlApplicationEngine::new();
     if let Some(mut engine) = engine.as_mut() {
         engine

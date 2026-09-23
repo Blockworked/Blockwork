@@ -98,7 +98,7 @@ ApplicationWindow {
             sourceComponent: root.appState.page === "Settings" ? settingsComponent : editorComponent
         }
     }
-    Component { id: editorComponent; EditorPage { appState: root.appState; invoke: root.invoke; sidebarWidth: root.sidebarWidth; onSidebarWidthChanged: root.sidebarWidth = sidebarWidth } }
+    Component { id: editorComponent; EditorPage { appState: root.appState; invoke: root.invoke; appBridge: bridge; sidebarWidth: root.sidebarWidth; onSidebarWidthChanged: root.sidebarWidth = sidebarWidth } }
     Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke } }
 
     Rectangle {

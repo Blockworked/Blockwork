@@ -19,6 +19,10 @@ pub mod qobject {
         #[qproperty(bool, connected)]
         #[qproperty(bool, should_quit, cxx_name = "shouldQuit")]
         #[qproperty(i32, focus_serial, cxx_name = "focusSerial")]
+        #[qproperty(QString, installed_apps_json, cxx_name = "installedAppsJson")]
+        #[qproperty(bool, installed_apps_loading, cxx_name = "installedAppsLoading")]
+        #[qproperty(QString, installed_apps_error, cxx_name = "installedAppsError")]
+        #[qproperty(i32, installed_apps_serial, cxx_name = "installedAppsSerial")]
         type AppBridge = super::AppBridgeRust;
 
         #[qinvokable]
@@ -30,6 +34,10 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "invokeCommand"]
         fn invoke_command(self: Pin<&mut AppBridge>, command: &QString, arguments: &QString);
+
+        #[qinvokable]
+        #[cxx_name = "refreshInstalledApps"]
+        fn refresh_installed_apps(self: Pin<&mut AppBridge>);
     }
 }
 
@@ -39,6 +47,10 @@ pub struct AppBridgeRust {
     connected: bool,
     should_quit: bool,
     focus_serial: i32,
+    installed_apps_json: QString,
+    installed_apps_loading: bool,
+    installed_apps_error: QString,
+    installed_apps_serial: i32,
     started: bool,
     request_tx: Option<tokio::sync::mpsc::UnboundedSender<daemon_client::Request>>,
     event_rx: Option<mpsc::Receiver<daemon_client::Event>>,
@@ -52,6 +64,10 @@ impl Default for AppBridgeRust {
             connected: false,
             should_quit: false,
             focus_serial: 0,
+            installed_apps_json: QString::from("[]"),
+            installed_apps_loading: false,
+            installed_apps_error: QString::default(),
+            installed_apps_serial: 0,
             started: false,
             request_tx: None,
             event_rx: None,
@@ -94,6 +110,20 @@ impl qobject::AppBridge {
                     self.as_mut().set_focus_serial(next);
                 }
                 daemon_client::Event::Quit => self.as_mut().set_should_quit(true),
+                daemon_client::Event::Apps(json) => {
+                    self.as_mut()
+                        .set_installed_apps_json(QString::from(&json));
+                    self.as_mut().set_installed_apps_loading(false);
+                    self.as_mut()
+                        .set_installed_apps_error(QString::default());
+                    let next = self.installed_apps_serial().saturating_add(1);
+                    self.as_mut().set_installed_apps_serial(next);
+                }
+                daemon_client::Event::AppsError(error) => {
+                    self.as_mut().set_installed_apps_loading(false);
+                    self.as_mut()
+                        .set_installed_apps_error(QString::from(&error));
+                }
             }
         }
     }
@@ -116,6 +146,23 @@ impl qobject::AppBridge {
         });
         if !sent {
             self.as_mut().set_last_error(QString::from(
+                "Blockwork is not connected to its background service",
+            ));
+        }
+    }
+
+    pub fn refresh_installed_apps(mut self: Pin<&mut Self>) {
+        self.as_mut().set_installed_apps_loading(true);
+        self.as_mut()
+            .set_installed_apps_error(QString::default());
+        let sent = self
+            .rust()
+            .request_tx
+            .as_ref()
+            .is_some_and(|tx| tx.send(daemon_client::Request::FetchApps).is_ok());
+        if !sent {
+            self.as_mut().set_installed_apps_loading(false);
+            self.as_mut().set_installed_apps_error(QString::from(
                 "Blockwork is not connected to its background service",
             ));
         }

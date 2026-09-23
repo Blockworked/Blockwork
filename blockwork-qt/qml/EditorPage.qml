@@ -8,6 +8,7 @@ Item {
     id: root
     required property var appState
     required property var invoke
+    required property var appBridge
     readonly property var macro: appState.current_macro
     readonly property bool recording: appState.recording_phase && appState.recording_phase.phase === "Active"
     property string sidebarKey: "a"
@@ -76,6 +77,38 @@ Item {
     function instructionExplainer(type) {
         const x={WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a keyboard key.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
         return x[type]||"A Blockwork instruction block.";
+    }
+    // ---- app picker ("Choose app" for OpenApp/CloseApp) ----
+    property var appPickerRequest: null   // { strandId, path, instruction } for canvas, or { paletteType } for palette
+    function openAppPicker(strandId, path, instruction) {
+        appPickerRequest = { strandId: strandId, path: path, instruction: instruction };
+        appSelector.title = instruction && instruction.type === "CloseApp" ? "Choose an App to Close" : "Choose an App";
+        appSelector.open();
+    }
+    function openPaletteAppPicker(instruction) {
+        const type = instruction ? instruction.type : "OpenApp";
+        appPickerRequest = { paletteType: type };
+        appSelector.title = type === "CloseApp" ? "Choose an App to Close" : "Choose an App";
+        appSelector.open();
+    }
+    function applyPickedApp(app) {
+        const req = appPickerRequest;
+        appPickerRequest = null;
+        if (!req || !app) return;
+        if (req.paletteType) {
+            const fresh = defaultInstruction(req.paletteType);
+            fresh.command = app.command;
+            fresh.name = app.name;
+            fresh.icon = app.icon || null;
+            root.invoke("add_strand", { x: 120, y: 120, instruction: fresh });
+            return;
+        }
+        const current = req.instruction || {};
+        const updated = JSON.parse(JSON.stringify(current));
+        updated.command = app.command;
+        updated.name = app.name;
+        updated.icon = app.icon || null;
+        root.invoke("edit_instruction", { strandId: req.strandId, path: req.path, instruction: updated });
     }
     // ---- dragging a palette entry onto the canvas ----
     property var paletteDrag: null   // { spec, offsetX, offsetY }
@@ -196,6 +229,7 @@ Item {
                     onDeleteListRequested: name => { deleteListDialog.listName = name; deleteListDialog.open(); }
                     onMakeBlockRequested: blockDialog.open()
                     onStandaloneKeyCaptureRequested: root.invoke("start_standalone_key_capture")
+                    onAppPickerRequested: instruction => root.openPaletteAppPicker(instruction)
                     onDetailsRequested:(name,identifier,explainer)=>detailsDialog.show(name,identifier,explainer)
                     onValueActivated: value => root.invoke("create_floating_value", { x: 160, y: 140, value: value, originBlockId: null })
                 }
@@ -221,6 +255,7 @@ Item {
                     onCommentForInstructionRequested: instruction => root.invoke("create_attached_comment", { instructionId: instruction.id, dx: 48, dy: 18, text: "" })
                     onRecordingTargetRequested: strandId => root.invoke("set_recording_target", { strandId: strandId })
                     onKeyCaptureRequested:(strandId,path)=>root.invoke("start_key_capture",{strandId:strandId,path:path})
+                    onAppPickerRequested:(strandId,path,instruction)=>root.openAppPicker(strandId,path,instruction)
                     onDetailsRequested:type=>detailsDialog.show(type,type,root.instructionExplainer(type))
                     onCanvasNoteRequested: (x, y) => root.invoke("create_comment", { x: x, y: y, text: "" })
                     onClearRequested: root.invoke("clear_instructions")
@@ -334,6 +369,11 @@ Item {
         }
     }
     MakeBlockDialog { id:blockDialog; onCreateRequested:(pieces,shape,color)=>root.invoke("create_block",{pieces:pieces,shape:shape,color:color}) }
+    AppSelectorDialog {
+        id: appSelector
+        bridge: root.appBridge
+        onSelected: app => root.applyPickedApp(app)
+    }
 
     // Follows the pointer while a palette entry is dragged.
     Item {

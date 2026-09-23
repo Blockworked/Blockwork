@@ -10,6 +10,7 @@ const DAEMON_ARG: &str = "--daemon";
 
 pub enum Request {
     Invoke { command: String, args: Value },
+    FetchApps,
 }
 
 pub enum Event {
@@ -18,6 +19,8 @@ pub enum Event {
     Error(String),
     Focus,
     Quit,
+    Apps(String),
+    AppsError(String),
 }
 
 pub fn spawn(requests: tokio::sync::mpsc::UnboundedReceiver<Request>, events: mpsc::Sender<Event>) {
@@ -67,18 +70,39 @@ async fn run(
     }
     let _ = events.send(Event::Connected);
     let mut next_id = 1_u64;
+    let mut pending_apps_id: Option<u64> = None;
 
     loop {
         tokio::select! {
             request = requests.recv() => {
-                let Some(Request::Invoke { command, args }) = request else { return Ok(()) };
-                let line = encode(&ClientMessage::Call { id: next_id, cmd: command, args });
-                next_id = next_id.wrapping_add(1);
-                if line.len() > blockwork_protocol::MAX_MESSAGE_BYTES {
-                    let _ = events.send(Event::Error("command is too large".into()));
-                    continue;
+                let Some(request) = request else { return Ok(()) };
+                match request {
+                    Request::Invoke { command, args } => {
+                        let line = encode(&ClientMessage::Call { id: next_id, cmd: command, args });
+                        next_id = next_id.wrapping_add(1);
+                        if line.len() > blockwork_protocol::MAX_MESSAGE_BYTES {
+                            let _ = events.send(Event::Error("command is too large".into()));
+                            continue;
+                        }
+                        writer.write_all(line.as_bytes()).await?;
+                    }
+                    Request::FetchApps => {
+                        let id = next_id;
+                        next_id = next_id.wrapping_add(1);
+                        let line = encode(&ClientMessage::Call {
+                            id,
+                            cmd: "list_installed_apps".to_owned(),
+                            args: serde_json::Value::Object(Default::default()),
+                        });
+                        if line.len() > blockwork_protocol::MAX_MESSAGE_BYTES {
+                            let _ = events.send(Event::AppsError("command is too large".into()));
+                            continue;
+                        }
+                        pending_apps_id = Some(id);
+                        eprintln!("[blockwork-qt] requesting installed apps (id {id})");
+                        writer.write_all(line.as_bytes()).await?;
+                    }
                 }
-                writer.write_all(line.as_bytes()).await?;
             }
             line = blockwork_protocol::read_line(&mut reader) => {
                 let Some(line) = line? else { return Err(io::Error::other("daemon disconnected")) };
@@ -96,7 +120,20 @@ async fn run(
                         }
                     }
                     DaemonMessageKind::Reply => {
-                        if let Some(error) = message.error {
+                        if pending_apps_id.is_some_and(|pending| message.id == Some(pending)) {
+                            pending_apps_id = None;
+                            if let Some(error) = message.error {
+                                eprintln!("[blockwork-qt] installed apps request failed: {error}");
+                                let _ = events.send(Event::AppsError(error));
+                            } else if let Some(data) = message.data {
+                                let json = data.to_string();
+                                eprintln!("[blockwork-qt] installed apps reply: {} bytes", json.len());
+                                let _ = events.send(Event::Apps(json));
+                            } else {
+                                eprintln!("[blockwork-qt] installed apps reply had no data");
+                                let _ = events.send(Event::Apps("[]".to_owned()));
+                            }
+                        } else if let Some(error) = message.error {
                             let _ = events.send(Event::Error(error));
                         }
                     }
