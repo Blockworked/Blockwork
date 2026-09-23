@@ -2,7 +2,10 @@ use crate::input::types::{Coordinate, Direction, InputToken, MacroButton, MacroK
 use crate::input::value::{Evaluated, Op, Value};
 use crate::macros::backend::{create_backend, InputBackend};
 use crate::macros::priority::raise_current_thread_priority;
-use crate::macros::{Instruction, InstructionKind, ListItem, Macro};
+use crate::macros::{Instruction, InstructionKind, Macro};
+use blockstitch_core::graph::{
+    ListItem, ListStore, is_list_reporter, list_index, resolve_list_reporter,
+};
 use spin_sleep::{SpinSleeper, SpinStrategy};
 use std::collections::HashMap;
 use std::process::Command;
@@ -14,8 +17,6 @@ use tracing::warn;
 /// Shared, macro-wide variable store, so a `Set`/`Change` in one strand is
 /// visible to others running concurrently.
 pub type VariableStore = Arc<Mutex<HashMap<String, Evaluated>>>;
-/// Shared, macro-wide list contents, parallel to `VariableStore`.
-pub type ListStore = Arc<Mutex<HashMap<String, Vec<ListItem>>>>;
 
 /// A custom block's runtime shape: input names in prototype order (matched
 /// positionally against call args) plus its body instructions. Built once
@@ -71,110 +72,6 @@ struct ExecCtx<'a> {
     pressed_buttons: &'a mut Vec<MacroButton>,
     param_env: HashMap<String, Evaluated>,
     branch_env: HashMap<String, Vec<Instruction>>,
-}
-
-use crate::macros::is_list_reporter;
-
-/// Resolves one list reporter whose arguments have already been reduced to
-/// ordinary values. This is shared by the macro runner and the editor's
-/// click-to-preview evaluator so the two always agree about list semantics.
-fn resolve_list_reporter(
-    op_name: &str,
-    args: Vec<Value>,
-    lists: &HashMap<String, Vec<ListItem>>,
-) -> Result<Value, String> {
-    let text = |index: usize| {
-        args.get(index)
-            .ok_or_else(|| "missing list reporter argument".to_string())
-            .and_then(Value::eval_text)
-    };
-    let number = |index: usize| {
-        args.get(index)
-            .ok_or_else(|| "missing list reporter argument".to_string())
-            .and_then(Value::eval_number)
-    };
-    let list_name = match op_name {
-        "ListItem" | "ListItemNumber" | "ListAmount" | "ListItemExists" => text(1)?,
-        "ListContains" => text(0)?,
-        "ListLength" | "ListIsEmpty" => text(0)?,
-        _ => return Err("not a list reporter".to_string()),
-    };
-    let list = lists.get(&list_name).cloned().unwrap_or_default();
-    let evaluated = match op_name {
-        "ListItem" => list_index(number(0)?, list.len(), false)
-            .and_then(|index| list.get(index))
-            .map(ListItem::evaluated)
-            .unwrap_or(Evaluated::Text(String::new())),
-        "ListItemNumber" => {
-            let needle = ListItem::from_evaluated(args[0].eval()?)
-                .ok_or_else(|| "list items must be number or text".to_string())?;
-            Evaluated::Number(
-                list.iter()
-                    .position(|item| item == &needle)
-                    .map_or(0, |index| index + 1) as f64,
-            )
-        }
-        "ListAmount" => {
-            let needle = ListItem::from_evaluated(args[0].eval()?)
-                .ok_or_else(|| "list items must be number or text".to_string())?;
-            Evaluated::Number(list.iter().filter(|item| *item == &needle).count() as f64)
-        }
-        "ListLength" => Evaluated::Number(list.len() as f64),
-        "ListContains" => {
-            let needle = ListItem::from_evaluated(args[1].eval()?)
-                .ok_or_else(|| "list items must be number or text".to_string())?;
-            Evaluated::Bool(list.contains(&needle))
-        }
-        "ListItemExists" => Evaluated::Bool(list_index(number(0)?, list.len(), false).is_some()),
-        "ListIsEmpty" => Evaluated::Bool(list.is_empty()),
-        _ => unreachable!("validated by is_list_reporter"),
-    };
-    Ok(evaluated.into_value())
-}
-
-/// Replaces list reporter nodes with their values from `lists`, without
-/// executing custom-block calls. Useful for non-running contexts such as a
-/// canvas reporter preview; the full runner adds call/parameter resolution.
-pub fn resolve_list_reporters(
-    value: &Value,
-    lists: &HashMap<String, Vec<ListItem>>,
-) -> Result<Value, String> {
-    match value {
-        Value::Op { op, args, saved } => {
-            let args = args
-                .iter()
-                .map(|arg| resolve_list_reporters(arg, lists))
-                .collect::<Result<Vec<_>, _>>()?;
-            if is_list_reporter(op) {
-                let name: Box<str> = match op {
-                    Op::Ext(name) => name.clone(),
-                    _ => unreachable!("validated by is_list_reporter"),
-                };
-                resolve_list_reporter(&name, args, lists)
-            } else {
-                Ok(Value::Op {
-                    op: op.clone(),
-                    args,
-                    saved: saved.clone(),
-                })
-            }
-        }
-        Value::Call {
-            block_id,
-            args,
-            branches,
-            saved,
-        } => Ok(Value::Call {
-            block_id: block_id.clone(),
-            args: args
-                .iter()
-                .map(|arg| resolve_list_reporters(arg, lists))
-                .collect::<Result<Vec<_>, _>>()?,
-            branches: branches.clone(),
-            saved: saved.clone(),
-        }),
-        _ => Ok(value.clone()),
-    }
 }
 
 impl<'a> ExecCtx<'a> {
@@ -319,21 +216,6 @@ const STOP_POLL_INTERVAL: Duration = Duration::from_millis(15);
 /// "should keep running", so this is just its negation behind the lock).
 fn stop_requested(flag: &Arc<Mutex<bool>>) -> bool {
     !flag.lock().map(|g| *g).unwrap_or(false)
-}
-
-/// Converts a Scratch-style 1-based numeric index to a vector offset. An
-/// insert may target the slot immediately after the final item; other list
-/// commands require an existing item.
-fn list_index(value: f64, len: usize, allow_end: bool) -> Option<usize> {
-    if !value.is_finite() || value < 1.0 {
-        return None;
-    }
-    let index = value.floor() as usize - 1;
-    if index < len || (allow_end && index == len) {
-        Some(index)
-    } else {
-        None
-    }
 }
 
 impl Macro {
@@ -1251,6 +1133,7 @@ mod tests {
         BlockDef, BlockPiece, BlockShape, InputValueType, MacroGraph, Strand,
         default_block_color,
     };
+    use blockstitch_core::graph::resolve_list_reporters;
 
     struct NoopBackend;
     impl InputBackend for NoopBackend {
@@ -1468,10 +1351,10 @@ mod tests {
                 comments: vec![],
                 variables: vec![],
                 block_defs: vec![],
+                lists: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         let start = Instant::now();
@@ -1499,10 +1382,10 @@ mod tests {
                 comments: vec![],
                 variables: vec![],
                 block_defs: vec![],
+                lists: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         let start = Instant::now();
@@ -1542,10 +1425,10 @@ mod tests {
                 comments: vec![],
                 variables: vec![],
                 block_defs: vec![],
+                lists: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         let stop_flag = Arc::new(Mutex::new(true));
@@ -1717,11 +1600,11 @@ mod tests {
                     shape: BlockShape::ReturnsValue,
                     color: default_block_color(),
                 }],
+                lists: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
-            lists: vec![],
         }
     }
 
@@ -1775,11 +1658,11 @@ mod tests {
                     shape: BlockShape::Normal,
                     color: default_block_color(),
                 }],
+                lists: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
-            lists: vec![],
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
         assert_eq!(
@@ -1855,10 +1738,10 @@ mod tests {
                     shape: BlockShape::ReturnsValue,
                     color: default_block_color(),
                 }],
+                lists: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -1908,10 +1791,10 @@ mod tests {
                     shape: BlockShape::Normal,
                     color: default_block_color(),
                 }],
+                lists: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         let start = Instant::now();
@@ -1975,10 +1858,10 @@ mod tests {
                     shape: BlockShape::ReturnsValue,
                     color: default_block_color(),
                 }],
+                lists: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         // Should return promptly (erroring out at MAX_CALL_DEPTH) rather than
@@ -2079,10 +1962,10 @@ mod tests {
                         color: default_block_color(),
                     },
                 ],
+                lists: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -2286,10 +2169,10 @@ mod tests {
                     shape: BlockShape::ReturnsValue,
                     color: default_block_color(),
                 }],
+                lists: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -2556,10 +2439,10 @@ mod tests {
                     shape: BlockShape::ReturnsValue,
                     color: default_block_color(),
                 }],
+                lists: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            lists: vec![],
             settings: crate::macros::MacroSettings::default(),
         };
         mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));

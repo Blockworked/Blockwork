@@ -1,16 +1,14 @@
 <script setup lang="ts">
 import { computed, watch } from 'vue';
 import { state } from '../store';
-import { setTitle, setMacroSpeedMultiplier } from '../tauri';
+import { renameList, setListItems, setMacroSpeedMultiplier, setTitle } from '../tauri';
 import InstructionSidebar from './InstructionSidebar.vue';
-import { Canvas } from 'blockstitch';
+import { Canvas, ListEditorOverlay, activateListEditors, isListEditorOpen, setListEditorOpen } from 'blockstitch';
 import EditorToolbar from './EditorToolbar.vue';
 import ContextMenu from './ContextMenu.vue';
 import DetailsDialog from './DetailsDialog.vue';
 import DeleteUsageDialog from './DeleteUsageDialog.vue';
 import CustomBlockCanvasColorSync from './CustomBlockCanvasColorSync.vue';
-import ListEditorOverlay from './ListEditorOverlay.vue';
-import { activateListEditors, isListEditorOpen } from '../listEditors';
 
 const isRecording = computed(() => state.recording_phase.phase === 'Active');
 watch(
@@ -87,7 +85,10 @@ function onSpeedNumberChange(e: Event) {
           <ListEditorOverlay
             v-for="list in state.current_macro?.lists?.filter(list => isListEditorOpen(list.name)) ?? []"
             :key="list.name"
-            :name="list.name"
+            :list="list"
+            :on-save-items="(name, items) => setListItems(name, items)"
+            :on-rename="(oldName, newName) => renameList(oldName, newName)"
+            :on-hide="name => setListEditorOpen(name, false)"
           />
         </template>
         <template #context-menu>

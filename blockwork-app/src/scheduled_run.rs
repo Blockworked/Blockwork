@@ -4,8 +4,10 @@
 
 use crate::state::{build_state_dto, SharedState};
 use blockwork_core::macros::backend::InputBackend;
-use blockwork_core::macros::runner::{run_instructions_with_lists, ListStore, VariableStore};
-use blockwork_core::macros::{run_registry, Instruction, ListDef, VariableDef};
+use blockwork_core::macros::runner::{run_instructions_with_lists, VariableStore};
+use blockstitch_core::graph::ListStore;
+use blockwork_core::macros::{run_registry, Instruction, VariableDef};
+use blockstitch_core::graph::ListDef;
 use std::sync::{Arc, Mutex};
 use crate::AppHandle;
 use tracing::warn;

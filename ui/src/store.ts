@@ -1,6 +1,13 @@
 import { reactive, ref } from 'vue';
+import { configureListEditorPersistence } from 'blockstitch';
 import { emptyState, type InstructionDto, type StateDto } from './types';
-import { getAppVersion, getState, onStateUpdated, requestAbsoluteMouseSupport } from './tauri';
+import { getAppVersion, getState, onStateUpdated, requestAbsoluteMouseSupport, setListEditorState } from './tauri';
+
+configureListEditorPersistence((name, visible, x, y) => {
+  void setListEditorState(name, visible, x, y).catch(error => {
+    console.error('Failed to save list editor state:', error);
+  });
+});
 
 // Reactive backend state snapshot.
 export const state = reactive<StateDto>(emptyState());

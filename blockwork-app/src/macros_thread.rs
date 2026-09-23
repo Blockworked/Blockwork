@@ -1,7 +1,8 @@
 use crate::state::{build_state_dto, SharedState};
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::run_registry;
-use blockwork_core::macros::runner::{ListStore, VariableStore};
+use blockwork_core::macros::runner::VariableStore;
+use blockstitch_core::graph::ListStore;
 use blockwork_core::macros::thread_pool::ThreadPool;
 use blockwork_core::macros::Macro;
 use std::sync::{Arc, Mutex};

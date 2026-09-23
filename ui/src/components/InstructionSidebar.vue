@@ -7,8 +7,9 @@ import PaletteCallBlock from './PaletteCallBlock.vue';
 import PaletteCallValueBlock from './PaletteCallValueBlock.vue';
 import MakeVariableDialog from './MakeVariableDialog.vue';
 import MakeBlockDialog from './MakeBlockDialog.vue';
-import MakeListDialog from './MakeListDialog.vue';
-import ListPanel from './ListPanel.vue';
+import { ListPanel, MakeListDialog } from 'blockstitch';
+import { createList, renameList } from '../tauri';
+import { openListMenu } from '../contextMenu';
 import { OPERATOR_KINDS, specForKind, setListNameOptions } from '../valueOps';
 import { applyPaletteValueEdit, paletteInstructions, paletteValueFor, syncPaletteTargetDefaults } from '../paletteState';
 import { state } from '../store';
@@ -16,7 +17,7 @@ import { blockShapeReturnsValue, sortedListNames, sortedVariableNames } from '..
 import type { InstructionDto, ValueDto, ValueKind } from '../types';
 import { closeVariableDialog, openCreateVariableDialog, variableDialog } from '../variableDialogs';
 import { blockDialog, closeBlockDialog, openCreateBlockDialog } from '../blockDialogs';
-import { closeListDialog, listDialog, openCreateListDialog } from '../listDialogs';
+import { closeListDialog, listDialog, openCreateListDialog } from 'blockstitch';
 
 // SetVariable/ChangeVariable render in the Variables section below and
 // Return in the "My Blocks" section, not here; BlockHeader/CallBlock are
@@ -77,6 +78,11 @@ function onSidebarContextMenu(event: MouseEvent) {
   if ((event.target as Element | null)?.closest('input, textarea')) return;
   event.preventDefault();
 }
+
+async function submitListDialog(name: string, renameTarget: string | null | undefined): Promise<void> {
+  if (renameTarget) await renameList(renameTarget, name);
+  else await createList(name);
+}
 </script>
 
 <template>
@@ -118,7 +124,7 @@ function onSidebarContextMenu(event: MouseEvent) {
         <span class="sidebar-section-label">Lists</span>
         <button type="button" class="btn-make-variable" @click="openCreateListDialog">Make a List</button>
       </div>
-      <ListPanel />
+      <ListPanel :lists="state.current_macro?.lists ?? []" @menu="(name, event) => openListMenu(event, name)" />
       <div class="sidebar-palette sidebar-palette-values" id="sidebar-palette-lists">
         <PaletteValueBlock
           v-for="kind in LIST_VALUE_KINDS"
@@ -159,6 +165,7 @@ function onSidebarContextMenu(event: MouseEvent) {
   <MakeListDialog
     v-if="listDialog.open"
     :rename-target="listDialog.renameTarget || null"
+    :on-submit="submitListDialog"
     @close="closeListDialog"
   />
 </template>

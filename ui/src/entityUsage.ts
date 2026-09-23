@@ -1,21 +1,8 @@
 // Reference checks used before deleting a variable or list. These walk the
 // document shown on the canvas, including nested C-block bodies and floating
 // reporter blocks, but never mutate it.
-import type { InstructionDto, MacroDto, ValueDto, ValueOp } from './types';
-
-const LIST_NAME_ARG: Partial<Record<ValueOp, number>> = {
-  ListItem: 1,
-  ListItemNumber: 1,
-  ListAmount: 1,
-  ListLength: 0,
-  ListContains: 0,
-  ListItemExists: 1,
-  ListIsEmpty: 0,
-};
-
-function textArgumentIs(value: ValueDto | undefined, name: string): boolean {
-  return value?.kind === 'Text' && value.value === name;
-}
+import { valueUsesList } from 'blockstitch';
+import type { InstructionDto, MacroDto, ValueDto } from './types';
 
 function valueUsesVariable(value: ValueDto, name: string): boolean {
   if (value.kind === 'Var') return value.name === name;
@@ -23,15 +10,6 @@ function valueUsesVariable(value: ValueDto, name: string): boolean {
     return value.args.some(arg => valueUsesVariable(arg, name)) || valueUsesVariable(value.saved, name);
   }
   return false;
-}
-
-function valueUsesList(value: ValueDto, name: string): boolean {
-  if (value.kind !== 'Op' && value.kind !== 'Call') return false;
-  if (value.kind === 'Op') {
-    const listNameIndex = LIST_NAME_ARG[value.op];
-    if (listNameIndex !== undefined && textArgumentIs(value.args[listNameIndex], name)) return true;
-  }
-  return value.args.some(arg => valueUsesList(arg, name)) || valueUsesList(value.saved, name);
 }
 
 function instructionUsesVariable(instruction: InstructionDto, name: string): boolean {

@@ -11,8 +11,8 @@ import { addInstruction, clearInstructions, createAttachedComment, createComment
 import { ContextMenuPanel, clientToCanvas, focusCommentOnMount, type ContextMenuItem } from 'blockstitch';
 import { ICONS } from '../icons';
 import { openRenameVariableDialog } from '../variableDialogs';
-import { openRenameListDialog } from '../listDialogs';
-import { forgetListEditor } from '../listEditors';
+import { openRenameListDialog } from 'blockstitch';
+import { forgetListEditor } from 'blockstitch';
 import { openDeleteUsageDialog } from '../deleteUsageDialog';
 import { macroUsesList, macroUsesVariable } from '../entityUsage';
 import { openEditBlockDialog } from '../blockDialogs';

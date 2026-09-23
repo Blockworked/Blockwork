@@ -14,9 +14,10 @@ use blockwork_core::config;
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
 use blockwork_core::input::types::InputToken;
 use blockwork_core::input::value::{Evaluated, Value};
-use blockwork_core::macros::runner::{ListStore, VariableStore, resolve_list_reporters};
+use blockwork_core::macros::runner::VariableStore;
+use blockstitch_core::graph::{ListItem, ListStore, resolve_list_reporters};
 use blockwork_core::macros::{
-    BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, ListDef, ListItem, Macro,
+    BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro,
     MacroGraph, SPEED_MULTIPLIER_RANGE, Strand, loop_control,
     normalize_block_color as normalize_persisted_block_color,
 };
@@ -38,10 +39,7 @@ fn push_undo(s: &mut AppState) {
 /// [`push_undo`] for an edit that coalesces with the keystrokes already in
 /// progress at `session` - only the first one checkpoints.
 fn push_undo_for(s: &mut AppState, session: Option<EditSession>) {
-    let snapshot = s
-        .current_macro
-        .as_ref()
-        .map(|mac| (mac.graph.clone(), mac.lists.clone()));
+    let snapshot = s.current_macro.as_ref().map(|mac| mac.graph.clone());
     match (snapshot, session) {
         (Some(snapshot), Some(session)) => {
             s.history.push_for_session(snapshot, session);
@@ -348,20 +346,11 @@ pub(crate) fn delete_variable(
 }
 
 fn create_list_in(mac: &mut Macro, name: &str) -> Result<String, String> {
-    let trimmed = name.trim().to_string();
-    if trimmed.is_empty() {
-        return Err("List name can't be empty".to_string());
+    let trimmed = mac.graph.create_list(name)?;
+    if let Some(list) = mac.graph.lists.iter_mut().find(|list| list.name == trimmed) {
+        list.editor_x = 36;
+        list.editor_y = 36;
     }
-    if mac.lists.iter().any(|list| list.name == trimmed) {
-        return Err(format!("A list named \"{trimmed}\" already exists"));
-    }
-    mac.lists.push(ListDef {
-        name: trimmed.clone(),
-        items: vec![],
-        editor_visible: false,
-        editor_x: 36,
-        editor_y: 36,
-    });
     Ok(trimmed)
 }
 
@@ -419,7 +408,8 @@ pub(crate) fn rename_list(
     s.current_macro
         .as_mut()
         .ok_or("No macro selected")?
-        .rename_list(&old_name, &trimmed);
+        .graph
+        .rename_list(&old_name, &trimmed)?;
     sync_list_values(&mut s);
     auto_save(&s);
     emit_state_updated(&app, &s);
@@ -444,8 +434,8 @@ pub(crate) fn delete_list(
         s.current_macro
             .as_mut()
             .expect("checked above")
-            .lists
-            .retain(|list| list.name != name);
+            .graph
+            .remove_list(&name);
     }
     sync_list_values(&mut s);
     auto_save(&s);
@@ -462,15 +452,12 @@ pub(crate) fn set_list_items(
     items: Vec<ListItemDto>,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let list = s
-        .current_macro
+    let items: Vec<ListItem> = items.iter().map(crate::state::dto_to_list_item).collect();
+    s.current_macro
         .as_mut()
         .ok_or("No macro selected")?
-        .lists
-        .iter_mut()
-        .find(|list| list.name == name)
-        .ok_or("List not found")?;
-    list.items = items.iter().map(crate::state::dto_to_list_item).collect();
+        .graph
+        .set_list_items(&name, items)?;
     sync_list_values(&mut s);
     auto_save(&s);
     emit_state_updated(&app, &s);
@@ -488,17 +475,11 @@ pub(crate) fn set_list_editor_state(
     y: i32,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let list = s
-        .current_macro
+    s.current_macro
         .as_mut()
         .ok_or("No macro selected")?
-        .lists
-        .iter_mut()
-        .find(|list| list.name == name)
-        .ok_or("List not found")?;
-    list.editor_visible = visible;
-    list.editor_x = x.max(0);
-    list.editor_y = y.max(0);
+        .graph
+        .set_list_editor_state(&name, visible, x, y)?;
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(())
@@ -1549,21 +1530,17 @@ pub(crate) fn clear_instructions(
 fn apply_history_step(
     state: &SharedState,
     app: &AppHandle,
-    step: fn(
-        &mut crate::state::History<(MacroGraph, Vec<ListDef>)>,
-        (MacroGraph, Vec<ListDef>),
-    ) -> Option<(MacroGraph, Vec<ListDef>)>,
+    step: fn(&mut crate::state::History<MacroGraph>, MacroGraph) -> Option<MacroGraph>,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(current) = s
         .current_macro
         .as_ref()
-        .map(|mac| (mac.graph.clone(), mac.lists.clone()))
-        && let Some((restored_graph, restored_lists)) = step(&mut s.history, current)
+        .map(|mac| mac.graph.clone())
+        && let Some(restored_graph) = step(&mut s.history, current)
     {
         if let Some(mac) = &mut s.current_macro {
             mac.graph = restored_graph;
-            mac.lists = restored_lists;
             mac.ensure_id();
         }
         sync_variable_values(&mut s);
@@ -2727,7 +2704,6 @@ mod value_location_tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            lists: vec![],
             settings: blockwork_core::macros::MacroSettings::default(),
         }
     }
@@ -3147,7 +3123,6 @@ mod value_location_tests {
             },
             recording_target: None,
             speed_multiplier: 1.0,
-            lists: vec![],
             settings: blockwork_core::macros::MacroSettings::default(),
         };
         let loc = ValueLocation::Field {

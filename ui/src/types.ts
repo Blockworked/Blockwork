@@ -73,15 +73,10 @@ export type ValueDto =
   | { kind: 'Call'; block_id: string; args: ValueDto[]; branches: BlockNode[][]; saved: ValueDto };
 
 /** Literal-only list item. Lists never store expressions, booleans, or refs. */
-export type ListItemDto = { kind: 'Number'; value: number } | { kind: 'Text'; value: string };
-
-export interface ListDto {
-  name: string;
-  items: ListItemDto[];
-  editor_visible: boolean;
-  editor_x: number;
-  editor_y: number;
-}
+import type { ListDef, ListItem } from 'blockstitch';
+export type ListItemDto = ListItem;
+export type ListDto = ListDef;
+import { sortedListNames as bsSortedListNames } from 'blockstitch';
 
 export function numberValue(value: number): ValueDto {
   return bsNumberValue(value);
@@ -329,7 +324,7 @@ export function sortedVariableNames(macro: MacroDto | null | undefined): string[
 }
 
 export function sortedListNames(macro: MacroDto | null | undefined): string[] {
-  return [...(macro?.lists ?? [])].map(list => list.name).sort((a, b) => a.localeCompare(b));
+  return bsSortedListNames(macro?.lists);
 }
 
 // What kind of value an input slot expects - 'Any' (number-or-text, the

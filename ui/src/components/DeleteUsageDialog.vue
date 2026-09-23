@@ -3,7 +3,7 @@ import { ref } from 'vue';
 import { Trash2 } from 'lucide-vue-next';
 import { deleteList, deleteVariable } from '../tauri';
 import { closeDeleteUsageDialog, deleteUsageDialog } from '../deleteUsageDialog';
-import { forgetListEditor } from '../listEditors';
+import { forgetListEditor } from 'blockstitch';
 
 const submitting = ref(false);
 

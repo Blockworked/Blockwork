@@ -12,9 +12,10 @@ pub(crate) use blockstitch_core::editor::{
 };
 pub(crate) use blockwork_core::input::value::{Evaluated, Value};
 pub(crate) use blockwork_core::macros::{
-    BlockDef, BlockPiece, Comment, FloatingValue, Instruction, InstructionKind, ListDef, ListItem,
+    BlockDef, BlockPiece, Comment, FloatingValue, Instruction, InstructionKind,
     Macro, MacroSettings, Strand,
 };
+pub(crate) use blockstitch_core::graph::{ListDef, ListItem};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use crate::AppHandle;
@@ -92,7 +93,7 @@ pub(crate) struct AppState {
     pub(crate) pending_standalone_key: Option<String>,
     /// Undo/redo over whole-canvas snapshots, plus the key that keeps a run
     /// of keystrokes to one step.
-    pub(crate) history: History<(MacroGraph, Vec<ListDef>)>,
+    pub(crate) history: History<MacroGraph>,
     pub(crate) recording_phase: RecordingPhase,
     pub(crate) recording_countdown_generation: u64,
     pub(crate) record_mouse_relative: bool,

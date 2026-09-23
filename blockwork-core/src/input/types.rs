@@ -217,8 +217,8 @@ impl InputToken {
     }
 
     /// Renames a list inside every embedded `Value` tree - see
-    /// `crate::macros::rename_list_in_value`.
+    /// `blockstitch_core::graph::rename_list_in_value`.
     pub fn rename_list(&mut self, old: &str, new: &str) {
-        self.visit_values_mut(&mut |v, _| crate::macros::rename_list_in_value(v, old, new));
+        self.visit_values_mut(&mut |v, _| blockstitch_core::graph::rename_list_in_value(v, old, new));
     }
 }
