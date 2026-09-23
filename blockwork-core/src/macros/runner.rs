@@ -162,6 +162,7 @@ pub fn resolve_list_reporters(
         Value::Call {
             block_id,
             args,
+            branches,
             saved,
         } => Ok(Value::Call {
             block_id: block_id.clone(),
@@ -169,6 +170,7 @@ pub fn resolve_list_reporters(
                 .iter()
                 .map(|arg| resolve_list_reporters(arg, lists))
                 .collect::<Result<Vec<_>, _>>()?,
+            branches: branches.clone(),
             saved: saved.clone(),
         }),
         _ => Ok(value.clone()),
@@ -426,12 +428,8 @@ impl Macro {
                     if let Some(def) = block_defs.iter().find(|b| &b.id == id) {
                         let input_names: Vec<String> =
                             def.input_names().map(str::to_string).collect();
-                        // Branch prototypes (`BlockPiece::Branch`) live in
-                        // blockstitch, which doesn't define them yet, so no
-                        // declared branch names can reach the runner. The
-                        // branch env plumbing below stays in place for when
-                        // they do; until then `RunBranch` is a no-op.
-                        let branch_names: Vec<String> = Vec::new();
+                        let branch_names: Vec<String> =
+                            def.branch_names().map(str::to_string).collect();
                         let body = strand.instructions[1..].to_vec();
                         block_table.insert(
                             id.clone(),
@@ -1728,6 +1726,69 @@ mod tests {
     }
 
     #[test]
+    fn custom_block_runs_the_callback_supplied_to_its_branch() {
+        let vars = empty_vars();
+        let block_id = "with_branch".to_string();
+        let mac = Macro {
+            id: "m".into(),
+            name: "Branches".into(),
+            description: "".into(),
+            graph: MacroGraph {
+                strands: vec![
+                    Strand {
+                        id: "caller".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::WhenRan),
+                            Instruction::new(InstructionKind::CallBlock {
+                                block_id: block_id.clone(),
+                                args: vec![],
+                                branches: vec![vec![Instruction::new(
+                                    InstructionKind::SetVariable(
+                                        "ran".into(),
+                                        Value::number(1.0),
+                                    ),
+                                )]],
+                            }),
+                        ],
+                    },
+                    Strand {
+                        id: "body".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
+                            Instruction::new(InstructionKind::RunBranch("callback".into())),
+                        ],
+                    },
+                ],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![BlockDef {
+                    id: block_id,
+                    pieces: vec![BlockPiece::Branch {
+                        id: "b1".into(),
+                        name: "callback".into(),
+                    }],
+                    shape: BlockShape::Normal,
+                    color: default_block_color(),
+                }],
+            },
+            recording_target: None,
+            speed_multiplier: 1.0,
+            settings: crate::macros::MacroSettings::default(),
+            lists: vec![],
+        };
+        mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+        assert_eq!(
+            vars.lock().unwrap().get("ran"),
+            Some(&Evaluated::Number(1.0))
+        );
+    }
+
+    #[test]
     fn value_call_to_reporter_block_resolves_and_runs() {
         let vars = empty_vars();
         let mac = macro_with_double_block(vec![Instruction::new(InstructionKind::SetVariable(
@@ -1735,6 +1796,7 @@ mod tests {
             Value::Call {
                 block_id: "double".to_string(),
                 args: vec![Value::number(21.0)],
+                branches: vec![],
                 saved: Box::new(Value::number(0.0)),
             },
         ))]);
@@ -1769,6 +1831,7 @@ mod tests {
                                 Value::Call {
                                     block_id: block_id.clone(),
                                     args: vec![],
+                                    branches: vec![],
                                     saved: Box::new(Value::number(0.0)),
                                 },
                             )),
@@ -1882,6 +1945,7 @@ mod tests {
                                 Value::Call {
                                     block_id: block_id.clone(),
                                     args: vec![],
+                                    branches: vec![],
                                     saved: Box::new(Value::number(0.0)),
                                 },
                             )),
@@ -1896,6 +1960,7 @@ mod tests {
                             Instruction::new(InstructionKind::Return(Value::Call {
                                 block_id: block_id.clone(),
                                 args: vec![],
+                                branches: vec![],
                                 saved: Box::new(Value::number(0.0)),
                             })),
                         ],
@@ -1947,6 +2012,7 @@ mod tests {
                                 Value::Call {
                                     block_id: triple_id.clone(),
                                     args: vec![Value::number(2.0)],
+                                    branches: vec![],
                                     saved: Box::new(Value::number(0.0)),
                                 },
                             )),
@@ -1978,6 +2044,7 @@ mod tests {
                                     Value::Call {
                                         block_id: double_id.clone(),
                                         args: vec![Value::Param { name: "n".into() }],
+                                        branches: vec![],
                                         saved: Box::new(Value::number(0.0)),
                                     },
                                     Value::Param { name: "n".into() },
@@ -2187,6 +2254,7 @@ mod tests {
                                 Value::Call {
                                     block_id: block_id.clone(),
                                     args: vec![],
+                                    branches: vec![],
                                     saved: Box::new(Value::number(0.0)),
                                 },
                             )),
@@ -2456,6 +2524,7 @@ mod tests {
                                 Value::Call {
                                     block_id: block_id.clone(),
                                     args: vec![],
+                                    branches: vec![],
                                     saved: Box::new(Value::number(0.0)),
                                 },
                             )),

@@ -552,6 +552,26 @@ pub(crate) fn edit_block(
     BlockDef::validate_pieces(&pieces)?;
     normalize_block_color(&color)?;
     push_undo(&mut s);
+    let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
+    if let Some(def) = mac.block_defs.iter().find(|b| b.id == block_id) {
+        let old_pieces = def.pieces.clone();
+        let renames: Vec<(String, String)> = pieces
+            .iter()
+            .filter_map(|new_piece| {
+                let BlockPiece::Branch { id, name: new_name } = new_piece else {
+                    return None;
+                };
+                let old_name = old_pieces.iter().find_map(|p| match p {
+                    BlockPiece::Branch { id: old_id, name } if old_id == id => Some(name),
+                    _ => None,
+                })?;
+                (old_name != new_name).then(|| (old_name.clone(), new_name.clone()))
+            })
+            .collect();
+        for (old_name, new_name) in &renames {
+            mac.rename_block_branch_body(&block_id, old_name, new_name);
+        }
+    }
     s.current_macro
         .as_mut()
         .ok_or("No macro selected")?
@@ -3509,6 +3529,7 @@ mod value_location_tests {
                 Value::Call {
                     block_id: id.clone(),
                     args: vec![],
+                    branches: vec![],
                     saved: Box::new(Value::number(0.0)),
                 },
             ))],
@@ -3535,6 +3556,7 @@ mod value_location_tests {
         let dto = Value::Call {
             block_id: "missing".into(),
             args: vec![],
+            branches: vec![],
             saved: Box::new(Value::Number { value: 0.0 }),
         };
         assert!(preview_value_with_env(&dto, &HashMap::new()).is_err());
@@ -3545,6 +3567,7 @@ mod value_location_tests {
         let mut node = Value::Call {
             block_id: "missing".into(),
             args: vec![],
+            branches: vec![],
             saved: Box::new(Value::number(0.0)),
         };
         apply_value_kind(&mut node, "Number", &HashMap::new()).unwrap();
