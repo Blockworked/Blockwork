@@ -1,81 +1,296 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Dialogs
 import com.blockworked.Blockstitch 1.0
 
 Dialog {
-    id:root
-    modal:true; anchors.centerIn:parent; title:"Make a Block"; width:700
-    standardButtons:Dialog.NoButton
-    signal createRequested(var pieces,string shape,string color)
-    property int selectedPiece:0
-    property string blockShape:"Normal"
-    property string blockColor:"#3b3c40"
+    id: root
+    modal: true
+    anchors.centerIn: parent
+    title: "Make a Block"
+    width: 720
+    height: Math.min(760, parent ? parent.height - 32 : 760)
+    standardButtons: Dialog.NoButton
+    background: Rectangle { radius:12;color:Theme.panel;border.color:Theme.border }
 
-    ListModel { id:pieces }
-    function resetForm() { pieces.clear();pieces.append({pieceKind:"Label",pieceName:"block name",valueType:"Number"});selectedPiece=0;blockShape="Normal";blockColor="#3b3c40"; }
-    function addPiece(kind,name,valueType) { pieces.append({pieceKind:kind,pieceName:name,valueType:valueType||"Number"});selectedPiece=pieces.count-1; }
-    function resultPieces() { let out=[];for(let i=0;i<pieces.count;i++){const p=pieces.get(i);out.push(p.pieceKind==="Label"?{kind:"Label",id:uuid(),text:p.pieceName}:{kind:"Input",id:uuid(),name:p.pieceName,value_type:p.valueType});}return out; }
-    function uuid(){return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g,c=>{const r=Math.random()*16|0;return(c==="x"?r:(r&3|8)).toString(16);});}
-    onOpened:resetForm()
+    signal createRequested(var pieces, string shape, string color)
 
-    contentItem:ColumnLayout {
-        spacing:12
+    property int selectedPiece: 0
+    property string blockShape: "Normal"
+    property string blockColor: "#4C97FF"
+    property string validationError: ""
+    readonly property bool returnsValue: blockShape === "ReturnsValue" || blockShape === "ReturnsBool"
+    readonly property bool hasBranches: branchCount() > 0
+    readonly property var colorPresets: [
+        "#4C97FF", "#9966FF", "#C65BCF", "#FFBF00", "#FFAB19", "#5BA9D0",
+        "#59C059", "#FF8C1A", "#FF5B1F", "#FF6680", "#19B88E", "#FF4D4F",
+        "#FF7F7F", "#FFB77B", "#FFF28A", "#8BF77A", "#78F0B0", "#70D5E8",
+        "#7DB5F5", "#8080F5", "#C667E8", "#F27AED", "#B3B3B3"
+    ]
+
+    ListModel { id: pieces }
+
+    function uuid() {
+        return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => {
+            const r = Math.random() * 16 | 0;
+            return (c === "x" ? r : (r & 3 | 8)).toString(16);
+        });
+    }
+    function resetForm() {
+        pieces.clear();
+        pieces.append({ pieceKind: "Label", pieceName: "block name", valueType: "Any" });
+        selectedPiece = 0; blockShape = "Normal"; blockColor = "#4C97FF"; validationError = "";
+        pieceEditor.text = "block name";
+    }
+    function branchCount() {
+        let count = 0;
+        for (let i = 0; i < pieces.count; ++i) if (pieces.get(i).pieceKind === "Branch") count++;
+        return count;
+    }
+    function firstBranchIndex() {
+        for (let i = 0; i < pieces.count; ++i) if (pieces.get(i).pieceKind === "Branch") return i;
+        return -1;
+    }
+    function nextName(prefix) {
+        let n = 1;
+        while (true) {
+            const candidate = prefix + n;
+            let used = false;
+            for (let i = 0; i < pieces.count; ++i)
+                if (pieces.get(i).pieceKind !== "Label" && pieces.get(i).pieceName === candidate) used = true;
+            if (!used) return candidate;
+            n++;
+        }
+    }
+    function addPiece(kind, valueType) {
+        if (kind === "Branch" && hasBranches)
+            pieces.append({ pieceKind: "Label", pieceName: "", valueType: "Any" });
+        const name = kind === "Label" ? "label" : nextName(kind === "Branch" ? "branch" : "value");
+        const insertAt = kind === "Label" && hasBranches ? firstBranchIndex() : pieces.count;
+        pieces.insert(insertAt, { pieceKind: kind, pieceName: name, valueType: valueType || "Any" });
+        selectedPiece = insertAt;
+        syncEditor();
+        pieceEditor.forceActiveFocus(); pieceEditor.selectAll();
+    }
+    function syncEditor() {
+        pieceEditor.text = pieces.count && selectedPiece >= 0 && selectedPiece < pieces.count
+                ? pieces.get(selectedPiece).pieceName : "";
+    }
+    function selectPiece(index) { selectedPiece = index; syncEditor(); }
+    function commitPiece() {
+        if (pieces.count && selectedPiece >= 0 && selectedPiece < pieces.count)
+            pieces.setProperty(selectedPiece, "pieceName", pieceEditor.text);
+    }
+    function moveSelected(delta) {
+        const target = selectedPiece + delta;
+        if (target < 0 || target >= pieces.count) return;
+        commitPiece(); pieces.move(selectedPiece, target, 1); selectedPiece = target; syncEditor();
+    }
+    function removeSelected() {
+        if (!pieces.count) return;
+        pieces.remove(selectedPiece);
+        selectedPiece = Math.max(0, Math.min(selectedPiece, pieces.count - 1)); syncEditor();
+    }
+    function resultPieces() {
+        const out = [];
+        for (let i = 0; i < pieces.count; ++i) {
+            const p = pieces.get(i); const name = p.pieceName.trim();
+            if (p.pieceKind === "Label") out.push({ kind: "Label", id: uuid(), text: name });
+            else if (p.pieceKind === "Branch") out.push({ kind: "Branch", id: uuid(), name: name });
+            else out.push({ kind: "Input", id: uuid(), name: name, value_type: p.valueType });
+        }
+        return out;
+    }
+    function submit() {
+        commitPiece();
+        let hasLabel = false; const names = ({});
+        for (let i = 0; i < pieces.count; ++i) {
+            const p = pieces.get(i); const text = p.pieceName.trim();
+            if (p.pieceKind === "Label") { if (text.length) hasLabel = true; continue; }
+            if (!text.length) { validationError = "Every input and branch needs a name"; return; }
+            if (names[text]) { validationError = "Input and branch names must be unique"; return; }
+            names[text] = true;
+        }
+        if (!hasLabel) { validationError = "Give the block a name"; return; }
+        createRequested(resultPieces(), blockShape, blockColor); accept();
+    }
+    onOpened: resetForm()
+
+    contentItem: ColumnLayout {
+        spacing: 12
+
         Rectangle {
-            Layout.fillWidth:true;Layout.preferredHeight:230;radius:6;color:Theme.canvas;border.color:Theme.border;clip:true
-            Canvas { anchors.fill:parent;onPaint:{const c=getContext("2d");c.fillStyle="#3c3d42";for(let x=10;x<width;x+=22)for(let y=10;y<height;y+=22){c.beginPath();c.arc(x,y,1,0,Math.PI*2);c.fill();}} }
-            Item {
-                anchors.centerIn:parent;width:Math.max(220,previewRow.implicitWidth+62);height:62
-                BlockSurface { anchors.fill:parent;shape:root.blockShape==="Ending"?"cap":"stack";fill:root.blockColor }
-                Row {
-                    id:previewRow;x:42;y:16;spacing:4
-                    LucideIcon{name:"blocks";color:Theme.textDim;width:16;height:16;anchors.verticalCenter:parent.verticalCenter}
-                    Repeater { model:pieces
-                        delegate:Rectangle {
-                            required property int index;required property string pieceKind;required property string pieceName;required property string valueType
-                            height:29;width:pieceText.implicitWidth+(pieceKind==="Label"?12:20);radius:valueType==="Bool"?12:5
-                            color:valueType==="Bool"?"transparent":root.selectedPiece===index?"#274c68":pieceKind==="Label"?"transparent":Theme.field
-                            border.color:valueType==="Bool"?"transparent":root.selectedPiece===index?Theme.accent:pieceKind==="Label"?"transparent":Theme.border
-                            Canvas { anchors.fill:parent;visible:valueType==="Bool";onPaint:{const c=getContext("2d");c.beginPath();const n=Math.min(height*.32,width/2);c.moveTo(n,.5);c.lineTo(width-n,.5);c.lineTo(width-.5,height/2);c.lineTo(width-n,height-.5);c.lineTo(n,height-.5);c.lineTo(.5,height/2);c.closePath();c.fillStyle=root.selectedPiece===index?"#274c68":Theme.field;c.fill();c.strokeStyle=root.selectedPiece===index?Theme.accent:Theme.border;c.stroke();} }
-                            Text{id:pieceText;anchors.centerIn:parent;text:pieceKind==="Label"?pieceName:"("+pieceName+")";color:pieceKind==="Label"?Theme.text:Theme.accent;font.pixelSize:12;font.weight:pieceKind==="Label"?Font.Normal:Font.DemiBold}
-                            TapHandler{onTapped:root.selectedPiece=index;onDoubleTapped:{root.selectedPiece=index;pieceEditor.text=pieceName;pieceEditor.forceActiveFocus();pieceEditor.selectAll();}}
-                        }
+            Layout.fillWidth: true; Layout.preferredHeight: 260
+            radius: Theme.radius; color: Theme.canvas; border.color: Theme.border; clip: true
+            Canvas {
+                anchors.fill: parent
+                onPaint: {
+                    const c = getContext("2d"); c.reset(); c.fillStyle = "#45464b";
+                    for (let x = 11; x < width; x += 22) for (let y = 11; y < height; y += 22) {
+                        c.beginPath(); c.arc(x, y, 1.1, 0, Math.PI * 2); c.fill();
                     }
                 }
             }
-        }
-        RowLayout {
-            Layout.fillWidth:true
-            Text { text:"Selected piece";color:Theme.textDim;font.pixelSize:12 }
-            BwTextField { id:pieceEditor;Layout.fillWidth:true;text:pieces.count&&root.selectedPiece<pieces.count?pieces.get(root.selectedPiece).pieceName:"";onEditingFinished:if(pieces.count)pieces.setProperty(root.selectedPiece,"pieceName",text) }
-            BwButton { iconName:"arrow-left";text:"";enabled:root.selectedPiece>0;onClicked:{pieces.move(root.selectedPiece,root.selectedPiece-1,1);root.selectedPiece--;} }
-            BwButton { iconName:"chevron-down";text:"";enabled:root.selectedPiece<pieces.count-1;onClicked:{pieces.move(root.selectedPiece,root.selectedPiece+1,1);root.selectedPiece++;} }
-            BwButton { iconName:"trash";text:"";danger:true;enabled:pieces.count>1;onClicked:{pieces.remove(root.selectedPiece);root.selectedPiece=Math.max(0,root.selectedPiece-1);} }
-        }
-        RowLayout {
-            Layout.fillWidth:true;spacing:8
-            BwButton { Layout.fillWidth:true;iconName:"plus";text:"Add a label";onClicked:root.addPiece("Label","label","Number") }
-            BwButton { Layout.fillWidth:true;iconName:"plus";text:"Add an input";onClicked:root.addPiece("Input","value","Number") }
-            BwButton { Layout.fillWidth:true;iconName:"plus";text:"Add a Boolean";onClicked:root.addPiece("Input","condition","Bool") }
-        }
-        Text { text:"Block shape";color:Theme.textDim;font.pixelSize:11;font.weight:Font.Bold }
-        RowLayout {
-            Layout.fillWidth:true;spacing:8
-            Repeater { model:["Normal","Ending","ReturnsValue","ReturnsBool"]
-                delegate:BwButton { required property string modelData;Layout.fillWidth:true;text:modelData==="ReturnsValue"?"Returns a value":modelData==="ReturnsBool"?"Returns a Boolean":modelData;primary:root.blockShape===modelData;onClicked:root.blockShape=modelData }
+
+            Column {
+                anchors.centerIn: parent; spacing: 8
+                Row {
+                    anchors.horizontalCenter: parent.horizontalCenter; spacing: 2
+                    BwButton { iconName: "arrow-left"; text: ""; implicitWidth: 28; implicitHeight: 27; enabled: root.selectedPiece > 0; onClicked: root.moveSelected(-1) }
+                    BwButton { iconName: "trash"; text: ""; danger: true; implicitWidth: 28; implicitHeight: 27; enabled: pieces.count > 0; onClicked: root.removeSelected() }
+                    BwButton { iconName: "chevron-down"; text: ""; implicitWidth: 28; implicitHeight: 27; enabled: root.selectedPiece < pieces.count - 1; onClicked: root.moveSelected(1) }
+                }
+
+                Item {
+                    visible: !root.hasBranches
+                    width: Math.max(230, previewRow.implicitWidth + 64); height: visible ? 62 : 0
+                    BlockSurface { anchors.fill: parent; shape: root.blockShape === "Ending" ? "cap" : "stack"; fill: root.blockColor }
+                    Row {
+                        id: previewRow; x: 42; y: 15; spacing: 4
+                        LucideIcon { name: "blocks"; color: Theme.textDim; width: 16; height: 16; anchors.verticalCenter: parent.verticalCenter }
+                        Repeater {
+                            model: pieces
+                            delegate: Rectangle {
+                                required property int index
+                                required property string pieceKind
+                                required property string pieceName
+                                required property string valueType
+                                visible: pieceKind !== "Branch"
+                                height: 29; width: visible ? pieceText.implicitWidth + (pieceKind === "Label" ? 12 : 22) : 0
+                                radius: valueType === "Bool" ? 14 : 5
+                                color: valueType === "Bool" ? "transparent" : pieceKind === "Label" ? "transparent" : Theme.field
+                                border.width: root.selectedPiece === index ? 2 : (pieceKind === "Label" ? 0 : 1)
+                                border.color: root.selectedPiece === index ? Theme.accent : Theme.border
+                                Canvas {
+                                    anchors.fill: parent; visible: valueType === "Bool"
+                                    onPaint: {
+                                        const c = getContext("2d"); c.reset(); c.beginPath(); const n = Math.min(height * .32, width / 2);
+                                        c.moveTo(n, .5); c.lineTo(width - n, .5); c.lineTo(width - .5, height / 2);
+                                        c.lineTo(width - n, height - .5); c.lineTo(n, height - .5); c.lineTo(.5, height / 2); c.closePath();
+                                        c.fillStyle = Theme.field; c.fill(); c.strokeStyle = root.selectedPiece === index ? Theme.accent : Theme.border; c.lineWidth = root.selectedPiece === index ? 2 : 1; c.stroke();
+                                    }
+                                }
+                                Text { id: pieceText; anchors.centerIn: parent; text: pieceKind === "Label" ? (pieceName || "Add label") : pieceName; color: pieceKind === "Label" ? Theme.text : Theme.accent; font.pixelSize: 13; font.weight: pieceKind === "Label" ? Font.Normal : Font.DemiBold }
+                                TapHandler { onTapped: root.selectPiece(index); onDoubleTapped: { root.selectPiece(index); pieceEditor.forceActiveFocus(); pieceEditor.selectAll(); } }
+                            }
+                        }
+                    }
+                }
+
+                Column {
+                    visible: root.hasBranches; width: Math.max(270, branchHead.implicitWidth + 70); spacing: 0
+                    Rectangle {
+                        width: parent.width; height: 48; radius: 6; color: root.blockColor; border.color: Qt.lighter(root.blockColor, 1.25)
+                        Row {
+                            id: branchHead; x: 18; anchors.verticalCenter: parent.verticalCenter; spacing: 5
+                            LucideIcon { name: "blocks"; color: Theme.text; width: 16; height: 16; anchors.verticalCenter: parent.verticalCenter }
+                            Repeater {
+                                model: pieces
+                                delegate: Rectangle {
+                                    required property int index; required property string pieceKind; required property string pieceName; required property string valueType
+                                    visible: index < root.firstBranchIndex() || pieceKind === "Input"
+                                    width: visible ? label.implicitWidth + (pieceKind === "Label" ? 8 : 18) : 0; height: 27; radius: 5
+                                    color: pieceKind === "Input" ? Theme.field : "transparent"
+                                    border.width: root.selectedPiece === index ? 2 : (pieceKind === "Input" ? 1 : 0)
+                                    border.color: root.selectedPiece === index ? Theme.accent : Theme.border
+                                    Text { id: label; anchors.centerIn: parent; text: pieceName || "Add label"; color: pieceKind === "Input" ? Theme.accent : Theme.text; font.pixelSize: 12 }
+                                    TapHandler { onTapped: root.selectPiece(index) }
+                                }
+                            }
+                        }
+                    }
+                    Repeater {
+                        model: pieces
+                        delegate: Column {
+                            required property int index; required property string pieceKind; required property string pieceName
+                            visible: pieceKind === "Branch"; width: parent.width; height: visible ? 64 : 0; spacing: 0
+                            Rectangle {
+                                width: parent.width; height: 64; color: Theme.canvas; border.color: Qt.lighter(root.blockColor, 1.25)
+                                Rectangle { width: 18; height: parent.height; color: root.blockColor }
+                                Rectangle {
+                                    x: 18; y: 8; width: branchName.implicitWidth + 18; height: 28; radius: 5; color: root.blockColor
+                                    border.width: root.selectedPiece === index ? 2 : 1; border.color: root.selectedPiece === index ? Theme.accent : Qt.lighter(root.blockColor, 1.25)
+                                    Text { id: branchName; anchors.centerIn: parent; text: pieceName; color: Theme.text; font.pixelSize: 12; font.weight: Font.DemiBold }
+                                    TapHandler { onTapped: root.selectPiece(index) }
+                                }
+                            }
+                        }
+                    }
+                    Rectangle { width: parent.width; height: 24; radius: 5; color: root.blockColor; border.color: Qt.lighter(root.blockColor, 1.25) }
+                }
             }
         }
-        Text { text:"Color";color:Theme.textDim;font.pixelSize:11;font.weight:Font.Bold }
-        Row { spacing:8
-            Repeater { model:["#3b3c40","#176fa6","#7755a8","#2b8060","#a56b2f","#a84855"]
-                delegate:Rectangle { required property string modelData;width:30;height:30;radius:15;color:modelData;border.width:root.blockColor===modelData?3:1;border.color:root.blockColor===modelData?Theme.accent:Theme.border;TapHandler{onTapped:root.blockColor=modelData} }
+
+        RowLayout {
+            Layout.fillWidth: true; spacing: 8
+            Text { text: "Selected piece"; color: Theme.textDim; font.pixelSize: 12 }
+            BwTextField { id: pieceEditor; Layout.fillWidth: true; placeholderText: "Piece name"; onTextEdited: root.commitPiece(); onEditingFinished: root.commitPiece() }
+        }
+
+        Grid {
+            Layout.alignment: Qt.AlignHCenter; columns: 12; spacing: 7
+            Repeater {
+                model: root.colorPresets
+                delegate: Rectangle {
+                    required property string modelData
+                    width: 30; height: 30; radius: 15; color: modelData
+                    border.width: root.blockColor === modelData ? 3 : 1
+                    border.color: root.blockColor === modelData ? Theme.text : Theme.border
+                    TapHandler { onTapped: root.blockColor = modelData }
+                }
+            }
+            Rectangle {
+                width:30;height:30;radius:15;color:Theme.panelRaised;border.width:root.colorPresets.indexOf(root.blockColor)<0?3:1;border.color:root.colorPresets.indexOf(root.blockColor)<0?Theme.text:Theme.border
+                LucideIcon{anchors.centerIn:parent;width:15;height:15;name:"pipette";color:Theme.text}
+                TapHandler{onTapped:customColor.open()}
             }
         }
-        Rectangle { Layout.fillWidth:true;height:1;color:Theme.borderSoft }
-        RowLayout { Layout.fillWidth:true
-            Item { Layout.fillWidth:true }
-            BwButton { text:"Cancel";onClicked:root.reject() }
-            BwButton { text:"Create block";iconName:"plus";primary:true;enabled:pieces.count>0;onClicked:{root.createRequested(root.resultPieces(),root.blockShape,root.blockColor);root.accept();} }
+
+        GridLayout {
+            Layout.fillWidth: true; columns: 4; columnSpacing: 8
+            Repeater {
+                model: [
+                    { title: "Add an input", subtitle: "number or text", sample: "123", kind: "Input", valueType: "Any" },
+                    { title: "Add an input", subtitle: "boolean", sample: "◇", kind: "Input", valueType: "Bool" },
+                    { title: "Add an input", subtitle: "branch", sample: "⌞", kind: "Branch", valueType: "Any" },
+                    { title: "Add a label", subtitle: "", sample: "Abc", kind: "Label", valueType: "Any" }
+                ]
+                delegate: Button {
+                    required property var modelData
+                    Layout.fillWidth: true; implicitHeight: 58
+                    onClicked: root.addPiece(modelData.kind, modelData.valueType)
+                    contentItem: Row {
+                        spacing: 8
+                        Text { text: modelData.sample; color: modelData.kind === "Input" || modelData.kind === "Branch" ? Theme.accent : Theme.text; font.pixelSize: modelData.kind === "Branch" ? 26 : 13; font.weight: Font.DemiBold; width: 32; anchors.verticalCenter: parent.verticalCenter; horizontalAlignment: Text.AlignHCenter }
+                        Column { anchors.verticalCenter: parent.verticalCenter
+                            Text { text: modelData.title; color: Theme.text; font.pixelSize: 12; font.weight: Font.DemiBold }
+                            Text { visible: modelData.subtitle.length > 0; text: modelData.subtitle; color: Theme.textDim; font.pixelSize: 10 }
+                        }
+                    }
+                    background: Rectangle { radius: Theme.radius; color: parent.hovered ? "#3b3c40" : Theme.panelRaised; border.color: parent.hovered ? Theme.accent : Theme.border }
+                }
+            }
+        }
+
+        RowLayout {
+            Layout.fillWidth: true; spacing: 8
+            BwButton { Layout.fillWidth: true; text: root.returnsValue ? "Return Text or Number" : "Normal block"; primary: root.blockShape === (root.returnsValue ? "ReturnsValue" : "Normal"); onClicked: root.blockShape = root.returnsValue ? "ReturnsValue" : "Normal" }
+            BwButton { Layout.fillWidth: true; text: root.returnsValue ? "Return a Boolean" : "Ending block"; primary: root.blockShape === (root.returnsValue ? "ReturnsBool" : "Ending"); onClicked: root.blockShape = root.returnsValue ? "ReturnsBool" : "Ending" }
+        }
+
+        BwCheckBox {
+            text: "Returns a value"; checked: root.returnsValue
+            onToggled: root.blockShape = checked ? "ReturnsValue" : "Normal"
+        }
+        Text { visible: root.validationError.length > 0; text: root.validationError; color: Theme.danger; font.pixelSize: 12 }
+        Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderSoft }
+        RowLayout {
+            Layout.fillWidth: true
+            Item { Layout.fillWidth: true }
+            BwButton { text: "Cancel"; onClicked: root.reject() }
+            BwButton { text: "OK"; primary: true; onClicked: root.submit() }
         }
     }
+    ColorDialog{id:customColor;title:"Choose a block color";selectedColor:root.blockColor;onAccepted:root.blockColor=String(selectedColor)}
 }

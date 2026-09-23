@@ -8,6 +8,7 @@ Item {
     id: root
     required property var appState
     required property var invoke
+    function capturingAction(action){return appState.combo_capture&&appState.combo_capture.kind==="Named"&&JSON.stringify(appState.combo_capture.action)===JSON.stringify(action)}
 
     ColumnLayout {
         anchors.fill: parent; spacing: 0
@@ -34,7 +35,7 @@ Item {
                             property var binding: (appState.hotkey_bindings || []).find(b => JSON.stringify(b.action) === JSON.stringify(modelData.action))
                             Text { Layout.fillWidth: true; text: root.actionLabel(modelData.action); color: "#e7e7e8"; font.pixelSize: 14 }
                             Rectangle { width: 138; height: 36; radius: 7; color: "#303136"; border.color: "#4a4b50"
-                                Text { anchors.centerIn: parent; text: parent.parent.binding ? parent.parent.binding.combo_display : (modelData.combo_display || "Not set"); color: "#a4a5aa"; font.pixelSize: 13 }
+                                Text { anchors.centerIn: parent; text: root.capturingAction(modelData.action)?"Press shortcut…":(parent.parent.binding ? parent.parent.binding.combo_display : (modelData.combo_display || "Not set")); color: root.capturingAction(modelData.action)?Theme.accent:"#a4a5aa"; font.pixelSize: 13 }
                                 TapHandler { onTapped: root.invoke("start_combo_capture", { action: modelData.action }) }
                             }
                             BwButton { iconName: "x"; text: ""; danger: true; implicitWidth: 42; onClicked: root.invoke("clear_named_hotkey", { action: modelData.action }) }
@@ -57,7 +58,7 @@ Item {
                         Text { text: "Add hotkey:"; color: "#e7e7e8" }
                         Item { Layout.fillWidth: true }
                         BwComboBox { id: macroBox; model: appState.macro_names || []; implicitWidth: 210; onActivated: index => root.invoke("set_pending_macro_idx", { index: index }) }
-                        BwButton { text: "Set combo"; onClicked: root.invoke("start_pending_combo_capture") }
+                        BwButton { text: appState.combo_capture&&appState.combo_capture.kind==="Pending"?"Press shortcut…":"Set combo"; primary:appState.combo_capture&&appState.combo_capture.kind==="Pending"; onClicked: root.invoke("start_pending_combo_capture") }
                         BwButton { iconName: "plus"; text: "Add"; onClicked: root.invoke("add_macro_hotkey") }
                     }
                 }
@@ -95,7 +96,7 @@ Item {
                     }
                 }
                 SectionCard {
-                    width: parent.width; title: "Updates"; iconName: "rotate"
+                    width: parent.width; title: "Updates"; iconName: "refresh-cw"
                     RowLayout { Layout.fillWidth: true
                         ColumnLayout { Layout.fillWidth: true
                             Text { text: root.updateTitle(); color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
@@ -133,6 +134,7 @@ Item {
         anchors.centerIn: parent; modal: true
         title: mode === "import" ? "Import macro" : "Export macro"
         standardButtons: Dialog.Ok | Dialog.Cancel
+        background:Rectangle{radius:10;color:Theme.panel;border.color:Theme.border}
         Column { width: 480; spacing: 8
             Text { text: "File path"; color: "#e7e7e8" }
             BwTextField { id: filePath; width: parent.width; placeholderText: "C:/path/to/macro.macro" }

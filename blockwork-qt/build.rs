@@ -17,6 +17,7 @@ fn main() {
     .file("src/app_bridge.rs")
     .file("src/qt_diagnostics.rs")
     .qt_module("QuickControls2")
+    .qt_module("QuickDialogs2")
     .qt_module("Network");
 
     unsafe {

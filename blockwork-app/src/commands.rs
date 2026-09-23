@@ -8,8 +8,6 @@ use crate::state::{
 use blockstitch_core::editor::{
     ValueEdit, drop_strand_buffers, prune_value_buffers, retain_live_buffers,
 };
-use base64::{engine::general_purpose::STANDARD, Engine as _};
-use serde::Deserialize;
 use blockwork_core::config;
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
 use blockwork_core::input::types::InputToken;

@@ -10,7 +10,9 @@ Item {
     required property var invoke
     readonly property var macro: appState.current_macro
     readonly property bool recording: appState.recording_phase && appState.recording_phase.phase === "Active"
-    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "SetVariable", "ChangeVariable", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"]
+    property string sidebarKey: "a"
+    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"]
+    readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList"]
 
     function uuid() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }); }
     function numberValue(n) { return { kind: "Number", value: n }; }
@@ -22,12 +24,19 @@ Item {
         else if (type === "WhenTime") i.schedule = { kind: "Daily", hour: 9, minute: 0 };
         else if (type === "Wait") i.duration = numberValue(1000);
         else if (type === "Text") i.text = textValue("text");
-        else if (type === "Key") { i.key = "a"; i.direction = "Click"; }
+        else if (type === "Key") { i.key = root.sidebarKey; i.direction = "Click"; }
         else if (type === "Button") { i.button = "Left"; i.direction = "Click"; }
         else if (type === "MoveMouse") { i.x = numberValue(0); i.y = numberValue(0); i.coordinate = "Relative"; }
         else if (type === "Scroll") { i.amount = numberValue(4); i.axis = "Vertical"; }
         else if (type === "Command") i.command = "";
         else if (type === "OpenApp" || type === "CloseApp") { i.command = ""; i.name = ""; i.icon = null; }
+        else if (type === "SetClipboard") i.value = textValue("text");
+        else if (type === "AddToList") { i.name = firstListName(); i.value = textValue("thing"); }
+        else if (type === "DeleteOfList") { i.name = firstListName(); i.index = numberValue(1); }
+        else if (type === "DeleteAllOfList" || type === "ReverseList") i.name = firstListName();
+        else if (type === "ShiftList") { i.name = firstListName(); i.amount = numberValue(1); }
+        else if (type === "InsertIntoList") { i.name = firstListName(); i.value = textValue("thing"); i.index = numberValue(1); }
+        else if (type === "ReplaceItemOfList") { i.name = firstListName(); i.index = numberValue(1); i.value = textValue("thing"); }
         else if (type === "If") { i.condition = { kind: "Bool" }; i.body = []; }
         else if (type === "IfElse") { i.condition = { kind: "Bool" }; i.then_body = []; i.else_body = []; }
         else if (type === "Repeat") { i.count = numberValue(10); i.body = []; }
@@ -38,11 +47,15 @@ Item {
         else if (type === "Return") i.value = numberValue(0);
         return i;
     }
+    function firstListName() { return root.macro && root.macro.lists && root.macro.lists.length ? root.macro.lists[0].name : ""; }
     function addBlock(type, x, y) { root.invoke("add_strand", { x: x, y: y, instruction: defaultInstruction(type) }); }
     function addCustomBlock(definition, x, y) {
         const args = (definition.pieces || []).filter(piece => piece.kind === "Input")
             .map(piece => piece.value_type === "Bool" ? { kind: "Bool" } : numberValue(0));
-        root.invoke("add_strand", { x: x, y: y, instruction: { id: uuid(), type: "CallBlock", block_id: definition.id, args: args } });
+        const branchCount = (definition.pieces || []).filter(piece => piece.kind === "Branch").length;
+        const instruction = { id: uuid(), type: branchCount ? "BranchCallBlock" : "CallBlock", block_id: definition.id, args: args };
+        if (branchCount) instruction.branches = Array.from({ length: branchCount }, () => []);
+        root.invoke("add_strand", { x: x, y: y, instruction: instruction });
     }
     function recordingLabel() {
         const phase = appState.recording_phase || { phase: "Idle" };
@@ -53,9 +66,20 @@ Item {
     function refreshIds(instruction) {
         const copy = JSON.parse(JSON.stringify(instruction)); copy.id = uuid();
         ["body","then_body","else_body"].forEach(k => { if (copy[k]) copy[k] = copy[k].map(refreshIds); });
+        if (copy.branches) copy.branches = copy.branches.map(branch => branch.map(refreshIds));
         return copy;
     }
     function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
+    function instructionExplainer(type) {
+        const x={WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a keyboard key.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
+        return x[type]||"A Blockwork instruction block.";
+    }
+    onAppStateChanged: {
+        if (appState.standalone_key !== null && appState.standalone_key !== undefined) {
+            sidebarKey = appState.standalone_key;
+            root.invoke("clear_standalone_key_capture");
+        }
+    }
 
     ColumnLayout {
         anchors.fill: parent; spacing: 0
@@ -86,7 +110,7 @@ Item {
                 BwButton { primary: true; iconName: appState.loop_mode_enabled ? "repeat" : "play"; text: appState.loop_mode_enabled ? "Start loop" : "Run macro"; enabled: appState.macro_selected !== null; onClicked: root.invoke("run_macro") }
                 BwSwitch { Accessible.name: "Loop mode"; checked: appState.loop_mode_enabled; onToggled: checked => root.invoke("toggle_loop_mode", { enabled: checked }) }
                 Item { Layout.fillWidth: true }
-                BwButton { danger: true; iconName: root.recording ? "square" : "circle"; text: root.recordingLabel(); enabled: appState.macro_selected !== null; onClicked: root.invoke(root.recording ? "stop_recording" : "start_recording") }
+                BwButton { danger: true; iconName: root.recording ? "square" : "circle"; iconFilled: !root.recording; text: root.recordingLabel(); enabled: appState.macro_selected !== null; onClicked: root.invoke(root.recording ? "stop_recording" : "start_recording") }
                 BwButton { iconName: "sliders"; text: ""; onClicked: recordingSettings.open() }
             }
         }
@@ -97,7 +121,12 @@ Item {
                 Text { text: "Title"; color: "#a1a2a7"; font.pixelSize: 13 }
                 BwTextField { Layout.fillWidth: true; text: root.macro ? root.macro.name : ""; onEditingFinished: root.invoke("set_title", { title: text }) }
                 Text { text: "Speed"; color: "#a1a2a7"; font.pixelSize: 13 }
-                Slider { id: speed; from: 0.1; to: 10; value: root.macro ? root.macro.speed_multiplier : 1; Layout.preferredWidth: 160; onMoved: root.invoke("set_macro_speed_multiplier", { multiplier: value }) }
+                Slider {
+                    id:speed;from:.1;to:10;value:root.macro?root.macro.speed_multiplier:1;Layout.preferredWidth:160;implicitHeight:30
+                    onMoved:root.invoke("set_macro_speed_multiplier",{multiplier:value})
+                    background:Rectangle{x:speed.leftPadding;y:speed.topPadding+speed.availableHeight/2-height/2;width:speed.availableWidth;height:5;radius:3;color:"#45474d";Rectangle{width:speed.visualPosition*parent.width;height:parent.height;radius:3;color:Theme.accent}}
+                    handle:Rectangle{x:speed.leftPadding+speed.visualPosition*(speed.availableWidth-width);y:speed.topPadding+speed.availableHeight/2-height/2;width:16;height:16;radius:8;color:"white";border.width:2;border.color:Theme.accent}
+                }
                 BwTextField { text: Number(speed.value).toFixed(2); Layout.preferredWidth: 62; horizontalAlignment: Text.AlignRight; onEditingFinished: root.invoke("set_macro_speed_multiplier", { multiplier: Number(text) }) }
                 Text { text: "x"; color: "#a1a2a7" }
             }
@@ -109,12 +138,22 @@ Item {
                 PalettePanel {
                     Layout.preferredWidth: 330; Layout.fillHeight: true
                     instructionTypes: root.instructionTypes
+                    listInstructionTypes: root.listInstructionTypes
                     variables: root.macro ? root.macro.variables : []
+                    lists: root.macro && root.macro.lists ? root.macro.lists : []
                     blockDefinitions: root.macro ? root.macro.block_defs : []
+                    keyCapture: appState.key_capture
+                    standaloneKey: root.sidebarKey
                     onBlockActivated: type => root.addBlock(type, 120, 120)
                     onCustomBlockActivated: definition => root.addCustomBlock(definition, 120, 120)
                     onMakeVariableRequested: variableDialog.open()
+                    onMakeListRequested: listDialog.openForCreate()
+                    onListEditorStateRequested: (name, visible, x, y) => root.invoke("set_list_editor_state", { name: name, visible: visible, x: x, y: y })
+                    onRenameListRequested: name => listDialog.openForRename(name)
+                    onDeleteListRequested: name => { deleteListDialog.listName = name; deleteListDialog.open(); }
                     onMakeBlockRequested: blockDialog.open()
+                    onStandaloneKeyCaptureRequested: root.invoke("start_standalone_key_capture")
+                    onDetailsRequested:(name,identifier,explainer)=>detailsDialog.show(name,identifier,explainer)
                     onValueActivated: value => root.invoke("create_floating_value", { x: 160, y: 140, value: value, originBlockId: null })
                 }
                 BlockCanvas {
@@ -123,17 +162,26 @@ Item {
                     comments: root.macro ? root.macro.comments : []
                     floatingValues: root.macro ? root.macro.floating_values : []
                     variables: root.macro ? root.macro.variables : []
+                    lists: root.macro && root.macro.lists ? root.macro.lists : []
                     blockDefinitions: root.macro ? root.macro.block_defs : []
+                    keyCapture: appState.key_capture
                     locked: root.recording
                     onStrandMoved: (strandId, x, y) => root.invoke("move_strand", { strandId: strandId, x: x, y: y })
                     onInstructionSplit: (strandId, path, x, y) => root.invoke("split_strand", { strandId: strandId, path: path, x: x, y: y })
-                    onBlockDropped: (type, x, y) => root.addBlock(type, x, y)
+                    onBlockDropped: (type, x, y) => {
+                        if(type.indexOf("__custom:")===0){const id=type.substring(9);const def=(root.macro.block_defs||[]).find(d=>d.id===id);if(def)root.addCustomBlock(def,x,y);}
+                        else root.addBlock(type,x,y);
+                    }
+                    onValueDropped:(value,x,y)=>root.invoke("create_floating_value",{x:x,y:y,value:value,originBlockId:null})
                     onInstructionRemoved: (strandId, path) => root.invoke("remove_instruction", { strandId: strandId, path: path })
                     onInstructionDuplicated: (strandId, path, instruction) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: root.refreshIds(instruction) })
                     onInstructionEdited: (strandId, path, instruction) => root.invoke("edit_instruction", { strandId: strandId, path: path, instruction: instruction })
+                    onRunBranchRequested: (strandId, path, name) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: { id: root.uuid(), type: "RunBranch", name: name } })
                     onValueEdited: (location, text) => root.invoke("edit_value_field", { location: location, text: text })
                     onCommentForInstructionRequested: instruction => root.invoke("create_attached_comment", { instructionId: instruction.id, dx: 48, dy: 18, text: "" })
                     onRecordingTargetRequested: strandId => root.invoke("set_recording_target", { strandId: strandId })
+                    onKeyCaptureRequested:(strandId,path)=>root.invoke("start_key_capture",{strandId:strandId,path:path})
+                    onDetailsRequested:type=>detailsDialog.show(type,type,root.instructionExplainer(type))
                     onCanvasNoteRequested: (x, y) => root.invoke("create_comment", { x: x, y: y, text: "" })
                     onClearRequested: root.invoke("clear_instructions")
                     onCommentMoved: (commentId, x, y) => root.invoke("move_comment", { commentId: commentId, x: x, y: y })
@@ -142,6 +190,8 @@ Item {
                     onCommentRemoved: commentId => root.invoke("remove_comment", { commentId: commentId })
                     onFloatingValueMoved: (floatingId, x, y) => root.invoke("move_floating_value", { floatingId: floatingId, x: x, y: y })
                     onFloatingValueRemoved: floatingId => root.invoke("remove_floating_value", { floatingId: floatingId })
+                    onListItemsEdited: (name, items) => root.invoke("set_list_items", { name: name, items: items })
+                    onListEditorStateChanged: (name, visible, x, y) => root.invoke("set_list_editor_state", { name: name, visible: visible, x: x, y: y })
                 }
             }
             Rectangle {
@@ -196,6 +246,7 @@ Item {
     }
     Dialog {
         id: variableDialog; anchors.centerIn: parent; modal: true; title: "Make a Variable"; standardButtons: Dialog.Ok | Dialog.Cancel
+        background:Rectangle{radius:10;color:Theme.panel;border.color:Theme.border}
         Column { width: 340; spacing: 8
             Text { text: "Variable name"; color: "#e7e7e8" }
             BwTextField { id: variableName; width: parent.width; placeholderText: "score" }
@@ -204,6 +255,47 @@ Item {
             const name = variableName.text.trim();
             if (name.length) root.invoke("create_variable", { name: name });
             variableName.clear();
+        }
+    }
+    Dialog {
+        id: listDialog
+        anchors.centerIn: parent; modal: true
+        property string renameTarget: ""
+        title: renameTarget.length ? "Rename List" : "Make a List"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        background:Rectangle{radius:10;color:Theme.panel;border.color:Theme.border}
+        function openForCreate() { renameTarget = ""; listName.text = ""; open(); listName.forceActiveFocus(); }
+        function openForRename(name) { renameTarget = name; listName.text = name; open(); listName.forceActiveFocus(); listName.selectAll(); }
+        Column { width: 340; spacing: 8
+            Text { text: "List name"; color: "#e7e7e8" }
+            BwTextField { id: listName; width: parent.width; placeholderText: "items" }
+        }
+        onAccepted: {
+            const name = listName.text.trim();
+            if (!name.length) return;
+            if (renameTarget.length) root.invoke("rename_list", { oldName: renameTarget, newName: name });
+            else root.invoke("create_list", { name: name });
+            renameTarget = ""; listName.clear();
+        }
+    }
+    Dialog {
+        id: deleteListDialog
+        anchors.centerIn: parent; modal: true; title: "Delete list?"; standardButtons: Dialog.Yes | Dialog.Cancel
+        property string listName: ""
+        background:Rectangle{radius:10;color:Theme.panel;border.color:Theme.border}
+        Text { text: "Delete “" + deleteListDialog.listName + "” and its saved items?"; color: "#e7e7e8" }
+        onAccepted: root.invoke("delete_list", { name: listName })
+    }
+    Dialog {
+        id:detailsDialog;anchors.centerIn:parent;modal:true;standardButtons:Dialog.NoButton;width:430
+        property string detailName:"";property string detailIdentifier:"";property string detailExplainer:""
+        function show(name,identifier,explainer){detailName=name;detailIdentifier=identifier;detailExplainer=explainer;open()}
+        background:Rectangle{radius:10;color:Theme.panel;border.color:Theme.border}
+        contentItem:Column{spacing:12;padding:18
+            Row{spacing:9;LucideIcon{name:"info";width:20;height:20;color:Theme.accent;anchors.verticalCenter:parent.verticalCenter}Text{text:detailsDialog.detailName;color:Theme.text;font.pixelSize:17;font.weight:Font.Bold;anchors.verticalCenter:parent.verticalCenter}}
+            Rectangle{width:parent.width-36;height:30;radius:5;color:Theme.field;border.color:Theme.border;Text{anchors.centerIn:parent;text:detailsDialog.detailIdentifier;color:Theme.accent;font.family:"monospace";font.pixelSize:12}}
+            Text{width:parent.width-36;text:detailsDialog.detailExplainer;color:Theme.textDim;font.pixelSize:13;wrapMode:Text.WordWrap}
+            Row{anchors.right:parent.right;anchors.rightMargin:18;BwButton{text:"Close";onClicked:detailsDialog.close()}}
         }
     }
     MakeBlockDialog { id:blockDialog; onCreateRequested:(pieces,shape,color)=>root.invoke("create_block",{pieces:pieces,shape:shape,color:color}) }

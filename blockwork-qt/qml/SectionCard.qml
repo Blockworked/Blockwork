@@ -7,7 +7,7 @@ Rectangle {
     property string title: ""
     property string iconName: ""
     default property alias content: body.data
-    implicitHeight: header.height + body.implicitHeight + 20
+    implicitHeight: header.height + body.implicitHeight + 36
     radius: 16
     color: "#292a2d"
     border.color: "#3d3e42"
@@ -20,8 +20,8 @@ Rectangle {
         radius: root.radius
         Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: root.radius; color: parent.color }
         Row { anchors.left: parent.left; anchors.leftMargin: 18; anchors.verticalCenter: parent.verticalCenter; spacing: 9
-            LucideIcon { name: root.iconName; color: "#9da0a8"; width: 16; height: 16 }
-            Text { text: root.title.toUpperCase(); color: "#a7a8ae"; font.pixelSize: 12; font.weight: Font.Bold; font.letterSpacing: 1.2 }
+            LucideIcon { name: root.iconName; color: "#9da0a8"; width: 16; height: 16; anchors.verticalCenter:parent.verticalCenter }
+            Text { text: root.title.toUpperCase(); color: "#a7a8ae"; font.pixelSize: 12; font.weight: Font.Bold; font.letterSpacing: 1.2; anchors.verticalCenter:parent.verticalCenter }
         }
     }
     ColumnLayout { id: body; anchors.left: parent.left; anchors.right: parent.right; anchors.top: header.bottom; anchors.margins: 18; spacing: 12 }
