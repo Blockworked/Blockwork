@@ -581,6 +581,7 @@ dependencies = [
 name = "blockwork-qt"
 version = "0.5.4"
 dependencies = [
+ "base64 0.23.1",
  "blockstitch-qml",
  "blockwork-protocol",
  "cxx",
@@ -589,6 +590,7 @@ dependencies = [
  "cxx-qt-lib",
  "dirs 7.0.0",
  "libc",
+ "png",
  "qt-build-utils",
  "qt-version",
  "serde",
@@ -597,6 +599,7 @@ dependencies = [
  "tracing",
  "tracing-log",
  "tracing-subscriber",
+ "windows-sys 0.61.2",
  "winres",
 ]
 

@@ -91,6 +91,20 @@ Item {
         appSelector.title = type === "CloseApp" ? "Choose an App to Close" : "Choose an App";
         appSelector.open();
     }
+    function resolvePickedIcon(app) {
+        if (app.icon) return app.icon;
+        // The backend ships no icons on some platforms - resolve the launch
+        // target's native file icon so the block keeps showing it.
+        try {
+            if (root.appBridge && typeof root.appBridge.nativeAppIcon === "function") {
+                const resolved = root.appBridge.nativeAppIcon(app.command || "");
+                if (resolved) return resolved;
+            }
+        } catch (e) {
+            console.warn("Failed to resolve native app icon", e);
+        }
+        return null;
+    }
     function applyPickedApp(app) {
         const req = appPickerRequest;
         appPickerRequest = null;
@@ -99,7 +113,7 @@ Item {
             const fresh = defaultInstruction(req.paletteType);
             fresh.command = app.command;
             fresh.name = app.name;
-            fresh.icon = app.icon || null;
+            fresh.icon = root.resolvePickedIcon(app);
             root.invoke("add_strand", { x: 120, y: 120, instruction: fresh });
             return;
         }
@@ -107,7 +121,7 @@ Item {
         const updated = JSON.parse(JSON.stringify(current));
         updated.command = app.command;
         updated.name = app.name;
-        updated.icon = app.icon || null;
+        updated.icon = root.resolvePickedIcon(app);
         root.invoke("edit_instruction", { strandId: req.strandId, path: req.path, instruction: updated });
     }
     // ---- dragging a palette entry onto the canvas ----
@@ -125,6 +139,18 @@ Item {
         // Live attach preview, just like canvas drags: the canvas opens the
         // hovered gap and shows where the new block will land.
         const spec = paletteDrag.spec;
+        if (spec && spec.kind === "value") {
+            canvas.clearSnap();
+            // Pass the dragged ghost's scene footprint so the canvas targets
+            // the nearest slot to the block (proximity), not the bare cursor.
+            // The ghost loader may not have built yet on the first move;
+            // then the size is 0 and the canvas falls back to the pointer.
+            const g1 = ghostLayer.mapToItem(null, ghost.x, ghost.y);
+            const g2 = ghostLayer.mapToItem(null, ghost.x + ghost.width, ghost.y + ghost.height);
+            canvas.updatePaletteValueTargetRect(g1.x, g1.y, g2.x, g2.y, sx, sy);
+            return;
+        }
+        canvas.updatePaletteValueTarget(null, null);
         if (spec && spec.kind !== "value" && spec.instruction) {
             const at = canvas.workspacePoint(sx, sy);
             if (at) canvas.updatePaletteSnap(at.x - paletteDrag.offsetX / canvas.zoom, at.y - paletteDrag.offsetY / canvas.zoom, spec.instruction, ghost.width, ghost.height);
@@ -144,12 +170,15 @@ Item {
         const snapValid = canvas.paletteSnapValid;
         const snapTargetId = canvas.paletteSnapTargetId;
         const snapPath = JSON.parse(JSON.stringify(canvas.paletteSnapPath || []));
+        const valueTarget = canvas.paletteValueTarget ? JSON.parse(JSON.stringify(canvas.paletteValueTarget)) : null;
         cancelPaletteDrag();
         if (!drag || recording) return;
+        const spec = drag.spec;
+        // A fresh operator dropped straight onto a value slot fills it.
+        if (spec.kind === "value" && valueTarget) { root.invoke("put_value", { location: valueTarget, value: spec.value }); return; }
         const at = canvas.workspacePoint(sx, sy);
         if (!at) return;
         const x = Math.round(at.x - drag.offsetX / canvas.zoom), y = Math.round(at.y - drag.offsetY / canvas.zoom);
-        const spec = drag.spec;
         if (spec.kind === "value") { root.invoke("create_floating_value", { x: x, y: y, value: spec.value, originBlockId: null }); return; }
         // Attach into the previewed gap when one is showing, else park as a
         // new detached strand - mirrors the webapp palette drop.
@@ -169,12 +198,19 @@ Item {
         if (spec.kind === "custom") root.addCustomBlock(spec.definition, x, y);
         else root.addBlock(spec.type, x, y);
     }
-    function cancelPaletteDrag() { paletteDrag = null; ghost.visible = false; ghost.spec = null; canvas.clearSnap(); }
+    function cancelPaletteDrag() { paletteDrag = null; ghost.visible = false; ghost.spec = null; canvas.clearSnap(); canvas.updatePaletteValueTarget(null, null); }
     // A canvas block dropped on the sidebar deletes it and everything below it in its stack.
     function trashDraggedBlocks(strandId, path, tailCount, sx, sy) {
         if (!palette.contains(palette.mapFromItem(null, sx, sy))) return;
         if (path.length === 1 && path[0].index === 0) { root.invoke("remove_strand", { strandId: strandId }); return; }
         for (let i = 0; i < tailCount; ++i) root.invoke("remove_instruction", { strandId: strandId, path: path });
+    }
+    // An existing value dropped on the sidebar resets its slot (fields) or
+    // deletes it (whole floating blocks) - mirrors the webapp trash.
+    function trashDraggedValue(location, value, sx, sy) {
+        if (!palette.contains(palette.mapFromItem(null, sx, sy))) return;
+        if (location.kind === "Floating" && !(location.path && location.path.length)) root.invoke("remove_floating_value", { floatingId: location.floating_id });
+        else root.invoke("take_value", { location: location });
     }
     onAppStateChanged: {
         if (appState.standalone_key !== null && appState.standalone_key !== undefined) {
@@ -288,6 +324,10 @@ Item {
                     onInstructionEdited: (strandId, path, instruction) => root.invoke("edit_instruction", { strandId: strandId, path: path, instruction: instruction })
                     onRunBranchRequested: (strandId, path, name) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: { id: root.uuid(), type: "RunBranch", name: name } })
                     onValueEdited: (location, text) => root.invoke("edit_value_field", { location: location, text: text })
+                    onValueTakeRequested: location => root.invoke("take_value", { location: location })
+                    onValuePutRequested: (location, value) => root.invoke("put_value", { location: location, value: value })
+                    onValueCreateRequested: (x, y, value) => root.invoke("create_floating_value", { x: x, y: y, value: value, originBlockId: null })
+                    onValueDragOutside: (location, value, sx, sy) => root.trashDraggedValue(location, value, sx, sy)
                     onCommentForInstructionRequested: instruction => root.invoke("create_attached_comment", { instructionId: instruction.id, dx: 48, dy: 18, text: "" })
                     onRecordingTargetRequested: strandId => root.invoke("set_recording_target", { strandId: strandId })
                     onKeyCaptureRequested:(strandId,path)=>root.invoke("start_key_capture",{strandId:strandId,path:path})
@@ -437,6 +477,7 @@ Item {
                 sourceComponent: ValueChip {
                     valueData: ghost.spec.value; boxed: true; editable: false
                     forceBoolean: !!ghost.spec.forceBoolean; callDisplayLabel: ghost.spec.label || "custom block"
+                    blockDefinitions: root.macro ? root.macro.block_defs : []
                 }
             }
         }

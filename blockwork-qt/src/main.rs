@@ -6,6 +6,7 @@
 mod app_bridge;
 mod app_icon;
 mod daemon_client;
+mod native_icon;
 mod qt_diagnostics;
 
 use cxx_qt::casting::Upcast;

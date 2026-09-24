@@ -31,5 +31,10 @@ qt-version = { version = "0.1", features = ["qt_version_at_least_6_10"] }
 [target.'cfg(windows)'.build-dependencies]
 winres = "0.1"
 
+[target.'cfg(windows)'.dependencies]
+windows-sys.workspace = true
+png = "0.18"
+base64.workspace = true
+
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

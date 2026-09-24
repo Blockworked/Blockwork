@@ -106,6 +106,7 @@ BwDialog {
         }
 
         ScrollView {
+            id: appScroll
             Layout.fillWidth: true
             Layout.fillHeight: true
             Layout.preferredHeight: 380
@@ -114,14 +115,32 @@ BwDialog {
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
 
             Flow {
-                width: parent.width
+                id: appGrid
+                // NOTE: must not use parent.width here - inside a ScrollView
+                // the Flow is reparented to the flickable content whose width
+                // derives from the Flow itself, collapsing the grid to a
+                // single column. Bind the viewport width explicitly instead.
+                width: appScroll.availableWidth
                 spacing: 8
+                // Fixed-width tiles left a ~150px gutter on the right; size
+                // them to fill the row with exactly four columns instead.
+                readonly property int columns: 4
+                readonly property real tileWidth: Math.max(1, (width - (columns - 1) * spacing) / columns)
                 Repeater {
                     model: root.filteredApps
                     delegate: Rectangle {
+                        id: tile
                         required property var modelData
                         required property int index
-                        width: 144
+                        property bool iconFailed: false
+                        // Backend data URIs first; where the backend ships no
+                        // icons (Windows/macOS listings) resolve the launch
+                        // target's native file icon instead, so tiles show
+                        // real icons rather than placeholders.
+                        readonly property string resolvedIcon: modelData.icon
+                            || (root.bridge && typeof root.bridge.nativeAppIcon === "function"
+                                ? root.bridge.nativeAppIcon(modelData.command || "") : "")
+                        width: appGrid.tileWidth
                         height: 104
                         radius: Theme.radius
                         color: hover.hovered ? "#3b3c40" : Theme.panelRaised
@@ -131,16 +150,30 @@ BwDialog {
                             spacing: 6
                             width: parent.width - 16
                             Image {
-                                visible: !!modelData.icon
-                                source: modelData.icon || ""
+                                visible: !!tile.resolvedIcon && !tile.iconFailed
+                                source: tile.resolvedIcon
                                 width: 32
                                 height: 32
                                 anchors.horizontalCenter: parent.horizontalCenter
                                 fillMode: Image.PreserveAspectFit
                                 smooth: true
+                                mipmap: true
+                                // Decode off the GUI thread: icon themes serve
+                                // large SVGs/PNGs and a full grid of them would
+                                // otherwise stall the dialog. Rasterize at 2x
+                                // so icons stay crisp on HiDPI displays.
+                                asynchronous: true
+                                sourceSize.width: 64
+                                sourceSize.height: 64
+                                onStatusChanged: {
+                                    if (status === Image.Error) {
+                                        tile.iconFailed = true;
+                                        console.warn("AppSelectorDialog: failed to load icon for \"" + (modelData.name || "?") + "\"");
+                                    }
+                                }
                             }
                             LucideIcon {
-                                visible: !modelData.icon
+                                visible: !tile.resolvedIcon || tile.iconFailed
                                 name: "app-window"
                                 color: Theme.textDim
                                 width: 28

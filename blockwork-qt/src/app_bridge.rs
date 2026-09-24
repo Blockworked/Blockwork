@@ -1,6 +1,7 @@
-use crate::daemon_client;
+use crate::{daemon_client, native_icon};
 use cxx_qt::CxxQtType;
 use cxx_qt_lib::QString;
+use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::mpsc;
 
@@ -38,6 +39,14 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "refreshInstalledApps"]
         fn refresh_installed_apps(self: Pin<&mut AppBridge>);
+
+        /// Native file icon for an installed app's launch target as a PNG
+        /// data: URI (or empty when none resolves). The backend ships icons
+        /// only on some platforms; the picker and the Open/Close App blocks
+        /// use this to fill the gap natively. Results are memoized.
+        #[qinvokable]
+        #[cxx_name = "nativeAppIcon"]
+        fn native_app_icon(self: Pin<&mut AppBridge>, command: &QString) -> QString;
     }
 }
 
@@ -54,6 +63,7 @@ pub struct AppBridgeRust {
     started: bool,
     request_tx: Option<tokio::sync::mpsc::UnboundedSender<daemon_client::Request>>,
     event_rx: Option<mpsc::Receiver<daemon_client::Event>>,
+    native_icon_cache: HashMap<String, QString>,
 }
 
 impl Default for AppBridgeRust {
@@ -71,6 +81,7 @@ impl Default for AppBridgeRust {
             started: false,
             request_tx: None,
             event_rx: None,
+            native_icon_cache: HashMap::new(),
         }
     }
 }
@@ -166,5 +177,19 @@ impl qobject::AppBridge {
                 "Blockwork is not connected to its background service",
             ));
         }
+    }
+
+    pub fn native_app_icon(mut self: Pin<&mut Self>, command: &QString) -> QString {
+        const SIZE: i32 = 64;
+        let key = command.to_string();
+        if let Some(cached) = self.rust().native_icon_cache.get(&key) {
+            return cached.clone();
+        }
+        let icon = QString::from(&native_icon::app_icon(&key, SIZE));
+        self.as_mut()
+            .rust_mut()
+            .native_icon_cache
+            .insert(key, icon.clone());
+        icon
     }
 }
