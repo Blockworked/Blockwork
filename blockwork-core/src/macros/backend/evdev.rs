@@ -632,40 +632,40 @@ pub(super) fn start_capture_thread(
             is_buttonpad || (has_abs && !has_rel)
         };
 
-        // Enumerate and grab exclusive (keyboard/mouse-like) devices.
-        let grabbed: Vec<_> = evdev::enumerate()
-            .filter_map(|(path, mut device)| {
-                let name = device.name().unwrap_or("").to_owned();
-                if name == "macros-input" {
-                    return None;
+        // Enumerate and grab exclusive (keyboard/mouse-like) devices. A device
+        // with keys held is grabbed later: the release would never reach the
+        // desktop, leaving the key stuck down.
+        let mut grabbed: Vec<evdev::Device> = Vec::new();
+        let mut deferred: Vec<evdev::Device> = Vec::new();
+        for (path, mut device) in evdev::enumerate() {
+            let name = device.name().unwrap_or("").to_owned();
+            if name == "macros-input" || is_touchpad(&device) {
+                continue;
+            }
+            let has_keys = device
+                .supported_keys()
+                .map(|s| s.contains(KeyCode::KEY_A) || s.contains(KeyCode::BTN_LEFT))
+                .unwrap_or(false);
+            let has_rel = device
+                .supported_relative_axes()
+                .map(|s| s.contains(RelativeAxisCode::REL_X))
+                .unwrap_or(false);
+            if !has_keys && !has_rel {
+                tracing::info!("evdev: skipping {:?} ({}) - no keys or relative motion", path, name);
+                continue;
+            }
+            match try_grab(&mut device) {
+                Ok(true) => {
+                    tracing::info!("evdev: grabbed {:?} ({}) - keys={} rel={}", path, name, has_keys, has_rel);
+                    grabbed.push(device);
                 }
-                if is_touchpad(&device) {
-                    return None;
+                Ok(false) => {
+                    tracing::info!("evdev: {:?} ({}) has keys held, deferring grab", path, name);
+                    deferred.push(device);
                 }
-                let has_keys = device
-                    .supported_keys()
-                    .map(|s| s.contains(KeyCode::KEY_A) || s.contains(KeyCode::BTN_LEFT))
-                    .unwrap_or(false);
-                let has_rel = device
-                    .supported_relative_axes()
-                    .map(|s| s.contains(RelativeAxisCode::REL_X))
-                    .unwrap_or(false);
-                if !has_keys && !has_rel {
-                    tracing::info!("evdev: skipping {:?} ({}) - no keys or relative motion", path, name);
-                    return None;
-                }
-                match device.grab() {
-                    Ok(()) => {
-                        tracing::info!("evdev: grabbed {:?} ({}) - keys={} rel={}", path, name, has_keys, has_rel);
-                        Some(device)
-                    }
-                    Err(e) => {
-                        warn!("Failed to grab {:?} ({}): {}", path, name, e);
-                        None
-                    }
-                }
-            })
-            .collect();
+                Err(e) => warn!("Failed to grab {:?} ({}): {}", path, name, e),
+            }
+        }
 
         // Enumerate touchpads separately, opened non-exclusively.
         let touchpads: Vec<_> = evdev::enumerate()
@@ -679,10 +679,10 @@ pub(super) fn start_capture_thread(
             })
             .collect();
 
-        if grabbed.is_empty() && touchpads.is_empty() {
+        if grabbed.is_empty() && deferred.is_empty() && touchpads.is_empty() {
             warn!("No input devices found; global hotkeys and recording unavailable.");
             crate::recording::set_grab_failed(true);
-        } else if grabbed.is_empty() {
+        } else if grabbed.is_empty() && deferred.is_empty() {
             warn!("No devices could be exclusively grabbed (only touchpads found); global hotkeys unavailable, but touchpad recording still works.");
             crate::recording::set_grab_failed(true);
         } else {
@@ -693,110 +693,27 @@ pub(super) fn start_capture_thread(
             spawn_touchpad_reader(device, tx.clone());
         }
 
-        // Spawn one reader thread per grabbed device.
-        for mut device in grabbed {
+        for device in grabbed {
+            spawn_reader(device, tx.clone());
+        }
+
+        for mut device in deferred {
             let tx = tx.clone();
             std::thread::Builder::new()
-                .name("evdev-reader".into())
+                .name("evdev-grab-wait".into())
                 .spawn(move || {
-                    crate::macros::priority::raise_current_thread_priority();
-                    let mut pending_dx = 0i32;
-                    let mut pending_dy = 0i32;
-                    let mut pending_wv = 0i32;
-                    let mut pending_wh = 0i32;
-                    let mut raw_x: Option<InputEvent> = None;
-                    let mut raw_y: Option<InputEvent> = None;
-                    let mut raw_wv: Option<InputEvent> = None;
-                    let mut raw_wh: Option<InputEvent> = None;
-                    let mut other_batch: Vec<InputEvent> = Vec::new();
-
                     loop {
-                        let events = match device.fetch_events() {
-                            Ok(e) => e,
+                        match try_grab(&mut device) {
+                            Ok(true) => break,
+                            Ok(false) => std::thread::sleep(std::time::Duration::from_millis(20)),
                             Err(e) => {
-                                warn!("evdev read error: {}", e);
-                                break;
-                            }
-                        };
-
-                        for event in events {
-                            match event.event_type() {
-                                EventType::KEY => {
-                                    if !other_batch.is_empty() {
-                                        let _ = tx.send(DeviceMsg::OtherBatch(
-                                            std::mem::take(&mut other_batch),
-                                        ));
-                                    }
-                                    let key = KeyCode(event.code());
-                                    let value = event.value();
-                                    if value == 2 {
-                                        // Autorepeat: pass through silently
-                                        let _ = tx.send(DeviceMsg::OtherBatch(vec![event]));
-                                        continue;
-                                    }
-                                    let is_btn = key.0 >= 0x100; // BTN_MISC = 0x100
-                                    let pressed = value == 1;
-                                    let msg = if is_btn {
-                                        if pressed {
-                                            DeviceMsg::ButtonPress { key, raw: event }
-                                        } else {
-                                            DeviceMsg::ButtonRelease { key, raw: event }
-                                        }
-                                    } else if pressed {
-                                        DeviceMsg::KeyPress { key, raw: event }
-                                    } else {
-                                        DeviceMsg::KeyRelease { key, raw: event }
-                                    };
-                                    let _ = tx.send(msg);
-                                }
-                                EventType::RELATIVE => {
-                                    match RelativeAxisCode(event.code()) {
-                                        RelativeAxisCode::REL_X => {
-                                            pending_dx += event.value();
-                                            raw_x = Some(event);
-                                        }
-                                        RelativeAxisCode::REL_Y => {
-                                            pending_dy += event.value();
-                                            raw_y = Some(event);
-                                        }
-                                        RelativeAxisCode::REL_WHEEL => {
-                                            pending_wv += event.value();
-                                            raw_wv = Some(event);
-                                        }
-                                        RelativeAxisCode::REL_HWHEEL => {
-                                            pending_wh += event.value();
-                                            raw_wh = Some(event);
-                                        }
-                                        _ => other_batch.push(event),
-                                    }
-                                }
-                                EventType::SYNCHRONIZATION => {
-                                    if !other_batch.is_empty() {
-                                        let _ = tx.send(DeviceMsg::OtherBatch(
-                                            std::mem::take(&mut other_batch),
-                                        ));
-                                    }
-                                    if pending_dx != 0 || pending_dy != 0 {
-                                        let _ = tx.send(DeviceMsg::MouseMove {
-                                            dx: std::mem::replace(&mut pending_dx, 0),
-                                            dy: std::mem::replace(&mut pending_dy, 0),
-                                            raw_x: raw_x.take(),
-                                            raw_y: raw_y.take(),
-                                        });
-                                    }
-                                    if pending_wv != 0 || pending_wh != 0 {
-                                        let _ = tx.send(DeviceMsg::Scroll {
-                                            v: std::mem::replace(&mut pending_wv, 0),
-                                            h: std::mem::replace(&mut pending_wh, 0),
-                                            raw_v: raw_wv.take(),
-                                            raw_h: raw_wh.take(),
-                                        });
-                                    }
-                                }
-                                _ => other_batch.push(event),
+                                warn!("Failed to grab deferred device: {}", e);
+                                return;
                             }
                         }
                     }
+                    crate::recording::set_grab_failed(false);
+                    spawn_reader(device, tx);
                 })
                 .ok();
         }
@@ -938,6 +855,130 @@ pub(super) fn start_capture_thread(
             })
             .ok();
     });
+}
+
+fn spawn_reader(mut device: evdev::Device, tx: std::sync::mpsc::SyncSender<DeviceMsg>) {
+    std::thread::Builder::new()
+        .name("evdev-reader".into())
+        .spawn(move || {
+            crate::macros::priority::raise_current_thread_priority();
+            let mut pending_dx = 0i32;
+            let mut pending_dy = 0i32;
+            let mut pending_wv = 0i32;
+            let mut pending_wh = 0i32;
+            let mut raw_x: Option<InputEvent> = None;
+            let mut raw_y: Option<InputEvent> = None;
+            let mut raw_wv: Option<InputEvent> = None;
+            let mut raw_wh: Option<InputEvent> = None;
+            let mut other_batch: Vec<InputEvent> = Vec::new();
+
+            loop {
+                let events = match device.fetch_events() {
+                    Ok(e) => e,
+                    Err(e) => {
+                        warn!("evdev read error: {}", e);
+                        break;
+                    }
+                };
+
+                for event in events {
+                    match event.event_type() {
+                        EventType::KEY => {
+                            if !other_batch.is_empty() {
+                                let _ = tx.send(DeviceMsg::OtherBatch(
+                                    std::mem::take(&mut other_batch),
+                                ));
+                            }
+                            let key = KeyCode(event.code());
+                            let value = event.value();
+                            if value == 2 {
+                                // Autorepeat: pass through silently
+                                let _ = tx.send(DeviceMsg::OtherBatch(vec![event]));
+                                continue;
+                            }
+                            let is_btn = key.0 >= 0x100; // BTN_MISC = 0x100
+                            let pressed = value == 1;
+                            let msg = if is_btn {
+                                if pressed {
+                                    DeviceMsg::ButtonPress { key, raw: event }
+                                } else {
+                                    DeviceMsg::ButtonRelease { key, raw: event }
+                                }
+                            } else if pressed {
+                                DeviceMsg::KeyPress { key, raw: event }
+                            } else {
+                                DeviceMsg::KeyRelease { key, raw: event }
+                            };
+                            let _ = tx.send(msg);
+                        }
+                        EventType::RELATIVE => {
+                            match RelativeAxisCode(event.code()) {
+                                RelativeAxisCode::REL_X => {
+                                    pending_dx += event.value();
+                                    raw_x = Some(event);
+                                }
+                                RelativeAxisCode::REL_Y => {
+                                    pending_dy += event.value();
+                                    raw_y = Some(event);
+                                }
+                                RelativeAxisCode::REL_WHEEL => {
+                                    pending_wv += event.value();
+                                    raw_wv = Some(event);
+                                }
+                                RelativeAxisCode::REL_HWHEEL => {
+                                    pending_wh += event.value();
+                                    raw_wh = Some(event);
+                                }
+                                _ => other_batch.push(event),
+                            }
+                        }
+                        EventType::SYNCHRONIZATION => {
+                            if !other_batch.is_empty() {
+                                let _ = tx.send(DeviceMsg::OtherBatch(
+                                    std::mem::take(&mut other_batch),
+                                ));
+                            }
+                            if pending_dx != 0 || pending_dy != 0 {
+                                let _ = tx.send(DeviceMsg::MouseMove {
+                                    dx: std::mem::replace(&mut pending_dx, 0),
+                                    dy: std::mem::replace(&mut pending_dy, 0),
+                                    raw_x: raw_x.take(),
+                                    raw_y: raw_y.take(),
+                                });
+                            }
+                            if pending_wv != 0 || pending_wh != 0 {
+                                let _ = tx.send(DeviceMsg::Scroll {
+                                    v: std::mem::replace(&mut pending_wv, 0),
+                                    h: std::mem::replace(&mut pending_wh, 0),
+                                    raw_v: raw_wv.take(),
+                                    raw_h: raw_wh.take(),
+                                });
+                            }
+                        }
+                        _ => other_batch.push(event),
+                    }
+                }
+            }
+        })
+        .ok();
+}
+
+/// Grabs the device only while no key/button is down. `Ok(false)` means keys
+/// are held and nothing was grabbed.
+fn try_grab(device: &mut evdev::Device) -> io::Result<bool> {
+    let held = |d: &evdev::Device| {
+        d.get_key_state().map(|s| s.iter().next().is_some()).unwrap_or(false)
+    };
+    if held(device) {
+        return Ok(false);
+    }
+    device.grab()?;
+    // A key may have gone down between the check and the grab.
+    if held(device) {
+        device.ungrab()?;
+        return Ok(false);
+    }
+    Ok(true)
 }
 
 /// Reads a touchpad non-exclusively (never `.grab()`ed - see the comment
