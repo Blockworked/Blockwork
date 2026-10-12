@@ -114,6 +114,7 @@ BwDialog {
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            WheelPan { flickable: appScroll.contentItem }
 
             Flow {
                 id: appGrid

@@ -67,6 +67,9 @@ const MOUSE_PLAYBACK_OVERHEAD: Duration = Duration::ZERO;
 // the gap since recording-start, instead of collapsing to zero.
 static HW_ELAPSED_OFFSET: OnceLock<Mutex<Duration>> = OnceLock::new();
 
+/// Set while the UI is capturing a new combo, so existing bindings don't fire.
+static HOTKEYS_SUSPENDED: AtomicBool = AtomicBool::new(false);
+
 static HOTKEY_TABLE: OnceLock<RwLock<Vec<HotkeyBinding>>> = OnceLock::new();
 
 /// Armed when a `StartRecordingImmediate` combo is pressed, so recording waits
@@ -138,6 +141,10 @@ pub fn set_last_mouse_pos(x: f64, y: f64) {
 
 pub fn get_recording_queue() -> &'static Mutex<VecDeque<Instruction>> {
     RECORDING_QUEUE.get_or_init(|| Mutex::new(VecDeque::new()))
+}
+
+pub fn set_hotkeys_suspended(suspended: bool) {
+    HOTKEYS_SUSPENDED.store(suspended, Ordering::Relaxed);
 }
 
 pub fn update_hotkey_table(bindings: Vec<HotkeyBinding>) {
@@ -220,6 +227,9 @@ fn elapsed_since_session_start(ts: CaptureTimestamp) -> Duration {
 }
 
 fn check_hotkey(mods: u8, key_name: &str) -> Option<HotkeyAction> {
+    if HOTKEYS_SUSPENDED.load(Ordering::Relaxed) {
+        return None;
+    }
     let table = HOTKEY_TABLE.get_or_init(|| RwLock::new(vec![]));
     if let Ok(bindings) = table.try_read() {
         for binding in bindings.iter() {
@@ -240,6 +250,9 @@ fn check_hotkey(mods: u8, key_name: &str) -> Option<HotkeyAction> {
 /// Looks up the configured `StopRecording` binding's key name, if any. It's
 /// always combo-less (enforced at capture time), so matching only compares the key.
 fn stop_recording_key() -> Option<String> {
+    if HOTKEYS_SUSPENDED.load(Ordering::Relaxed) {
+        return None;
+    }
     let table = HOTKEY_TABLE.get_or_init(|| RwLock::new(vec![]));
     table.try_read().ok().and_then(|bindings| {
         bindings

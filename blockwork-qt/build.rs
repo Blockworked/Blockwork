@@ -20,6 +20,7 @@ fn main() {
         "qml/SectionCard.qml",
         "qml/WindowControls.qml",
         "qml/TitleBarDrag.qml",
+        "qml/WheelPan.qml",
         "qml/MakeBlockDialog.qml",
         "qml/AppSelectorDialog.qml",
     ];

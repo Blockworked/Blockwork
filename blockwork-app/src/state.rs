@@ -52,6 +52,7 @@ pub(crate) enum Page {
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum ComboCapture {
     Named(HotkeyAction),
+    Binding(usize),
     Pending,
 }
 
@@ -464,6 +465,7 @@ pub(crate) struct NamedHotkeyDefaultDto {
 pub(crate) struct ComboCaptureDto {
     pub(crate) kind: String,
     pub(crate) action: Option<HotkeyActionDto>,
+    pub(crate) binding_index: Option<usize>,
 }
 
 #[derive(Serialize, Clone)]
@@ -1000,10 +1002,17 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         ComboCapture::Named(action) => ComboCaptureDto {
             kind: "Named".to_string(),
             action: Some(hotkey_action_to_dto(action)),
+            binding_index: None,
+        },
+        ComboCapture::Binding(index) => ComboCaptureDto {
+            kind: "Binding".to_string(),
+            action: None,
+            binding_index: Some(*index),
         },
         ComboCapture::Pending => ComboCaptureDto {
             kind: "Pending".to_string(),
             action: None,
+            binding_index: None,
         },
     });
 
@@ -1159,6 +1168,7 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
 }
 
 pub(crate) fn emit_state_updated(app: &AppHandle, s: &AppState) {
+    blockwork_core::recording::set_hotkeys_suspended(s.combo_capture.is_some());
     let dto = build_state_dto(s);
     app.emit_state(&dto);
 }

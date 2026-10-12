@@ -513,6 +513,14 @@ impl Backend {
                     action,
                 )?)
             }
+            "start_binding_combo_capture" => {
+                let index: usize = arg(&args, "index")?;
+                to_json(commands::start_binding_combo_capture(
+                    &self.state,
+                    &self.app,
+                    index,
+                )?)
+            }
             "start_pending_combo_capture" => to_json(commands::start_pending_combo_capture(
                 &self.state,
                 &self.app,

@@ -8,6 +8,7 @@ Item {
     id: root
     required property var appState
     required property var invoke
+    function capturingBinding(index){return appState.combo_capture&&appState.combo_capture.kind==="Binding"&&appState.combo_capture.binding_index===index}
     function capturingAction(action){return appState.combo_capture&&appState.combo_capture.kind==="Named"&&JSON.stringify(appState.combo_capture.action)===JSON.stringify(action)}
 
     ColumnLayout {
@@ -29,7 +30,9 @@ Item {
             }
         }
         ScrollView {
+            id: settingsScroll
             Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+            WheelPan { flickable: settingsScroll.contentItem }
             Column {
                 width: Math.max(760, root.width - 36); x: Math.max(18, (root.width - width) / 2); spacing: 16; padding: 0
                 Item { width: 1; height: 4 }
@@ -60,10 +63,16 @@ Item {
                     Repeater {
                         model: (appState.hotkey_bindings || []).filter(b => b.action && b.action.type === "RunSpecificMacro")
                         delegate: RowLayout {
+                            id: macroRow
                             required property var modelData
-                            Layout.fillWidth: true
+                            readonly property bool capturing: root.capturingBinding(modelData.binding_index)
+                            Layout.fillWidth: true; spacing: 8
                             Text { Layout.fillWidth: true; text: modelData.macro_name || "Macro"; color: "#e7e7e8"; font.pixelSize: 14 }
-                            Text { text: modelData.combo_display; color: "#a4a5aa"; font.pixelSize: 13 }
+                            BwButton {
+                                text: macroRow.capturing ? "Press shortcut…" : macroRow.modelData.combo_display
+                                primary: macroRow.capturing; implicitWidth: 150; implicitHeight: 36
+                                onClicked: if (!macroRow.capturing) root.invoke("start_binding_combo_capture", { index: macroRow.modelData.binding_index })
+                            }
                             BwButton { iconName: "x"; text: ""; danger: true; implicitWidth: 42; onClicked: root.invoke("remove_hotkey_binding", { index: modelData.binding_index }) }
                         }
                     }

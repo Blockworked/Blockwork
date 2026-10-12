@@ -2107,6 +2107,19 @@ pub(crate) fn start_combo_capture(
     Ok(())
 }
 
+pub(crate) fn start_binding_combo_capture(
+    state: &SharedState,
+    app: &AppHandle,
+    index: usize,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if index < s.hotkey_bindings.len() {
+        s.combo_capture = Some(ComboCapture::Binding(index));
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
 pub(crate) fn start_pending_combo_capture(
     state: &SharedState,
     app: &AppHandle,
@@ -2152,6 +2165,12 @@ pub(crate) fn combo_capture_event(
                 s.hotkey_bindings.push(HotkeyBinding { action, combo });
             }
             save_hotkey_bindings_impl(&mut s);
+        }
+        Some(ComboCapture::Binding(index)) => {
+            if let Some(existing) = s.hotkey_bindings.get_mut(index) {
+                existing.combo = combo;
+                save_hotkey_bindings_impl(&mut s);
+            }
         }
         Some(ComboCapture::Pending) => {
             let entry = s.pending_macro_hotkey.get_or_insert((None, None));
