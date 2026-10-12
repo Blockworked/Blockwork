@@ -45,6 +45,8 @@ pub struct AppSettings {
     pub start_at_startup: Option<bool>,
     /// False while the first-run welcome screen is still pending.
     pub onboarding_done: Option<bool>,
+    /// Block palette layout: rail, chips, accordion, flyout or tiles.
+    pub palette_layout: Option<String>,
     /// When true, recorded mouse movement is captured as relative deltas;
     /// when false, as absolute positions. Only relevant when
     /// `record_mouse_movement` is also true.

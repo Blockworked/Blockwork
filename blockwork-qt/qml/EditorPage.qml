@@ -342,8 +342,10 @@ Item {
             RowLayout { anchors.fill: parent; spacing: 0
                 Item {
                     id: sidebarHost
-                    Layout.preferredWidth: root.sidebarCollapsed ? 0 : root.sidebarWidth; Layout.fillHeight: true
-                    clip: true
+                    // The flyout layout keeps only its icon rail in the layout and floats the list over the canvas.
+                    Layout.preferredWidth: root.sidebarCollapsed ? 0 : (palette.layout === "flyout" ? palette.railWidth : root.sidebarWidth); Layout.fillHeight: true
+                    clip: palette.layout !== "flyout"
+                    z: palette.layout === "flyout" ? 5 : 0
                     // Animate only the collapse toggle, not drag-resizing.
                     Behavior on Layout.preferredWidth {
                         enabled: root.sidebarToggling
@@ -353,7 +355,9 @@ Item {
                     id: palette
                     // Fixed width and visible until the slot is closed, so it slides out under the clip.
                     anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-                    width: root.sidebarWidth; visible: sidebarHost.width > 0
+                    width: palette.layout === "flyout" && !palette.flyoutShown ? palette.railWidth : root.sidebarWidth
+                    visible: sidebarHost.width > 0
+                    layout: appState.palette_layout || "rail"
                     trashActive: canvas.dragging
                     trashArmed: canvas.dragging && palette.contains(palette.mapFromItem(null, canvas.dragSceneX, canvas.dragSceneY))
                     onResizeRequested: width => root.sidebarWidth = Math.max(root.minSidebarWidth, Math.min(root.maxSidebarWidth, width))
@@ -566,6 +570,36 @@ Item {
     Item {
         id: ghostLayer
         anchors.fill: parent; z: 500; enabled: false
+        // Canvas drags are clipped by the canvas, so redraw them here while over the sidebar.
+        Item {
+            id: canvasGhost
+            readonly property bool overSidebar: canvas.dragging && !root.sidebarCollapsed
+                && palette.contains(palette.mapFromItem(null, canvas.dragSceneX, canvas.dragSceneY))
+            visible: overSidebar
+            property point pos: overSidebar ? ghostLayer.mapFromItem(null, canvas.dragGhostX, canvas.dragGhostY) : Qt.point(0, 0)
+            x: pos.x; y: pos.y; opacity: 0.92
+            Column {
+                visible: !canvas.dragIsValue
+                spacing: -8; scale: canvas.zoom; transformOrigin: Item.TopLeft
+                Repeater {
+                    model: canvasGhost.overSidebar && !canvas.dragIsValue ? canvas.dragInstructions : []
+                    delegate: InstructionBlock {
+                        required property var modelData
+                        instruction: modelData; paletteMode: true; locked: true
+                        variables: root.macro ? root.macro.variables : []; lists: root.macro && root.macro.lists ? root.macro.lists : []
+                        blockDefinitions: root.macro ? root.macro.block_defs : []
+                    }
+                }
+            }
+            Loader {
+                active: canvasGhost.overSidebar && canvas.dragIsValue
+                scale: canvas.zoom; transformOrigin: Item.TopLeft
+                sourceComponent: ValueChip {
+                    valueData: canvas.dragValue; boxed: true; editable: false
+                    blockDefinitions: root.macro ? root.macro.block_defs : []
+                }
+            }
+        }
         Item {
             id: ghost
             property var spec: null

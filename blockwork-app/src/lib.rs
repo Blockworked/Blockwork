@@ -126,6 +126,7 @@ impl Backend {
             close_to_tray: settings.close_to_tray.unwrap_or(false),
             start_at_startup: settings.start_at_startup.unwrap_or(false),
             onboarding_done: settings.onboarding_done.unwrap_or(true),
+            palette_layout: settings.palette_layout.clone().unwrap_or_else(|| "rail".into()),
             confirm_clear_instructions: false,
             clear_confirm_remaining_secs: 0,
             clear_confirm_generation: 0,

@@ -2362,6 +2362,23 @@ pub(crate) fn set_close_to_tray(
     Ok(())
 }
 
+const PALETTE_LAYOUTS: [&str; 5] = ["rail", "chips", "accordion", "flyout", "tiles"];
+
+pub(crate) fn set_palette_layout(
+    state: &SharedState,
+    app: &AppHandle,
+    layout: String,
+) -> Result<(), String> {
+    if !PALETTE_LAYOUTS.contains(&layout.as_str()) {
+        return Err(format!("Unknown palette layout: {layout}"));
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.palette_layout = layout.clone();
+    config::update_settings(|settings| settings.palette_layout = Some(layout));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
 pub(crate) fn set_start_at_startup(
     state: &SharedState,
     app: &AppHandle,

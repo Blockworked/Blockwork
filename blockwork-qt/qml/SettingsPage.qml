@@ -125,6 +125,25 @@ Item {
                     }
                 }
                 SectionCard {
+                    width: parent.width; title: "Editor"; iconName: "blocks"
+                    RowLayout { Layout.fillWidth: true
+                        ColumnLayout { Layout.fillWidth: true
+                            Text { text: "Block palette layout"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
+                            Text { text: "How the block sidebar is organized in the editor."; color: "#9fa0a6"; font.pixelSize: 12 }
+                        }
+                        BwComboBox {
+                            id: paletteLayoutBox
+                            readonly property var layouts: [
+                                { id: "rail", text: "Category rail" }, { id: "chips", text: "Chip strip" }, { id: "accordion", text: "Accordion" },
+                                { id: "flyout", text: "Rail with flyout" }, { id: "tiles", text: "Tile grid" }
+                            ]
+                            model: layouts; textRole: "text"; implicitWidth: 210
+                            currentIndex: Math.max(0, layouts.findIndex(l => l.id === (appState.palette_layout || "rail")))
+                            onActivated: index => root.invoke("set_palette_layout", { layout: layouts[index].id })
+                        }
+                    }
+                }
+                SectionCard {
                     width: parent.width; title: "Welcome"; iconName: "info"
                     RowLayout { Layout.fillWidth: true
                         ColumnLayout { Layout.fillWidth: true

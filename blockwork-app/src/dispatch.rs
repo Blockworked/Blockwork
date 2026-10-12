@@ -595,6 +595,14 @@ impl Backend {
                     enabled,
                 )?)
             }
+            "set_palette_layout" => {
+                let layout: String = arg(&args, "layout")?;
+                to_json(commands::set_palette_layout(
+                    &self.state,
+                    &self.app,
+                    layout,
+                )?)
+            }
             "set_start_at_startup" => {
                 let enabled: bool = arg(&args, "enabled")?;
                 to_json(commands::set_start_at_startup(
