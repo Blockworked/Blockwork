@@ -24,6 +24,10 @@ pub mod qobject {
         #[qproperty(bool, installed_apps_loading, cxx_name = "installedAppsLoading")]
         #[qproperty(QString, installed_apps_error, cxx_name = "installedAppsError")]
         #[qproperty(i32, installed_apps_serial, cxx_name = "installedAppsSerial")]
+        #[qproperty(QString, preview_key, cxx_name = "previewKey")]
+        #[qproperty(QString, preview_text, cxx_name = "previewText")]
+        #[qproperty(bool, preview_error, cxx_name = "previewError")]
+        #[qproperty(i32, preview_serial, cxx_name = "previewSerial")]
         type AppBridge = super::AppBridgeRust;
 
         #[qinvokable]
@@ -35,6 +39,12 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "invokeCommand"]
         fn invoke_command(self: Pin<&mut AppBridge>, command: &QString, arguments: &QString);
+
+        /// Sample-evaluates a value block (JSON); the answer arrives through
+        /// the `preview*` properties, tagged with `key`.
+        #[qinvokable]
+        #[cxx_name = "previewValue"]
+        fn preview_value(self: Pin<&mut AppBridge>, key: &QString, value: &QString);
 
         #[qinvokable]
         #[cxx_name = "refreshInstalledApps"]
@@ -60,6 +70,10 @@ pub struct AppBridgeRust {
     installed_apps_loading: bool,
     installed_apps_error: QString,
     installed_apps_serial: i32,
+    preview_key: QString,
+    preview_text: QString,
+    preview_error: bool,
+    preview_serial: i32,
     started: bool,
     request_tx: Option<tokio::sync::mpsc::UnboundedSender<daemon_client::Request>>,
     event_rx: Option<mpsc::Receiver<daemon_client::Event>>,
@@ -78,6 +92,10 @@ impl Default for AppBridgeRust {
             installed_apps_loading: false,
             installed_apps_error: QString::default(),
             installed_apps_serial: 0,
+            preview_key: QString::default(),
+            preview_text: QString::default(),
+            preview_error: false,
+            preview_serial: 0,
             started: false,
             request_tx: None,
             event_rx: None,
@@ -130,6 +148,13 @@ impl qobject::AppBridge {
                     let next = self.installed_apps_serial().saturating_add(1);
                     self.as_mut().set_installed_apps_serial(next);
                 }
+                daemon_client::Event::Preview { key, text, error } => {
+                    self.as_mut().set_preview_key(QString::from(&key));
+                    self.as_mut().set_preview_text(QString::from(&text));
+                    self.as_mut().set_preview_error(error);
+                    let next = self.preview_serial().saturating_add(1);
+                    self.as_mut().set_preview_serial(next);
+                }
                 daemon_client::Event::AppsError(error) => {
                     self.as_mut().set_installed_apps_loading(false);
                     self.as_mut()
@@ -155,6 +180,23 @@ impl qobject::AppBridge {
             tx.send(daemon_client::Request::Invoke { command, args })
                 .is_ok()
         });
+        if !sent {
+            self.as_mut().set_last_error(QString::from(
+                "Blockwork is not connected to its background service",
+            ));
+        }
+    }
+
+    pub fn preview_value(mut self: Pin<&mut Self>, key: &QString, value: &QString) {
+        let Ok(value) = serde_json::from_str(&value.to_string()) else {
+            return;
+        };
+        let key = key.to_string();
+        let sent = self
+            .rust()
+            .request_tx
+            .as_ref()
+            .is_some_and(|tx| tx.send(daemon_client::Request::Preview { key, value }).is_ok());
         if !sent {
             self.as_mut().set_last_error(QString::from(
                 "Blockwork is not connected to its background service",

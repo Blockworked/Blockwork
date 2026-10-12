@@ -35,40 +35,6 @@ fn persist_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str
     app.emit_state(&dto);
 }
 
-pub(crate) fn into_loop_task(
-    mac: Macro,
-    emulator: Arc<Mutex<dyn InputBackend>>,
-    loop_flag: Arc<Mutex<bool>>,
-    speed_multiplier: f64,
-    variables: VariableStore,
-    lists: ListStore,
-    shared_state: SharedState,
-    app: AppHandle,
-) -> impl FnOnce() + Send + 'static {
-    move || {
-        println!("Starting macro loop: {}", mac.name);
-        let macro_id = mac.id.clone();
-        run_registry::register(&loop_flag);
-        loop {
-            if let Ok(should_continue) = loop_flag.lock() {
-                if !*should_continue {
-                    break;
-                }
-            } else {
-                warn!("Failed to lock loop flag, stopping loop");
-                break;
-            }
-
-            mac.clone().run_with_lists(Arc::clone(&emulator), Some(Arc::clone(&loop_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists));
-
-            //todo better solution std::thread::sleep(std::time::Duration::from_millis(1));
-        }
-        run_registry::end_run(&loop_flag);
-        persist_variables(&shared_state, &app, &macro_id, &variables, &lists);
-        println!("Macro loop stopped.");
-    }
-}
-
 pub(crate) fn into_single_run_task(
     mac: Macro,
     emulator: Arc<Mutex<dyn InputBackend>>,

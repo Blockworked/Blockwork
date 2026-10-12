@@ -475,10 +475,6 @@ impl Backend {
                 &self.app,
             )?),
             "run_macro" => to_json(commands::run_macro(&self.state, &self.app)?),
-            "toggle_loop_mode" => {
-                let enabled: bool = arg(&args, "enabled")?;
-                to_json(commands::toggle_loop_mode(&self.state, &self.app, enabled)?)
-            }
             "set_global_speed_multiplier" => {
                 let multiplier: f64 = arg(&args, "multiplier")?;
                 to_json(commands::set_global_speed_multiplier(

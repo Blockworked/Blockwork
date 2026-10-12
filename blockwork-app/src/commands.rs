@@ -1091,6 +1091,17 @@ pub(crate) fn edit_value_field(
             // A numeric field keeps the raw text either way, so a
             // half-written number doesn't snap back mid-edit.
             ValueEdit::Number { parsed } => {
+                // Keep what was typed ("09", "1.50") in an operator argument
+                // as text; a numeric leaf would reformat it. Text still
+                // coerces to a number when evaluated.
+                if parsed && !location.path().is_empty() {
+                    let typed = text.trim();
+                    if let Some(node) = mac.value_at_mut(&location)
+                        && matches!(node, Value::Number { value } if value.to_string() != typed)
+                    {
+                        *node = Value::text(typed);
+                    }
+                }
                 s.invalid_field_buffers.insert(location, text);
                 if parsed {
                     auto_save(&s);
@@ -1838,12 +1849,11 @@ pub(crate) fn run_macro(
     state: &SharedState,
     app: &AppHandle,
 ) -> Result<(), String> {
-    let (mac, emulator, is_looping, loop_mode, speed_multiplier, variables, lists) = {
+    let (mac, emulator, is_looping, speed_multiplier, variables, lists) = {
         let s = state.lock().map_err(|e| e.to_string())?;
         let mac = s.current_macro.clone();
         let emulator = s.emulator.as_ref().map(Arc::clone);
         let is_looping = Arc::clone(&s.is_looping);
-        let loop_mode = s.loop_mode_enabled;
         let speed_multiplier =
             mac.as_ref().map_or(1.0, |m| m.speed_multiplier) * s.global_speed_multiplier;
         let variables = Arc::clone(&s.variable_values);
@@ -1852,7 +1862,6 @@ pub(crate) fn run_macro(
             mac,
             emulator,
             is_looping,
-            loop_mode,
             speed_multiplier,
             variables,
             lists,
@@ -1860,69 +1869,30 @@ pub(crate) fn run_macro(
     };
 
     if let (Some(mac), Some(emulator)) = (mac, emulator) {
-        if loop_mode {
-            if let Err(e) = loop_control::start_loop(&is_looping) {
-                warn!("Failed to start loop: {e}");
-                return Ok(());
-            }
-            let mac_name = mac.name.clone();
-            let loop_task = macros_thread::into_loop_task(
-                mac,
-                Arc::clone(&emulator),
-                Arc::clone(&is_looping),
-                speed_multiplier,
-                variables,
-                lists,
-                Arc::clone(&*state),
-                app.clone(),
-            );
-            let mut s = state.lock().map_err(|e| e.to_string())?;
-            if let Err(e) = macros_thread::spawn_macro_thread(
-                &mut s.thread_pool,
-                format!("loop_{}", mac_name),
-                loop_task,
-            ) {
-                warn!("Failed to spawn loop thread: {e}");
-                let _ = loop_control::stop_loop(&is_looping);
-            }
-        } else {
-            let _ = loop_control::set_loop_state(&is_looping, true);
-            let mac_name = mac.name.clone();
-            let single_run_task = macros_thread::into_single_run_task(
-                mac,
-                Arc::clone(&emulator),
-                Arc::clone(&is_looping),
-                speed_multiplier,
-                variables,
-                lists,
-                Arc::clone(&*state),
-                app.clone(),
-            );
-            let mut s = state.lock().map_err(|e| e.to_string())?;
-            if let Err(e) = macros_thread::spawn_macro_thread(
-                &mut s.thread_pool,
-                format!("run_{}", mac_name),
-                single_run_task,
-            ) {
-                warn!("Failed to spawn run thread: {e}");
-                let _ = loop_control::stop_loop(&is_looping);
-            }
+        let _ = loop_control::set_loop_state(&is_looping, true);
+        let mac_name = mac.name.clone();
+        let single_run_task = macros_thread::into_single_run_task(
+            mac,
+            Arc::clone(&emulator),
+            Arc::clone(&is_looping),
+            speed_multiplier,
+            variables,
+            lists,
+            Arc::clone(&*state),
+            app.clone(),
+        );
+        let mut s = state.lock().map_err(|e| e.to_string())?;
+        if let Err(e) = macros_thread::spawn_macro_thread(
+            &mut s.thread_pool,
+            format!("run_{}", mac_name),
+            single_run_task,
+        ) {
+            warn!("Failed to spawn run thread: {e}");
+            let _ = loop_control::stop_loop(&is_looping);
         }
     }
 
     let s = state.lock().map_err(|e| e.to_string())?;
-    emit_state_updated(&app, &s);
-    Ok(())
-}
-
-pub(crate) fn toggle_loop_mode(
-    state: &SharedState,
-    app: &AppHandle,
-    enabled: bool,
-) -> Result<(), String> {
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.loop_mode_enabled = enabled;
-    config::update_settings(|settings| settings.loop_mode_enabled = Some(enabled));
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -2471,7 +2441,6 @@ pub(crate) fn handle_hotkey_action(
             if let Some(emulator) = s.emulator.as_ref() {
                 let emulator = Arc::clone(emulator);
                 let is_looping = Arc::clone(&s.is_looping);
-                let loop_mode = s.loop_mode_enabled;
                 let global_speed_multiplier = s.global_speed_multiplier;
                 let shared_state = Arc::clone(state);
                 let mac = match &action {
@@ -2503,7 +2472,6 @@ pub(crate) fn handle_hotkey_action(
                         mac,
                         emulator,
                         is_looping,
-                        loop_mode,
                         speed_multiplier,
                         variables,
                         lists,
@@ -2569,14 +2537,6 @@ pub(crate) fn handle_hotkey_action(
                 }
             }
         }
-        HotkeyAction::ToggleLoop => {
-            if let Ok(mut s) = state.lock() {
-                s.loop_mode_enabled = !s.loop_mode_enabled;
-                let enabled = s.loop_mode_enabled;
-                config::update_settings(|settings| settings.loop_mode_enabled = Some(enabled));
-                emit_state_updated(app, &s);
-            }
-        }
         HotkeyAction::StartRecordingImmediate => {
             if let Ok(mut s) = state.lock() {
                 if s.current_macro.is_some() {
@@ -2607,7 +2567,6 @@ fn run_macro_task(
     mac: Macro,
     emulator: Arc<std::sync::Mutex<dyn blockwork_core::macros::backend::InputBackend>>,
     is_looping: Arc<std::sync::Mutex<bool>>,
-    loop_mode: bool,
     speed_multiplier: f64,
     variables: VariableStore,
     lists: ListStore,
@@ -2619,56 +2578,28 @@ fn run_macro_task(
     #[cfg(windows)]
     let prep_backend = Arc::clone(&emulator);
 
-    if loop_mode {
-        if let Ok(mut st) = is_looping.lock() {
-            *st = true;
-        }
-        let loop_flag = Arc::clone(&is_looping);
-        // `into_loop_task` already loops until `loop_flag` clears and
-        // persists final variable values - no need to hand-roll it here.
-        let task = macros_thread::into_loop_task(
-            mac,
-            emulator,
-            loop_flag,
-            speed_multiplier,
-            variables,
-            lists,
-            state,
-            app,
-        );
-        tokio::task::spawn_blocking(move || {
-            // Registered before the run starts so "Stop Loop" can reach it
-            // even during the focus switch below.
-            let playback_guard = blockwork_core::macros::run_registry::begin_run();
-            #[cfg(windows)]
-            blockwork_core::macros::backend::windows::prepare_for_macro_execution(&prep_backend);
-            task();
-            blockwork_core::macros::run_registry::end_run(&playback_guard);
-        });
-    } else {
-        if let Ok(mut st) = is_looping.lock() {
-            *st = true;
-        }
-        let stop_flag = Arc::clone(&is_looping);
-        let task = macros_thread::into_single_run_task(
-            mac,
-            emulator,
-            stop_flag,
-            speed_multiplier,
-            variables,
-            lists,
-            state,
-            app,
-        );
-        tokio::task::spawn_blocking(move || {
-            // Same pre-registration as the loop branch above.
-            let playback_guard = blockwork_core::macros::run_registry::begin_run();
-            #[cfg(windows)]
-            blockwork_core::macros::backend::windows::prepare_for_macro_execution(&prep_backend);
-            task();
-            blockwork_core::macros::run_registry::end_run(&playback_guard);
-        });
+    if let Ok(mut st) = is_looping.lock() {
+        *st = true;
     }
+    let stop_flag = Arc::clone(&is_looping);
+    let task = macros_thread::into_single_run_task(
+        mac,
+        emulator,
+        stop_flag,
+        speed_multiplier,
+        variables,
+        lists,
+        state,
+        app,
+    );
+    tokio::task::spawn_blocking(move || {
+        // Same pre-registration as the loop branch above.
+        let playback_guard = blockwork_core::macros::run_registry::begin_run();
+        #[cfg(windows)]
+        blockwork_core::macros::backend::windows::prepare_for_macro_execution(&prep_backend);
+        task();
+        blockwork_core::macros::run_registry::end_run(&playback_guard);
+    });
 }
 
 // ─── Open App picker ────────────────────────────────────────────────────────

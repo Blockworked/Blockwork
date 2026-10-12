@@ -309,24 +309,15 @@ fn run_macro_blocking(id: String, elapsed_overshoot_ms: f64, backend: Arc<Mutex<
         Arc::new(Mutex::new(mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect()));
     let settings = config::load_settings();
     let speed_multiplier = mac.speed_multiplier * settings.global_speed_multiplier.unwrap_or(1.0);
-    let loop_mode = settings.loop_mode_enabled.unwrap_or(false);
     // Log accept so a missing playback attempt is distinguishable from a lost command.
     tracing::info!(
-        "run_macro: starting '{}' ({id}), speed_multiplier={speed_multiplier}, loop_mode={loop_mode}, elapsed_overshoot_ms={elapsed_overshoot_ms}",
+        "run_macro: starting '{}' ({id}), speed_multiplier={speed_multiplier}, elapsed_overshoot_ms={elapsed_overshoot_ms}",
         mac.name
     );
 
-    let mut offset = Duration::from_secs_f64(elapsed_overshoot_ms.max(0.0) / 1000.0);
+    let offset = Duration::from_secs_f64(elapsed_overshoot_ms.max(0.0) / 1000.0);
     let flag = run_registry::begin_run();
-    loop {
-        mac.clone().run_with_offset(Arc::clone(&emulator), Some(Arc::clone(&flag)), speed_multiplier, Arc::clone(&variables), offset);
-        // Only the first iteration backdates against the trigger.
-        offset = Duration::ZERO;
-        let keep_looping = loop_mode && flag.lock().map(|g| *g).unwrap_or(false);
-        if !keep_looping {
-            break;
-        }
-    }
+    mac.clone().run_with_offset(Arc::clone(&emulator), Some(Arc::clone(&flag)), speed_multiplier, Arc::clone(&variables), offset);
     run_registry::end_run(&flag);
     if let Ok(values) = variables.lock() {
         let mut mac = mac.clone();

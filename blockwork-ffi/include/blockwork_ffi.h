@@ -43,8 +43,7 @@ int32_t blockwork_stop_recording(void);
 
 /**
  * Runs a macro on a background thread - the explicit `id_utf8` if given
- * (nullable), otherwise the currently-selected macro. Loop mode is read
- * live from the shared settings file on every call. Returns immediately;
+ * (nullable), otherwise the currently-selected macro. Returns immediately;
  * interrupt with `blockwork_stop_loop`.
  *
  * `elapsed_overshoot_ms` (>= 0, milliseconds): how much real time had

@@ -192,8 +192,7 @@ pub extern "C" fn blockwork_stop_recording() -> i32 {
 }
 
 /// Runs a macro on a background thread - the explicit `id_utf8` if given
-/// (nullable), otherwise the currently-selected macro. Loop mode is read
-/// live from the shared settings file on every call. Returns immediately;
+/// (nullable), otherwise the currently-selected macro. Returns immediately;
 /// interrupt with `blockwork_stop_loop`.
 ///
 /// `elapsed_overshoot_ms` (>= 0, milliseconds): how much real time had
@@ -229,23 +228,11 @@ pub extern "C" fn blockwork_run_macro(id_utf8: *const c_char, elapsed_overshoot_
             Arc::new(Mutex::new(mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect()));
         let settings = config::load_settings();
         let speed_multiplier = mac.speed_multiplier * settings.global_speed_multiplier.unwrap_or(1.0);
-        let loop_mode = settings.loop_mode_enabled.unwrap_or(false);
         let initial_offset = std::time::Duration::from_secs_f64(elapsed_overshoot_ms.max(0.0) / 1000.0);
 
         let flag = run_registry::begin_run();
         let spawned = std::thread::Builder::new().name("macros-run".to_string()).spawn(move || {
-            let mut offset = initial_offset;
-            loop {
-                mac.clone().run_with_offset(Arc::clone(&emulator), Some(Arc::clone(&flag)), speed_multiplier, Arc::clone(&variables), offset);
-                // Only the very first iteration corresponds to the real
-                // attempt-start trigger; a loop-mode repeat restarting
-                // immediately after has nothing to backdate against.
-                offset = std::time::Duration::ZERO;
-                let keep_looping = loop_mode && flag.lock().map(|g| *g).unwrap_or(false);
-                if !keep_looping {
-                    break;
-                }
-            }
+            mac.clone().run_with_offset(Arc::clone(&emulator), Some(Arc::clone(&flag)), speed_multiplier, Arc::clone(&variables), initial_offset);
             run_registry::end_run(&flag);
             if let Ok(values) = variables.lock() {
                 let mut mac = mac.clone();

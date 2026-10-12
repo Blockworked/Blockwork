@@ -13,6 +13,8 @@ Item {
     readonly property bool recording: appState.recording_phase && appState.recording_phase.phase === "Active"
     property string sidebarKey: "a"
     property real sidebarWidth: 348
+    property bool sidebarCollapsed: false
+    property bool sidebarToggling: false
     readonly property real minSidebarWidth: 180
     readonly property real maxSidebarWidth: 600
     readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"]
@@ -200,15 +202,37 @@ Item {
     }
     function cancelPaletteDrag() { paletteDrag = null; ghost.visible = false; ghost.spec = null; canvas.clearSnap(); canvas.updatePaletteValueTarget(null, null); }
     // A canvas block dropped on the sidebar deletes it and everything below it in its stack.
+    function blockDefById(id) {
+        const defs = root.macro ? root.macro.block_defs : [];
+        for (let i = 0; i < defs.length; ++i) if (defs[i].id === id) return defs[i];
+        return null;
+    }
+    function editBlockById(id) {
+        const def = blockDefById(id);
+        if (def) blockDialog.openForEdit(def);
+    }
+    // A custom block's header row takes its whole definition with it.
+    function removeInstruction(strandId, path) {
+        const strands = root.macro ? root.macro.strands : [];
+        for (let i = 0; i < strands.length; ++i) {
+            if (strands[i].id !== strandId) continue;
+            const first = strands[i].instructions[0];
+            if (path.length === 1 && path[0].index === 0 && first && first.type === "BlockHeader") {
+                root.invoke("delete_block", { blockId: first.block_id });
+                return;
+            }
+        }
+        root.invoke("remove_instruction", { strandId: strandId, path: path });
+    }
     function trashDraggedBlocks(strandId, path, tailCount, sx, sy) {
-        if (!palette.contains(palette.mapFromItem(null, sx, sy))) return;
+        if (root.sidebarCollapsed || !palette.contains(palette.mapFromItem(null, sx, sy))) return;
         if (path.length === 1 && path[0].index === 0) { root.invoke("remove_strand", { strandId: strandId }); return; }
         for (let i = 0; i < tailCount; ++i) root.invoke("remove_instruction", { strandId: strandId, path: path });
     }
     // An existing value dropped on the sidebar resets its slot (fields) or
     // deletes it (whole floating blocks) - mirrors the webapp trash.
     function trashDraggedValue(location, value, sx, sy) {
-        if (!palette.contains(palette.mapFromItem(null, sx, sy))) return;
+        if (root.sidebarCollapsed || !palette.contains(palette.mapFromItem(null, sx, sy))) return;
         if (location.kind === "Floating" && !(location.path && location.path.length)) root.invoke("remove_floating_value", { floatingId: location.floating_id });
         else root.invoke("take_value", { location: location });
     }
@@ -222,62 +246,106 @@ Item {
     ColumnLayout {
         anchors.fill: parent; spacing: 0
         Rectangle {
-            Layout.fillWidth: true; Layout.preferredHeight: 104; color: "#292a2d"; border.color: "#38393d"
+            id: toolbar
+            // Collapse stages: 1 Record icon-only, 2 Run icon-only, 3 undo/redo/save in a menu.
+            readonly property int tier: width < 700 ? 3 : (width < 780 ? 2 : (width < 860 ? 1 : 0))
+            Layout.fillWidth: true; Layout.preferredHeight: 52; color: "#292a2d"; border.color: "#38393d"
+            TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
             RowLayout {
-                anchors.fill: parent; anchors.margins: 14; spacing: 10
-                ColumnLayout {
-                    Layout.preferredWidth: 240; Layout.minimumWidth: 240; Layout.maximumWidth: 240; Layout.alignment: Qt.AlignBottom; spacing: 5
-                    Text { text: "Select macro"; color: "#a1a2a7"; font.pixelSize: 12 }
-                    BwComboBox {
-                        id: macroPicker
-                        Layout.fillWidth: true; Layout.preferredHeight: 38; model: appState.macro_names || []
-                        currentIndex: appState.macro_selected === null || appState.macro_selected === undefined ? -1 : appState.macro_selected
-                        onActivated: index => root.invoke("select_macro", { index: index })
+                anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                Image {
+                    visible: Qt.platform.os !== "osx" && toolbar.tier < 3
+                    source: "qrc:/icons/blockwork.png"; sourceSize: Qt.size(40, 40)
+                    Layout.preferredWidth: 20; Layout.preferredHeight: 20; Layout.rightMargin: 2
+                    fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
+                }
+                BwButton {
+                    iconName: "panel-left"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro
+                    ToolTip.visible: hovered; ToolTip.text: root.sidebarCollapsed ? "Show sidebar" : "Hide sidebar"
+                    onClicked: { root.sidebarToggling = true; root.sidebarCollapsed = !root.sidebarCollapsed; }
+                }
+                BwComboBox {
+                    id: macroPicker
+                    Layout.preferredWidth: Math.max(90, Math.min(200, toolbar.width * 0.17)); Layout.preferredHeight: 34; model: appState.macro_names || []
+                    currentIndex: appState.macro_selected === null || appState.macro_selected === undefined ? -1 : appState.macro_selected
+                    onActivated: index => root.invoke("select_macro", { index: index })
+                }
+                BwButton {
+                    id: macroMenuButton
+                    iconName: "ellipsis"; text: ""; implicitWidth: 34; implicitHeight: 34
+                    ToolTip.visible: hovered && !macroMenu.visible; ToolTip.text: "Macro actions"
+                    onClicked: macroMenu.popup(macroMenuButton, 0, macroMenuButton.height + 4)
+                    BwMenu {
+                        id: macroMenu
+                        implicitWidth: 190
+                        BwMenuItem { iconName: "sliders"; text: "Macro settings"; enabled: !!root.macro; onTriggered: macroSettings.open() }
+                        BwMenuItem { iconName: "plus"; text: "New macro"; onTriggered: root.invoke("new_macro") }
+                        BwMenuItem { iconName: "trash"; text: "Delete macro"; danger: true; enabled: !!root.macro; onTriggered: removeDialog.open() }
                     }
                 }
-                BwButton { Layout.alignment: Qt.AlignBottom; iconName: "sliders"; text: ""; enabled: !!root.macro; onClicked: macroSettings.open() }
                 Item { Layout.fillWidth: true }
-                BwButton { Layout.alignment: Qt.AlignBottom; iconName: "plus"; text: "New macro"; onClicked: root.invoke("new_macro") }
-                BwButton { Layout.alignment: Qt.AlignBottom; iconName: "trash"; text: "Delete"; danger: true; enabled: !!root.macro; onClicked: removeDialog.open() }
-                BwButton { Layout.alignment: Qt.AlignBottom; iconName: "settings"; text: "Settings"; onClicked: root.invoke("open_settings") }
-            }
-        }
-        Rectangle {
-            Layout.fillWidth: true; Layout.preferredHeight: 66; color: "#292a2d"; border.color: "#38393d"
-            RowLayout { anchors.fill: parent; anchors.margins: 14; spacing: 10
-                BwButton { Layout.alignment: Qt.AlignVCenter; Layout.preferredWidth: 128; Layout.minimumWidth: 128; Layout.maximumWidth: 128; primary: true; iconName: appState.loop_mode_enabled ? "repeat" : "play"; text: appState.loop_mode_enabled ? "Start loop" : "Run macro"; enabled: appState.macro_selected !== null; onClicked: root.invoke("run_macro") }
-                BwSwitch { Layout.alignment: Qt.AlignVCenter; Accessible.name: "Loop mode"; checked: appState.loop_mode_enabled; onToggled: checked => root.invoke("toggle_loop_mode", { enabled: checked }) }
-                Item { Layout.fillWidth: true }
-                BwButton { Layout.alignment: Qt.AlignVCenter; danger: true; iconName: root.recording ? "square" : "circle"; iconFilled: !root.recording; text: root.recordingLabel(); enabled: appState.macro_selected !== null; onClicked: root.invoke(root.recording ? "stop_recording" : "start_recording") }
-                BwButton { Layout.alignment: Qt.AlignVCenter; iconName: "sliders"; text: ""; onClicked: recordingSettings.open() }
-            }
-        }
-        Rectangle {
-            visible: !!root.macro
-            Layout.fillWidth: true; Layout.preferredHeight: 54; color: "#292a2d"; border.color: "#38393d"
-            RowLayout { anchors.fill: parent; anchors.margins: 12; spacing: 10
-                Text { text: "Title"; color: "#a1a2a7"; font.pixelSize: 13 }
-                BwTextField { Layout.fillWidth: true; text: root.macro ? root.macro.name : ""; onEditingFinished: root.invoke("set_title", { title: text }) }
-                Text { text: "Speed"; color: "#a1a2a7"; font.pixelSize: 13 }
-                Slider {
-                    id:speed;from:.1;to:10;value:root.macro?root.macro.speed_multiplier:1;Layout.preferredWidth:160;implicitHeight:30
-                    onMoved:root.invoke("set_macro_speed_multiplier",{multiplier:value})
-                    HoverHandler{cursorShape:Qt.PointingHandCursor}
-                    background:Rectangle{x:speed.leftPadding;y:speed.topPadding+speed.availableHeight/2-height/2;width:speed.availableWidth;height:5;radius:3;color:"#45474d";Rectangle{width:speed.visualPosition*parent.width;height:parent.height;radius:3;color:Theme.accent}}
-                    handle:Rectangle{x:speed.leftPadding+speed.visualPosition*(speed.availableWidth-width);y:speed.topPadding+speed.availableHeight/2-height/2;width:16;height:16;radius:8;color:"white";border.width:2;border.color:Theme.accent}
+                BwButton {
+                    primary: true; implicitHeight: 34; iconName: "play"; text: toolbar.tier < 2 ? "Run" : ""
+                    implicitWidth: toolbar.tier < 2 ? 76 : 34
+                    enabled: appState.macro_selected !== null; ToolTip.visible: hovered && toolbar.tier >= 2; ToolTip.text: "Run macro"
+                    onClicked: root.invoke("run_macro")
                 }
-                BwTextField { text: Number(speed.value).toFixed(2); Layout.preferredWidth: 62; horizontalAlignment: Text.AlignRight; onEditingFinished: root.invoke("set_macro_speed_multiplier", { multiplier: Number(text) }) }
-                Text { text: "x"; color: "#a1a2a7" }
+                Row {
+                    spacing: -1
+                    BwButton {
+                        danger: true; implicitHeight: 34; iconName: root.recording ? "square" : "circle"; iconFilled: !root.recording
+                        text: toolbar.tier < 1 ? root.recordingLabel() : ""
+                        implicitWidth: toolbar.tier < 1 ? 100 : 34
+                        enabled: appState.macro_selected !== null; ToolTip.visible: hovered && toolbar.tier >= 1; ToolTip.text: root.recordingLabel()
+                        onClicked: root.invoke(root.recording ? "stop_recording" : "start_recording")
+                    }
+                    BwButton {
+                        danger: true; iconName: "chevron-down"; text: ""; implicitWidth: 26; implicitHeight: 34
+                        ToolTip.visible: hovered; ToolTip.text: "Recording settings"; onClicked: recordingSettings.open()
+                    }
+                }
+                Item { Layout.fillWidth: true }
+                BwButton { visible: toolbar.tier < 3; iconName: "undo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_undo; ToolTip.visible: hovered; ToolTip.text: "Undo"; onClicked: root.invoke("undo") }
+                BwButton { visible: toolbar.tier < 3; iconName: "redo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_redo; ToolTip.visible: hovered; ToolTip.text: "Redo"; onClicked: root.invoke("redo") }
+                BwButton { visible: toolbar.tier < 3; iconName: "save"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro; ToolTip.visible: hovered; ToolTip.text: "Save macro"; onClicked: root.invoke("save_macro") }
+                BwButton {
+                    id: editMenuButton
+                    visible: toolbar.tier >= 3
+                    iconName: "ellipsis"; text: ""; implicitWidth: 34; implicitHeight: 34
+                    ToolTip.visible: hovered && !editMenu.visible; ToolTip.text: "Undo, redo and save"
+                    onClicked: editMenu.popup(editMenuButton, 0, editMenuButton.height + 4)
+                    BwMenu {
+                        id: editMenu
+                        implicitWidth: 170
+                        BwMenuItem { iconName: "undo"; text: "Undo"; enabled: appState.can_undo; onTriggered: root.invoke("undo") }
+                        BwMenuItem { iconName: "redo"; text: "Redo"; enabled: appState.can_redo; onTriggered: root.invoke("redo") }
+                        BwMenuItem { iconName: "save"; text: "Save macro"; enabled: !!root.macro; onTriggered: root.invoke("save_macro") }
+                    }
+                }
+                BwButton { iconName: "settings"; text: ""; implicitWidth: 34; implicitHeight: 34; ToolTip.visible: hovered; ToolTip.text: "Settings"; onClicked: root.invoke("open_settings") }
+                WindowControls { visible: Qt.platform.os !== "osx" }
             }
         }
         Item {
             visible: !!root.macro
             Layout.fillWidth: true; Layout.fillHeight: true
             RowLayout { anchors.fill: parent; spacing: 0
+                Item {
+                    id: sidebarHost
+                    Layout.preferredWidth: root.sidebarCollapsed ? 0 : root.sidebarWidth; Layout.fillHeight: true
+                    clip: true
+                    // Animate only the collapse toggle, not drag-resizing.
+                    Behavior on Layout.preferredWidth {
+                        enabled: root.sidebarToggling
+                        NumberAnimation { duration: 140; easing.type: Easing.OutCubic; onRunningChanged: if (!running) root.sidebarToggling = false }
+                    }
                 PalettePanel {
                     id: palette
+                    // Fixed width and visible until the slot is closed, so it slides out under the clip.
+                    anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
+                    width: root.sidebarWidth; visible: sidebarHost.width > 0
+                    trashActive: canvas.dragging
                     trashArmed: canvas.dragging && palette.contains(palette.mapFromItem(null, canvas.dragSceneX, canvas.dragSceneY))
-                    Layout.preferredWidth: root.sidebarWidth; Layout.fillHeight: true
                     onResizeRequested: width => root.sidebarWidth = Math.max(root.minSidebarWidth, Math.min(root.maxSidebarWidth, width))
                     onDragStarted: (spec, sx, sy, ox, oy) => root.beginPaletteDrag(spec, ox, oy, sx, sy)
                     onDragMoved: (sx, sy) => root.movePaletteDrag(sx, sy)
@@ -292,21 +360,27 @@ Item {
                     standaloneKey: root.sidebarKey
                     onBlockActivated: type => root.addBlock(type, 120, 120)
                     onCustomBlockActivated: definition => root.addCustomBlock(definition, 120, 120)
-                    onMakeVariableRequested: variableDialog.open()
+                    onMakeVariableRequested: variableDialog.openForCreate()
+                    onRenameVariableRequested: name => variableDialog.openForRename(name)
+                    onDeleteVariableRequested: name => root.invoke("delete_variable", { name: name })
+                    onEditBlockRequested: definition => blockDialog.openForEdit(definition)
+                    onDeleteBlockRequested: blockId => root.invoke("delete_block", { blockId: blockId })
                     onMakeListRequested: listDialog.openForCreate()
                     onListEditorStateRequested: (name, visible, x, y) => root.invoke("set_list_editor_state", { name: name, visible: visible, x: x, y: y })
                     onRenameListRequested: name => listDialog.openForRename(name)
                     onDeleteListRequested: name => { deleteListDialog.listName = name; deleteListDialog.open(); }
-                    onMakeBlockRequested: blockDialog.open()
+                    onMakeBlockRequested: blockDialog.openForCreate()
                     onStandaloneKeyCaptureRequested: root.invoke("start_standalone_key_capture")
                     onAppPickerRequested: instruction => root.openPaletteAppPicker(instruction)
                     onDetailsRequested:(name,identifier,explainer)=>detailsDialog.show(name,identifier,explainer)
                     onValueActivated: value => root.invoke("create_floating_value", { x: 160, y: 140, value: value, originBlockId: null })
                 }
+                }
                 BlockCanvas {
                     id: canvas
                     Layout.fillWidth: true; Layout.fillHeight: true
                     strands: root.macro ? root.macro.strands : []
+                    recordingTargetId: root.macro && root.macro.recording_target_strand_id ? root.macro.recording_target_strand_id : ""
                     comments: root.macro ? root.macro.comments : []
                     floatingValues: root.macro ? root.macro.floating_values : []
                     variables: root.macro ? root.macro.variables : []
@@ -319,7 +393,10 @@ Item {
                     onStrandsMerged: (draggedId, targetId, path) => root.invoke("merge_strand", { draggedId: draggedId, targetId: targetId, path: path })
                     onTailMerged: (strandId, path, targetId, targetPath) => root.invoke("merge_tail", { strandId: strandId, path: path, targetId: targetId, targetPath: targetPath })
                     onBlockDragOutside: (strandId, path, tailCount, sx, sy) => root.trashDraggedBlocks(strandId, path, tailCount, sx, sy)
-                    onInstructionRemoved: (strandId, path) => root.invoke("remove_instruction", { strandId: strandId, path: path })
+                    onInstructionRemoved: (strandId, path) => root.removeInstruction(strandId, path)
+                    onBlockMenuAction: (action, strandId, path, instruction) => {
+                        if (action === "edit_block") root.editBlockById(instruction.block_id);
+                    }
                     onInstructionDuplicated: (strandId, path, instruction) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: root.refreshIds(instruction) })
                     onInstructionEdited: (strandId, path, instruction) => root.invoke("edit_instruction", { strandId: strandId, path: path, instruction: instruction })
                     onRunBranchRequested: (strandId, path, name) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: { id: root.uuid(), type: "RunBranch", name: name } })
@@ -364,15 +441,6 @@ Item {
                 Text { text: "Choose a macro above or create a new one."; color: "#9fa0a6"; font.pixelSize: 13 }
             }
         }
-        Rectangle {
-            visible: !!root.macro
-            Layout.fillWidth: true; Layout.preferredHeight: 58; color: "#292a2d"; border.color: "#38393d"
-            Row { anchors.left: parent.left; anchors.verticalCenter: parent.verticalCenter; anchors.leftMargin: 14; spacing: 8
-                BwButton { iconName: "undo"; text: "Undo"; enabled: appState.can_undo; onClicked: root.invoke("undo") }
-                BwButton { iconName: "redo"; text: "Redo"; enabled: appState.can_redo; onClicked: root.invoke("redo") }
-                BwButton { iconName: "save"; text: "Save macro"; primary: true; onClicked: root.invoke("save_macro") }
-            }
-        }
     }
 
     BwDialog {
@@ -384,6 +452,20 @@ Item {
         id: macroSettings; title: "Macro settings"; standardButtons: Dialog.Close
         Column { spacing: 14; width: 360
             Text { text: "Controls behavior specific to this macro."; color: "#a5a6ab" }
+            Text { text: "Title"; color: "#a1a2a7"; font.pixelSize: 13 }
+            BwTextField { width: parent.width; text: root.macro ? root.macro.name : ""; onEditingFinished: root.invoke("set_title", { title: text }) }
+            Text { text: "Speed"; color: "#a1a2a7"; font.pixelSize: 13 }
+            RowLayout { width: parent.width; spacing: 10
+                Slider {
+                    id: speed; from: .1; to: 10; value: root.macro ? root.macro.speed_multiplier : 1; Layout.fillWidth: true; implicitHeight: 30
+                    onMoved: root.invoke("set_macro_speed_multiplier", { multiplier: value })
+                    HoverHandler { cursorShape: Qt.PointingHandCursor }
+                    background: Rectangle { x: speed.leftPadding; y: speed.topPadding + speed.availableHeight / 2 - height / 2; width: speed.availableWidth; height: 5; radius: 3; color: "#45474d"; Rectangle { width: speed.visualPosition * parent.width; height: parent.height; radius: 3; color: Theme.accent } }
+                    handle: Rectangle { x: speed.leftPadding + speed.visualPosition * (speed.availableWidth - width); y: speed.topPadding + speed.availableHeight / 2 - height / 2; width: 16; height: 16; radius: 8; color: "white"; border.width: 2; border.color: Theme.accent }
+                }
+                BwTextField { text: Number(speed.value).toFixed(2); Layout.preferredWidth: 62; horizontalAlignment: Text.AlignRight; onEditingFinished: root.invoke("set_macro_speed_multiplier", { multiplier: Number(text) }) }
+                Text { text: "x"; color: "#a1a2a7" }
+            }
             BwSwitch { Accessible.name: "Listen for triggers while Blockwork is open"; checked: root.macro && root.macro.settings ? root.macro.settings.always_listen : false; onToggled: checked => root.invoke("set_macro_always_listen", { enabled: checked }) }
         }
     }
@@ -396,15 +478,23 @@ Item {
         }
     }
     BwDialog {
-        id: variableDialog; title: "Make a Variable"; standardButtons: Dialog.Ok | Dialog.Cancel
+        id: variableDialog
+        property string renameTarget: ""
+        title: renameTarget.length ? "Rename Variable" : "Make a Variable"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        function openForCreate() { renameTarget = ""; variableName.text = ""; open(); variableName.forceActiveFocus(); }
+        function openForRename(name) { renameTarget = name; variableName.text = name; open(); variableName.forceActiveFocus(); variableName.selectAll(); }
         Column { width: 340; spacing: 8
             Text { text: "Variable name"; color: "#e7e7e8" }
-            BwTextField { id: variableName; width: parent.width; placeholderText: "score" }
+            BwTextField { id: variableName; width: parent.width; placeholderText: "score"; onAccepted: variableDialog.accept() }
         }
         onAccepted: {
             const name = variableName.text.trim();
-            if (name.length) root.invoke("create_variable", { name: name });
-            variableName.clear();
+            if (name.length) {
+                if (renameTarget.length) { if (name !== renameTarget) root.invoke("rename_variable", { oldName: renameTarget, newName: name }); }
+                else root.invoke("create_variable", { name: name });
+            }
+            renameTarget = ""; variableName.clear();
         }
     }
     BwDialog {
@@ -444,7 +534,18 @@ Item {
             Row{anchors.right:parent.right;anchors.rightMargin:18;BwButton{text:"Close";onClicked:detailsDialog.close()}}
         }
     }
-    MakeBlockDialog { id:blockDialog; onCreateRequested:(pieces,shape,color)=>root.invoke("create_block",{pieces:pieces,shape:shape,color:color}) }
+    MakeBlockDialog {
+        id:blockDialog
+        onCreateRequested:(pieces,shape,color)=>root.invoke("create_block",{pieces:pieces,shape:shape,color:color})
+        onEditRequested:(blockId,pieces,shape,color)=>root.invoke("edit_block",{blockId:blockId,pieces:pieces,shape:shape,color:color})
+    }
+
+    // Click-to-preview on operators: the daemon evaluates, the chip shows the answer.
+    Component.onCompleted: BlockRegistry.previewHandler = (key, value) => root.appBridge.previewValue(key, JSON.stringify(value))
+    Connections {
+        target: root.appBridge
+        function onPreviewSerialChanged() { BlockRegistry.deliverPreview(root.appBridge.previewKey, root.appBridge.previewText, root.appBridge.previewError); }
+    }
     AppSelectorDialog {
         id: appSelector
         bridge: root.appBridge

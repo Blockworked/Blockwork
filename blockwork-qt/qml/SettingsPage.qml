@@ -14,10 +14,18 @@ Item {
         anchors.fill: parent; spacing: 0
         Rectangle {
             Layout.fillWidth: true; Layout.preferredHeight: 68; color: "#292a2d"; border.color: "#3a3b3f"
+            TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
             RowLayout { anchors.fill: parent; anchors.margins: 14
+                Image {
+                    visible: Qt.platform.os !== "osx"
+                    source: "qrc:/icons/blockwork.png"; sourceSize: Qt.size(40, 40)
+                    Layout.preferredWidth: 20; Layout.preferredHeight: 20; Layout.rightMargin: 2
+                    fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
+                }
                 BwButton { iconName: "arrow-left"; text: "Back"; onClicked: root.invoke("close_settings") }
                 Text { text: "Settings"; color: "#e7e7e8"; font.pixelSize: 17; font.weight: Font.Bold }
                 Item { Layout.fillWidth: true }
+                WindowControls { visible: Qt.platform.os !== "osx" }
             }
         }
         ScrollView {
@@ -117,7 +125,7 @@ Item {
 
     function actionLabel(action) {
         if (!action) return "Hotkey";
-        const labels = { RunMacro: "Run Macro", StopLoop: "Stop Loop", NextMacro: "Next Macro", PrevMacro: "Previous Macro", ToggleLoop: "Toggle Loop", StartRecordingImmediate: "Start Recording (immediate)", StopRecording: "Stop Recording", Undo: "Undo", Redo: "Redo" };
+        const labels = { RunMacro: "Run Macro", StopLoop: "Stop Loop", NextMacro: "Next Macro", PrevMacro: "Previous Macro", StartRecordingImmediate: "Start Recording (immediate)", StopRecording: "Stop Recording", Undo: "Undo", Redo: "Redo" };
         return labels[action.type] || action.type;
     }
     function updateTitle() {

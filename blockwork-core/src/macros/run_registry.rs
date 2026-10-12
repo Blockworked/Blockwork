@@ -9,7 +9,7 @@ fn active_runs() -> &'static Mutex<Vec<Arc<Mutex<bool>>>> {
     ACTIVE_RUNS.get_or_init(|| Mutex::new(Vec::new()))
 }
 
-/// Registers an existing stop flag (loop mode's `is_looping`) for the duration
+/// Registers an existing stop flag (the app's shared `is_looping`) for the duration
 /// of a run.
 pub fn register(flag: &Arc<Mutex<bool>>) {
     if let Ok(mut runs) = active_runs().lock() {
@@ -29,7 +29,7 @@ pub fn begin_run() -> Arc<Mutex<bool>> {
 pub fn end_run(flag: &Arc<Mutex<bool>>) {
     if let Ok(mut runs) = active_runs().lock() {
         // Only drops one registration, so two concurrent runs sharing a flag
-        // (loop mode's `is_looping`) don't deregister each other.
+        // (the app's shared `is_looping`) don't deregister each other.
         if let Some(pos) = runs.iter().position(|f| Arc::ptr_eq(f, flag)) {
             runs.remove(pos);
         }

@@ -1,18 +1,26 @@
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Effects
 import com.blockworked.Blockstitch 1.0
 import com.blockworked.Blockwork 1.0
 
 ApplicationWindow {
     id: root
-    width: 1220
-    height: 850
-    minimumWidth: 900
-    minimumHeight: 640
+    // Room around the frameless window for the drop shadow (KWin only shadows decorated windows).
+    readonly property real shadowMargin: customChrome && visibility === Window.Windowed ? 18 : 0
+    width: 1220 + 2 * 18
+    height: 850 + 2 * 18
+    minimumWidth: 600 + 2 * 18
+    minimumHeight: 640 + 2 * 18
     visible: true
     title: "Blockwork"
-    color: "#202124"
+    // macOS keeps its native title bar.
+    readonly property bool customChrome: Qt.platform.os !== "osx"
+    readonly property real cornerRadius: customChrome && visibility === Window.Windowed ? 10 : 0
+    flags: customChrome ? (Qt.Window | Qt.FramelessWindowHint) : Qt.Window
+    color: customChrome ? "transparent" : "#202124"
     property real sidebarWidth: 348
+    property bool sidebarCollapsed: false
 
     // Keep every control on the app theme instead of the system light/dark palette.
     palette {
@@ -24,7 +32,7 @@ ApplicationWindow {
 
     property var appState: ({
         macro_names: [], macro_selected: null, current_macro: null, macros_data: [],
-        loop_mode_enabled: false, global_speed_multiplier: 1, is_looping: false,
+        global_speed_multiplier: 1, is_looping: false,
         recording_phase: { phase: "Idle", countdown: null }, page: "Main",
         can_undo: false, can_redo: false, hotkey_bindings: [], named_hotkey_defaults: [],
         ipc_active_port: null, ipc_auto_start: false, ipc_port_text: "47821",
@@ -89,6 +97,25 @@ ApplicationWindow {
     Component.onCompleted: bridge.start()
     Timer { interval: 16; running: true; repeat: true; onTriggered: bridge.poll() }
 
+    Rectangle {
+        id: shadowSource
+        anchors.fill: frame; radius: root.cornerRadius; color: "black"
+        visible: false; layer.enabled: true; layer.smooth: true; layer.samples: 4
+    }
+    MultiEffect {
+        visible: root.shadowMargin > 0
+        source: shadowSource; anchors.fill: shadowSource
+        shadowEnabled: true; shadowColor: "black"; shadowBlur: 1.0; shadowOpacity: 0.55
+        shadowVerticalOffset: 5; shadowScale: 1.0
+    }
+    // Clipped to the rounded window shape on the frameless build.
+    Item {
+        id: frame
+        anchors.fill: parent; anchors.margins: root.shadowMargin
+        layer.enabled: root.cornerRadius > 0
+        layer.smooth: true; layer.samples: 4
+        layer.effect: MultiEffect { maskEnabled: true; maskSource: frameMask; maskThresholdMin: 0.5; maskSpreadAtMin: 1.0 }
+        Rectangle { anchors.fill: parent; color: "#202124" }
     Item {
         id:contentRoot;anchors.fill:parent;focus:true
         Keys.priority:Keys.BeforeItem
@@ -98,9 +125,6 @@ ApplicationWindow {
             sourceComponent: root.appState.page === "Settings" ? settingsComponent : editorComponent
         }
     }
-    Component { id: editorComponent; EditorPage { appState: root.appState; invoke: root.invoke; appBridge: bridge; sidebarWidth: root.sidebarWidth; onSidebarWidthChanged: root.sidebarWidth = sidebarWidth } }
-    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke } }
-
     Rectangle {
         visible: !bridge.connected
         anchors.fill: parent
@@ -119,4 +143,53 @@ ApplicationWindow {
         height: 38; color: "#4b2225"; z: 110
         Text { anchors.centerIn: parent; text: bridge.lastError; color: "#ffb5b5"; font.pixelSize: 13 }
     }
+    }
+    Item {
+        id: frameMask
+        anchors.fill: frame; visible: false
+        layer.enabled: true; layer.smooth: true; layer.samples: 4
+        Rectangle { anchors.fill: parent; radius: root.cornerRadius; color: "black"; antialiasing: true }
+    }
+    Component {
+        id: editorComponent
+        EditorPage {
+            appState: root.appState; invoke: root.invoke; appBridge: bridge
+            sidebarWidth: root.sidebarWidth
+            onSidebarWidthChanged: root.sidebarWidth = sidebarWidth
+            sidebarCollapsed: root.sidebarCollapsed
+            onSidebarCollapsedChanged: root.sidebarCollapsed = sidebarCollapsed
+        }
+    }
+    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke } }
+
+    // Frameless window: hairline outline and edge/corner resize grips.
+    Rectangle {
+        visible: root.customChrome && root.visibility !== Window.Maximized
+        anchors.fill: parent; anchors.margins: root.shadowMargin
+        color: "transparent"; radius: root.cornerRadius; border.color: "#45474d"; z: 150
+    }
+    Repeater {
+        model: root.customChrome && root.visibility === Window.Windowed ? [
+            { e: Qt.TopEdge, c: Qt.SizeVerCursor }, { e: Qt.BottomEdge, c: Qt.SizeVerCursor },
+            { e: Qt.LeftEdge, c: Qt.SizeHorCursor }, { e: Qt.RightEdge, c: Qt.SizeHorCursor },
+            { e: Qt.TopEdge | Qt.LeftEdge, c: Qt.SizeFDiagCursor }, { e: Qt.BottomEdge | Qt.RightEdge, c: Qt.SizeFDiagCursor },
+            { e: Qt.TopEdge | Qt.RightEdge, c: Qt.SizeBDiagCursor }, { e: Qt.BottomEdge | Qt.LeftEdge, c: Qt.SizeBDiagCursor }
+        ] : []
+        delegate: MouseArea {
+            required property var modelData
+            readonly property int grip: Math.max(5, root.shadowMargin)
+            readonly property bool edgeL: (modelData.e & Qt.LeftEdge) !== 0
+            readonly property bool edgeR: (modelData.e & Qt.RightEdge) !== 0
+            readonly property bool edgeT: (modelData.e & Qt.TopEdge) !== 0
+            readonly property bool edgeB: (modelData.e & Qt.BottomEdge) !== 0
+            readonly property bool corner: (edgeL || edgeR) && (edgeT || edgeB)
+            z: 200; cursorShape: modelData.c
+            x: edgeR ? root.width - (corner ? grip * 2 : grip) : 0
+            y: edgeB ? root.height - (corner ? grip * 2 : grip) : 0
+            width: (edgeL || edgeR) ? (corner ? grip * 2 : grip) : root.width
+            height: (edgeT || edgeB) ? (corner ? grip * 2 : grip) : root.height
+            onPressed: root.startSystemResize(modelData.e)
+        }
+    }
+
 }

@@ -63,7 +63,6 @@ pub enum HotkeyAction {
     StopLoop,
     NextMacro,
     PrevMacro,
-    ToggleLoop,
     RunSpecificMacro(String),
     StartRecordingImmediate,
     StopRecording,

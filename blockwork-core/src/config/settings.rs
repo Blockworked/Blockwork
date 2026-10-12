@@ -17,11 +17,21 @@ fn settings_cache() -> &'static Mutex<Option<(SystemTime, AppSettings)>> {
     SETTINGS_CACHE.get_or_init(|| Mutex::new(None))
 }
 
+/// Drops bindings that no longer parse (e.g. the retired `ToggleLoop`) instead
+/// of failing the whole settings file.
+fn lenient_bindings<'de, D>(d: D) -> Result<Option<Vec<HotkeyBinding>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw: Option<Vec<serde_json::Value>> = Option::deserialize(d)?;
+    Ok(raw.map(|v| v.into_iter().filter_map(|b| serde_json::from_value(b).ok()).collect()))
+}
+
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct AppSettings {
-    pub loop_mode_enabled: Option<bool>,
     pub ipc_port: Option<u16>,
     pub ipc_auto_start: Option<bool>,
+    #[serde(default, deserialize_with = "lenient_bindings")]
     pub global_hotkeys: Option<Vec<HotkeyBinding>>,
     pub selected_macro_id: Option<String>,
     /// Runtime-only playback speed override applied on top of each macro's

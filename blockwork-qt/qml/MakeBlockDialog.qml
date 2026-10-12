@@ -5,20 +5,25 @@ import com.blockworked.Blockstitch 1.0
 
 BwDialog {
     id: root
-    title: "Make a Block"
+    title: editBlockId.length ? "Edit Block" : "Make a Block"
     width: 720
     height: Math.min(760, parent ? parent.height - 32 : 760)
     standardButtons: Dialog.NoButton
 
     signal createRequested(var pieces, string shape, string color)
+    signal editRequested(string blockId, var pieces, string shape, string color)
+
+    // Set while editing an existing block; empty when making a new one.
+    property string editBlockId: ""
+    property var pendingDef: null
 
     property int selectedPiece: 0
     property int editingPiece: -1
     property var activeEditor: null
     property bool customPickerOpen: false
     property real customHue: 215
-    property real customSaturation: 100
-    property real customLightness: 65
+    property real customSaturation: 0.7
+    property real customValue: 1
     property string blockShape: "Normal"
     property string blockColor: "#4C97FF"
     property string validationError: ""
@@ -26,41 +31,43 @@ BwDialog {
     readonly property bool hasBranches: branchCount() > 0
     readonly property var colorPresets: ["#4C97FF", "#9966FF", "#C65BCF", "#FFBF00", "#FFAB19", "#5BA9D0", "#59C059", "#FF8C1A", "#FF5B1F", "#FF6680", "#19B88E", "#FF4D4F", "#FF7F7F", "#FFB77B", "#FFF28A", "#8BF77A", "#78F0B0", "#70D5E8", "#7DB5F5", "#8080F5", "#C667E8", "#F27AED", "#B3B3B3"]
 
-    function hslToHex(h, s, l) {
-        s /= 100;
-        l /= 100;
-        const c = (1 - Math.abs(2 * l - 1)) * s;
+    function hsvToHex(h, s, v) {
+        const c = v * s;
         const x = c * (1 - Math.abs((h / 60) % 2 - 1));
-        const m = l - c / 2;
-        const rgb = h < 60 ? [c, x, 0] : h < 120 ? [x, c, 0] : h < 180 ? [0, c, x] : h < 240 ? [0, x, c] : h < 300 ? [x, 0, c] : [c, 0, x];
-        return "#" + rgb.map(v => Math.round((v + m) * 255).toString(16).padStart(2, "0")).join("").toUpperCase();
+        const m = v - c;
+        const i = Math.min(5, Math.floor(h / 60));
+        const rgb = [[c, x, 0], [x, c, 0], [0, c, x], [0, x, c], [x, 0, c], [c, 0, x]][i];
+        return "#" + rgb.map(k => Math.round((k + m) * 255).toString(16).padStart(2, "0")).join("").toUpperCase();
     }
-    function hexToHsl(hex) {
+    // [hue 0-360, saturation 0-1, value 0-1], or null for anything but #RRGGBB.
+    function hexToHsv(hex) {
         const match = /^#([0-9a-f]{6})$/i.exec(hex);
         if (!match)
             return null;
         const rgb = [0, 2, 4].map(i => parseInt(match[1].slice(i, i + 2), 16) / 255);
         const max = Math.max(...rgb), min = Math.min(...rgb), delta = max - min;
-        const lightness = (max + min) / 2;
-        const saturation = delta === 0 ? 0 : delta / (1 - Math.abs(2 * lightness - 1));
         let hue = 0;
         if (delta !== 0)
             hue = max === rgb[0] ? 60 * (((rgb[1] - rgb[2]) / delta) % 6) : max === rgb[1] ? 60 * ((rgb[2] - rgb[0]) / delta + 2) : 60 * ((rgb[0] - rgb[1]) / delta + 4);
-        return [(hue + 360) % 360, saturation * 100, lightness * 100];
+        return [(hue + 360) % 360, max === 0 ? 0 : delta / max, max];
+    }
+    function loadCustomColor(hex) {
+        const hsv = hexToHsv(hex);
+        if (!hsv)
+            return;
+        // A grey has no hue of its own: keep the one already showing.
+        if (hsv[1] > 0.001 && hsv[2] > 0.001)
+            customHue = hsv[0];
+        customSaturation = hsv[1];
+        customValue = hsv[2];
     }
     function toggleCustomPicker() {
-        if (!customPickerOpen) {
-            const hsl = hexToHsl(blockColor);
-            if (hsl) {
-                customHue = hsl[0];
-                customSaturation = hsl[1];
-                customLightness = hsl[2];
-            }
-        }
+        if (!customPickerOpen)
+            loadCustomColor(blockColor);
         customPickerOpen = !customPickerOpen;
     }
     function updateCustomColor() {
-        blockColor = hslToHex(customHue, customSaturation, customLightness);
+        blockColor = hsvToHex(customHue, customSaturation, customValue);
     }
 
     ListModel {
@@ -97,7 +104,7 @@ BwDialog {
             pieces.setProperty(branch.sepIndex, "pieceName", text);
         else if (text.length) {
             const insertAt = branch.index + 1;
-            pieces.insert(insertAt, { pieceKind: "Label", pieceName: text, valueType: "Any" });
+            pieces.insert(insertAt, { pieceKind: "Label", pieceName: text, valueType: "Any", pieceId: "" });
             if (selectedPiece >= insertAt) selectedPiece++;
         }
     }
@@ -137,12 +144,43 @@ BwDialog {
             return (c === "x" ? r : (r & 3 | 8)).toString(16);
         });
     }
+    function openForCreate() {
+        editBlockId = "";
+        pendingDef = null;
+        open();
+    }
+    function openForEdit(def) {
+        editBlockId = def.id;
+        pendingDef = def;
+        open();
+    }
+    function loadDef(def) {
+        pieces.clear();
+        for (const p of def.pieces || []) {
+            pieces.append({
+                pieceKind: p.kind,
+                pieceName: p.kind === "Label" ? p.text : p.name,
+                valueType: p.kind === "Input" ? p.value_type : "Any",
+                pieceId: p.id || ""
+            });
+        }
+        if (!pieces.count)
+            pieces.append({ pieceKind: "Label", pieceName: "block name", valueType: "Any", pieceId: "" });
+        selectedPiece = 0;
+        editingPiece = -1;
+        activeEditor = null;
+        blockShape = def.shape || "Normal";
+        blockColor = def.color || "#4C97FF";
+        validationError = "";
+        customPickerOpen = false;
+    }
     function resetForm() {
         pieces.clear();
         pieces.append({
             pieceKind: "Label",
             pieceName: "block name",
-            valueType: "Any"
+            valueType: "Any",
+            pieceId: ""
         });
         selectedPiece = 0;
         editingPiece = -1;
@@ -186,14 +224,16 @@ BwDialog {
             pieces.append({
                 pieceKind: "Label",
                 pieceName: "",
-                valueType: "Any"
+                valueType: "Any",
+                pieceId: ""
             });
         const name = kind === "Label" ? "label" : nextName(kind === "Branch" ? "branch" : "value");
         const insertAt = kind === "Label" && hasBranches ? firstBranchIndex() : pieces.count;
         pieces.insert(insertAt, {
             pieceKind: kind,
             pieceName: name,
-            valueType: valueType || "Any"
+            valueType: valueType || "Any",
+            pieceId: ""
         });
         selectedPiece = insertAt;
         Qt.callLater(() => focusPiece(insertAt));
@@ -255,8 +295,8 @@ BwDialog {
         const to = branchInfo[targetOrdinal].index;
         const first = pieces.get(from);
         const second = pieces.get(to);
-        pieces.set(from, { pieceKind: second.pieceKind, pieceName: second.pieceName, valueType: second.valueType });
-        pieces.set(to, { pieceKind: first.pieceKind, pieceName: first.pieceName, valueType: first.valueType });
+        pieces.set(from, { pieceKind: second.pieceKind, pieceName: second.pieceName, valueType: second.valueType, pieceId: second.pieceId });
+        pieces.set(to, { pieceKind: first.pieceKind, pieceName: first.pieceName, valueType: first.valueType, pieceId: first.pieceId });
         selectedPiece = to;
     }
     function removeBranch(ordinal) {
@@ -302,19 +342,19 @@ BwDialog {
             if (p.pieceKind === "Label")
                 out.push({
                     kind: "Label",
-                    id: uuid(),
+                    id: p.pieceId || uuid(),
                     text: name
                 });
             else if (p.pieceKind === "Branch")
                 out.push({
                     kind: "Branch",
-                    id: uuid(),
+                    id: p.pieceId || uuid(),
                     name: name
                 });
             else
                 out.push({
                     kind: "Input",
-                    id: uuid(),
+                    id: p.pieceId || uuid(),
                     name: name,
                     value_type: p.valueType
                 });
@@ -348,10 +388,24 @@ BwDialog {
             validationError = "Give the block a name";
             return;
         }
-        createRequested(resultPieces(), blockShape, blockColor);
+        if (editBlockId.length)
+            editRequested(editBlockId, resultPieces(), blockShape, blockColor);
+        else
+            createRequested(resultPieces(), blockShape, blockColor);
         accept();
     }
-    onOpened: resetForm()
+    onOpened: {
+        if (pendingDef) {
+            loadDef(pendingDef);
+            Qt.callLater(() => focusPiece(0));
+        } else {
+            resetForm();
+        }
+    }
+    onClosed: {
+        editBlockId = "";
+        pendingDef = null;
+    }
 
     component PreviewPiece: Item {
         id: piece
@@ -545,8 +599,8 @@ BwDialog {
                 scale: Math.min(1, (parent.height - 16) / implicitHeight)
                 Item {
                     visible: !root.hasBranches
-                    width: Math.max(230, previewRow.implicitWidth + 64)
-                    height: visible ? (root.returnsValue ? 43 : 62) : 0
+                    width: Math.max(root.returnsValue ? 90 : 132, previewRow.implicitWidth + (root.returnsValue ? 36 : 28))
+                    height: visible ? (root.returnsValue ? 43 : root.blockShape === "Ending" ? 54 : 62) : 0
                     BlockSurface {
                         anchors.fill: parent
                         visible: !root.returnsValue
@@ -572,7 +626,7 @@ BwDialog {
                     }
                     Row {
                         id: previewRow
-                        x: root.returnsValue ? 24 : 42
+                        x: root.returnsValue ? 18 : 14
                         y: root.returnsValue ? 7 : 15
                         spacing: 4
                         LucideIcon {
@@ -802,70 +856,138 @@ BwDialog {
         }
 
         Rectangle {
+            id: picker
             visible: root.customPickerOpen
             Layout.alignment: Qt.AlignHCenter
             Layout.preferredWidth: 430
-            Layout.preferredHeight: 100
+            Layout.preferredHeight: 196
             radius: Theme.radius
             color: Theme.panelRaised
             border.color: Theme.border
-            RowLayout {
+            readonly property color pure: Qt.hsva(root.customHue / 360, 1, 1, 1)
+
+            ColumnLayout {
                 anchors.fill: parent
                 anchors.margins: 12
-                spacing: 12
+                spacing: 10
+
+                // Saturation across, value down: the usual picker square.
                 Rectangle {
-                    Layout.preferredWidth: 72
-                    Layout.preferredHeight: 72
-                    radius: Theme.radius
-                    color: root.hslToHex(root.customHue, root.customSaturation, root.customLightness)
-                    border.color: Theme.border
-                }
-                ColumnLayout {
+                    id: field
                     Layout.fillWidth: true
-                    spacing: 2
-                    Repeater {
-                        model: ["Hue", "Saturation", "Lightness"]
-                        delegate: RowLayout {
-                            required property string modelData
-                            required property int index
-                            Layout.fillWidth: true
-                            spacing: 8
-                            Text {
-                                text: modelData
-                                color: Theme.textDim
-                                font.pixelSize: 12
-                                Layout.preferredWidth: 66
-                            }
-                            Slider {
-                                Layout.fillWidth: true
-                                implicitHeight: 25
-                                from: 0
-                                to: index === 0 ? 359 : 100
-                                value: index === 0 ? root.customHue : index === 1 ? root.customSaturation : root.customLightness
-                                onMoved: {
-                                    if (index === 0)
-                                        root.customHue = value;
-                                    else if (index === 1)
-                                        root.customSaturation = value;
-                                    else
-                                        root.customLightness = value;
-                                    root.updateCustomColor();
-                                }
-                            }
+                    Layout.fillHeight: true
+                    radius: 4
+                    clip: true
+                    border.color: Theme.border
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0; color: "#ffffff" }
+                        GradientStop { position: 1; color: picker.pure }
+                    }
+                    Rectangle {
+                        anchors.fill: parent
+                        gradient: Gradient {
+                            GradientStop { position: 0; color: "#00000000" }
+                            GradientStop { position: 1; color: "#ff000000" }
                         }
                     }
-                    Text {
-                        text: root.hslToHex(root.customHue, root.customSaturation, root.customLightness)
-                        color: Theme.textDim
-                        font.family: "monospace"
-                        font.pixelSize: 12
+                    Rectangle {
+                        x: root.customSaturation * field.width - width / 2
+                        y: (1 - root.customValue) * field.height - height / 2
+                        width: 14
+                        height: 14
+                        radius: 7
+                        color: "transparent"
+                        border.width: 2
+                        border.color: root.customValue > 0.6 && root.customSaturation < 0.5 ? "#000000" : "#ffffff"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.CrossCursor
+                        preventStealing: true
+                        function pick(mouse) {
+                            root.customSaturation = Math.max(0, Math.min(1, mouse.x / width));
+                            root.customValue = 1 - Math.max(0, Math.min(1, mouse.y / height));
+                            root.updateCustomColor();
+                        }
+                        onPressed: mouse => pick(mouse)
+                        onPositionChanged: mouse => { if (pressed) pick(mouse); }
                     }
                 }
-                BwButton {
-                    text: "Done"
-                    primary: true
-                    implicitWidth: 50
-                    onClicked: root.customPickerOpen = false
+
+                Rectangle {
+                    id: hueStrip
+                    Layout.fillWidth: true
+                    Layout.preferredHeight: 14
+                    radius: 7
+                    border.color: Theme.border
+                    gradient: Gradient {
+                        orientation: Gradient.Horizontal
+                        GradientStop { position: 0 / 6; color: "#ff0000" }
+                        GradientStop { position: 1 / 6; color: "#ffff00" }
+                        GradientStop { position: 2 / 6; color: "#00ff00" }
+                        GradientStop { position: 3 / 6; color: "#00ffff" }
+                        GradientStop { position: 4 / 6; color: "#0000ff" }
+                        GradientStop { position: 5 / 6; color: "#ff00ff" }
+                        GradientStop { position: 6 / 6; color: "#ff0000" }
+                    }
+                    Rectangle {
+                        x: root.customHue / 360 * (hueStrip.width - width)
+                        y: -2
+                        width: 10
+                        height: parent.height + 4
+                        radius: 5
+                        color: picker.pure
+                        border.width: 2
+                        border.color: "#ffffff"
+                    }
+                    MouseArea {
+                        anchors.fill: parent
+                        cursorShape: Qt.PointingHandCursor
+                        preventStealing: true
+                        function pick(mouse) {
+                            root.customHue = Math.max(0, Math.min(359.99, mouse.x / width * 360));
+                            root.updateCustomColor();
+                        }
+                        onPressed: mouse => pick(mouse)
+                        onPositionChanged: mouse => { if (pressed) pick(mouse); }
+                    }
+                }
+
+                RowLayout {
+                    Layout.fillWidth: true
+                    spacing: 10
+                    Rectangle {
+                        Layout.preferredWidth: 28
+                        Layout.preferredHeight: 28
+                        radius: 14
+                        color: root.blockColor
+                        border.color: Theme.border
+                    }
+                    BwTextField {
+                        id: hexField
+                        Layout.preferredWidth: 100
+                        font.family: "monospace"
+                        text: root.blockColor
+                        onEditingFinished: {
+                            const typed = text.trim().toUpperCase();
+                            const hex = typed.startsWith("#") ? typed : "#" + typed;
+                            if (root.hexToHsv(hex)) {
+                                root.blockColor = hex;
+                                root.loadCustomColor(hex);
+                            }
+                            text = Qt.binding(() => root.blockColor);
+                        }
+                    }
+                    Item {
+                        Layout.fillWidth: true
+                    }
+                    BwButton {
+                        text: "Done"
+                        primary: true
+                        implicitWidth: 60
+                        onClicked: root.customPickerOpen = false
+                    }
                 }
             }
         }

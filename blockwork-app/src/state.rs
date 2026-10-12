@@ -79,7 +79,6 @@ pub(crate) struct AppState {
     pub(crate) list_values: Arc<Mutex<HashMap<String, Vec<ListItem>>>>,
     pub(crate) thread_pool: ThreadPool,
     pub(crate) is_looping: Arc<Mutex<bool>>,
-    pub(crate) loop_mode_enabled: bool,
     pub(crate) global_speed_multiplier: f64,
     pub(crate) ipc_server: Option<tokio::task::JoinHandle<()>>,
     pub(crate) ipc_shutdown_tx: Option<tokio::sync::watch::Sender<bool>>,
@@ -124,7 +123,6 @@ pub(crate) struct StateDto {
     pub(crate) macro_selected: Option<usize>,
     pub(crate) current_macro: Option<MacroDto>,
     pub(crate) macros_data: Vec<MacroDto>,
-    pub(crate) loop_mode_enabled: bool,
     pub(crate) global_speed_multiplier: f64,
     pub(crate) is_looping: bool,
     pub(crate) ipc_active_port: Option<u16>,
@@ -437,7 +435,6 @@ pub(crate) enum HotkeyActionDto {
     StopLoop,
     NextMacro,
     PrevMacro,
-    ToggleLoop,
     StartRecordingImmediate,
     StopRecording,
     Undo,
@@ -951,7 +948,6 @@ fn hotkey_action_to_dto(action: &HotkeyAction) -> HotkeyActionDto {
         HotkeyAction::StopLoop => HotkeyActionDto::StopLoop,
         HotkeyAction::NextMacro => HotkeyActionDto::NextMacro,
         HotkeyAction::PrevMacro => HotkeyActionDto::PrevMacro,
-        HotkeyAction::ToggleLoop => HotkeyActionDto::ToggleLoop,
         HotkeyAction::StartRecordingImmediate => HotkeyActionDto::StartRecordingImmediate,
         HotkeyAction::StopRecording => HotkeyActionDto::StopRecording,
         HotkeyAction::Undo => HotkeyActionDto::Undo,
@@ -968,7 +964,6 @@ pub(crate) fn dto_to_hotkey_action(dto: &HotkeyActionDto) -> HotkeyAction {
         HotkeyActionDto::StopLoop => HotkeyAction::StopLoop,
         HotkeyActionDto::NextMacro => HotkeyAction::NextMacro,
         HotkeyActionDto::PrevMacro => HotkeyAction::PrevMacro,
-        HotkeyActionDto::ToggleLoop => HotkeyAction::ToggleLoop,
         HotkeyActionDto::StartRecordingImmediate => HotkeyAction::StartRecordingImmediate,
         HotkeyActionDto::StopRecording => HotkeyAction::StopRecording,
         HotkeyActionDto::Undo => HotkeyAction::Undo,
@@ -1034,12 +1029,11 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         })
         .collect();
 
-    const NAMED_HOTKEY_ACTIONS: [HotkeyAction; 9] = [
+    const NAMED_HOTKEY_ACTIONS: [HotkeyAction; 8] = [
         HotkeyAction::RunMacro,
         HotkeyAction::StopLoop,
         HotkeyAction::NextMacro,
         HotkeyAction::PrevMacro,
-        HotkeyAction::ToggleLoop,
         HotkeyAction::StartRecordingImmediate,
         HotkeyAction::StopRecording,
         HotkeyAction::Undo,
@@ -1124,7 +1118,6 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         macro_selected: s.macro_selected,
         current_macro,
         macros_data,
-        loop_mode_enabled: s.loop_mode_enabled,
         global_speed_multiplier: s.global_speed_multiplier,
         is_looping,
         ipc_active_port: s.ipc_active_port,

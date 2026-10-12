@@ -11,6 +11,8 @@ const DAEMON_ARG: &str = "--daemon";
 pub enum Request {
     Invoke { command: String, args: Value },
     FetchApps,
+    /// Sample-evaluates a value block; answered by [`Event::Preview`] with the same `key`.
+    Preview { key: String, value: Value },
 }
 
 pub enum Event {
@@ -21,6 +23,7 @@ pub enum Event {
     Quit,
     Apps(String),
     AppsError(String),
+    Preview { key: String, text: String, error: bool },
 }
 
 pub fn spawn(requests: tokio::sync::mpsc::UnboundedReceiver<Request>, events: mpsc::Sender<Event>) {
@@ -66,6 +69,7 @@ async fn run(
     let _ = events.send(Event::Connected);
     let mut next_id = 1_u64;
     let mut pending_apps_id: Option<u64> = None;
+    let mut pending_previews: std::collections::HashMap<u64, String> = Default::default();
 
     loop {
         tokio::select! {
@@ -79,6 +83,21 @@ async fn run(
                             let _ = events.send(Event::Error("command is too large".into()));
                             continue;
                         }
+                        writer.write_all(line.as_bytes()).await?;
+                    }
+                    Request::Preview { key, value } => {
+                        let id = next_id;
+                        next_id = next_id.wrapping_add(1);
+                        let line = encode(&ClientMessage::Call {
+                            id,
+                            cmd: "preview_value".to_owned(),
+                            args: serde_json::json!({ "value": value }),
+                        });
+                        if line.len() > blockwork_protocol::MAX_MESSAGE_BYTES {
+                            let _ = events.send(Event::Preview { key, text: "too large".into(), error: true });
+                            continue;
+                        }
+                        pending_previews.insert(id, key);
                         writer.write_all(line.as_bytes()).await?;
                     }
                     Request::FetchApps => {
@@ -115,7 +134,15 @@ async fn run(
                         }
                     }
                     DaemonMessageKind::Reply => {
-                        if pending_apps_id.is_some_and(|pending| message.id == Some(pending)) {
+                        if let Some(key) = message.id.and_then(|id| pending_previews.remove(&id)) {
+                            let event = match (message.error, message.data) {
+                                (Some(error), _) => Event::Preview { key, text: error, error: true },
+                                (None, Some(Value::String(text))) => Event::Preview { key, text, error: false },
+                                (None, Some(other)) => Event::Preview { key, text: other.to_string(), error: false },
+                                (None, None) => Event::Preview { key, text: String::new(), error: false },
+                            };
+                            let _ = events.send(event);
+                        } else if pending_apps_id.is_some_and(|pending| message.id == Some(pending)) {
                             pending_apps_id = None;
                             if let Some(error) = message.error {
                                 eprintln!("[blockwork-qt] installed apps request failed: {error}");

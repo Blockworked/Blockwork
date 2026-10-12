@@ -17,6 +17,8 @@ fn main() {
         "qml/EditorPage.qml",
         "qml/SettingsPage.qml",
         "qml/SectionCard.qml",
+        "qml/WindowControls.qml",
+        "qml/TitleBarDrag.qml",
         "qml/MakeBlockDialog.qml",
         "qml/AppSelectorDialog.qml",
     ];
