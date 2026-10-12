@@ -3,7 +3,7 @@
 //! [`InstructionKind`]'s [`BlockKind`] impl is the hinge between the two.
 
 use crate::input::schedule::TimeSchedule;
-use crate::input::types::InputToken;
+use crate::input::types::{Direction, InputToken};
 use crate::input::value::{Op, Value};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
@@ -61,6 +61,7 @@ impl BlockKind for InstructionKind {
             | InstructionKind::Return(value)
             | InstructionKind::WhenBatteryDischargedTo(value)
             | InstructionKind::WhenBatteryChargedTo(value)
+            | InstructionKind::WhenKey(value, _)
             | InstructionKind::SetClipboard(value)
             | InstructionKind::SetVariable(_, value)
             | InstructionKind::ChangeVariable(_, value)
@@ -117,6 +118,7 @@ impl BlockKind for InstructionKind {
                 | InstructionKind::WhenPowerPluggedIn
                 | InstructionKind::WhenPowerUnplugged
                 | InstructionKind::WhenClipboardChanged
+                | InstructionKind::WhenKey(..)
         )
     }
 
@@ -246,6 +248,10 @@ pub enum InstructionKind {
     /// clipboard's contents change. Edge-triggered like the other watcher
     /// headers, but with no threshold to recover past - any change fires it.
     WhenClipboardChanged,
+    /// Header-only marker driven by the key watcher (`key_watch` in the
+    /// desktop app): fires the body when the key combo in the value is
+    /// pressed or released. `Click` is treated as `Press`.
+    WhenKey(Value, Direction),
     /// Launches an installed application, chosen via the desktop app's "Open
     /// App" picker (`blockwork-app`'s `installed_apps` module lists candidates).
     /// `command` is the already-resolved, platform-specific launch string
@@ -538,6 +544,11 @@ impl std::hash::Hash for InstructionKind {
             Self::WhenClipboardChanged => {
                 32u8.hash(state);
             }
+            Self::WhenKey(key, direction) => {
+                33u8.hash(state);
+                key.hash(state);
+                direction.hash(state);
+            }
         }
     }
 }
@@ -555,6 +566,7 @@ enum InstructionKindDe {
     WhenPowerPluggedIn,
     WhenPowerUnplugged,
     WhenClipboardChanged,
+    WhenKey(Value, Direction),
     OpenApp {
         command: String,
         name: String,
@@ -690,6 +702,7 @@ impl From<InstructionKindDe> for InstructionKind {
             InstructionKindDe::WhenPowerPluggedIn => InstructionKind::WhenPowerPluggedIn,
             InstructionKindDe::WhenPowerUnplugged => InstructionKind::WhenPowerUnplugged,
             InstructionKindDe::WhenClipboardChanged => InstructionKind::WhenClipboardChanged,
+            InstructionKindDe::WhenKey(key, direction) => InstructionKind::WhenKey(key, direction),
             InstructionKindDe::OpenApp {
                 command,
                 name,

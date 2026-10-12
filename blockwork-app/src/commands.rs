@@ -1785,47 +1785,54 @@ pub(crate) fn start_standalone_key_capture(
     Ok(())
 }
 
+/// `keys` are the `(code, key)` pairs held when a key was released, in
+/// press order; they become one combo such as `Control+Alt+o`.
 pub(crate) fn key_capture_event(
     state: &SharedState,
     app: &AppHandle,
-    code: String,
-    key: String,
+    keys: Vec<(String, String)>,
 ) -> Result<(), String> {
+    use blockwork_core::input::key_names::{format_key_combo, match_key};
+    let mut combo: Vec<blockwork_core::input::types::MacroKey> = Vec::new();
+    for (code, key) in &keys {
+        let parsed = blockwork_core::key_mapping::web_code_to_macro_key(code)
+            .or_else(|| blockwork_core::key_mapping::web_key_to_macro_key(key));
+        if let Some(mk) = parsed {
+            if !combo.iter().any(|k| match_key(k) == match_key(&mk)) {
+                combo.push(mk);
+            }
+        }
+    }
+    if combo.is_empty() {
+        return Ok(());
+    }
+    let text = format_key_combo(&combo);
+
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let Some(target) = s.key_capture.take() else {
         return Ok(());
     };
-
-    let captured_key = blockwork_core::key_mapping::web_code_to_macro_key(&code)
-        .or_else(|| blockwork_core::key_mapping::web_key_to_macro_key(&key));
-
-    if let Some(mk) = captured_key {
-        match target {
-            KeyCaptureTarget::Strand(strand_id, path) => {
-                let captured = s.current_macro.as_mut().is_some_and(|mac| {
-                    match mac.instruction_at_mut(&strand_id, &path) {
-                        Some(Instruction {
-                            kind: InstructionKind::Token(InputToken::Key(key, _)),
-                            ..
-                        }) => {
-                            *key = mk;
-                            true
-                        }
-                        _ => false,
+    match target {
+        KeyCaptureTarget::Strand(strand_id, path) => {
+            let captured = s.current_macro.as_mut().is_some_and(|mac| {
+                match mac.instruction_at_mut(&strand_id, &path) {
+                    Some(Instruction {
+                        kind:
+                            InstructionKind::Token(InputToken::Key(value, _))
+                            | InstructionKind::WhenKey(value, _),
+                        ..
+                    }) => {
+                        *value = Value::Text { value: text };
+                        true
                     }
-                });
-                if captured {
-                    auto_save(&s);
+                    _ => false,
                 }
-            }
-            KeyCaptureTarget::Standalone => {
-                s.pending_standalone_key = Some(
-                    blockwork_core::input::key_to_string(&mk)
-                        .unwrap_or("Unknown")
-                        .to_string(),
-                );
+            });
+            if captured {
+                auto_save(&s);
             }
         }
+        KeyCaptureTarget::Standalone => s.pending_standalone_key = Some(text),
     }
     emit_state_updated(&app, &s);
     Ok(())

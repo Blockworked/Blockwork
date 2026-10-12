@@ -15,6 +15,7 @@ pub enum FieldId {
     MoveMouseY,
     ScrollAmount,
     TextValue,
+    KeyValue,
     SetVariableValue,
     ChangeVariableValue,
     SetClipboardValue,
@@ -60,6 +61,7 @@ impl std::fmt::Display for FieldId {
             FieldId::MoveMouseY => write!(f, "MoveMouseY"),
             FieldId::ScrollAmount => write!(f, "ScrollAmount"),
             FieldId::TextValue => write!(f, "TextValue"),
+            FieldId::KeyValue => write!(f, "KeyValue"),
             FieldId::SetVariableValue => write!(f, "SetVariableValue"),
             FieldId::ChangeVariableValue => write!(f, "ChangeVariableValue"),
             FieldId::SetClipboardValue => write!(f, "SetClipboardValue"),
@@ -89,6 +91,7 @@ impl std::str::FromStr for FieldId {
             "MoveMouseY" => Ok(FieldId::MoveMouseY),
             "ScrollAmount" => Ok(FieldId::ScrollAmount),
             "TextValue" => Ok(FieldId::TextValue),
+            "KeyValue" => Ok(FieldId::KeyValue),
             "SetVariableValue" => Ok(FieldId::SetVariableValue),
             "ChangeVariableValue" => Ok(FieldId::ChangeVariableValue),
             "SetClipboardValue" => Ok(FieldId::SetClipboardValue),
@@ -121,6 +124,8 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
         (InstructionKind::Token(InputToken::MoveMouse(_, y, _)), FieldId::MoveMouseY) => Some(y),
         (InstructionKind::Token(InputToken::Scroll(a, _)), FieldId::ScrollAmount) => Some(a),
         (InstructionKind::Token(InputToken::Text(t)), FieldId::TextValue) => Some(t),
+        (InstructionKind::Token(InputToken::Key(k, _)), FieldId::KeyValue) => Some(k),
+        (InstructionKind::WhenKey(k, _), FieldId::KeyValue) => Some(k),
         (InstructionKind::SetVariable(_, v), FieldId::SetVariableValue) => Some(v),
         (InstructionKind::Return(v), FieldId::ReturnValue) => Some(v),
         (InstructionKind::CallBlock { args, .. }, FieldId::CallArg(i)) => args.get_mut(i),
@@ -163,6 +168,7 @@ pub(crate) fn blank_field_value(
 ) -> Option<Value> {
     match (kind, field) {
         (_, FieldId::Condition) => Some(Value::Bool),
+        (_, FieldId::KeyValue) => Some(Value::Text { value: String::new() }),
         (InstructionKind::CallBlock { block_id, .. }, FieldId::CallArg(index)) => {
             let declared = blocks
                 .iter()

@@ -17,7 +17,7 @@ Item {
     property bool sidebarToggling: false
     readonly property real minSidebarWidth: 180
     readonly property real maxSidebarWidth: 600
-    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"]
+    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"]
     readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList"]
 
     function uuid() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }); }
@@ -30,7 +30,8 @@ Item {
         else if (type === "WhenTime") i.schedule = { kind: "Daily", hour: 9, minute: 0 };
         else if (type === "Wait") i.duration = numberValue(1000);
         else if (type === "Text") i.text = textValue("text");
-        else if (type === "Key") { i.key = root.sidebarKey; i.direction = "Click"; }
+        else if (type === "Key") { i.key = textValue(root.sidebarKey); i.direction = "Click"; }
+        else if (type === "WhenKey") { i.key = textValue(root.sidebarKey); i.direction = "Press"; }
         else if (type === "Button") { i.button = "Left"; i.direction = "Click"; }
         else if (type === "MoveMouse") { i.x = numberValue(0); i.y = numberValue(0); i.coordinate = "Relative"; }
         else if (type === "Scroll") { i.amount = numberValue(4); i.axis = "Vertical"; }
@@ -77,7 +78,7 @@ Item {
     }
     function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
     function instructionExplainer(type) {
-        const x={WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a keyboard key.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
+        const x={WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a key or key combo.",WhenKey:"Runs when a key or key combo is pressed or released.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
         return x[type]||"A Blockwork instruction block.";
     }
     // ---- app picker ("Choose app" for OpenApp/CloseApp) ----

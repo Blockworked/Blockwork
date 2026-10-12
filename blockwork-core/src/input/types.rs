@@ -189,12 +189,28 @@ pub enum MacroButton {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub enum InputToken {
-    Key(MacroKey, Direction),
+    /// The key slot holds a combo string such as `Control+Alt+O`, so a
+    /// variable or operator can supply it.
+    Key(#[serde(deserialize_with = "deserialize_key_value")] Value, Direction),
     Button(MacroButton, Direction),
     MoveMouse(Value, Value, Coordinate),
     Scroll(Value, Axis),
     Text(Value),
     Raw(u16, Direction),
+}
+
+/// Saves from before the key became a value stored a bare `MacroKey`.
+fn deserialize_key_value<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Value, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum KeyDe {
+        Legacy(MacroKey),
+        Current(Value),
+    }
+    Ok(match KeyDe::deserialize(d)? {
+        KeyDe::Legacy(key) => Value::Text { value: crate::input::key_names::key_name(&key) },
+        KeyDe::Current(value) => value,
+    })
 }
 
 impl InputToken {
@@ -212,7 +228,8 @@ impl InputToken {
             }
             InputToken::Scroll(amount, _) => f(amount, Any),
             InputToken::Text(value) => f(value, Any),
-            InputToken::Key(..) | InputToken::Button(..) | InputToken::Raw(..) => {}
+            InputToken::Key(key, _) => f(key, Any),
+            InputToken::Button(..) | InputToken::Raw(..) => {}
         }
     }
 
@@ -220,5 +237,25 @@ impl InputToken {
     /// `blockstitch_core::graph::rename_list_in_value`.
     pub fn rename_list(&mut self, old: &str, new: &str) {
         self.visit_values_mut(&mut |v, _| blockstitch_core::graph::rename_list_in_value(v, old, new));
+    }
+}
+
+#[cfg(test)]
+mod key_token_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_key_token_loads_as_text_value() {
+        let token: InputToken = serde_json::from_str(r#"{"Key":["Return","Press"]}"#).unwrap();
+        assert_eq!(token, InputToken::Key(Value::Text { value: "Enter".into() }, Direction::Press));
+        let token: InputToken = serde_json::from_str(r#"{"Key":[{"Unicode":"a"},"Click"]}"#).unwrap();
+        assert_eq!(token, InputToken::Key(Value::Text { value: "a".into() }, Direction::Click));
+    }
+
+    #[test]
+    fn current_key_token_round_trips() {
+        let token = InputToken::Key(Value::Text { value: "Control+s".into() }, Direction::Click);
+        let json = serde_json::to_string(&token).unwrap();
+        assert_eq!(serde_json::from_str::<InputToken>(&json).unwrap(), token);
     }
 }

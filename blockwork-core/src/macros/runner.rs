@@ -335,7 +335,8 @@ impl Macro {
                 | Some(InstructionKind::WhenTime(_))
                 | Some(InstructionKind::WhenPowerPluggedIn)
                 | Some(InstructionKind::WhenPowerUnplugged)
-                | Some(InstructionKind::WhenClipboardChanged) => {}
+                | Some(InstructionKind::WhenClipboardChanged)
+                | Some(InstructionKind::WhenKey(..)) => {}
                 _ => {}
             }
         }
@@ -542,6 +543,7 @@ fn run_block(
             InstructionKind::WhenPowerPluggedIn => {}
             InstructionKind::WhenPowerUnplugged => {}
             InstructionKind::WhenClipboardChanged => {}
+            InstructionKind::WhenKey(..) => {}
             InstructionKind::OpenApp { command, .. } => {
                 println!("Opening app: {command}");
                 if let Err(e) = open_app(command) {
@@ -743,6 +745,21 @@ fn run_block(
                     }
                 }
                 InputToken::Key(key, direction) => {
+                    let text = match ctx.resolve(key, depth).and_then(|v| v.eval_text()) {
+                        Ok(t) => t,
+                        Err(e) => {
+                            warn!("Skipping Key: {}", e);
+                            continue;
+                        }
+                    };
+                    let keys: Vec<MacroKey> = crate::input::key_names::parse_key_combo(&text)
+                        .into_iter()
+                        .map(normalize_modifier_key)
+                        .collect();
+                    if keys.is_empty() {
+                        warn!("Skipping Key: no key in '{}'", text);
+                        continue;
+                    }
                     let mut em = match ctx.emulator.lock() {
                         Ok(guard) => guard,
                         Err(err) => {
@@ -750,33 +767,43 @@ fn run_block(
                             return Ok(Flow::Normal);
                         }
                     };
-                    let normalized_key = normalize_modifier_key(key.clone());
-                    let key_for_event = match (normalized_key.clone(), direction.clone()) {
-                        (MacroKey::Unicode(c), Direction::Click)
-                            if shift_is_pressed(ctx.pressed_keys) && c.is_ascii_lowercase() =>
-                        {
-                            MacroKey::Unicode(c.to_ascii_uppercase())
-                        }
-                        (key, _) => key,
-                    };
-
-                    match em.key(key_for_event, direction.clone()) {
-                        Ok(()) => match direction {
-                            Direction::Press => {
-                                if !ctx.pressed_keys.contains(&normalized_key) {
-                                    ctx.pressed_keys.push(normalized_key);
+                    // Press in order, release in reverse, like a typed chord.
+                    let press = !matches!(direction, Direction::Release);
+                    let release = !matches!(direction, Direction::Press);
+                    let mut emit = |key: &MacroKey, dir: Direction, pressed_keys: &mut Vec<MacroKey>| {
+                        let key_for_event = match (key, &dir) {
+                            (MacroKey::Unicode(c), Direction::Click)
+                                if shift_is_pressed(pressed_keys) && c.is_ascii_lowercase() =>
+                            {
+                                MacroKey::Unicode(c.to_ascii_uppercase())
+                            }
+                            _ => key.clone(),
+                        };
+                        match em.key(key_for_event, dir.clone()) {
+                            Ok(()) => match dir {
+                                Direction::Press => {
+                                    if !pressed_keys.contains(key) {
+                                        pressed_keys.push(key.clone());
+                                    }
                                 }
+                                Direction::Release => pressed_keys.retain(|k| k != key),
+                                Direction::Click => {}
+                            },
+                            Err(err) => warn!("Failed to press key {:?} ({:?}): {}", key, dir, err),
+                        }
+                    };
+                    if keys.len() == 1 {
+                        emit(&keys[0], direction.clone(), ctx.pressed_keys);
+                    } else {
+                        if press {
+                            for key in &keys {
+                                emit(key, Direction::Press, ctx.pressed_keys);
                             }
-                            Direction::Release => {
-                                ctx.pressed_keys.retain(|k| k != &normalized_key);
+                        }
+                        if release {
+                            for key in keys.iter().rev() {
+                                emit(key, Direction::Release, ctx.pressed_keys);
                             }
-                            Direction::Click => {}
-                        },
-                        Err(err) => {
-                            warn!(
-                                "Failed to press key {:?} ({:?}): {}",
-                                normalized_key, direction, err
-                            );
                         }
                     }
                 }

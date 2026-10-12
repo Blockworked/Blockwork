@@ -461,13 +461,11 @@ impl Backend {
                 &self.app,
             )?),
             "key_capture_event" => {
-                let code: String = arg(&args, "code")?;
-                let key: String = arg(&args, "key")?;
+                let keys: Vec<(String, String)> = arg(&args, "keys")?;
                 to_json(commands::key_capture_event(
                     &self.state,
                     &self.app,
-                    code,
-                    key,
+                    keys,
                 )?)
             }
             "clear_standalone_key_capture" => to_json(commands::clear_standalone_key_capture(

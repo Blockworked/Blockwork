@@ -70,6 +70,31 @@ static HW_ELAPSED_OFFSET: OnceLock<Mutex<Duration>> = OnceLock::new();
 /// Set while the UI is capturing a new combo, so existing bindings don't fire.
 static HOTKEYS_SUSPENDED: AtomicBool = AtomicBool::new(false);
 
+/// A physical key press or release, as seen by the capture callback.
+#[derive(Debug, Clone)]
+pub struct KeyEvent {
+    pub key: MacroKey,
+    pub pressed: bool,
+}
+
+static KEY_SUBSCRIBERS: OnceLock<Mutex<Vec<std::sync::mpsc::Sender<KeyEvent>>>> = OnceLock::new();
+
+/// Receives every key event the capture callback sees, for `WhenKey` watching.
+pub fn subscribe_key_events() -> std::sync::mpsc::Receiver<KeyEvent> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    if let Ok(mut subs) = KEY_SUBSCRIBERS.get_or_init(|| Mutex::new(Vec::new())).lock() {
+        subs.push(tx);
+    }
+    rx
+}
+
+fn broadcast_key_event(key: &MacroKey, pressed: bool) {
+    let Some(subs) = KEY_SUBSCRIBERS.get() else { return };
+    if let Ok(mut subs) = subs.lock() {
+        subs.retain(|tx| tx.send(KeyEvent { key: key.clone(), pressed }).is_ok());
+    }
+}
+
 static HOTKEY_TABLE: OnceLock<RwLock<Vec<HotkeyBinding>>> = OnceLock::new();
 
 /// Armed when a `StartRecordingImmediate` combo is pressed, so recording waits
@@ -273,12 +298,14 @@ pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp)
     Box::new(move |event: CaptureEvent, ts: CaptureTimestamp| {
             match &event {
                 CaptureEvent::KeyPress(key) => {
+                    broadcast_key_event(key, true);
                     let bit = key.modifier_bit();
                     if bit != 0 {
                         HELD_MODS.fetch_or(bit, Ordering::Relaxed);
                     }
                 }
                 CaptureEvent::KeyRelease(key) => {
+                    broadcast_key_event(key, false);
                     let bit = key.modifier_bit();
                     if bit != 0 {
                         HELD_MODS.fetch_and(!bit, Ordering::Relaxed);
@@ -438,13 +465,17 @@ pub fn start_grab_thread() {
 /// between relative deltas and absolute coordinates, whichever the event
 /// itself isn't already expressed in, based on `RECORD_MOUSE_RELATIVE`.
 /// Mouse movement is dropped entirely unless `RECORD_MOUSE_MOVEMENT` is set.
+fn key_value(key: &MacroKey) -> Value {
+    Value::Text { value: crate::input::key_names::key_name(key) }
+}
+
 fn capture_event_to_instruction(event: &CaptureEvent, prev_pos: Option<(f64, f64)>) -> Option<Instruction> {
     Some(Instruction::new(match event {
         CaptureEvent::KeyPress(key) => {
-            InstructionKind::Token(InputToken::Key(key.clone(), Direction::Press))
+            InstructionKind::Token(InputToken::Key(key_value(key), Direction::Press))
         }
         CaptureEvent::KeyRelease(key) => {
-            InstructionKind::Token(InputToken::Key(key.clone(), Direction::Release))
+            InstructionKind::Token(InputToken::Key(key_value(key), Direction::Release))
         }
         CaptureEvent::ButtonPress(btn) => {
             InstructionKind::Token(InputToken::Button(btn.clone(), Direction::Press))

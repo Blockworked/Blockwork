@@ -8,6 +8,7 @@
 pub mod autostart;
 pub(crate) mod battery_watch;
 pub(crate) mod clipboard_watch;
+pub(crate) mod key_watch;
 pub(crate) mod commands;
 mod dispatch;
 pub(crate) mod installed_apps;
@@ -239,6 +240,9 @@ impl Backend {
 
         // ── Background clipboard-event watcher (see clipboard_watch.rs) ───
         clipboard_watch::start(Arc::clone(&shared), app.clone());
+
+        // ── Background key-event watcher (see key_watch.rs) ──────────────
+        key_watch::start(Arc::clone(&shared), app.clone());
 
         // ── QueueSignal consumer (hotkeys and the recording stop key) ────
         {

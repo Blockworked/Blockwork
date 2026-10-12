@@ -69,11 +69,28 @@ ApplicationWindow {
         codes[Qt.Key_Apostrophe]="Quote"; codes[Qt.Key_Comma]="Comma"; codes[Qt.Key_Period]="Period"; codes[Qt.Key_Slash]="Slash";
         return codes[event.key] || "";
     }
+    // Keys held during a key capture, in press order; sent together when one is released.
+    property var heldCaptureKeys: []
+    function captureCode(event) {
+        if (event.key === Qt.Key_Control) return "Control";
+        if (event.key === Qt.Key_Shift) return "Shift";
+        if (event.key === Qt.Key_Alt) return "Alt";
+        if (event.key === Qt.Key_Meta) return "Meta";
+        return root.webCode(event);
+    }
+    // Ctrl turns event.text into a control character, so letters come from the key code.
+    function captureChar(event) {
+        if (event.key >= Qt.Key_A && event.key <= Qt.Key_Z) return String.fromCharCode(97 + event.key - Qt.Key_A);
+        return event.text && event.text.length === 1 && event.text >= " " ? event.text : "";
+    }
     function captureKey(event) {
         if (root.appState.key_capture !== null && root.appState.key_capture !== undefined) {
-            const code = root.webCode(event);
-            if (code.length) root.invoke("key_capture_event", { code: code, key: event.text || code });
             event.accepted = true;
+            if (event.isAutoRepeat) return;
+            const code = root.captureCode(event), key = root.captureChar(event) || code;
+            if (!code.length && !key.length) return;
+            if (!root.heldCaptureKeys.some(k => k[0] === code && k[1] === key))
+                root.heldCaptureKeys = root.heldCaptureKeys.concat([[code, key]]);
             return;
         }
         if (root.appState.combo_capture !== null && root.appState.combo_capture !== undefined) {
@@ -95,6 +112,7 @@ ApplicationWindow {
         onStateJsonChanged: {
             try { root.appState = JSON.parse(stateJson); }
             catch (error) { console.warn("Invalid Blockwork state", error); }
+            if (root.appState.key_capture === null || root.appState.key_capture === undefined) root.heldCaptureKeys = [];
             if (root.appState.key_capture !== null || root.appState.combo_capture !== null) contentRoot.forceActiveFocus();
         }
         onShouldQuitChanged: if (shouldQuit) Qt.quit()
@@ -123,6 +141,15 @@ ApplicationWindow {
         id:contentRoot;anchors.fill:parent;focus:true
         Keys.priority:Keys.BeforeItem
         Keys.onPressed:event=>root.captureKey(event)
+        Keys.onReleased:event=>{
+            if (event.isAutoRepeat || root.heldCaptureKeys.length === 0) return;
+            if (root.appState.key_capture !== null && root.appState.key_capture !== undefined) {
+                const keys = root.heldCaptureKeys;
+                root.heldCaptureKeys = [];
+                root.invoke("key_capture_event", { keys: keys });
+                event.accepted = true;
+            }
+        }
         Loader {
             anchors.fill: parent
             sourceComponent: root.appState.onboarding_done === false ? onboardingComponent

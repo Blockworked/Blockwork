@@ -1,7 +1,7 @@
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
 use blockwork_core::input::schedule::TimeSchedule;
 use blockwork_core::input::types::{Axis, Coordinate, Direction, InputToken};
-use blockwork_core::input::{get_mouse_button_names, key_to_string, mouse_button_to_index};
+use blockwork_core::input::{get_mouse_button_names, mouse_button_to_index};
 use blockwork_core::macros::MacroGraph;
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::thread_pool::ThreadPool;
@@ -279,7 +279,12 @@ pub(crate) enum InstructionDto {
     },
     Key {
         id: String,
-        key: String,
+        key: Value,
+        direction: String,
+    },
+    WhenKey {
+        id: String,
+        key: Value,
         direction: String,
     },
     Button {
@@ -568,6 +573,11 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         InstructionKind::WhenPowerPluggedIn => InstructionDto::WhenPowerPluggedIn { id },
         InstructionKind::WhenPowerUnplugged => InstructionDto::WhenPowerUnplugged { id },
         InstructionKind::WhenClipboardChanged => InstructionDto::WhenClipboardChanged { id },
+        InstructionKind::WhenKey(key, direction) => InstructionDto::WhenKey {
+            id,
+            key: key.clone(),
+            direction: direction_to_str(direction).to_string(),
+        },
         InstructionKind::OpenApp {
             command,
             name,
@@ -681,7 +691,7 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             },
             InputToken::Key(k, d) => InstructionDto::Key {
                 id,
-                key: key_to_string(k).unwrap_or("Unknown").to_string(),
+                key: k.clone(),
                 direction: direction_to_str(d).to_string(),
             },
             InputToken::Button(b, d) => InstructionDto::Button {
@@ -709,7 +719,7 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
 }
 
 pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
-    use blockwork_core::input::{index_to_mouse_button, key_names::string_to_key};
+    use blockwork_core::input::index_to_mouse_button;
     let (id, kind) = match dto {
         InstructionDto::Wait { id, duration } => {
             (id, InstructionKind::Wait(duration.clone()))
@@ -718,13 +728,14 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
             id,
             InstructionKind::Token(InputToken::Text(text.clone())),
         ),
-        InstructionDto::Key { id, key, direction } => {
-            let mk = string_to_key(key).ok()?;
-            (
-                id,
-                InstructionKind::Token(InputToken::Key(mk, str_to_direction(direction))),
-            )
-        }
+        InstructionDto::Key { id, key, direction } => (
+            id,
+            InstructionKind::Token(InputToken::Key(key.clone(), str_to_direction(direction))),
+        ),
+        InstructionDto::WhenKey { id, key, direction } => (
+            id,
+            InstructionKind::WhenKey(key.clone(), str_to_direction(direction)),
+        ),
         InstructionDto::Button {
             id,
             button,
