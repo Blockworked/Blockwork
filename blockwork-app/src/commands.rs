@@ -2343,6 +2343,34 @@ pub(crate) fn set_close_to_tray(
     Ok(())
 }
 
+pub(crate) fn set_start_at_startup(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    crate::autostart::set_enabled(enabled)?;
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.start_at_startup = enabled;
+    config::update_settings(|settings| settings.start_at_startup = Some(enabled));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_onboarding_done(
+    state: &SharedState,
+    app: &AppHandle,
+    done: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.onboarding_done = done;
+    if !done {
+        s.page = Page::Main;
+    }
+    config::update_settings(|settings| settings.onboarding_done = Some(done));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
 // ─── Updates (Windows/macOS) ───────────────────────────────────────────────
 
 pub(crate) fn check_for_updates(

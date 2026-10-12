@@ -41,6 +41,10 @@ pub struct AppSettings {
     /// When true, closing the main window hides it to the system tray
     /// instead of exiting the app.
     pub close_to_tray: Option<bool>,
+    /// Launch the daemon in the background at login.
+    pub start_at_startup: Option<bool>,
+    /// False while the first-run welcome screen is still pending.
+    pub onboarding_done: Option<bool>,
     /// When true, recorded mouse movement is captured as relative deltas;
     /// when false, as absolute positions. Only relevant when
     /// `record_mouse_movement` is also true.

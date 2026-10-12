@@ -1,6 +1,6 @@
 use std::sync::{Arc, Mutex, OnceLock};
 
-/// Stop flags for every macro run currently executing, so "Stop Loop" can
+/// Stop flags for every macro run currently executing, so "Stop Macro" can
 /// abort *any* run, not just loop-mode ones. Loop runs register their shared
 /// `is_looping` flag; single runs register one of their own (see `begin_run`).
 static ACTIVE_RUNS: OnceLock<Mutex<Vec<Arc<Mutex<bool>>>>> = OnceLock::new();

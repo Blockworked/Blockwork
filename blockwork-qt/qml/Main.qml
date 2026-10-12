@@ -20,6 +20,12 @@ ApplicationWindow {
     flags: customChrome ? (Qt.Window | Qt.FramelessWindowHint) : Qt.Window
     color: customChrome ? "transparent" : "#202124"
     property real sidebarWidth: 348
+    // True while the window is being resized: the rounded-corner mask layer is
+    // skipped then, since rendering the whole UI offscreen every frame is slow.
+    property bool liveResizing: false
+    onWidthChanged: { liveResizing = true; resizeIdle.restart(); }
+    onHeightChanged: { liveResizing = true; resizeIdle.restart(); }
+    Timer { id: resizeIdle; interval: 140; onTriggered: root.liveResizing = false }
     property bool sidebarCollapsed: false
 
     // Keep every control on the app theme instead of the system light/dark palette.
@@ -36,7 +42,7 @@ ApplicationWindow {
         recording_phase: { phase: "Idle", countdown: null }, page: "Main",
         can_undo: false, can_redo: false, hotkey_bindings: [], named_hotkey_defaults: [],
         ipc_active_port: null, ipc_auto_start: false, ipc_port_text: "47821",
-        close_to_tray: false, record_mouse_relative: true, record_mouse_movement: false,
+        close_to_tray: false, start_at_startup: false, onboarding_done: true, record_mouse_relative: true, record_mouse_movement: false,
         key_capture: null, standalone_key: null, combo_capture: null,
         absolute_mouse_position_available: true, update_check_state: { state: "Idle" }
     })
@@ -97,23 +103,19 @@ ApplicationWindow {
     Component.onCompleted: bridge.start()
     Timer { interval: 16; running: true; repeat: true; onTriggered: bridge.poll() }
 
-    Rectangle {
-        id: shadowSource
-        anchors.fill: frame; radius: root.cornerRadius; color: "black"
-        visible: false; layer.enabled: true; layer.smooth: true; layer.samples: 4
-    }
-    MultiEffect {
+    // Pre-baked 9-slice shadow: scaling a bitmap is far cheaper per resize frame than a live blur.
+    BorderImage {
         visible: root.shadowMargin > 0
-        source: shadowSource; anchors.fill: shadowSource
-        shadowEnabled: true; shadowColor: "black"; shadowBlur: 1.0; shadowOpacity: 0.55
-        shadowVerticalOffset: 5; shadowScale: 1.0
+        anchors.fill: parent
+        source: "qrc:/icons/window-shadow.png"
+        border { left: 40; right: 40; top: 40; bottom: 40 }
     }
     // Clipped to the rounded window shape on the frameless build.
     Item {
         id: frame
         anchors.fill: parent; anchors.margins: root.shadowMargin
-        layer.enabled: root.cornerRadius > 0
-        layer.smooth: true; layer.samples: 4
+        layer.enabled: root.cornerRadius > 0 && !root.liveResizing
+        layer.smooth: true
         layer.effect: MultiEffect { maskEnabled: true; maskSource: frameMask; maskThresholdMin: 0.5; maskSpreadAtMin: 1.0 }
         Rectangle { anchors.fill: parent; color: "#202124" }
     Item {
@@ -122,7 +124,8 @@ ApplicationWindow {
         Keys.onPressed:event=>root.captureKey(event)
         Loader {
             anchors.fill: parent
-            sourceComponent: root.appState.page === "Settings" ? settingsComponent : editorComponent
+            sourceComponent: root.appState.onboarding_done === false ? onboardingComponent
+                : root.appState.page === "Settings" ? settingsComponent : editorComponent
         }
     }
     Rectangle {
@@ -147,7 +150,7 @@ ApplicationWindow {
     Item {
         id: frameMask
         anchors.fill: frame; visible: false
-        layer.enabled: true; layer.smooth: true; layer.samples: 4
+        layer.enabled: root.cornerRadius > 0 && !root.liveResizing; layer.smooth: true
         Rectangle { anchors.fill: parent; radius: root.cornerRadius; color: "black"; antialiasing: true }
     }
     Component {
@@ -160,6 +163,7 @@ ApplicationWindow {
             onSidebarCollapsedChanged: root.sidebarCollapsed = sidebarCollapsed
         }
     }
+    Component { id: onboardingComponent; OnboardingPage { appState: root.appState; invoke: root.invoke } }
     Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke } }
 
     // Frameless window: hairline outline and edge/corner resize grips.

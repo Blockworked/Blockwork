@@ -7,7 +7,8 @@ BwDialog {
     id: root
     title: "Choose an App"
     width: 640
-    height: Math.min(620, parent ? parent.height - 32 : 620)
+    // Follow the window only while open; closed, a resize would relayout all of it.
+    height: visible ? Math.min(620, parent ? parent.height - 32 : 620) : 620
     standardButtons: Dialog.NoButton
 
     required property var bridge

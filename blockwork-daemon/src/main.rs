@@ -9,7 +9,8 @@
 //! Lifecycle:
 //! - Started by the first `blockwork` launch; a second daemon exits
 //!   immediately because the socket is already taken.
-//! - Exits once the last UI disconnects, unless "close to tray" is on.
+//! - Exits once the last UI disconnects, unless "close to tray" is on or it
+//!   was started with `--background` (login autostart).
 //! - Tray "Open" relaunches the UI; tray "Quit" closes the UI and exits.
 
 #![cfg_attr(
@@ -22,6 +23,7 @@ mod tray;
 
 use blockwork_app::{Backend, Event};
 use std::sync::Arc;
+use std::sync::atomic::{AtomicBool, Ordering};
 use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 
 /// Work the socket server and backend hand to the main (tray) thread.
@@ -32,8 +34,16 @@ pub(crate) enum MainThreadEvent {
     Quit,
 }
 
+/// Set by `--background` (login autostart): keep the tray and the daemon alive
+/// with no editor window, even after a UI opened from the tray closes.
+pub(crate) static BACKGROUND: AtomicBool = AtomicBool::new(false);
+
 fn main() {
     tracing_subscriber::fmt::init();
+    BACKGROUND.store(
+        std::env::args().any(|a| a == "--background"),
+        Ordering::Relaxed,
+    );
 
     let runtime = tokio::runtime::Builder::new_multi_thread()
         .enable_all()
@@ -85,7 +95,7 @@ fn main() {
     ));
 
     let mut tray = tray::Tray::new(proxy.clone());
-    tray.set_visible(backend.close_to_tray());
+    tray.set_visible(backend.close_to_tray() || BACKGROUND.load(Ordering::Relaxed));
 
     // Hold the runtime for the life of the process: the event loop below
     // never returns, and dropping it would stop every backend task.
@@ -95,7 +105,9 @@ fn main() {
         let _ = &runtime;
         if let tao::event::Event::UserEvent(event) = event {
             match event {
-                MainThreadEvent::SetTrayVisible(visible) => tray.set_visible(visible),
+                MainThreadEvent::SetTrayVisible(visible) => {
+                    tray.set_visible(visible || BACKGROUND.load(Ordering::Relaxed))
+                }
                 MainThreadEvent::OpenUi => {
                     if !clients.focus_ui() {
                         server::spawn_ui();

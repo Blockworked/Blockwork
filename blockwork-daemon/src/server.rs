@@ -60,7 +60,9 @@ pub(crate) async fn serve(
                     let was_ui = handle_connection(id, connection, &backend, &clients).await;
                     if was_ui {
                         tracing::info!("UI disconnected");
-                        if !backend.close_to_tray() {
+                        if !backend.close_to_tray()
+                            && !crate::BACKGROUND.load(Ordering::Relaxed)
+                        {
                             let _ = proxy.send_event(MainThreadEvent::Quit);
                         }
                     }

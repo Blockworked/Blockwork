@@ -7,7 +7,8 @@ BwDialog {
     id: root
     title: editBlockId.length ? "Edit Block" : "Make a Block"
     width: 720
-    height: Math.min(760, parent ? parent.height - 32 : 760)
+    // Follow the window only while open; closed, a resize would relayout all of it.
+    height: visible ? Math.min(760, parent ? parent.height - 32 : 760) : 760
     standardButtons: Dialog.NoButton
 
     signal createRequested(var pieces, string shape, string color)

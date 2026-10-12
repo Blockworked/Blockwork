@@ -5,6 +5,7 @@
 //! reaches it through [`Backend::dispatch`] over the daemon's
 //! local socket (see `blockwork-protocol`).
 
+pub mod autostart;
 pub(crate) mod battery_watch;
 pub(crate) mod clipboard_watch;
 pub(crate) mod commands;
@@ -123,6 +124,8 @@ impl Backend {
             ipc_active_port: None,
             ipc_auto_start: settings.ipc_auto_start.unwrap_or(false),
             close_to_tray: settings.close_to_tray.unwrap_or(false),
+            start_at_startup: settings.start_at_startup.unwrap_or(false),
+            onboarding_done: settings.onboarding_done.unwrap_or(true),
             confirm_clear_instructions: false,
             clear_confirm_remaining_secs: 0,
             clear_confirm_generation: 0,
@@ -162,6 +165,11 @@ impl Backend {
             // Load macros; create a default one if empty
             let macros = config::get_macros_from_config();
             if macros.is_empty() {
+                // No macros and no verdict yet means a fresh install.
+                if settings.onboarding_done.is_none() {
+                    s.onboarding_done = false;
+                    config::update_settings(|st| st.onboarding_done = Some(false));
+                }
                 let _ = blockwork_core::macros::Macro::new("New Macro".into(), "".into(), vec![]).add();
             }
             let macros = config::get_macros_from_config();

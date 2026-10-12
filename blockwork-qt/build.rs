@@ -16,6 +16,7 @@ fn main() {
         "qml/Main.qml",
         "qml/EditorPage.qml",
         "qml/SettingsPage.qml",
+        "qml/OnboardingPage.qml",
         "qml/SectionCard.qml",
         "qml/WindowControls.qml",
         "qml/TitleBarDrag.qml",
@@ -41,9 +42,10 @@ fn main() {
     // Runtime window icon (see src/app_icon.cpp, addressed as ":/icons/..."
     // in C++); kept under /icons so its resource path stays stable.
     .qrc_resources(QResources::new().resource(
-        QResource::new().prefix("/icons").file(
-            QResourceFile::new("../res/icons/blockwork.png").alias("blockwork.png"),
-        ),
+        QResource::new()
+            .prefix("/icons")
+            .file(QResourceFile::new("../res/icons/blockwork.png").alias("blockwork.png"))
+            .file(QResourceFile::new("../res/icons/window-shadow.png").alias("window-shadow.png")),
     ))
     .qt_module("QuickControls2")
     .qt_module("QuickDialogs2")

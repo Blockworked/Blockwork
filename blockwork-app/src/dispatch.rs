@@ -587,6 +587,22 @@ impl Backend {
                     enabled,
                 )?)
             }
+            "set_start_at_startup" => {
+                let enabled: bool = arg(&args, "enabled")?;
+                to_json(commands::set_start_at_startup(
+                    &self.state,
+                    &self.app,
+                    enabled,
+                )?)
+            }
+            "set_onboarding_done" => {
+                let done: bool = arg(&args, "done")?;
+                to_json(commands::set_onboarding_done(
+                    &self.state,
+                    &self.app,
+                    done,
+                )?)
+            }
             "check_for_updates" => to_json(commands::check_for_updates(&self.state, &self.app)?),
             "apply_update" => to_json(commands::apply_update(&self.state, &self.app)?),
             "list_installed_apps" => to_json(commands::list_installed_apps().await),

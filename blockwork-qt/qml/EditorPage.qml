@@ -274,9 +274,14 @@ Item {
                     id: macroMenuButton
                     iconName: "ellipsis"; text: ""; implicitWidth: 34; implicitHeight: 34
                     ToolTip.visible: hovered && !macroMenu.visible; ToolTip.text: "Macro actions"
-                    onClicked: macroMenu.popup(macroMenuButton, 0, macroMenuButton.height + 4)
+                    property double pressStamp: 0
+                    property double closeStamp: 0
+                    onPressed: pressStamp = Date.now()
+                    // The press that closes the menu also clicks the button; don't reopen on release.
+                    onClicked: if (Math.abs(closeStamp - pressStamp) > 100) macroMenu.popup(macroMenuButton, 0, macroMenuButton.height + 4)
                     BwMenu {
                         id: macroMenu
+                        onAboutToHide: macroMenuButton.closeStamp = Date.now()
                         implicitWidth: 190
                         BwMenuItem { iconName: "sliders"; text: "Macro settings"; enabled: !!root.macro; onTriggered: macroSettings.open() }
                         BwMenuItem { iconName: "plus"; text: "New macro"; onTriggered: root.invoke("new_macro") }
@@ -285,7 +290,7 @@ Item {
                 }
                 Item { Layout.fillWidth: true }
                 BwButton {
-                    primary: true; implicitHeight: 34; iconName: "play"; text: toolbar.tier < 2 ? "Run" : ""
+                    implicitHeight: 34; iconName: "play"; iconFilled: true; iconColor: Theme.accent; text: toolbar.tier < 2 ? "Run" : ""
                     implicitWidth: toolbar.tier < 2 ? 76 : 34
                     enabled: appState.macro_selected !== null; ToolTip.visible: hovered && toolbar.tier >= 2; ToolTip.text: "Run macro"
                     onClicked: root.invoke("run_macro")
@@ -293,14 +298,14 @@ Item {
                 Row {
                     spacing: -1
                     BwButton {
-                        danger: true; implicitHeight: 34; iconName: root.recording ? "square" : "circle"; iconFilled: !root.recording
+                        implicitHeight: 34; iconName: root.recording ? "square" : "circle"; iconFilled: true; iconColor: Theme.danger
                         text: toolbar.tier < 1 ? root.recordingLabel() : ""
                         implicitWidth: toolbar.tier < 1 ? 100 : 34
                         enabled: appState.macro_selected !== null; ToolTip.visible: hovered && toolbar.tier >= 1; ToolTip.text: root.recordingLabel()
                         onClicked: root.invoke(root.recording ? "stop_recording" : "start_recording")
                     }
                     BwButton {
-                        danger: true; iconName: "chevron-down"; text: ""; implicitWidth: 26; implicitHeight: 34
+                        iconName: "chevron-down"; text: ""; implicitWidth: 26; implicitHeight: 34
                         ToolTip.visible: hovered; ToolTip.text: "Recording settings"; onClicked: recordingSettings.open()
                     }
                 }
@@ -313,9 +318,14 @@ Item {
                     visible: toolbar.tier >= 3
                     iconName: "ellipsis"; text: ""; implicitWidth: 34; implicitHeight: 34
                     ToolTip.visible: hovered && !editMenu.visible; ToolTip.text: "Undo, redo and save"
-                    onClicked: editMenu.popup(editMenuButton, 0, editMenuButton.height + 4)
+                    property double pressStamp: 0
+                    property double closeStamp: 0
+                    onPressed: pressStamp = Date.now()
+                    // The press that closes the menu also clicks the button; don't reopen on release.
+                    onClicked: if (Math.abs(closeStamp - pressStamp) > 100) editMenu.popup(editMenuButton, 0, editMenuButton.height + 4)
                     BwMenu {
                         id: editMenu
+                        onAboutToHide: editMenuButton.closeStamp = Date.now()
                         implicitWidth: 170
                         BwMenuItem { iconName: "undo"; text: "Undo"; enabled: appState.can_undo; onTriggered: root.invoke("undo") }
                         BwMenuItem { iconName: "redo"; text: "Redo"; enabled: appState.can_redo; onTriggered: root.invoke("redo") }

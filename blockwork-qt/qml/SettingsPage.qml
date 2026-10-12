@@ -107,6 +107,23 @@ Item {
                         }
                         BwSwitch { checked: appState.close_to_tray; onToggled: checked => root.invoke("set_close_to_tray", { enabled: checked }) }
                     }
+                    RowLayout { Layout.fillWidth: true
+                        ColumnLayout { Layout.fillWidth: true
+                            Text { text: "Start at system startup"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
+                            Text { text: "Launch Blockwork in the background when you log in so hotkeys work right away."; color: "#9fa0a6"; font.pixelSize: 12 }
+                        }
+                        BwSwitch { checked: appState.start_at_startup === true; onToggled: checked => root.invoke("set_start_at_startup", { enabled: checked }) }
+                    }
+                }
+                SectionCard {
+                    width: parent.width; title: "Welcome"; iconName: "info"
+                    RowLayout { Layout.fillWidth: true
+                        ColumnLayout { Layout.fillWidth: true
+                            Text { text: "Welcome tour"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
+                            Text { text: "Show the first-run welcome screens again."; color: "#9fa0a6"; font.pixelSize: 12 }
+                        }
+                        BwButton { text: "Replay"; onClicked: root.invoke("set_onboarding_done", { done: false }) }
+                    }
                 }
                 SectionCard {
                     width: parent.width; title: "Updates"; iconName: "refresh-cw"
@@ -125,7 +142,7 @@ Item {
 
     function actionLabel(action) {
         if (!action) return "Hotkey";
-        const labels = { RunMacro: "Run Macro", StopLoop: "Stop Loop", NextMacro: "Next Macro", PrevMacro: "Previous Macro", StartRecordingImmediate: "Start Recording (immediate)", StopRecording: "Stop Recording", Undo: "Undo", Redo: "Redo" };
+        const labels = { RunMacro: "Run Macro", StopLoop: "Stop Macro", NextMacro: "Next Macro", PrevMacro: "Previous Macro", StartRecordingImmediate: "Start Recording (immediate)", StopRecording: "Stop Recording", Undo: "Undo", Redo: "Redo" };
         return labels[action.type] || action.type;
     }
     function updateTitle() {
