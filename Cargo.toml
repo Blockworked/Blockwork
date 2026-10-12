@@ -21,9 +21,9 @@ edition = "2024"
 
 [workspace.dependencies]
 blockstitch-core = {
-    #git = "https://github.com/Blockworked/blockstitch",
-    #rev = "6e4f3026",
-    path = "../blockstitch/crates/blockstitch-core"
+    git = "https://github.com/Blockworked/blockstitch",
+    rev = "fa100f5",
+    #path = "../blockstitch/crates/blockstitch-core"
 }
 tracing = "0.1.44"
 tracing-log = "0.2.0"
@@ -68,5 +68,3 @@ starship-battery = { version = "0.11.1", default-features = false }
 arboard = { version = "3.6.1", features = ["wayland-data-control"] }
 base64 = "0.23.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
-axum = { version = "0.8.9", features = ["ws"] }
-tower-http = { version = "0.7.1", features = ["cors"] }

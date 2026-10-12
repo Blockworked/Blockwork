@@ -2,7 +2,7 @@
 
 use crate::MainThreadEvent;
 use blockwork_app::{Backend, Event};
-use blockwork_protocol::{ClientMessage, DaemonMessage, FOCUSED_KEY_EVENT, Listener, encode};
+use blockwork_protocol::{ClientMessage, DaemonMessage, Listener, encode};
 use serde_json::value::RawValue;
 use std::sync::Mutex;
 use std::sync::atomic::{AtomicU64, Ordering};
@@ -13,18 +13,14 @@ use tokio::sync::mpsc;
 
 /// The currently connected UI, if any. Only one editor window is allowed at a
 /// time - a second launch just brings the existing one to the front.
-/// Also remembers the UI's `--ozone-platform` choice so tray relaunches keep
-/// it until the daemon quits.
 pub(crate) struct Clients {
     ui: Mutex<Option<(u64, mpsc::Sender<String>)>>,
-    ozone_platform: Mutex<Option<String>>,
 }
 
 impl Default for Clients {
     fn default() -> Self {
         Self {
             ui: Mutex::new(None),
-            ozone_platform: Mutex::new(blockwork_protocol::current_ozone_platform()),
         }
     }
 }
@@ -38,16 +34,6 @@ impl Clients {
             Some((_, tx)) => tx.try_send(encode(&DaemonMessage::focus())).is_ok(),
             None => false,
         }
-    }
-
-    fn set_ozone_platform(&self, ozone: Option<String>) {
-        if ozone.is_some() {
-            *self.ozone_platform.lock().unwrap() = ozone;
-        }
-    }
-
-    fn ozone_platform(&self) -> Option<String> {
-        self.ozone_platform.lock().unwrap().clone()
     }
 }
 
@@ -123,13 +109,7 @@ async fn handle_connection(
     )
     .await
     {
-        Ok(Ok(Some(line)))
-            if matches!(serde_json::from_str(&line), Ok(ClientMessage::Hello { .. })) =>
-        {
-            if let Ok(ClientMessage::Hello { ozone_platform }) = serde_json::from_str(&line) {
-                clients.set_ozone_platform(ozone_platform);
-            }
-        }
+        Ok(Ok(Some(line))) if matches!(serde_json::from_str(&line), Ok(ClientMessage::Hello)) => {}
         _ => {
             writer_task.abort();
             return false;
@@ -178,11 +158,7 @@ async fn handle_connection(
             // Handled one at a time, in order: commands mutate the same state
             // and the UI relies on them applying in the order it sent them.
             Ok(ClientMessage::Call { id, cmd, args }) => {
-                let result = if cmd == FOCUSED_KEY_EVENT {
-                    focused_key_event(&args)
-                } else {
-                    backend.dispatch(&cmd, args).await
-                };
+                let result = backend.dispatch(&cmd, args).await;
                 if tx
                     .try_send(encode(&DaemonMessage::reply(id, result)))
                     .is_err()
@@ -190,9 +166,7 @@ async fn handle_connection(
                     break;
                 }
             }
-            Ok(ClientMessage::Hello { ozone_platform }) => {
-                clients.set_ozone_platform(ozone_platform);
-            }
+            Ok(ClientMessage::Hello) => {}
             Err(e) => tracing::warn!("Ignoring malformed message from the UI: {e}"),
         }
     }
@@ -206,19 +180,6 @@ async fn handle_connection(
         *ui = None;
     }
     true
-}
-
-fn focused_key_event(args: &serde_json::Value) -> Result<serde_json::Value, String> {
-    let vk = args
-        .get("vk")
-        .and_then(|v| v.as_u64())
-        .ok_or("missing vk")?;
-    let pressed = args
-        .get("pressed")
-        .and_then(|v| v.as_bool())
-        .ok_or("missing pressed")?;
-    let vk = u16::try_from(vk).map_err(|e| e.to_string())?;
-    Ok(blockwork_app::dispatch_from_focused_window(vk, pressed).into())
 }
 
 async fn forward_events(
@@ -262,10 +223,8 @@ fn send_state_snapshot(backend: &Backend, tx: &mpsc::Sender<String>) {
 /// Launches the editor UI. The UI passes its own launch command down when it
 /// starts the daemon (`BLOCKWORK_UI_EXE`) - inside Flatpak that's the
 /// `/app/bin/blockwork` wrapper rather than the bare binary, and in a macOS
-/// bundle the UI binary is named after the app. Replays the remembered
-/// `--ozone-platform` choice, if any.
-pub(crate) fn spawn_ui(clients: &Clients) {
-    let ozone = clients.ozone_platform();
+/// bundle the UI binary is named after the app.
+pub(crate) fn spawn_ui() {
     let program = std::env::var_os("BLOCKWORK_UI_EXE")
         .map(std::path::PathBuf::from)
         .or_else(|| {
@@ -277,9 +236,6 @@ pub(crate) fn spawn_ui(clients: &Clients) {
         return;
     };
     let mut command = std::process::Command::new(&program);
-    if let Some(ozone) = ozone {
-        command.arg(blockwork_protocol::ozone_platform_arg(&ozone));
-    }
     match command.spawn() {
         // Reap it once it exits so it doesn't linger as a zombie.
         Ok(mut child) => {

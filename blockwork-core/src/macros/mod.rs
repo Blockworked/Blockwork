@@ -18,7 +18,7 @@ pub mod runner;
 pub mod thread_pool;
 
 pub use blockstitch_core::graph::{
-    BlockDef, BlockGraph, BlockKind, BlockPiece, BlockShape, Comment, FloatingValue,
+    BlockDef, BlockGraph, BlockKind, BlockPiece, BlockShape, Comment, DictDef, FloatingValue,
     InputValueType, ListDef, ListItem, VariableDef, default_block_color, normalize_block_color,
 };
 pub use fields::FieldId;
@@ -217,7 +217,7 @@ pub enum InstructionKind {
     /// entry point Run/Loop invokes - `runner::run_with_offset` skips these
     /// strands entirely. Instead they're driven independently by a
     /// long-running background watcher outside a macro run altogether (in
-    /// the desktop app, `src-tauri`'s `battery_watch` module), which polls
+    /// the desktop app, `blockwork-app`'s `battery_watch` module), which polls
     /// the battery, fires the strand's body (everything after this marker)
     /// the moment the condition holds, and won't fire it again until the
     /// battery recovers past the threshold and crosses it again.
@@ -247,7 +247,7 @@ pub enum InstructionKind {
     /// headers, but with no threshold to recover past - any change fires it.
     WhenClipboardChanged,
     /// Launches an installed application, chosen via the desktop app's "Open
-    /// App" picker (`src-tauri`'s `installed_apps` module lists candidates).
+    /// App" picker (`blockwork-app`'s `installed_apps` module lists candidates).
     /// `command` is the already-resolved, platform-specific launch string
     /// (a cleaned freedesktop `Exec=` line on Linux, a `.lnk` path on
     /// Windows, an `.app` bundle path on macOS) captured at pick time -
@@ -851,6 +851,9 @@ enum MacroDe {
         settings: MacroSettings,
         #[serde(default)]
         lists: Vec<ListDef>,
+        // Carried for round-trip only, Blockwork has no dict blocks or UI.
+        #[serde(default)]
+        dicts: Vec<DictDef>,
     },
     Legacy {
         #[serde(default = "default_macro_id")]
@@ -877,6 +880,7 @@ impl From<MacroDe> for Macro {
                 block_defs,
                 settings,
                 lists,
+                dicts,
             } => {
                 // Pre-"When Ran" saves have a strand id=="root" that was the
                 // implicit entry point; give it a real WhenRan on upgrade.
@@ -897,6 +901,7 @@ impl From<MacroDe> for Macro {
                         comments,
                         variables,
                         lists,
+                        dicts,
                         block_defs,
                     },
                     recording_target,

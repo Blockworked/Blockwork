@@ -1,48 +1,94 @@
 name := "blockwork"
 appid := "com.blockworked.Blockwork"
 
+set allow-duplicate-variables
+
+[unix]
+set shell := ["sh", "-cu"]
+
+[windows]
+set shell := ["cmd.exe", "/Q", "/C"]
+
+[unix]
 TARGET := "target/release/blockwork"
+
+[windows]
+TARGET := "target/release/blockwork.exe"
+
+[unix]
+DAEMON := "target/release/blockwork-daemon"
+
+[windows]
+DAEMON := "target/release/blockwork-daemon.exe"
+
 LIBDIR := "/usr/lib/blockwork"
+
+mkdir-cargo := if os() == "windows" { 'if not exist .cargo mkdir .cargo' } else { 'mkdir -p .cargo' }
+rm-cargo-cfg := if os() == "windows" { 'if exist .cargo\config.toml (del /F /Q .cargo\config.toml)' } else { 'rm -f .cargo/config.toml' }
 
 default: build
 
+# Build everything. The UI starts `blockwork-daemon` from beside itself,
+# so the whole workspace has to be built, not just the default members.
+# blockwork-linux-bridge is Linux-only and ships separately (see packaging).
 build *args:
-    cargo build --release {{args}}
+    cargo build --release --workspace --exclude blockwork-linux-bridge {{args}}
 
 run: build
-    cargo build -p blockwork-daemon
     {{TARGET}}
+
+test:
+    cargo test --workspace --exclude blockwork-linux-bridge
 
 clean:
     cargo clean
 
-blockstitch-local path="../../blockstitch":
-    cd ui && npm pkg set dependencies.blockstitch="link:{{path}}" && pnpm install
-    git update-index --skip-worktree ui/package.json ui/pnpm-lock.yaml
-    mkdir -p .cargo
-    printf 'paths = ["%s/crates/blockstitch-core"]\n' "$(realpath ui/{{path}})" > .cargo/config.toml
+# Work on blockstitch locally: point cargo's blockstitch-core at the same
+# checkout, without touching the committed lockfile.
+blockstitch-local path="../blockstitch":
+    {{mkdir-cargo}}
+    {{ if os() == "windows" { 'echo paths = ["' + replace(clean(justfile_directory() / path), "\\", "/") + '/crates/blockstitch-core"] > .cargo\config.toml' } else { "printf 'paths = [\"%s/crates/blockstitch-core\"]\\n' \"$(realpath " + path + ")\" > .cargo/config.toml" } }}
 
 blockstitch-published commit="":
-    rm -f .cargo/config.toml
-    git update-index --no-skip-worktree ui/package.json ui/pnpm-lock.yaml
-    git checkout -- ui/package.json ui/pnpm-lock.yaml
-    if [ -n "{{commit}}" ]; then cd ui && npm pkg set dependencies.blockstitch="github:Blockworked/blockstitch#{{commit}}"; fi
-    cd ui && pnpm install
-    if [ -n "{{commit}}" ]; then sed -i 's|\(blockstitch-core = { git = "https://github.com/Blockworked/blockstitch", rev = "\)[^"]*\(" }\)|\1{{commit}}\2|' Cargo.toml; fi
+    {{rm-cargo-cfg}}
+    {{ if os() == "windows" { 'if not "' + commit + '"=="" (node scripts/set-blockstitch-rev.js ' + commit + ')' } else { 'if [ -n "' + commit + '" ]; then node scripts/set-blockstitch-rev.js ' + commit + '; fi' } }}
     cargo fetch
 
+[linux]
 install:
     sudo install -Dm0755 {{TARGET}} {{LIBDIR}}/blockwork
-    sudo install -Dm0755 target/release/blockwork-daemon {{LIBDIR}}/blockwork-daemon
+    sudo install -Dm0755 {{DAEMON}} {{LIBDIR}}/blockwork-daemon
     sudo ln -sf {{LIBDIR}}/blockwork /usr/bin/blockwork
     sudo install -Dm0644 res/blockwork.desktop /usr/share/applications/blockwork.desktop
     sudo install -Dm0644 res/icons/blockwork.png /usr/share/icons/hicolor/256x256/apps/blockwork.png
 
+[linux]
 uninstall:
     sudo rm -rf {{LIBDIR}}
     sudo rm -f /usr/bin/blockwork /usr/share/applications/blockwork.desktop /usr/share/icons/hicolor/256x256/apps/blockwork.png
 
+[windows]
+install:
+    @echo "Windows installs go through the MSIX - see just msix-install."
+
+[windows]
+uninstall:
+    @echo "Windows uninstalls remove the MSIX package under Settings - Apps."
+
+[macos]
+install:
+    @echo "macOS installs go through the app bundle - see just macos-install."
+
+[macos]
+uninstall:
+    sudo rm -rf "/Applications/Blockwork.app"
+
+# Rebuild and reinstall the editor and daemon.
 replace: build uninstall install
+
+# Reinstall over the current install without removing it first.
+[linux]
+replace-fast: build install
 
 flatpak-sources:
     flatpak run --command=flatpak-cargo-generator org.flatpak.Builder -o packaging/flatpak/cargo-sources.json Cargo.lock
@@ -57,7 +103,7 @@ flatpak-build *args:
     flatpak run --command=flatpak-cargo-generator org.flatpak.Builder \
         -o packaging/flatpak/cargo-sources.json Cargo.lock
     awk '
-      /# BEGIN app-source/ { print; print "      - type: dir"; print "        path: ../.."; print "        skip: [target, .git, .flatpak-builder, flatpak-build, flatpak-repo, node_modules, ui/node_modules, ui/dist, packaging/flatpak]"; skip = 1; next }
+      /# BEGIN app-source/ { print; print "      - type: dir"; print "        path: ../.."; print "        skip: [target, .git, .flatpak-builder, flatpak-build, flatpak-repo, packaging/flatpak]"; skip = 1; next }
       /# END app-source/ { skip = 0; print; next }
       /# BEGIN blockstitch-source/ { print; print "      - type: dir"; print "        path: ../../../blockstitch"; print "        dest: .flatpak-blockstitch"; print "        skip: [target, .git, node_modules, dist]"; skip = 1; next }
       /# END blockstitch-source/ { skip = 0; print; next }

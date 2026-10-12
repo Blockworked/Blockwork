@@ -17,8 +17,6 @@
     windows_subsystem = "windows"
 )]
 
-#[cfg(feature = "dev-bridge")]
-mod dev_bridge;
 mod server;
 mod tray;
 
@@ -86,9 +84,6 @@ fn main() {
         listener,
     ));
 
-    #[cfg(feature = "dev-bridge")]
-    runtime.spawn(dev_bridge::run(backend.clone()));
-
     let mut tray = tray::Tray::new(proxy.clone());
     tray.set_visible(backend.close_to_tray());
 
@@ -103,7 +98,7 @@ fn main() {
                 MainThreadEvent::SetTrayVisible(visible) => tray.set_visible(visible),
                 MainThreadEvent::OpenUi => {
                     if !clients.focus_ui() {
-                        server::spawn_ui(&clients);
+                        server::spawn_ui();
                     }
                 }
                 MainThreadEvent::Quit => {

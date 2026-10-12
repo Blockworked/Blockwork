@@ -39,9 +39,7 @@ cp "$RELEASE_DIR/blockwork" "$CONTENTS/MacOS/$APP_NAME"
 cp "$RELEASE_DIR/blockwork-daemon" "$CONTENTS/MacOS/blockwork-daemon"
 sed -e "s/__VERSION__/$VERSION/g" installer/macos/Info.plist.in > "$CONTENTS/Info.plist"
 
-# Rebuild icon.icns from res/icons/blockwork.png -- the committed
-# src-tauri/icons/icon.icns is an empty stub (nothing in this repo invokes
-# the Tauri CLI's own bundler, which is what normally generates it).
+# Rebuild icon.icns from res/icons/blockwork.png.
 ICONSET_PARENT="$(mktemp -d)"
 ICONSET="$ICONSET_PARENT/icon.iconset"
 mkdir -p "$ICONSET"

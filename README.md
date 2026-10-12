@@ -16,9 +16,7 @@ Keep the two repositories as siblings: Blockwork consumes Blockstitch's native
 QML module directly while Blockstitch keeps its browser frontend intact. The
 build uses an installed Qt 6 when one is available; otherwise CXX-Qt's Qt
 Minimal integration downloads the required Qt SDK. Release packaging uses
-`windeployqt`/`macdeployqt` to include the dynamic Qt runtime. The old
-Tauri/Vue sources remain in `src-tauri/` and `ui/` only as a migration
-reference; they are no longer workspace members or release inputs.
+`windeployqt`/`macdeployqt` to include the dynamic Qt runtime.
 
 ### Installation
 

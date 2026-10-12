@@ -86,7 +86,7 @@ fn build(proxy: EventLoopProxy<MainThreadEvent>) -> Result<BuiltTray, Box<dyn st
 
 fn icon_rgba() -> Result<(Vec<u8>, u32, u32), Box<dyn std::error::Error>> {
     let decoder = png::Decoder::new(std::io::Cursor::new(include_bytes!(
-        "../../src-tauri/icons/128x128.png"
+        "../../res/icons/blockwork.png"
     )));
     let mut reader = decoder.read_info()?;
     let mut rgba = vec![0; reader.output_buffer_size().ok_or("icon too large")?];

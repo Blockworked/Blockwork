@@ -17,10 +17,3 @@ tray-icon = { version = "0.25", default-features = false, features = ["libappind
 ksni = { version = "0.3.6", default-features = false, features = ["blocking", "tokio"] }
 tao = "0.37"
 png = "0.18"
-axum = { workspace = true, optional = true }
-tower-http = { workspace = true, optional = true }
-
-[features]
-# Debug-only HTTP+WebSocket bridge that lets a plain browser tab (no Tauri
-# webview) drive the real running backend - see src/dev_bridge.rs.
-dev-bridge = ["dep:axum", "dep:tower-http"]

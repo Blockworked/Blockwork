@@ -39,9 +39,12 @@ modules:
     buildsystem: simple
     build-commands:
       # blockwork-qt intentionally consumes the QML module from the sibling
-      # Blockstitch repository. Sources are placed beside this build directory
-      # to preserve the same ../../blockstitch path used by local development.
+      # Blockstitch repository, plus the shared Lucide icons from the sibling
+      # lucide-qt repository. Sources are placed beside this build directory
+      # to preserve the same ../../blockstitch and ../../lucide-qt paths used
+      # by local development.
       - cp -a .flatpak-blockstitch ../blockstitch
+      - cp -a .flatpak-lucide-qt ../lucide-qt
       - cargo --offline build --release --workspace --exclude blockwork-linux-bridge
       - install -Dm755 target/release/blockwork /app/lib/blockwork/blockwork
       - install -Dm755 target/release/blockwork-daemon /app/lib/blockwork/blockwork-daemon
@@ -72,5 +75,13 @@ modules:
         branch: main
         dest: .flatpak-blockstitch
       # END blockstitch-source
+
+      # CI replaces this with the checked-out sibling, same as above.
+      # BEGIN lucide-qt-source
+      - type: git
+        url: https://github.com/Blockworked/lucide-qt.git
+        branch: main
+        dest: .flatpak-lucide-qt
+      # END lucide-qt-source
 
       - cargo-sources.json

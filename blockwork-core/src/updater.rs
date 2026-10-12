@@ -7,7 +7,7 @@
 //! macOS: downloads the latest release's `.app.zip` (produced by
 //! `scripts/build-macos-bundle.sh` + `ditto -c -k --keepParent`), extracts it
 //! with the system `ditto` (which restores the symlinks/resource forks inside
-//! `Chromium Embedded Framework.framework` faithfully - a pure-Rust zip
+//! the Qt frameworks faithfully - a pure-Rust zip
 //! extractor would not), swaps the new `Blockwork.app` over the running
 //! bundle, and re-opens it. The caller exits immediately after.
 

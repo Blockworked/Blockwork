@@ -26,10 +26,6 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
-/// Feeds a key event observed in the focused UI window into the hotkey
-/// pipeline (Windows only; see `blockwork_protocol::FOCUSED_KEY_EVENT`).
-pub use blockwork_core::macros::backend::dispatch_from_focused_window;
-
 pub use blockwork_core::config::migrate_legacy_app_id;
 
 /// Something the backend tells whoever is hosting it.
@@ -44,8 +40,7 @@ pub enum Event {
 }
 
 /// Cheap, cloneable handle commands and background threads use to publish
-/// [`Event`]s - the stand-in for the `tauri::AppHandle` these modules used to
-/// emit `state-updated` through.
+/// [`Event`]s to daemon subscribers.
 #[derive(Clone)]
 pub struct AppHandle {
     events: broadcast::Sender<Event>,

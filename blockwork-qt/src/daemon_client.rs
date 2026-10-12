@@ -47,12 +47,7 @@ async fn run(
     let (reader, mut writer) = tokio::io::split(connection);
     let mut reader = BufReader::new(reader);
     writer
-        .write_all(
-            encode(&ClientMessage::Hello {
-                ozone_platform: blockwork_protocol::current_ozone_platform(),
-            })
-            .as_bytes(),
-        )
+        .write_all(encode(&ClientMessage::Hello).as_bytes())
         .await?;
 
     let line = tokio::time::timeout(
@@ -194,9 +189,6 @@ fn spawn_daemon() -> io::Result<()> {
         }
         None => std::process::Command::new(&daemon_exe),
     };
-    if let Some(ozone) = blockwork_protocol::current_ozone_platform() {
-        command.arg(blockwork_protocol::ozone_platform_arg(&ozone));
-    }
     command
         .env(
             "BLOCKWORK_UI_EXE",

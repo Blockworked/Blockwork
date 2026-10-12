@@ -326,7 +326,7 @@ impl Macro {
                 Some(InstructionKind::WhenRan) => entry_strands.push(strand.instructions),
                 // Battery/time-triggered strands aren't run here at all -
                 // they're driven by the app's own background watchers (e.g.
-                // src-tauri's `battery_watch`/`time_watch` modules), which
+                // `blockwork-app`'s `battery_watch`/`time_watch` modules), which
                 // fire just their body directly once their own condition
                 // holds, independent of Run/Loop. A manual Run intentionally
                 // leaves them alone.
@@ -1352,6 +1352,7 @@ mod tests {
                 variables: vec![],
                 block_defs: vec![],
                 lists: vec![],
+                dicts: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
@@ -1383,6 +1384,7 @@ mod tests {
                 variables: vec![],
                 block_defs: vec![],
                 lists: vec![],
+                dicts: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
@@ -1426,6 +1428,7 @@ mod tests {
                 variables: vec![],
                 block_defs: vec![],
                 lists: vec![],
+                dicts: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
@@ -1601,6 +1604,7 @@ mod tests {
                     color: default_block_color(),
                 }],
                 lists: vec![],
+                dicts: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
@@ -1659,6 +1663,7 @@ mod tests {
                     color: default_block_color(),
                 }],
                 lists: vec![],
+                dicts: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
@@ -1739,6 +1744,7 @@ mod tests {
                     color: default_block_color(),
                 }],
                 lists: vec![],
+                dicts: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
@@ -1792,6 +1798,7 @@ mod tests {
                     color: default_block_color(),
                 }],
                 lists: vec![],
+                dicts: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
@@ -1859,6 +1866,7 @@ mod tests {
                     color: default_block_color(),
                 }],
                 lists: vec![],
+                dicts: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
@@ -1963,6 +1971,7 @@ mod tests {
                     },
                 ],
                 lists: vec![],
+                dicts: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
@@ -2170,6 +2179,7 @@ mod tests {
                     color: default_block_color(),
                 }],
                 lists: vec![],
+                dicts: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,
@@ -2440,6 +2450,7 @@ mod tests {
                     color: default_block_color(),
                 }],
                 lists: vec![],
+                dicts: vec![],
             },
             recording_target: None,
             speed_multiplier: 1.0,

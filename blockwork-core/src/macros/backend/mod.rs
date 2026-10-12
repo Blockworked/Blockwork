@@ -140,19 +140,6 @@ pub fn note_hotkey_matched() {
     windows::note_hotkey_matched();
 }
 
-/// Feeds a key event from the app's own webview into the same hotkey
-/// pipeline the global OS hook uses (Chromium starves the Windows low-level
-/// keyboard hook while the app's own window has focus). No-op elsewhere.
-pub fn dispatch_from_focused_window(vk: u16, pressed: bool) -> bool {
-    #[cfg(windows)]
-    return windows::dispatch_from_focused_window(vk, pressed);
-    #[cfg(not(windows))]
-    {
-        let _ = (vk, pressed);
-        false
-    }
-}
-
 /// Create the platform-specific input backend wrapped in
 /// `Arc<Mutex<dyn InputBackend>>`.
 pub fn create_backend() -> Option<Arc<Mutex<dyn InputBackend>>> {

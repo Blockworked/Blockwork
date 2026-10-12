@@ -1,6 +1,6 @@
 //! `TimeSchedule` - the payload of `InstructionKind::WhenTime`: a recurring
 //! point in local time (daily, weekly, monthly, or yearly) plus a
-//! time-of-day. Backs the background time watcher (e.g. src-tauri's
+//! time-of-day. Backs the background time watcher (e.g. blockwork-app's
 //! `time_watch` module), the same way `InstructionKind::WhenBatteryDischargedTo`/
 //! `WhenBatteryChargedTo` back the battery watcher.
 

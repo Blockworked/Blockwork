@@ -48,6 +48,16 @@ jobs:
             git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
           fi
 
+      - name: Checkout lucide-qt icons
+        shell: bash
+        run: |
+          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/Blockworked/lucide-qt.git "$ref" >/dev/null; then
+            git clone --depth 1 --branch "$ref" https://github.com/Blockworked/lucide-qt.git ../lucide-qt
+          else
+            git clone --depth 1 https://github.com/Blockworked/lucide-qt.git ../lucide-qt
+          fi
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -180,6 +190,16 @@ jobs:
             git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
           fi
 
+      - name: Checkout lucide-qt icons
+        shell: bash
+        run: |
+          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/Blockworked/lucide-qt.git "$ref" >/dev/null; then
+            git clone --depth 1 --branch "$ref" https://github.com/Blockworked/lucide-qt.git ../lucide-qt
+          else
+            git clone --depth 1 https://github.com/Blockworked/lucide-qt.git ../lucide-qt
+          fi
+
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
@@ -228,7 +248,7 @@ jobs:
           test -n "$QMAKE_PATH"
           export QMAKE="$QMAKE_PATH"
           export LD_LIBRARY_PATH="$($QMAKE -query QT_INSTALL_LIBS):${LD_LIBRARY_PATH:-}"
-          export QML_SOURCES_PATHS="$PWD/blockwork-qt/qml:$PWD/../blockstitch/qml"
+          export QML_SOURCES_PATHS="$PWD/blockwork-qt/qml:$PWD/../blockstitch/qml:$PWD/../lucide-qt/qml"
 
           RELEASE_DIR="target/${{ matrix.target }}/release"
 
@@ -282,6 +302,16 @@ jobs:
             git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
           fi
 
+      - name: Checkout lucide-qt icons
+        shell: bash
+        run: |
+          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
+          if git ls-remote --exit-code --heads https://github.com/Blockworked/lucide-qt.git "$ref" >/dev/null; then
+            git clone --depth 1 --branch "$ref" https://github.com/Blockworked/lucide-qt.git ../lucide-qt
+          else
+            git clone --depth 1 https://github.com/Blockworked/lucide-qt.git ../lucide-qt
+          fi
+
       - name: Install Flatpak tooling
         run: |
           sudo apt-get update -qq
@@ -306,7 +336,7 @@ jobs:
               print
               print "      - type: dir"
               print "        path: ../.."
-              print "        skip: [target, .git, .flatpak-builder, flatpak-build, flatpak-repo, node_modules, ui/node_modules, ui/dist, packaging/flatpak]"
+              print "        skip: [target, .git, .flatpak-builder, flatpak-build, flatpak-repo, packaging/flatpak]"
               skip = "app"
               next
             }
@@ -321,6 +351,16 @@ jobs:
               next
             }
             /# END blockstitch-source/ { skip = ""; print; next }
+            /# BEGIN lucide-qt-source/ {
+              print
+              print "      - type: dir"
+              print "        path: ../../../lucide-qt"
+              print "        dest: .flatpak-lucide-qt"
+              print "        skip: [target, .git]"
+              skip = "lucide";
+              next
+            }
+            /# END lucide-qt-source/ { skip = ""; print; next }
             !skip
           ' "$manifest.yml" > "$manifest.local.yml"
           flatpak-builder --force-clean --user --default-branch=stable --repo=flatpak-repo flatpak-build "$manifest.local.yml"

@@ -1,4 +1,4 @@
-use cxx_qt_build::{CxxQtBuilder, QmlModule};
+use cxx_qt_build::{CxxQtBuilder, QmlFile, QmlModule};
 use qt_build_utils::{QResource, QResourceFile, QResources};
 
 fn main() {
@@ -21,10 +21,17 @@ fn main() {
         "qml/AppSelectorDialog.qml",
     ];
 
+    // Shared Lucide icons (lean set): staged under qml/Lucide/ (gitignored,
+    // rewritten only when changed) and compiled into this module, so every
+    // page resolves LucideIcon/Icons locally with no import.
+    let (lucide_icons, lucide_item) = lucide_qt::stage_qml_here("qml/Lucide");
+
     let builder = CxxQtBuilder::new_qml_module(
         QmlModule::new("com.blockworked.Blockwork")
             .version(1, 0)
-            .qml_files(blockwork),
+            .qml_file(QmlFile::from(lucide_icons).singleton(true))
+            .qml_files(blockwork)
+            .qml_files([lucide_item]),
     )
     .file("src/app_bridge.rs")
     .file("src/app_icon.rs")

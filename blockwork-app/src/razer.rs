@@ -1,6 +1,6 @@
 //! Checks whether an installed `openrazer` daemon is reachable by the current
 //! user - Linux-only concern (like `installed_apps.rs`'s per-platform split),
-//! surfaced as a `WarningBanners.vue` banner the same way `grab_available`
+//! surfaced as a warning banner the same way `grab_available`
 //! surfaces evdev grab failures.
 
 #[cfg(target_os = "linux")]

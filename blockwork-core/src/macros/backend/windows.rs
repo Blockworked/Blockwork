@@ -354,49 +354,6 @@ fn dispatch(event: CaptureEvent) -> CaptureDecision {
     decision
 }
 
-/// Repeat-tracking for `dispatch_from_focused_window`, kept separate from
-/// `HOOK_STATE` since this compatibility path runs on the UI thread, not
-/// `winapi-hook`. Timestamp tracking also remains safe if a UI client fails to
-/// deliver a matching `KEYUP` after handling a key-down.
-static FOCUSED_KEY_LAST_PRESS: Mutex<[Option<std::time::Instant>; 256]> = Mutex::new([None; 256]);
-
-/// Auto-repeat delivers the next `RAWKEYDOWN` well under this apart (Windows'
-/// fastest repeat rate is ~33ms); a deliberate second press is comfortably
-/// slower.
-const FOCUSED_KEY_REPEAT_WINDOW: std::time::Duration = std::time::Duration::from_millis(60);
-
-/// Feeds a key event from the app's own webview into the same hotkey
-/// pipeline the global hook uses - needed because Chromium grabs raw
-/// keyboard input for its focused window, starving `WH_KEYBOARD_LL` while
-/// our window has focus. Returns whether to suppress the key.
-pub(crate) fn dispatch_from_focused_window(vk: u16, pressed: bool) -> bool {
-    if vk as usize >= 256 {
-        return false;
-    }
-    if pressed {
-        let now = std::time::Instant::now();
-        let is_repeat = FOCUSED_KEY_LAST_PRESS
-            .lock()
-            .map(|mut last| {
-                let prev = last[vk as usize].replace(now);
-                prev.is_some_and(|p| now.duration_since(p) < FOCUSED_KEY_REPEAT_WINDOW)
-            })
-            .unwrap_or(false);
-        if is_repeat {
-            return false;
-        }
-    }
-    let Some(macro_key) = vk_to_macro_key(vk) else {
-        return false;
-    };
-    let event = if pressed {
-        CaptureEvent::KeyPress(macro_key)
-    } else {
-        CaptureEvent::KeyRelease(macro_key)
-    };
-    matches!(dispatch(event), CaptureDecision::Suppress)
-}
-
 /// A key held across a desktop switch (UAC prompt, Ctrl+Alt+Del, lock
 /// screen) has its key-up delivered to the secure desktop, invisible to our
 /// hook - so every tracker is cleared here to avoid wedging on the missed

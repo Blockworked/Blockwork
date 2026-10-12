@@ -31,8 +31,8 @@ from other devices.
 
 ## Third parties
 
-Blockwork does not share data with third parties. The app bundles the
-Chromium Embedded Framework to render its interface, which runs locally.
+Blockwork does not share data with third parties. The app interface is built
+with Qt 6/QML, which runs locally.
 
 ## Changes
 

@@ -201,7 +201,7 @@ pub(crate) fn new_macro(
 }
 
 /// Deletes the current macro. The frontend confirms with the user via a
-/// popup (`RemoveMacroDialog.vue`) before ever calling this, so it deletes
+/// confirmation dialog before ever calling this, so it deletes
 /// unconditionally.
 pub(crate) fn remove_macro(
     state: &SharedState,
@@ -1182,7 +1182,7 @@ pub(crate) fn preview_value(state: &SharedState, value: Value) -> Result<String,
 }
 
 /// The actual evaluation logic behind `preview_value`, factored out so it's
-/// testable without a real `tauri::State`.
+/// testable without backend state locking.
 #[cfg(test)]
 fn preview_value_with_env(
     value: &Value,
