@@ -14,7 +14,7 @@ pub const APP_ID: &str = "Blockwork";
 const LEGACY_APP_ID: &str = "Macros";
 pub const GLOBAL_HOTKEYS_KEY: &str = "global_hotkeys";
 
-use crate::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo, MOD_ALT, MOD_CTRL};
+use crate::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo, MOD_ALT, MOD_CTRL, MOD_SHIFT};
 use crate::macros::Macro;
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -75,13 +75,32 @@ impl Macro {
 }
 
 pub fn load_hotkey_bindings() -> Vec<HotkeyBinding> {
-    load_settings()
-        .global_hotkeys
-        .unwrap_or_else(default_hotkey_bindings)
+    let settings = load_settings();
+    let Some(mut bindings) = settings.global_hotkeys else {
+        return default_hotkey_bindings();
+    };
+    // Saved bindings predate the kill switch: add its default once, so
+    // removing it later sticks.
+    if !settings.emergency_stop_seeded.unwrap_or(false) {
+        if !bindings.iter().any(|b| b.action == HotkeyAction::EmergencyStop)
+            && let Some(combo) = default_combo_for_action(&HotkeyAction::EmergencyStop)
+        {
+            bindings.push(HotkeyBinding { action: HotkeyAction::EmergencyStop, combo });
+        }
+        let saved = bindings.clone();
+        update_settings(|s| {
+            s.global_hotkeys = Some(saved);
+            s.emergency_stop_seeded = Some(true);
+        });
+    }
+    bindings
 }
 
 pub fn save_hotkey_bindings(bindings: &[HotkeyBinding]) {
-    update_settings(|s| s.global_hotkeys = Some(bindings.to_vec()));
+    update_settings(|s| {
+        s.global_hotkeys = Some(bindings.to_vec());
+        s.emergency_stop_seeded = Some(true);
+    });
 }
 
 pub fn default_combo_for_action(action: &HotkeyAction) -> Option<KeyCombo> {
@@ -100,6 +119,10 @@ fn default_hotkey_bindings() -> Vec<HotkeyBinding> {
         HotkeyBinding {
             action: HotkeyAction::StopLoop,
             combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT, key: "KeyS".to_string() },
+        },
+        HotkeyBinding {
+            action: HotkeyAction::EmergencyStop,
+            combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT | MOD_SHIFT, key: "Escape".to_string() },
         },
         HotkeyBinding {
             action: HotkeyAction::NextMacro,

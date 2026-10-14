@@ -22,6 +22,12 @@ finish-args:
   - --talk-name=org.freedesktop.Flatpak
   # "Close to tray" icon (StatusNotifierItem).
   - --talk-name=org.kde.StatusNotifierWatcher
+  # Web request/fetch blocks.
+  - --share=network
+  # Notify block.
+  - --talk-name=org.freedesktop.Notifications
+  # File blocks and the file-change trigger work on the user's files.
+  - --filesystem=home
 
 build-options:
   append-path: /usr/lib/sdk/rust-stable/bin

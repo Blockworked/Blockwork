@@ -23,6 +23,8 @@ fn main() {
         "qml/WheelPan.qml",
         "qml/MakeBlockDialog.qml",
         "qml/AppSelectorDialog.qml",
+        "qml/ActivityPanel.qml",
+        "qml/TemplateList.qml",
     ];
 
     // Shared Lucide icons (lean set): staged under qml/Lucide/ (gitignored,
@@ -40,6 +42,7 @@ fn main() {
     .file("src/app_bridge.rs")
     .file("src/app_icon.rs")
     .file("src/qt_diagnostics.rs")
+    .file("src/window_frame.rs")
     // Runtime window icon (see src/app_icon.cpp, addressed as ":/icons/..."
     // in C++); kept under /icons so its resource path stays stable.
     .qrc_resources(QResources::new().resource(
@@ -52,13 +55,39 @@ fn main() {
     .qt_module("QuickDialogs2")
     .qt_module("Network");
 
+    // QtGui private headers for the Wayland frame-margin hook (window_frame.cpp).
+    let private_includes = qt_private_includes();
+
     unsafe {
         builder
             .cc_builder(|cc| {
                 cc.include("src");
                 cc.file("src/qt_diagnostics.cpp");
                 cc.file("src/app_icon.cpp");
+                cc.file("src/window_frame.cpp");
+                for dir in &private_includes {
+                    cc.include(dir);
+                }
             })
             .build();
     }
+}
+
+/// `QtCore/<ver>` and `QtGui/<ver>` private header dirs, Linux only.
+fn qt_private_includes() -> Vec<std::path::PathBuf> {
+    if std::env::var("CARGO_CFG_TARGET_OS").as_deref() != Ok("linux") {
+        return Vec::new();
+    }
+    let Ok(qt) = qt_build_utils::QtBuild::new(vec!["Core".into(), "Gui".into()]) else {
+        return Vec::new();
+    };
+    let version = qt.version().to_string();
+    qt.include_paths()
+        .into_iter()
+        .filter_map(|dir| {
+            let name = dir.file_name()?.to_str()?;
+            (name == "QtCore" || name == "QtGui").then(|| dir.join(&version))
+        })
+        .filter(|dir| dir.exists())
+        .collect()
 }

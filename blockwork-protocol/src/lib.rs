@@ -21,6 +21,10 @@ pub enum ClientMessage {
     /// already open (and has been asked to come to the front), so this one
     /// should exit.
     Hello,
+    /// First message from a script client (the `blockwork run` command line)
+    /// instead of `Hello`. It gets no state pushes, may only call
+    /// [`SCRIPT_COMMANDS`], and doesn't count as an open window.
+    Script,
     /// Runs a backend command; answered by a reply with the same `id`.
     Call {
         id: u64,
@@ -29,6 +33,9 @@ pub enum ClientMessage {
         args: serde_json::Value,
     },
 }
+
+/// What a [`ClientMessage::Script`] connection may call.
+pub const SCRIPT_COMMANDS: [&str; 3] = ["list_macros", "run_macro_named", "stop_macro_named"];
 
 /// A message from the daemon to the UI. Kept as one flat struct rather than
 /// a tagged enum so `payload` can stay a borrowed [`RawValue`]: the state
@@ -60,6 +67,8 @@ pub enum DaemonMessageKind {
     Focus,
     /// Close the UI; the whole app is shutting down.
     Quit,
+    /// `data` lists the blocks running strands are on, `[{macro_id, block_id}]`.
+    Trace,
 }
 
 impl<'a> DaemonMessage<'a> {
@@ -106,6 +115,13 @@ impl<'a> DaemonMessage<'a> {
 
     pub fn quit() -> Self {
         Self::new(DaemonMessageKind::Quit)
+    }
+
+    pub fn trace(active: serde_json::Value) -> Self {
+        DaemonMessage {
+            data: Some(active),
+            ..Self::new(DaemonMessageKind::Trace)
+        }
     }
 }
 

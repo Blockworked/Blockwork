@@ -32,6 +32,24 @@ pub enum FieldId {
     RepeatCount,
     BatteryDischargeThreshold,
     BatteryChargeThreshold,
+    WriteFilePath,
+    WriteFileText,
+    HttpUrl,
+    HttpBody,
+    HttpHeaders,
+    NotifyTitle,
+    NotifyMessage,
+    LogValue,
+    ErrorMessage,
+    WindowPattern,
+    WatchedFilePath,
+    RetryCount,
+    RetryDelay,
+    WindowX,
+    WindowY,
+    MacroTarget,
+    GlobalName,
+    GlobalValue,
 }
 
 impl FieldId {
@@ -49,6 +67,9 @@ impl FieldId {
                 | FieldId::ShiftListAmount
                 | FieldId::InsertIntoListIndex
                 | FieldId::ReplaceItemOfListIndex
+                | FieldId::RetryCount
+                | FieldId::WindowX
+                | FieldId::WindowY
         )
     }
 }
@@ -78,6 +99,24 @@ impl std::fmt::Display for FieldId {
             FieldId::RepeatCount => write!(f, "RepeatCount"),
             FieldId::BatteryDischargeThreshold => write!(f, "BatteryDischargeThreshold"),
             FieldId::BatteryChargeThreshold => write!(f, "BatteryChargeThreshold"),
+            FieldId::WriteFilePath => write!(f, "WriteFilePath"),
+            FieldId::WriteFileText => write!(f, "WriteFileText"),
+            FieldId::HttpUrl => write!(f, "HttpUrl"),
+            FieldId::HttpBody => write!(f, "HttpBody"),
+            FieldId::HttpHeaders => write!(f, "HttpHeaders"),
+            FieldId::NotifyTitle => write!(f, "NotifyTitle"),
+            FieldId::NotifyMessage => write!(f, "NotifyMessage"),
+            FieldId::LogValue => write!(f, "LogValue"),
+            FieldId::ErrorMessage => write!(f, "ErrorMessage"),
+            FieldId::WindowPattern => write!(f, "WindowPattern"),
+            FieldId::WatchedFilePath => write!(f, "WatchedFilePath"),
+            FieldId::RetryCount => write!(f, "RetryCount"),
+            FieldId::RetryDelay => write!(f, "RetryDelay"),
+            FieldId::WindowX => write!(f, "WindowX"),
+            FieldId::WindowY => write!(f, "WindowY"),
+            FieldId::MacroTarget => write!(f, "MacroTarget"),
+            FieldId::GlobalName => write!(f, "GlobalName"),
+            FieldId::GlobalValue => write!(f, "GlobalValue"),
         }
     }
 }
@@ -107,6 +146,24 @@ impl std::str::FromStr for FieldId {
             "RepeatCount" => Ok(FieldId::RepeatCount),
             "BatteryDischargeThreshold" => Ok(FieldId::BatteryDischargeThreshold),
             "BatteryChargeThreshold" => Ok(FieldId::BatteryChargeThreshold),
+            "WriteFilePath" => Ok(FieldId::WriteFilePath),
+            "WriteFileText" => Ok(FieldId::WriteFileText),
+            "HttpUrl" => Ok(FieldId::HttpUrl),
+            "HttpBody" => Ok(FieldId::HttpBody),
+            "HttpHeaders" => Ok(FieldId::HttpHeaders),
+            "NotifyTitle" => Ok(FieldId::NotifyTitle),
+            "NotifyMessage" => Ok(FieldId::NotifyMessage),
+            "LogValue" => Ok(FieldId::LogValue),
+            "ErrorMessage" => Ok(FieldId::ErrorMessage),
+            "WindowPattern" => Ok(FieldId::WindowPattern),
+            "WatchedFilePath" => Ok(FieldId::WatchedFilePath),
+            "RetryCount" => Ok(FieldId::RetryCount),
+            "RetryDelay" => Ok(FieldId::RetryDelay),
+            "WindowX" => Ok(FieldId::WindowX),
+            "WindowY" => Ok(FieldId::WindowY),
+            "MacroTarget" => Ok(FieldId::MacroTarget),
+            "GlobalName" => Ok(FieldId::GlobalName),
+            "GlobalValue" => Ok(FieldId::GlobalValue),
             _ if s.starts_with("CallArg:") => s["CallArg:".len()..]
                 .parse::<usize>()
                 .map(FieldId::CallArg)
@@ -154,6 +211,29 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
             Some(v)
         }
         (InstructionKind::WhenBatteryChargedTo(v), FieldId::BatteryChargeThreshold) => Some(v),
+        (InstructionKind::WriteFile { path, .. }, FieldId::WriteFilePath) => Some(path),
+        (InstructionKind::WriteFile { text, .. }, FieldId::WriteFileText) => Some(text),
+        (InstructionKind::HttpRequest { url, .. }, FieldId::HttpUrl) => Some(url),
+        (InstructionKind::HttpRequest { body, .. }, FieldId::HttpBody) => Some(body),
+        (InstructionKind::HttpRequest { headers, .. }, FieldId::HttpHeaders) => Some(headers),
+        (InstructionKind::Notify { title, .. }, FieldId::NotifyTitle) => Some(title),
+        (InstructionKind::Notify { message, .. }, FieldId::NotifyMessage) => Some(message),
+        (InstructionKind::Log(v), FieldId::LogValue) => Some(v),
+        (InstructionKind::ThrowError(v), FieldId::ErrorMessage) => Some(v),
+        (InstructionKind::WhenWindow { pattern, .. }, FieldId::WindowPattern) => Some(pattern),
+        (InstructionKind::WhenFileChanged(v), FieldId::WatchedFilePath) => Some(v),
+        (InstructionKind::Retry { count, .. }, FieldId::RetryCount) => Some(count),
+        (InstructionKind::Retry { delay, .. }, FieldId::RetryDelay) => Some(delay),
+        (InstructionKind::WindowAction { pattern, .. }, FieldId::WindowPattern) => Some(pattern),
+        (InstructionKind::MoveWindow { pattern, .. }, FieldId::WindowPattern) => Some(pattern),
+        (InstructionKind::MoveWindow { x, .. }, FieldId::WindowX) => Some(x),
+        (InstructionKind::MoveWindow { y, .. }, FieldId::WindowY) => Some(y),
+        (InstructionKind::RunMacro { target, .. }, FieldId::MacroTarget) => Some(target),
+        (InstructionKind::StopMacroNamed(v), FieldId::MacroTarget) => Some(v),
+        (InstructionKind::SetGlobal { name, .. }, FieldId::GlobalName) => Some(name),
+        (InstructionKind::SetGlobal { value, .. }, FieldId::GlobalValue) => Some(value),
+        (InstructionKind::ChangeGlobal { name, .. }, FieldId::GlobalName) => Some(name),
+        (InstructionKind::ChangeGlobal { by, .. }, FieldId::GlobalValue) => Some(by),
         _ => None,
     }
 }

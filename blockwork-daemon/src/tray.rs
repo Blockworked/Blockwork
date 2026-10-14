@@ -1,15 +1,26 @@
 //! The tray icon shown while "close to tray" is enabled: left click opens the
-//! editor, right click shows the Open/Quit menu.
+//! editor, right click shows recent activity and the Open/Quit menu.
 
 use crate::MainThreadEvent;
+use blockwork_app::run_log;
 use tao::event_loop::EventLoopProxy;
-use tray_icon::menu::{Menu, MenuEvent, MenuItem};
+use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem, Submenu};
 use tray_icon::{
     Icon as TrayImage, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent,
 };
 
 const OPEN_ID: &str = "open";
 const QUIT_ID: &str = "quit";
+/// Recent activity entries share this id; clicking one opens the editor.
+const ACTIVITY_ID: &str = "activity";
+const ACTIVITY_ITEMS: usize = 8;
+const ACTIVITY_CHARS: usize = 70;
+
+/// The newest run log entries as menu labels, newest first.
+fn activity_lines() -> Vec<String> {
+    let entries = run_log::snapshot();
+    entries.iter().rev().take(ACTIVITY_ITEMS).map(|e| run_log::summary(e, ACTIVITY_CHARS)).collect()
+}
 
 pub(crate) struct Tray {
     icon: Option<BuiltTray>,
@@ -29,7 +40,7 @@ impl Tray {
         let menu_proxy = proxy.clone();
         MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
             let action = match event.id().as_ref() {
-                OPEN_ID => MainThreadEvent::OpenUi,
+                OPEN_ID | ACTIVITY_ID => MainThreadEvent::OpenUi,
                 QUIT_ID => MainThreadEvent::Quit,
                 _ => return,
             };
@@ -62,6 +73,38 @@ impl Tray {
             Err(e) => tracing::warn!("Failed to create tray icon: {e}"),
         }
     }
+
+    pub(crate) fn refresh_activity(&mut self) {
+        match &self.icon {
+            Some(BuiltTray::Native(icon)) => match menu() {
+                Ok(menu) => icon.set_menu(Some(Box::new(menu))),
+                Err(e) => tracing::warn!("Failed to rebuild the tray menu: {e}"),
+            },
+            #[cfg(all(unix, not(target_os = "macos")))]
+            Some(BuiltTray::Flatpak(tray)) => {
+                // ksni rebuilds the menu from `menu()` on update.
+                tray.handle.update(|_| {});
+            }
+            None => {}
+        }
+    }
+}
+
+fn menu() -> Result<Menu, Box<dyn std::error::Error>> {
+    let activity = Submenu::new("Recent activity", true);
+    let lines = activity_lines();
+    if lines.is_empty() {
+        activity.append(&MenuItem::new("Nothing yet", false, None))?;
+    }
+    for line in lines {
+        activity.append(&MenuItem::with_id(ACTIVITY_ID, line, true, None))?;
+    }
+    let menu = Menu::new();
+    menu.append(&MenuItem::with_id(OPEN_ID, "Open", true, None))?;
+    menu.append(&activity)?;
+    menu.append(&PredefinedMenuItem::separator())?;
+    menu.append(&MenuItem::with_id(QUIT_ID, "Quit", true, None))?;
+    Ok(menu)
 }
 
 fn build(proxy: EventLoopProxy<MainThreadEvent>) -> Result<BuiltTray, Box<dyn std::error::Error>> {
@@ -70,13 +113,9 @@ fn build(proxy: EventLoopProxy<MainThreadEvent>) -> Result<BuiltTray, Box<dyn st
         return FlatpakTray::new(proxy).map(BuiltTray::Flatpak);
     }
 
-    let menu = Menu::new();
-    menu.append(&MenuItem::with_id(OPEN_ID, "Open", true, None))?;
-    menu.append(&MenuItem::with_id(QUIT_ID, "Quit", true, None))?;
-
     Ok(BuiltTray::Native(
         TrayIconBuilder::new()
-            .with_menu(Box::new(menu))
+            .with_menu(Box::new(menu()?))
             .with_menu_on_left_click(false)
             .with_tooltip("Blockwork")
             .with_icon(icon()?)
@@ -170,17 +209,27 @@ impl ksni::Tray for FlatpakNotifier {
     }
 
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {
-        use ksni::menu::StandardItem;
+        use ksni::menu::{StandardItem, SubMenu};
 
-        vec![
+        let open = |label: String| -> ksni::MenuItem<Self> {
             StandardItem {
-                label: "Open".into(),
+                label,
                 activate: Box::new(|notifier: &mut Self| {
                     let _ = notifier.proxy.send_event(MainThreadEvent::OpenUi);
                 }),
                 ..Default::default()
             }
-            .into(),
+            .into()
+        };
+        // dbusmenu reads a single underscore as an access key.
+        let mut activity: Vec<ksni::MenuItem<Self>> =
+            activity_lines().into_iter().map(|l| open(l.replace('_', "__"))).collect();
+        if activity.is_empty() {
+            activity.push(StandardItem { label: "Nothing yet".into(), enabled: false, ..Default::default() }.into());
+        }
+        vec![
+            open("Open".into()),
+            SubMenu { label: "Recent activity".into(), submenu: activity, ..Default::default() }.into(),
             ksni::MenuItem::Separator,
             StandardItem {
                 label: "Quit".into(),

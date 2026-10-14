@@ -43,7 +43,124 @@ static OPERATORS: &[ExtOperator] = &[
         default_args: Vec::new,
         eval: |_| Ok(Evaluated::Bool(crate::clipboard::has_file_list())),
     },
+    ExtOperator {
+        kind: "ReadFile",
+        op: "ReadFile",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| Ok(Evaluated::Text(crate::files::read_text(&args[0].as_text())?)),
+    },
+    ExtOperator {
+        kind: "FileExists",
+        op: "FileExists",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| Ok(Evaluated::Bool(crate::files::exists(&args[0].as_text()))),
+    },
+    ExtOperator {
+        kind: "ListDirectory",
+        op: "ListDirectory",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| Ok(Evaluated::Text(crate::files::list_dir(&args[0].as_text())?)),
+    },
+    ExtOperator {
+        kind: "HttpGet",
+        op: "HttpGet",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| Ok(Evaluated::Text(crate::http::get(&args[0].as_text())?)),
+    },
+    ExtOperator {
+        kind: "JsonGet",
+        op: "JsonGet",
+        arity: 2,
+        default_args: two_texts,
+        eval: |args| {
+            Ok(Evaluated::Text(crate::http::json_get(&args[1].as_text(), &args[0].as_text())?))
+        },
+    },
+    ExtOperator {
+        kind: "ShellOutput",
+        op: "ShellOutput",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| Ok(Evaluated::Text(crate::shell::run(&args[0].as_text())?.stdout)),
+    },
+    ExtOperator {
+        kind: "ShellSucceeded",
+        op: "ShellSucceeded",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| Ok(Evaluated::Bool(crate::shell::run(&args[0].as_text())?.success)),
+    },
+    ExtOperator {
+        kind: "ActiveWindowTitle",
+        op: "ActiveWindowTitle",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Text(crate::window::active()?.title)),
+    },
+    ExtOperator {
+        kind: "ActiveWindowApp",
+        op: "ActiveWindowApp",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Text(crate::window::active()?.app)),
+    },
+    ExtOperator {
+        kind: "WindowExists",
+        op: "WindowExists",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| Ok(Evaluated::Bool(crate::window::exists(&args[0].as_text())?)),
+    },
+    ExtOperator {
+        kind: "MacroRunning",
+        op: "MacroRunning",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| Ok(Evaluated::Bool(crate::macros::calls::is_running(&args[0].as_text())?)),
+    },
+    ExtOperator {
+        kind: "GlobalVariable",
+        op: "GlobalVariable",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| Ok(crate::globals::get(&args[0].as_text())),
+    },
+    ExtOperator {
+        kind: "LastError",
+        op: "LastError",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Text(crate::macros::runner::last_error())),
+    },
 ];
+
+fn one_text() -> Vec<Value> {
+    vec![Value::text("")]
+}
+
+fn two_texts() -> Vec<Value> {
+    vec![Value::text(""), Value::text("")]
+}
+
+/// Operators that run commands or go online, so evaluating one has side
+/// effects. Click-to-preview refuses these, and importing a macro that uses
+/// one asks first.
+pub const SIDE_EFFECT_OPERATORS: [&str; 3] = ["ShellOutput", "ShellSucceeded", "HttpGet"];
+
+/// Whether `value` contains any of [`SIDE_EFFECT_OPERATORS`].
+pub fn has_side_effect_operator(value: &Value) -> bool {
+    match value {
+        Value::Op { op, args, .. } => {
+            SIDE_EFFECT_OPERATORS.contains(&op.name()) || args.iter().any(has_side_effect_operator)
+        }
+        Value::Call { args, .. } => args.iter().any(has_side_effect_operator),
+        _ => false,
+    }
+}
 
 /// Teaches `blockstitch` about [`OPERATORS`]. Idempotent; called from
 /// [`crate::init`], which every entry point runs before touching a macro.

@@ -117,6 +117,20 @@ Item {
                                     onClicked: root.invoke(available ? "apply_update" : "check_for_updates")
                                 }
                             }
+                            SettingsRow { title: "Global variables"
+                                detail: (appState.globals || []).length ? "Shared by every macro and kept after restarts. Set them with the \u201cset global\u201d block."
+                                    : "None yet. The \u201cset global\u201d block makes one: a value every macro can read, kept after restarts."
+                            }
+                            Repeater {
+                                model: appState.globals || []
+                                delegate: RowLayout {
+                                    required property var modelData
+                                    Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 6; spacing: 10
+                                    Text { text: modelData.name; color: "#e7e7e8"; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.maximumWidth: 220 }
+                                    Text { text: modelData.value; color: "#9fa0a6"; font.pixelSize: 13; elide: Text.ElideRight; Layout.fillWidth: true }
+                                    BwButton { iconName: "trash-2"; text: "Delete"; onClicked: root.invoke("delete_global", { name: modelData.name }) }
+                                }
+                            }
                             Rectangle { Layout.fillWidth: true; Layout.topMargin: 8; height: 1; color: "#3a3b3f" }
                             RowLayout { Layout.fillWidth: true; Layout.topMargin: 16; spacing: 8
                                 BwButton { iconName: "download"; text: "Import macro…"; onClicked: pathDialog.mode = "import", pathDialog.open() }
@@ -213,6 +227,9 @@ Item {
                             SettingsRow { title: "Start automatically"; detail: "Start the TCP server whenever Blockwork launches."
                                 BwSwitch { Accessible.name: "Start TCP server automatically"; checked: appState.ipc_auto_start; onToggled: checked => root.invoke("set_ipc_auto_start", { enabled: checked }) }
                             }
+                            SettingsRow { title: "Command line"
+                                detail: "Scripts and launchers can run macros by name: \u201cblockwork run <name>\u201d (add --wait to return when it ends), \u201cblockwork stop <name>\u201d and \u201cblockwork list\u201d."
+                            }
                         }
                     }
                 }
@@ -222,7 +239,7 @@ Item {
 
     function actionLabel(action) {
         if (!action) return "Hotkey";
-        const labels = { RunMacro: "Run Macro", StopLoop: "Stop Macro", NextMacro: "Next Macro", PrevMacro: "Previous Macro", StartRecordingImmediate: "Start Recording (immediate)", StopRecording: "Stop Recording", Undo: "Undo", Redo: "Redo" };
+        const labels = { RunMacro: "Run Macro", StopLoop: "Stop Macro", EmergencyStop: "Emergency Stop (pauses triggers)", NextMacro: "Next Macro", PrevMacro: "Previous Macro", StartRecordingImmediate: "Start Recording (immediate)", StopRecording: "Stop Recording", Undo: "Undo", Redo: "Redo" };
         return labels[action.type] || action.type;
     }
     function updateTitle() {
@@ -236,6 +253,61 @@ Item {
     function updateDetail() {
         const u = appState.update_check_state || {};
         return u.error || "Check for a new release of Blockwork.";
+    }
+
+    // An imported macro waits here until the user has seen what it can do.
+    readonly property var importReview: appState.import_review || null
+    readonly property string importReviewKey: importReview ? JSON.stringify(importReview) : ""
+    property var keepSettings: ({})
+    onImportReviewKeyChanged: {
+        if (importReview) { keepSettings = ({}); importDialog.open(); }
+        else importDialog.close();
+    }
+    BwDialog {
+        id: importDialog
+        readonly property var caps: root.importReview ? root.importReview.capabilities : []
+        readonly property var customSettings: root.importReview ? root.importReview.custom_settings : []
+        title: root.importReview ? "Import \u201c" + root.importReview.name + "\u201d?" : "Import macro"
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        Component.onCompleted: standardButton(Dialog.Ok).text = "Import"
+        Column { width: 460; spacing: 10
+            Text {
+                width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
+                text: importDialog.caps.length ? "This macro can:" : "This macro only uses blocks that stay inside Blockwork, like waits and variables."
+            }
+            Repeater {
+                model: importDialog.caps
+                delegate: Row {
+                    required property var modelData
+                    spacing: 8
+                    LucideIcon {
+                        anchors.verticalCenter: parent.verticalCenter; width: 16; height: 16
+                        name: modelData.risky ? "triangle-alert" : "check"; color: modelData.risky ? Theme.warning : Theme.textDim
+                    }
+                    Text { text: modelData.label; color: modelData.risky ? Theme.warning : Theme.text; font.pixelSize: 13 }
+                }
+            }
+            Text {
+                visible: importDialog.caps.some(c => c.risky)
+                width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
+                text: "Only import macros that run commands, go online or write files from people you trust."
+            }
+            Text {
+                visible: importDialog.customSettings.length > 0; topPadding: 6
+                width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
+                text: "It also comes with these settings. Untick any you don't want:"
+            }
+            Repeater {
+                model: importDialog.customSettings
+                delegate: BwCheckBox {
+                    required property var modelData
+                    text: modelData.label; checked: modelData.enabled
+                    onToggled: root.keepSettings[modelData.key] = checked
+                }
+            }
+        }
+        onAccepted: root.invoke("confirm_import_macro", { keepSettings: root.keepSettings })
+        onRejected: root.invoke("cancel_import_macro")
     }
 
     BwDialog {

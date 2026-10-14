@@ -1,4 +1,4 @@
-use crate::{daemon_client, native_icon};
+use crate::{daemon_client, native_icon, window_frame};
 use cxx_qt::CxxQtType;
 use cxx_qt_lib::QString;
 use std::collections::HashMap;
@@ -28,6 +28,7 @@ pub mod qobject {
         #[qproperty(QString, preview_text, cxx_name = "previewText")]
         #[qproperty(bool, preview_error, cxx_name = "previewError")]
         #[qproperty(i32, preview_serial, cxx_name = "previewSerial")]
+        #[qproperty(QString, active_blocks_json, cxx_name = "activeBlocksJson")]
         type AppBridge = super::AppBridgeRust;
 
         #[qinvokable]
@@ -57,6 +58,12 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "nativeAppIcon"]
         fn native_app_icon(self: Pin<&mut AppBridge>, command: &QString) -> QString;
+
+        /// Marks `margin` px around frameless windows as shadow, so the
+        /// compositor moves and clamps the visible frame (Wayland).
+        #[qinvokable]
+        #[cxx_name = "setWindowFrameMargin"]
+        fn set_window_frame_margin(self: &AppBridge, margin: i32);
     }
 }
 
@@ -74,6 +81,7 @@ pub struct AppBridgeRust {
     preview_text: QString,
     preview_error: bool,
     preview_serial: i32,
+    active_blocks_json: QString,
     started: bool,
     request_tx: Option<tokio::sync::mpsc::UnboundedSender<daemon_client::Request>>,
     event_rx: Option<mpsc::Receiver<daemon_client::Event>>,
@@ -96,6 +104,7 @@ impl Default for AppBridgeRust {
             preview_text: QString::default(),
             preview_error: false,
             preview_serial: 0,
+            active_blocks_json: QString::from("[]"),
             started: false,
             request_tx: None,
             event_rx: None,
@@ -154,6 +163,9 @@ impl qobject::AppBridge {
                     self.as_mut().set_preview_error(error);
                     let next = self.preview_serial().saturating_add(1);
                     self.as_mut().set_preview_serial(next);
+                }
+                daemon_client::Event::Trace(json) => {
+                    self.as_mut().set_active_blocks_json(QString::from(&json));
                 }
                 daemon_client::Event::AppsError(error) => {
                     self.as_mut().set_installed_apps_loading(false);
@@ -219,6 +231,10 @@ impl qobject::AppBridge {
                 "Blockwork is not connected to its background service",
             ));
         }
+    }
+
+    pub fn set_window_frame_margin(&self, margin: i32) {
+        window_frame::set_margin(margin);
     }
 
     pub fn native_app_icon(mut self: Pin<&mut Self>, command: &QString) -> QString {

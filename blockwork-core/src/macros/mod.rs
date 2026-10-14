@@ -10,12 +10,14 @@ use std::ops::{Deref, DerefMut};
 use uuid::Uuid;
 
 pub mod backend;
+pub mod calls;
 pub mod fields;
 pub mod loop_control;
 pub mod priority;
 pub mod run_registry;
 pub mod runner;
 pub mod thread_pool;
+pub mod trace;
 
 pub use blockstitch_core::graph::{
     BlockDef, BlockGraph, BlockKind, BlockPiece, BlockShape, Comment, DictDef, FloatingValue,
@@ -65,7 +67,41 @@ impl BlockKind for InstructionKind {
             | InstructionKind::SetClipboard(value)
             | InstructionKind::SetVariable(_, value)
             | InstructionKind::ChangeVariable(_, value)
-            | InstructionKind::Repeat { count: value, .. } => f(value, InputValueType::Any),
+            | InstructionKind::Repeat { count: value, .. }
+            | InstructionKind::Log(value)
+            | InstructionKind::ThrowError(value)
+            | InstructionKind::WhenFileChanged(value)
+            | InstructionKind::WhenWindow { pattern: value, .. } => f(value, InputValueType::Any),
+            InstructionKind::WriteFile { path, text, .. } => {
+                f(path, InputValueType::Any);
+                f(text, InputValueType::Any);
+            }
+            InstructionKind::HttpRequest { url, body, headers, .. } => {
+                f(url, InputValueType::Any);
+                f(body, InputValueType::Any);
+                f(headers, InputValueType::Any);
+            }
+            InstructionKind::Notify { title, message } => {
+                f(title, InputValueType::Any);
+                f(message, InputValueType::Any);
+            }
+            InstructionKind::Retry { count, delay, .. } => {
+                f(count, InputValueType::Any);
+                f(delay, InputValueType::Any);
+            }
+            InstructionKind::WindowAction { pattern, .. } => f(pattern, InputValueType::Any),
+            InstructionKind::MoveWindow { pattern, x, y, .. } => {
+                f(pattern, InputValueType::Any);
+                f(x, InputValueType::Any);
+                f(y, InputValueType::Any);
+            }
+            InstructionKind::RunMacro { target, .. } | InstructionKind::StopMacroNamed(target) => {
+                f(target, InputValueType::Any)
+            }
+            InstructionKind::SetGlobal { name, value: other } | InstructionKind::ChangeGlobal { name, by: other } => {
+                f(name, InputValueType::Any);
+                f(other, InputValueType::Any);
+            }
             // A call site's declared Boolean inputs live on the `BlockDef`,
             // not here - `BlockGraph::migrate_bool_slots` handles those.
             InstructionKind::CallBlock { args, .. } => {
@@ -91,6 +127,8 @@ impl BlockKind for InstructionKind {
             | InstructionKind::BlockHeader(_)
             | InstructionKind::EscapeLoop
             | InstructionKind::ContinueLoop
+            | InstructionKind::StopMacro
+            | InstructionKind::TryCatch { .. }
             | InstructionKind::WhenTime(_)
             | InstructionKind::WhenPowerPluggedIn
             | InstructionKind::WhenPowerUnplugged
@@ -119,6 +157,8 @@ impl BlockKind for InstructionKind {
                 | InstructionKind::WhenPowerUnplugged
                 | InstructionKind::WhenClipboardChanged
                 | InstructionKind::WhenKey(..)
+                | InstructionKind::WhenWindow { .. }
+                | InstructionKind::WhenFileChanged(_)
         )
     }
 
@@ -130,6 +170,9 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Repeat { body, .. }, 0) => Some(body),
             (InstructionKind::Forever { body }, 0) => Some(body),
             (InstructionKind::While { body, .. }, 0) => Some(body),
+            (InstructionKind::TryCatch { body, .. }, 0) => Some(body),
+            (InstructionKind::TryCatch { catch_body, .. }, 1) => Some(catch_body),
+            (InstructionKind::Retry { body, .. }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get(slot as usize),
             _ => None,
         }
@@ -143,6 +186,9 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Repeat { body, .. }, 0) => Some(body),
             (InstructionKind::Forever { body }, 0) => Some(body),
             (InstructionKind::While { body, .. }, 0) => Some(body),
+            (InstructionKind::TryCatch { body, .. }, 0) => Some(body),
+            (InstructionKind::TryCatch { catch_body, .. }, 1) => Some(catch_body),
+            (InstructionKind::Retry { body, .. }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get_mut(slot as usize),
             _ => None,
         }
@@ -150,9 +196,9 @@ impl BlockKind for InstructionKind {
 
     fn variable_target_mut(&mut self) -> Option<&mut String> {
         match self {
-            InstructionKind::SetVariable(name, _) | InstructionKind::ChangeVariable(name, _) => {
-                Some(name)
-            }
+            InstructionKind::SetVariable(name, _)
+            | InstructionKind::ChangeVariable(name, _)
+            | InstructionKind::HttpRequest { variable: name, .. } => Some(name),
             _ => None,
         }
     }
@@ -373,6 +419,91 @@ pub enum InstructionKind {
     /// Skips straight to the next iteration of the nearest enclosing
     /// `Repeat`/`Forever`/`While`. A no-op if not inside a loop.
     ContinueLoop,
+    /// `write`/`append <text> to file <path>`.
+    WriteFile {
+        path: Value,
+        text: Value,
+        append: bool,
+    },
+    /// Sends an HTTP request and stores the response body in `variable`
+    /// (skipped when empty). A 4xx/5xx status is an error.
+    HttpRequest {
+        method: String,
+        url: Value,
+        body: Value,
+        headers: Value,
+        variable: String,
+    },
+    /// Shows a desktop notification.
+    Notify {
+        title: Value,
+        message: Value,
+    },
+    /// Writes a line to the run log.
+    Log(Value),
+    /// `try { body } on error { catch_body }`: an error inside `body` stops
+    /// it and runs `catch_body`, where the `LastError` reporter has the message.
+    TryCatch {
+        body: Vec<Instruction>,
+        catch_body: Vec<Instruction>,
+    },
+    /// Fails with the given message: ends the strand unless a `TryCatch`
+    /// catches it.
+    ThrowError(Value),
+    /// Stops every strand of the current run.
+    StopMacro,
+    /// Runs `body`; if a block in it fails, waits `delay` ms and runs it
+    /// again, up to `count` attempts in all.
+    Retry {
+        count: Value,
+        delay: Value,
+        body: Vec<Instruction>,
+    },
+    /// One of `window::ACTIONS` on the first window whose title or app
+    /// (`by`, a `window::MatchBy` name) contains `pattern` (the active
+    /// window when empty).
+    WindowAction {
+        action: String,
+        pattern: Value,
+        by: String,
+    },
+    /// Moves a matching window to (`x`, `y`), or with `resize` sizes it
+    /// to `x` by `y`.
+    MoveWindow {
+        pattern: Value,
+        by: String,
+        resize: bool,
+        x: Value,
+        y: Value,
+    },
+    /// Starts another macro, found by name; with `wait` the strand pauses
+    /// until that run ends.
+    RunMacro {
+        target: Value,
+        wait: bool,
+    },
+    /// Stops every run of the named macro.
+    StopMacroNamed(Value),
+    /// Sets a global variable: shared by every macro and kept across restarts.
+    SetGlobal {
+        name: Value,
+        value: Value,
+    },
+    /// Adds `by` to a global variable.
+    ChangeGlobal {
+        name: Value,
+        by: Value,
+    },
+    /// Header for a strand fired when a window whose title or app contains
+    /// `pattern` gains (`focused`) or loses focus. Driven by `window_watch`
+    /// in the desktop app, like the other `When*` watcher headers.
+    WhenWindow {
+        pattern: Value,
+        focused: bool,
+    },
+    /// Header for a strand fired when the file at the path is created,
+    /// changed or deleted. Driven by `file_watch` in the desktop app.
+    WhenFileChanged(Value),
 }
 
 impl std::hash::Hash for InstructionKind {
@@ -549,6 +680,95 @@ impl std::hash::Hash for InstructionKind {
                 key.hash(state);
                 direction.hash(state);
             }
+            Self::WriteFile { path, text, append } => {
+                34u8.hash(state);
+                path.hash(state);
+                text.hash(state);
+                append.hash(state);
+            }
+            Self::HttpRequest {
+                method,
+                url,
+                body,
+                headers,
+                variable,
+            } => {
+                35u8.hash(state);
+                method.hash(state);
+                url.hash(state);
+                body.hash(state);
+                headers.hash(state);
+                variable.hash(state);
+            }
+            Self::Notify { title, message } => {
+                36u8.hash(state);
+                title.hash(state);
+                message.hash(state);
+            }
+            Self::Log(v) => {
+                37u8.hash(state);
+                v.hash(state);
+            }
+            Self::TryCatch { body, catch_body } => {
+                38u8.hash(state);
+                body.hash(state);
+                catch_body.hash(state);
+            }
+            Self::ThrowError(v) => {
+                39u8.hash(state);
+                v.hash(state);
+            }
+            Self::StopMacro => {
+                40u8.hash(state);
+            }
+            Self::WhenWindow { pattern, focused } => {
+                41u8.hash(state);
+                pattern.hash(state);
+                focused.hash(state);
+            }
+            Self::WhenFileChanged(path) => {
+                42u8.hash(state);
+                path.hash(state);
+            }
+            Self::Retry { count, delay, body } => {
+                43u8.hash(state);
+                count.hash(state);
+                delay.hash(state);
+                body.hash(state);
+            }
+            Self::WindowAction { action, pattern, by } => {
+                44u8.hash(state);
+                action.hash(state);
+                pattern.hash(state);
+                by.hash(state);
+            }
+            Self::MoveWindow { pattern, by, resize, x, y } => {
+                45u8.hash(state);
+                pattern.hash(state);
+                by.hash(state);
+                resize.hash(state);
+                x.hash(state);
+                y.hash(state);
+            }
+            Self::RunMacro { target, wait } => {
+                46u8.hash(state);
+                target.hash(state);
+                wait.hash(state);
+            }
+            Self::StopMacroNamed(target) => {
+                47u8.hash(state);
+                target.hash(state);
+            }
+            Self::SetGlobal { name, value } => {
+                48u8.hash(state);
+                name.hash(state);
+                value.hash(state);
+            }
+            Self::ChangeGlobal { name, by } => {
+                49u8.hash(state);
+                name.hash(state);
+                by.hash(state);
+            }
         }
     }
 }
@@ -639,6 +859,70 @@ enum InstructionKindDe {
     },
     EscapeLoop,
     ContinueLoop,
+    WriteFile {
+        path: Value,
+        text: Value,
+        append: bool,
+    },
+    HttpRequest {
+        method: String,
+        url: Value,
+        body: Value,
+        headers: Value,
+        variable: String,
+    },
+    Notify {
+        title: Value,
+        message: Value,
+    },
+    Log(Value),
+    TryCatch {
+        body: Vec<Instruction>,
+        catch_body: Vec<Instruction>,
+    },
+    ThrowError(Value),
+    StopMacro,
+    WhenWindow {
+        pattern: Value,
+        focused: bool,
+    },
+    WhenFileChanged(Value),
+    Retry {
+        count: Value,
+        delay: Value,
+        body: Vec<Instruction>,
+    },
+    WindowAction {
+        action: String,
+        pattern: Value,
+        #[serde(default = "match_by_title")]
+        by: String,
+    },
+    MoveWindow {
+        pattern: Value,
+        #[serde(default = "match_by_title")]
+        by: String,
+        resize: bool,
+        x: Value,
+        y: Value,
+    },
+    RunMacro {
+        target: Value,
+        wait: bool,
+    },
+    StopMacroNamed(Value),
+    SetGlobal {
+        name: Value,
+        value: Value,
+    },
+    ChangeGlobal {
+        name: Value,
+        by: Value,
+    },
+}
+
+fn match_by_title() -> String {
+    "Title".into()
 }
 
 #[derive(Deserialize)]
@@ -772,6 +1056,44 @@ impl From<InstructionKindDe> for InstructionKind {
             }
             InstructionKindDe::EscapeLoop => InstructionKind::EscapeLoop,
             InstructionKindDe::ContinueLoop => InstructionKind::ContinueLoop,
+            InstructionKindDe::WriteFile { path, text, append } => {
+                InstructionKind::WriteFile { path, text, append }
+            }
+            InstructionKindDe::HttpRequest {
+                method,
+                url,
+                body,
+                headers,
+                variable,
+            } => InstructionKind::HttpRequest {
+                method,
+                url,
+                body,
+                headers,
+                variable,
+            },
+            InstructionKindDe::Notify { title, message } => InstructionKind::Notify { title, message },
+            InstructionKindDe::Log(v) => InstructionKind::Log(v),
+            InstructionKindDe::TryCatch { body, catch_body } => {
+                InstructionKind::TryCatch { body, catch_body }
+            }
+            InstructionKindDe::ThrowError(v) => InstructionKind::ThrowError(v),
+            InstructionKindDe::StopMacro => InstructionKind::StopMacro,
+            InstructionKindDe::WhenWindow { pattern, focused } => {
+                InstructionKind::WhenWindow { pattern, focused }
+            }
+            InstructionKindDe::WhenFileChanged(v) => InstructionKind::WhenFileChanged(v),
+            InstructionKindDe::Retry { count, delay, body } => InstructionKind::Retry { count, delay, body },
+            InstructionKindDe::WindowAction { action, pattern, by } => {
+                InstructionKind::WindowAction { action, pattern, by }
+            }
+            InstructionKindDe::MoveWindow { pattern, by, resize, x, y } => {
+                InstructionKind::MoveWindow { pattern, by, resize, x, y }
+            }
+            InstructionKindDe::RunMacro { target, wait } => InstructionKind::RunMacro { target, wait },
+            InstructionKindDe::StopMacroNamed(v) => InstructionKind::StopMacroNamed(v),
+            InstructionKindDe::SetGlobal { name, value } => InstructionKind::SetGlobal { name, value },
+            InstructionKindDe::ChangeGlobal { name, by } => InstructionKind::ChangeGlobal { name, by },
         }
     }
 }
@@ -833,6 +1155,13 @@ pub struct MacroSettings {
     /// strands are live.
     #[serde(default)]
     pub always_listen: bool,
+    /// Stops a run (or a trigger-fired strand) after this many seconds;
+    /// 0 means no limit.
+    #[serde(default)]
+    pub max_run_secs: u32,
+    /// Stops any one loop after this many iterations; 0 means no limit.
+    #[serde(default)]
+    pub max_loop_iterations: u32,
 }
 
 /// Deserialization shape supporting both the current multi-strand format and

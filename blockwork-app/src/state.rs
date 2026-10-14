@@ -111,12 +111,11 @@ pub(crate) struct AppState {
     pub(crate) ipc_port_text: String,
     pub(crate) ipc_port_invalid: bool,
     pub(crate) update_check_state: UpdateCheckState,
-    /// A macro file the user just picked via `import_macro` but whose import
-    /// is paused on the "contains a Command instruction" warning popup -
-    /// `confirm_import_macro`/`cancel_import_macro` resolve it. `None` the
-    /// rest of the time (including immediately after a no-warning-needed
-    /// import, which commits inline instead of staging here).
-    pub(crate) pending_import: Option<Macro>,
+    /// A macro file the user just picked via `import_macro`, waiting on its
+    /// review - `confirm_import_macro`/`cancel_import_macro` resolve it.
+    pub(crate) pending_import: Option<(Macro, ImportReviewDto)>,
+    /// Set by the emergency stop; watchers fire nothing until it's cleared.
+    pub(crate) triggers_paused: bool,
 }
 
 // ─── Serializable DTO ──────────────────────────────────────────────────────
@@ -158,6 +157,18 @@ pub(crate) struct StateDto {
     pub(crate) grab_available: bool,
     pub(crate) razer_permission_warning: bool,
     pub(crate) update_check_state: UpdateCheckStateDto,
+    pub(crate) triggers_paused: bool,
+    pub(crate) run_log: Vec<blockwork_core::run_log::Entry>,
+    pub(crate) import_review: Option<ImportReviewDto>,
+    pub(crate) globals: Vec<GlobalDto>,
+    pub(crate) templates: Vec<crate::templates::TemplateDto>,
+}
+
+/// A global variable as the settings page lists it.
+#[derive(Serialize, Clone)]
+pub(crate) struct GlobalDto {
+    pub(crate) name: String,
+    pub(crate) value: String,
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]
@@ -226,11 +237,15 @@ pub(crate) struct MacroDto {
 #[derive(Serialize, Deserialize, Clone, Debug, Default, PartialEq)]
 pub(crate) struct MacroSettingsDto {
     pub(crate) always_listen: bool,
+    pub(crate) max_run_secs: u32,
+    pub(crate) max_loop_iterations: u32,
 }
 
 fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
     MacroSettingsDto {
         always_listen: settings.always_listen,
+        max_run_secs: settings.max_run_secs,
+        max_loop_iterations: settings.max_loop_iterations,
     }
 }
 
@@ -243,11 +258,20 @@ pub(crate) struct CustomMacroSettingDto {
     pub(crate) enabled: bool,
 }
 
-/// What `import_macro` needs the user to resolve before the staged
-/// `pending_import` macro can be committed.
+/// One thing an imported macro can do - see `commands::macro_capabilities`.
 #[derive(Serialize, Clone)]
-pub(crate) struct ImportPromptDto {
-    pub(crate) needs_command_warning: bool,
+pub(crate) struct CapabilityDto {
+    pub(crate) kind: String,
+    pub(crate) label: String,
+    /// Runs commands, goes online or writes files.
+    pub(crate) risky: bool,
+}
+
+/// What the user reviews before the staged `pending_import` macro is added.
+#[derive(Serialize, Clone)]
+pub(crate) struct ImportReviewDto {
+    pub(crate) name: String,
+    pub(crate) capabilities: Vec<CapabilityDto>,
     pub(crate) custom_settings: Vec<CustomMacroSettingDto>,
 }
 
@@ -422,6 +446,91 @@ pub(crate) enum InstructionDto {
     ContinueLoop {
         id: String,
     },
+    WriteFile {
+        id: String,
+        path: Value,
+        text: Value,
+        append: bool,
+    },
+    HttpRequest {
+        id: String,
+        method: String,
+        url: Value,
+        body: Value,
+        headers: Value,
+        variable: String,
+    },
+    Notify {
+        id: String,
+        title: Value,
+        message: Value,
+    },
+    Log {
+        id: String,
+        value: Value,
+    },
+    TryCatch {
+        id: String,
+        body: Vec<InstructionDto>,
+        catch_body: Vec<InstructionDto>,
+    },
+    ThrowError {
+        id: String,
+        message: Value,
+    },
+    StopMacro {
+        id: String,
+    },
+    WhenWindow {
+        id: String,
+        pattern: Value,
+        focused: bool,
+    },
+    WhenFileChanged {
+        id: String,
+        path: Value,
+    },
+    Retry {
+        id: String,
+        count: Value,
+        delay: Value,
+        body: Vec<InstructionDto>,
+    },
+    WindowAction {
+        id: String,
+        action: String,
+        pattern: Value,
+        #[serde(default = "match_by_title")]
+        by: String,
+    },
+    MoveWindow {
+        id: String,
+        pattern: Value,
+        #[serde(default = "match_by_title")]
+        by: String,
+        resize: bool,
+        x: Value,
+        y: Value,
+    },
+    RunMacro {
+        id: String,
+        target: Value,
+        wait: bool,
+    },
+    StopMacroNamed {
+        id: String,
+        target: Value,
+    },
+    SetGlobal {
+        id: String,
+        name: Value,
+        value: Value,
+    },
+    ChangeGlobal {
+        id: String,
+        name: Value,
+        by: Value,
+    },
 }
 
 /// One entry in the "Open App" picker's list - see `installed_apps`.
@@ -445,6 +554,7 @@ pub(crate) struct RecordingPhaseDto {
 pub(crate) enum HotkeyActionDto {
     RunMacro,
     StopLoop,
+    EmergencyStop,
     NextMacro,
     PrevMacro,
     StartRecordingImmediate,
@@ -538,6 +648,10 @@ fn str_to_axis(s: &str) -> Axis {
         "Horizontal" => Axis::Horizontal,
         _ => Axis::Vertical,
     }
+}
+
+fn match_by_title() -> String {
+    "Title".into()
 }
 
 pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
@@ -684,6 +798,90 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         },
         InstructionKind::EscapeLoop => InstructionDto::EscapeLoop { id },
         InstructionKind::ContinueLoop => InstructionDto::ContinueLoop { id },
+        InstructionKind::WriteFile { path, text, append } => InstructionDto::WriteFile {
+            id,
+            path: path.clone(),
+            text: text.clone(),
+            append: *append,
+        },
+        InstructionKind::HttpRequest {
+            method,
+            url,
+            body,
+            headers,
+            variable,
+        } => InstructionDto::HttpRequest {
+            id,
+            method: method.clone(),
+            url: url.clone(),
+            body: body.clone(),
+            headers: headers.clone(),
+            variable: variable.clone(),
+        },
+        InstructionKind::Notify { title, message } => InstructionDto::Notify {
+            id,
+            title: title.clone(),
+            message: message.clone(),
+        },
+        InstructionKind::Log(value) => InstructionDto::Log {
+            id,
+            value: value.clone(),
+        },
+        InstructionKind::TryCatch { body, catch_body } => InstructionDto::TryCatch {
+            id,
+            body: body.iter().map(instruction_to_dto).collect(),
+            catch_body: catch_body.iter().map(instruction_to_dto).collect(),
+        },
+        InstructionKind::ThrowError(message) => InstructionDto::ThrowError {
+            id,
+            message: message.clone(),
+        },
+        InstructionKind::StopMacro => InstructionDto::StopMacro { id },
+        InstructionKind::WhenWindow { pattern, focused } => InstructionDto::WhenWindow {
+            id,
+            pattern: pattern.clone(),
+            focused: *focused,
+        },
+        InstructionKind::WhenFileChanged(path) => InstructionDto::WhenFileChanged {
+            id,
+            path: path.clone(),
+        },
+        InstructionKind::Retry { count, delay, body } => InstructionDto::Retry {
+            id,
+            count: count.clone(),
+            delay: delay.clone(),
+            body: body.iter().map(instruction_to_dto).collect(),
+        },
+        InstructionKind::WindowAction { action, pattern, by } => InstructionDto::WindowAction {
+            id,
+            action: action.clone(),
+            pattern: pattern.clone(),
+            by: by.clone(),
+        },
+        InstructionKind::MoveWindow { pattern, by, resize, x, y } => InstructionDto::MoveWindow {
+            id,
+            pattern: pattern.clone(),
+            by: by.clone(),
+            resize: *resize,
+            x: x.clone(),
+            y: y.clone(),
+        },
+        InstructionKind::RunMacro { target, wait } => InstructionDto::RunMacro {
+            id,
+            target: target.clone(),
+            wait: *wait,
+        },
+        InstructionKind::StopMacroNamed(target) => InstructionDto::StopMacroNamed { id, target: target.clone() },
+        InstructionKind::SetGlobal { name, value } => InstructionDto::SetGlobal {
+            id,
+            name: name.clone(),
+            value: value.clone(),
+        },
+        InstructionKind::ChangeGlobal { name, by } => InstructionDto::ChangeGlobal {
+            id,
+            name: name.clone(),
+            by: by.clone(),
+        },
         InstructionKind::Token(token) => match token {
             InputToken::Text(t) => InstructionDto::Text {
                 id,
@@ -928,6 +1126,111 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         ),
         InstructionDto::EscapeLoop { id } => (id, InstructionKind::EscapeLoop),
         InstructionDto::ContinueLoop { id } => (id, InstructionKind::ContinueLoop),
+        InstructionDto::WriteFile {
+            id,
+            path,
+            text,
+            append,
+        } => (
+            id,
+            InstructionKind::WriteFile {
+                path: path.clone(),
+                text: text.clone(),
+                append: *append,
+            },
+        ),
+        InstructionDto::HttpRequest {
+            id,
+            method,
+            url,
+            body,
+            headers,
+            variable,
+        } => (
+            id,
+            InstructionKind::HttpRequest {
+                method: method.clone(),
+                url: url.clone(),
+                body: body.clone(),
+                headers: headers.clone(),
+                variable: variable.clone(),
+            },
+        ),
+        InstructionDto::Notify { id, title, message } => (
+            id,
+            InstructionKind::Notify {
+                title: title.clone(),
+                message: message.clone(),
+            },
+        ),
+        InstructionDto::Log { id, value } => (id, InstructionKind::Log(value.clone())),
+        InstructionDto::TryCatch {
+            id,
+            body,
+            catch_body,
+        } => (
+            id,
+            InstructionKind::TryCatch {
+                body: body
+                    .iter()
+                    .map(dto_to_instruction)
+                    .collect::<Option<Vec<_>>>()?,
+                catch_body: catch_body
+                    .iter()
+                    .map(dto_to_instruction)
+                    .collect::<Option<Vec<_>>>()?,
+            },
+        ),
+        InstructionDto::ThrowError { id, message } => {
+            (id, InstructionKind::ThrowError(message.clone()))
+        }
+        InstructionDto::StopMacro { id } => (id, InstructionKind::StopMacro),
+        InstructionDto::WhenWindow {
+            id,
+            pattern,
+            focused,
+        } => (
+            id,
+            InstructionKind::WhenWindow {
+                pattern: pattern.clone(),
+                focused: *focused,
+            },
+        ),
+        InstructionDto::WhenFileChanged { id, path } => {
+            (id, InstructionKind::WhenFileChanged(path.clone()))
+        }
+        InstructionDto::Retry { id, count, delay, body } => (
+            id,
+            InstructionKind::Retry {
+                count: count.clone(),
+                delay: delay.clone(),
+                body: body.iter().map(dto_to_instruction).collect::<Option<Vec<_>>>()?,
+            },
+        ),
+        InstructionDto::WindowAction { id, action, pattern, by } => (
+            id,
+            InstructionKind::WindowAction { action: action.clone(), pattern: pattern.clone(), by: by.clone() },
+        ),
+        InstructionDto::MoveWindow { id, pattern, by, resize, x, y } => (
+            id,
+            InstructionKind::MoveWindow {
+                pattern: pattern.clone(),
+                by: by.clone(),
+                resize: *resize,
+                x: x.clone(),
+                y: y.clone(),
+            },
+        ),
+        InstructionDto::RunMacro { id, target, wait } => {
+            (id, InstructionKind::RunMacro { target: target.clone(), wait: *wait })
+        }
+        InstructionDto::StopMacroNamed { id, target } => (id, InstructionKind::StopMacroNamed(target.clone())),
+        InstructionDto::SetGlobal { id, name, value } => {
+            (id, InstructionKind::SetGlobal { name: name.clone(), value: value.clone() })
+        }
+        InstructionDto::ChangeGlobal { id, name, by } => {
+            (id, InstructionKind::ChangeGlobal { name: name.clone(), by: by.clone() })
+        }
     };
     Some(Instruction {
         id: id.clone(),
@@ -965,6 +1268,7 @@ fn hotkey_action_to_dto(action: &HotkeyAction) -> HotkeyActionDto {
     match action {
         HotkeyAction::RunMacro => HotkeyActionDto::RunMacro,
         HotkeyAction::StopLoop => HotkeyActionDto::StopLoop,
+        HotkeyAction::EmergencyStop => HotkeyActionDto::EmergencyStop,
         HotkeyAction::NextMacro => HotkeyActionDto::NextMacro,
         HotkeyAction::PrevMacro => HotkeyActionDto::PrevMacro,
         HotkeyAction::StartRecordingImmediate => HotkeyActionDto::StartRecordingImmediate,
@@ -981,6 +1285,7 @@ pub(crate) fn dto_to_hotkey_action(dto: &HotkeyActionDto) -> HotkeyAction {
     match dto {
         HotkeyActionDto::RunMacro => HotkeyAction::RunMacro,
         HotkeyActionDto::StopLoop => HotkeyAction::StopLoop,
+        HotkeyActionDto::EmergencyStop => HotkeyAction::EmergencyStop,
         HotkeyActionDto::NextMacro => HotkeyAction::NextMacro,
         HotkeyActionDto::PrevMacro => HotkeyAction::PrevMacro,
         HotkeyActionDto::StartRecordingImmediate => HotkeyAction::StartRecordingImmediate,
@@ -1055,9 +1360,10 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         })
         .collect();
 
-    const NAMED_HOTKEY_ACTIONS: [HotkeyAction; 8] = [
+    const NAMED_HOTKEY_ACTIONS: [HotkeyAction; 9] = [
         HotkeyAction::RunMacro,
         HotkeyAction::StopLoop,
+        HotkeyAction::EmergencyStop,
         HotkeyAction::NextMacro,
         HotkeyAction::PrevMacro,
         HotkeyAction::StartRecordingImmediate,
@@ -1178,6 +1484,14 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         grab_available: !blockwork_core::recording::grab_failed(),
         razer_permission_warning: crate::razer::permission_warning(),
         update_check_state,
+        triggers_paused: s.triggers_paused,
+        run_log: blockwork_core::run_log::snapshot(),
+        import_review: s.pending_import.as_ref().map(|(_, review)| review.clone()),
+        globals: blockwork_core::globals::all()
+            .into_iter()
+            .map(|(name, value)| GlobalDto { name, value: value.as_text() })
+            .collect(),
+        templates: crate::templates::list(),
     }
 }
 

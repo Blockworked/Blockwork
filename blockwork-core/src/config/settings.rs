@@ -53,6 +53,8 @@ pub struct AppSettings {
     pub record_mouse_relative: Option<bool>,
     /// Whether mouse movement is captured into recordings at all.
     pub record_mouse_movement: Option<bool>,
+    /// Set once the emergency stop default was added to saved bindings.
+    pub emergency_stop_seeded: Option<bool>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {

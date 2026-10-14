@@ -5,15 +5,20 @@
 
 mod app_bridge;
 mod app_icon;
+mod cli;
 mod daemon_client;
 mod native_icon;
 mod qt_diagnostics;
+mod window_frame;
 
 use cxx_qt::casting::Upcast;
 use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QQmlEngine, QUrl};
 use std::pin::Pin;
 
 fn main() {
+    if let Some(args) = cli::requested() {
+        std::process::exit(cli::main(args));
+    }
     // Every control is drawn from the app's own theme; pin the Basic style so the
     // platform style (e.g. Fluent on Windows 11) doesn't add native chrome, shadows
     // or light/dark palettes underneath it. Must be set before the first control.

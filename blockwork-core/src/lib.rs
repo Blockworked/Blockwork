@@ -1,16 +1,23 @@
 pub mod battery;
 pub mod clipboard;
 pub mod config;
+pub mod files;
+pub mod globals;
 pub mod flatpak;
 pub mod hotkey_types;
+pub mod http;
 pub mod input;
 #[cfg(feature = "ipc")]
 pub mod ipc;
 pub mod key_mapping;
 pub mod macros;
+pub mod notify;
 pub mod recording;
+pub mod run_log;
+pub mod shell;
 #[cfg(all(feature = "updater", any(windows, target_os = "macos")))]
 pub mod updater;
+pub mod window;
 pub mod wire;
 
 /// Registers Blockwork's own value operators with blockstitch, so a saved

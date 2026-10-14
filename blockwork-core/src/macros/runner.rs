@@ -2,7 +2,7 @@ use crate::input::types::{Coordinate, Direction, InputToken, MacroButton, MacroK
 use crate::input::value::{Evaluated, Op, Value};
 use crate::macros::backend::{create_backend, InputBackend};
 use crate::macros::priority::raise_current_thread_priority;
-use crate::macros::{Instruction, InstructionKind, Macro};
+use crate::macros::{BlockKind, Instruction, InstructionKind, Macro};
 use blockstitch_core::graph::{
     ListItem, ListStore, is_list_reporter, list_index, resolve_list_reporter,
 };
@@ -64,7 +64,7 @@ struct ExecCtx<'a> {
     speed_multiplier: f64,
     variables: VariableStore,
     lists: ListStore,
-    block_table: Arc<HashMap<String, BlockRuntime>>,
+    block_table: BlockTable,
     pressed_keys: &'a mut Vec<MacroKey>,
     /// Mouse buttons held by this strand, tracked and cleaned up like
     /// `pressed_keys`. Without this, stopping between a press and release
@@ -72,6 +72,17 @@ struct ExecCtx<'a> {
     pressed_buttons: &'a mut Vec<MacroButton>,
     param_env: HashMap<String, Evaluated>,
     branch_env: HashMap<String, Vec<Instruction>>,
+    /// Names this run in the run log.
+    source: Arc<crate::run_log::Source>,
+    /// Block behind the error currently unwinding, for the run log.
+    error_block: String,
+    /// How many `TryCatch` bodies are executing; inside one, a failing
+    /// block raises an error instead of being skipped.
+    try_depth: u32,
+    /// Publishes the block this strand is on, for the editor's highlight.
+    trace: Option<crate::macros::trace::Tracker>,
+    /// Iterations any one loop may run; 0 means no limit.
+    max_loop_iterations: u64,
 }
 
 impl<'a> ExecCtx<'a> {
@@ -197,6 +208,59 @@ fn call_block(
     })
 }
 
+thread_local! {
+    /// Message of the error the innermost running `TryCatch` caught. Strands
+    /// run on their own threads, so this is per strand.
+    static LAST_ERROR: std::cell::RefCell<String> = const { std::cell::RefCell::new(String::new()) };
+}
+
+/// Backs the `LastError` reporter.
+pub fn last_error() -> String {
+    LAST_ERROR.with(|e| e.borrow().clone())
+}
+
+/// A block couldn't do its job. Inside a `TryCatch` that's an error the
+/// catch handles; elsewhere the block is skipped and the run log says why.
+fn soft_fail(ctx: &mut ExecCtx, block_id: &str, block: &str, error: impl std::fmt::Display) -> Result<(), String> {
+    let message = format!("{block}: {error}");
+    if ctx.try_depth > 0 {
+        ctx.error_block = block_id.to_string();
+        return Err(message);
+    }
+    warn!("{message}");
+    crate::run_log::block_error(&ctx.source, block_id, message);
+    Ok(())
+}
+
+/// Counts one loop iteration. Past the macro's loop limit it reports the
+/// loop (an error inside a try) and returns `true`: stop looping.
+fn loop_limit_hit(ctx: &mut ExecCtx, block_id: &str, iterations: &mut u64) -> Result<bool, String> {
+    *iterations += 1;
+    if ctx.max_loop_iterations == 0 || *iterations <= ctx.max_loop_iterations {
+        return Ok(false);
+    }
+    let limit = ctx.max_loop_iterations;
+    soft_fail(ctx, block_id, "Loop", format!("stopped after {limit} iterations (this macro's loop limit)"))?;
+    Ok(true)
+}
+
+/// Sleeps `ms` (scaled by playback speed), waking early when the run is
+/// stopped. Returns `true` if it was.
+fn sleep_unless_stopped(ctx: &ExecCtx, ms: f64) -> bool {
+    let secs = (ms / ctx.speed_multiplier).max(0.0) / 1000.0;
+    let deadline = Instant::now() + Duration::from_secs_f64(secs);
+    loop {
+        if ctx.stop_flag.as_ref().is_some_and(stop_requested) {
+            return true;
+        }
+        let now = Instant::now();
+        if now >= deadline {
+            return false;
+        }
+        std::thread::sleep((deadline - now).min(STOP_POLL_INTERVAL));
+    }
+}
+
 static EMULATOR_FAILED: AtomicBool = AtomicBool::new(false);
 
 pub fn emulator_failed() -> bool {
@@ -218,7 +282,33 @@ fn stop_requested(flag: &Arc<Mutex<bool>>) -> bool {
     !flag.lock().map(|g| *g).unwrap_or(false)
 }
 
+/// Custom block bodies keyed by block id, shared read-only by a run's strands.
+pub type BlockTable = Arc<HashMap<String, BlockRuntime>>;
+
 impl Macro {
+    /// Builds the custom block table from this macro's `BlockHeader` strands.
+    pub fn block_table(&self) -> BlockTable {
+        let mut table = HashMap::new();
+        for strand in &self.graph.strands {
+            let Some(InstructionKind::BlockHeader(id)) =
+                strand.instructions.first().map(|i| &i.kind)
+            else {
+                continue;
+            };
+            if let Some(def) = self.graph.block_defs.iter().find(|b| &b.id == id) {
+                table.insert(
+                    id.clone(),
+                    BlockRuntime {
+                        input_names: def.input_names().map(str::to_string).collect(),
+                        branch_names: def.branch_names().map(str::to_string).collect(),
+                        body: strand.instructions[1..].to_vec(),
+                    },
+                );
+            }
+        }
+        Arc::new(table)
+    }
+
     /// Runs every "When Ran" entry-point strand concurrently on its own
     /// thread, sharing one `stop_flag`. A custom block's header strand isn't
     /// run directly - its body is extracted into `block_table` and only
@@ -300,47 +390,20 @@ impl Macro {
         lists: ListStore,
         initial_offset: Duration,
     ) {
-        let block_defs = self.graph.block_defs;
-        let mut block_table: HashMap<String, BlockRuntime> = HashMap::new();
-        let mut entry_strands: Vec<Vec<Instruction>> = Vec::new();
-
-        for strand in self.graph.strands {
-            match strand.instructions.first().map(|i| &i.kind) {
-                Some(InstructionKind::BlockHeader(id)) => {
-                    if let Some(def) = block_defs.iter().find(|b| &b.id == id) {
-                        let input_names: Vec<String> =
-                            def.input_names().map(str::to_string).collect();
-                        let branch_names: Vec<String> =
-                            def.branch_names().map(str::to_string).collect();
-                        let body = strand.instructions[1..].to_vec();
-                        block_table.insert(
-                            id.clone(),
-                            BlockRuntime {
-                                input_names,
-                                branch_names,
-                                body,
-                            },
-                        );
-                    }
-                }
-                Some(InstructionKind::WhenRan) => entry_strands.push(strand.instructions),
-                // Battery/time-triggered strands aren't run here at all -
-                // they're driven by the app's own background watchers (e.g.
-                // `blockwork-app`'s `battery_watch`/`time_watch` modules), which
-                // fire just their body directly once their own condition
-                // holds, independent of Run/Loop. A manual Run intentionally
-                // leaves them alone.
-                Some(InstructionKind::WhenBatteryDischargedTo(_))
-                | Some(InstructionKind::WhenBatteryChargedTo(_))
-                | Some(InstructionKind::WhenTime(_))
-                | Some(InstructionKind::WhenPowerPluggedIn)
-                | Some(InstructionKind::WhenPowerUnplugged)
-                | Some(InstructionKind::WhenClipboardChanged)
-                | Some(InstructionKind::WhenKey(..)) => {}
-                _ => {}
-            }
-        }
-        let block_table = Arc::new(block_table);
+        let source = Arc::new(crate::run_log::Source::for_macro(&self.id, &self.name));
+        let max_loop_iterations = self.settings.max_loop_iterations;
+        // StopMacro needs a flag every strand of this run shares.
+        let stop_flag = stop_flag.or_else(|| Some(Arc::new(Mutex::new(true))));
+        let block_table = self.block_table();
+        // Trigger strands are fired by the app's watchers via
+        // `run_fired_strand`, never by a manual Run.
+        let entry_strands: Vec<Vec<Instruction>> = self
+            .graph
+            .strands
+            .into_iter()
+            .filter(|s| matches!(s.instructions.first().map(|i| &i.kind), Some(InstructionKind::WhenRan)))
+            .map(|s| s.instructions)
+            .collect();
 
         if entry_strands.is_empty() {
             return;
@@ -354,10 +417,12 @@ impl Macro {
                 let variables = Arc::clone(&variables);
                 let lists = Arc::clone(&lists);
                 let block_table = Arc::clone(&block_table);
+                let source = Arc::clone(&source);
                 let spawned = std::thread::Builder::new()
                     .stack_size(STRAND_STACK_SIZE)
                     .spawn_scoped(scope, move || {
                         run_strand(
+                            source,
                             instructions,
                             emulator,
                             stop_flag,
@@ -366,6 +431,7 @@ impl Macro {
                             lists,
                             block_table,
                             initial_offset,
+                            max_loop_iterations,
                         )
                     });
                 if let Err(e) = spawned {
@@ -382,14 +448,16 @@ impl Macro {
 /// `Return` reaching strand level has nowhere to hand its value, and resolve
 /// errors are already `warn!`-logged at their source.
 fn run_strand(
+    source: Arc<crate::run_log::Source>,
     instructions: Vec<Instruction>,
     emulator: Arc<Mutex<dyn InputBackend>>,
     stop_flag: Option<Arc<Mutex<bool>>>,
     speed_multiplier: f64,
     variables: VariableStore,
     lists: ListStore,
-    block_table: Arc<HashMap<String, BlockRuntime>>,
+    block_table: BlockTable,
     initial_offset: Duration,
+    max_loop_iterations: u32,
 ) {
     raise_current_thread_priority();
     // Priority-raise happens first (its latency shouldn't eat into the
@@ -413,8 +481,17 @@ fn run_strand(
             pressed_buttons: &mut pressed_buttons,
             param_env: HashMap::new(),
             branch_env: HashMap::new(),
+            source: Arc::clone(&source),
+            error_block: String::new(),
+            try_depth: 0,
+            trace: crate::macros::trace::Tracker::new(&source.macro_id),
+            max_loop_iterations: max_loop_iterations.into(),
         };
-        let _ = run_block(&instructions, &mut ctx, 0, start);
+        // An error reaching the top ends this strand.
+        if let Err(e) = run_block(&instructions, &mut ctx, 0, start) {
+            warn!("Strand ended with an error: {e}");
+            crate::run_log::block_error(&source, &ctx.error_block, e);
+        }
     }
 
     if !pressed_keys.is_empty() || !pressed_buttons.is_empty() {
@@ -466,7 +543,8 @@ pub fn run_instructions_with_lists(
     variables: VariableStore,
     lists: ListStore,
 ) {
-    run_strand(
+    run_fired_strand(
+        crate::run_log::Source::default(),
         instructions,
         emulator,
         stop_flag,
@@ -474,7 +552,35 @@ pub fn run_instructions_with_lists(
         variables,
         lists,
         Arc::new(HashMap::new()),
+        0,
+    );
+}
+
+/// Runs one trigger-fired strand body, logging as `source`.
+/// `block_table` comes from `Macro::block_table` so custom block calls resolve.
+#[allow(clippy::too_many_arguments)]
+pub fn run_fired_strand(
+    source: crate::run_log::Source,
+    instructions: Vec<Instruction>,
+    emulator: Arc<Mutex<dyn InputBackend>>,
+    stop_flag: Option<Arc<Mutex<bool>>>,
+    speed_multiplier: f64,
+    variables: VariableStore,
+    lists: ListStore,
+    block_table: BlockTable,
+    max_loop_iterations: u32,
+) {
+    run_strand(
+        Arc::new(source),
+        instructions,
+        emulator,
+        stop_flag.or_else(|| Some(Arc::new(Mutex::new(true)))),
+        speed_multiplier,
+        variables,
+        lists,
+        block_table,
         Duration::ZERO,
+        max_loop_iterations,
     );
 }
 
@@ -527,6 +633,11 @@ fn run_block(
                 break;
             }
         }
+        if let Some(trace) = &ctx.trace
+            && !ins.kind.is_header()
+        {
+            trace.at(&ins.id);
+        }
 
         match &ins.kind {
             InstructionKind::Comment(_) => {}
@@ -544,16 +655,18 @@ fn run_block(
             InstructionKind::WhenPowerUnplugged => {}
             InstructionKind::WhenClipboardChanged => {}
             InstructionKind::WhenKey(..) => {}
+            InstructionKind::WhenWindow { .. } => {}
+            InstructionKind::WhenFileChanged(_) => {}
             InstructionKind::OpenApp { command, .. } => {
                 println!("Opening app: {command}");
                 if let Err(e) = open_app(command) {
-                    warn!("Failed to open app: {}", e);
+                    soft_fail(ctx, &ins.id, "Open app", e)?;
                 }
             }
             InstructionKind::CloseApp { command, name, .. } => {
                 println!("Closing app: {name}");
                 if let Err(e) = close_app(command, name) {
-                    warn!("Failed to close app: {}", e);
+                    soft_fail(ctx, &ins.id, "Close app", e)?;
                 }
             }
             InstructionKind::Return(value) => {
@@ -562,6 +675,173 @@ fn run_block(
             }
             InstructionKind::EscapeLoop => return Ok(Flow::Break),
             InstructionKind::ContinueLoop => return Ok(Flow::Continue),
+            InstructionKind::StopMacro => {
+                crate::run_log::info(&ctx.source, "Stopped by a stop macro block");
+                if let Some(flag) = &ctx.stop_flag
+                    && let Ok(mut running) = flag.lock()
+                {
+                    *running = false;
+                }
+                break;
+            }
+            InstructionKind::ThrowError(message) => {
+                let message = ctx
+                    .resolve(message, depth)
+                    .and_then(|v| v.eval_text())
+                    .unwrap_or_else(|e| e);
+                ctx.error_block = ins.id.clone();
+                return Err(if message.is_empty() { "error".to_string() } else { message });
+            }
+            InstructionKind::TryCatch { body, catch_body } => {
+                ctx.try_depth += 1;
+                let result = run_block(body, ctx, depth, Instant::now());
+                ctx.try_depth -= 1;
+                match result {
+                    Ok(Flow::Normal) => {}
+                    Ok(flow) => return Ok(flow),
+                    Err(message) => {
+                        crate::run_log::info(&ctx.source, format!("Handled error: {message}"));
+                        ctx.error_block.clear();
+                        LAST_ERROR.with(|e| *e.borrow_mut() = message);
+                        let flow = run_block(catch_body, ctx, depth, Instant::now())?;
+                        if flow != Flow::Normal {
+                            return Ok(flow);
+                        }
+                    }
+                }
+            }
+            InstructionKind::Retry { count, delay, body } => {
+                let attempts = ctx.resolve(count, depth).and_then(|v| v.eval_number());
+                let delay_ms = ctx.resolve(delay, depth).and_then(|v| v.eval_number());
+                let (attempts, delay_ms) = match (attempts, delay_ms) {
+                    (Ok(a), Ok(d)) => (a.max(1.0).round() as u64, d),
+                    (Err(e), _) | (_, Err(e)) => {
+                        soft_fail(ctx, &ins.id, "Retry", e)?;
+                        continue;
+                    }
+                };
+                for attempt in 1..=attempts {
+                    ctx.try_depth += 1;
+                    let result = run_block(body, ctx, depth, Instant::now());
+                    ctx.try_depth -= 1;
+                    let message = match result {
+                        Ok(Flow::Normal) => break,
+                        Ok(flow) => return Ok(flow),
+                        Err(message) => message,
+                    };
+                    ctx.error_block.clear();
+                    LAST_ERROR.with(|e| *e.borrow_mut() = message.clone());
+                    if attempt == attempts {
+                        soft_fail(ctx, &ins.id, "Retry", format!("gave up after {attempts} attempts: {message}"))?;
+                        break;
+                    }
+                    crate::run_log::info(&ctx.source, format!("Attempt {attempt} of {attempts} failed: {message}"));
+                    if sleep_unless_stopped(ctx, delay_ms) {
+                        break;
+                    }
+                }
+            }
+            InstructionKind::WindowAction { action, pattern, by } => {
+                let done = (|| {
+                    let pattern = ctx.resolve(pattern, depth)?.eval_text()?;
+                    crate::window::act(action.parse()?, &pattern, by.parse()?)
+                })();
+                if let Err(e) = done {
+                    soft_fail(ctx, &ins.id, "Window", e)?;
+                }
+            }
+            InstructionKind::MoveWindow { pattern, by, resize, x, y } => {
+                let done = (|| {
+                    let pattern = ctx.resolve(pattern, depth)?.eval_text()?;
+                    let x = ctx.resolve(x, depth)?.eval_number()?.round() as i32;
+                    let y = ctx.resolve(y, depth)?.eval_number()?.round() as i32;
+                    crate::window::place(&pattern, by.parse()?, *resize, x, y)
+                })();
+                if let Err(e) = done {
+                    soft_fail(ctx, &ins.id, if *resize { "Resize window" } else { "Move window" }, e)?;
+                }
+            }
+            InstructionKind::RunMacro { target, wait } => {
+                match ctx.resolve(target, depth).and_then(|v| v.eval_text()).and_then(|name| crate::macros::calls::start(&name)) {
+                    Ok((id, done)) if *wait => {
+                        // Stopping this run stops the one it's waiting on too.
+                        while !done.load(Ordering::Relaxed) {
+                            if ctx.stop_flag.as_ref().is_some_and(stop_requested) {
+                                crate::macros::run_registry::stop_macro(&id);
+                                break;
+                            }
+                            std::thread::sleep(STOP_POLL_INTERVAL);
+                        }
+                    }
+                    Ok(_) => {}
+                    Err(e) => soft_fail(ctx, &ins.id, "Run macro", e)?,
+                }
+            }
+            InstructionKind::StopMacroNamed(target) => {
+                if let Err(e) = ctx.resolve(target, depth).and_then(|v| v.eval_text()).and_then(|name| crate::macros::calls::stop(&name)) {
+                    soft_fail(ctx, &ins.id, "Stop macro", e)?;
+                }
+            }
+            InstructionKind::SetGlobal { name, value } => {
+                let set = ctx.resolve(name, depth).and_then(|n| n.eval_text()).and_then(|name| {
+                    crate::globals::set(&name, ctx.resolve(value, depth)?.eval()?)
+                });
+                if let Err(e) = set {
+                    soft_fail(ctx, &ins.id, "Set global", e)?;
+                }
+            }
+            InstructionKind::ChangeGlobal { name, by } => {
+                let changed = ctx.resolve(name, depth).and_then(|n| n.eval_text()).and_then(|name| {
+                    crate::globals::change(&name, ctx.resolve(by, depth)?.eval_number()?)
+                });
+                if let Err(e) = changed {
+                    soft_fail(ctx, &ins.id, "Change global", e)?;
+                }
+            }
+            InstructionKind::Log(value) => match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {
+                Ok(text) => crate::run_log::info(&ctx.source, text),
+                Err(e) => soft_fail(ctx, &ins.id, "Log", e)?,
+            },
+            InstructionKind::Notify { title, message } => {
+                let title = ctx.resolve(title, depth).and_then(|v| v.eval_text());
+                let message = ctx.resolve(message, depth).and_then(|v| v.eval_text());
+                let shown = title.and_then(|t| message.and_then(|m| crate::notify::show(&t, &m)));
+                if let Err(e) = shown {
+                    soft_fail(ctx, &ins.id, "Notify", e)?;
+                }
+            }
+            InstructionKind::WriteFile { path, text, append } => {
+                let path = ctx.resolve(path, depth).and_then(|v| v.eval_text());
+                let text = ctx.resolve(text, depth).and_then(|v| v.eval_text());
+                let written = path.and_then(|p| text.and_then(|t| crate::files::write_text(&p, &t, *append)));
+                if let Err(e) = written {
+                    soft_fail(ctx, &ins.id, if *append { "Append to file" } else { "Write file" }, e)?;
+                }
+            }
+            InstructionKind::HttpRequest {
+                method,
+                url,
+                body,
+                headers,
+                variable,
+            } => {
+                let response = (|| {
+                    let url = ctx.resolve(url, depth)?.eval_text()?;
+                    let body = ctx.resolve(body, depth)?.eval_text()?;
+                    let headers = ctx.resolve(headers, depth)?.eval_text()?;
+                    crate::http::request(method, &url, &body, &headers)
+                })();
+                match response {
+                    Ok(text) => {
+                        if !variable.is_empty()
+                            && let Ok(mut vars) = ctx.variables.lock()
+                        {
+                            vars.insert(variable.clone(), Evaluated::Text(text));
+                        }
+                    }
+                    Err(e) => soft_fail(ctx, &ins.id, "Web request", e)?,
+                }
+            }
             InstructionKind::CallBlock {
                 block_id,
                 args,
@@ -572,7 +852,7 @@ fn run_block(
                     match ctx.resolve(a, depth).and_then(|v| v.eval()) {
                         Ok(v) => evaluated_args.push(v),
                         Err(e) => {
-                            warn!("Skipping call to '{}': arg {}", block_id, e);
+                            soft_fail(ctx, &ins.id, &format!("Call to '{block_id}'"), e)?;
                             continue;
                         }
                     }
@@ -600,7 +880,7 @@ fn run_block(
                             }
                         }
                     }
-                    Err(e) => warn!("Skipping If: condition {}", e),
+                    Err(e) => soft_fail(ctx, &ins.id, "If", e)?,
                 }
             }
             InstructionKind::IfElse {
@@ -615,22 +895,26 @@ fn run_block(
                         return Ok(flow);
                     }
                 }
-                Err(e) => warn!("Skipping IfElse: condition {}", e),
+                Err(e) => soft_fail(ctx, &ins.id, "If else", e)?,
             },
             InstructionKind::Repeat { count, body } => {
                 let n = match ctx.resolve(count, depth).and_then(|v| v.eval_number()) {
                     Ok(v) => v,
                     Err(e) => {
-                        warn!("Skipping Repeat: count {}", e);
+                        soft_fail(ctx, &ins.id, "Repeat", e)?;
                         continue;
                     }
                 };
                 let n = n.max(0.0).round() as u64;
+                let mut iterations = 0;
                 for _ in 0..n {
                     if let Some(flag) = &ctx.stop_flag {
                         if stop_requested(flag) {
                             break;
                         }
+                    }
+                    if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
+                        break;
                     }
                     match run_block(body, ctx, depth, Instant::now())? {
                         Flow::Normal | Flow::Continue => {}
@@ -639,46 +923,58 @@ fn run_block(
                     }
                 }
             }
-            InstructionKind::Forever { body } => loop {
-                if let Some(flag) = &ctx.stop_flag {
-                    if stop_requested(flag) {
-                        break;
-                    }
-                }
-                match run_block(body, ctx, depth, Instant::now())? {
-                    Flow::Normal | Flow::Continue => {}
-                    Flow::Break => break,
-                    flow @ Flow::Return(_) => return Ok(flow),
-                }
-            },
-            InstructionKind::While { condition, body } => loop {
-                if let Some(flag) = &ctx.stop_flag {
-                    if stop_requested(flag) {
-                        break;
-                    }
-                }
-                match ctx.resolve(condition, depth).and_then(|v| v.eval()) {
-                    Ok(cond) => {
-                        if !cond.as_bool() {
+            InstructionKind::Forever { body } => {
+                let mut iterations = 0;
+                loop {
+                    if let Some(flag) = &ctx.stop_flag {
+                        if stop_requested(flag) {
                             break;
                         }
                     }
-                    Err(e) => {
-                        warn!("Skipping While: condition {}", e);
+                    if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
                         break;
                     }
+                    match run_block(body, ctx, depth, Instant::now())? {
+                        Flow::Normal | Flow::Continue => {}
+                        Flow::Break => break,
+                        flow @ Flow::Return(_) => return Ok(flow),
+                    }
                 }
-                match run_block(body, ctx, depth, Instant::now())? {
-                    Flow::Normal | Flow::Continue => {}
-                    Flow::Break => break,
-                    flow @ Flow::Return(_) => return Ok(flow),
+            }
+            InstructionKind::While { condition, body } => {
+                let mut iterations = 0;
+                loop {
+                    if let Some(flag) = &ctx.stop_flag {
+                        if stop_requested(flag) {
+                            break;
+                        }
+                    }
+                    match ctx.resolve(condition, depth).and_then(|v| v.eval()) {
+                        Ok(cond) => {
+                            if !cond.as_bool() {
+                                break;
+                            }
+                        }
+                        Err(e) => {
+                            soft_fail(ctx, &ins.id, "While", e)?;
+                            break;
+                        }
+                    }
+                    if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
+                        break;
+                    }
+                    match run_block(body, ctx, depth, Instant::now())? {
+                        Flow::Normal | Flow::Continue => {}
+                        Flow::Break => break,
+                        flow @ Flow::Return(_) => return Ok(flow),
+                    }
                 }
-            },
+            }
             InstructionKind::Wait(duration) => {
                 let duration = match ctx.resolve(duration, depth).and_then(|v| v.eval_number()) {
                     Ok(v) => v,
                     Err(e) => {
-                        warn!("Skipping Wait: duration {}", e);
+                        soft_fail(ctx, &ins.id, "Wait", e)?;
                         continue;
                     }
                 };
@@ -721,7 +1017,7 @@ fn run_block(
             InstructionKind::Command(command) => {
                 println!("Running command: {command}");
                 if let Err(e) = Command::new("bash").args(["-c", command]).status() {
-                    warn!("Command failed: {}", e)
+                    soft_fail(ctx, &ins.id, "Command", e)?;
                 }
             }
             InstructionKind::Token(token) => match token {
@@ -729,7 +1025,7 @@ fn run_block(
                     let text = match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {
                         Ok(t) => t,
                         Err(e) => {
-                            warn!("Skipping Text: {}", e);
+                            soft_fail(ctx, &ins.id, "Type text", e)?;
                             continue;
                         }
                     };
@@ -748,7 +1044,7 @@ fn run_block(
                     let text = match ctx.resolve(key, depth).and_then(|v| v.eval_text()) {
                         Ok(t) => t,
                         Err(e) => {
-                            warn!("Skipping Key: {}", e);
+                            soft_fail(ctx, &ins.id, "Key", e)?;
                             continue;
                         }
                     };
@@ -757,7 +1053,7 @@ fn run_block(
                         .map(normalize_modifier_key)
                         .collect();
                     if keys.is_empty() {
-                        warn!("Skipping Key: no key in '{}'", text);
+                        soft_fail(ctx, &ins.id, "Key", format!("no key in '{text}'"))?;
                         continue;
                     }
                     let mut em = match ctx.emulator.lock() {
@@ -850,14 +1146,14 @@ fn run_block(
                     let x = match ctx.resolve(x, depth).and_then(|v| v.eval_number()) {
                         Ok(v) => v.round() as i32,
                         Err(e) => {
-                            warn!("Skipping mouse move: x {}", e);
+                            soft_fail(ctx, &ins.id, "Move mouse", e)?;
                             continue;
                         }
                     };
                     let y = match ctx.resolve(y, depth).and_then(|v| v.eval_number()) {
                         Ok(v) => v.round() as i32,
                         Err(e) => {
-                            warn!("Skipping mouse move: y {}", e);
+                            soft_fail(ctx, &ins.id, "Move mouse", e)?;
                             continue;
                         }
                     };
@@ -880,7 +1176,7 @@ fn run_block(
                     let amount = match ctx.resolve(amount, depth).and_then(|v| v.eval_number()) {
                         Ok(v) => v.round() as i32,
                         Err(e) => {
-                            warn!("Skipping scroll: {}", e);
+                            soft_fail(ctx, &ins.id, "Scroll", e)?;
                             continue;
                         }
                     };
@@ -903,7 +1199,7 @@ fn run_block(
                             vars.insert(name.clone(), result);
                         }
                     }
-                    Err(e) => warn!("Skipping Set Variable: {}", e),
+                    Err(e) => soft_fail(ctx, &ins.id, "Set variable", e)?,
                 }
             }
             InstructionKind::ChangeVariable(name, value) => {
@@ -921,17 +1217,17 @@ fn run_block(
                             vars.insert(name.clone(), Evaluated::Number(current + delta));
                         }
                     }
-                    Err(e) => warn!("Skipping Change Variable: {}", e),
+                    Err(e) => soft_fail(ctx, &ins.id, "Change variable", e)?,
                 }
             }
             InstructionKind::SetClipboard(value) => {
                 match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {
                     Ok(text) => {
                         if let Err(e) = crate::clipboard::set_text(text) {
-                            warn!("Failed to set clipboard: {}", e);
+                            soft_fail(ctx, &ins.id, "Set clipboard", e)?;
                         }
                     }
-                    Err(e) => warn!("Skipping Set Clipboard: {}", e),
+                    Err(e) => soft_fail(ctx, &ins.id, "Set clipboard", e)?,
                 }
             }
             InstructionKind::AddToList { value, name } => {
@@ -944,9 +1240,9 @@ fn run_block(
                                 }
                             }
                         }
-                        None => warn!("Skipping Add to List: list items must be number or text"),
+                        None => soft_fail(ctx, &ins.id, "Add to list", "list items must be number or text")?,
                     },
-                    Err(e) => warn!("Skipping Add to List: {e}"),
+                    Err(e) => soft_fail(ctx, &ins.id, "Add to list", e)?,
                 }
             }
             InstructionKind::DeleteOfList { index, name } => {
@@ -960,7 +1256,7 @@ fn run_block(
                             }
                         }
                     }
-                    Err(e) => warn!("Skipping Delete List Item: {e}"),
+                    Err(e) => soft_fail(ctx, &ins.id, "Delete list item", e)?,
                 }
             }
             InstructionKind::DeleteAllOfList { name } => {
@@ -987,7 +1283,7 @@ fn run_block(
                             }
                         }
                     }
-                    Err(e) => warn!("Skipping Shift List: {e}"),
+                    Err(e) => soft_fail(ctx, &ins.id, "Shift list", e)?,
                 }
             }
             InstructionKind::InsertIntoList { value, index, name } => {
@@ -1005,10 +1301,10 @@ fn run_block(
                             }
                         }
                         None => {
-                            warn!("Skipping Insert into List: list items must be number or text")
+                            soft_fail(ctx, &ins.id, "Insert into list", "list items must be number or text")?
                         }
                     },
-                    (Err(e), _) | (_, Err(e)) => warn!("Skipping Insert into List: {e}"),
+                    (Err(e), _) | (_, Err(e)) => soft_fail(ctx, &ins.id, "Insert into list", e)?,
                 }
             }
             InstructionKind::ReplaceItemOfList { index, name, value } => {
@@ -1026,10 +1322,10 @@ fn run_block(
                             }
                         }
                         None => {
-                            warn!("Skipping Replace List Item: list items must be number or text")
+                            soft_fail(ctx, &ins.id, "Replace list item", "list items must be number or text")?
                         }
                     },
-                    (Err(e), _) | (_, Err(e)) => warn!("Skipping Replace List Item: {e}"),
+                    (Err(e), _) | (_, Err(e)) => soft_fail(ctx, &ins.id, "Replace list item", e)?,
                 }
             }
             InstructionKind::ReverseList { name } => {
@@ -1843,6 +2139,75 @@ mod tests {
         );
     }
 
+    /// A watcher-fired trigger body can call the macro's custom blocks.
+    #[test]
+    fn fired_strand_can_call_custom_block() {
+        let block_id = "setter".to_string();
+        let mac = Macro {
+            id: "m".into(),
+            name: "Fired".into(),
+            description: "".into(),
+            graph: MacroGraph {
+                strands: vec![
+                    Strand {
+                        id: "trigger".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::WhenClipboardChanged),
+                            Instruction::new(InstructionKind::CallBlock {
+                                block_id: block_id.clone(),
+                                args: vec![],
+                                branches: vec![],
+                            }),
+                        ],
+                    },
+                    Strand {
+                        id: "setter_body".into(),
+                        x: 0,
+                        y: 0,
+                        instructions: vec![
+                            Instruction::new(InstructionKind::BlockHeader(block_id.clone())),
+                            Instruction::new(InstructionKind::SetVariable(
+                                "x".to_string(),
+                                Value::number(1.0),
+                            )),
+                        ],
+                    },
+                ],
+                floating_values: vec![],
+                comments: vec![],
+                variables: vec![],
+                block_defs: vec![BlockDef {
+                    id: block_id,
+                    pieces: vec![],
+                    shape: BlockShape::Normal,
+                    color: default_block_color(),
+                    icon: String::new(),
+                }],
+                lists: vec![],
+                dicts: vec![],
+            },
+            recording_target: None,
+            speed_multiplier: 1.0,
+            settings: crate::macros::MacroSettings::default(),
+        };
+        let vars = empty_vars();
+        let body = mac.strands[0].instructions[1..].to_vec();
+        run_fired_strand(
+            crate::run_log::Source::app("Fired"),
+            body,
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&vars),
+            Arc::new(Mutex::new(HashMap::new())),
+            mac.block_table(),
+            0,
+        );
+        assert_eq!(vars.lock().unwrap().get("x"), Some(&Evaluated::Number(1.0)));
+    }
+
     /// A block that calls itself should error past `MAX_CALL_DEPTH` instead
     /// of overflowing the stack.
     #[test]
@@ -2028,6 +2393,214 @@ mod tests {
             args: vec![],
             saved: Box::new(Value::number(0.0)),
         }
+    }
+
+    fn set(name: &str, value: Value) -> Instruction {
+        Instruction::new(InstructionKind::SetVariable(name.to_string(), value))
+    }
+
+    /// Fails to evaluate: text isn't a number.
+    fn bad_number() -> Value {
+        Value::op(Op::Add, vec![Value::text("abc"), Value::number(1.0)])
+    }
+
+    #[test]
+    fn try_catch_runs_catch_body_with_the_error_message() {
+        crate::input::value::register_blockwork_operators();
+        let vars = empty_vars();
+        run_instructions(
+            vec![Instruction::new(InstructionKind::TryCatch {
+                body: vec![
+                    set("a", Value::number(1.0)),
+                    Instruction::new(InstructionKind::ThrowError(Value::text("boom"))),
+                    set("a", Value::number(2.0)),
+                ],
+                catch_body: vec![set("e", Value::op(Op::from_name("LastError"), vec![]))],
+            })],
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&vars),
+        );
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("a"), Some(&Evaluated::Number(1.0)));
+        assert_eq!(vars.get("e"), Some(&Evaluated::Text("boom".into())));
+    }
+
+    #[test]
+    fn failing_block_is_caught_inside_try_and_skipped_outside() {
+        let vars = empty_vars();
+        run_instructions(
+            vec![
+                set("y", bad_number()),
+                set("after_skip", Value::number(1.0)),
+                Instruction::new(InstructionKind::TryCatch {
+                    body: vec![set("y", bad_number()), set("after_error", Value::number(1.0))],
+                    catch_body: vec![set("caught", Value::number(1.0))],
+                }),
+            ],
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&vars),
+        );
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("after_skip"), Some(&Evaluated::Number(1.0)));
+        assert_eq!(vars.get("after_error"), None);
+        assert_eq!(vars.get("caught"), Some(&Evaluated::Number(1.0)));
+    }
+
+    fn bump(name: &str) -> Instruction {
+        Instruction::new(InstructionKind::ChangeVariable(name.to_string(), Value::number(1.0)))
+    }
+
+    #[test]
+    fn retry_runs_the_body_again_until_attempts_run_out() {
+        let vars = empty_vars();
+        run_instructions(
+            vec![
+                Instruction::new(InstructionKind::TryCatch {
+                    body: vec![Instruction::new(InstructionKind::Retry {
+                        count: Value::number(3.0),
+                        delay: Value::number(0.0),
+                        body: vec![bump("tries"), Instruction::new(InstructionKind::ThrowError(Value::text("nope")))],
+                    })],
+                    catch_body: vec![set("caught", Value::number(1.0))],
+                }),
+                Instruction::new(InstructionKind::Retry {
+                    count: Value::number(5.0),
+                    delay: Value::number(0.0),
+                    body: vec![bump("ok")],
+                }),
+            ],
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&vars),
+        );
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("tries"), Some(&Evaluated::Number(3.0)));
+        assert_eq!(vars.get("caught"), Some(&Evaluated::Number(1.0)), "giving up is an error a try catches");
+        assert_eq!(vars.get("ok"), Some(&Evaluated::Number(1.0)), "a body that works runs once");
+    }
+
+    #[test]
+    fn loop_limit_stops_a_runaway_loop() {
+        let vars = empty_vars();
+        run_fired_strand(
+            crate::run_log::Source::default(),
+            vec![
+                Instruction::new(InstructionKind::Forever { body: vec![bump("n")] }),
+                set("after", Value::number(1.0)),
+            ],
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&vars),
+            Arc::new(Mutex::new(HashMap::new())),
+            Arc::new(HashMap::new()),
+            10,
+        );
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("n"), Some(&Evaluated::Number(10.0)));
+        assert_eq!(vars.get("after"), Some(&Evaluated::Number(1.0)), "outside a try the strand carries on");
+    }
+
+    #[test]
+    fn run_macro_waits_for_the_other_run_to_end() {
+        struct Host;
+        impl crate::macros::calls::MacroHost for Host {
+            fn find(&self, name: &str) -> Option<String> {
+                (name == "Helper").then(|| "helper-id".to_string())
+            }
+            fn start(&self, _id: &str) -> Result<Arc<AtomicBool>, String> {
+                let done = Arc::new(AtomicBool::new(false));
+                let flag = Arc::clone(&done);
+                std::thread::spawn(move || {
+                    std::thread::sleep(Duration::from_millis(60));
+                    flag.store(true, Ordering::Relaxed);
+                });
+                Ok(done)
+            }
+        }
+        crate::macros::calls::set_host(Arc::new(Host));
+        let vars = empty_vars();
+        let started = Instant::now();
+        run_instructions(
+            vec![
+                Instruction::new(InstructionKind::RunMacro { target: Value::text("Nope"), wait: true }),
+                Instruction::new(InstructionKind::RunMacro { target: Value::text("Helper"), wait: true }),
+                set("after", Value::number(1.0)),
+            ],
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&vars),
+        );
+        assert!(started.elapsed() >= Duration::from_millis(60), "waited for the helper");
+        assert_eq!(vars.lock().unwrap().get("after"), Some(&Evaluated::Number(1.0)), "an unknown macro is a soft error");
+    }
+
+    #[test]
+    fn uncaught_throw_ends_the_strand() {
+        let vars = empty_vars();
+        run_instructions(
+            vec![
+                Instruction::new(InstructionKind::ThrowError(Value::text("stop here"))),
+                set("after", Value::number(1.0)),
+            ],
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&vars),
+        );
+        assert_eq!(vars.lock().unwrap().get("after"), None);
+    }
+
+    #[test]
+    fn run_log_errors_name_the_failing_block() {
+        let _log = crate::run_log::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let throw = Instruction::new(InstructionKind::ThrowError(Value::text("boom")));
+        let source = crate::run_log::Source::for_macro("blame-test", "Blame");
+        run_fired_strand(
+            source,
+            vec![Instruction::new(InstructionKind::Log(Value::text("hi"))), throw.clone()],
+            noop_emulator(),
+            None,
+            1.0,
+            empty_vars(),
+            Arc::new(Mutex::new(HashMap::new())),
+            Arc::new(HashMap::new()),
+            0,
+        );
+        let errors: Vec<_> = crate::run_log::snapshot()
+            .into_iter()
+            .filter(|e| e.macro_id == "blame-test" && e.level == crate::run_log::Level::Error)
+            .collect();
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].block_id, throw.id);
+        assert_eq!(errors[0].message, "boom");
+    }
+
+    #[test]
+    fn stop_macro_stops_every_strand_of_the_run() {
+        let mut stopper = when_ran_strand("b", 0.0);
+        stopper.instructions.push(Instruction::new(InstructionKind::StopMacro));
+        let mac = Macro {
+            id: "m".into(),
+            name: "Stops itself".into(),
+            description: "".into(),
+            graph: MacroGraph {
+                strands: vec![when_ran_strand("a", 5_000.0), stopper],
+                ..MacroGraph::new()
+            },
+            recording_target: None,
+            speed_multiplier: 1.0,
+            settings: crate::macros::MacroSettings::default(),
+        };
+        let start = Instant::now();
+        mac.run(noop_emulator(), None, 1.0, empty_vars());
+        assert!(start.elapsed() < Duration::from_millis(1000), "stop macro didn't end the waiting strand");
     }
 
     #[test]

@@ -8,6 +8,50 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Tag releases (`0.x.y`, see `.github/workflows/release.yml`) publish the matching
 section below as the GitHub release notes, followed by the downloads table.
 
+## [Unreleased]
+
+### Added
+- File blocks: write or append to a file, read a file, check a file exists,
+  list a folder, and a "when file changes" trigger.
+- Web blocks: send GET/POST/PUT/PATCH/DELETE requests into a variable, fetch a
+  URL, and read values out of JSON.
+- Shell reporters: a command's output and whether it succeeded.
+- Notify block for desktop notifications.
+- Active window title/app reporters and a "when window is focused/unfocused"
+  trigger (Windows, macOS, X11, Hyprland, Sway, KDE with kdotool).
+- Activity strip under the canvas showing the macro's latest run event; click it to open the run log.
+- Blocks that failed in the last run get a red marker; click a logged error to jump to its block.
+- Tray menu "Recent activity" lists the latest runs, triggers and errors.
+- Error handling: try/on error, throw error, error message, and stop macro.
+- Emergency stop hotkey (Ctrl+Alt+Shift+Esc) that stops every run and pauses
+  triggers until resumed, plus a per-macro time limit.
+- The block each running strand is on is outlined live on the canvas.
+- Retry block: runs its body again after a failure, up to N attempts.
+- Per-macro loop limit that stops runaway loops.
+- Window blocks: focus, minimize, maximize, restore, close, move or resize a
+  window, matched by its title or its app (picked from a dropdown), plus a
+  "window exists?" reporter.
+- Run macro (and continue, or wait for it to finish), stop macro by name, and
+  a "macro is running?" reporter.
+- Global variables: set/change global blocks and a "global" reporter, shared
+  by every macro and kept across restarts. Listed in Settings, where they can
+  be deleted.
+- Command line: `blockwork list`, `blockwork run <name> [--wait]` and
+  `blockwork stop <name>` drive macros through the daemon without a window.
+- Starter templates (auto clicker, text snippet, break reminder, website
+  watcher) in the welcome screen and the macro menu's "New from template".
+- Importing a macro shows what it can do (commands, web, files, input,
+  clipboard, windows, triggers) before it's added.
+
+### Changed
+- Blocks that fail at run time are reported in the run log instead of only
+  the console.
+- Click-to-preview won't run shell or web blocks.
+
+### Fixed
+- Importing a macro that runs commands or has custom settings did nothing in
+  the Qt editor; it now opens the review.
+
 ## [0.5.4] - 2026-09-20
 
 ### Added

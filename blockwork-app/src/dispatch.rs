@@ -31,6 +31,10 @@ impl Backend {
                 to_json(commands::select_macro(&self.state, &self.app, index)?)
             }
             "new_macro" => to_json(commands::new_macro(&self.state, &self.app)?),
+            "new_macro_from_template" => {
+                let template: String = arg(&args, "template")?;
+                to_json(commands::new_macro_from_template(&self.state, &self.app, &template)?)
+            }
             "remove_macro" => to_json(commands::remove_macro(&self.state, &self.app)?),
             "set_title" => {
                 let title: String = arg(&args, "title")?;
@@ -52,6 +56,33 @@ impl Backend {
                     enabled,
                 )?)
             }
+            "set_macro_max_run_secs" => {
+                let seconds: u32 = arg(&args, "seconds")?;
+                to_json(commands::set_macro_max_run_secs(&self.state, &self.app, seconds)?)
+            }
+            "set_macro_max_loop_iterations" => {
+                let iterations: u32 = arg(&args, "iterations")?;
+                to_json(commands::set_macro_max_loop_iterations(&self.state, &self.app, iterations)?)
+            }
+            "list_macros" => to_json(crate::macro_runs::list(&self.state)?),
+            "run_macro_named" => {
+                let name: String = arg(&args, "name")?;
+                to_json(crate::macro_runs::run_named(&self.state, &self.app, &name)?)
+            }
+            "stop_macro_named" => {
+                let name: String = arg(&args, "name")?;
+                to_json(crate::macro_runs::stop_named(&self.state, &name)?)
+            }
+            "delete_global" => {
+                let name: String = arg(&args, "name")?;
+                to_json(commands::delete_global(&self.state, &self.app, &name)?)
+            }
+            "emergency_stop" => {
+                commands::emergency_stop(&self.state, &self.app);
+                to_json(())
+            }
+            "resume_triggers" => to_json(commands::resume_triggers(&self.state, &self.app)?),
+            "clear_run_log" => to_json(commands::clear_run_log(&self.state, &self.app)?),
             "save_macro" => to_json(commands::save_macro(&self.state, &self.app)?),
             "export_macro_file_name" => {
                 let macro_id: String = arg(&args, "macroId")?;
@@ -72,7 +103,7 @@ impl Backend {
                     commands::confirm_import_macro(&self.state, &self.app, keep_settings).await?,
                 )
             }
-            "cancel_import_macro" => to_json(commands::cancel_import_macro(&self.state)?),
+            "cancel_import_macro" => to_json(commands::cancel_import_macro(&self.state, &self.app)?),
             "add_instruction" => {
                 let strand_id: String = arg(&args, "strandId")?;
                 let path: Vec<PathStep> = arg(&args, "path")?;

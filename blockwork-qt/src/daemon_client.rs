@@ -24,6 +24,8 @@ pub enum Event {
     Apps(String),
     AppsError(String),
     Preview { key: String, text: String, error: bool },
+    /// JSON list of the blocks running right now.
+    Trace(String),
 }
 
 pub fn spawn(requests: tokio::sync::mpsc::UnboundedReceiver<Request>, events: mpsc::Sender<Event>) {
@@ -46,7 +48,7 @@ async fn run(
     mut requests: tokio::sync::mpsc::UnboundedReceiver<Request>,
     events: &mpsc::Sender<Event>,
 ) -> io::Result<()> {
-    let connection = connect_or_spawn().await?;
+    let connection = connect_or_spawn(false).await?;
     let (reader, mut writer) = tokio::io::split(connection);
     let mut reader = BufReader::new(reader);
     writer
@@ -160,6 +162,10 @@ async fn run(
                         }
                     }
                     DaemonMessageKind::Focus => { let _ = events.send(Event::Focus); }
+                    DaemonMessageKind::Trace => {
+                        let json = message.data.map(|d| d.to_string()).unwrap_or_else(|| "[]".to_owned());
+                        let _ = events.send(Event::Trace(json));
+                    }
                     DaemonMessageKind::Quit => { let _ = events.send(Event::Quit); return Ok(()); }
                     DaemonMessageKind::Hello => {}
                 }
@@ -168,7 +174,9 @@ async fn run(
     }
 }
 
-async fn connect_or_spawn() -> io::Result<blockwork_protocol::Connection> {
+/// Connects to the daemon, starting it first if needed. `background` starts
+/// it like a login autostart, so it stays up with no window open.
+pub(crate) async fn connect_or_spawn(background: bool) -> io::Result<blockwork_protocol::Connection> {
     match blockwork_protocol::connect().await {
         Ok(connection) => Ok(connection),
         Err(error)
@@ -177,7 +185,7 @@ async fn connect_or_spawn() -> io::Result<blockwork_protocol::Connection> {
                 io::ErrorKind::NotFound | io::ErrorKind::ConnectionRefused
             ) =>
         {
-            spawn_daemon()?;
+            spawn_daemon(background)?;
             let deadline = Instant::now() + SPAWN_TIMEOUT;
             loop {
                 match blockwork_protocol::connect().await {
@@ -204,7 +212,7 @@ fn daemon_exe() -> io::Result<std::path::PathBuf> {
         .with_file_name(format!("blockwork-daemon{}", std::env::consts::EXE_SUFFIX)))
 }
 
-fn spawn_daemon() -> io::Result<()> {
+fn spawn_daemon(background: bool) -> io::Result<()> {
     let ui_exe = std::env::current_exe()?;
     let appimage = std::env::var_os("APPIMAGE");
     let daemon_exe = daemon_exe()?;
@@ -216,6 +224,13 @@ fn spawn_daemon() -> io::Result<()> {
         }
         None => std::process::Command::new(&daemon_exe),
     };
+    if background {
+        // Started from the command line: keep its logs out of the terminal.
+        command
+            .arg("--background")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null());
+    }
     command
         .env(
             "BLOCKWORK_UI_EXE",

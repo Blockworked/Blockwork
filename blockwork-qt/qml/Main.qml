@@ -118,7 +118,9 @@ ApplicationWindow {
         onShouldQuitChanged: if (shouldQuit) Qt.quit()
         onFocusSerialChanged: { root.show(); root.raise(); root.requestActivate(); }
     }
-    Component.onCompleted: bridge.start()
+    Component.onCompleted: { bridge.start(); bridge.setWindowFrameMargin(shadowMargin); }
+    // Compositor treats the shadow as outside the window, so it can reach the screen edges.
+    onShadowMarginChanged: bridge.setWindowFrameMargin(shadowMargin)
     onActiveChanged: if (!active && appState.combo_capture) invoke("cancel_combo_capture")
     Timer { interval: 16; running: true; repeat: true; onTriggered: bridge.poll() }
 

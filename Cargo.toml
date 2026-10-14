@@ -56,6 +56,7 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_Storage_FileSystem",
     "Win32_Storage_Packaging_Appx",
     "Win32_System_Memory",
+    "Win32_System_Console",
     "Win32_Security",
 ] }
 enigo = { git = "https://github.com/enigo-rs/enigo", rev = "a88d9b7", default-features = false }
@@ -68,3 +69,5 @@ starship-battery = { version = "0.11.1", default-features = false }
 arboard = { version = "3.6.1", features = ["wayland-data-control"] }
 base64 = "0.23.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
+ureq = { version = "3.4", default-features = false, features = ["rustls", "gzip"] }
+zbus = { version = "5.19", default-features = false, features = ["blocking-api", "async-io"] }

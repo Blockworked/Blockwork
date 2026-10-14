@@ -17,13 +17,15 @@ Item {
     property bool sidebarToggling: false
     readonly property real minSidebarWidth: 180
     readonly property real maxSidebarWidth: 600
-    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"]
+    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile", "HttpRequest", "Notify", "Log", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry", "ThrowError", "StopMacro", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal"]
     readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList"]
 
     function uuid() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }); }
     function numberValue(n) { return { kind: "Number", value: n }; }
     function textValue(t) { return { kind: "Text", value: t }; }
     function defaultInstruction(type) {
+        const registered = BlockRegistry.prefab(type);
+        if (registered) { registered.id = uuid(); return registered; }
         const i = { id: uuid(), type: type };
         if (type === "WhenBatteryDischargedTo") i.threshold = numberValue(20);
         else if (type === "WhenBatteryChargedTo") i.threshold = numberValue(100);
@@ -81,7 +83,7 @@ Item {
     function totalBlocks() { return (root.macro ? root.macro.strands : []).reduce((n, st) => n + st.instructions.length, 0); }
     function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
     function instructionExplainer(type) {
-        const x={WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a key or key combo.",WhenKey:"Runs when a key or key combo is pressed or released.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
+        const x={RunMacro:"Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too.",StopMacroNamed:"Stops every run of the named macro.",SetGlobal:"Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts.",ChangeGlobal:"Adds a number to a global variable. A global that was never set counts as 0.",Retry:"Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other.",WindowAction:"Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window.",MoveWindow:"Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating.",WhenWindow:"Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window.",WhenFileChanged:"Runs when the file is created, changed or deleted. Checked once a second.",WriteFile:"Writes text to a file, replacing it, or appends to the end. ~ means your home folder.",HttpRequest:"Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error.",Notify:"Shows a desktop notification.",Log:"Adds a line to the run log.",TryCatch:"Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong.",ThrowError:"Fails with this message. Ends the strand unless a try block catches it.",StopMacro:"Stops every strand of this run.",WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a key or key combo.",WhenKey:"Runs when a key or key combo is pressed or released.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
         return x[type]||"A Blockwork instruction block.";
     }
     // ---- app picker ("Choose app" for OpenApp/CloseApp) ----
@@ -301,6 +303,8 @@ Item {
                         implicitWidth: 190
                         BwMenuItem { iconName: "sliders"; text: "Macro settings"; enabled: !!root.macro; onTriggered: macroSettings.open() }
                         BwMenuItem { iconName: "plus"; text: "New macro"; onTriggered: root.invoke("new_macro") }
+                        BwMenuItem { iconName: "sparkles"; text: "New from template…"; onTriggered: templateDialog.open() }
+                        BwMenuItem { iconName: "octagon"; text: "Emergency stop"; danger: true; onTriggered: root.invoke("emergency_stop") }
                         BwMenuItem { iconName: "trash"; text: "Delete macro"; danger: true; enabled: !!root.macro; onTriggered: removeDialog.open() }
                     }
                 }
@@ -352,6 +356,16 @@ Item {
                 WindowControls { visible: Qt.platform.os !== "osx" }
             }
         }
+        Rectangle {
+            visible: !!appState.triggers_paused
+            Layout.fillWidth: true; Layout.preferredHeight: 40; color: "#3a2a12"; border.color: "#5a4220"
+            RowLayout {
+                anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 10; spacing: 10
+                LucideIcon { name: "pause"; color: Theme.warning; width: 16; height: 16 }
+                Text { Layout.fillWidth: true; text: "Emergency stop: triggers are paused until you resume them."; color: Theme.text; font.pixelSize: 13; elide: Text.ElideRight }
+                BwButton { text: "Resume triggers"; implicitHeight: 28; onClicked: root.invoke("resume_triggers") }
+            }
+        }
         Item {
             visible: !!root.macro
             Layout.fillWidth: true; Layout.fillHeight: true
@@ -383,6 +397,8 @@ Item {
                     onDragCanceled: root.cancelPaletteDrag()
                     instructionTypes: root.instructionTypes
                     listInstructionTypes: root.listInstructionTypes
+                    extraOperators: root.extraOperators
+                    extraCategories: root.extraCategories
                     variables: root.macro ? root.macro.variables : []
                     lists: root.macro && root.macro.lists ? root.macro.lists : []
                     blockDefinitions: root.macro ? root.macro.block_defs : []
@@ -478,6 +494,15 @@ Item {
                 }
             }
         }
+        ActivityPanel {
+            id: activity
+            visible: !!root.macro
+            Layout.fillWidth: true; Layout.preferredHeight: implicitHeight
+            entries: root.runLog
+            macroId: root.macro ? root.macro.id : ""
+            onBlockRequested: blockId => canvas.revealInstruction(blockId)
+            onClearRequested: root.invoke("clear_run_log")
+        }
         Item {
             visible: !root.macro
             Layout.fillWidth: true; Layout.fillHeight: true
@@ -513,6 +538,35 @@ Item {
                 Text { text: "x"; color: "#a1a2a7" }
             }
             BwSwitch { Accessible.name: "Listen for triggers while Blockwork is open"; checked: root.macro && root.macro.settings ? root.macro.settings.always_listen : false; onToggled: checked => root.invoke("set_macro_always_listen", { enabled: checked }) }
+            Text { text: "Time limit"; color: "#a1a2a7"; font.pixelSize: 13 }
+            RowLayout { width: parent.width; spacing: 10
+                Text { text: "Stop a run after"; color: Theme.text; font.pixelSize: 13 }
+                BwTextField {
+                    Layout.preferredWidth: 70; horizontalAlignment: Text.AlignRight
+                    validator: IntValidator { bottom: 0; top: 86400 }
+                    text: root.macro && root.macro.settings ? String(root.macro.settings.max_run_secs) : "0"
+                    onEditingFinished: root.invoke("set_macro_max_run_secs", { seconds: Number(text) || 0 })
+                }
+                Text { Layout.fillWidth: true; text: "seconds (0 = no limit)"; color: "#a1a2a7"; font.pixelSize: 13 }
+            }
+            Text { text: "Loop limit"; color: "#a1a2a7"; font.pixelSize: 13 }
+            RowLayout { width: parent.width; spacing: 10
+                Text { text: "Stop a loop after"; color: Theme.text; font.pixelSize: 13 }
+                BwTextField {
+                    Layout.preferredWidth: 90; horizontalAlignment: Text.AlignRight
+                    validator: IntValidator { bottom: 0; top: 2000000000 }
+                    text: root.macro && root.macro.settings ? String(root.macro.settings.max_loop_iterations || 0) : "0"
+                    onEditingFinished: root.invoke("set_macro_max_loop_iterations", { iterations: Number(text) || 0 })
+                }
+                Text { Layout.fillWidth: true; text: "repeats (0 = no limit)"; color: "#a1a2a7"; font.pixelSize: 13 }
+            }
+        }
+    }
+    BwDialog {
+        id: templateDialog; title: "Start from a template"; standardButtons: Dialog.Cancel
+        TemplateList {
+            width: 560; templates: appState.templates || []
+            onPicked: id => { root.invoke("new_macro_from_template", { template: id }); templateDialog.close(); }
         }
     }
     BwDialog {
@@ -586,8 +640,144 @@ Item {
         onEditRequested:(blockId,pieces,shape,color,icon)=>root.invoke("edit_block",{blockId:blockId,pieces:pieces,shape:shape,color:color,icon:icon})
     }
 
+    // Blockwork's automation blocks, declared for blockstitch's generic rows.
+    readonly property var extraOperators: [
+        ["ReadFile", "text", 1, [textValue("~/notes.txt")]], ["FileExists", "bool", 1, [textValue("~/notes.txt")]],
+        ["ListDirectory", "text", 1, [textValue("~")]], ["HttpGet", "text", 1, [textValue("https://example.com")]],
+        ["JsonGet", "text", 2, [textValue("name"), textValue('{"name": "Blockwork"}')]],
+        ["ShellOutput", "text", 1, [textValue("echo hello")]], ["ShellSucceeded", "bool", 1, [textValue("true")]],
+        ["ActiveWindowTitle", "text", 0], ["ActiveWindowApp", "text", 0], ["WindowExists", "bool", 1, [textValue("Firefox")]],
+        ["LastError", "text", 0], ["MacroRunning", "bool", 1, [textValue("")]], ["GlobalVariable", "text", 1, [textValue("counter")]]
+    ]
+    readonly property var extraCategories: ({
+        WriteFile: "system", HttpRequest: "system", Notify: "system", Log: "system",
+        TryCatch: "control", Retry: "control", ThrowError: "control",
+        WindowAction: "system", MoveWindow: "system", WindowExists: "system", StopMacro: "control", LastError: "control",
+        RunMacro: "control", StopMacroNamed: "control", MacroRunning: "control", SetGlobal: "data", ChangeGlobal: "data", GlobalVariable: "data",
+        ReadFile: "system", FileExists: "system", ListDirectory: "system", HttpGet: "system", JsonGet: "system",
+        ShellOutput: "system", ShellSucceeded: "system", ActiveWindowTitle: "system", ActiveWindowApp: "system"
+    })
+    function variableChoices() {
+        return [{ value: "", label: "(no variable)" }].concat((root.macro ? root.macro.variables : []).map(v => ({ value: v, label: v })));
+    }
+    // Which part of a window the window blocks match against.
+    readonly property var windowMatchOptions: [{ value: "Title", label: "window" }, { value: "App", label: "app" }]
+    // Another macro's name, for the Run macro prefab.
+    function otherMacroName() {
+        const names = appState.macro_names || [];
+        const mine = root.macro ? root.macro.name : "";
+        return names.find(n => n && n !== mine) || "";
+    }
+    function registerBlocks() {
+        const label = text => ({ kind: "label", text: text });
+        const value = (field, key) => ({ kind: "value", field: field, key: key });
+        BlockRegistry.registerOperators({
+            ReadFile: { prefix: "contents of file", result: "text" }, FileExists: { prefix: "file", suffix: "exists?", result: "bool" },
+            ListDirectory: { prefix: "files in folder", result: "text" }, HttpGet: { prefix: "fetch", result: "text" },
+            JsonGet: { prefix: "get", infix: "from JSON", result: "text" },
+            ShellOutput: { prefix: "output of command", result: "text" }, ShellSucceeded: { prefix: "command", suffix: "succeeds?", result: "bool" },
+            ActiveWindowTitle: { prefix: "active window title", result: "text" }, ActiveWindowApp: { prefix: "active app", result: "text" },
+            WindowExists: { prefix: "window", suffix: "exists?", result: "bool" },
+            LastError: { prefix: "error message", result: "text" },
+            MacroRunning: { prefix: "macro", suffix: "is running?", result: "bool" }, GlobalVariable: { prefix: "global", result: "text" }
+        });
+        BlockRegistry.registerRows({
+            WhenWindow: { shape: "header", icon: "app-window", head: [label("WHEN WINDOW"), value("WindowPattern", "pattern"), label("IS"),
+                { kind: "dropdown", key: "focused", options: [{ value: "focused", label: "focused" }, { value: "unfocused", label: "unfocused" }],
+                  encode: v => v === "focused", decode: v => v ? "focused" : "unfocused" }] },
+            WhenFileChanged: { shape: "header", icon: "file", head: [label("WHEN FILE"), value("WatchedFilePath", "path"), label("CHANGES")] },
+            WriteFile: { icon: "file-text", head: [
+                { kind: "dropdown", key: "append", options: [{ value: "write", label: "write" }, { value: "append", label: "append" }],
+                  encode: v => v === "append", decode: v => v ? "append" : "write" },
+                value("WriteFileText", "text"), label("to file"), value("WriteFilePath", "path")] },
+            // Target first, like "set", so it isn't lost at the end of a long row.
+            HttpRequest: { icon: "cloud", head: [
+                label("set"), { kind: "dropdown", key: "variable", options: () => root.variableChoices(), placeholder: "(no variable)" },
+                label("to response of"), { kind: "dropdown", key: "method", options: ["GET", "POST", "PUT", "PATCH", "DELETE"].map(m => ({ value: m, label: m })) },
+                value("HttpUrl", "url"),
+                Object.assign(label("with body"), { when: i => !i || i.method !== "GET" }), Object.assign(value("HttpBody", "body"), { when: i => !i || i.method !== "GET" }),
+                label("headers"), value("HttpHeaders", "headers")] },
+            Notify: { icon: "message-square", head: [label("notify"), value("NotifyTitle", "title"), label("saying"), value("NotifyMessage", "message")] },
+            Log: { icon: "list", head: [label("log"), value("LogValue", "value")] },
+            TryCatch: { icon: "circle-alert", mouths: ["body", "catch_body"], separators: ["on error"], head: [label("try")] },
+            ThrowError: { shape: "cap", icon: "triangle-alert", head: [label("throw error"), value("ErrorMessage", "message")] },
+            StopMacro: { shape: "cap", icon: "octagon", head: [label("stop macro")] },
+            Retry: { icon: "refresh-cw", mouths: ["body"], head: [label("try up to"), value("RetryCount", "count"), label("times,"),
+                value("RetryDelay", "delay"), label("ms apart")] },
+            WindowAction: { icon: "app-window", head: [
+                { kind: "dropdown", key: "action", options: ["Focus", "Minimize", "Maximize", "Restore", "Close"].map(a => ({ value: a, label: a.toLowerCase() })) },
+                { kind: "dropdown", key: "by", options: root.windowMatchOptions }, value("WindowPattern", "pattern")] },
+            MoveWindow: { icon: "move", head: [
+                { kind: "dropdown", key: "resize", options: [{ value: "move", label: "move" }, { value: "resize", label: "resize" }],
+                  encode: v => v === "resize", decode: v => v ? "resize" : "move" },
+                { kind: "dropdown", key: "by", options: root.windowMatchOptions }, value("WindowPattern", "pattern"),
+                Object.assign(label("to x"), { when: i => !i || !i.resize }), Object.assign(label("to width"), { when: i => !!i && i.resize }),
+                value("WindowX", "x"),
+                Object.assign(label("y"), { when: i => !i || !i.resize }), Object.assign(label("height"), { when: i => !!i && i.resize }),
+                value("WindowY", "y")] },
+            RunMacro: { icon: "play", head: [label("run macro"), value("MacroTarget", "target"),
+                { kind: "dropdown", key: "wait", options: [{ value: "start", label: "and continue" }, { value: "wait", label: "and wait" }],
+                  encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
+            StopMacroNamed: { icon: "square", head: [label("stop macro"), value("MacroTarget", "target")] },
+            SetGlobal: { icon: "variable", head: [label("set global"), value("GlobalName", "name"), label("to"), value("GlobalValue", "value")] },
+            ChangeGlobal: { icon: "variable", head: [label("change global"), value("GlobalName", "name"), label("by"), value("GlobalValue", "by")] }
+        });
+        BlockRegistry.registerPrefabs({
+            WhenWindow: { pattern: textValue("Firefox"), focused: true },
+            WhenFileChanged: { path: textValue("~/notes.txt") },
+            WriteFile: { path: textValue("~/notes.txt"), text: textValue("hello"), append: true },
+            HttpRequest: () => ({ method: "GET", url: textValue("https://example.com"), body: textValue(""), headers: textValue(""),
+                variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
+            Notify: { title: textValue("Blockwork"), message: textValue("Done!") },
+            Log: { value: textValue("checkpoint") },
+            TryCatch: { body: [], catch_body: [] },
+            ThrowError: { message: textValue("something went wrong") },
+            StopMacro: {},
+            Retry: { count: numberValue(3), delay: numberValue(1000), body: [] },
+            WindowAction: { action: "Focus", by: "Title", pattern: textValue("Firefox") },
+            MoveWindow: { pattern: textValue("Firefox"), by: "Title", resize: false, x: numberValue(0), y: numberValue(0) },
+            RunMacro: () => ({ target: textValue(root.otherMacroName()), wait: true }),
+            StopMacroNamed: () => ({ target: textValue(root.otherMacroName()) }),
+            SetGlobal: { name: textValue("counter"), value: numberValue(0) },
+            ChangeGlobal: { name: textValue("counter"), by: numberValue(1) }
+        });
+    }
+    // The variable dropdowns read macro state through a function, so nudge them.
+    readonly property string variablesKey: JSON.stringify(root.macro ? root.macro.variables : [])
+    onVariablesKeyChanged: BlockRegistry.revision++
+
+    // ---- run log ----
+    readonly property var runLog: appState.run_log || []
+    // Blocks that failed since this macro last started or fired get a marker.
+    readonly property var blockMarks: {
+        const id = root.macro ? root.macro.id : "", out = {};
+        for (let i = runLog.length - 1; i >= 0; --i) {
+            const e = runLog[i];
+            if (e.macro_id !== id) continue;
+            if (e.event === "Started" || e.event === "Fired") break;
+            if (e.level === "Error" && e.block_id && !(e.block_id in out)) out[e.block_id] = e.message;
+        }
+        return out;
+    }
+    Binding { target: BlockRegistry; property: "blockMarks"; value: root.blockMarks }
+    // Blocks this macro's running strands are on, outlined live.
+    readonly property var runningIds: {
+        const id = root.macro ? root.macro.id : "";
+        let active = [];
+        try { active = JSON.parse(root.appBridge.activeBlocksJson || "[]"); } catch (e) {}
+        return active.filter(b => b.macro_id === id).map(b => b.block_id);
+    }
+    Binding { target: BlockRegistry; property: "runningIds"; value: root.runningIds }
+    Connections {
+        target: BlockRegistry
+        function onMarkClicked(instructionId) { activity.showBlockError(instructionId); }
+    }
+
     // Click-to-preview on operators: the daemon evaluates, the chip shows the answer.
-    Component.onCompleted: BlockRegistry.previewHandler = (key, value) => root.appBridge.previewValue(key, JSON.stringify(value))
+    Component.onCompleted: {
+        registerBlocks();
+        BlockRegistry.previewHandler = (key, value) => root.appBridge.previewValue(key, JSON.stringify(value));
+    }
     Connections {
         target: root.appBridge
         function onPreviewSerialChanged() { BlockRegistry.deliverPreview(root.appBridge.previewKey, root.appBridge.previewText, root.appBridge.previewError); }

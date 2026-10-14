@@ -10,13 +10,17 @@ pub(crate) mod battery_watch;
 pub(crate) mod clipboard_watch;
 pub(crate) mod key_watch;
 pub(crate) mod commands;
+pub(crate) mod file_watch;
 mod dispatch;
 pub(crate) mod installed_apps;
+pub(crate) mod macro_runs;
 pub(crate) mod macros_thread;
 pub(crate) mod razer;
 pub(crate) mod scheduled_run;
 pub(crate) mod state;
+pub(crate) mod templates;
 pub(crate) mod time_watch;
+pub(crate) mod window_watch;
 
 use crate::state::{AppState, History, UNDO_STACK_LIMIT, Page, RecordingPhase, SharedState, UpdateCheckState};
 use blockwork_core::macros::runner::make_backend;
@@ -29,6 +33,7 @@ use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
 pub use blockwork_core::config::migrate_legacy_app_id;
+pub use blockwork_core::run_log;
 
 /// Something the backend tells whoever is hosting it.
 #[derive(Clone, Debug)]
@@ -37,6 +42,8 @@ pub enum Event {
     State(Arc<str>),
     /// "Close to tray" was toggled, so the host should show/hide its tray icon.
     CloseToTray(bool),
+    /// The blocks running strands are on right now (`trace::snapshot`).
+    Trace(serde_json::Value),
     /// The app should shut down entirely (e.g. an update was just applied).
     Quit,
 }
@@ -157,6 +164,7 @@ impl Backend {
             ipc_port_invalid: false,
             update_check_state: UpdateCheckState::Idle,
             pending_import: None,
+            triggers_paused: false,
         };
 
         let shared: SharedState = Arc::new(Mutex::new(initial_state));
@@ -232,6 +240,8 @@ impl Backend {
             }
         }
 
+        blockwork_core::macros::calls::set_host(Arc::new(macro_runs::Host { state: Arc::clone(&shared), app: app.clone() }));
+
         // ── Background battery-event watcher (see battery_watch.rs) ──────
         battery_watch::start(Arc::clone(&shared), app.clone());
 
@@ -243,6 +253,51 @@ impl Backend {
 
         // ── Background key-event watcher (see key_watch.rs) ──────────────
         key_watch::start(Arc::clone(&shared), app.clone());
+
+        window_watch::start(Arc::clone(&shared), app.clone());
+
+        file_watch::start(Arc::clone(&shared), app.clone());
+
+        // Pushes run log updates to the UI, at most a few times a second.
+        {
+            let state = Arc::clone(&shared);
+            let app = app.clone();
+            let _ = std::thread::Builder::new().name("run-log-watch".into()).spawn(move || {
+                let mut seen = blockwork_core::run_log::revision();
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(250));
+                    let revision = blockwork_core::run_log::revision();
+                    if revision != seen {
+                        seen = revision;
+                        if let Ok(s) = state.lock() {
+                            state::emit_state_updated(&app, &s);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Pushes which blocks are running, for the editor's live highlight.
+        {
+            let app = app.clone();
+            let _ = std::thread::Builder::new().name("trace-watch".into()).spawn(move || {
+                use blockwork_core::macros::trace;
+                let (mut seen, mut sent) = (trace::revision(), Vec::new());
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    let revision = trace::revision();
+                    if revision == seen {
+                        continue;
+                    }
+                    seen = revision;
+                    let active = trace::snapshot();
+                    if active != sent {
+                        app.send(Event::Trace(serde_json::to_value(&active).unwrap_or_default()));
+                        sent = active;
+                    }
+                }
+            });
+        }
 
         // ── QueueSignal consumer (hotkeys and the recording stop key) ────
         {

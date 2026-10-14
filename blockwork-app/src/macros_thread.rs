@@ -13,7 +13,7 @@ use tracing::warn;
 /// Writes the run's final variable values back into the (still-selected)
 /// macro and saves it to disk. Called once per run/loop finish rather than
 /// per-instruction, and a no-op if the macro was switched away mid-run.
-fn persist_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str, variables: &VariableStore, lists: &ListStore) {
+pub(crate) fn persist_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str, variables: &VariableStore, lists: &ListStore) {
     let (mac_to_save, dto) = {
         let Ok(mut s) = shared_state.lock() else { return };
         let Some(mac) = s.current_macro.as_mut() else { return };
@@ -48,11 +48,17 @@ pub(crate) fn into_single_run_task(
     move || {
         println!("Running macro: {}", mac.name);
         let macro_id = mac.id.clone();
+        let source = blockwork_core::run_log::Source::for_macro(&mac.id, &mac.name);
+        blockwork_core::run_log::run_event(&source, blockwork_core::run_log::RunEvent::Started, "Run started");
         // A stop flag of this run's own, not the shared `is_looping` `stop_flag`
         // refers to - that one gets cleared by whichever run finishes first,
         // which would spuriously cut a concurrently-started run short.
-        let run_flag = run_registry::begin_run();
+        let run_flag = run_registry::begin_macro_run(&mac.id);
+        let done = crate::scheduled_run::limit_run(&source, &run_flag, mac.settings.max_run_secs);
         mac.run_with_lists(emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists));
+        done.store(true, std::sync::atomic::Ordering::Relaxed);
+        let stopped = !run_flag.lock().map(|r| *r).unwrap_or(true);
+        blockwork_core::run_log::run_event(&source, blockwork_core::run_log::RunEvent::Ended, if stopped { "Run stopped" } else { "Run finished" });
         run_registry::end_run(&run_flag);
         persist_variables(&shared_state, &app, &macro_id, &variables, &lists);
         if let Ok(mut stopped) = stop_flag.lock() {

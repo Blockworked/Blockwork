@@ -111,7 +111,19 @@ async fn handle_connection(
     )
     .await
     {
-        Ok(Ok(Some(line))) if matches!(serde_json::from_str(&line), Ok(ClientMessage::Hello)) => {}
+        Ok(Ok(Some(line))) => match serde_json::from_str(&line) {
+            Ok(ClientMessage::Hello) => {}
+            Ok(ClientMessage::Script) => {
+                serve_script(&mut reader, backend, &tx, &mut writer_task).await;
+                drop(tx);
+                let _ = tokio::time::timeout(std::time::Duration::from_secs(1), writer_task).await;
+                return false;
+            }
+            _ => {
+                writer_task.abort();
+                return false;
+            }
+        },
         _ => {
             writer_task.abort();
             return false;
@@ -168,7 +180,7 @@ async fn handle_connection(
                     break;
                 }
             }
-            Ok(ClientMessage::Hello) => {}
+            Ok(ClientMessage::Hello | ClientMessage::Script) => {}
             Err(e) => tracing::warn!("Ignoring malformed message from the UI: {e}"),
         }
     }
@@ -184,6 +196,39 @@ async fn handle_connection(
     true
 }
 
+/// Answers a script client's calls until it hangs up. Only
+/// [`blockwork_protocol::SCRIPT_COMMANDS`] are allowed.
+async fn serve_script<R: tokio::io::AsyncBufRead + Unpin>(
+    reader: &mut R,
+    backend: &Backend,
+    tx: &mpsc::Sender<String>,
+    writer_task: &mut tokio::task::JoinHandle<()>,
+) {
+    if tx.try_send(encode(&DaemonMessage::hello(true))).is_err() {
+        return;
+    }
+    loop {
+        let line = tokio::select! {
+            _ = &mut *writer_task => return,
+            line = blockwork_protocol::read_line(reader) => match line {
+                Ok(Some(line)) => line,
+                _ => return,
+            },
+        };
+        let Ok(ClientMessage::Call { id, cmd, args }) = serde_json::from_str::<ClientMessage>(&line) else {
+            continue;
+        };
+        let result = if blockwork_protocol::SCRIPT_COMMANDS.contains(&cmd.as_str()) {
+            backend.dispatch(&cmd, args).await
+        } else {
+            Err(format!("\"{cmd}\" isn't available to scripts"))
+        };
+        if tx.try_send(encode(&DaemonMessage::reply(id, result))).is_err() {
+            return;
+        }
+    }
+}
+
 async fn forward_events(
     backend: Backend,
     mut events: tokio::sync::broadcast::Receiver<Event>,
@@ -196,6 +241,7 @@ async fn forward_events(
                 Err(_) => continue,
             },
             Ok(Event::Quit) => encode(&DaemonMessage::quit()),
+            Ok(Event::Trace(active)) => encode(&DaemonMessage::trace(active)),
             Ok(Event::CloseToTray(_)) => continue,
             // Fell behind: intermediate states are moot, send the latest.
             Err(RecvError::Lagged(_)) => {

@@ -57,6 +57,13 @@ Item {
                         }
                     }
                 }
+                SectionCard {
+                    Layout.fillWidth: true; title: "Start from a template"; iconName: "sparkles"
+                    TemplateList {
+                        Layout.fillWidth: true; templates: appState.templates || []
+                        onPicked: id => { root.invoke("new_macro_from_template", { template: id }); root.invoke("set_onboarding_done", { done: true }); }
+                    }
+                }
                 BwButton {
                     Layout.alignment: Qt.AlignHCenter; Layout.topMargin: 10
                     text: "Get started"; primary: true

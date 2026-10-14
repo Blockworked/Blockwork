@@ -174,7 +174,15 @@ pub(crate) fn new_macro(
     state: &SharedState,
     app: &AppHandle,
 ) -> Result<(), String> {
-    let new_macro = Macro::new("New Macro".into(), "".into(), vec![]);
+    add_and_select(state, app, Macro::new("New Macro".into(), "".into(), vec![]))
+}
+
+/// Adds a starter macro from `templates` and opens it.
+pub(crate) fn new_macro_from_template(state: &SharedState, app: &AppHandle, template: &str) -> Result<(), String> {
+    add_and_select(state, app, crate::templates::build(template)?)
+}
+
+fn add_and_select(state: &SharedState, app: &AppHandle, new_macro: Macro) -> Result<(), String> {
     let new_id = new_macro.id.clone();
     if let Err(e) = new_macro.add() {
         return Err(format!("Failed to create macro: {e}"));
@@ -270,6 +278,80 @@ pub(crate) fn set_macro_always_listen(
         auto_save(&s);
         refresh_macro_list(&mut s);
     }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Sets how long a run of the selected macro may last; 0 means no limit.
+pub(crate) fn set_macro_max_run_secs(
+    state: &SharedState,
+    app: &AppHandle,
+    seconds: u32,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        mac.settings.max_run_secs = seconds;
+        auto_save(&s);
+        refresh_macro_list(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Sets how many iterations any one loop of the selected macro may run; 0
+/// means no limit.
+pub(crate) fn delete_global(state: &SharedState, app: &AppHandle, name: &str) -> Result<(), String> {
+    blockwork_core::globals::remove(name);
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_macro_max_loop_iterations(
+    state: &SharedState,
+    app: &AppHandle,
+    iterations: u32,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        mac.settings.max_loop_iterations = iterations;
+        auto_save(&s);
+        refresh_macro_list(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Kill switch: stops every run, including trigger-fired ones, and pauses
+/// the trigger watchers until `resume_triggers`.
+pub(crate) fn emergency_stop(state: &SharedState, app: &AppHandle) {
+    let cleared = blockwork_core::macros::run_registry::stop_all();
+    tracing::info!(cleared, "Emergency stop");
+    blockwork_core::run_log::error(
+        &blockwork_core::run_log::Source::app("Blockwork"),
+        format!("Emergency stop: stopped {cleared} run(s) and paused triggers"),
+    );
+    if let Ok(mut s) = state.lock() {
+        s.triggers_paused = true;
+        if let Ok(mut lk) = s.is_looping.lock() {
+            *lk = false;
+        }
+        emit_state_updated(app, &s);
+    }
+}
+
+/// Re-arms the trigger watchers after an emergency stop.
+pub(crate) fn resume_triggers(state: &SharedState, app: &AppHandle) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.triggers_paused = false;
+    blockwork_core::run_log::info(&blockwork_core::run_log::Source::app("Blockwork"), "Triggers resumed");
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn clear_run_log(state: &SharedState, app: &AppHandle) -> Result<(), String> {
+    blockwork_core::run_log::clear();
+    let s = state.lock().map_err(|e| e.to_string())?;
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -644,32 +726,85 @@ pub(crate) fn export_macro(macro_id: String, path: String) -> Result<(), String>
     config::write_macro_file(std::path::Path::new(&path), &mac)
 }
 
-/// Whether `body` (or anything nested inside its `If`/`IfElse`/`Repeat`/
-/// `Forever`/`While` blocks) contains a `Command` instruction - the check
-/// behind `import_macro`'s "this macro can run arbitrary commands" warning.
-fn body_contains_command(body: &[Instruction]) -> bool {
-    body.iter().any(|ins| match &ins.kind {
-        // `OpenApp`'s `command` is just as capable of running arbitrary
-        // shell as a plain `Command` - a hand-edited macro file could carry
-        // any string there, not just what the picker would produce.
-        InstructionKind::Command(_) | InstructionKind::OpenApp { .. } => true,
-        InstructionKind::If { body, .. }
-        | InstructionKind::Repeat { body, .. }
-        | InstructionKind::Forever { body }
-        | InstructionKind::While { body, .. } => body_contains_command(body),
-        InstructionKind::IfElse {
-            then_body,
-            else_body,
-            ..
-        } => body_contains_command(then_body) || body_contains_command(else_body),
-        _ => false,
+/// What an imported macro can do, shown before it's added: (kind, label,
+/// whether it deserves a warning). Listed in display order.
+const CAPABILITIES: [(&str, &str, bool); 10] = [
+    ("commands", "Runs commands and opens or closes apps", true),
+    ("network", "Goes online", true),
+    ("files_write", "Writes to files", true),
+    ("files_read", "Reads files and folders", false),
+    ("input", "Presses keys, clicks and moves the mouse", false),
+    ("clipboard", "Reads or changes the clipboard", false),
+    ("windows", "Reads or controls other windows", false),
+    ("triggers", "Starts on its own (time, battery, keys, windows, files or clipboard)", false),
+    ("macros", "Runs or stops your other macros", false),
+    ("globals", "Reads or changes global variables", false),
+];
+
+/// The capability a reporter needs, by operator name.
+fn operator_capability(op: &str) -> Option<&'static str> {
+    Some(match op {
+        "ShellOutput" | "ShellSucceeded" => "commands",
+        "HttpGet" => "network",
+        "ReadFile" | "FileExists" | "ListDirectory" => "files_read",
+        "ClipboardText" | "ClipboardHasImage" | "ClipboardHasFiles" => "clipboard",
+        "ActiveWindowTitle" | "ActiveWindowApp" | "WindowExists" => "windows",
+        "MacroRunning" => "macros",
+        "GlobalVariable" => "globals",
+        _ => return None,
     })
 }
 
-fn macro_contains_command(mac: &Macro) -> bool {
-    mac.strands
+fn value_capabilities(value: &Value, found: &mut std::collections::HashSet<&'static str>) {
+    match value {
+        Value::Op { op, args, .. } => {
+            found.extend(operator_capability(op.name()));
+            args.iter().for_each(|a| value_capabilities(a, found));
+        }
+        Value::Call { args, .. } => args.iter().for_each(|a| value_capabilities(a, found)),
+        _ => {}
+    }
+}
+
+/// Everything `mac` can do anywhere, nested blocks included, for the import
+/// review. `OpenApp`'s command can be any shell string in a hand-edited
+/// file, so it counts as running commands.
+fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
+    use blockwork_core::macros::BlockKind;
+    let mut found = std::collections::HashSet::new();
+    mac.graph.walk_instructions(&mut |ins| {
+        let kind = match &ins.kind {
+            InstructionKind::Command(_) | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. } => {
+                Some("commands")
+            }
+            InstructionKind::HttpRequest { .. } => Some("network"),
+            InstructionKind::WriteFile { .. } => Some("files_write"),
+            InstructionKind::Token(_) => Some("input"),
+            InstructionKind::SetClipboard(_) | InstructionKind::WhenClipboardChanged => Some("clipboard"),
+            InstructionKind::WindowAction { .. }
+            | InstructionKind::MoveWindow { .. }
+            | InstructionKind::WhenWindow { .. } => Some("windows"),
+            InstructionKind::WhenFileChanged(_) => Some("files_read"),
+            InstructionKind::RunMacro { .. } | InstructionKind::StopMacroNamed(_) => Some("macros"),
+            InstructionKind::SetGlobal { .. } | InstructionKind::ChangeGlobal { .. } => Some("globals"),
+            _ => None,
+        };
+        found.extend(kind);
+        if ins.kind.is_header() && !matches!(ins.kind, InstructionKind::WhenRan | InstructionKind::BlockHeader(_)) {
+            found.insert("triggers");
+        }
+        let mut kind = ins.kind.clone();
+        kind.visit_values_mut(&mut |value, _| value_capabilities(value, &mut found));
+    });
+    CAPABILITIES
         .iter()
-        .any(|strand| body_contains_command(&strand.instructions))
+        .filter(|(kind, ..)| found.contains(kind))
+        .map(|(kind, label, risky)| crate::state::CapabilityDto {
+            kind: kind.to_string(),
+            label: label.to_string(),
+            risky: *risky,
+        })
+        .collect()
 }
 
 /// One (key, label, getter, setter) entry per `MacroSettings` field - the
@@ -758,38 +893,30 @@ fn commit_imported_macro(
     Ok(())
 }
 
-/// Reads the `.macro` file the user picked in the UI. If it needs a confirmation prompt
-/// before it can be committed - a `Command` instruction, and/or non-default
-/// macro settings (see `non_default_macro_settings`) - the parsed macro is
-/// staged in `pending_import` and the prompt to show is returned; the
-/// frontend resolves it via `confirm_import_macro`/`cancel_import_macro`.
-/// Otherwise the macro is imported immediately and `None` is returned.
+/// Reads the `.macro` file the user picked in the UI and stages it in
+/// `pending_import` with a review of what it can do (see
+/// `macro_capabilities`) and any non-default settings. The review shows
+/// through `StateDto::import_review`; the frontend resolves it via
+/// `confirm_import_macro`/`cancel_import_macro`.
 pub(crate) fn import_macro(
     state: &SharedState,
     app: &AppHandle,
     path: String,
-) -> Result<Option<crate::state::ImportPromptDto>, String> {
+) -> Result<(), String> {
     let mac = config::read_macro_file(std::path::Path::new(&path))?;
-
-    let needs_command_warning = macro_contains_command(&mac);
-    let custom_settings = non_default_macro_settings(&mac.settings);
-
-    if needs_command_warning || !custom_settings.is_empty() {
-        let prompt = crate::state::ImportPromptDto {
-            needs_command_warning,
-            custom_settings,
-        };
-        let mut s = state.lock().map_err(|e| e.to_string())?;
-        s.pending_import = Some(mac);
-        return Ok(Some(prompt));
-    }
-
-    commit_imported_macro(mac, &state, &app)?;
-    Ok(None)
+    let review = crate::state::ImportReviewDto {
+        name: mac.name.clone(),
+        capabilities: macro_capabilities(&mac),
+        custom_settings: non_default_macro_settings(&mac.settings),
+    };
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.pending_import = Some((mac, review));
+    emit_state_updated(app, &s);
+    Ok(())
 }
 
 /// Finishes an import staged by `import_macro` after the user resolves its
-/// prompt. `keep_settings` maps each `ImportPromptDto::custom_settings`
+/// review. `keep_settings` maps each `ImportReviewDto::custom_settings`
 /// entry's `key` to whether the user kept its imported value (`true`) or
 /// reset it to default (`false`); a key the popup never showed is absent,
 /// which `apply_setting_overrides` treats as "keep".
@@ -805,18 +932,18 @@ pub(crate) async fn confirm_import_macro(
             .pending_import
             .take()
     };
-    let Some(mut mac) = mac else {
+    let Some((mut mac, _)) = mac else {
         return Ok(());
     };
     apply_setting_overrides(&mut mac.settings, &keep_settings);
     commit_imported_macro(mac, &state, &app)
 }
 
-/// Discards an import staged by `import_macro` after the user declines the
-/// Command warning popup.
-pub(crate) fn cancel_import_macro(state: &SharedState) -> Result<(), String> {
+/// Discards an import staged by `import_macro` after the user declines its review.
+pub(crate) fn cancel_import_macro(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.pending_import = None;
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -1189,13 +1316,21 @@ pub(crate) fn put_value(
 /// tooltip on operator blocks - stateless. Uses `eval_text` so text-only
 /// ops (`Join`/`NewLine`/`Tab`) preview without erroring as "not a number".
 pub(crate) fn preview_value(state: &SharedState, value: Value) -> Result<String, String> {
-    let s = state.lock().map_err(|e| e.to_string())?;
-    let env: HashMap<String, Evaluated> = s
-        .variable_values
-        .lock()
-        .map(|g| g.clone())
-        .unwrap_or_default();
-    let lists = s.list_values.lock().map(|g| g.clone()).unwrap_or_default();
+    // A click shouldn't run a command or hit the network.
+    if blockwork_core::input::value::has_side_effect_operator(&value) {
+        return Err("Preview is off for blocks that run commands or go online".into());
+    }
+    let (env, lists) = {
+        let s = state.lock().map_err(|e| e.to_string())?;
+        let env: HashMap<String, Evaluated> = s
+            .variable_values
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_default();
+        let lists = s.list_values.lock().map(|g| g.clone()).unwrap_or_default();
+        (env, lists)
+    };
+    // Evaluated unlocked: a file or window read may be slow.
     preview_value_with_env_and_lists(&value, &env, &lists)
 }
 
@@ -2559,6 +2694,7 @@ pub(crate) fn handle_hotkey_action(
                 }
             }
         }
+        HotkeyAction::EmergencyStop => emergency_stop(state, app),
         HotkeyAction::StopLoop => {
             // Clears every in-flight run's stop flag, not just loop mode's -
             // a single run has its own stop flag that `is_looping` doesn't reach.
@@ -3583,5 +3719,55 @@ mod value_location_tests {
         };
         apply_value_kind(&mut node, "Number", &HashMap::new()).unwrap();
         assert_eq!(node, Value::number(0.0));
+    }
+}
+
+#[cfg(test)]
+mod import_review_tests {
+    use super::*;
+    use blockwork_core::input::value::Op;
+    use blockwork_core::macros::MacroGraph;
+
+    #[test]
+    fn lists_what_a_macro_can_do_including_nested_blocks_and_reporters() {
+        blockwork_core::init();
+        let nested = Instruction::new(InstructionKind::If {
+            condition: Value::Bool,
+            body: vec![Instruction::new(InstructionKind::Log(Value::op(
+                Op::from_name("ShellOutput"),
+                vec![Value::text("ls")],
+            )))],
+        });
+        let mac = Macro {
+            id: "m".into(),
+            name: "Test".into(),
+            description: "".into(),
+            graph: MacroGraph {
+                strands: vec![Strand {
+                    id: "s1".into(),
+                    x: 0,
+                    y: 0,
+                    instructions: vec![
+                        Instruction::new(InstructionKind::WhenFileChanged(Value::text("~/a"))),
+                        nested,
+                        Instruction::new(InstructionKind::Token(InputToken::Text(Value::text("hi")))),
+                    ],
+                }],
+                ..MacroGraph::new()
+            },
+            recording_target: None,
+            speed_multiplier: 1.0,
+            settings: blockwork_core::macros::MacroSettings::default(),
+        };
+        let kinds: Vec<_> = macro_capabilities(&mac).into_iter().map(|c| (c.kind, c.risky)).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                ("commands".to_string(), true),
+                ("files_read".to_string(), false),
+                ("input".to_string(), false),
+                ("triggers".to_string(), false),
+            ]
+        );
     }
 }

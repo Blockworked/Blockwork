@@ -461,11 +461,13 @@ dependencies = [
  "starship-battery",
  "tokio",
  "tracing",
+ "ureq",
  "uuid",
  "wayland-client",
  "wayland-protocols",
  "windows-sys 0.61.2",
  "x11rb 0.14.0",
+ "zbus",
 ]
 
 [[package]]
