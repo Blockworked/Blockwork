@@ -76,6 +76,9 @@ Item {
         if (copy.branches) copy.branches = copy.branches.map(branch => branch.map(refreshIds));
         return copy;
     }
+    // In-memory copy/paste buffer (not the OS clipboard).
+    property var clipboard: []
+    function totalBlocks() { return (root.macro ? root.macro.strands : []).reduce((n, st) => n + st.instructions.length, 0); }
     function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
     function instructionExplainer(type) {
         const x={WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a key or key combo.",WhenKey:"Runs when a key or key combo is pressed or released.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
@@ -186,7 +189,9 @@ Item {
         // Attach into the previewed gap when one is showing, else park as a
         // new detached strand - mirrors the webapp palette drop.
         if (snapValid && snapTargetId) {
-            if (spec.kind === "custom") {
+            if (spec.kind === "branch") {
+                root.invoke("add_instruction", { strandId: snapTargetId, path: snapPath, instruction: { id: uuid(), type: "RunBranch", name: spec.instruction.name } });
+            } else if (spec.kind === "custom") {
                 const args = (spec.definition.pieces || []).filter(piece => piece.kind === "Input")
                     .map(piece => piece.value_type === "Bool" ? { kind: "Bool" } : numberValue(0));
                 const branchCount = (spec.definition.pieces || []).filter(piece => piece.kind === "Branch").length;
@@ -198,7 +203,8 @@ Item {
             }
             return;
         }
-        if (spec.kind === "custom") root.addCustomBlock(spec.definition, x, y);
+        if (spec.kind === "branch") root.invoke("add_strand", { x: x, y: y, instruction: { id: uuid(), type: "RunBranch", name: spec.instruction.name } });
+        else if (spec.kind === "custom") root.addCustomBlock(spec.definition, x, y);
         else root.addBlock(spec.type, x, y);
     }
     function cancelPaletteDrag() { paletteDrag = null; ghost.visible = false; ghost.spec = null; canvas.clearSnap(); canvas.updatePaletteValueTarget(null, null); }
@@ -227,7 +233,16 @@ Item {
     }
     function trashDraggedBlocks(strandId, path, tailCount, sx, sy) {
         if (root.sidebarCollapsed || !palette.contains(palette.mapFromItem(null, sx, sy))) return;
-        if (path.length === 1 && path[0].index === 0) { root.invoke("remove_strand", { strandId: strandId }); return; }
+        if (path.length === 1 && path[0].index === 0) {
+            const strands = root.macro ? root.macro.strands : [];
+            for (let i = 0; i < strands.length; ++i) {
+                if (strands[i].id !== strandId) continue;
+                const first = strands[i].instructions[0];
+                if (first && first.type === "BlockHeader") { root.invoke("delete_block", { blockId: first.block_id }); return; }
+            }
+            root.invoke("remove_strand", { strandId: strandId });
+            return;
+        }
         for (let i = 0; i < tailCount; ++i) root.invoke("remove_instruction", { strandId: strandId, path: path });
     }
     // An existing value dropped on the sidebar resets its slot (fields) or
@@ -409,8 +424,20 @@ Item {
                     onTailMerged: (strandId, path, targetId, targetPath) => root.invoke("merge_tail", { strandId: strandId, path: path, targetId: targetId, targetPath: targetPath })
                     onBlockDragOutside: (strandId, path, tailCount, sx, sy) => root.trashDraggedBlocks(strandId, path, tailCount, sx, sy)
                     onInstructionRemoved: (strandId, path) => root.removeInstruction(strandId, path)
+                    canPaste: root.clipboard.length > 0
+                    clearIcon: appState.confirm_clear_instructions ? "triangle-alert" : "trash"
+                    clearText: appState.confirm_clear_instructions ? "Confirm delete (" + appState.confirm_clear_instructions_remaining_secs + "s)?" : "Delete " + root.totalBlocks() + " Blocks"
+                    onCanvasMenuAction: (action, x, y) => {
+                        if (action === "paste" && root.clipboard.length) root.invoke("paste_instructions", { x: x, y: y, instructions: root.clipboard.map(root.refreshIds) });
+                    }
                     onBlockMenuAction: (action, strandId, path, instruction) => {
                         if (action === "edit_block") root.editBlockById(instruction.block_id);
+                        else if (action === "copy") root.clipboard = [instruction];
+                        else if (action === "copy_all") {
+                            const strand = canvas.strandById(strandId);
+                            const list = strand ? canvas.listFor(strand, path.slice(0, path.length - 1)) : null;
+                            if (list) root.clipboard = list.slice(path[path.length - 1].index);
+                        } else if (action === "cut") { root.clipboard = [instruction]; root.removeInstruction(strandId, path); }
                     }
                     onInstructionDuplicated: (strandId, path, instruction) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: root.refreshIds(instruction) })
                     onInstructionEdited: (strandId, path, instruction) => root.invoke("edit_instruction", { strandId: strandId, path: path, instruction: instruction })
@@ -420,7 +447,11 @@ Item {
                     onValuePutRequested: (location, value) => root.invoke("put_value", { location: location, value: value })
                     onValueCreateRequested: (x, y, value) => root.invoke("create_floating_value", { x: x, y: y, value: value, originBlockId: null })
                     onValueDragOutside: (location, value, sx, sy) => root.trashDraggedValue(location, value, sx, sy)
-                    onCommentForInstructionRequested: instruction => root.invoke("create_attached_comment", { instructionId: instruction.id, dx: 48, dy: 18, text: "" })
+                    onCommentForInstructionRequested: instruction => {
+                        const existing = (root.macro && root.macro.comments || []).find(c => c.attached_to === instruction.id);
+                        if (existing) { if (existing.collapsed) root.invoke("set_comment_collapsed", { commentId: existing.id, collapsed: false }); }
+                        else root.invoke("create_attached_comment", { instructionId: instruction.id, dx: 48, dy: 18, text: "" });
+                    }
                     onRecordingTargetRequested: strandId => root.invoke("set_recording_target", { strandId: strandId })
                     onKeyCaptureRequested:(strandId,path)=>root.invoke("start_key_capture",{strandId:strandId,path:path})
                     onAppPickerRequested:(strandId,path,instruction)=>root.openAppPicker(strandId,path,instruction)
@@ -551,8 +582,8 @@ Item {
     }
     MakeBlockDialog {
         id:blockDialog
-        onCreateRequested:(pieces,shape,color)=>root.invoke("create_block",{pieces:pieces,shape:shape,color:color})
-        onEditRequested:(blockId,pieces,shape,color)=>root.invoke("edit_block",{blockId:blockId,pieces:pieces,shape:shape,color:color})
+        onCreateRequested:(pieces,shape,color,icon)=>root.invoke("create_block",{pieces:pieces,shape:shape,color:color,icon:icon})
+        onEditRequested:(blockId,pieces,shape,color,icon)=>root.invoke("edit_block",{blockId:blockId,pieces:pieces,shape:shape,color:color,icon:icon})
     }
 
     // Click-to-preview on operators: the daemon evaluates, the chip shows the answer.

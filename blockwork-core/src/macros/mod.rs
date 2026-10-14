@@ -1154,6 +1154,7 @@ mod tests {
             pieces: vec![],
             shape: BlockShape::Ending,
             color: default_block_color(),
+            icon: String::new(),
         };
         let json = serde_json::to_string(&def).unwrap();
         assert!(

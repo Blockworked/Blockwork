@@ -155,12 +155,14 @@ impl Backend {
                 let pieces: Vec<BlockPiece> = arg(&args, "pieces")?;
                 let shape: BlockShape = arg(&args, "shape")?;
                 let color: String = arg(&args, "color")?;
+                let icon: String = arg(&args, "icon").unwrap_or_default();
                 to_json(commands::create_block(
                     &self.state,
                     &self.app,
                     pieces,
                     shape,
                     color,
+                    icon,
                 )?)
             }
             "edit_block" => {
@@ -168,6 +170,7 @@ impl Backend {
                 let pieces: Vec<BlockPiece> = arg(&args, "pieces")?;
                 let shape: BlockShape = arg(&args, "shape")?;
                 let color: String = arg(&args, "color")?;
+                let icon: String = arg(&args, "icon").unwrap_or_default();
                 to_json(commands::edit_block(
                     &self.state,
                     &self.app,
@@ -175,6 +178,7 @@ impl Backend {
                     pieces,
                     shape,
                     color,
+                    icon,
                 )?)
             }
             "delete_block" => {

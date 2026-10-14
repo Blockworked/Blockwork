@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
+import QtQuick.Shapes
 import com.blockworked.Blockstitch 1.0
 
 BwDialog {
@@ -11,8 +12,8 @@ BwDialog {
     height: visible ? Math.min(760, parent ? parent.height - 32 : 760) : 760
     standardButtons: Dialog.NoButton
 
-    signal createRequested(var pieces, string shape, string color)
-    signal editRequested(string blockId, var pieces, string shape, string color)
+    signal createRequested(var pieces, string shape, string color, string icon)
+    signal editRequested(string blockId, var pieces, string shape, string color, string icon)
 
     // Set while editing an existing block; empty when making a new one.
     property string editBlockId: ""
@@ -27,6 +28,10 @@ BwDialog {
     property real customValue: 1
     property string blockShape: "Normal"
     property string blockColor: "#4C97FF"
+    // Lucide name; empty means the default blocks icon.
+    property string blockIcon: ""
+    property string iconSearch: ""
+    readonly property var allIcons: Object.keys(Icons.paths).sort()
     property string validationError: ""
     readonly property bool returnsValue: blockShape === "ReturnsValue" || blockShape === "ReturnsBool"
     readonly property bool hasBranches: branchCount() > 0
@@ -69,6 +74,87 @@ BwDialog {
     }
     function updateCustomColor() {
         blockColor = hsvToHex(customHue, customSaturation, customValue);
+    }
+
+    Popup {
+        id: iconPopup
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        modal: true
+        focus: true
+        width: Math.min(520, parent.width - 48)
+        height: Math.min(520, parent.height - 48)
+        padding: 12
+        closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
+        background: Rectangle {
+            radius: 8
+            color: Theme.block
+            border.color: Theme.border
+        }
+        readonly property var shown: {
+            const q = root.iconSearch.trim().toLowerCase();
+            return q.length ? root.allIcons.filter(n => n.indexOf(q) >= 0) : root.allIcons;
+        }
+        contentItem: ColumnLayout {
+            spacing: 10
+            BwTextField {
+                id: iconSearchField
+                Layout.fillWidth: true
+                placeholderText: "Search icons"
+                text: root.iconSearch
+                onTextChanged: root.iconSearch = text
+            }
+            GridView {
+                id: iconGrid
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                cellWidth: Math.floor(width / Math.max(1, Math.floor(width / 52)))
+                cellHeight: 52
+                model: iconPopup.shown
+                ScrollBar.vertical: ScrollBar {}
+                WheelPan { flickable: iconGrid }
+                delegate: Item {
+                    required property string modelData
+                    width: iconGrid.cellWidth
+                    height: iconGrid.cellHeight
+                    Rectangle {
+                        anchors.fill: parent
+                        anchors.margins: 3
+                        radius: 6
+                        color: tile.hovered ? "#414246" : Theme.field
+                        border.color: root.blockIcon === modelData ? Theme.accent : Theme.border
+                        border.width: root.blockIcon === modelData ? 2 : 1
+                    }
+                    LucideIcon {
+                        anchors.centerIn: parent
+                        width: 22
+                        height: 22
+                        name: modelData
+                        color: Theme.text
+                    }
+                    HoverHandler {
+                        id: tile
+                        cursorShape: Qt.PointingHandCursor
+                    }
+                    TapHandler {
+                        onTapped: {
+                            root.blockIcon = modelData;
+                            iconPopup.close();
+                        }
+                    }
+                    ToolTip.visible: tile.hovered
+                    ToolTip.delay: 400
+                    ToolTip.text: modelData
+                }
+            }
+            Text {
+                visible: iconPopup.shown.length === 0
+                text: "No icons match"
+                color: Theme.textDim
+                Layout.alignment: Qt.AlignHCenter
+            }
+        }
     }
 
     ListModel {
@@ -172,6 +258,7 @@ BwDialog {
         activeEditor = null;
         blockShape = def.shape || "Normal";
         blockColor = def.color || "#4C97FF";
+        blockIcon = def.icon || "";
         validationError = "";
         customPickerOpen = false;
     }
@@ -188,6 +275,7 @@ BwDialog {
         activeEditor = null;
         blockShape = "Normal";
         blockColor = "#4C97FF";
+        blockIcon = "";
         validationError = "";
         customPickerOpen = false;
         Qt.callLater(() => focusPiece(0));
@@ -390,9 +478,9 @@ BwDialog {
             return;
         }
         if (editBlockId.length)
-            editRequested(editBlockId, resultPieces(), blockShape, blockColor);
+            editRequested(editBlockId, resultPieces(), blockShape, blockColor, blockIcon);
         else
-            createRequested(resultPieces(), blockShape, blockColor);
+            createRequested(resultPieces(), blockShape, blockColor, blockIcon);
         accept();
     }
     onOpened: {
@@ -631,7 +719,7 @@ BwDialog {
                         y: root.returnsValue ? 7 : 15
                         spacing: 4
                         LucideIcon {
-                            name: "blocks"
+                            name: root.blockIcon || "blocks"
                             color: root.blockColor
                             width: 16
                             height: 16
@@ -649,14 +737,51 @@ BwDialog {
                 }
 
                 Item {
-                    id: wrapPreview
+                    id: wrapShell
                     visible: root.hasBranches
-                    readonly property real mouthHeight: 46
+                    readonly property bool boolShape: root.blockShape === "ReturnsBool"
+                    readonly property real padX: root.returnsValue ? (boolShape ? 36 : 22) : 0
+                    readonly property real padY: root.returnsValue ? 12 : 0
+                    width: wrapPreview.width + 2 * padX
+                    height: visible ? wrapPreview.height + 2 * padY : 0
+                    Shape {
+                        id: wrapShape
+                        anchors.fill: parent
+                        visible: root.returnsValue
+                        preferredRendererType: Shape.CurveRenderer
+                        readonly property string outline: {
+                            const w = width, h = height;
+                            if (w <= 0 || h <= 0) return "";
+                            if (wrapShell.boolShape) {
+                                const n = Math.min(24, h / 2);
+                                return "M" + n + " .5 L" + (w - n) + " .5 L" + (w - .5) + " " + h / 2 + " L" + (w - n) + " " + (h - .5) + " L" + n + " " + (h - .5) + " L.5 " + h / 2 + " Z";
+                            }
+                            const r = Math.min(24, h / 2), R = w - .5, B = h - .5;
+                            return "M" + (.5 + r) + " .5 L" + (R - r) + " .5 Q" + R + " .5 " + R + " " + (.5 + r) + " L" + R + " " + (B - r) + " Q" + R + " " + B + " " + (R - r) + " " + B
+                                + " L" + (.5 + r) + " " + B + " Q.5 " + B + " .5 " + (B - r) + " L.5 " + (.5 + r) + " Q.5 .5 " + (.5 + r) + " .5 Z";
+                        }
+                        ShapePath {
+                            strokeColor: Theme.border
+                            strokeWidth: 1.3
+                            joinStyle: ShapePath.RoundJoin
+                            fillColor: Theme.block
+                            PathSvg { path: wrapShape.outline }
+                        }
+                    }
+                Item {
+                    id: wrapPreview
+                    x: wrapShell.padX
+                    y: wrapShell.padY
+                    visible: root.hasBranches
+                    readonly property real mouthHeight: 50
+                    readonly property bool noTab: root.returnsValue || root.blockShape === "Ending"
                     width: Math.max(270, branchHead.implicitWidth + 70, root.branchPreviewWidth())
-                    height: visible ? 50 + root.branchInfo.length * mouthHeight + Math.max(0, root.branchInfo.length - 1) * 34 + 26 + 8 : 0
+                    height: visible ? 50 + root.branchInfo.length * mouthHeight + Math.max(0, root.branchInfo.length - 1) * 34 + 26 + (noTab ? 0 : 8) : 0
                     BlockSurface {
                         anchors.fill: parent
                         shape: "wrap"
+                        headNotch: !root.returnsValue
+                        footTab: !wrapPreview.noTab
                         fill: Theme.block
                         outline: Theme.border
                         hoverColor: root.blockColor
@@ -672,7 +797,7 @@ BwDialog {
                         y: 12
                         spacing: 5
                         LucideIcon {
-                            name: "blocks"
+                            name: root.blockIcon || "blocks"
                             color: root.blockColor
                             width: 16
                             height: 16
@@ -805,6 +930,7 @@ BwDialog {
                         }
                     }
                 }
+                }
             }
         }
 
@@ -853,6 +979,34 @@ BwDialog {
                 TapHandler {
                     onTapped: root.toggleCustomPicker()
                 }
+            }
+        }
+
+        RowLayout {
+            Layout.alignment: Qt.AlignHCenter
+            spacing: 10
+            Text {
+                text: "Icon"
+                color: Theme.textDim
+                font.pixelSize: 12
+                Layout.alignment: Qt.AlignVCenter
+            }
+            BwButton {
+                text: root.blockIcon ? root.blockIcon : "Default"
+                iconName: root.blockIcon || "blocks"
+                implicitHeight: 32
+                onClicked: {
+                    root.iconSearch = "";
+                    iconPopup.open();
+                    iconGrid.positionViewAtBeginning();
+                    iconSearchField.forceActiveFocus();
+                }
+            }
+            BwButton {
+                visible: root.blockIcon.length > 0
+                text: "Reset"
+                implicitHeight: 32
+                onClicked: root.blockIcon = ""
             }
         }
 

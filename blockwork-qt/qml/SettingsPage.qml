@@ -11,6 +11,35 @@ Item {
     function capturingBinding(index){return appState.combo_capture&&appState.combo_capture.kind==="Binding"&&appState.combo_capture.binding_index===index}
     function capturingAction(action){return appState.combo_capture&&appState.combo_capture.kind==="Named"&&JSON.stringify(appState.combo_capture.action)===JSON.stringify(action)}
 
+    property int tab: 0
+    readonly property var tabs: [
+        { name: "General", icon: "settings" }, { name: "Hotkeys", icon: "keyboard" },
+        { name: "Editor", icon: "blocks" }, { name: "Integrations", icon: "terminal" }
+    ]
+
+    component SettingsRow: ColumnLayout {
+        id: row
+        property string title: ""
+        property string detail: ""
+        property bool first: false
+        default property alias controls: ctl.data
+        Layout.fillWidth: true; spacing: 0
+        Rectangle { Layout.fillWidth: true; height: 1; color: "#3a3b3f"; visible: !row.first }
+        RowLayout {
+            Layout.fillWidth: true; Layout.topMargin: 14; Layout.bottomMargin: 14; spacing: 16
+            ColumnLayout { Layout.fillWidth: true; spacing: 2
+                Text { text: row.title; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
+                Text { visible: row.detail !== ""; text: row.detail; color: "#9fa0a6"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
+            }
+            RowLayout { id: ctl; spacing: 8 }
+        }
+    }
+
+    component SubHeading: Text {
+        Layout.topMargin: 6; Layout.bottomMargin: 2
+        color: "#a7a8ae"; font.pixelSize: 12; font.weight: Font.Bold; font.letterSpacing: 1.2
+    }
+
     ColumnLayout {
         anchors.fill: parent; spacing: 0
         Rectangle {
@@ -29,141 +58,164 @@ Item {
                 WindowControls { visible: Qt.platform.os !== "osx" }
             }
         }
-        ScrollView {
-            id: settingsScroll
-            Layout.fillWidth: true; Layout.fillHeight: true; clip: true
-            WheelPan { flickable: settingsScroll.contentItem }
-            Column {
-                width: Math.max(760, root.width - 36); x: Math.max(18, (root.width - width) / 2); spacing: 16; padding: 0
-                Item { width: 1; height: 4 }
-                SectionCard {
-                    width: parent.width; title: "Global hotkeys"; iconName: "keyboard"
+
+        RowLayout {
+            Layout.fillWidth: true; Layout.fillHeight: true; spacing: 0
+
+            Rectangle {
+                Layout.preferredWidth: 190; Layout.fillHeight: true
+                color: "#252629"
+                Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: "#3a3b3f" }
+                Column {
+                    anchors.fill: parent; anchors.margins: 10; spacing: 2
                     Repeater {
-                        model: appState.named_hotkey_defaults || []
-                        delegate: RowLayout {
-                            id: hotkeyRow
+                        model: root.tabs
+                        delegate: Rectangle {
+                            id: navItem
                             required property var modelData
-                            Layout.fillWidth: true; spacing: 8
-                            readonly property var binding: (appState.hotkey_bindings || []).find(b => JSON.stringify(b.action) === JSON.stringify(modelData.action))
-                            readonly property bool capturing: root.capturingAction(modelData.action)
-                            readonly property bool atDefault: modelData.combo_display == null || (binding ? binding.combo_display : null) === modelData.combo_display
-                            Text { Layout.fillWidth: true; text: root.actionLabel(modelData.action); color: "#e7e7e8"; font.pixelSize: 14 }
-                            BwButton {
-                                text: hotkeyRow.capturing ? "Press shortcut…" : (hotkeyRow.binding ? hotkeyRow.binding.combo_display : "Not set")
-                                primary: hotkeyRow.capturing; implicitWidth: 150; implicitHeight: 36
-                                onClicked: if (!hotkeyRow.capturing) root.invoke("start_combo_capture", { action: hotkeyRow.modelData.action })
+                            required property int index
+                            width: parent.width; height: 38; radius: 8
+                            color: root.tab === index ? "#2f3b4d" : (navMouse.containsMouse ? "#2e2f33" : "transparent")
+                            Row { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 10
+                                LucideIcon { name: navItem.modelData.icon; width: 16; height: 16; anchors.verticalCenter: parent.verticalCenter
+                                    color: root.tab === navItem.index ? "#6cb2ff" : "#9da0a8" }
+                                Text { text: navItem.modelData.name; font.pixelSize: 14; anchors.verticalCenter: parent.verticalCenter
+                                    font.weight: root.tab === navItem.index ? Font.DemiBold : Font.Normal
+                                    color: root.tab === navItem.index ? "#6cb2ff" : "#c4c5ca" }
                             }
-                            BwButton { visible: !hotkeyRow.capturing && !hotkeyRow.atDefault; text: "Default"; implicitHeight: 36; onClicked: root.invoke("reset_hotkey_to_default", { action: hotkeyRow.modelData.action }) }
-                            BwButton { visible: !hotkeyRow.capturing && !!hotkeyRow.binding; iconName: "x"; text: ""; danger: true; implicitWidth: 42; implicitHeight: 36; onClicked: root.invoke("clear_named_hotkey", { action: hotkeyRow.modelData.action }) }
+                            MouseArea { id: navMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.tab = navItem.index }
                         }
                     }
                 }
-                SectionCard {
-                    width: parent.width; title: "Per-macro hotkeys"; iconName: "keyboard"
-                    Repeater {
-                        model: (appState.hotkey_bindings || []).filter(b => b.action && b.action.type === "RunSpecificMacro")
-                        delegate: RowLayout {
-                            id: macroRow
-                            required property var modelData
-                            readonly property bool capturing: root.capturingBinding(modelData.binding_index)
-                            Layout.fillWidth: true; spacing: 8
-                            Text { Layout.fillWidth: true; text: modelData.macro_name || "Macro"; color: "#e7e7e8"; font.pixelSize: 14 }
-                            BwButton {
-                                text: macroRow.capturing ? "Press shortcut…" : macroRow.modelData.combo_display
-                                primary: macroRow.capturing; implicitWidth: 150; implicitHeight: 36
-                                onClicked: if (!macroRow.capturing) root.invoke("start_binding_combo_capture", { index: macroRow.modelData.binding_index })
+            }
+
+            ScrollView {
+                id: settingsScroll
+                Layout.fillWidth: true; Layout.fillHeight: true; clip: true
+                contentWidth: availableWidth
+                WheelPan { flickable: settingsScroll.contentItem }
+                Item {
+                    width: settingsScroll.availableWidth
+                    implicitHeight: pane.implicitHeight + 48
+                    ColumnLayout {
+                        id: pane
+                        x: 28; y: 24; width: Math.min(720, parent.width - 56); spacing: 0
+
+                        // General
+                        ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 0
+                            Text { text: "General"; color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            SettingsRow { first: true; title: "Close to tray"; detail: "Keep hotkeys and schedules active after closing the editor."
+                                BwSwitch { checked: appState.close_to_tray; onToggled: checked => root.invoke("set_close_to_tray", { enabled: checked }) }
                             }
-                            BwButton { iconName: "x"; text: ""; danger: true; implicitWidth: 42; onClicked: root.invoke("remove_hotkey_binding", { index: modelData.binding_index }) }
+                            SettingsRow { title: "Start at system startup"; detail: "Launch Blockwork in the background when you log in so hotkeys work right away."
+                                BwSwitch { checked: appState.start_at_startup === true; onToggled: checked => root.invoke("set_start_at_startup", { enabled: checked }) }
+                            }
+                            SettingsRow { title: root.updateTitle(); detail: root.updateDetail()
+                                BwButton {
+                                    readonly property bool available: appState.update_check_state && appState.update_check_state.state === "UpdateAvailable"
+                                    text: available ? "Install update" : "Check for updates"; primary: available
+                                    onClicked: root.invoke(available ? "apply_update" : "check_for_updates")
+                                }
+                            }
+                            Rectangle { Layout.fillWidth: true; Layout.topMargin: 8; height: 1; color: "#3a3b3f" }
+                            RowLayout { Layout.fillWidth: true; Layout.topMargin: 16; spacing: 8
+                                BwButton { iconName: "download"; text: "Import macro…"; onClicked: pathDialog.mode = "import", pathDialog.open() }
+                                BwButton { iconName: "upload"; text: "Export macro…"; enabled: appState.macro_selected !== null; onClicked: pathDialog.mode = "export", pathDialog.open() }
+                                BwButton { iconName: "play"; text: "Replay welcome tour"; onClicked: root.invoke("set_onboarding_done", { done: false }) }
+                                Item { Layout.fillWidth: true }
+                            }
                         }
-                    }
-                    RowLayout { Layout.fillWidth: true
-                        Text { text: "Add hotkey:"; color: "#e7e7e8" }
-                        Item { Layout.fillWidth: true }
-                        BwComboBox { id: macroBox; model: appState.macro_names || []; implicitWidth: 210; onActivated: index => root.invoke("set_pending_macro_idx", { index: index }) }
-                        BwButton { text: appState.combo_capture&&appState.combo_capture.kind==="Pending"?"Press shortcut…":"Set combo"; primary:appState.combo_capture&&appState.combo_capture.kind==="Pending"; onClicked: root.invoke("start_pending_combo_capture") }
-                        BwButton { iconName: "plus"; text: "Add"; onClicked: root.invoke("add_macro_hotkey") }
+
+                        // Hotkeys
+                        ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 1
+                            Text { text: "Hotkeys"; color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            SubHeading { text: "GLOBAL" }
+                            Repeater {
+                                model: appState.named_hotkey_defaults || []
+                                delegate: SettingsRow {
+                                    id: hotkeyRow
+                                    required property var modelData
+                                    required property int index
+                                    first: index === 0
+                                    title: root.actionLabel(modelData.action)
+                                    readonly property var binding: (appState.hotkey_bindings || []).find(b => JSON.stringify(b.action) === JSON.stringify(modelData.action))
+                                    readonly property bool capturing: root.capturingAction(modelData.action)
+                                    readonly property bool atDefault: modelData.combo_display == null || (binding ? binding.combo_display : null) === modelData.combo_display
+                                    BwButton {
+                                        text: hotkeyRow.capturing ? "Press shortcut…" : (hotkeyRow.binding ? hotkeyRow.binding.combo_display : "Not set")
+                                        primary: hotkeyRow.capturing; implicitWidth: 150; implicitHeight: 36
+                                        onClicked: if (!hotkeyRow.capturing) root.invoke("start_combo_capture", { action: hotkeyRow.modelData.action })
+                                    }
+                                    Item { Layout.preferredWidth: 84; Layout.preferredHeight: 36
+                                        BwButton { anchors.fill: parent; visible: !hotkeyRow.capturing && !hotkeyRow.atDefault; text: "Default"; implicitHeight: 36
+                                            onClicked: root.invoke("reset_hotkey_to_default", { action: hotkeyRow.modelData.action }) }
+                                    }
+                                    Item { Layout.preferredWidth: 42; Layout.preferredHeight: 36
+                                        BwButton { anchors.fill: parent; visible: !hotkeyRow.capturing && !!hotkeyRow.binding; iconName: "x"; text: ""; danger: true; implicitHeight: 36
+                                            onClicked: root.invoke("clear_named_hotkey", { action: hotkeyRow.modelData.action }) }
+                                    }
+                                }
+                            }
+                            SubHeading { text: "PER MACRO"; Layout.topMargin: 24 }
+                            Repeater {
+                                model: (appState.hotkey_bindings || []).filter(b => b.action && b.action.type === "RunSpecificMacro")
+                                delegate: SettingsRow {
+                                    id: macroRow
+                                    required property var modelData
+                                    required property int index
+                                    first: index === 0
+                                    title: modelData.macro_name || "Macro"
+                                    readonly property bool capturing: root.capturingBinding(modelData.binding_index)
+                                    BwButton {
+                                        text: macroRow.capturing ? "Press shortcut…" : macroRow.modelData.combo_display
+                                        primary: macroRow.capturing; implicitWidth: 150; implicitHeight: 36
+                                        onClicked: if (!macroRow.capturing) root.invoke("start_binding_combo_capture", { index: macroRow.modelData.binding_index })
+                                    }
+                                    BwButton { iconName: "x"; text: ""; danger: true; implicitWidth: 42; implicitHeight: 36
+                                        onClicked: root.invoke("remove_hotkey_binding", { index: macroRow.modelData.binding_index }) }
+                                }
+                            }
+                            RowLayout { Layout.fillWidth: true; Layout.topMargin: 14; spacing: 8
+                                Text { text: "Add hotkey"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
+                                Item { Layout.fillWidth: true }
+                                BwComboBox { id: macroBox; model: appState.macro_names || []; implicitWidth: 210; onActivated: index => root.invoke("set_pending_macro_idx", { index: index }) }
+                                BwButton { text: appState.combo_capture&&appState.combo_capture.kind==="Pending"?"Press shortcut…":"Set combo"; primary:appState.combo_capture&&appState.combo_capture.kind==="Pending"; onClicked: root.invoke("start_pending_combo_capture") }
+                                BwButton { iconName: "plus"; text: "Add"; onClicked: root.invoke("add_macro_hotkey") }
+                            }
+                        }
+
+                        // Editor
+                        ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 2
+                            Text { text: "Editor"; color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            SettingsRow { first: true; title: "Block palette layout"; detail: "How the block sidebar is organized in the editor."
+                                BwComboBox {
+                                    id: paletteLayoutBox
+                                    readonly property var layouts: [
+                                        { id: "rail", text: "Category rail" }, { id: "chips", text: "Chip strip" }, { id: "accordion", text: "Accordion" },
+                                        { id: "flyout", text: "Rail with flyout" }, { id: "tiles", text: "Tile grid" }
+                                    ]
+                                    model: layouts; textRole: "text"; implicitWidth: 210
+                                    currentIndex: Math.max(0, layouts.findIndex(l => l.id === (appState.palette_layout || "rail")))
+                                    onActivated: index => root.invoke("set_palette_layout", { layout: layouts[index].id })
+                                }
+                            }
+                        }
+
+                        // Integrations
+                        ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 3
+                            Text { text: "Integrations"; color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            SettingsRow { first: true
+                                title: appState.ipc_active_port === null ? "TCP server stopped" : "TCP server listening on port " + appState.ipc_active_port
+                                detail: "Allow local integrations to run Blockwork macros."
+                                BwTextField { id: port; text: appState.ipc_port_text || "47821"; validator: IntValidator { bottom: 1; top: 65535 } implicitWidth: 100; onEditingFinished: root.invoke("set_ipc_port_text", { text: text }) }
+                                BwButton { text: appState.ipc_active_port === null ? "Start" : "Stop"; primary: appState.ipc_active_port === null; onClicked: root.invoke(appState.ipc_active_port === null ? "start_ipc_server" : "stop_ipc_server") }
+                            }
+                            SettingsRow { title: "Start automatically"; detail: "Start the TCP server whenever Blockwork launches."
+                                BwSwitch { Accessible.name: "Start TCP server automatically"; checked: appState.ipc_auto_start; onToggled: checked => root.invoke("set_ipc_auto_start", { enabled: checked }) }
+                            }
+                        }
                     }
                 }
-                SectionCard {
-                    width: parent.width; title: "Import and export"; iconName: "layers"
-                    RowLayout { Layout.fillWidth: true
-                        ColumnLayout { Layout.fillWidth: true
-                            Text { text: "Portable macro files"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                            Text { text: "Import or export .macro files without changing the browser frontend."; color: "#9fa0a6"; font.pixelSize: 12 }
-                        }
-                        BwButton { text: "Import…"; onClicked: pathDialog.mode = "import", pathDialog.open() }
-                        BwButton { text: "Export…"; enabled: appState.macro_selected !== null; onClicked: pathDialog.mode = "export", pathDialog.open() }
-                    }
-                }
-                SectionCard {
-                    width: parent.width; title: "TCP server"; iconName: "terminal"
-                    RowLayout { Layout.fillWidth: true
-                        ColumnLayout { Layout.fillWidth: true
-                            Text { text: appState.ipc_active_port === null ? "Server stopped" : "Listening on port " + appState.ipc_active_port; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                            Text { text: "Allow local integrations to run Blockwork macros."; color: "#9fa0a6"; font.pixelSize: 12 }
-                        }
-                        BwTextField { id: port; text: appState.ipc_port_text || "47821"; validator: IntValidator { bottom: 1; top: 65535 } implicitWidth: 100; onEditingFinished: root.invoke("set_ipc_port_text", { text: text }) }
-                        BwButton { text: appState.ipc_active_port === null ? "Start" : "Stop"; primary: appState.ipc_active_port === null; onClicked: root.invoke(appState.ipc_active_port === null ? "start_ipc_server" : "stop_ipc_server") }
-                    }
-                    BwSwitch { Accessible.name: "Start TCP server automatically"; checked: appState.ipc_auto_start; onToggled: checked => root.invoke("set_ipc_auto_start", { enabled: checked }) }
-                }
-                SectionCard {
-                    width: parent.width; title: "System"; iconName: "settings"
-                    RowLayout { Layout.fillWidth: true
-                        ColumnLayout { Layout.fillWidth: true
-                            Text { text: "Close to tray"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                            Text { text: "Keep hotkeys and schedules active after closing the editor."; color: "#9fa0a6"; font.pixelSize: 12 }
-                        }
-                        BwSwitch { checked: appState.close_to_tray; onToggled: checked => root.invoke("set_close_to_tray", { enabled: checked }) }
-                    }
-                    RowLayout { Layout.fillWidth: true
-                        ColumnLayout { Layout.fillWidth: true
-                            Text { text: "Start at system startup"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                            Text { text: "Launch Blockwork in the background when you log in so hotkeys work right away."; color: "#9fa0a6"; font.pixelSize: 12 }
-                        }
-                        BwSwitch { checked: appState.start_at_startup === true; onToggled: checked => root.invoke("set_start_at_startup", { enabled: checked }) }
-                    }
-                }
-                SectionCard {
-                    width: parent.width; title: "Editor"; iconName: "blocks"
-                    RowLayout { Layout.fillWidth: true
-                        ColumnLayout { Layout.fillWidth: true
-                            Text { text: "Block palette layout"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                            Text { text: "How the block sidebar is organized in the editor."; color: "#9fa0a6"; font.pixelSize: 12 }
-                        }
-                        BwComboBox {
-                            id: paletteLayoutBox
-                            readonly property var layouts: [
-                                { id: "rail", text: "Category rail" }, { id: "chips", text: "Chip strip" }, { id: "accordion", text: "Accordion" },
-                                { id: "flyout", text: "Rail with flyout" }, { id: "tiles", text: "Tile grid" }
-                            ]
-                            model: layouts; textRole: "text"; implicitWidth: 210
-                            currentIndex: Math.max(0, layouts.findIndex(l => l.id === (appState.palette_layout || "rail")))
-                            onActivated: index => root.invoke("set_palette_layout", { layout: layouts[index].id })
-                        }
-                    }
-                }
-                SectionCard {
-                    width: parent.width; title: "Welcome"; iconName: "info"
-                    RowLayout { Layout.fillWidth: true
-                        ColumnLayout { Layout.fillWidth: true
-                            Text { text: "Welcome tour"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                            Text { text: "Show the first-run welcome screens again."; color: "#9fa0a6"; font.pixelSize: 12 }
-                        }
-                        BwButton { text: "Replay"; onClicked: root.invoke("set_onboarding_done", { done: false }) }
-                    }
-                }
-                SectionCard {
-                    width: parent.width; title: "Updates"; iconName: "refresh-cw"
-                    RowLayout { Layout.fillWidth: true
-                        ColumnLayout { Layout.fillWidth: true
-                            Text { text: root.updateTitle(); color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                            Text { text: root.updateDetail(); color: "#9fa0a6"; font.pixelSize: 12 }
-                        }
-                        BwButton { text: appState.update_check_state && appState.update_check_state.state === "UpdateAvailable" ? "Install update" : "Check for updates"; primary: appState.update_check_state && appState.update_check_state.state === "UpdateAvailable"; onClicked: root.invoke(appState.update_check_state && appState.update_check_state.state === "UpdateAvailable" ? "apply_update" : "check_for_updates") }
-                    }
-                }
-                Item { width: 1; height: 18 }
             }
         }
     }

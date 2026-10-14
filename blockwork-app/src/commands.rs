@@ -501,6 +501,7 @@ pub(crate) fn create_block(
     pieces: Vec<BlockPiece>,
     shape: BlockShape,
     color: String,
+    icon: String,
 ) -> Result<String, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     BlockDef::validate_pieces(&pieces)?;
@@ -509,6 +510,7 @@ pub(crate) fn create_block(
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let (x, y) = mac.next_strand_position();
     let id = mac.create_block(pieces, shape, color, x, y);
+    mac.set_block_icon(&id, &icon)?;
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(id)
@@ -524,6 +526,7 @@ pub(crate) fn edit_block(
     pieces: Vec<BlockPiece>,
     shape: BlockShape,
     color: String,
+    icon: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     // `update_block` re-checks both; doing it first keeps a rejected edit
@@ -555,6 +558,10 @@ pub(crate) fn edit_block(
         .as_mut()
         .ok_or("No macro selected")?
         .update_block(&block_id, pieces, shape, &color)?;
+    s.current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .set_block_icon(&block_id, &icon)?;
     auto_save(&s);
     emit_state_updated(&app, &s);
     Ok(())
