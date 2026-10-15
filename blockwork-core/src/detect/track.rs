@@ -10,8 +10,9 @@ use std::time::{Duration, Instant};
 pub const MAX_MISSES: u32 = 5;
 /// Weight of the newest box in the smoothed one.
 const SMOOTHING: f64 = 0.6;
-/// A tracker idle this long starts over: its objects have moved on.
-const STALE_AFTER: Duration = Duration::from_secs(2);
+/// A tracker idle this long starts over: its objects have moved on. Well
+/// above one frame, since a portal capture alone can take seconds.
+const STALE_AFTER: Duration = Duration::from_secs(10);
 
 #[derive(Debug, Clone)]
 struct Track {
