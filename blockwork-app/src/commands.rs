@@ -282,6 +282,36 @@ pub(crate) fn set_macro_always_listen(
     Ok(())
 }
 
+/// Sets when triggers and hotkeys may start the selected macro. Empty
+/// times mean all day; one empty time is an error.
+pub(crate) fn set_macro_conditions(
+    state: &SharedState,
+    app: &AppHandle,
+    only_in_window: String,
+    power: blockwork_core::macros::conditions::PowerCondition,
+    active_from: &str,
+    active_until: &str,
+    active_days: u8,
+) -> Result<(), String> {
+    use blockwork_core::macros::conditions::parse_clock;
+    let active_hours = match (active_from.trim(), active_until.trim()) {
+        ("", "") => None,
+        ("", _) | (_, "") => return Err("set both a start and an end time, or neither".into()),
+        (from, until) => Some((parse_clock(from)?, parse_clock(until)?)),
+    };
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        mac.settings.only_in_window = only_in_window.trim().to_string();
+        mac.settings.power = power;
+        mac.settings.active_hours = active_hours;
+        mac.settings.active_days = active_days & 0x7f;
+        auto_save(&s);
+        refresh_macro_list(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
 /// Sets how long a run of the selected macro may last; 0 means no limit.
 pub(crate) fn set_macro_max_run_secs(
     state: &SharedState,
@@ -743,8 +773,8 @@ const CAPABILITIES: [(&str, &str, bool); 11] = [
     ("files_read", "Reads files and folders", false),
     ("input", "Presses keys, clicks and moves the mouse", false),
     ("clipboard", "Reads or changes the clipboard", false),
-    ("windows", "Reads or controls other windows", false),
-    ("triggers", "Starts on its own (time, battery, keys, windows, files or clipboard)", false),
+    ("windows", "Reads or controls other apps and windows", false),
+    ("triggers", "Starts on its own (schedules, keys, typing, apps, idle, windows, files and more)", false),
     ("screen", "Reads the screen (colors, images and text)", false),
     ("macros", "Runs or stops your other macros", false),
     ("globals", "Reads or changes global variables", false),
@@ -757,7 +787,7 @@ fn operator_capability(op: &str) -> Option<&'static str> {
         "HttpGet" => "network",
         "ReadFile" | "FileExists" | "ListDirectory" => "files_read",
         "ClipboardText" | "ClipboardHasImage" | "ClipboardHasFiles" => "clipboard",
-        "ActiveWindowTitle" | "ActiveWindowApp" | "WindowExists" => "windows",
+        "ActiveWindowTitle" | "ActiveWindowApp" | "WindowExists" | "AppRunning" => "windows",
         "MacroRunning" => "macros",
         "PixelColor" | "AverageColor" | "ScreenText" => "screen",
         "GlobalVariable" => "globals",
@@ -793,7 +823,9 @@ fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
             InstructionKind::SetClipboard(_) | InstructionKind::WhenClipboardChanged => Some("clipboard"),
             InstructionKind::WindowAction { .. }
             | InstructionKind::MoveWindow { .. }
-            | InstructionKind::WhenWindow { .. } => Some("windows"),
+            | InstructionKind::WhenWindow { .. }
+            | InstructionKind::WhenApp { .. } => Some("windows"),
+            InstructionKind::WhenTyped { .. } => Some("input"),
             InstructionKind::WhenFileChanged(_) => Some("files_read"),
             InstructionKind::RunMacro { .. } | InstructionKind::StopMacroNamed(_) => Some("macros"),
             InstructionKind::FindImage { .. } | InstructionKind::WaitForImage { .. } => Some("screen"),
@@ -804,6 +836,9 @@ fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
         found.extend(kind);
         if matches!(ins.kind, InstructionKind::ClickImage { .. }) {
             found.insert("screen");
+        }
+        if matches!(ins.kind, InstructionKind::PasteText(_)) {
+            found.extend(["input", "clipboard"]);
         }
         if ins.kind.is_header() && !matches!(ins.kind, InstructionKind::WhenRan | InstructionKind::BlockHeader(_)) {
             found.insert("triggers");
@@ -2681,6 +2716,11 @@ pub(crate) fn handle_hotkey_action(
                 };
                 drop(s);
                 if let Some(mac) = mac {
+                    if let Some(reason) = mac.settings.blocked_by() {
+                        let source = blockwork_core::run_log::Source::for_macro(&mac.id, &mac.name);
+                        blockwork_core::run_log::info(&source, format!("Hotkey ignored: {reason}"));
+                        return;
+                    }
                     let speed_multiplier = mac.speed_multiplier * global_speed_multiplier;
                     // Seeded from this macro's own persisted values, not
                     // `AppState::variable_values` (tracks the *selected* macro).

@@ -55,6 +55,20 @@ section below as the GitHub release notes, followed by the downloads table.
   Windows/macOS built-ins, or Tesseract on Linux.
 - Importing a macro shows what it can do (commands, web, files, input,
   clipboard, windows, triggers) before it's added.
+- Text expansion: a "when I type" trigger that fires on an abbreviation like
+  `;addr` typed anywhere, optionally erasing it, and a paste block that
+  pastes through the clipboard and puts the old clipboard back. The Text
+  snippet template uses them.
+- Triggers for when an app starts or exits, after N minutes idle, and when
+  the screen locks or unlocks, plus "app is running?", "seconds idle" and
+  "screen is locked?" reporters.
+- "On schedule" trigger with cron expressions (`*/15 9-17 * * mon-fri`,
+  `@hourly`); a broken expression is reported in the run log.
+- Per-macro conditions in Macro settings: triggers and hotkeys only start the
+  macro while a given window is focused, on AC or battery power, between two
+  times, or on chosen weekdays.
+- "With lock" block: only one strand, across every macro, runs inside a lock
+  of the same name at a time.
 
 ### Changed
 - Blocks that fail at run time are reported in the run log instead of only

@@ -239,13 +239,26 @@ pub(crate) struct MacroSettingsDto {
     pub(crate) always_listen: bool,
     pub(crate) max_run_secs: u32,
     pub(crate) max_loop_iterations: u32,
+    pub(crate) only_in_window: String,
+    pub(crate) power: blockwork_core::macros::conditions::PowerCondition,
+    /// `HH:MM`, both empty when there are no active hours.
+    pub(crate) active_from: String,
+    pub(crate) active_until: String,
+    pub(crate) active_days: u8,
 }
 
 fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
+    use blockwork_core::macros::conditions::clock;
+    let (active_from, active_until) = settings.active_hours.map(|(a, b)| (clock(a), clock(b))).unwrap_or_default();
     MacroSettingsDto {
         always_listen: settings.always_listen,
         max_run_secs: settings.max_run_secs,
         max_loop_iterations: settings.max_loop_iterations,
+        only_in_window: settings.only_in_window.clone(),
+        power: settings.power,
+        active_from,
+        active_until,
+        active_days: settings.active_days,
     }
 }
 
@@ -555,6 +568,37 @@ pub(crate) enum InstructionDto {
         tolerance: Value,
         appear: bool,
         timeout: Value,
+    },
+    WhenTyped {
+        id: String,
+        text: Value,
+        erase: bool,
+    },
+    PasteText {
+        id: String,
+        text: Value,
+    },
+    WhenApp {
+        id: String,
+        pattern: Value,
+        started: bool,
+    },
+    WhenIdle {
+        id: String,
+        minutes: Value,
+    },
+    WhenScreenLock {
+        id: String,
+        locked: bool,
+    },
+    WithLock {
+        id: String,
+        name: Value,
+        body: Vec<InstructionDto>,
+    },
+    WhenCron {
+        id: String,
+        expression: Value,
     },
 }
 
@@ -932,6 +976,19 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             appear: *appear,
             timeout: timeout.clone(),
         },
+        InstructionKind::WhenTyped { text, erase } => InstructionDto::WhenTyped { id, text: text.clone(), erase: *erase },
+        InstructionKind::PasteText(text) => InstructionDto::PasteText { id, text: text.clone() },
+        InstructionKind::WhenApp { pattern, started } => {
+            InstructionDto::WhenApp { id, pattern: pattern.clone(), started: *started }
+        }
+        InstructionKind::WhenIdle(minutes) => InstructionDto::WhenIdle { id, minutes: minutes.clone() },
+        InstructionKind::WhenScreenLock { locked } => InstructionDto::WhenScreenLock { id, locked: *locked },
+        InstructionKind::WithLock { name, body } => InstructionDto::WithLock {
+            id,
+            name: name.clone(),
+            body: body.iter().map(instruction_to_dto).collect(),
+        },
+        InstructionKind::WhenCron(expression) => InstructionDto::WhenCron { id, expression: expression.clone() },
         InstructionKind::Token(token) => match token {
             InputToken::Text(t) => InstructionDto::Text {
                 id,
@@ -1306,6 +1363,21 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
                 timeout: timeout.clone(),
             },
         ),
+        InstructionDto::WhenTyped { id, text, erase } => (id, InstructionKind::WhenTyped { text: text.clone(), erase: *erase }),
+        InstructionDto::PasteText { id, text } => (id, InstructionKind::PasteText(text.clone())),
+        InstructionDto::WhenApp { id, pattern, started } => {
+            (id, InstructionKind::WhenApp { pattern: pattern.clone(), started: *started })
+        }
+        InstructionDto::WhenIdle { id, minutes } => (id, InstructionKind::WhenIdle(minutes.clone())),
+        InstructionDto::WhenScreenLock { id, locked } => (id, InstructionKind::WhenScreenLock { locked: *locked }),
+        InstructionDto::WithLock { id, name, body } => (
+            id,
+            InstructionKind::WithLock {
+                name: name.clone(),
+                body: body.iter().map(dto_to_instruction).collect::<Option<Vec<_>>>()?,
+            },
+        ),
+        InstructionDto::WhenCron { id, expression } => (id, InstructionKind::WhenCron(expression.clone())),
     };
     Some(Instruction {
         id: id.clone(),

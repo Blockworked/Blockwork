@@ -11,7 +11,9 @@ use uuid::Uuid;
 
 pub mod backend;
 pub mod calls;
+pub mod conditions;
 pub mod fields;
+pub mod locks;
 pub mod loop_control;
 pub mod priority;
 pub mod run_registry;
@@ -71,7 +73,13 @@ impl BlockKind for InstructionKind {
             | InstructionKind::Log(value)
             | InstructionKind::ThrowError(value)
             | InstructionKind::WhenFileChanged(value)
-            | InstructionKind::WhenWindow { pattern: value, .. } => f(value, InputValueType::Any),
+            | InstructionKind::WhenWindow { pattern: value, .. }
+            | InstructionKind::WhenTyped { text: value, .. }
+            | InstructionKind::PasteText(value)
+            | InstructionKind::WhenApp { pattern: value, .. }
+            | InstructionKind::WhenIdle(value)
+            | InstructionKind::WhenCron(value)
+            | InstructionKind::WithLock { name: value, .. } => f(value, InputValueType::Any),
             InstructionKind::WriteFile { path, text, .. } => {
                 f(path, InputValueType::Any);
                 f(text, InputValueType::Any);
@@ -144,6 +152,7 @@ impl BlockKind for InstructionKind {
             | InstructionKind::WhenPowerPluggedIn
             | InstructionKind::WhenPowerUnplugged
             | InstructionKind::WhenClipboardChanged
+            | InstructionKind::WhenScreenLock { .. }
             | InstructionKind::Forever { .. }
             | InstructionKind::OpenApp { .. }
             | InstructionKind::CloseApp { .. }
@@ -170,6 +179,11 @@ impl BlockKind for InstructionKind {
                 | InstructionKind::WhenKey(..)
                 | InstructionKind::WhenWindow { .. }
                 | InstructionKind::WhenFileChanged(_)
+                | InstructionKind::WhenTyped { .. }
+                | InstructionKind::WhenApp { .. }
+                | InstructionKind::WhenIdle(_)
+                | InstructionKind::WhenScreenLock { .. }
+                | InstructionKind::WhenCron(_)
         )
     }
 
@@ -184,6 +198,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::TryCatch { body, .. }, 0) => Some(body),
             (InstructionKind::TryCatch { catch_body, .. }, 1) => Some(catch_body),
             (InstructionKind::Retry { body, .. }, 0) => Some(body),
+            (InstructionKind::WithLock { body, .. }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get(slot as usize),
             _ => None,
         }
@@ -200,6 +215,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::TryCatch { body, .. }, 0) => Some(body),
             (InstructionKind::TryCatch { catch_body, .. }, 1) => Some(catch_body),
             (InstructionKind::Retry { body, .. }, 0) => Some(body),
+            (InstructionKind::WithLock { body, .. }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get_mut(slot as usize),
             _ => None,
         }
@@ -542,6 +558,36 @@ pub enum InstructionKind {
     /// Header for a strand fired when the file at the path is created,
     /// changed or deleted. Driven by `file_watch` in the desktop app.
     WhenFileChanged(Value),
+    /// Header for a strand fired when the user types `text` (text
+    /// expansion); with `erase` the typed text is backspaced away first.
+    /// Driven by `type_watch` in the desktop app.
+    WhenTyped {
+        text: Value,
+        erase: bool,
+    },
+    /// Pastes text through the clipboard, then puts the old clipboard back.
+    PasteText(Value),
+    /// Header for a strand fired when a program whose name contains
+    /// `pattern` starts (or with `started` false, exits).
+    WhenApp {
+        pattern: Value,
+        started: bool,
+    },
+    /// Header for a strand fired once there has been no keyboard or mouse
+    /// input for the given number of minutes.
+    WhenIdle(Value),
+    /// Header for a strand fired when the screen locks (or unlocks).
+    WhenScreenLock {
+        locked: bool,
+    },
+    /// Runs `body` while holding the named lock, so only one strand in any
+    /// macro runs a block guarded by the same name at a time.
+    WithLock {
+        name: Value,
+        body: Vec<Instruction>,
+    },
+    /// Header for a strand fired on a cron schedule, like `*/15 9-17 * * mon-fri`.
+    WhenCron(Value),
 }
 
 impl std::hash::Hash for InstructionKind {
@@ -832,6 +878,37 @@ impl std::hash::Hash for InstructionKind {
                 appear.hash(state);
                 timeout.hash(state);
             }
+            Self::WhenTyped { text, erase } => {
+                54u8.hash(state);
+                text.hash(state);
+                erase.hash(state);
+            }
+            Self::PasteText(v) => {
+                55u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenApp { pattern, started } => {
+                56u8.hash(state);
+                pattern.hash(state);
+                started.hash(state);
+            }
+            Self::WhenIdle(v) => {
+                57u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenScreenLock { locked } => {
+                58u8.hash(state);
+                locked.hash(state);
+            }
+            Self::WithLock { name, body } => {
+                59u8.hash(state);
+                name.hash(state);
+                body.hash(state);
+            }
+            Self::WhenCron(v) => {
+                60u8.hash(state);
+                v.hash(state);
+            }
         }
     }
 }
@@ -1003,6 +1080,24 @@ enum InstructionKindDe {
         appear: bool,
         timeout: Value,
     },
+    WhenTyped {
+        text: Value,
+        erase: bool,
+    },
+    PasteText(Value),
+    WhenApp {
+        pattern: Value,
+        started: bool,
+    },
+    WhenIdle(Value),
+    WhenScreenLock {
+        locked: bool,
+    },
+    WithLock {
+        name: Value,
+        body: Vec<Instruction>,
+    },
+    WhenCron(Value),
 }
 
 fn match_by_title() -> String {
@@ -1186,6 +1281,13 @@ impl From<InstructionKindDe> for InstructionKind {
             InstructionKindDe::WaitForImage { image, tolerance, appear, timeout } => {
                 InstructionKind::WaitForImage { image, tolerance, appear, timeout }
             }
+            InstructionKindDe::WhenTyped { text, erase } => InstructionKind::WhenTyped { text, erase },
+            InstructionKindDe::PasteText(v) => InstructionKind::PasteText(v),
+            InstructionKindDe::WhenApp { pattern, started } => InstructionKind::WhenApp { pattern, started },
+            InstructionKindDe::WhenIdle(v) => InstructionKind::WhenIdle(v),
+            InstructionKindDe::WhenScreenLock { locked } => InstructionKind::WhenScreenLock { locked },
+            InstructionKindDe::WithLock { name, body } => InstructionKind::WithLock { name, body },
+            InstructionKindDe::WhenCron(v) => InstructionKind::WhenCron(v),
         }
     }
 }
@@ -1238,7 +1340,7 @@ pub const SPEED_MULTIPLIER_RANGE: std::ops::RangeInclusive<f64> = 0.1..=10.0;
 /// the app treats it. Persisted and exported/imported with the macro like
 /// everything else in `Macro`, so a new field here needs no separate wiring
 /// to survive a save/export round-trip.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
 pub struct MacroSettings {
     /// When `true`, this macro's `WhenBattery*`/`WhenTime`/`WhenPower*`
     /// strands are watched by the background watchers (`battery_watch`/
@@ -1254,6 +1356,18 @@ pub struct MacroSettings {
     /// Stops any one loop after this many iterations; 0 means no limit.
     #[serde(default)]
     pub max_loop_iterations: u32,
+    /// Triggers and hotkeys only start the macro while a window whose
+    /// title or app contains this is focused; empty means any window.
+    #[serde(default)]
+    pub only_in_window: String,
+    #[serde(default)]
+    pub power: conditions::PowerCondition,
+    /// Only from/until these minutes after midnight (may wrap past midnight).
+    #[serde(default)]
+    pub active_hours: Option<(u16, u16)>,
+    /// Only on these weekdays, bit 0 = Sunday; 0 means every day.
+    #[serde(default)]
+    pub active_days: u8,
 }
 
 /// Deserialization shape supporting both the current multi-strand format and

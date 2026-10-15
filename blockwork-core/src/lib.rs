@@ -16,6 +16,7 @@ pub mod recording;
 pub mod run_log;
 pub mod screen;
 pub mod shell;
+pub mod system;
 #[cfg(all(feature = "updater", any(windows, target_os = "macos")))]
 pub mod updater;
 pub mod window;

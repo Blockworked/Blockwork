@@ -36,7 +36,7 @@ pub(crate) fn fire(
     let lists: ListStore = Arc::new(Mutex::new(list_defs.iter().map(|list| (list.name.clone(), list.items.clone())).collect()));
     std::thread::spawn(move || {
         // Looked up here, off the watcher's thread, which may hold the lock.
-        let (source, max_secs, max_loops, block_table) = {
+        let (source, max_secs, max_loops, block_table, settings) = {
             let Ok(s) = shared_state.lock() else { return };
             if s.triggers_paused {
                 return;
@@ -48,8 +48,13 @@ pub(crate) fn fire(
                 mac.map_or(0, |m| m.settings.max_run_secs),
                 mac.map_or(0, |m| m.settings.max_loop_iterations),
                 mac.map(|m| m.block_table()).unwrap_or_default(),
+                mac.map(|m| m.settings.clone()).unwrap_or_default(),
             )
         };
+        // Conditions may ask the window system, so checked unlocked.
+        if settings.blocked_by().is_some() {
+            return;
+        }
         run_log::run_event(&source, run_log::RunEvent::Fired, "Trigger fired");
         let run_flag = run_registry::begin_macro_run(&macro_id);
         let done = limit_run(&source, &run_flag, max_secs);

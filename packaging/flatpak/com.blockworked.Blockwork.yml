@@ -26,6 +26,10 @@ finish-args:
   - --share=network
   # Notify block.
   - --talk-name=org.freedesktop.Notifications
+  # Screen lock trigger and reporter.
+  - --talk-name=org.freedesktop.ScreenSaver
+  - --talk-name=org.gnome.ScreenSaver
+  - --system-talk-name=org.freedesktop.login1
   # File blocks and the file-change trigger work on the user's files.
   - --filesystem=home
 

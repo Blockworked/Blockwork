@@ -4,7 +4,7 @@ use crate::input::value::Value;
 use crate::macros::backend::{self, CaptureDecision, CaptureEvent, CaptureTimestamp};
 use crate::macros::{Instruction, InstructionKind};
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Mutex, OnceLock, RwLock};
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
@@ -93,6 +93,34 @@ fn broadcast_key_event(key: &MacroKey, pressed: bool) {
     if let Ok(mut subs) = subs.lock() {
         subs.retain(|tx| tx.send(KeyEvent { key: key.clone(), pressed }).is_ok());
     }
+}
+
+// When the capture started, and the last input since then in ms after it.
+static CAPTURE_EPOCH: OnceLock<Instant> = OnceLock::new();
+static LAST_INPUT_MS: AtomicU64 = AtomicU64::new(0);
+static CLICKS: AtomicU64 = AtomicU64::new(0);
+
+fn note_input(event: &CaptureEvent) {
+    let epoch = CAPTURE_EPOCH.get_or_init(Instant::now);
+    LAST_INPUT_MS.store(epoch.elapsed().as_millis() as u64, Ordering::Relaxed);
+    if matches!(event, CaptureEvent::ButtonPress(_)) {
+        CLICKS.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+/// Time since the last physical key or mouse input, or `None` when the
+/// capture can't see input.
+pub fn time_since_input() -> Option<Duration> {
+    let epoch = CAPTURE_EPOCH.get()?;
+    if grab_failed() {
+        return None;
+    }
+    Some(epoch.elapsed().saturating_sub(Duration::from_millis(LAST_INPUT_MS.load(Ordering::Relaxed))))
+}
+
+/// Counts physical mouse clicks, so text tracking can tell the caret moved.
+pub fn click_count() -> u64 {
+    CLICKS.load(Ordering::Relaxed)
 }
 
 static HOTKEY_TABLE: OnceLock<RwLock<Vec<HotkeyBinding>>> = OnceLock::new();
@@ -295,7 +323,9 @@ fn stop_recording_key() -> Option<String> {
 /// bookkeeping and cursor tracking either way - this is the one place that
 /// logic lives.
 pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp) -> CaptureDecision + Send + 'static> {
+    CAPTURE_EPOCH.get_or_init(Instant::now);
     Box::new(move |event: CaptureEvent, ts: CaptureTimestamp| {
+            note_input(&event);
             match &event {
                 CaptureEvent::KeyPress(key) => {
                     broadcast_key_event(key, true);

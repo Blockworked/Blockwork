@@ -64,6 +64,13 @@ impl Backend {
                 let iterations: u32 = arg(&args, "iterations")?;
                 to_json(commands::set_macro_max_loop_iterations(&self.state, &self.app, iterations)?)
             }
+            "set_macro_conditions" => {
+                let window: String = arg(&args, "onlyInWindow")?;
+                let power = arg(&args, "power")?;
+                let (from, until): (String, String) = (arg(&args, "activeFrom")?, arg(&args, "activeUntil")?);
+                let days: u8 = arg(&args, "activeDays")?;
+                to_json(commands::set_macro_conditions(&self.state, &self.app, window, power, &from, &until, days)?)
+            }
             "list_macros" => to_json(crate::macro_runs::list(&self.state)?),
             "screen_grab" => {
                 let (x, y): (f64, f64) = (arg(&args, "x")?, arg(&args, "y")?);

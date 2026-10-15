@@ -52,6 +52,12 @@ pub enum FieldId {
     GlobalValue,
     WaitTimeout,
     ImageTolerance,
+    TypedText,
+    PasteValue,
+    AppPattern,
+    IdleMinutes,
+    LockName,
+    CronExpression,
 }
 
 impl FieldId {
@@ -121,6 +127,12 @@ impl std::fmt::Display for FieldId {
             FieldId::GlobalValue => write!(f, "GlobalValue"),
             FieldId::WaitTimeout => write!(f, "WaitTimeout"),
             FieldId::ImageTolerance => write!(f, "ImageTolerance"),
+            FieldId::TypedText => write!(f, "TypedText"),
+            FieldId::PasteValue => write!(f, "PasteValue"),
+            FieldId::AppPattern => write!(f, "AppPattern"),
+            FieldId::IdleMinutes => write!(f, "IdleMinutes"),
+            FieldId::LockName => write!(f, "LockName"),
+            FieldId::CronExpression => write!(f, "CronExpression"),
         }
     }
 }
@@ -170,6 +182,12 @@ impl std::str::FromStr for FieldId {
             "GlobalValue" => Ok(FieldId::GlobalValue),
             "WaitTimeout" => Ok(FieldId::WaitTimeout),
             "ImageTolerance" => Ok(FieldId::ImageTolerance),
+            "TypedText" => Ok(FieldId::TypedText),
+            "PasteValue" => Ok(FieldId::PasteValue),
+            "AppPattern" => Ok(FieldId::AppPattern),
+            "IdleMinutes" => Ok(FieldId::IdleMinutes),
+            "LockName" => Ok(FieldId::LockName),
+            "CronExpression" => Ok(FieldId::CronExpression),
             _ if s.starts_with("CallArg:") => s["CallArg:".len()..]
                 .parse::<usize>()
                 .map(FieldId::CallArg)
@@ -246,6 +264,12 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
         (InstructionKind::FindImage { tolerance, .. }, FieldId::ImageTolerance) => Some(tolerance),
         (InstructionKind::ClickImage { tolerance, .. }, FieldId::ImageTolerance) => Some(tolerance),
         (InstructionKind::WaitForImage { tolerance, .. }, FieldId::ImageTolerance) => Some(tolerance),
+        (InstructionKind::WhenTyped { text, .. }, FieldId::TypedText) => Some(text),
+        (InstructionKind::PasteText(v), FieldId::PasteValue) => Some(v),
+        (InstructionKind::WhenApp { pattern, .. }, FieldId::AppPattern) => Some(pattern),
+        (InstructionKind::WhenIdle(v), FieldId::IdleMinutes) => Some(v),
+        (InstructionKind::WithLock { name, .. }, FieldId::LockName) => Some(name),
+        (InstructionKind::WhenCron(v), FieldId::CronExpression) => Some(v),
         _ => None,
     }
 }

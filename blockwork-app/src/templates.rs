@@ -51,15 +51,13 @@ fn templates() -> [Template; 4] {
             info: TemplateDto {
                 id: "text_snippet",
                 name: "Text snippet",
-                description: "Types a saved reply whenever you press Ctrl+Alt+R.",
+                description: "Type ;thx anywhere and it turns into a saved reply.",
                 icon: "type",
             },
             build: || {
                 vec![
-                    ins(InstructionKind::WhenKey(Value::text("Control+Alt+R"), Direction::Press)),
-                    ins(InstructionKind::Token(InputToken::Text(Value::text(
-                        "Thanks for reaching out! I'll get back to you soon.",
-                    )))),
+                    ins(InstructionKind::WhenTyped { text: Value::text(";thx"), erase: true }),
+                    ins(InstructionKind::PasteText(Value::text("Thanks for reaching out! I'll get back to you soon."))),
                 ]
             },
             always_listen: true,

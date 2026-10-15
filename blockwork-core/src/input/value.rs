@@ -214,6 +214,27 @@ static OPERATORS: &[ExtOperator] = &[
         },
     },
     ExtOperator {
+        kind: "AppRunning",
+        op: "AppRunning",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| Ok(Evaluated::Bool(crate::system::app_running(&args[0].as_text())?)),
+    },
+    ExtOperator {
+        kind: "IdleSeconds",
+        op: "IdleSeconds",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Number(crate::system::idle_time()?.as_secs_f64().floor())),
+    },
+    ExtOperator {
+        kind: "ScreenLocked",
+        op: "ScreenLocked",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Bool(crate::system::screen_locked()?)),
+    },
+    ExtOperator {
         kind: "LastError",
         op: "LastError",
         arity: 0,

@@ -57,6 +57,8 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_Storage_Packaging_Appx",
     "Win32_System_Memory",
     "Win32_System_Console",
+    "Win32_System_Diagnostics_ToolHelp",
+    "Win32_System_SystemInformation",
     "Win32_Security",
 ] }
 enigo = { git = "https://github.com/enigo-rs/enigo", rev = "a88d9b7", default-features = false }

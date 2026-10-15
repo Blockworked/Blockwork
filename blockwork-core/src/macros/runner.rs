@@ -278,6 +278,31 @@ const STOP_POLL_INTERVAL: Duration = Duration::from_millis(15);
 /// How often wait-until blocks re-check (on top of the check's own time).
 const CONDITION_POLL_MS: f64 = 100.0;
 
+// Time for the clipboard to take the new text, and for the app to read it.
+const PASTE_SETTLE: Duration = Duration::from_millis(80);
+const PASTE_RESTORE: Duration = Duration::from_millis(400);
+
+/// Pastes `text` with Ctrl+V (Cmd+V on macOS), then restores the clipboard
+/// if it held text.
+fn paste_text(ctx: &ExecCtx, text: String) -> Result<(), String> {
+    let previous = crate::clipboard::get_text().ok();
+    crate::clipboard::set_text(text)?;
+    std::thread::sleep(PASTE_SETTLE);
+    {
+        let mut em = ctx.emulator.lock().map_err(|e| e.to_string())?;
+        let modifier = if cfg!(target_os = "macos") { MacroKey::Meta } else { MacroKey::LControl };
+        em.key(modifier.clone(), Direction::Press)?;
+        let pressed = em.key(MacroKey::Unicode('v'), Direction::Click);
+        em.key(modifier, Direction::Release)?;
+        pressed?;
+    }
+    std::thread::sleep(PASTE_RESTORE);
+    if let Some(previous) = previous {
+        crate::clipboard::set_text(previous)?;
+    }
+    Ok(())
+}
+
 /// `true` once a stop has been requested on `flag` (the flag itself holds
 /// "should keep running", so this is just its negation behind the lock).
 fn stop_requested(flag: &Arc<Mutex<bool>>) -> bool {
@@ -659,6 +684,34 @@ fn run_block(
             InstructionKind::WhenKey(..) => {}
             InstructionKind::WhenWindow { .. } => {}
             InstructionKind::WhenFileChanged(_) => {}
+            InstructionKind::WhenTyped { .. } => {}
+            InstructionKind::WhenApp { .. } => {}
+            InstructionKind::WhenIdle(_) => {}
+            InstructionKind::WhenScreenLock { .. } => {}
+            InstructionKind::WhenCron(_) => {}
+            InstructionKind::PasteText(text) => {
+                let pasted = ctx.resolve(text, depth).and_then(|v| v.eval_text()).and_then(|text| paste_text(ctx, text));
+                if let Err(e) = pasted {
+                    soft_fail(ctx, &ins.id, "Paste", e)?;
+                }
+            }
+            InstructionKind::WithLock { name, body } => {
+                let name = match ctx.resolve(name, depth).and_then(|v| v.eval_text()) {
+                    Ok(name) => name,
+                    Err(e) => {
+                        soft_fail(ctx, &ins.id, "Lock", e)?;
+                        continue;
+                    }
+                };
+                let stop = ctx.stop_flag.clone();
+                let Some(_guard) = crate::macros::locks::acquire(&name, Duration::from_millis(50), || stop.as_ref().is_some_and(stop_requested)) else {
+                    break;
+                };
+                let flow = run_block(body, ctx, depth, Instant::now())?;
+                if flow != Flow::Normal {
+                    return Ok(flow);
+                }
+            }
             InstructionKind::OpenApp { command, .. } => {
                 println!("Opening app: {command}");
                 if let Err(e) = open_app(command) {
@@ -768,7 +821,7 @@ fn run_block(
                     Ok(ms) => ms.max(0.0),
                     Err(e) => {
                         soft_fail(ctx, &ins.id, "Wait until", e)?;
-                        return Ok(Flow::Normal);
+                        continue;
                     }
                 };
                 let started = Instant::now();
@@ -2661,6 +2714,35 @@ mod tests {
         assert_eq!(vars.get("missed"), None);
         let elapsed = started.elapsed();
         assert!(elapsed >= Duration::from_millis(150) && elapsed < Duration::from_secs(2), "{elapsed:?}");
+    }
+
+    #[test]
+    fn lock_blocks_run_their_body_and_give_up_when_stopped() {
+        let lock = |name: &str, body| Instruction::new(InstructionKind::WithLock { name: Value::text(name), body });
+        let vars = empty_vars();
+        run_instructions(vec![lock("runner-free", vec![set("ran", Value::number(1.0))])], noop_emulator(), None, 1.0, Arc::clone(&vars));
+        assert_eq!(vars.lock().unwrap().get("ran"), Some(&Evaluated::Number(1.0)));
+        assert!(!crate::macros::locks::is_held("runner-free"));
+
+        // Held elsewhere: the strand waits until it's stopped, skipping the body.
+        let held = std::thread::spawn(|| {
+            let guard = crate::macros::locks::acquire("runner-busy", Duration::from_millis(5), || false);
+            std::thread::sleep(Duration::from_millis(400));
+            drop(guard);
+        });
+        std::thread::sleep(Duration::from_millis(50));
+        let stop = Arc::new(Mutex::new(true));
+        let stopper = Arc::clone(&stop);
+        std::thread::spawn(move || {
+            std::thread::sleep(Duration::from_millis(100));
+            *stopper.lock().unwrap() = false;
+        });
+        let vars = empty_vars();
+        let started = Instant::now();
+        run_instructions(vec![lock("runner-busy", vec![set("ran", Value::number(1.0))])], noop_emulator(), Some(stop), 1.0, Arc::clone(&vars));
+        assert!(started.elapsed() < Duration::from_millis(300));
+        assert_eq!(vars.lock().unwrap().get("ran"), None);
+        held.join().unwrap();
     }
 
     #[test]

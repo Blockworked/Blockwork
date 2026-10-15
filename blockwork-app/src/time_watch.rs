@@ -1,13 +1,16 @@
-//! Fires `WhenTime` strands. Dedups once per date.
+//! Fires `WhenTime` strands (once per date) and `WhenCron` strands (once
+//! per matching minute).
 
 use crate::scheduled_run;
 use crate::state::SharedState;
-use chrono::{Local, NaiveDate};
+use crate::AppHandle;
+use blockwork_core::input::cron::Cron;
 use blockwork_core::macros::InstructionKind;
+use blockwork_core::run_log;
+use chrono::{Local, NaiveDateTime, Timelike};
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::AppHandle;
 
 /// Poll interval.
 const POLL_INTERVAL: Duration = Duration::from_secs(1);
@@ -18,38 +21,58 @@ pub(crate) fn start(shared_state: SharedState, app: AppHandle) {
 }
 
 fn run(shared_state: SharedState, app: AppHandle) {
-    // (macro_id, strand_id) -> last fired date.
-    let mut last_fired: HashMap<(String, String), NaiveDate> = HashMap::new();
+    // (macro_id, strand_id) -> the minute it last fired. `WhenTime` only
+    // compares the date part.
+    let mut last_fired: HashMap<(String, String), NaiveDateTime> = HashMap::new();
+    // Cron expressions already reported as broken.
+    let mut reported: HashMap<(String, String), String> = HashMap::new();
 
     loop {
         std::thread::sleep(POLL_INTERVAL);
 
         let now = Local::now();
-        let today = now.date_naive();
+        let Some(minute) = now.naive_local().with_second(0).and_then(|t| t.with_nanosecond(0)) else { continue };
 
-        let (macros, emulator, speed_multiplier, selected_id) = {
+        let (macros, emulator, speed_multiplier) = {
             let Ok(s) = shared_state.lock() else { continue };
             let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
-            let selected_id = s.macro_selected.and_then(|i| s.macros_list.get(i)).map(|m| m.id.clone());
-            (s.macros_list.clone(), emulator, s.global_speed_multiplier, selected_id)
+            let macros: Vec<_> = scheduled_run::live_macros(&s).into_iter().cloned().collect();
+            (macros, emulator, s.global_speed_multiplier)
         };
 
         let mut next_last_fired = HashMap::with_capacity(last_fired.len());
         for mac in &macros {
-            if !mac.settings.always_listen && selected_id.as_deref() != Some(mac.id.as_str()) {
-                continue;
-            }
+            let env: HashMap<_, _> = mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect();
             for strand in &mac.strands {
-                let Some(InstructionKind::WhenTime(schedule)) = strand.instructions.first().map(|i| &i.kind) else { continue };
-
                 let key = (mac.id.clone(), strand.id.clone());
-                let already_fired_today = last_fired.get(&key) == Some(&today);
-
-                if !already_fired_today && schedule.matches(&now) {
+                let previous = last_fired.get(&key).copied();
+                let due = match strand.instructions.first().map(|i| &i.kind) {
+                    Some(InstructionKind::WhenTime(schedule)) => {
+                        previous.map(|t| t.date()) != Some(minute.date()) && schedule.matches(&now)
+                    }
+                    Some(InstructionKind::WhenCron(expression)) => {
+                        let text = expression.resolve_vars(&env).eval_text().unwrap_or_default();
+                        match text.parse::<Cron>() {
+                            Ok(cron) => {
+                                reported.remove(&key);
+                                previous != Some(minute) && cron.matches(&now)
+                            }
+                            Err(e) => {
+                                if reported.get(&key) != Some(&text) {
+                                    run_log::error(&run_log::Source::for_macro(&mac.id, &mac.name), format!("Schedule: {e}"));
+                                    reported.insert(key.clone(), text);
+                                }
+                                false
+                            }
+                        }
+                    }
+                    _ => continue,
+                };
+                if due {
                     scheduled_run::fire(mac.id.clone(), strand.instructions[1..].to_vec(), Arc::clone(&emulator), speed_multiplier, &mac.variables, &mac.lists, Arc::clone(&shared_state), app.clone());
-                    next_last_fired.insert(key, today);
-                } else if already_fired_today {
-                    next_last_fired.insert(key, today);
+                    next_last_fired.insert(key, minute);
+                } else if let Some(previous) = previous {
+                    next_last_fired.insert(key, previous);
                 }
             }
         }

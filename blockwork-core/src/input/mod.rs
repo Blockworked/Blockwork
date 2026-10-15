@@ -2,7 +2,9 @@ pub mod types;
 pub mod instruction_utils;
 pub mod key_names;
 pub mod mouse;
+pub mod cron;
 pub mod schedule;
+pub mod typed;
 pub mod ui_utils;
 pub mod value;
 

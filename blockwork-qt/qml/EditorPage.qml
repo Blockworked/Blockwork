@@ -17,7 +17,7 @@ Item {
     property bool sidebarToggling: false
     readonly property real minSidebarWidth: 180
     readonly property real maxSidebarWidth: 600
-    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile", "HttpRequest", "Notify", "Log", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry", "ThrowError", "StopMacro", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal", "WaitUntil", "FindImage", "ClickImage", "WaitForImage"]
+    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "WhenTyped", "WhenApp", "WhenIdle", "WhenScreenLock", "WhenCron", "Wait", "Text", "PasteText", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile", "HttpRequest", "Notify", "Log", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry", "ThrowError", "StopMacro", "WithLock", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal", "WaitUntil", "FindImage", "ClickImage", "WaitForImage"]
     readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList"]
 
     function uuid() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }); }
@@ -83,7 +83,7 @@ Item {
     function totalBlocks() { return (root.macro ? root.macro.strands : []).reduce((n, st) => n + st.instructions.length, 0); }
     function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
     function instructionExplainer(type) {
-        const x={WaitUntil:"Pauses until the condition is true, checking about 10 times a second. If it's still false after the time limit it's an error; 0 waits forever.",FindImage:"Looks for the picture on screen and puts the screen position of its middle in the two variables, or -1 if it isn't there. Click the picture area to capture one. Tolerance is how different the pixels may be, in percent.",ClickImage:"Finds the picture on screen and clicks its middle. It's an error if the picture isn't there. Click the picture area to capture one.",WaitForImage:"Pauses until the picture appears on screen (or goes away). If that hasn't happened within the time limit it's an error; 0 waits forever.",PixelColor:"The color of the screen at a point, as #rrggbb. Use the screen picker in the toolbar to find coordinates.",AverageColor:"The average color of a screen region, as #rrggbb.",ColorsMatch:"Whether two colors are within the given percentage of each other (0 = identical, 100 = black vs white).",ScreenText:"Reads the text in a screen region (OCR). Uses Windows or macOS text recognition, or Tesseract on Linux.",MousePosition:"Where the mouse pointer is, in screen coordinates.",ScreenSize:"The size of the whole desktop, across all monitors.",MonitorInfo:"The position or size of a monitor, counting from 1.",MonitorCount:"How many monitors are connected.",RunMacro:"Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too.",StopMacroNamed:"Stops every run of the named macro.",SetGlobal:"Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts.",ChangeGlobal:"Adds a number to a global variable. A global that was never set counts as 0.",Retry:"Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other.",WindowAction:"Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window.",MoveWindow:"Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating.",WhenWindow:"Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window.",WhenFileChanged:"Runs when the file is created, changed or deleted. Checked once a second.",WriteFile:"Writes text to a file, replacing it, or appends to the end. ~ means your home folder.",HttpRequest:"Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error.",Notify:"Shows a desktop notification.",Log:"Adds a line to the run log.",TryCatch:"Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong.",ThrowError:"Fails with this message. Ends the strand unless a try block catches it.",StopMacro:"Stops every strand of this run.",WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a key or key combo.",WhenKey:"Runs when a key or key combo is pressed or released.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
+        const x={WhenTyped:"Text expansion: runs when you type the text anywhere, like ;addr. With 'erase it' the typed text is deleted first, so a paste block can replace it. Uses a US keyboard layout for symbols.",PasteText:"Pastes text with Ctrl+V (Cmd+V on macOS), then puts back the text that was on the clipboard. Faster and more reliable than typing for long text. Terminals that paste with Ctrl+Shift+V need a Key block instead.",WhenApp:"Runs when a program whose name contains the text starts or exits. Checked once a second.",WhenIdle:"Runs once you haven't touched the keyboard or mouse for this many minutes. Fires again after the next idle stretch.",WhenScreenLock:"Runs when the screen locks or unlocks.",WhenCron:"Runs on a cron schedule: minute hour day month weekday. Examples: '0 9 * * mon-fri' (9:00 on weekdays), '*/15 * * * *' (every 15 minutes), '@hourly'.",WithLock:"Runs its body while holding a named lock. Only one strand, in any macro, can be inside a lock with the same name at a time; others wait their turn. Use it so two macros don't type over each other.",AppRunning:"Whether a program whose name contains the text is running.",IdleSeconds:"How many seconds since the last keyboard or mouse input.",ScreenLocked:"Whether the screen is locked.",WaitUntil:"Pauses until the condition is true, checking about 10 times a second. If it's still false after the time limit it's an error; 0 waits forever.",FindImage:"Looks for the picture on screen and puts the screen position of its middle in the two variables, or -1 if it isn't there. Click the picture area to capture one. Tolerance is how different the pixels may be, in percent.",ClickImage:"Finds the picture on screen and clicks its middle. It's an error if the picture isn't there. Click the picture area to capture one.",WaitForImage:"Pauses until the picture appears on screen (or goes away). If that hasn't happened within the time limit it's an error; 0 waits forever.",PixelColor:"The color of the screen at a point, as #rrggbb. Use the screen picker in the toolbar to find coordinates.",AverageColor:"The average color of a screen region, as #rrggbb.",ColorsMatch:"Whether two colors are within the given percentage of each other (0 = identical, 100 = black vs white).",ScreenText:"Reads the text in a screen region (OCR). Uses Windows or macOS text recognition, or Tesseract on Linux.",MousePosition:"Where the mouse pointer is, in screen coordinates.",ScreenSize:"The size of the whole desktop, across all monitors.",MonitorInfo:"The position or size of a monitor, counting from 1.",MonitorCount:"How many monitors are connected.",RunMacro:"Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too.",StopMacroNamed:"Stops every run of the named macro.",SetGlobal:"Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts.",ChangeGlobal:"Adds a number to a global variable. A global that was never set counts as 0.",Retry:"Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other.",WindowAction:"Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window.",MoveWindow:"Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating.",WhenWindow:"Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window.",WhenFileChanged:"Runs when the file is created, changed or deleted. Checked once a second.",WriteFile:"Writes text to a file, replacing it, or appends to the end. ~ means your home folder.",HttpRequest:"Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error.",Notify:"Shows a desktop notification.",Log:"Adds a line to the run log.",TryCatch:"Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong.",ThrowError:"Fails with this message. Ends the strand unless a try block catches it.",StopMacro:"Stops every strand of this run.",WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a key or key combo.",WhenKey:"Runs when a key or key combo is pressed or released.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
         return x[type]||"A Blockwork instruction block.";
     }
     // ---- daemon commands whose result QML needs ----
@@ -620,7 +620,16 @@ Item {
     }
     BwDialog {
         id: macroSettings; title: "Macro settings"; standardButtons: Dialog.Close
-        Column { spacing: 14; width: 360
+        readonly property var settings: root.macro && root.macro.settings ? root.macro.settings : ({})
+        function saveConditions(days) {
+            root.invoke("set_macro_conditions", { onlyInWindow: condWindow.text, power: powerBox.options[powerBox.currentIndex].value,
+                activeFrom: condFrom.text, activeUntil: condUntil.text, activeDays: days === undefined ? (settings.active_days || 0) : days });
+        }
+        Flickable {
+        implicitWidth: 380; implicitHeight: Math.min(settingsColumn.implicitHeight, root.height - 190)
+        contentHeight: settingsColumn.implicitHeight; clip: true; boundsBehavior: Flickable.StopAtBounds
+        ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+        Column { id: settingsColumn; spacing: 14; width: 360
             Text { text: "Controls behavior specific to this macro."; color: "#a5a6ab" }
             Text { text: "Title"; color: "#a1a2a7"; font.pixelSize: 13 }
             BwTextField { width: parent.width; text: root.macro ? root.macro.name : ""; onEditingFinished: root.invoke("set_title", { title: text }) }
@@ -659,6 +668,71 @@ Item {
                 }
                 Text { Layout.fillWidth: true; text: "repeats (0 = no limit)"; color: "#a1a2a7"; font.pixelSize: 13 }
             }
+            Text { text: "Conditions"; color: "#a1a2a7"; font.pixelSize: 13 }
+            Text {
+                width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
+                text: "Triggers and hotkeys only start this macro when all of these hold. The Run button ignores them."
+            }
+            RowLayout { width: parent.width; spacing: 8
+                Text { text: "While"; color: Theme.text; font.pixelSize: 13 }
+                BwTextField {
+                    id: condWindow; Layout.fillWidth: true; placeholderText: "any window"
+                    text: macroSettings.settings.only_in_window || ""
+                    onEditingFinished: macroSettings.saveConditions()
+                }
+                Text { text: "is focused"; color: Theme.text; font.pixelSize: 13 }
+            }
+            RowLayout { width: parent.width; spacing: 8
+                Text { text: "On"; color: Theme.text; font.pixelSize: 13 }
+                BwComboBox {
+                    id: powerBox; Layout.fillWidth: true; textRole: "text"
+                    readonly property var options: [{ value: "Any", text: "battery or AC power" }, { value: "PluggedIn", text: "AC power only" }, { value: "OnBattery", text: "battery only" }]
+                    model: options
+                    currentIndex: Math.max(0, options.findIndex(o => o.value === macroSettings.settings.power))
+                    onActivated: macroSettings.saveConditions()
+                }
+            }
+            RowLayout { width: parent.width; spacing: 8
+                Text { text: "Between"; color: Theme.text; font.pixelSize: 13 }
+                BwTextField {
+                    id: condFrom; Layout.preferredWidth: 70; horizontalAlignment: Text.AlignHCenter; placeholderText: "09:00"
+                    text: macroSettings.settings.active_from || ""
+                    onEditingFinished: if (!!text === !!condUntil.text) macroSettings.saveConditions()
+                }
+                Text { text: "and"; color: Theme.text; font.pixelSize: 13 }
+                BwTextField {
+                    id: condUntil; Layout.preferredWidth: 70; horizontalAlignment: Text.AlignHCenter; placeholderText: "17:00"
+                    text: macroSettings.settings.active_until || ""
+                    onEditingFinished: if (!!text === !!condFrom.text) macroSettings.saveConditions()
+                }
+                Text { Layout.fillWidth: true; text: "(empty = all day)"; color: Theme.textDim; font.pixelSize: 12 }
+            }
+            Row { spacing: 6
+                Text { text: "On"; color: Theme.text; font.pixelSize: 13; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
+                Repeater {
+                    model: ["S", "M", "T", "W", "T", "F", "S"]
+                    delegate: Rectangle {
+                        required property string modelData
+                        required property int index
+                        readonly property int days: macroSettings.settings.active_days || 0
+                        // No days picked means every day.
+                        readonly property bool on: days === 0 || (days & (1 << index)) !== 0
+                        width: 30; height: 30; radius: 15
+                        color: on ? Theme.accent : Theme.panelRaised; border.color: Theme.border
+                        Accessible.name: ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"][index]
+                        Text { anchors.centerIn: parent; text: parent.modelData; color: parent.on ? "white" : Theme.textDim; font.pixelSize: 12; font.weight: Font.DemiBold }
+                        MouseArea {
+                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
+                            onClicked: {
+                                const next = (parent.days === 0 ? 0x7f : parent.days) ^ (1 << parent.index);
+                                if (next === 0) return; // keep at least one day
+                                macroSettings.saveConditions(next === 0x7f ? 0 : next);
+                            }
+                        }
+                    }
+                }
+            }
+        }
         }
     }
     BwDialog {
@@ -816,11 +890,13 @@ Item {
         ["ColorsMatch", "bool", 3, [textValue("#ffffff"), textValue("#fafafa"), numberValue(10)]],
         ["ScreenText", "text", 4, [numberValue(0), numberValue(0), numberValue(400), numberValue(100)]],
         ["MousePosition", "number", 1, [textValue("x")]], ["ScreenSize", "number", 1, [textValue("width")]],
-        ["MonitorCount", "number", 0], ["MonitorInfo", "number", 2, [numberValue(1), textValue("width")]]
+        ["MonitorCount", "number", 0], ["MonitorInfo", "number", 2, [numberValue(1), textValue("width")]],
+        ["AppRunning", "bool", 1, [textValue("firefox")]], ["IdleSeconds", "number", 0], ["ScreenLocked", "bool", 0]
     ]
     readonly property var extraCategories: ({
         WriteFile: "system", HttpRequest: "system", Notify: "system", Log: "system",
-        TryCatch: "control", Retry: "control", ThrowError: "control",
+        TryCatch: "control", Retry: "control", ThrowError: "control", WithLock: "control", PasteText: "input",
+        AppRunning: "system", IdleSeconds: "system", ScreenLocked: "system",
         WindowAction: "system", MoveWindow: "system", WindowExists: "system", StopMacro: "control", LastError: "control",
         RunMacro: "control", StopMacroNamed: "control", MacroRunning: "control", SetGlobal: "data", ChangeGlobal: "data", GlobalVariable: "data",
         WaitUntil: "control", FindImage: "screen", ClickImage: "screen", WaitForImage: "screen", PixelColor: "screen", AverageColor: "screen",
@@ -864,13 +940,29 @@ Item {
             ScreenSize: { prefix: "screen", result: "number", enumArg: { index: 0, options: [{ value: "width", label: "width" }, { value: "height", label: "height" }] } },
             MonitorCount: { prefix: "number of monitors", result: "number" },
             MonitorInfo: { prefix: "monitor", result: "number",
-                enumArg: { index: 1, options: ["x", "y", "width", "height"].map(v => ({ value: v, label: v })) } }
+                enumArg: { index: 1, options: ["x", "y", "width", "height"].map(v => ({ value: v, label: v })) } },
+            AppRunning: { prefix: "app", suffix: "is running?", result: "bool" },
+            IdleSeconds: { prefix: "seconds idle", result: "number" },
+            ScreenLocked: { prefix: "screen is locked?", result: "bool" }
         });
         BlockRegistry.registerRows({
             WhenWindow: { shape: "header", icon: "app-window", head: [label("WHEN WINDOW"), value("WindowPattern", "pattern"), label("IS"),
                 { kind: "dropdown", key: "focused", options: [{ value: "focused", label: "focused" }, { value: "unfocused", label: "unfocused" }],
                   encode: v => v === "focused", decode: v => v ? "focused" : "unfocused" }] },
             WhenFileChanged: { shape: "header", icon: "file", head: [label("WHEN FILE"), value("WatchedFilePath", "path"), label("CHANGES")] },
+            WhenTyped: { shape: "header", icon: "type", head: [label("WHEN I TYPE"), value("TypedText", "text"), label("THEN"),
+                { kind: "dropdown", key: "erase", options: [{ value: "erase", label: "erase it" }, { value: "keep", label: "keep it" }],
+                  encode: v => v === "erase", decode: v => v ? "erase" : "keep" }] },
+            WhenApp: { shape: "header", icon: "app-window", head: [label("WHEN APP"), value("AppPattern", "pattern"),
+                { kind: "dropdown", key: "started", options: [{ value: "starts", label: "starts" }, { value: "exits", label: "exits" }],
+                  encode: v => v === "starts", decode: v => v ? "starts" : "exits" }] },
+            WhenIdle: { shape: "header", icon: "moon", head: [label("WHEN IDLE FOR"), value("IdleMinutes", "minutes"), label("MINUTES")] },
+            WhenScreenLock: { shape: "header", icon: "lock", head: [label("WHEN SCREEN IS"),
+                { kind: "dropdown", key: "locked", options: [{ value: "locked", label: "locked" }, { value: "unlocked", label: "unlocked" }],
+                  encode: v => v === "locked", decode: v => v ? "locked" : "unlocked" }] },
+            WhenCron: { shape: "header", icon: "clock", head: [label("ON SCHEDULE"), value("CronExpression", "expression")] },
+            PasteText: { icon: "clipboard-paste", head: [label("paste"), value("PasteValue", "text")] },
+            WithLock: { icon: "lock", mouths: ["body"], head: [label("with lock"), value("LockName", "name")] },
             WriteFile: { icon: "file-text", head: [
                 { kind: "dropdown", key: "append", options: [{ value: "write", label: "write" }, { value: "append", label: "append" }],
                   encode: v => v === "append", decode: v => v ? "append" : "write" },
@@ -923,6 +1015,13 @@ Item {
         BlockRegistry.registerPrefabs({
             WhenWindow: { pattern: textValue("Firefox"), focused: true },
             WhenFileChanged: { path: textValue("~/notes.txt") },
+            WhenTyped: { text: textValue(";addr"), erase: true },
+            WhenApp: { pattern: textValue("firefox"), started: true },
+            WhenIdle: { minutes: numberValue(5) },
+            WhenScreenLock: { locked: true },
+            WhenCron: { expression: textValue("0 9 * * mon-fri") },
+            PasteText: { text: textValue("Hello!") },
+            WithLock: { name: textValue("keyboard"), body: [] },
             WriteFile: { path: textValue("~/notes.txt"), text: textValue("hello"), append: true },
             HttpRequest: () => ({ method: "GET", url: textValue("https://example.com"), body: textValue(""), headers: textValue(""),
                 variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),

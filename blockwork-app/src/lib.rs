@@ -19,8 +19,10 @@ pub(crate) mod razer;
 pub(crate) mod scheduled_run;
 pub(crate) mod screen_pick;
 pub(crate) mod state;
+pub(crate) mod system_watch;
 pub(crate) mod templates;
 pub(crate) mod time_watch;
+pub(crate) mod type_watch;
 pub(crate) mod window_watch;
 
 use crate::state::{AppState, History, UNDO_STACK_LIMIT, Page, RecordingPhase, SharedState, UpdateCheckState};
@@ -258,6 +260,8 @@ impl Backend {
         window_watch::start(Arc::clone(&shared), app.clone());
 
         file_watch::start(Arc::clone(&shared), app.clone());
+        type_watch::start(Arc::clone(&shared), app.clone());
+        system_watch::start(Arc::clone(&shared), app.clone());
 
         // Pushes run log updates to the UI, at most a few times a second.
         {
