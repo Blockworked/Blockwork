@@ -50,6 +50,8 @@ pub enum FieldId {
     MacroTarget,
     GlobalName,
     GlobalValue,
+    WaitTimeout,
+    ImageTolerance,
 }
 
 impl FieldId {
@@ -117,6 +119,8 @@ impl std::fmt::Display for FieldId {
             FieldId::MacroTarget => write!(f, "MacroTarget"),
             FieldId::GlobalName => write!(f, "GlobalName"),
             FieldId::GlobalValue => write!(f, "GlobalValue"),
+            FieldId::WaitTimeout => write!(f, "WaitTimeout"),
+            FieldId::ImageTolerance => write!(f, "ImageTolerance"),
         }
     }
 }
@@ -164,6 +168,8 @@ impl std::str::FromStr for FieldId {
             "MacroTarget" => Ok(FieldId::MacroTarget),
             "GlobalName" => Ok(FieldId::GlobalName),
             "GlobalValue" => Ok(FieldId::GlobalValue),
+            "WaitTimeout" => Ok(FieldId::WaitTimeout),
+            "ImageTolerance" => Ok(FieldId::ImageTolerance),
             _ if s.starts_with("CallArg:") => s["CallArg:".len()..]
                 .parse::<usize>()
                 .map(FieldId::CallArg)
@@ -234,6 +240,12 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
         (InstructionKind::SetGlobal { value, .. }, FieldId::GlobalValue) => Some(value),
         (InstructionKind::ChangeGlobal { name, .. }, FieldId::GlobalName) => Some(name),
         (InstructionKind::ChangeGlobal { by, .. }, FieldId::GlobalValue) => Some(by),
+        (InstructionKind::WaitUntil { condition, .. }, FieldId::Condition) => Some(condition),
+        (InstructionKind::WaitUntil { timeout, .. }, FieldId::WaitTimeout) => Some(timeout),
+        (InstructionKind::WaitForImage { timeout, .. }, FieldId::WaitTimeout) => Some(timeout),
+        (InstructionKind::FindImage { tolerance, .. }, FieldId::ImageTolerance) => Some(tolerance),
+        (InstructionKind::ClickImage { tolerance, .. }, FieldId::ImageTolerance) => Some(tolerance),
+        (InstructionKind::WaitForImage { tolerance, .. }, FieldId::ImageTolerance) => Some(tolerance),
         _ => None,
     }
 }

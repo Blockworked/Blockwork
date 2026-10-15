@@ -31,6 +31,9 @@ arboard.workspace = true
 chrono.workspace = true
 # HTTP blocks (see src/http.rs).
 ureq.workspace = true
+# Screen images: captures, block images as PNG data: URIs (see src/screen/).
+png = "0.18"
+base64.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

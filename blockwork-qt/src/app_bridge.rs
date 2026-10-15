@@ -29,6 +29,10 @@ pub mod qobject {
         #[qproperty(bool, preview_error, cxx_name = "previewError")]
         #[qproperty(i32, preview_serial, cxx_name = "previewSerial")]
         #[qproperty(QString, active_blocks_json, cxx_name = "activeBlocksJson")]
+        #[qproperty(QString, reply_key, cxx_name = "replyKey")]
+        #[qproperty(QString, reply_json, cxx_name = "replyJson")]
+        #[qproperty(QString, reply_error, cxx_name = "replyError")]
+        #[qproperty(i32, reply_serial, cxx_name = "replySerial")]
         type AppBridge = super::AppBridgeRust;
 
         #[qinvokable]
@@ -46,6 +50,12 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "previewValue"]
         fn preview_value(self: Pin<&mut AppBridge>, key: &QString, value: &QString);
+
+        /// Runs a command whose result QML needs; it arrives through the
+        /// `reply*` properties, tagged with `key`.
+        #[qinvokable]
+        #[cxx_name = "callCommand"]
+        fn call_command(self: Pin<&mut AppBridge>, key: &QString, command: &QString, arguments: &QString);
 
         #[qinvokable]
         #[cxx_name = "refreshInstalledApps"]
@@ -82,6 +92,10 @@ pub struct AppBridgeRust {
     preview_error: bool,
     preview_serial: i32,
     active_blocks_json: QString,
+    reply_key: QString,
+    reply_json: QString,
+    reply_error: QString,
+    reply_serial: i32,
     started: bool,
     request_tx: Option<tokio::sync::mpsc::UnboundedSender<daemon_client::Request>>,
     event_rx: Option<mpsc::Receiver<daemon_client::Event>>,
@@ -105,6 +119,10 @@ impl Default for AppBridgeRust {
             preview_error: false,
             preview_serial: 0,
             active_blocks_json: QString::from("[]"),
+            reply_key: QString::default(),
+            reply_json: QString::default(),
+            reply_error: QString::default(),
+            reply_serial: 0,
             started: false,
             request_tx: None,
             event_rx: None,
@@ -164,6 +182,13 @@ impl qobject::AppBridge {
                     let next = self.preview_serial().saturating_add(1);
                     self.as_mut().set_preview_serial(next);
                 }
+                daemon_client::Event::Reply { key, json, error } => {
+                    self.as_mut().set_reply_key(QString::from(&key));
+                    self.as_mut().set_reply_json(QString::from(&json));
+                    self.as_mut().set_reply_error(QString::from(&error));
+                    let next = self.reply_serial().saturating_add(1);
+                    self.as_mut().set_reply_serial(next);
+                }
                 daemon_client::Event::Trace(json) => {
                     self.as_mut().set_active_blocks_json(QString::from(&json));
                 }
@@ -213,6 +238,20 @@ impl qobject::AppBridge {
             self.as_mut().set_last_error(QString::from(
                 "Blockwork is not connected to its background service",
             ));
+        }
+    }
+
+    pub fn call_command(mut self: Pin<&mut Self>, key: &QString, command: &QString, arguments: &QString) {
+        let key = key.to_string();
+        let args = serde_json::from_str(&arguments.to_string()).unwrap_or(serde_json::Value::Null);
+        let request = daemon_client::Request::Call { key: key.clone(), command: command.to_string(), args };
+        let sent = self.rust().request_tx.as_ref().is_some_and(|tx| tx.send(request).is_ok());
+        if !sent {
+            self.as_mut().set_reply_key(QString::from(&key));
+            self.as_mut().set_reply_json(QString::from("null"));
+            self.as_mut().set_reply_error(QString::from("Blockwork is not connected to its background service"));
+            let next = self.reply_serial().saturating_add(1);
+            self.as_mut().set_reply_serial(next);
         }
     }
 

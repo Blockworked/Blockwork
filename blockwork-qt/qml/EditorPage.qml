@@ -17,7 +17,7 @@ Item {
     property bool sidebarToggling: false
     readonly property real minSidebarWidth: 180
     readonly property real maxSidebarWidth: 600
-    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile", "HttpRequest", "Notify", "Log", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry", "ThrowError", "StopMacro", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal"]
+    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "Wait", "Text", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile", "HttpRequest", "Notify", "Log", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry", "ThrowError", "StopMacro", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal", "WaitUntil", "FindImage", "ClickImage", "WaitForImage"]
     readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList"]
 
     function uuid() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }); }
@@ -83,9 +83,101 @@ Item {
     function totalBlocks() { return (root.macro ? root.macro.strands : []).reduce((n, st) => n + st.instructions.length, 0); }
     function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
     function instructionExplainer(type) {
-        const x={RunMacro:"Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too.",StopMacroNamed:"Stops every run of the named macro.",SetGlobal:"Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts.",ChangeGlobal:"Adds a number to a global variable. A global that was never set counts as 0.",Retry:"Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other.",WindowAction:"Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window.",MoveWindow:"Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating.",WhenWindow:"Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window.",WhenFileChanged:"Runs when the file is created, changed or deleted. Checked once a second.",WriteFile:"Writes text to a file, replacing it, or appends to the end. ~ means your home folder.",HttpRequest:"Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error.",Notify:"Shows a desktop notification.",Log:"Adds a line to the run log.",TryCatch:"Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong.",ThrowError:"Fails with this message. Ends the strand unless a try block catches it.",StopMacro:"Stops every strand of this run.",WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a key or key combo.",WhenKey:"Runs when a key or key combo is pressed or released.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
+        const x={WaitUntil:"Pauses until the condition is true, checking about 10 times a second. If it's still false after the time limit it's an error; 0 waits forever.",FindImage:"Looks for the picture on screen and puts the screen position of its middle in the two variables, or -1 if it isn't there. Click the picture area to capture one. Tolerance is how different the pixels may be, in percent.",ClickImage:"Finds the picture on screen and clicks its middle. It's an error if the picture isn't there. Click the picture area to capture one.",WaitForImage:"Pauses until the picture appears on screen (or goes away). If that hasn't happened within the time limit it's an error; 0 waits forever.",PixelColor:"The color of the screen at a point, as #rrggbb. Use the screen picker in the toolbar to find coordinates.",AverageColor:"The average color of a screen region, as #rrggbb.",ColorsMatch:"Whether two colors are within the given percentage of each other (0 = identical, 100 = black vs white).",ScreenText:"Reads the text in a screen region (OCR). Uses Windows or macOS text recognition, or Tesseract on Linux.",MousePosition:"Where the mouse pointer is, in screen coordinates.",ScreenSize:"The size of the whole desktop, across all monitors.",MonitorInfo:"The position or size of a monitor, counting from 1.",MonitorCount:"How many monitors are connected.",RunMacro:"Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too.",StopMacroNamed:"Stops every run of the named macro.",SetGlobal:"Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts.",ChangeGlobal:"Adds a number to a global variable. A global that was never set counts as 0.",Retry:"Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other.",WindowAction:"Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window.",MoveWindow:"Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating.",WhenWindow:"Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window.",WhenFileChanged:"Runs when the file is created, changed or deleted. Checked once a second.",WriteFile:"Writes text to a file, replacing it, or appends to the end. ~ means your home folder.",HttpRequest:"Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error.",Notify:"Shows a desktop notification.",Log:"Adds a line to the run log.",TryCatch:"Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong.",ThrowError:"Fails with this message. Ends the strand unless a try block catches it.",StopMacro:"Stops every strand of this run.",WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a key or key combo.",WhenKey:"Runs when a key or key combo is pressed or released.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
         return x[type]||"A Blockwork instruction block.";
     }
+    // ---- daemon commands whose result QML needs ----
+    property int callSeq: 0
+    property var callbacks: ({})
+    function daemonCall(command, args, done) {
+        const key = "call" + (++callSeq);
+        callbacks[key] = done;
+        root.appBridge.callCommand(key, command, JSON.stringify(args || {}));
+    }
+    Connections {
+        target: root.appBridge
+        function onReplySerialChanged() {
+            const key = root.appBridge.replyKey, done = root.callbacks[key];
+            if (!done) return;
+            delete root.callbacks[key];
+            const error = root.appBridge.replyError;
+            done(error ? null : JSON.parse(root.appBridge.replyJson || "null"), error);
+        }
+    }
+
+    // ---- screen picker: images for image blocks, points/regions for reporters ----
+    // { kind: "image", strandId, path, instruction } or { kind: "tool" }
+    property var pickRequest: null
+    property int savedVisibility: Window.Windowed
+    // Gives the compositor a moment to take a window off screen.
+    function afterUnmap(action) { unmapDelay.action = action; unmapDelay.restart(); }
+    Timer { id: unmapDelay; interval: 300; property var action: null; onTriggered: if (action) action() }
+    function startScreenPick(request) {
+        const win = Window.window;
+        if (pickRequest || !win) return;
+        pickRequest = request;
+        // Out of the way, so whatever is behind the editor can be picked.
+        savedVisibility = win.visibility;
+        win.hide();
+        const image = request.kind === "image";
+        root.afterUnmap(() => screenOverlay.begin(image,
+            image ? "Drag around the image to look for" : "Click a point or drag out a region"));
+    }
+    function restoreWindow() {
+        const win = Window.window;
+        if (!win) return;
+        // show*() rather than assigning `visibility`, which fights the window's `visible` binding.
+        if (savedVisibility === Window.Maximized) win.showMaximized();
+        else if (savedVisibility === Window.FullScreen) win.showFullScreen();
+        else win.showNormal();
+        win.raise(); win.requestActivate();
+    }
+    ScreenOverlay {
+        id: screenOverlay
+        onCanceled: { root.pickRequest = null; root.restoreWindow(); }
+        onPicked: (x, y, width, height) => {
+            const request = root.pickRequest;
+            root.pickRequest = null;
+            // Capture once the overlay itself is gone.
+            root.afterUnmap(() => root.daemonCall("screen_grab", { x: x, y: y, width: width, height: height }, (result, error) => {
+                root.restoreWindow();
+                if (!result) { pickError.show(error); return; }
+                if (request && request.kind === "image") root.setBlockImage(request, result.image);
+                else pickResult.show(result);
+            }));
+        }
+    }
+    function setBlockImage(request, image) {
+        const updated = JSON.parse(JSON.stringify(request.instruction || {}));
+        updated.image = image;
+        root.invoke("edit_instruction", { strandId: request.strandId, path: request.path, instruction: updated });
+    }
+    function onPieceAction(action, strandId, path, instruction) {
+        const request = { kind: "image", strandId: strandId, path: path, instruction: instruction };
+        if (action === "captureImage") root.startScreenPick(request);
+        else if (action === "loadImage") imageFileDialog.openFor(request);
+    }
+    // Canvas coordinates near the top-left of what's on screen, for blocks added from a dialog.
+    function visibleCanvasPoint() {
+        const scene = canvas.mapToItem(null, 60, 60);
+        const at = canvas.workspacePoint(scene.x, scene.y);
+        return at ? { x: Math.round(at.x), y: Math.round(at.y) } : { x: 120, y: 120 };
+    }
+    // Adds a reporter or block made from a pick to the canvas.
+    function addPicked(kind, pick) {
+        const n = v => numberValue(v), op = (name, args) => ({ kind: "Op", op: name, args: args });
+        const region = [n(pick.x), n(pick.y), n(pick.width), n(pick.height)];
+        const at = visibleCanvasPoint();
+        if (kind === "PixelColor") root.invoke("create_floating_value", { x: at.x, y: at.y, value: op("PixelColor", [n(pick.x), n(pick.y)]), originBlockId: null });
+        else if (kind === "AverageColor" || kind === "ScreenText") root.invoke("create_floating_value", { x: at.x, y: at.y, value: op(kind, region), originBlockId: null });
+        else {
+            const block = defaultInstruction(kind);
+            if (kind === "MoveMouse") { block.x = n(pick.x); block.y = n(pick.y); block.coordinate = "Absolute"; }
+            else block.image = pick.image;
+            root.invoke("add_strand", { x: at.x, y: at.y, instruction: block });
+        }
+    }
+
     // ---- app picker ("Choose app" for OpenApp/CloseApp) ----
     property var appPickerRequest: null   // { strandId, path, instruction } for canvas, or { paletteType } for palette
     function openAppPicker(strandId, path, instruction) {
@@ -329,6 +421,11 @@ Item {
                         ToolTip.visible: hovered; ToolTip.text: "Recording settings"; onClicked: recordingSettings.open()
                     }
                 }
+                BwButton {
+                    iconName: "crosshair"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro
+                    ToolTip.visible: hovered; ToolTip.text: "Pick a point or region from the screen"
+                    onClicked: root.startScreenPick({ kind: "tool" })
+                }
                 Item { Layout.fillWidth: true }
                 BwButton { visible: toolbar.tier < 3; iconName: "undo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_undo; ToolTip.visible: hovered; ToolTip.text: "Undo"; onClicked: root.invoke("undo") }
                 BwButton { visible: toolbar.tier < 3; iconName: "redo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_redo; ToolTip.visible: hovered; ToolTip.text: "Redo"; onClicked: root.invoke("redo") }
@@ -399,6 +496,7 @@ Item {
                     listInstructionTypes: root.listInstructionTypes
                     extraOperators: root.extraOperators
                     extraCategories: root.extraCategories
+                    appCategories: [{ id: "screen", name: "Screen", icon: "crosshair" }]
                     variables: root.macro ? root.macro.variables : []
                     lists: root.macro && root.macro.lists ? root.macro.lists : []
                     blockDefinitions: root.macro ? root.macro.block_defs : []
@@ -471,6 +569,7 @@ Item {
                     onRecordingTargetRequested: strandId => root.invoke("set_recording_target", { strandId: strandId })
                     onKeyCaptureRequested:(strandId,path)=>root.invoke("start_key_capture",{strandId:strandId,path:path})
                     onAppPickerRequested:(strandId,path,instruction)=>root.openAppPicker(strandId,path,instruction)
+                    onPieceActionRequested:(action,strandId,path,instruction)=>root.onPieceAction(action,strandId,path,instruction)
                     onDetailsRequested:type=>detailsDialog.show(type,type,root.instructionExplainer(type))
                     onCanvasNoteRequested: (x, y) => root.invoke("create_comment", { x: x, y: y, text: "" })
                     onClearRequested: root.invoke("clear_instructions")
@@ -563,6 +662,71 @@ Item {
         }
     }
     BwDialog {
+        id: pickError; title: "Couldn't read the screen"; standardButtons: Dialog.Ok
+        property string message: ""
+        function show(text) { message = text || "Unknown error"; open(); }
+        Text { width: 420; wrapMode: Text.WordWrap; text: pickError.message; color: Theme.text; font.pixelSize: 13 }
+    }
+    BwDialog {
+        id: pickResult; title: "Picked from the screen"; standardButtons: Dialog.Close
+        property var pick: null
+        readonly property bool region: !!pick && pick.width > 0 && pick.height > 0
+        function show(result) { pick = result; open(); }
+        Column {
+            width: 440; spacing: 12
+            Row {
+                spacing: 14
+                Image {
+                    visible: pickResult.region; source: pickResult.region ? pickResult.pick.image : ""
+                    width: Math.min(160, implicitWidth); height: Math.min(90, implicitHeight); fillMode: Image.PreserveAspectFit; smooth: false
+                }
+                Column {
+                    spacing: 6
+                    TextEdit {
+                        readOnly: true; selectByMouse: true; color: Theme.text; font.pixelSize: 13
+                        text: !pickResult.pick ? "" : "x " + pickResult.pick.x + "   y " + pickResult.pick.y
+                            + (pickResult.region ? "\nwidth " + pickResult.pick.width + "   height " + pickResult.pick.height : "")
+                    }
+                    Row {
+                        spacing: 8
+                        Rectangle { width: 18; height: 18; radius: 4; color: pickResult.pick ? pickResult.pick.color : "black"; border.color: Theme.border }
+                        TextEdit { readOnly: true; selectByMouse: true; text: pickResult.pick ? pickResult.pick.color : ""; color: Theme.text; font.pixelSize: 13 }
+                    }
+                }
+            }
+            Text { text: "Add to the canvas:"; color: Theme.textDim; font.pixelSize: 12 }
+            Flow {
+                width: parent.width; spacing: 8
+                Repeater {
+                    model: pickResult.region
+                        ? [["ScreenText", "text in this region"], ["AverageColor", "average color here"], ["ClickImage", "click this image"],
+                           ["WaitForImage", "wait for this image"], ["FindImage", "find this image"]]
+                        : [["PixelColor", "color at this point"], ["MoveMouse", "move mouse here"]]
+                    delegate: BwButton {
+                        required property var modelData
+                        text: modelData[1]
+                        onClicked: { root.addPicked(modelData[0], pickResult.pick); pickResult.close(); }
+                    }
+                }
+            }
+        }
+    }
+    BwDialog {
+        id: imageFileDialog; title: "Use an image file"; standardButtons: Dialog.Ok | Dialog.Cancel
+        property var request: null
+        function openFor(req) { request = req; imagePath.text = ""; open(); imagePath.forceActiveFocus(); }
+        Column { width: 420; spacing: 8
+            Text { text: "Path to a PNG image"; color: Theme.text }
+            BwTextField { id: imagePath; width: parent.width; placeholderText: "~/Pictures/button.png"; onAccepted: imageFileDialog.accept() }
+        }
+        onAccepted: {
+            const req = request;
+            root.daemonCall("image_from_file", { path: imagePath.text.trim() }, (image, error) => {
+                if (image) root.setBlockImage(req, image); else pickError.show(error);
+            });
+        }
+    }
+    BwDialog {
         id: templateDialog; title: "Start from a template"; standardButtons: Dialog.Cancel
         TemplateList {
             width: 560; templates: appState.templates || []
@@ -647,13 +811,20 @@ Item {
         ["JsonGet", "text", 2, [textValue("name"), textValue('{"name": "Blockwork"}')]],
         ["ShellOutput", "text", 1, [textValue("echo hello")]], ["ShellSucceeded", "bool", 1, [textValue("true")]],
         ["ActiveWindowTitle", "text", 0], ["ActiveWindowApp", "text", 0], ["WindowExists", "bool", 1, [textValue("Firefox")]],
-        ["LastError", "text", 0], ["MacroRunning", "bool", 1, [textValue("")]], ["GlobalVariable", "text", 1, [textValue("counter")]]
+        ["LastError", "text", 0], ["MacroRunning", "bool", 1, [textValue("")]], ["GlobalVariable", "text", 1, [textValue("counter")]],
+        ["PixelColor", "text", 2, [numberValue(100), numberValue(100)]], ["AverageColor", "text", 4, [numberValue(0), numberValue(0), numberValue(100), numberValue(100)]],
+        ["ColorsMatch", "bool", 3, [textValue("#ffffff"), textValue("#fafafa"), numberValue(10)]],
+        ["ScreenText", "text", 4, [numberValue(0), numberValue(0), numberValue(400), numberValue(100)]],
+        ["MousePosition", "number", 1, [textValue("x")]], ["ScreenSize", "number", 1, [textValue("width")]],
+        ["MonitorCount", "number", 0], ["MonitorInfo", "number", 2, [numberValue(1), textValue("width")]]
     ]
     readonly property var extraCategories: ({
         WriteFile: "system", HttpRequest: "system", Notify: "system", Log: "system",
         TryCatch: "control", Retry: "control", ThrowError: "control",
         WindowAction: "system", MoveWindow: "system", WindowExists: "system", StopMacro: "control", LastError: "control",
         RunMacro: "control", StopMacroNamed: "control", MacroRunning: "control", SetGlobal: "data", ChangeGlobal: "data", GlobalVariable: "data",
+        WaitUntil: "control", FindImage: "screen", ClickImage: "screen", WaitForImage: "screen", PixelColor: "screen", AverageColor: "screen",
+        ColorsMatch: "screen", ScreenText: "screen", MousePosition: "screen", ScreenSize: "screen", MonitorCount: "screen", MonitorInfo: "screen",
         ReadFile: "system", FileExists: "system", ListDirectory: "system", HttpGet: "system", JsonGet: "system",
         ShellOutput: "system", ShellSucceeded: "system", ActiveWindowTitle: "system", ActiveWindowApp: "system"
     })
@@ -670,6 +841,11 @@ Item {
     }
     function registerBlocks() {
         const label = text => ({ kind: "label", text: text });
+        // The image blocks' picture: click to capture from the screen, or load a file.
+        const imagePieces = [
+            { kind: "button", action: "captureImage", image: "image", icon: "crosshair", text: i => i && i.image ? "" : "capture image" },
+            { kind: "button", action: "loadImage", icon: "folder-open" }
+        ];
         const value = (field, key) => ({ kind: "value", field: field, key: key });
         BlockRegistry.registerOperators({
             ReadFile: { prefix: "contents of file", result: "text" }, FileExists: { prefix: "file", suffix: "exists?", result: "bool" },
@@ -679,7 +855,16 @@ Item {
             ActiveWindowTitle: { prefix: "active window title", result: "text" }, ActiveWindowApp: { prefix: "active app", result: "text" },
             WindowExists: { prefix: "window", suffix: "exists?", result: "bool" },
             LastError: { prefix: "error message", result: "text" },
-            MacroRunning: { prefix: "macro", suffix: "is running?", result: "bool" }, GlobalVariable: { prefix: "global", result: "text" }
+            MacroRunning: { prefix: "macro", suffix: "is running?", result: "bool" }, GlobalVariable: { prefix: "global", result: "text" },
+            PixelColor: { prefix: "color at x", infix: ["y"], result: "text" },
+            AverageColor: { prefix: "average color at x", infix: ["y", "width", "height"], result: "text" },
+            ColorsMatch: { infix: ["matches", "within"], suffix: "%", result: "bool" },
+            ScreenText: { prefix: "text on screen at x", infix: ["y", "width", "height"], result: "text" },
+            MousePosition: { prefix: "mouse", result: "number", enumArg: { index: 0, options: [{ value: "x", label: "x" }, { value: "y", label: "y" }] } },
+            ScreenSize: { prefix: "screen", result: "number", enumArg: { index: 0, options: [{ value: "width", label: "width" }, { value: "height", label: "height" }] } },
+            MonitorCount: { prefix: "number of monitors", result: "number" },
+            MonitorInfo: { prefix: "monitor", result: "number",
+                enumArg: { index: 1, options: ["x", "y", "width", "height"].map(v => ({ value: v, label: v })) } }
         });
         BlockRegistry.registerRows({
             WhenWindow: { shape: "header", icon: "app-window", head: [label("WHEN WINDOW"), value("WindowPattern", "pattern"), label("IS"),
@@ -720,7 +905,20 @@ Item {
                   encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
             StopMacroNamed: { icon: "square", head: [label("stop macro"), value("MacroTarget", "target")] },
             SetGlobal: { icon: "variable", head: [label("set global"), value("GlobalName", "name"), label("to"), value("GlobalValue", "value")] },
-            ChangeGlobal: { icon: "variable", head: [label("change global"), value("GlobalName", "name"), label("by"), value("GlobalValue", "by")] }
+            ChangeGlobal: { icon: "variable", head: [label("change global"), value("GlobalName", "name"), label("by"), value("GlobalValue", "by")] },
+            WaitUntil: { icon: "loader", head: [label("wait until"), { kind: "value", field: "Condition", key: "condition", bool: true },
+                label("for up to"), value("WaitTimeout", "timeout"), label("ms")] },
+            FindImage: { icon: "search", head: [label("find"), ...imagePieces, label("put x in"),
+                { kind: "dropdown", key: "x_variable", options: () => root.variableChoices(), placeholder: "(no variable)" },
+                label("y in"), { kind: "dropdown", key: "y_variable", options: () => root.variableChoices(), placeholder: "(no variable)" },
+                label("within"), value("ImageTolerance", "tolerance"), label("%")] },
+            ClickImage: { icon: "mouse-pointer-click", head: [label("click"),
+                { kind: "dropdown", key: "button", options: [{ value: "Left", label: "left" }, { value: "Right", label: "right" }, { value: "Middle", label: "middle" }] },
+                label("on"), ...imagePieces, label("within"), value("ImageTolerance", "tolerance"), label("%")] },
+            WaitForImage: { icon: "eye", head: [label("wait until"), ...imagePieces,
+                { kind: "dropdown", key: "appear", options: [{ value: "appears", label: "appears" }, { value: "gone", label: "disappears" }],
+                  encode: v => v === "appears", decode: v => v ? "appears" : "gone" },
+                label("for up to"), value("WaitTimeout", "timeout"), label("ms, within"), value("ImageTolerance", "tolerance"), label("%")] }
         });
         BlockRegistry.registerPrefabs({
             WhenWindow: { pattern: textValue("Firefox"), focused: true },
@@ -739,7 +937,12 @@ Item {
             RunMacro: () => ({ target: textValue(root.otherMacroName()), wait: true }),
             StopMacroNamed: () => ({ target: textValue(root.otherMacroName()) }),
             SetGlobal: { name: textValue("counter"), value: numberValue(0) },
-            ChangeGlobal: { name: textValue("counter"), by: numberValue(1) }
+            ChangeGlobal: { name: textValue("counter"), by: numberValue(1) },
+            WaitUntil: { condition: { kind: "Bool" }, timeout: numberValue(0) },
+            FindImage: () => ({ image: "", tolerance: numberValue(10), x_variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "",
+                y_variable: root.macro && root.macro.variables.length > 1 ? root.macro.variables[1] : "" }),
+            ClickImage: { image: "", tolerance: numberValue(10), button: "Left" },
+            WaitForImage: { image: "", tolerance: numberValue(10), appear: true, timeout: numberValue(10000) }
         });
     }
     // The variable dropdowns read macro state through a function, so nudge them.

@@ -393,6 +393,14 @@ pub(crate) fn rename_variable(
     if trimmed == old_name {
         return Ok(());
     }
+    // Find image writes a second variable that blockstitch's rename can't see.
+    graph.walk_instructions_mut(&mut |ins| {
+        if let InstructionKind::FindImage { y_variable, .. } = &mut ins.kind
+            && *y_variable == old_name
+        {
+            y_variable.clone_from(&trimmed);
+        }
+    });
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {
         mac.graph = graph;
@@ -728,7 +736,7 @@ pub(crate) fn export_macro(macro_id: String, path: String) -> Result<(), String>
 
 /// What an imported macro can do, shown before it's added: (kind, label,
 /// whether it deserves a warning). Listed in display order.
-const CAPABILITIES: [(&str, &str, bool); 10] = [
+const CAPABILITIES: [(&str, &str, bool); 11] = [
     ("commands", "Runs commands and opens or closes apps", true),
     ("network", "Goes online", true),
     ("files_write", "Writes to files", true),
@@ -737,6 +745,7 @@ const CAPABILITIES: [(&str, &str, bool); 10] = [
     ("clipboard", "Reads or changes the clipboard", false),
     ("windows", "Reads or controls other windows", false),
     ("triggers", "Starts on its own (time, battery, keys, windows, files or clipboard)", false),
+    ("screen", "Reads the screen (colors, images and text)", false),
     ("macros", "Runs or stops your other macros", false),
     ("globals", "Reads or changes global variables", false),
 ];
@@ -750,6 +759,7 @@ fn operator_capability(op: &str) -> Option<&'static str> {
         "ClipboardText" | "ClipboardHasImage" | "ClipboardHasFiles" => "clipboard",
         "ActiveWindowTitle" | "ActiveWindowApp" | "WindowExists" => "windows",
         "MacroRunning" => "macros",
+        "PixelColor" | "AverageColor" | "ScreenText" => "screen",
         "GlobalVariable" => "globals",
         _ => return None,
     })
@@ -786,10 +796,15 @@ fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
             | InstructionKind::WhenWindow { .. } => Some("windows"),
             InstructionKind::WhenFileChanged(_) => Some("files_read"),
             InstructionKind::RunMacro { .. } | InstructionKind::StopMacroNamed(_) => Some("macros"),
+            InstructionKind::FindImage { .. } | InstructionKind::WaitForImage { .. } => Some("screen"),
+            InstructionKind::ClickImage { .. } => Some("input"),
             InstructionKind::SetGlobal { .. } | InstructionKind::ChangeGlobal { .. } => Some("globals"),
             _ => None,
         };
         found.extend(kind);
+        if matches!(ins.kind, InstructionKind::ClickImage { .. }) {
+            found.insert("screen");
+        }
         if ins.kind.is_header() && !matches!(ins.kind, InstructionKind::WhenRan | InstructionKind::BlockHeader(_)) {
             found.insert("triggers");
         }

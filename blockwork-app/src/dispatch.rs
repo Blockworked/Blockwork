@@ -65,6 +65,19 @@ impl Backend {
                 to_json(commands::set_macro_max_loop_iterations(&self.state, &self.app, iterations)?)
             }
             "list_macros" => to_json(crate::macro_runs::list(&self.state)?),
+            "screen_grab" => {
+                let (x, y): (f64, f64) = (arg(&args, "x")?, arg(&args, "y")?);
+                let (width, height): (f64, f64) = (arg(&args, "width")?, arg(&args, "height")?);
+                to_json(
+                    tokio::task::spawn_blocking(move || crate::screen_pick::grab(x, y, width, height))
+                        .await
+                        .map_err(|e| e.to_string())??,
+                )
+            }
+            "image_from_file" => {
+                let path: String = arg(&args, "path")?;
+                to_json(crate::screen_pick::image_from_file(&path)?)
+            }
             "run_macro_named" => {
                 let name: String = arg(&args, "name")?;
                 to_json(crate::macro_runs::run_named(&self.state, &self.app, &name)?)

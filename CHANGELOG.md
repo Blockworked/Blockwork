@@ -40,6 +40,19 @@ section below as the GitHub release notes, followed by the downloads table.
   `blockwork stop <name>` drive macros through the daemon without a window.
 - Starter templates (auto clicker, text snippet, break reminder, website
   watcher) in the welcome screen and the macro menu's "New from template".
+- Screen blocks, in a new Screen palette category: color at a point, average
+  color of a region, colors match, text on screen (OCR), mouse position,
+  screen size, monitor count and monitor position/size.
+- Image blocks: find an image on screen, click on it, and wait for it to
+  appear or disappear, with a tolerance. Capture the image straight from the
+  screen or load a PNG.
+- "Wait until" block that pauses until a condition is true, with a time limit.
+- Screen picker in the editor toolbar: a see-through overlay on every
+  monitor where you click a point or drag a region on the live screen to get
+  its coordinates and color, and add matching blocks.
+  On Wayland, captures go through the desktop portal (KDE and GNOME may ask
+  for permission once) or `grim` on wlroots desktops. Text recognition uses
+  Windows/macOS built-ins, or Tesseract on Linux.
 - Importing a macro shows what it can do (commands, web, files, input,
   clipboard, windows, triggers) before it's added.
 

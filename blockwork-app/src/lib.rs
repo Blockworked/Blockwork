@@ -17,6 +17,7 @@ pub(crate) mod macro_runs;
 pub(crate) mod macros_thread;
 pub(crate) mod razer;
 pub(crate) mod scheduled_run;
+pub(crate) mod screen_pick;
 pub(crate) mod state;
 pub(crate) mod templates;
 pub(crate) mod time_watch;

@@ -13,6 +13,8 @@ pub enum Request {
     FetchApps,
     /// Sample-evaluates a value block; answered by [`Event::Preview`] with the same `key`.
     Preview { key: String, value: Value },
+    /// Runs a command and answers with [`Event::Reply`] tagged with `key`.
+    Call { key: String, command: String, args: Value },
 }
 
 pub enum Event {
@@ -26,6 +28,8 @@ pub enum Event {
     Preview { key: String, text: String, error: bool },
     /// JSON list of the blocks running right now.
     Trace(String),
+    /// A [`Request::Call`]'s result: JSON data, or an error message.
+    Reply { key: String, json: String, error: String },
 }
 
 pub fn spawn(requests: tokio::sync::mpsc::UnboundedReceiver<Request>, events: mpsc::Sender<Event>) {
@@ -72,6 +76,7 @@ async fn run(
     let mut next_id = 1_u64;
     let mut pending_apps_id: Option<u64> = None;
     let mut pending_previews: std::collections::HashMap<u64, String> = Default::default();
+    let mut pending_calls: std::collections::HashMap<u64, String> = Default::default();
 
     loop {
         tokio::select! {
@@ -100,6 +105,17 @@ async fn run(
                             continue;
                         }
                         pending_previews.insert(id, key);
+                        writer.write_all(line.as_bytes()).await?;
+                    }
+                    Request::Call { key, command, args } => {
+                        let id = next_id;
+                        next_id = next_id.wrapping_add(1);
+                        let line = encode(&ClientMessage::Call { id, cmd: command, args });
+                        if line.len() > blockwork_protocol::MAX_MESSAGE_BYTES {
+                            let _ = events.send(Event::Reply { key, json: String::new(), error: "command is too large".into() });
+                            continue;
+                        }
+                        pending_calls.insert(id, key);
                         writer.write_all(line.as_bytes()).await?;
                     }
                     Request::FetchApps => {
@@ -136,7 +152,10 @@ async fn run(
                         }
                     }
                     DaemonMessageKind::Reply => {
-                        if let Some(key) = message.id.and_then(|id| pending_previews.remove(&id)) {
+                        if let Some(key) = message.id.and_then(|id| pending_calls.remove(&id)) {
+                            let json = message.data.map(|d| d.to_string()).unwrap_or_else(|| "null".into());
+                            let _ = events.send(Event::Reply { key, json, error: message.error.unwrap_or_default() });
+                        } else if let Some(key) = message.id.and_then(|id| pending_previews.remove(&id)) {
                             let event = match (message.error, message.data) {
                                 (Some(error), _) => Event::Preview { key, text: error, error: true },
                                 (None, Some(Value::String(text))) => Event::Preview { key, text, error: false },

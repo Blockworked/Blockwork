@@ -531,6 +531,31 @@ pub(crate) enum InstructionDto {
         name: Value,
         by: Value,
     },
+    WaitUntil {
+        id: String,
+        condition: Value,
+        timeout: Value,
+    },
+    FindImage {
+        id: String,
+        image: String,
+        tolerance: Value,
+        x_variable: String,
+        y_variable: String,
+    },
+    ClickImage {
+        id: String,
+        image: String,
+        tolerance: Value,
+        button: blockwork_core::input::types::MacroButton,
+    },
+    WaitForImage {
+        id: String,
+        image: String,
+        tolerance: Value,
+        appear: bool,
+        timeout: Value,
+    },
 }
 
 /// One entry in the "Open App" picker's list - see `installed_apps`.
@@ -882,6 +907,31 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             name: name.clone(),
             by: by.clone(),
         },
+        InstructionKind::WaitUntil { condition, timeout } => InstructionDto::WaitUntil {
+            id,
+            condition: condition.clone(),
+            timeout: timeout.clone(),
+        },
+        InstructionKind::FindImage { image, tolerance, x_variable, y_variable } => InstructionDto::FindImage {
+            id,
+            image: image.clone(),
+            tolerance: tolerance.clone(),
+            x_variable: x_variable.clone(),
+            y_variable: y_variable.clone(),
+        },
+        InstructionKind::ClickImage { image, tolerance, button } => InstructionDto::ClickImage {
+            id,
+            image: image.clone(),
+            tolerance: tolerance.clone(),
+            button: button.clone(),
+        },
+        InstructionKind::WaitForImage { image, tolerance, appear, timeout } => InstructionDto::WaitForImage {
+            id,
+            image: image.clone(),
+            tolerance: tolerance.clone(),
+            appear: *appear,
+            timeout: timeout.clone(),
+        },
         InstructionKind::Token(token) => match token {
             InputToken::Text(t) => InstructionDto::Text {
                 id,
@@ -1231,6 +1281,31 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         InstructionDto::ChangeGlobal { id, name, by } => {
             (id, InstructionKind::ChangeGlobal { name: name.clone(), by: by.clone() })
         }
+        InstructionDto::WaitUntil { id, condition, timeout } => {
+            (id, InstructionKind::WaitUntil { condition: condition.clone(), timeout: timeout.clone() })
+        }
+        InstructionDto::FindImage { id, image, tolerance, x_variable, y_variable } => (
+            id,
+            InstructionKind::FindImage {
+                image: image.clone(),
+                tolerance: tolerance.clone(),
+                x_variable: x_variable.clone(),
+                y_variable: y_variable.clone(),
+            },
+        ),
+        InstructionDto::ClickImage { id, image, tolerance, button } => (
+            id,
+            InstructionKind::ClickImage { image: image.clone(), tolerance: tolerance.clone(), button: button.clone() },
+        ),
+        InstructionDto::WaitForImage { id, image, tolerance, appear, timeout } => (
+            id,
+            InstructionKind::WaitForImage {
+                image: image.clone(),
+                tolerance: tolerance.clone(),
+                appear: *appear,
+                timeout: timeout.clone(),
+            },
+        ),
     };
     Some(Instruction {
         id: id.clone(),

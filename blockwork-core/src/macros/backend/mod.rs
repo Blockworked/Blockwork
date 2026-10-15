@@ -190,11 +190,11 @@ pub mod evdev_mapping;
 #[cfg(target_os = "linux")]
 pub mod evdev;
 #[cfg(target_os = "linux")]
-mod cursor_track;
+pub(crate) mod cursor_track;
 #[cfg(target_os = "linux")]
-mod x11_cursor;
+pub(crate) mod x11_cursor;
 #[cfg(target_os = "linux")]
-mod wayland_display;
+pub(crate) mod wayland_display;
 
 #[cfg(windows)]
 pub mod windows;

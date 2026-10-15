@@ -130,6 +130,90 @@ static OPERATORS: &[ExtOperator] = &[
         eval: |args| Ok(crate::globals::get(&args[0].as_text())),
     },
     ExtOperator {
+        kind: "PixelColor",
+        op: "PixelColor",
+        arity: 2,
+        default_args: || numbers(&[100.0, 100.0]),
+        eval: |args| Ok(Evaluated::Text(crate::screen::pixel_color(args[0].as_number()?, args[1].as_number()?)?)),
+    },
+    ExtOperator {
+        kind: "AverageColor",
+        op: "AverageColor",
+        arity: 4,
+        default_args: || numbers(&[0.0, 0.0, 100.0, 100.0]),
+        eval: |args| {
+            let n = |i: usize| args[i].as_number();
+            Ok(Evaluated::Text(crate::screen::average_color(n(0)?, n(1)?, n(2)?, n(3)?)?))
+        },
+    },
+    ExtOperator {
+        kind: "ColorsMatch",
+        op: "ColorsMatch",
+        arity: 3,
+        default_args: || vec![Value::text("#ffffff"), Value::text("#fafafa"), Value::number(10.0)],
+        eval: |args| {
+            let a = crate::screen::parse_color(&args[0].as_text())?;
+            let b = crate::screen::parse_color(&args[1].as_text())?;
+            Ok(Evaluated::Bool(crate::screen::color_distance(a, b) <= args[2].as_number()?))
+        },
+    },
+    ExtOperator {
+        kind: "ScreenText",
+        op: "ScreenText",
+        arity: 4,
+        default_args: || numbers(&[0.0, 0.0, 400.0, 100.0]),
+        eval: |args| {
+            let n = |i: usize| args[i].as_number();
+            Ok(Evaluated::Text(crate::screen::read_text(n(0)?, n(1)?, n(2)?, n(3)?)?))
+        },
+    },
+    ExtOperator {
+        kind: "MousePosition",
+        op: "MousePosition",
+        arity: 1,
+        default_args: || vec![Value::text("x")],
+        eval: |args| {
+            let (x, y) = crate::screen::cursor()?;
+            Ok(Evaluated::Number(if args[0].as_text() == "y" { y } else { x } as f64))
+        },
+    },
+    ExtOperator {
+        kind: "ScreenSize",
+        op: "ScreenSize",
+        arity: 1,
+        default_args: || vec![Value::text("width")],
+        eval: |args| {
+            let desktop = crate::screen::desktop()?;
+            Ok(Evaluated::Number(if args[0].as_text() == "height" { desktop.height } else { desktop.width }))
+        },
+    },
+    ExtOperator {
+        kind: "MonitorCount",
+        op: "MonitorCount",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Number(crate::screen::monitors().len() as f64)),
+    },
+    ExtOperator {
+        kind: "MonitorInfo",
+        op: "MonitorInfo",
+        arity: 2,
+        default_args: || vec![Value::number(1.0), Value::text("width")],
+        eval: |args| {
+            let monitors = crate::screen::monitors();
+            let n = args[0].as_number()?;
+            let m = monitors
+                .get((n.round() as usize).wrapping_sub(1))
+                .ok_or_else(|| format!("there's no monitor {n} ({} found)", monitors.len()))?;
+            Ok(Evaluated::Number(match args[1].as_text().as_str() {
+                "x" => m.x,
+                "y" => m.y,
+                "height" => m.height,
+                _ => m.width,
+            }))
+        },
+    },
+    ExtOperator {
         kind: "LastError",
         op: "LastError",
         arity: 0,
@@ -137,6 +221,10 @@ static OPERATORS: &[ExtOperator] = &[
         eval: |_| Ok(Evaluated::Text(crate::macros::runner::last_error())),
     },
 ];
+
+fn numbers(values: &[f64]) -> Vec<Value> {
+    values.iter().map(|&v| Value::number(v)).collect()
+}
 
 fn one_text() -> Vec<Value> {
     vec![Value::text("")]

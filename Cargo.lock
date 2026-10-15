@@ -442,6 +442,7 @@ name = "blockwork-core"
 version = "0.5.4"
 dependencies = [
  "arboard",
+ "base64 0.23.1",
  "bincode",
  "blockstitch-core",
  "chrono",
@@ -453,6 +454,7 @@ dependencies = [
  "foreign-types",
  "http",
  "libc",
+ "png",
  "rand",
  "self_update",
  "serde",

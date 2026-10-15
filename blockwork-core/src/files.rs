@@ -28,6 +28,11 @@ pub fn read_text(path: &str) -> Result<String, String> {
     std::fs::read_to_string(&full).map_err(|e| format!("couldn't read {}: {e}", full.display()))
 }
 
+pub fn read_bytes(path: &str) -> Result<Vec<u8>, String> {
+    let full = check(path)?;
+    std::fs::read(&full).map_err(|e| format!("couldn't read {}: {e}", full.display()))
+}
+
 pub fn write_text(path: &str, text: &str, append: bool) -> Result<(), String> {
     let full = check(path)?;
     let mut file = std::fs::OpenOptions::new()

@@ -3,7 +3,7 @@
 //! [`InstructionKind`]'s [`BlockKind`] impl is the hinge between the two.
 
 use crate::input::schedule::TimeSchedule;
-use crate::input::types::{Direction, InputToken};
+use crate::input::types::{Direction, InputToken, MacroButton};
 use crate::input::value::{Op, Value};
 use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
@@ -101,6 +101,17 @@ impl BlockKind for InstructionKind {
             InstructionKind::SetGlobal { name, value: other } | InstructionKind::ChangeGlobal { name, by: other } => {
                 f(name, InputValueType::Any);
                 f(other, InputValueType::Any);
+            }
+            InstructionKind::WaitUntil { condition, timeout } => {
+                f(condition, InputValueType::Bool);
+                f(timeout, InputValueType::Any);
+            }
+            InstructionKind::FindImage { tolerance, .. } | InstructionKind::ClickImage { tolerance, .. } => {
+                f(tolerance, InputValueType::Any)
+            }
+            InstructionKind::WaitForImage { tolerance, timeout, .. } => {
+                f(tolerance, InputValueType::Any);
+                f(timeout, InputValueType::Any);
             }
             // A call site's declared Boolean inputs live on the `BlockDef`,
             // not here - `BlockGraph::migrate_bool_slots` handles those.
@@ -494,6 +505,33 @@ pub enum InstructionKind {
         name: Value,
         by: Value,
     },
+    /// Pauses until `condition` is true, failing after `timeout` ms (0 = never).
+    WaitUntil {
+        condition: Value,
+        timeout: Value,
+    },
+    /// Looks for `image` (a PNG `data:` URI or file path) on screen and puts
+    /// the screen position of its middle in two variables, -1 if it's not there.
+    FindImage {
+        image: String,
+        tolerance: Value,
+        x_variable: String,
+        y_variable: String,
+    },
+    /// Clicks the middle of `image` on screen; an error if it's not there.
+    ClickImage {
+        image: String,
+        tolerance: Value,
+        button: MacroButton,
+    },
+    /// Pauses until `image` appears (or with `appear` false, disappears),
+    /// failing after `timeout` ms (0 = never).
+    WaitForImage {
+        image: String,
+        tolerance: Value,
+        appear: bool,
+        timeout: Value,
+    },
     /// Header for a strand fired when a window whose title or app contains
     /// `pattern` gains (`focused`) or loses focus. Driven by `window_watch`
     /// in the desktop app, like the other `When*` watcher headers.
@@ -769,6 +807,31 @@ impl std::hash::Hash for InstructionKind {
                 name.hash(state);
                 by.hash(state);
             }
+            Self::WaitUntil { condition, timeout } => {
+                50u8.hash(state);
+                condition.hash(state);
+                timeout.hash(state);
+            }
+            Self::FindImage { image, tolerance, x_variable, y_variable } => {
+                51u8.hash(state);
+                image.hash(state);
+                tolerance.hash(state);
+                x_variable.hash(state);
+                y_variable.hash(state);
+            }
+            Self::ClickImage { image, tolerance, button } => {
+                52u8.hash(state);
+                image.hash(state);
+                tolerance.hash(state);
+                button.hash(state);
+            }
+            Self::WaitForImage { image, tolerance, appear, timeout } => {
+                53u8.hash(state);
+                image.hash(state);
+                tolerance.hash(state);
+                appear.hash(state);
+                timeout.hash(state);
+            }
         }
     }
 }
@@ -918,6 +981,27 @@ enum InstructionKindDe {
     ChangeGlobal {
         name: Value,
         by: Value,
+    },
+    WaitUntil {
+        condition: Value,
+        timeout: Value,
+    },
+    FindImage {
+        image: String,
+        tolerance: Value,
+        x_variable: String,
+        y_variable: String,
+    },
+    ClickImage {
+        image: String,
+        tolerance: Value,
+        button: MacroButton,
+    },
+    WaitForImage {
+        image: String,
+        tolerance: Value,
+        appear: bool,
+        timeout: Value,
     },
 }
 
@@ -1094,6 +1178,14 @@ impl From<InstructionKindDe> for InstructionKind {
             InstructionKindDe::StopMacroNamed(v) => InstructionKind::StopMacroNamed(v),
             InstructionKindDe::SetGlobal { name, value } => InstructionKind::SetGlobal { name, value },
             InstructionKindDe::ChangeGlobal { name, by } => InstructionKind::ChangeGlobal { name, by },
+            InstructionKindDe::WaitUntil { condition, timeout } => InstructionKind::WaitUntil { condition, timeout },
+            InstructionKindDe::FindImage { image, tolerance, x_variable, y_variable } => {
+                InstructionKind::FindImage { image, tolerance, x_variable, y_variable }
+            }
+            InstructionKindDe::ClickImage { image, tolerance, button } => InstructionKind::ClickImage { image, tolerance, button },
+            InstructionKindDe::WaitForImage { image, tolerance, appear, timeout } => {
+                InstructionKind::WaitForImage { image, tolerance, appear, timeout }
+            }
         }
     }
 }

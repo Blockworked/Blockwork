@@ -275,6 +275,8 @@ fn spin_sleeper() -> &'static SpinSleeper {
 /// Polling granularity during a `Wait`, so a stop signal lands quickly
 /// instead of only being noticed once the full wait elapses.
 const STOP_POLL_INTERVAL: Duration = Duration::from_millis(15);
+/// How often wait-until blocks re-check (on top of the check's own time).
+const CONDITION_POLL_MS: f64 = 100.0;
 
 /// `true` once a stop has been requested on `flag` (the flag itself holds
 /// "should keep running", so this is just its negation behind the lock).
@@ -759,6 +761,98 @@ fn run_block(
                 })();
                 if let Err(e) = done {
                     soft_fail(ctx, &ins.id, if *resize { "Resize window" } else { "Move window" }, e)?;
+                }
+            }
+            InstructionKind::WaitUntil { condition, timeout } => {
+                let timeout = match ctx.resolve(timeout, depth).and_then(|v| v.eval_number()) {
+                    Ok(ms) => ms.max(0.0),
+                    Err(e) => {
+                        soft_fail(ctx, &ins.id, "Wait until", e)?;
+                        return Ok(Flow::Normal);
+                    }
+                };
+                let started = Instant::now();
+                loop {
+                    match ctx.resolve(condition, depth).and_then(|v| v.eval()).map(|v| v.as_bool()) {
+                        Ok(true) => break,
+                        Ok(false) => {}
+                        Err(e) => {
+                            soft_fail(ctx, &ins.id, "Wait until", e)?;
+                            break;
+                        }
+                    }
+                    if timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout {
+                        soft_fail(ctx, &ins.id, "Wait until", format!("still false after {timeout} ms"))?;
+                        break;
+                    }
+                    if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
+                        break;
+                    }
+                }
+            }
+            InstructionKind::FindImage { image, tolerance, x_variable, y_variable } => {
+                let found = ctx
+                    .resolve(tolerance, depth)
+                    .and_then(|t| t.eval_number())
+                    .and_then(|t| crate::screen::find_image(&*crate::screen::image::load_cached(image)?, t));
+                match found {
+                    Ok(at) => {
+                        let (x, y) = at.map_or((-1.0, -1.0), |(x, y)| (x.round(), y.round()));
+                        if let Ok(mut vars) = ctx.variables.lock() {
+                            for (name, value) in [(x_variable, x), (y_variable, y)] {
+                                if !name.is_empty() {
+                                    vars.insert(name.clone(), Evaluated::Number(value));
+                                }
+                            }
+                        }
+                    }
+                    Err(e) => soft_fail(ctx, &ins.id, "Find image", e)?,
+                }
+            }
+            InstructionKind::ClickImage { image, tolerance, button } => {
+                let clicked = (|| {
+                    let tolerance = ctx.resolve(tolerance, depth)?.eval_number()?;
+                    let (x, y) = crate::screen::find_image(&*crate::screen::image::load_cached(image)?, tolerance)?
+                        .ok_or("the image isn't on screen")?;
+                    let mut em = ctx.emulator.lock().map_err(|e| e.to_string())?;
+                    em.move_mouse_abs(x.round() as i32, y.round() as i32)?;
+                    em.button(button.clone(), Direction::Click)
+                })();
+                if let Err(e) = clicked {
+                    soft_fail(ctx, &ins.id, "Click image", e)?;
+                }
+            }
+            InstructionKind::WaitForImage { image, tolerance, appear, timeout } => {
+                let setup = (|| {
+                    let tolerance = ctx.resolve(tolerance, depth)?.eval_number()?;
+                    let timeout = ctx.resolve(timeout, depth)?.eval_number()?.max(0.0);
+                    Ok::<_, String>((crate::screen::image::load_cached(image)?, tolerance, timeout))
+                })();
+                let (needle, tolerance, timeout) = match setup {
+                    Ok(setup) => setup,
+                    Err(e) => {
+                        soft_fail(ctx, &ins.id, "Wait for image", e)?;
+                        return Ok(Flow::Normal);
+                    }
+                };
+                let started = Instant::now();
+                loop {
+                    match crate::screen::find_image(&needle, tolerance) {
+                        Ok(at) if at.is_some() == *appear => break,
+                        Ok(_) => {}
+                        Err(e) => {
+                            soft_fail(ctx, &ins.id, "Wait for image", e)?;
+                            break;
+                        }
+                    }
+                    if timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout {
+                        let what = if *appear { "didn't appear" } else { "didn't go away" };
+                        soft_fail(ctx, &ins.id, "Wait for image", format!("the image {what} within {timeout} ms"))?;
+                        break;
+                    }
+                    if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
+                        break;
+                    }
                 }
             }
             InstructionKind::RunMacro { target, wait } => {
@@ -2539,6 +2633,57 @@ mod tests {
         );
         assert!(started.elapsed() >= Duration::from_millis(60), "waited for the helper");
         assert_eq!(vars.lock().unwrap().get("after"), Some(&Evaluated::Number(1.0)), "an unknown macro is a soft error");
+    }
+
+    #[test]
+    fn wait_until_returns_when_true_and_fails_after_its_timeout() {
+        let vars = empty_vars();
+        let started = Instant::now();
+        let gt = |a: Value, b: Value| Value::op(Op::from_name("Gt"), vec![a, b]);
+        run_instructions(
+            vec![
+                Instruction::new(InstructionKind::WaitUntil { condition: gt(Value::number(2.0), Value::number(1.0)), timeout: Value::number(0.0) }),
+                Instruction::new(InstructionKind::TryCatch {
+                    body: vec![
+                        Instruction::new(InstructionKind::WaitUntil { condition: gt(Value::number(1.0), Value::number(2.0)), timeout: Value::number(150.0) }),
+                        set("missed", Value::number(1.0)),
+                    ],
+                    catch_body: vec![set("timed_out", Value::number(1.0))],
+                }),
+            ],
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&vars),
+        );
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("timed_out"), Some(&Evaluated::Number(1.0)));
+        assert_eq!(vars.get("missed"), None);
+        let elapsed = started.elapsed();
+        assert!(elapsed >= Duration::from_millis(150) && elapsed < Duration::from_secs(2), "{elapsed:?}");
+    }
+
+    #[test]
+    fn image_blocks_without_an_image_fail_softly() {
+        let vars = empty_vars();
+        run_instructions(
+            vec![
+                Instruction::new(InstructionKind::FindImage {
+                    image: String::new(),
+                    tolerance: Value::number(5.0),
+                    x_variable: "x".into(),
+                    y_variable: "y".into(),
+                }),
+                set("after", Value::number(1.0)),
+            ],
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&vars),
+        );
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("x"), None);
+        assert_eq!(vars.get("after"), Some(&Evaluated::Number(1.0)));
     }
 
     #[test]
