@@ -68,6 +68,16 @@ pub enum FieldId {
     AtTime,
     SignalName,
     WebhookPath,
+    DetectorUrl,
+    DetectLabel,
+    DetectConfidence,
+    AimTargetX,
+    AimTargetY,
+    AimGain,
+    AimMaxStep,
+    AimDeadzone,
+    AimIndex,
+    AimSettle,
 }
 
 impl FieldId {
@@ -88,6 +98,7 @@ impl FieldId {
                 | FieldId::RetryCount
                 | FieldId::WindowX
                 | FieldId::WindowY
+                | FieldId::AimIndex
         )
     }
 }
@@ -153,6 +164,16 @@ impl std::fmt::Display for FieldId {
             FieldId::AtTime => write!(f, "AtTime"),
             FieldId::SignalName => write!(f, "SignalName"),
             FieldId::WebhookPath => write!(f, "WebhookPath"),
+            FieldId::DetectorUrl => write!(f, "DetectorUrl"),
+            FieldId::DetectLabel => write!(f, "DetectLabel"),
+            FieldId::DetectConfidence => write!(f, "DetectConfidence"),
+            FieldId::AimTargetX => write!(f, "AimTargetX"),
+            FieldId::AimTargetY => write!(f, "AimTargetY"),
+            FieldId::AimGain => write!(f, "AimGain"),
+            FieldId::AimMaxStep => write!(f, "AimMaxStep"),
+            FieldId::AimDeadzone => write!(f, "AimDeadzone"),
+            FieldId::AimIndex => write!(f, "AimIndex"),
+            FieldId::AimSettle => write!(f, "AimSettle"),
         }
     }
 }
@@ -218,6 +239,16 @@ impl std::str::FromStr for FieldId {
             "AtTime" => Ok(FieldId::AtTime),
             "SignalName" => Ok(FieldId::SignalName),
             "WebhookPath" => Ok(FieldId::WebhookPath),
+            "DetectorUrl" => Ok(FieldId::DetectorUrl),
+            "DetectLabel" => Ok(FieldId::DetectLabel),
+            "DetectConfidence" => Ok(FieldId::DetectConfidence),
+            "AimTargetX" => Ok(FieldId::AimTargetX),
+            "AimTargetY" => Ok(FieldId::AimTargetY),
+            "AimGain" => Ok(FieldId::AimGain),
+            "AimMaxStep" => Ok(FieldId::AimMaxStep),
+            "AimDeadzone" => Ok(FieldId::AimDeadzone),
+            "AimIndex" => Ok(FieldId::AimIndex),
+            "AimSettle" => Ok(FieldId::AimSettle),
             _ if s.starts_with("CallArg:") => s["CallArg:".len()..]
                 .parse::<usize>()
                 .map(FieldId::CallArg)
@@ -310,6 +341,39 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
         (InstructionKind::WhenAt(v), FieldId::AtTime) => Some(v),
         (InstructionKind::WhenSignal(v) | InstructionKind::SendSignal { name: v, .. }, FieldId::SignalName) => Some(v),
         (InstructionKind::WhenWebhook { path, .. }, FieldId::WebhookPath) => Some(path),
+        (
+            InstructionKind::DetectObjectsInWindow { pattern, .. }
+            | InstructionKind::WaitForDetection { pattern, .. }
+            | InstructionKind::AimStep { pattern, .. },
+            FieldId::WindowPattern,
+        ) => Some(pattern),
+        (
+            InstructionKind::DetectObjectsInWindow { detector, .. } | InstructionKind::WaitForDetection { detector, .. },
+            FieldId::DetectorUrl,
+        ) => Some(detector),
+        (
+            InstructionKind::DetectObjectsInWindow { label, .. } | InstructionKind::WaitForDetection { label, .. },
+            FieldId::DetectLabel,
+        ) => Some(label),
+        (
+            InstructionKind::DetectObjectsInWindow { confidence, .. } | InstructionKind::WaitForDetection { confidence, .. },
+            FieldId::DetectConfidence,
+        ) => Some(confidence),
+        (
+            InstructionKind::WaitForDetection { timeout, .. } | InstructionKind::AimAtDetection { timeout, .. },
+            FieldId::WaitTimeout,
+        ) => Some(timeout),
+        (InstructionKind::AimStep { target_x, .. }, FieldId::AimTargetX) => Some(target_x),
+        (InstructionKind::AimStep { target_y, .. }, FieldId::AimTargetY) => Some(target_y),
+        (InstructionKind::AimStep { gain, .. } | InstructionKind::AimAtDetection { gain, .. }, FieldId::AimGain) => Some(gain),
+        (InstructionKind::AimStep { max_step, .. } | InstructionKind::AimAtDetection { max_step, .. }, FieldId::AimMaxStep) => {
+            Some(max_step)
+        }
+        (InstructionKind::AimStep { deadzone, .. } | InstructionKind::AimAtDetection { deadzone, .. }, FieldId::AimDeadzone) => {
+            Some(deadzone)
+        }
+        (InstructionKind::AimAtDetection { index, .. }, FieldId::AimIndex) => Some(index),
+        (InstructionKind::AimAtDetection { settle_ms, .. }, FieldId::AimSettle) => Some(settle_ms),
         _ => None,
     }
 }
@@ -348,6 +412,8 @@ mod tests {
             FieldId::MoveMouseX,
             FieldId::CallArg(3),
             FieldId::BatteryChargeThreshold,
+            FieldId::DetectorUrl,
+            FieldId::AimSettle,
         ] {
             assert_eq!(field.to_string().parse(), Ok(field));
         }

@@ -69,6 +69,28 @@ pub fn request(method: &str, url: &str, body: &str, headers: &str) -> Result<Str
     Ok(text)
 }
 
+/// POSTs raw bytes (an image, say) and returns the response body. A 4xx/5xx
+/// status is an error.
+pub fn post_bytes(url: &str, content_type: &str, body: Vec<u8>) -> Result<String, String> {
+    let request = ureq::http::Request::builder()
+        .method("POST")
+        .uri(url)
+        .header("Content-Type", content_type)
+        .body(body)
+        .map_err(|e| e.to_string())?;
+    let mut response = agent().run(request).map_err(|e| format!("POST {url} failed: {e}"))?;
+    let status = response.status();
+    let text = response
+        .body_mut()
+        .read_to_string()
+        .map_err(|e| format!("couldn't read the response from {url}: {e}"))?;
+    if status.as_u16() >= 400 {
+        let snippet: String = text.chars().take(ERROR_BODY_CHARS).collect();
+        return Err(format!("HTTP {status} from {url}: {snippet}"));
+    }
+    Ok(text)
+}
+
 pub fn get(url: &str) -> Result<String, String> {
     request("GET", url, "", "")
 }

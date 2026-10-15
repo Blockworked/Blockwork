@@ -280,6 +280,8 @@ fn spin_sleeper() -> &'static SpinSleeper {
 const STOP_POLL_INTERVAL: Duration = Duration::from_millis(15);
 /// How often wait-until blocks re-check (on top of the check's own time).
 const CONDITION_POLL_MS: f64 = 100.0;
+/// Pause between aim steps, on top of the detection's own time.
+const AIM_FRAME_MS: f64 = 15.0;
 
 // Time for the clipboard to take the new text, and for the app to read it.
 const PASTE_SETTLE: Duration = Duration::from_millis(80);
@@ -340,6 +342,9 @@ fn guarded_ability(kind: &InstructionKind) -> Option<&'static str> {
         InstructionKind::HttpRequest { .. } => "network",
         InstructionKind::WriteFile { .. } => "files_write",
         InstructionKind::FindImage { .. } | InstructionKind::ClickImage { .. } | InstructionKind::WaitForImage { .. } => "screen",
+        InstructionKind::DetectObjectsInWindow { .. }
+        | InstructionKind::WaitForDetection { .. }
+        | InstructionKind::AimAtDetection { .. } => "screen",
         _ => return None,
     })
 }
@@ -379,6 +384,96 @@ fn set_variable(ctx: &ExecCtx, name: &str, value: Evaluated) {
     }
     if let Ok(mut vars) = ctx.variables.lock() {
         vars.insert(name.to_string(), value);
+    }
+}
+
+/// A detection query from a detect block's slots.
+#[allow(clippy::too_many_arguments)]
+fn detect_query(
+    ctx: &mut ExecCtx,
+    depth: u32,
+    pattern: &Value,
+    by: &str,
+    detector: &Value,
+    label: &Value,
+    confidence: &Value,
+    sort: &str,
+) -> Result<crate::detect::Query, String> {
+    Ok(crate::detect::Query {
+        pattern: ctx.resolve(pattern, depth)?.eval_text()?,
+        by: by.parse()?,
+        detector: ctx.resolve(detector, depth)?.eval_text()?,
+        label: ctx.resolve(label, depth)?.eval_text()?,
+        min_score: (ctx.resolve(confidence, depth)?.eval_number()? / 100.0).clamp(0.0, 1.0),
+        sort: sort.parse()?,
+    })
+}
+
+/// One tracked detection pass, written to `list` in the query's order.
+fn detect_into_list(ctx: &ExecCtx, query: &crate::detect::Query, list: &str) -> Result<crate::detect::Frame, String> {
+    let frame = crate::detect::detect_on_screen(query)?;
+    let mut found = crate::detect::track::update(&ctx.source.macro_id, list, query, frame.detections);
+    crate::detect::sort(&mut found, query.sort, frame.crosshair);
+    if !list.is_empty()
+        && let Ok(mut lists) = ctx.lists.lock()
+    {
+        lists.insert(list.to_string(), found.iter().map(|d| ListItem::Text(d.to_item())).collect());
+    }
+    Ok(crate::detect::Frame { detections: found, crosshair: frame.crosshair })
+}
+
+fn aim_controller(ctx: &mut ExecCtx, depth: u32, gain: &Value, max_step: &Value, deadzone: &Value) -> Result<crate::detect::AimController, String> {
+    Ok(crate::detect::AimController {
+        gain: ctx.resolve(gain, depth)?.eval_number()?,
+        max_step: ctx.resolve(max_step, depth)?.eval_number()?,
+        deadzone: ctx.resolve(deadzone, depth)?.eval_number()?,
+    })
+}
+
+/// Steps toward track `target` with a fresh detection each frame until it's
+/// held centered for `settle_ms`. Returns `hit`, `timeout`, `lost` or `stopped`.
+fn aim_at(
+    ctx: &ExecCtx,
+    query: &crate::detect::Query,
+    list: &str,
+    target: u64,
+    aim: crate::detect::AimController,
+    timeout_ms: f64,
+    settle_ms: f64,
+) -> Result<&'static str, String> {
+    let started = Instant::now();
+    let mut centered_since: Option<Instant> = None;
+    loop {
+        if ctx.stop_flag.as_ref().is_some_and(stop_requested) {
+            return Ok("stopped");
+        }
+        let frame = detect_into_list(ctx, query, list)?;
+        match frame.detections.iter().find(|d| d.id == Some(target)) {
+            // Missed this frame; give up once the tracker drops it.
+            None => {
+                centered_since = None;
+                if !crate::detect::track::alive(&ctx.source.macro_id, list, target) {
+                    return Ok("lost");
+                }
+            }
+            Some(d) => match aim.step(d.center(), frame.crosshair) {
+                None => {
+                    if centered_since.get_or_insert_with(Instant::now).elapsed().as_secs_f64() * 1000.0 >= settle_ms {
+                        return Ok("hit");
+                    }
+                }
+                Some((dx, dy)) => {
+                    centered_since = None;
+                    ctx.emulator.lock().map_err(|e| e.to_string())?.move_mouse_rel(dx, dy)?;
+                }
+            },
+        }
+        if timeout_ms > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout_ms {
+            return Ok("timeout");
+        }
+        if sleep_unless_stopped(ctx, AIM_FRAME_MS) {
+            return Ok("stopped");
+        }
     }
 }
 
@@ -1115,6 +1210,85 @@ fn run_block(
                     if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
                         break;
                     }
+                }
+            }
+            InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable } => {
+                let found = detect_query(ctx, depth, pattern, by, detector, label, confidence, sort)
+                    .and_then(|query| detect_into_list(ctx, &query, results_list));
+                match found {
+                    Ok(frame) => set_variable(ctx, count_variable, Evaluated::Number(frame.detections.len() as f64)),
+                    Err(e) => soft_fail(ctx, &ins.id, "Detect objects", e)?,
+                }
+            }
+            InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout } => {
+                let setup = detect_query(ctx, depth, pattern, by, detector, label, confidence, "Score")
+                    .and_then(|query| Ok((query, ctx.resolve(timeout, depth)?.eval_number()?.max(0.0))));
+                let (query, timeout) = match setup {
+                    Ok(setup) => setup,
+                    Err(e) => {
+                        soft_fail(ctx, &ins.id, "Wait for detection", e)?;
+                        continue;
+                    }
+                };
+                let started = Instant::now();
+                loop {
+                    match crate::detect::detect_on_screen(&query) {
+                        Ok(frame) if frame.detections.is_empty() != *appear => break,
+                        Ok(_) => {}
+                        Err(e) => {
+                            soft_fail(ctx, &ins.id, "Wait for detection", e)?;
+                            break;
+                        }
+                    }
+                    if timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout {
+                        let what = if *appear { "didn't appear" } else { "didn't go away" };
+                        soft_fail(ctx, &ins.id, "Wait for detection", format!("it {what} within {timeout} ms"))?;
+                        break;
+                    }
+                    if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
+                        break;
+                    }
+                }
+            }
+            InstructionKind::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => {
+                let done = (|| {
+                    let pattern = ctx.resolve(pattern, depth)?.eval_text()?;
+                    let target = (ctx.resolve(target_x, depth)?.eval_number()?, ctx.resolve(target_y, depth)?.eval_number()?);
+                    let aim = aim_controller(ctx, depth, gain, max_step, deadzone)?;
+                    let window = crate::window::bounds(&pattern, by.parse()?)?;
+                    let crosshair = (window.x + window.width / 2.0, window.y + window.height / 2.0);
+                    if let Some((dx, dy)) = aim.step(target, crosshair) {
+                        ctx.emulator.lock().map_err(|e| e.to_string())?.move_mouse_rel(dx, dy)?;
+                    }
+                    Ok::<_, String>(())
+                })();
+                if let Err(e) = done {
+                    soft_fail(ctx, &ins.id, "Aim", e)?;
+                }
+            }
+            InstructionKind::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => {
+                let setup = (|| {
+                    let query = crate::detect::track::query_for(&ctx.source.macro_id, results_list)
+                        .ok_or_else(|| format!("detect objects into the list \"{results_list}\" first"))?;
+                    let n = ctx.resolve(index, depth)?.eval_number()?;
+                    let item = ctx
+                        .lists
+                        .lock()
+                        .ok()
+                        .and_then(|lists| Some(lists.get(results_list)?.get((n.round() as usize).wrapping_sub(1))?.evaluated().as_text()))
+                        .ok_or_else(|| format!("the list \"{results_list}\" has no item {n}"))?;
+                    let target = crate::detect::Detection::from_item(&item)?
+                        .id
+                        .ok_or("that item has no tracking id; fill the list with a detect block")?;
+                    let aim = aim_controller(ctx, depth, gain, max_step, deadzone)?;
+                    let timeout = ctx.resolve(timeout, depth)?.eval_number()?.max(0.0);
+                    let settle = ctx.resolve(settle_ms, depth)?.eval_number()?.max(0.0);
+                    Ok::<_, String>((query, target, aim, timeout, settle))
+                })();
+                let result = setup.and_then(|(query, target, aim, timeout, settle)| aim_at(ctx, &query, results_list, target, aim, timeout, settle));
+                match result {
+                    Ok(status) => set_variable(ctx, status_variable, Evaluated::Text(status.to_string())),
+                    Err(e) => soft_fail(ctx, &ins.id, "Aim at detection", e)?,
                 }
             }
             InstructionKind::RunMacro { target, wait } => {

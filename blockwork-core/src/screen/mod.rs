@@ -76,6 +76,13 @@ impl Shot {
 
     /// The part of the image under a screen rectangle, clipped to the image.
     pub fn region(&self, x: f64, y: f64, width: f64, height: f64) -> Result<Image, String> {
+        self.crop(Rect { x, y, width, height }).map(|shot| shot.image)
+    }
+
+    /// The part of this shot under a screen rectangle, clipped to the image,
+    /// keeping the mapping back to screen coordinates.
+    pub fn crop(&self, rect: Rect) -> Result<Shot, String> {
+        let Rect { x, y, width, height } = rect;
         let (x0, y0) = self.to_image(x, y);
         let (x1, y1) = self.to_image(x + width, y + height);
         let clip = |v: i64, max: u32| v.clamp(0, max as i64) as u32;
@@ -84,7 +91,16 @@ impl Shot {
         if x1 <= x0 || y1 <= y0 {
             return Err(format!("the region {x},{y} {width}x{height} is off screen"));
         }
-        Ok(self.image.crop(x0, y0, x1 - x0, y1 - y0))
+        Ok(Shot {
+            image: self.image.crop(x0, y0, x1 - x0, y1 - y0),
+            origin: self.to_screen(x0 as f64, y0 as f64),
+            scale: self.scale,
+        })
+    }
+
+    /// The screen point at the middle of the image.
+    pub fn center(&self) -> (f64, f64) {
+        self.to_screen(self.image.width as f64 / 2.0, self.image.height as f64 / 2.0)
     }
 }
 
@@ -151,6 +167,13 @@ pub fn find_image(needle: &Image, tolerance: f64) -> Result<Option<(f64, f64)>, 
     Ok(find(&shot.image, needle, tolerance).map(|(px, py)| {
         shot.to_screen(px as f64 + needle.width as f64 / 2.0, py as f64 + needle.height as f64 / 2.0)
     }))
+}
+
+/// What's inside a matching window right now (the active window when
+/// `pattern` is empty). Anything covering the window is captured too.
+pub fn capture_window(pattern: &str, by: crate::window::MatchBy) -> Result<Shot, String> {
+    let bounds = crate::window::bounds(pattern, by)?;
+    capture()?.crop(bounds).map_err(|_| "the window is off screen".to_string())
 }
 
 /// Every monitor, in screen coordinates.
@@ -231,6 +254,11 @@ mod tests {
         let region = shot.region(0.0, 0.0, 20.0, 10.0).unwrap();
         assert_eq!((region.width, region.height), (30, 15));
         assert!(shot.region(500.0, 500.0, 10.0, 10.0).is_err());
+        // A crop hanging off the left edge starts at the image edge.
+        let crop = shot.crop(Rect { x: -120.0, y: 10.0, width: 40.0, height: 20.0 }).unwrap();
+        assert_eq!(crop.origin, (-100.0, 10.0));
+        assert_eq!((crop.image.width, crop.image.height), (30, 30));
+        assert_eq!(crop.center(), (-90.0, 20.0));
     }
 }
 

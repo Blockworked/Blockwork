@@ -1,6 +1,7 @@
 pub mod battery;
 pub mod clipboard;
 pub mod config;
+pub mod detect;
 pub mod files;
 pub mod globals;
 pub mod flatpak;

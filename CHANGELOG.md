@@ -28,6 +28,10 @@ section below as the GitHub release notes, followed by the downloads table.
 - The block each running strand is on is outlined live on the canvas.
 - Retry block: runs its body again after a failure, up to N attempts.
 - Per-macro loop limit that stops runaway loops.
+- Window detection blocks: detect objects in a window with a local detector
+  service, wait for a detection, aim one step toward a point, and aim at a
+  tracked detection, plus "window x/y/width/height/center" and "detection of"
+  reporters. Detectors must run on this computer.
 - Window blocks: focus, minimize, maximize, restore, close, move or resize a
   window, matched by its title or its app (picked from a dropdown), plus a
   "window exists?" reporter.

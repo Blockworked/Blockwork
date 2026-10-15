@@ -696,6 +696,48 @@ pub(crate) enum InstructionDto {
         path: Value,
         variable: String,
     },
+    DetectObjectsInWindow {
+        id: String,
+        pattern: Value,
+        by: String,
+        detector: Value,
+        label: Value,
+        confidence: Value,
+        sort: String,
+        results_list: String,
+        count_variable: String,
+    },
+    WaitForDetection {
+        id: String,
+        pattern: Value,
+        by: String,
+        detector: Value,
+        label: Value,
+        confidence: Value,
+        appear: bool,
+        timeout: Value,
+    },
+    AimStep {
+        id: String,
+        pattern: Value,
+        by: String,
+        target_x: Value,
+        target_y: Value,
+        gain: Value,
+        max_step: Value,
+        deadzone: Value,
+    },
+    AimAtDetection {
+        id: String,
+        results_list: String,
+        index: Value,
+        gain: Value,
+        max_step: Value,
+        deadzone: Value,
+        timeout: Value,
+        settle_ms: Value,
+        status_variable: String,
+    },
 }
 
 /// One entry in the "Open App" picker's list - see `installed_apps`.
@@ -1114,6 +1156,54 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         InstructionKind::SendSignal { name, wait } => InstructionDto::SendSignal { id, name: name.clone(), wait: *wait },
         InstructionKind::WhenWebhook { path, variable } => {
             InstructionDto::WhenWebhook { id, path: path.clone(), variable: variable.clone() }
+        }
+        InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable } => {
+            InstructionDto::DetectObjectsInWindow {
+                id,
+                pattern: pattern.clone(),
+                by: by.clone(),
+                detector: detector.clone(),
+                label: label.clone(),
+                confidence: confidence.clone(),
+                sort: sort.clone(),
+                results_list: results_list.clone(),
+                count_variable: count_variable.clone(),
+            }
+        }
+        InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout } => {
+            InstructionDto::WaitForDetection {
+                id,
+                pattern: pattern.clone(),
+                by: by.clone(),
+                detector: detector.clone(),
+                label: label.clone(),
+                confidence: confidence.clone(),
+                appear: *appear,
+                timeout: timeout.clone(),
+            }
+        }
+        InstructionKind::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => InstructionDto::AimStep {
+            id,
+            pattern: pattern.clone(),
+            by: by.clone(),
+            target_x: target_x.clone(),
+            target_y: target_y.clone(),
+            gain: gain.clone(),
+            max_step: max_step.clone(),
+            deadzone: deadzone.clone(),
+        },
+        InstructionKind::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => {
+            InstructionDto::AimAtDetection {
+                id,
+                results_list: results_list.clone(),
+                index: index.clone(),
+                gain: gain.clone(),
+                max_step: max_step.clone(),
+                deadzone: deadzone.clone(),
+                timeout: timeout.clone(),
+                settle_ms: settle_ms.clone(),
+                status_variable: status_variable.clone(),
+            }
         }
         InstructionKind::Token(token) => match token {
             InputToken::Text(t) => InstructionDto::Text {
@@ -1537,6 +1627,56 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         InstructionDto::WhenWebhook { id, path, variable } => {
             (id, InstructionKind::WhenWebhook { path: path.clone(), variable: variable.clone() })
         }
+        InstructionDto::DetectObjectsInWindow { id, pattern, by, detector, label, confidence, sort, results_list, count_variable } => (
+            id,
+            InstructionKind::DetectObjectsInWindow {
+                pattern: pattern.clone(),
+                by: by.clone(),
+                detector: detector.clone(),
+                label: label.clone(),
+                confidence: confidence.clone(),
+                sort: sort.clone(),
+                results_list: results_list.clone(),
+                count_variable: count_variable.clone(),
+            },
+        ),
+        InstructionDto::WaitForDetection { id, pattern, by, detector, label, confidence, appear, timeout } => (
+            id,
+            InstructionKind::WaitForDetection {
+                pattern: pattern.clone(),
+                by: by.clone(),
+                detector: detector.clone(),
+                label: label.clone(),
+                confidence: confidence.clone(),
+                appear: *appear,
+                timeout: timeout.clone(),
+            },
+        ),
+        InstructionDto::AimStep { id, pattern, by, target_x, target_y, gain, max_step, deadzone } => (
+            id,
+            InstructionKind::AimStep {
+                pattern: pattern.clone(),
+                by: by.clone(),
+                target_x: target_x.clone(),
+                target_y: target_y.clone(),
+                gain: gain.clone(),
+                max_step: max_step.clone(),
+                deadzone: deadzone.clone(),
+            },
+        ),
+        InstructionDto::AimAtDetection { id, results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => (
+            id,
+            InstructionKind::AimAtDetection {
+                results_list: results_list.clone(),
+                index: index.clone(),
+                gain: gain.clone(),
+                max_step: max_step.clone(),
+                deadzone: deadzone.clone(),
+                timeout: timeout.clone(),
+                settle_ms: settle_ms.clone(),
+                status_variable: status_variable.clone(),
+            },
+        ),
     };
     Some(Instruction {
         id: id.clone(),
@@ -1834,4 +1974,61 @@ pub(crate) fn emit_state_updated(app: &AppHandle, s: &AppState) {
     blockwork_core::recording::set_hotkeys_suspended(s.combo_capture.is_some());
     let dto = build_state_dto(s);
     app.emit_state(&dto);
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use blockwork_core::macros::Instruction;
+
+    #[test]
+    fn detection_blocks_round_trip_through_dtos() {
+        let (n, t) = (Value::number, Value::text);
+        let kinds = [
+            InstructionKind::DetectObjectsInWindow {
+                pattern: t("Minecraft"),
+                by: "Title".into(),
+                detector: t("http://127.0.0.1:8765/detect"),
+                label: t("player"),
+                confidence: n(50.0),
+                sort: "Closest".into(),
+                results_list: "players".into(),
+                count_variable: "count".into(),
+            },
+            InstructionKind::WaitForDetection {
+                pattern: t("Minecraft"),
+                by: "App".into(),
+                detector: t("http://localhost:1/x"),
+                label: t(""),
+                confidence: n(40.0),
+                appear: false,
+                timeout: n(500.0),
+            },
+            InstructionKind::AimStep {
+                pattern: t(""),
+                by: "Title".into(),
+                target_x: n(10.0),
+                target_y: n(20.0),
+                gain: n(0.4),
+                max_step: n(40.0),
+                deadzone: n(6.0),
+            },
+            InstructionKind::AimAtDetection {
+                results_list: "players".into(),
+                index: n(1.0),
+                gain: n(0.4),
+                max_step: n(40.0),
+                deadzone: n(6.0),
+                timeout: n(3000.0),
+                settle_ms: n(150.0),
+                status_variable: "status".into(),
+            },
+        ];
+        for kind in kinds {
+            let dto = instruction_to_dto(&Instruction::new(kind.clone()));
+            // Through JSON too, the way the frontend sends it back.
+            let dto: InstructionDto = serde_json::from_str(&serde_json::to_string(&dto).unwrap()).unwrap();
+            assert_eq!(dto_to_instruction(&dto).map(|i| i.kind), Some(kind));
+        }
+    }
 }

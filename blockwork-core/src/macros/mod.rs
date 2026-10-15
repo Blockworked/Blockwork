@@ -140,6 +140,26 @@ impl BlockKind for InstructionKind {
                 f(tolerance, InputValueType::Any);
                 f(timeout, InputValueType::Any);
             }
+            InstructionKind::DetectObjectsInWindow { pattern, detector, label, confidence, .. } => {
+                for v in [pattern, detector, label, confidence] {
+                    f(v, InputValueType::Any);
+                }
+            }
+            InstructionKind::WaitForDetection { pattern, detector, label, confidence, timeout, .. } => {
+                for v in [pattern, detector, label, confidence, timeout] {
+                    f(v, InputValueType::Any);
+                }
+            }
+            InstructionKind::AimStep { pattern, target_x, target_y, gain, max_step, deadzone, .. } => {
+                for v in [pattern, target_x, target_y, gain, max_step, deadzone] {
+                    f(v, InputValueType::Any);
+                }
+            }
+            InstructionKind::AimAtDetection { index, gain, max_step, deadzone, timeout, settle_ms, .. } => {
+                for v in [index, gain, max_step, deadzone, timeout, settle_ms] {
+                    f(v, InputValueType::Any);
+                }
+            }
             // A call site's declared Boolean inputs live on the `BlockDef`,
             // not here - `BlockGraph::migrate_bool_slots` handles those.
             InstructionKind::CallBlock { args, .. } => {
@@ -255,7 +275,9 @@ impl BlockKind for InstructionKind {
             | InstructionKind::AskText { name, .. }
             | InstructionKind::AskYesNo { name, .. }
             | InstructionKind::AskChoice { name, .. }
-            | InstructionKind::WhenWebhook { variable: name, .. } => Some(name),
+            | InstructionKind::WhenWebhook { variable: name, .. }
+            | InstructionKind::DetectObjectsInWindow { count_variable: name, .. }
+            | InstructionKind::AimAtDetection { status_variable: name, .. } => Some(name),
             _ => None,
         }
     }
@@ -270,7 +292,9 @@ impl BlockKind for InstructionKind {
             | InstructionKind::ReplaceItemOfList { name, .. }
             | InstructionKind::ReverseList { name }
             | InstructionKind::SplitIntoList { name, .. }
-            | InstructionKind::AskChoice { list: name, .. } => Some(name),
+            | InstructionKind::AskChoice { list: name, .. }
+            | InstructionKind::DetectObjectsInWindow { results_list: name, .. }
+            | InstructionKind::AimAtDetection { results_list: name, .. } => Some(name),
             _ => None,
         }
     }
@@ -679,6 +703,54 @@ pub enum InstructionKind {
         path: Value,
         variable: String,
     },
+    /// One detection pass over a matching window: boxes from `detector`
+    /// (a local URL) scoring at least `confidence` percent replace list
+    /// `results_list`, one JSON item each, ordered by `sort`.
+    DetectObjectsInWindow {
+        pattern: Value,
+        by: String,
+        detector: Value,
+        label: Value,
+        confidence: Value,
+        sort: String,
+        results_list: String,
+        count_variable: String,
+    },
+    /// Pauses until `label` appears in the window (or with `appear` false,
+    /// is gone), failing after `timeout` ms (0 = never).
+    WaitForDetection {
+        pattern: Value,
+        by: String,
+        detector: Value,
+        label: Value,
+        confidence: Value,
+        appear: bool,
+        timeout: Value,
+    },
+    /// One relative mouse move from the window's center toward the screen
+    /// point (`target_x`, `target_y`); see `detect::AimController`.
+    AimStep {
+        pattern: Value,
+        by: String,
+        target_x: Value,
+        target_y: Value,
+        gain: Value,
+        max_step: Value,
+        deadzone: Value,
+    },
+    /// Follows item `index` of a list a `DetectObjectsInWindow` filled,
+    /// re-detecting and stepping until it's held centered for `settle_ms`.
+    /// Writes `hit`, `timeout` or `lost` to `status_variable`.
+    AimAtDetection {
+        results_list: String,
+        index: Value,
+        gain: Value,
+        max_step: Value,
+        deadzone: Value,
+        timeout: Value,
+        settle_ms: Value,
+        status_variable: String,
+    },
 }
 
 impl std::hash::Hash for InstructionKind {
@@ -1060,6 +1132,24 @@ impl std::hash::Hash for InstructionKind {
                 path.hash(state);
                 variable.hash(state);
             }
+            Self::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable } => {
+                73u8.hash(state);
+                (pattern, by, detector, label, confidence).hash(state);
+                (sort, results_list, count_variable).hash(state);
+            }
+            Self::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout } => {
+                74u8.hash(state);
+                (pattern, by, detector, label, confidence, appear, timeout).hash(state);
+            }
+            Self::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => {
+                75u8.hash(state);
+                (pattern, by, target_x, target_y, gain, max_step, deadzone).hash(state);
+            }
+            Self::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => {
+                76u8.hash(state);
+                (results_list, index, gain, max_step, deadzone).hash(state);
+                (timeout, settle_ms, status_variable).hash(state);
+            }
         }
     }
 }
@@ -1292,6 +1382,44 @@ enum InstructionKindDe {
         path: Value,
         variable: String,
     },
+    DetectObjectsInWindow {
+        pattern: Value,
+        by: String,
+        detector: Value,
+        label: Value,
+        confidence: Value,
+        sort: String,
+        results_list: String,
+        count_variable: String,
+    },
+    WaitForDetection {
+        pattern: Value,
+        by: String,
+        detector: Value,
+        label: Value,
+        confidence: Value,
+        appear: bool,
+        timeout: Value,
+    },
+    AimStep {
+        pattern: Value,
+        by: String,
+        target_x: Value,
+        target_y: Value,
+        gain: Value,
+        max_step: Value,
+        deadzone: Value,
+    },
+    AimAtDetection {
+        results_list: String,
+        index: Value,
+        gain: Value,
+        max_step: Value,
+        deadzone: Value,
+        timeout: Value,
+        settle_ms: Value,
+        status_variable: String,
+    },
 }
 
 fn empty_text() -> Value {
@@ -1500,6 +1628,18 @@ impl From<InstructionKindDe> for InstructionKind {
             InstructionKindDe::WhenSignal(v) => InstructionKind::WhenSignal(v),
             InstructionKindDe::SendSignal { name, wait } => InstructionKind::SendSignal { name, wait },
             InstructionKindDe::WhenWebhook { path, variable } => InstructionKind::WhenWebhook { path, variable },
+            InstructionKindDe::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable } => {
+                InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable }
+            }
+            InstructionKindDe::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout } => {
+                InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout }
+            }
+            InstructionKindDe::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => {
+                InstructionKind::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone }
+            }
+            InstructionKindDe::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => {
+                InstructionKind::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable }
+            }
         }
     }
 }

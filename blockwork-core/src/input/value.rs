@@ -125,6 +125,33 @@ static OPERATORS: &[ExtOperator] = &[
         eval: |args| Ok(Evaluated::Bool(crate::window::exists(&args[0].as_text())?)),
     },
     ExtOperator {
+        kind: "WindowInfo",
+        op: "WindowInfo",
+        arity: 2,
+        default_args: || vec![Value::text("Firefox"), Value::text("center x")],
+        eval: |args| {
+            let w = crate::window::bounds(&args[0].as_text(), crate::window::MatchBy::Any)?;
+            Ok(Evaluated::Number(match args[1].as_text().as_str() {
+                "x" => w.x,
+                "y" => w.y,
+                "width" => w.width,
+                "height" => w.height,
+                "center y" => w.y + w.height / 2.0,
+                _ => w.x + w.width / 2.0,
+            }))
+        },
+    },
+    ExtOperator {
+        kind: "Detection",
+        op: "Detection",
+        arity: 2,
+        default_args: || {
+            let item = Value::op(Op::from_name("ListItem"), vec![Value::number(1.0), Value::text("detections")]);
+            vec![Value::text("center x"), item]
+        },
+        eval: |args| crate::detect::Detection::from_item(&args[1].as_text())?.field(&args[0].as_text()),
+    },
+    ExtOperator {
         kind: "MacroRunning",
         op: "MacroRunning",
         arity: 1,
@@ -431,6 +458,16 @@ mod tests {
         assert_eq!(op("FormatNumber", vec![Value::number(2.5), Value::number(2.0)]), Ok(Evaluated::Text("2.50".into())));
         let year = op("DatePart", vec![text("year"), Value::op(Op::from_name("Timestamp"), vec![])]);
         assert!(matches!(year, Ok(Evaluated::Number(y)) if y >= 2026.0));
+    }
+
+    #[test]
+    fn detection_reporter_reads_list_items() {
+        register_blockwork_operators();
+        let item = r#"{"x":10,"y":20,"w":30,"h":40,"label":"player","score":0.5,"id":7}"#;
+        let op = |field: &str, item: &str| Value::op(Op::from_name("Detection"), vec![Value::text(field), Value::text(item)]).eval();
+        assert_eq!(op("center x", item), Ok(Evaluated::Number(25.0)));
+        assert_eq!(op("label", item), Ok(Evaluated::Text("player".into())));
+        assert!(op("x", "").is_err(), "an empty item (list index out of range) is an error");
     }
 
     #[test]

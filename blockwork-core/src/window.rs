@@ -3,6 +3,8 @@
 //! this, so Linux asks the compositor directly where it can (Hyprland, Sway,
 //! KDE via kdotool) and falls back to X11 off Wayland.
 
+pub use crate::screen::Rect;
+
 #[derive(Debug, Clone, Default, PartialEq, Eq)]
 pub struct ActiveWindow {
     pub title: String,
@@ -93,6 +95,13 @@ pub fn place(pattern: &str, by: MatchBy, resize: bool, a: i32, b: i32) -> Result
     linux::place(pattern.trim(), by, resize, a, b)
 }
 
+/// The client area of a matching window (the active one when `pattern` is
+/// empty), in screen coordinates.
+#[cfg(target_os = "linux")]
+pub fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
+    linux::bounds(pattern.trim(), by)
+}
+
 /// Whether any window's title or app contains `pattern`.
 #[cfg(target_os = "linux")]
 pub fn exists(pattern: &str) -> Result<bool, String> {
@@ -100,15 +109,18 @@ pub fn exists(pattern: &str) -> Result<bool, String> {
 }
 
 #[cfg(windows)]
-pub use windows::{act, active, exists, place};
+pub use windows::{act, active, bounds, exists, place};
 
 #[cfg(target_os = "macos")]
-pub use macos::{act, active, exists, place};
+pub use macos::{act, active, bounds, exists, place};
 
 #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
 mod unsupported {
-    use super::{Action, ActiveWindow, MatchBy};
+    use super::{Action, ActiveWindow, MatchBy, Rect};
     const MSG: &str = "window info isn't supported on this platform";
+    pub fn bounds(_: &str, _: MatchBy) -> Result<Rect, String> {
+        Err(MSG.into())
+    }
     pub fn active() -> Result<ActiveWindow, String> {
         Err(MSG.into())
     }
@@ -123,11 +135,11 @@ mod unsupported {
     }
 }
 #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
-pub use unsupported::{act, active, exists, place};
+pub use unsupported::{act, active, bounds, exists, place};
 
 #[cfg(target_os = "linux")]
 mod linux {
-    use super::{no_match, Action, ActiveWindow, MatchBy};
+    use super::{no_match, Action, ActiveWindow, MatchBy, Rect};
     use crate::flatpak::host_command;
 
     enum Desktop {
@@ -197,6 +209,19 @@ mod linux {
         }
     }
 
+    pub(super) fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
+        match desktop()? {
+            Desktop::Hyprland => hypr::bounds(&hypr::find(pattern, by)?),
+            Desktop::Sway => sway::bounds(&sway::find(pattern, by)?),
+            Desktop::Kde => kde::parse_geometry(&run("kdotool", &["getwindowgeometry", &kde::find(pattern, by)?])?),
+            Desktop::X11 => {
+                let x = x11::X11::connect()?;
+                let w = x.find(pattern, by)?;
+                x.bounds(w)
+            }
+        }
+    }
+
     pub(super) fn exists(pattern: &str) -> Result<bool, String> {
         if pattern.is_empty() {
             return Ok(true);
@@ -228,6 +253,18 @@ mod linux {
 
     fn text(node: &serde_json::Value, key: &str) -> String {
         node.get(key).and_then(|v| v.as_str()).unwrap_or_default().to_string()
+    }
+
+    fn number(node: &serde_json::Value, key: &str) -> f64 {
+        node.get(key).and_then(|v| v.as_f64()).unwrap_or_default()
+    }
+
+    /// A window's size, refusing empty ones (minimized or hidden).
+    fn sized(x: f64, y: f64, width: f64, height: f64) -> Result<Rect, String> {
+        if width < 1.0 || height < 1.0 {
+            return Err("the window is minimized or hidden".into());
+        }
+        Ok(Rect { x, y, width, height })
     }
 
     mod hypr {
@@ -297,6 +334,19 @@ mod linux {
                     }
                 }
             }
+        }
+
+        pub(super) fn bounds(client: &serde_json::Value) -> Result<Rect, String> {
+            let pair = |key: &str| {
+                let v = client.get(key).and_then(|v| v.as_array());
+                let at = |i: usize| v.and_then(|v| v.get(i)).and_then(|n| n.as_f64()).unwrap_or_default();
+                (at(0), at(1))
+            };
+            if client.get("hidden").and_then(|h| h.as_bool()) == Some(true) {
+                return Err("the window is hidden".into());
+            }
+            let ((x, y), (w, h)) = (pair("at"), pair("size"));
+            sized(x, y, w, h)
         }
 
         pub(super) fn place(client: &serde_json::Value, resize: bool, a: i32, b: i32) -> Result<(), String> {
@@ -371,13 +421,25 @@ mod linux {
             )
         }
 
+        /// `rect` is the container; `window_rect` is the content inside it.
+        pub(super) fn bounds(node: &serde_json::Value) -> Result<Rect, String> {
+            let empty = serde_json::Value::Null;
+            let (outer, inner) = (node.get("rect").unwrap_or(&empty), node.get("window_rect").unwrap_or(&empty));
+            sized(
+                number(outer, "x") + number(inner, "x"),
+                number(outer, "y") + number(inner, "y"),
+                number(inner, "width"),
+                number(inner, "height"),
+            )
+        }
+
         pub(super) fn place(node: &serde_json::Value, resize: bool, a: i32, b: i32) -> Result<(), String> {
             let verb = if resize { format!("resize set {a} {b}") } else { format!("move absolute position {a} {b}") };
             command(node, &format!("floating enable, {verb}"))
         }
     }
 
-    mod kde {
+    pub(super) mod kde {
         use super::*;
 
         /// kdotool searches by regex, case-insensitively by default.
@@ -436,6 +498,19 @@ mod linux {
             })
         }
 
+        /// `getwindowgeometry` prints "Position: x,y" and "Geometry: WxH" lines.
+        pub(crate) fn parse_geometry(out: &str) -> Result<Rect, String> {
+            let field = |name: &str, sep: char| -> Option<(f64, f64)> {
+                let line = out.lines().find_map(|l| l.trim().strip_prefix(name))?;
+                let (a, b) = line.trim().split_once(sep)?;
+                Some((a.trim().parse().ok()?, b.trim().parse().ok()?))
+            };
+            let bad = || format!("unexpected kdotool output: {}", out.trim());
+            let (x, y) = field("Position:", ',').ok_or_else(bad)?;
+            let (w, h) = field("Geometry:", 'x').ok_or_else(bad)?;
+            sized(x, y, w, h)
+        }
+
         pub(super) fn act(action: Action, id: &str) -> Result<(), String> {
             let args: &[&str] = match action {
                 Action::Focus => &["windowactivate", id],
@@ -449,7 +524,7 @@ mod linux {
     }
 
     pub(super) mod x11 {
-        use super::{no_match, Action, ActiveWindow, MatchBy};
+        use super::{no_match, sized, Action, ActiveWindow, MatchBy, Rect};
         use x11rb::connection::Connection;
         use x11rb::protocol::xproto::{AtomEnum, ClientMessageEvent, ConnectionExt, EventMask, Window};
         use x11rb::rust_connection::RustConnection;
@@ -551,6 +626,18 @@ mod linux {
                 }
             }
 
+            /// The window's own area (without the frame), translated to root coordinates.
+            pub(crate) fn bounds(&self, window: Window) -> Result<Rect, String> {
+                let geometry = self.conn.get_geometry(window).map_err(|e| e.to_string())?.reply().map_err(|e| e.to_string())?;
+                let origin = self
+                    .conn
+                    .translate_coordinates(window, self.root, 0, 0)
+                    .map_err(|e| e.to_string())?
+                    .reply()
+                    .map_err(|e| e.to_string())?;
+                sized(origin.dst_x as f64, origin.dst_y as f64, geometry.width as f64, geometry.height as f64)
+            }
+
             pub(crate) fn place(&self, window: Window, resize: bool, a: i32, b: i32) -> Result<(), String> {
                 // Flags: which of x/y/width/height apply, plus source 2.
                 let (flags, data) = if resize {
@@ -566,13 +653,14 @@ mod linux {
 
 #[cfg(windows)]
 mod windows {
-    use super::{no_match, Action, ActiveWindow, MatchBy};
-    use windows_sys::Win32::Foundation::{CloseHandle, HWND, LPARAM, RECT};
+    use super::{no_match, Action, ActiveWindow, MatchBy, Rect};
+    use windows_sys::Win32::Foundation::{CloseHandle, HWND, LPARAM, POINT, RECT};
+    use windows_sys::Win32::Graphics::Gdi::ClientToScreen;
     use windows_sys::Win32::System::Threading::{
         OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        EnumWindows, GetForegroundWindow, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
+        EnumWindows, GetClientRect, GetForegroundWindow, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
         IsWindowVisible, IsZoomed, PostMessageW, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, SWP_NOACTIVATE, SWP_NOMOVE,
         SWP_NOSIZE, SWP_NOZORDER, SetForegroundWindow, SetWindowPos, ShowWindow, WM_CLOSE,
     };
@@ -692,6 +780,27 @@ mod windows {
         Ok(())
     }
 
+    /// The client area, so title bars and borders don't shift the center.
+    pub fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
+        let hwnd = find(pattern, by)?;
+        // SAFETY: as in `act`; `rect` and `origin` are plain out-parameters.
+        unsafe {
+            if IsIconic(hwnd) != 0 {
+                return Err("the window is minimized".into());
+            }
+            let mut rect: RECT = std::mem::zeroed();
+            let mut origin = POINT { x: 0, y: 0 };
+            if GetClientRect(hwnd, &mut rect) == 0 || ClientToScreen(hwnd, &mut origin) == 0 {
+                return Err("couldn't read the window's position".into());
+            }
+            let (width, height) = ((rect.right - rect.left) as f64, (rect.bottom - rect.top) as f64);
+            if width < 1.0 || height < 1.0 {
+                return Err("the window is minimized or hidden".into());
+            }
+            Ok(Rect { x: origin.x as f64, y: origin.y as f64, width, height })
+        }
+    }
+
     pub fn exists(pattern: &str) -> Result<bool, String> {
         Ok(pattern.trim().is_empty() || find(pattern, MatchBy::Any).is_ok())
     }
@@ -699,7 +808,7 @@ mod windows {
 
 #[cfg(target_os = "macos")]
 mod macos {
-    use super::{Action, ActiveWindow, MatchBy};
+    use super::{Action, ActiveWindow, MatchBy, Rect};
 
     // Finds the window by app or title, then does `verb` to it. Arguments
     // travel as argv so a pattern can't break out of the script.
@@ -736,6 +845,11 @@ mod macos {
             return (name of targetProc) & linefeed & t
         end if
         if targetWin is missing value then error "no window matches '" & pat & "'"
+        if verb is "Bounds" then
+            set {px, py} to position of targetWin
+            set {sx, sy} to size of targetWin
+            return (px as text) & "," & (py as text) & "," & (sx as text) & "," & (sy as text)
+        end if
         if verb is "Focus" then
             set value of attribute "AXMinimized" of targetWin to false
             set frontmost of targetProc to true
@@ -802,6 +916,17 @@ end run"#;
         run(&[pattern.trim(), mode(by), if resize { "Resize" } else { "Move" }, &a, &b]).map(drop)
     }
 
+    /// The whole window frame; System Events has no separate content area.
+    pub fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
+        let text = run(&[pattern.trim(), mode(by), "Bounds"])?;
+        let n: Vec<f64> = text.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+        match n[..] {
+            [x, y, width, height] if width >= 1.0 && height >= 1.0 => Ok(Rect { x, y, width, height }),
+            [_, _, _, _] => Err("the window is minimized or hidden".into()),
+            _ => Err(format!("unexpected window bounds '{text}'")),
+        }
+    }
+
     pub fn exists(pattern: &str) -> Result<bool, String> {
         Ok(pattern.trim().is_empty() || run(&[pattern.trim(), "Any", "Exists"])? == "true")
     }
@@ -820,6 +945,15 @@ mod tests {
         assert!(!w.matches("firefox", MatchBy::Any));
         assert!(w.matches("inbox", MatchBy::Title) && !w.matches("inbox", MatchBy::App));
         assert!(w.matches("thunder", MatchBy::App) && !w.matches("thunder", MatchBy::Title));
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn kdotool_geometry_parses() {
+        let out = "Window {5f1e}\n  Position: 120,-40\n  Geometry: 800x600\n";
+        assert_eq!(linux::kde::parse_geometry(out), Ok(Rect { x: 120.0, y: -40.0, width: 800.0, height: 600.0 }));
+        assert!(linux::kde::parse_geometry("Position: 1,2\n  Geometry: 0x0").is_err());
+        assert!(linux::kde::parse_geometry("nonsense").is_err());
     }
 
     #[test]

@@ -898,7 +898,7 @@ fn operator_capability(op: &str) -> Option<&'static str> {
         "HttpGet" => "network",
         "ReadFile" | "FileExists" | "ListDirectory" => "files_read",
         "ClipboardText" | "ClipboardHasImage" | "ClipboardHasFiles" => "clipboard",
-        "ActiveWindowTitle" | "ActiveWindowApp" | "WindowExists" | "AppRunning" => "windows",
+        "ActiveWindowTitle" | "ActiveWindowApp" | "WindowExists" | "WindowInfo" | "AppRunning" => "windows",
         "MacroRunning" => "macros",
         "PixelColor" | "AverageColor" | "ScreenText" => "screen",
         "GlobalVariable" => "globals",
@@ -941,12 +941,13 @@ fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
             InstructionKind::WhenFileChanged(_) => Some("files_read"),
             InstructionKind::RunMacro { .. } | InstructionKind::StopMacroNamed(_) => Some("macros"),
             InstructionKind::FindImage { .. } | InstructionKind::WaitForImage { .. } => Some("screen"),
-            InstructionKind::ClickImage { .. } => Some("input"),
+            InstructionKind::DetectObjectsInWindow { .. } | InstructionKind::WaitForDetection { .. } => Some("screen"),
+            InstructionKind::ClickImage { .. } | InstructionKind::AimStep { .. } | InstructionKind::AimAtDetection { .. } => Some("input"),
             InstructionKind::SetGlobal { .. } | InstructionKind::ChangeGlobal { .. } => Some("globals"),
             _ => None,
         };
         found.extend(kind);
-        if matches!(ins.kind, InstructionKind::ClickImage { .. }) {
+        if matches!(ins.kind, InstructionKind::ClickImage { .. } | InstructionKind::AimAtDetection { .. }) {
             found.insert("screen");
         }
         if matches!(ins.kind, InstructionKind::PasteText(_)) {
