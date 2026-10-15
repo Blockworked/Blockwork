@@ -288,6 +288,11 @@ Differences from the spec above:
   item's tracking id, and writes `stopped` when the run is stopped. There is
   no strict flag; it never raises on `timeout`/`lost`.
 
+Smoke testing: `examples/detector/detector.py --color ff0000` finds blobs
+of one color with no model (Pillow and numpy), or `--yolo weights.pt` runs
+an Ultralytics model. With it running, `cargo test -p blockwork-core --lib
+finds_a_red_square -- --ignored` checks the HTTP path end to end.
+
 Not done: M3 (native ONNX backend, model manager and downloads), the
 confirm dialog before a detection macro drives input, a sub-rect region
 picker, and screenshot fixture tests (they need a trained model).

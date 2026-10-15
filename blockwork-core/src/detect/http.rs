@@ -136,6 +136,24 @@ mod tests {
         assert_eq!(Image::from_png(&body).map(|i| (i.width, i.height)), Ok((8, 6)));
     }
 
+    /// Against a running `examples/detector/detector.py --color ff0000`; run
+    /// by hand with `--ignored` (URL from `BLOCKWORK_TEST_DETECTOR` if set).
+    #[test]
+    #[ignore]
+    fn finds_a_red_square_with_the_example_detector() {
+        let url = std::env::var("BLOCKWORK_TEST_DETECTOR").unwrap_or("http://127.0.0.1:8765/detect".into());
+        let mut image = Image::new(320, 200);
+        for y in 60..100 {
+            for x in 200..240 {
+                let i = (y * 320 + x) * 4;
+                image.rgba[i..i + 3].copy_from_slice(&[255, 0, 0]);
+            }
+        }
+        let found = HttpDetector::new(&url).unwrap().detect(&image).unwrap();
+        assert_eq!(found.len(), 1, "{found:?}");
+        assert_eq!(found[0].center(), (220.0, 80.0));
+    }
+
     #[test]
     fn replies_parse_in_every_supported_shape() {
         let want = Detection { x: 40.0, y: 20.0, w: 64.0, h: 128.0, label: "player".into(), score: 0.87, id: None };
