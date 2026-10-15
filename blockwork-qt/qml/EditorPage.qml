@@ -9,6 +9,8 @@ Item {
     required property var appState
     required property var invoke
     required property var appBridge
+    // Shared import/export flow (MacroFiles in Main.qml).
+    property var macroFiles: null
     readonly property var macro: appState.current_macro
     readonly property bool recording: appState.recording_phase && appState.recording_phase.phase === "Active"
     property string sidebarKey: "a"
@@ -17,8 +19,8 @@ Item {
     property bool sidebarToggling: false
     readonly property real minSidebarWidth: 180
     readonly property real maxSidebarWidth: 600
-    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "WhenTyped", "WhenApp", "WhenIdle", "WhenScreenLock", "WhenCron", "Wait", "Text", "PasteText", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile", "HttpRequest", "Notify", "Log", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry", "ThrowError", "StopMacro", "WithLock", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal", "WaitUntil", "FindImage", "ClickImage", "WaitForImage"]
-    readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList"]
+    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "WhenTyped", "WhenApp", "WhenIdle", "WhenScreenLock", "WhenCron", "WhenNetwork", "WhenUsb", "WhenMouseButton", "Wait", "Text", "PasteText", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile", "HttpRequest", "Notify", "Log", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry", "ThrowError", "StopMacro", "WithLock", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal", "WaitUntil", "FindImage", "ClickImage", "WaitForImage"]
+    readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList", "SplitIntoList"]
 
     function uuid() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }); }
     function numberValue(n) { return { kind: "Number", value: n }; }
@@ -83,7 +85,7 @@ Item {
     function totalBlocks() { return (root.macro ? root.macro.strands : []).reduce((n, st) => n + st.instructions.length, 0); }
     function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
     function instructionExplainer(type) {
-        const x={WhenTyped:"Text expansion: runs when you type the text anywhere, like ;addr. With 'erase it' the typed text is deleted first, so a paste block can replace it. Uses a US keyboard layout for symbols.",PasteText:"Pastes text with Ctrl+V (Cmd+V on macOS), then puts back the text that was on the clipboard. Faster and more reliable than typing for long text. Terminals that paste with Ctrl+Shift+V need a Key block instead.",WhenApp:"Runs when a program whose name contains the text starts or exits. Checked once a second.",WhenIdle:"Runs once you haven't touched the keyboard or mouse for this many minutes. Fires again after the next idle stretch.",WhenScreenLock:"Runs when the screen locks or unlocks.",WhenCron:"Runs on a cron schedule: minute hour day month weekday. Examples: '0 9 * * mon-fri' (9:00 on weekdays), '*/15 * * * *' (every 15 minutes), '@hourly'.",WithLock:"Runs its body while holding a named lock. Only one strand, in any macro, can be inside a lock with the same name at a time; others wait their turn. Use it so two macros don't type over each other.",AppRunning:"Whether a program whose name contains the text is running.",IdleSeconds:"How many seconds since the last keyboard or mouse input.",ScreenLocked:"Whether the screen is locked.",WaitUntil:"Pauses until the condition is true, checking about 10 times a second. If it's still false after the time limit it's an error; 0 waits forever.",FindImage:"Looks for the picture on screen and puts the screen position of its middle in the two variables, or -1 if it isn't there. Click the picture area to capture one. Tolerance is how different the pixels may be, in percent.",ClickImage:"Finds the picture on screen and clicks its middle. It's an error if the picture isn't there. Click the picture area to capture one.",WaitForImage:"Pauses until the picture appears on screen (or goes away). If that hasn't happened within the time limit it's an error; 0 waits forever.",PixelColor:"The color of the screen at a point, as #rrggbb. Use the screen picker in the toolbar to find coordinates.",AverageColor:"The average color of a screen region, as #rrggbb.",ColorsMatch:"Whether two colors are within the given percentage of each other (0 = identical, 100 = black vs white).",ScreenText:"Reads the text in a screen region (OCR). Uses Windows or macOS text recognition, or Tesseract on Linux.",MousePosition:"Where the mouse pointer is, in screen coordinates.",ScreenSize:"The size of the whole desktop, across all monitors.",MonitorInfo:"The position or size of a monitor, counting from 1.",MonitorCount:"How many monitors are connected.",RunMacro:"Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too.",StopMacroNamed:"Stops every run of the named macro.",SetGlobal:"Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts.",ChangeGlobal:"Adds a number to a global variable. A global that was never set counts as 0.",Retry:"Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other.",WindowAction:"Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window.",MoveWindow:"Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating.",WhenWindow:"Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window.",WhenFileChanged:"Runs when the file is created, changed or deleted. Checked once a second.",WriteFile:"Writes text to a file, replacing it, or appends to the end. ~ means your home folder.",HttpRequest:"Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error.",Notify:"Shows a desktop notification.",Log:"Adds a line to the run log.",TryCatch:"Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong.",ThrowError:"Fails with this message. Ends the strand unless a try block catches it.",StopMacro:"Stops every strand of this run.",WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a key or key combo.",WhenKey:"Runs when a key or key combo is pressed or released.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
+        const x={WhenNetwork:"Runs when the computer goes online or offline: when a network route to the internet appears or goes away. Checked once a second.",WhenUsb:"Runs when a USB device is plugged in or unplugged. The text matches the device's name or its vendor:product id (like 046d:c52b); leave it empty for any device. Hubs don't count.",WhenMouseButton:"Runs when a mouse button is pressed or released, or the wheel scrolls. Put modifier keys in the box (like Control+Shift) to only run while exactly those are held; leave it empty to ignore modifiers. The click still goes through to the app.",SplitIntoList:"Cuts the text at every separator and puts the pieces in the list, replacing what was there. An empty separator splits it into letters.",Secret:"The value of a secret saved in Settings > Secrets. It comes from your system keyring, isn't stored in the macro file, and shows as dots in the run log.",NetworkConnected:"Whether the computer has a network route to the internet.",UsbConnected:"Whether a USB device whose name or vendor:product id contains the text is plugged in. Empty matches any device.",TextCheck:"Checks text: contains, starts with, ends with, or matches a regular expression. Case matters.",TextReplace:"Replaces every copy of the first text inside the second with the third.",RegexReplace:"Replaces every match of a regular expression. Use $1, $2 in the replacement for groups.",RegexFind:"The first match of a regular expression, or its first group if it has one. Empty when nothing matches.",SplitPart:"Cuts the text at every separator and gives one piece, counting from 1. Negative numbers count from the end.",SplitCount:"How many pieces the text has when cut at every separator.",Substring:"The letters between two positions, counting from 1, both included.",Trim:"The text without spaces or line breaks at its start and end.",FormatNumber:"The number as text with exactly this many digits after the point.",Timestamp:"The current time as a Unix timestamp: seconds since 1970. Add 86400 for a day later.",FormatDate:"Writes a timestamp as a date in local time. Codes: %Y year, %m month, %d day, %H hour, %M minute, %S second, %A weekday name, %B month name.",ParseDate:"The timestamp of a date written as text, in local time. Leave the format empty for dates like 2026-01-31 09:00, or use codes like %d.%m.%Y.",DatePart:"One part of a timestamp in local time. Weekday is 1 for Sunday to 7 for Saturday.",WhenTyped:"Text expansion: runs when you type the text anywhere, like ;addr. With 'erase it' the typed text is deleted first, so a paste block can replace it. Uses a US keyboard layout for symbols.",PasteText:"Pastes text with Ctrl+V (Cmd+V on macOS), then puts back the text that was on the clipboard. Faster and more reliable than typing for long text. Terminals that paste with Ctrl+Shift+V need a Key block instead.",WhenApp:"Runs when a program whose name contains the text starts or exits. Checked once a second.",WhenIdle:"Runs once you haven't touched the keyboard or mouse for this many minutes. Fires again after the next idle stretch.",WhenScreenLock:"Runs when the screen locks or unlocks.",WhenCron:"Runs on a cron schedule: minute hour day month weekday. Examples: '0 9 * * mon-fri' (9:00 on weekdays), '*/15 * * * *' (every 15 minutes), '@hourly'.",WithLock:"Runs its body while holding a named lock. Only one strand, in any macro, can be inside a lock with the same name at a time; others wait their turn. Use it so two macros don't type over each other.",AppRunning:"Whether a program whose name contains the text is running.",IdleSeconds:"How many seconds since the last keyboard or mouse input.",ScreenLocked:"Whether the screen is locked.",WaitUntil:"Pauses until the condition is true, checking about 10 times a second. If it's still false after the time limit it's an error; 0 waits forever.",FindImage:"Looks for the picture on screen and puts the screen position of its middle in the two variables, or -1 if it isn't there. Click the picture area to capture one. Tolerance is how different the pixels may be, in percent.",ClickImage:"Finds the picture on screen and clicks its middle. It's an error if the picture isn't there. Click the picture area to capture one.",WaitForImage:"Pauses until the picture appears on screen (or goes away). If that hasn't happened within the time limit it's an error; 0 waits forever.",PixelColor:"The color of the screen at a point, as #rrggbb. Use the screen picker in the toolbar to find coordinates.",AverageColor:"The average color of a screen region, as #rrggbb.",ColorsMatch:"Whether two colors are within the given percentage of each other (0 = identical, 100 = black vs white).",ScreenText:"Reads the text in a screen region (OCR). Uses Windows or macOS text recognition, or Tesseract on Linux.",MousePosition:"Where the mouse pointer is, in screen coordinates.",ScreenSize:"The size of the whole desktop, across all monitors.",MonitorInfo:"The position or size of a monitor, counting from 1.",MonitorCount:"How many monitors are connected.",RunMacro:"Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too.",StopMacroNamed:"Stops every run of the named macro.",SetGlobal:"Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts.",ChangeGlobal:"Adds a number to a global variable. A global that was never set counts as 0.",Retry:"Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other.",WindowAction:"Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window.",MoveWindow:"Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating.",WhenWindow:"Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window.",WhenFileChanged:"Runs when the file is created, changed or deleted. Checked once a second.",WriteFile:"Writes text to a file, replacing it, or appends to the end. ~ means your home folder.",HttpRequest:"Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error.",Notify:"Shows a desktop notification.",Log:"Adds a line to the run log.",TryCatch:"Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong.",ThrowError:"Fails with this message. Ends the strand unless a try block catches it.",StopMacro:"Stops every strand of this run.",WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a key or key combo.",WhenKey:"Runs when a key or key combo is pressed or released.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
         return x[type]||"A Blockwork instruction block.";
     }
     // ---- daemon commands whose result QML needs ----
@@ -374,11 +376,34 @@ Item {
                     ToolTip.visible: hovered; ToolTip.text: root.sidebarCollapsed ? "Show sidebar" : "Hide sidebar"
                     onClicked: { root.sidebarToggling = true; root.sidebarCollapsed = !root.sidebarCollapsed; }
                 }
-                BwComboBox {
-                    id: macroPicker
-                    Layout.preferredWidth: Math.max(90, Math.min(200, toolbar.width * 0.17)); Layout.preferredHeight: 34; model: appState.macro_names || []
-                    currentIndex: appState.macro_selected === null || appState.macro_selected === undefined ? -1 : appState.macro_selected
-                    onActivated: index => root.invoke("select_macro", { index: index })
+                Rectangle {
+                    id: libraryButton
+                    Layout.preferredWidth: Math.max(110, Math.min(240, toolbar.width * 0.2)); Layout.preferredHeight: 34
+                    radius: Theme.radius; color: libraryHover.hovered ? "#3b3c40" : Theme.panelRaised; border.color: library.visible ? Theme.accent : Theme.border
+                    Accessible.role: Accessible.Button; Accessible.name: "Macro library"
+                    RowLayout {
+                        anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 8; spacing: 7
+                        LucideIcon { name: "blocks"; width: 15; height: 15; color: Theme.textDim }
+                        Text {
+                            Layout.fillWidth: true; elide: Text.ElideRight; font.pixelSize: 13
+                            text: root.macro ? (root.macro.settings.folder ? root.macro.settings.folder + " / " : "") + root.macro.name : "Choose a macro"
+                            color: root.macro ? Theme.text : Theme.textDim
+                        }
+                        LucideIcon { name: "chevron-down"; width: 14; height: 14; color: Theme.textDim }
+                    }
+                    HoverHandler { id: libraryHover; cursorShape: Qt.PointingHandCursor }
+                    TapHandler { onTapped: library.visible ? library.close() : library.open() }
+                    ToolTip.visible: libraryHover.hovered && !library.visible; ToolTip.delay: 500; ToolTip.text: "Macro library"
+                    LibraryPanel {
+                        id: library
+                        y: libraryButton.height + 4
+                        appState: root.appState; invoke: root.invoke
+                        runningIds: root.runningMacroIds
+                        onImportRequested: if (root.macroFiles) root.macroFiles.importMacro()
+                        onExportRequested: macroId => { if (root.macroFiles) root.macroFiles.exportMacro(macroId); }
+                        onTemplateRequested: templateDialog.open()
+                        onDeleteRequested: (macroId, name) => { deleteMacroDialog.macroId = macroId; deleteMacroDialog.macroName = name; deleteMacroDialog.open(); }
+                    }
                 }
                 BwButton {
                     id: macroMenuButton
@@ -392,10 +417,13 @@ Item {
                     BwMenu {
                         id: macroMenu
                         onAboutToHide: macroMenuButton.closeStamp = Date.now()
-                        implicitWidth: 190
+                        implicitWidth: 200
                         BwMenuItem { iconName: "sliders"; text: "Macro settings"; enabled: !!root.macro; onTriggered: macroSettings.open() }
                         BwMenuItem { iconName: "plus"; text: "New macro"; onTriggered: root.invoke("new_macro") }
                         BwMenuItem { iconName: "sparkles"; text: "New from template…"; onTriggered: templateDialog.open() }
+                        BwMenuItem { iconName: "copy"; text: "Duplicate macro"; enabled: !!root.macro; onTriggered: root.invoke("duplicate_macro", { id: root.macro.id }) }
+                        BwMenuItem { iconName: "upload"; text: "Export…"; enabled: !!root.macro && !!root.macroFiles; onTriggered: root.macroFiles.exportMacro(root.macro.id) }
+                        BwMenuItem { iconName: "circle-dot"; text: "Clear breakpoints"; enabled: (appState.breakpoints || []).length > 0; onTriggered: root.invoke("clear_breakpoints") }
                         BwMenuItem { iconName: "octagon"; text: "Emergency stop"; danger: true; onTriggered: root.invoke("emergency_stop") }
                         BwMenuItem { iconName: "trash"; text: "Delete macro"; danger: true; enabled: !!root.macro; onTriggered: removeDialog.open() }
                     }
@@ -462,6 +490,65 @@ Item {
                 Text { Layout.fillWidth: true; text: "Emergency stop: triggers are paused until you resume them."; color: Theme.text; font.pixelSize: 13; elide: Text.ElideRight }
                 BwButton { text: "Resume triggers"; implicitHeight: 28; onClicked: root.invoke("resume_triggers") }
             }
+        }
+        Rectangle {
+            id: debugBar
+            readonly property string macroId: root.macro ? root.macro.id : ""
+            readonly property var paused: (appState.paused_strands || []).filter(p => p.macro_id === macroId)
+            readonly property bool isPaused: !!macroId && (appState.paused_macros || []).indexOf(macroId) >= 0
+            readonly property var strand: paused.length ? paused[0] : null
+            function act(action) { root.invoke("debug_action", { action: action }); }
+            visible: !!root.macro && (root.runningIds.length > 0 || isPaused || paused.length > 0)
+            Layout.fillWidth: true; Layout.preferredHeight: debugColumn.implicitHeight + 14
+            color: isPaused ? "#33291a" : "#1c2a21"; border.color: isPaused ? "#5a4220" : "#2b4a35"
+            ColumnLayout {
+                id: debugColumn
+                anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
+                anchors.leftMargin: 14; anchors.rightMargin: 10; anchors.topMargin: 7; spacing: 6
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 8
+                    LucideIcon { name: debugBar.isPaused ? "pause" : "play"; color: debugBar.isPaused ? Theme.warning : Theme.running; width: 16; height: 16 }
+                    Text {
+                        Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 13
+                        text: debugBar.strand
+                            ? "Paused before \u201c" + root.blockLabel(debugBar.strand.block_id) + "\u201d" + (debugBar.paused.length > 1 ? " (" + debugBar.paused.length + " strands waiting)" : "")
+                            : debugBar.isPaused ? "Pausing at the next block…" : "Running"
+                        HoverHandler { cursorShape: debugBar.strand ? Qt.PointingHandCursor : Qt.ArrowCursor }
+                        TapHandler { enabled: !!debugBar.strand; onTapped: canvas.revealInstruction(debugBar.strand.block_id) }
+                    }
+                    BwButton { visible: !debugBar.isPaused; iconName: "pause"; text: "Pause"; implicitHeight: 28; ToolTip.visible: hovered; ToolTip.text: "Pause before the next block (F8)"; onClicked: debugBar.act("pause") }
+                    BwButton { visible: debugBar.isPaused; iconName: "play"; text: "Resume"; implicitHeight: 28; ToolTip.visible: hovered; ToolTip.text: "Run on until the next breakpoint (F8)"; onClicked: debugBar.act("resume") }
+                    BwButton { visible: debugBar.isPaused; iconName: "step-forward"; text: "Step"; implicitHeight: 28; enabled: debugBar.paused.length > 0; ToolTip.visible: hovered; ToolTip.text: "Run one block, then pause again (F10)"; onClicked: debugBar.act("step") }
+                    BwButton { iconName: "square"; text: "Stop"; danger: true; implicitHeight: 28; onClicked: debugBar.act("stop") }
+                }
+                Flow {
+                    visible: !!debugBar.strand
+                    Layout.fillWidth: true; Layout.bottomMargin: 2; spacing: 6
+                    Text {
+                        visible: !!debugBar.strand && !debugBar.strand.variables.length && !debugBar.strand.lists.length
+                        text: "No variables"; color: Theme.textDim; font.pixelSize: 12
+                    }
+                    Repeater {
+                        model: debugBar.strand ? debugBar.strand.variables.map(v => v[0] + " = " + v[1])
+                            .concat(debugBar.strand.lists.map(l => l[0] + ": [" + l[1].join(", ") + "]")) : []
+                        delegate: Rectangle {
+                            required property string modelData
+                            width: Math.min(chipText.implicitWidth + 16, 320); height: 24; radius: 12
+                            color: "#2a2b2e"; border.color: "#45464b"
+                            Text {
+                                id: chipText
+                                anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
+                                verticalAlignment: Text.AlignVCenter; elide: Text.ElideRight
+                                text: parent.modelData; color: Theme.text; font.pixelSize: 12; font.family: "monospace"
+                            }
+                            ToolTip.visible: chipHover.hovered && chipText.truncated; ToolTip.text: modelData
+                            HoverHandler { id: chipHover }
+                        }
+                    }
+                }
+            }
+            Shortcut { sequence: "F8"; enabled: debugBar.visible; onActivated: debugBar.act(debugBar.isPaused ? "resume" : "pause") }
+            Shortcut { sequence: "F10"; enabled: debugBar.visible && debugBar.paused.length > 0; onActivated: debugBar.act("step") }
         }
         Item {
             visible: !!root.macro
@@ -546,6 +633,7 @@ Item {
                     }
                     onBlockMenuAction: (action, strandId, path, instruction) => {
                         if (action === "edit_block") root.editBlockById(instruction.block_id);
+                        else if (action === "breakpoint") root.invoke("toggle_breakpoint", { blockId: instruction.id });
                         else if (action === "copy") root.clipboard = [instruction];
                         else if (action === "copy_all") {
                             const strand = canvas.strandById(strandId);
@@ -613,6 +701,13 @@ Item {
         }
     }
 
+    BwDialog {
+        id: deleteMacroDialog; title: "Delete macro?"; standardButtons: Dialog.Yes | Dialog.Cancel
+        property string macroId: ""
+        property string macroName: ""
+        Text { text: "This removes \u201c" + deleteMacroDialog.macroName + "\u201d from Blockwork."; color: "#e7e7e8" }
+        onAccepted: root.invoke("delete_macro", { id: macroId })
+    }
     BwDialog {
         id: removeDialog; title: "Delete macro?"; standardButtons: Dialog.Yes | Dialog.Cancel
         Text { text: "This removes the selected macro from Blockwork."; color: "#e7e7e8" }
@@ -892,12 +987,24 @@ Item {
         ["ScreenText", "text", 4, [numberValue(0), numberValue(0), numberValue(400), numberValue(100)]],
         ["MousePosition", "number", 1, [textValue("x")]], ["ScreenSize", "number", 1, [textValue("width")]],
         ["MonitorCount", "number", 0], ["MonitorInfo", "number", 2, [numberValue(1), textValue("width")]],
-        ["AppRunning", "bool", 1, [textValue("firefox")]], ["IdleSeconds", "number", 0], ["ScreenLocked", "bool", 0]
+        ["AppRunning", "bool", 1, [textValue("firefox")]], ["IdleSeconds", "number", 0], ["ScreenLocked", "bool", 0],
+        ["NetworkConnected", "bool", 0], ["UsbConnected", "bool", 1, [textValue("")]], ["Secret", "text", 1, [textValue("api token")]],
+        ["TextCheck", "bool", 3, [textValue("hello world"), textValue("contains"), textValue("world")]],
+        ["TextReplace", "text", 3, [textValue("world"), textValue("hello world"), textValue("there")]],
+        ["RegexReplace", "text", 3, [textValue("[0-9]+"), textValue("order 1234"), textValue("#")]],
+        ["RegexFind", "text", 2, [textValue("[0-9]+"), textValue("order 1234")]],
+        ["SplitPart", "text", 3, [numberValue(1), textValue("a,b,c"), textValue(",")]],
+        ["SplitCount", "number", 2, [textValue("a,b,c"), textValue(",")]],
+        ["Substring", "text", 3, [numberValue(1), numberValue(3), textValue("hello")]],
+        ["Trim", "text", 1, [textValue("  hello  ")]], ["FormatNumber", "text", 2, [numberValue(3.14159), numberValue(2)]],
+        ["Timestamp", "number", 0], ["FormatDate", "text", 2, [{ kind: "Op", op: "Timestamp", args: [], saved: numberValue(0) }, textValue("%Y-%m-%d %H:%M")]],
+        ["ParseDate", "number", 2, [textValue("2026-01-31 09:00"), textValue("")]],
+        ["DatePart", "number", 2, [textValue("day"), { kind: "Op", op: "Timestamp", args: [], saved: numberValue(0) }]]
     ]
     readonly property var extraCategories: ({
         WriteFile: "system", HttpRequest: "system", Notify: "system", Log: "system",
         TryCatch: "control", Retry: "control", ThrowError: "control", WithLock: "control", PasteText: "input",
-        AppRunning: "system", IdleSeconds: "system", ScreenLocked: "system",
+        AppRunning: "system", IdleSeconds: "system", ScreenLocked: "system", NetworkConnected: "system", UsbConnected: "system", Secret: "data",
         WindowAction: "system", MoveWindow: "system", WindowExists: "system", StopMacro: "control", LastError: "control",
         RunMacro: "control", StopMacroNamed: "control", MacroRunning: "control", SetGlobal: "data", ChangeGlobal: "data", GlobalVariable: "data",
         WaitUntil: "control", FindImage: "screen", ClickImage: "screen", WaitForImage: "screen", PixelColor: "screen", AverageColor: "screen",
@@ -908,6 +1015,9 @@ Item {
     function variableChoices() {
         return [{ value: "", label: "(no variable)" }].concat((root.macro ? root.macro.variables : []).map(v => ({ value: v, label: v })));
     }
+    readonly property var mouseButtonOptions: [["Left", "left button"], ["Right", "right button"], ["Middle", "middle button"],
+        ["Back", "back button"], ["Forward", "forward button"], ["ScrollUp", "wheel up"], ["ScrollDown", "wheel down"],
+        ["ScrollLeft", "wheel left"], ["ScrollRight", "wheel right"]].map(b => ({ value: b[0], label: b[1] }))
     // Which part of a window the window blocks match against.
     readonly property var windowMatchOptions: [{ value: "Title", label: "window" }, { value: "App", label: "app" }]
     // Another macro's name, for the Run macro prefab.
@@ -944,7 +1054,28 @@ Item {
                 enumArg: { index: 1, options: ["x", "y", "width", "height"].map(v => ({ value: v, label: v })) } },
             AppRunning: { prefix: "app", suffix: "is running?", result: "bool" },
             IdleSeconds: { prefix: "seconds idle", result: "number" },
-            ScreenLocked: { prefix: "screen is locked?", result: "bool" }
+            ScreenLocked: { prefix: "screen is locked?", result: "bool" },
+            NetworkConnected: { prefix: "online?", result: "bool" },
+            UsbConnected: { prefix: "USB device", suffix: "plugged in?", result: "bool" },
+            Secret: { prefix: "secret", result: "text", enumArg: { index: 0, options: () => {
+                const names = appState.secret_names || [];
+                return names.length ? names.map(n => ({ value: n, label: n })) : [{ value: "", label: "(add one in Settings)" }];
+            } } },
+            TextCheck: { infix: ["", ""], suffix: "?", result: "bool",
+                enumArg: { index: 1, options: ["contains", "starts with", "ends with", "matches regex"].map(v => ({ value: v, label: v })) } },
+            TextReplace: { prefix: "replace", infix: ["in", "with"], result: "text" },
+            RegexReplace: { prefix: "replace regex", infix: ["in", "with"], result: "text" },
+            RegexFind: { prefix: "match of regex", infix: "in", result: "text" },
+            SplitPart: { prefix: "part", infix: ["of", "split by"], result: "text" },
+            SplitCount: { prefix: "number of parts in", infix: "split by", result: "number" },
+            Substring: { prefix: "letters", infix: ["to", "of"], result: "text" },
+            Trim: { prefix: "trim", result: "text" },
+            FormatNumber: { infix: "with", suffix: "decimals", result: "text" },
+            Timestamp: { prefix: "timestamp now", result: "number" },
+            FormatDate: { prefix: "date of", infix: "as", result: "text" },
+            ParseDate: { prefix: "timestamp of", infix: "in format", result: "number" },
+            DatePart: { infix: "of", result: "number",
+                enumArg: { index: 0, options: ["year", "month", "day", "hour", "minute", "second", "weekday"].map(v => ({ value: v, label: v })) } }
         });
         BlockRegistry.registerRows({
             WhenWindow: { shape: "header", icon: "app-window", head: [label("WHEN WINDOW"), value("WindowPattern", "pattern"), label("IS"),
@@ -962,6 +1093,19 @@ Item {
                 { kind: "dropdown", key: "locked", options: [{ value: "locked", label: "locked" }, { value: "unlocked", label: "unlocked" }],
                   encode: v => v === "locked", decode: v => v ? "locked" : "unlocked" }] },
             WhenCron: { shape: "header", icon: "clock", head: [label("ON SCHEDULE"), value("CronExpression", "expression")] },
+            WhenNetwork: { shape: "header", icon: "radio", head: [label("WHEN NETWORK"),
+                { kind: "dropdown", key: "connected", options: [{ value: "on", label: "connects" }, { value: "off", label: "disconnects" }],
+                  encode: v => v === "on", decode: v => v ? "on" : "off" }] },
+            WhenUsb: { shape: "header", icon: "plug-zap", head: [label("WHEN USB DEVICE"), value("UsbPattern", "pattern"), label("IS"),
+                { kind: "dropdown", key: "connected", options: [{ value: "in", label: "plugged in" }, { value: "out", label: "unplugged" }],
+                  encode: v => v === "in", decode: v => v ? "in" : "out" }] },
+            WhenMouseButton: { shape: "header", icon: "mouse", head: [label("WHEN"),
+                { kind: "dropdown", key: "button", options: root.mouseButtonOptions },
+                { kind: "dropdown", key: "pressed", options: [{ value: "down", label: "is pressed" }, { value: "up", label: "is released" }],
+                  encode: v => v === "down", decode: v => v ? "down" : "up" },
+                label("WITH KEYS"), value("MouseModifiers", "modifiers")] },
+            SplitIntoList: { icon: "scissors", head: [label("split"), value("SplitText", "text"), label("by"), value("SplitSeparator", "separator"),
+                label("into"), { kind: "dropdown", key: "name", options: "lists" }] },
             PasteText: { icon: "clipboard-paste", head: [label("paste"), value("PasteValue", "text")] },
             WithLock: { icon: "lock", mouths: ["body"], head: [label("with lock"), value("LockName", "name")] },
             WriteFile: { icon: "file-text", head: [
@@ -1021,6 +1165,10 @@ Item {
             WhenIdle: { minutes: numberValue(5) },
             WhenScreenLock: { locked: true },
             WhenCron: { expression: textValue("0 9 * * mon-fri") },
+            WhenNetwork: { connected: true },
+            WhenUsb: { pattern: textValue(""), connected: true },
+            WhenMouseButton: { button: "Back", pressed: true, modifiers: textValue("") },
+            SplitIntoList: () => ({ text: textValue("a,b,c"), separator: textValue(","), name: root.firstListName() }),
             PasteText: { text: textValue("Hello!") },
             WithLock: { name: textValue("keyboard"), body: [] },
             WriteFile: { path: textValue("~/notes.txt"), text: textValue("hello"), append: true },
@@ -1046,7 +1194,7 @@ Item {
         });
     }
     // The variable dropdowns read macro state through a function, so nudge them.
-    readonly property string variablesKey: JSON.stringify(root.macro ? root.macro.variables : [])
+    readonly property string variablesKey: JSON.stringify([root.macro ? root.macro.variables : [], appState.secret_names || []])
     onVariablesKeyChanged: BlockRegistry.revision++
 
     // ---- run log ----
@@ -1071,14 +1219,43 @@ Item {
         return active.filter(b => b.macro_id === id).map(b => b.block_id);
     }
     Binding { target: BlockRegistry; property: "runningIds"; value: root.runningIds }
+    // Every macro with a strand running, for the library.
+    readonly property var runningMacroIds: {
+        let active = [];
+        try { active = JSON.parse(root.appBridge.activeBlocksJson || "[]"); } catch (e) {}
+        return active.map(b => b.macro_id).filter((id, i, all) => all.indexOf(id) === i);
+    }
+    Binding { target: BlockRegistry; property: "breakpointIds"; value: appState.breakpoints || [] }
+    Binding { target: BlockRegistry; property: "pausedIds"; value: debugBar.paused.map(p => p.block_id) }
     Connections {
         target: BlockRegistry
         function onMarkClicked(instructionId) { activity.showBlockError(instructionId); }
+        function onBreakpointClicked(instructionId) { root.invoke("toggle_breakpoint", { blockId: instructionId }); }
+    }
+    // A block's palette name, for the debugger bar.
+    function findInstruction(id) {
+        const walk = list => {
+            for (const i of list || []) {
+                if (i.id === id) return i;
+                for (const key of ["body", "then_body", "else_body"]) { const found = walk(i[key]); if (found) return found; }
+                for (const branch of i.branches || []) { const found = walk(branch); if (found) return found; }
+            }
+            return null;
+        };
+        for (const strand of root.macro ? root.macro.strands : []) { const found = walk(strand.instructions); if (found) return found; }
+        return null;
+    }
+    function blockLabel(id) {
+        const ins = findInstruction(id);
+        if (!ins) return "a block";
+        if (ins.type === "CallBlock" || ins.type === "BranchCallBlock") { const def = blockDefById(ins.block_id); return def ? "custom block" : "a block"; }
+        return ins.type.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
     }
 
     // Click-to-preview on operators: the daemon evaluates, the chip shows the answer.
     Component.onCompleted: {
         registerBlocks();
+        BlockRegistry.blockMenu = [{ id: "breakpoint", text: "Toggle breakpoint", icon: "circle-dot" }];
         BlockRegistry.previewHandler = (key, value) => root.appBridge.previewValue(key, JSON.stringify(value));
     }
     Connections {

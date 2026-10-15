@@ -74,12 +74,17 @@ pub(crate) fn limit_run(source: &run_log::Source, flag: &Arc<Mutex<bool>>, secs:
     }
     let (source, flag, finished) = (source.clone(), Arc::clone(flag), Arc::clone(&done));
     std::thread::spawn(move || {
-        let deadline = Instant::now() + Duration::from_secs(secs.into());
+        const TICK: Duration = Duration::from_millis(100);
+        let mut deadline = Instant::now() + Duration::from_secs(secs.into());
         while Instant::now() < deadline {
             if finished.load(Ordering::Relaxed) {
                 return;
             }
-            std::thread::sleep(Duration::from_millis(100));
+            std::thread::sleep(TICK);
+            // Time paused in the debugger doesn't count.
+            if blockwork_core::macros::debug::is_paused(&source.macro_id) {
+                deadline += TICK;
+            }
         }
         if !finished.load(Ordering::Relaxed)
             && let Ok(mut running) = flag.lock()

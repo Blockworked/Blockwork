@@ -235,6 +235,127 @@ static OPERATORS: &[ExtOperator] = &[
         eval: |_| Ok(Evaluated::Bool(crate::system::screen_locked()?)),
     },
     ExtOperator {
+        kind: "NetworkConnected",
+        op: "NetworkConnected",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Bool(crate::system::network_connected()?)),
+    },
+    ExtOperator {
+        kind: "UsbConnected",
+        op: "UsbConnected",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| {
+            let pattern = args[0].as_text();
+            Ok(Evaluated::Bool(crate::system::usb_devices()?.iter().any(|d| d.matches(&pattern))))
+        },
+    },
+    ExtOperator {
+        kind: "Secret",
+        op: "Secret",
+        arity: 1,
+        default_args: one_text,
+        eval: |args| Ok(Evaluated::Text(crate::secrets::get(&args[0].as_text())?)),
+    },
+    ExtOperator {
+        kind: "TextCheck",
+        op: "TextCheck",
+        arity: 3,
+        default_args: || vec![Value::text("hello world"), Value::text("contains"), Value::text("world")],
+        eval: |args| Ok(Evaluated::Bool(crate::text::check(&args[0].as_text(), &args[1].as_text(), &args[2].as_text())?)),
+    },
+    ExtOperator {
+        kind: "TextReplace",
+        op: "TextReplace",
+        arity: 3,
+        default_args: || vec![Value::text("world"), Value::text("hello world"), Value::text("there")],
+        eval: |args| Ok(Evaluated::Text(args[1].as_text().replace(&args[0].as_text(), &args[2].as_text()))),
+    },
+    ExtOperator {
+        kind: "RegexReplace",
+        op: "RegexReplace",
+        arity: 3,
+        default_args: || vec![Value::text("[0-9]+"), Value::text("order 1234"), Value::text("#")],
+        eval: |args| {
+            Ok(Evaluated::Text(crate::text::regex_replace(&args[0].as_text(), &args[1].as_text(), &args[2].as_text())?))
+        },
+    },
+    ExtOperator {
+        kind: "RegexFind",
+        op: "RegexFind",
+        arity: 2,
+        default_args: || vec![Value::text("[0-9]+"), Value::text("order 1234")],
+        eval: |args| Ok(Evaluated::Text(crate::text::regex_find(&args[0].as_text(), &args[1].as_text())?)),
+    },
+    ExtOperator {
+        kind: "SplitPart",
+        op: "SplitPart",
+        arity: 3,
+        default_args: || vec![Value::number(1.0), Value::text("a,b,c"), Value::text(",")],
+        eval: |args| {
+            Ok(Evaluated::Text(crate::text::split_part(&args[1].as_text(), &args[2].as_text(), args[0].as_number()?)?))
+        },
+    },
+    ExtOperator {
+        kind: "SplitCount",
+        op: "SplitCount",
+        arity: 2,
+        default_args: || vec![Value::text("a,b,c"), Value::text(",")],
+        eval: |args| Ok(Evaluated::Number(crate::text::split(&args[0].as_text(), &args[1].as_text()).len() as f64)),
+    },
+    ExtOperator {
+        kind: "Substring",
+        op: "Substring",
+        arity: 3,
+        default_args: || vec![Value::number(1.0), Value::number(3.0), Value::text("hello")],
+        eval: |args| {
+            Ok(Evaluated::Text(crate::text::substring(&args[2].as_text(), args[0].as_number()?, args[1].as_number()?)))
+        },
+    },
+    ExtOperator {
+        kind: "Trim",
+        op: "Trim",
+        arity: 1,
+        default_args: || vec![Value::text("  hello  ")],
+        eval: |args| Ok(Evaluated::Text(args[0].as_text().trim().to_string())),
+    },
+    ExtOperator {
+        kind: "FormatNumber",
+        op: "FormatNumber",
+        arity: 2,
+        default_args: || numbers(&[3.14159, 2.0]),
+        eval: |args| Ok(Evaluated::Text(crate::text::format_number(args[0].as_number()?, args[1].as_number()?))),
+    },
+    ExtOperator {
+        kind: "Timestamp",
+        op: "Timestamp",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Number(crate::text::now_timestamp())),
+    },
+    ExtOperator {
+        kind: "FormatDate",
+        op: "FormatDate",
+        arity: 2,
+        default_args: || vec![Value::op(Op::from_name("Timestamp"), vec![]), Value::text("%Y-%m-%d %H:%M")],
+        eval: |args| Ok(Evaluated::Text(crate::text::format_date(args[0].as_number()?, &args[1].as_text())?)),
+    },
+    ExtOperator {
+        kind: "ParseDate",
+        op: "ParseDate",
+        arity: 2,
+        default_args: || vec![Value::text("2026-01-31 09:00"), Value::text("")],
+        eval: |args| Ok(Evaluated::Number(crate::text::parse_date(&args[0].as_text(), &args[1].as_text())?)),
+    },
+    ExtOperator {
+        kind: "DatePart",
+        op: "DatePart",
+        arity: 2,
+        default_args: || vec![Value::text("day"), Value::op(Op::from_name("Timestamp"), vec![])],
+        eval: |args| Ok(Evaluated::Number(crate::text::date_part(args[1].as_number()?, &args[0].as_text())?)),
+    },
+    ExtOperator {
         kind: "LastError",
         op: "LastError",
         arity: 0,
@@ -280,6 +401,20 @@ pub fn register_blockwork_operators() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn text_operators_evaluate() {
+        register_blockwork_operators();
+        let op = |name: &str, args: Vec<Value>| Value::op(Op::from_name(name), args).eval();
+        let text = Value::text;
+        assert_eq!(op("SplitPart", vec![Value::number(2.0), text("a-b-c"), text("-")]), Ok(Evaluated::Text("b".into())));
+        assert_eq!(op("TextCheck", vec![text("hello"), text("ends with"), text("llo")]), Ok(Evaluated::Bool(true)));
+        assert_eq!(op("RegexReplace", vec![text("o"), text("foo"), text("0")]), Ok(Evaluated::Text("f00".into())));
+        assert_eq!(op("Substring", vec![Value::number(2.0), Value::number(3.0), text("abcd")]), Ok(Evaluated::Text("bc".into())));
+        assert_eq!(op("FormatNumber", vec![Value::number(2.5), Value::number(2.0)]), Ok(Evaluated::Text("2.50".into())));
+        let year = op("DatePart", vec![text("year"), Value::op(Op::from_name("Timestamp"), vec![])]);
+        assert!(matches!(year, Ok(Evaluated::Number(y)) if y >= 2026.0));
+    }
 
     #[test]
     fn battery_operators_evaluate_once_registered() {

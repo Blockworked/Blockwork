@@ -58,6 +58,10 @@ pub enum FieldId {
     IdleMinutes,
     LockName,
     CronExpression,
+    SplitText,
+    SplitSeparator,
+    UsbPattern,
+    MouseModifiers,
 }
 
 impl FieldId {
@@ -133,6 +137,10 @@ impl std::fmt::Display for FieldId {
             FieldId::IdleMinutes => write!(f, "IdleMinutes"),
             FieldId::LockName => write!(f, "LockName"),
             FieldId::CronExpression => write!(f, "CronExpression"),
+            FieldId::SplitText => write!(f, "SplitText"),
+            FieldId::SplitSeparator => write!(f, "SplitSeparator"),
+            FieldId::UsbPattern => write!(f, "UsbPattern"),
+            FieldId::MouseModifiers => write!(f, "MouseModifiers"),
         }
     }
 }
@@ -188,6 +196,10 @@ impl std::str::FromStr for FieldId {
             "IdleMinutes" => Ok(FieldId::IdleMinutes),
             "LockName" => Ok(FieldId::LockName),
             "CronExpression" => Ok(FieldId::CronExpression),
+            "SplitText" => Ok(FieldId::SplitText),
+            "SplitSeparator" => Ok(FieldId::SplitSeparator),
+            "UsbPattern" => Ok(FieldId::UsbPattern),
+            "MouseModifiers" => Ok(FieldId::MouseModifiers),
             _ if s.starts_with("CallArg:") => s["CallArg:".len()..]
                 .parse::<usize>()
                 .map(FieldId::CallArg)
@@ -270,6 +282,10 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
         (InstructionKind::WhenIdle(v), FieldId::IdleMinutes) => Some(v),
         (InstructionKind::WithLock { name, .. }, FieldId::LockName) => Some(name),
         (InstructionKind::WhenCron(v), FieldId::CronExpression) => Some(v),
+        (InstructionKind::SplitIntoList { text, .. }, FieldId::SplitText) => Some(text),
+        (InstructionKind::SplitIntoList { separator, .. }, FieldId::SplitSeparator) => Some(separator),
+        (InstructionKind::WhenUsb { pattern, .. }, FieldId::UsbPattern) => Some(pattern),
+        (InstructionKind::WhenMouseButton { modifiers, .. }, FieldId::MouseModifiers) => Some(modifiers),
         _ => None,
     }
 }

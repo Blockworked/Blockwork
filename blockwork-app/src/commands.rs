@@ -218,6 +218,65 @@ fn add_and_select(state: &SharedState, app: &AppHandle, new_macro: Macro) -> Res
     Ok(())
 }
 
+/// Opens the macro with id `id`.
+pub(crate) fn select_macro_by_id(state: &SharedState, app: &AppHandle, id: &str) -> Result<(), String> {
+    let index = {
+        let s = state.lock().map_err(|e| e.to_string())?;
+        s.macros_list.iter().position(|m| m.id == id).ok_or("Macro not found")?
+    };
+    select_macro(state, app, index)
+}
+
+/// The freshest copy of macro `id`: the open one holds unsaved edits.
+fn find_macro(s: &crate::state::AppState, id: &str) -> Result<Macro, String> {
+    s.current_macro
+        .as_ref()
+        .filter(|m| m.id == id)
+        .or_else(|| s.macros_list.iter().find(|m| m.id == id))
+        .cloned()
+        .ok_or_else(|| "Macro not found".to_string())
+}
+
+/// Saves a copy of macro `id` next to it and opens the copy.
+pub(crate) fn duplicate_macro(state: &SharedState, app: &AppHandle, id: &str) -> Result<(), String> {
+    let mut copy = {
+        let s = state.lock().map_err(|e| e.to_string())?;
+        find_macro(&s, id)?
+    };
+    copy.id = uuid::Uuid::new_v4().simple().to_string();
+    copy.name = format!("{} copy", copy.name);
+    add_and_select(state, app, copy)
+}
+
+/// Moves macro `id` into `folder` (empty for the top level).
+pub(crate) fn set_macro_folder(state: &SharedState, app: &AppHandle, id: &str, folder: &str) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mut mac = find_macro(&s, id)?;
+    mac.settings.folder = folder.trim().trim_matches('/').trim().to_string();
+    mac.save()?;
+    if let Some(open) = s.current_macro.as_mut().filter(|m| m.id == id) {
+        open.settings.folder = mac.settings.folder.clone();
+    }
+    refresh_macro_list(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Deletes macro `id`, closing it if it's open. The UI confirms first.
+pub(crate) fn delete_macro(state: &SharedState, app: &AppHandle, id: &str) -> Result<(), String> {
+    let is_open = state.lock().map_err(|e| e.to_string())?.current_macro.as_ref().is_some_and(|m| m.id == id);
+    if is_open {
+        return remove_macro(state, app);
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mac = find_macro(&s, id)?;
+    blockwork_core::macros::debug::clear_breakpoints(id);
+    mac.remove()?;
+    refresh_macro_list(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
 /// Deletes the current macro. The frontend confirms with the user via a
 /// confirmation dialog before ever calling this, so it deletes
 /// unconditionally.
@@ -776,8 +835,9 @@ pub(crate) fn export_macro(macro_id: String, path: String) -> Result<(), String>
 
 /// What an imported macro can do, shown before it's added: (kind, label,
 /// whether it deserves a warning). Listed in display order.
-const CAPABILITIES: [(&str, &str, bool); 11] = [
+const CAPABILITIES: [(&str, &str, bool); 12] = [
     ("commands", "Runs commands and opens or closes apps", true),
+    ("secrets", "Reads your saved secrets", true),
     ("network", "Goes online", true),
     ("files_write", "Writes to files", true),
     ("files_read", "Reads files and folders", false),
@@ -801,6 +861,7 @@ fn operator_capability(op: &str) -> Option<&'static str> {
         "MacroRunning" => "macros",
         "PixelColor" | "AverageColor" | "ScreenText" => "screen",
         "GlobalVariable" => "globals",
+        "Secret" => "secrets",
         _ => return None,
     })
 }
@@ -1003,6 +1064,61 @@ pub(crate) async fn confirm_import_macro(
 pub(crate) fn cancel_import_macro(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.pending_import = None;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+// ─── Debugger ──────────────────────────────────────────────────────────────
+
+fn open_macro_id(state: &SharedState) -> Result<String, String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    s.current_macro.as_ref().map(|m| m.id.clone()).ok_or_else(|| "No macro selected".to_string())
+}
+
+/// Turns the breakpoint on block `block_id` of the open macro on or off.
+pub(crate) fn toggle_breakpoint(state: &SharedState, block_id: &str) -> Result<(), String> {
+    use blockwork_core::macros::debug;
+    let id = open_macro_id(state)?;
+    let on = !debug::breakpoints(&id).iter().any(|b| b == block_id);
+    debug::set_breakpoint(&id, block_id, on);
+    Ok(())
+}
+
+pub(crate) fn clear_breakpoints(state: &SharedState) -> Result<(), String> {
+    blockwork_core::macros::debug::clear_breakpoints(&open_macro_id(state)?);
+    Ok(())
+}
+
+/// `pause`, `resume`, `step` or `stop` for the open macro's runs.
+pub(crate) fn debug_action(state: &SharedState, action: &str) -> Result<(), String> {
+    use blockwork_core::macros::{debug, run_registry};
+    let id = open_macro_id(state)?;
+    match action {
+        "pause" => debug::pause(&id),
+        "resume" => debug::resume(&id),
+        "step" => debug::step(&id),
+        "stop" => {
+            run_registry::stop_macro(&id);
+            debug::resume(&id);
+        }
+        other => return Err(format!("unknown debugger action {other}")),
+    }
+    Ok(())
+}
+
+// ─── Secrets ───────────────────────────────────────────────────────────────
+
+/// Saves a secret to the keyring. Blocking: the keyring may show an unlock prompt.
+pub(crate) fn set_secret(state: &SharedState, app: &AppHandle, name: &str, value: &str) -> Result<(), String> {
+    blockwork_core::secrets::set(name, value)?;
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn delete_secret(state: &SharedState, app: &AppHandle, name: &str) -> Result<(), String> {
+    blockwork_core::secrets::delete(name)?;
+    let s = state.lock().map_err(|e| e.to_string())?;
     emit_state_updated(app, &s);
     Ok(())
 }
@@ -1391,7 +1507,7 @@ pub(crate) fn preview_value(state: &SharedState, value: Value) -> Result<String,
         (env, lists)
     };
     // Evaluated unlocked: a file or window read may be slow.
-    preview_value_with_env_and_lists(&value, &env, &lists)
+    preview_value_with_env_and_lists(&value, &env, &lists).map(|text| blockwork_core::secrets::redact(&text))
 }
 
 /// The actual evaluation logic behind `preview_value`, factored out so it's

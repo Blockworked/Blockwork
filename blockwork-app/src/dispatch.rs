@@ -31,6 +31,47 @@ impl Backend {
                 to_json(commands::select_macro(&self.state, &self.app, index)?)
             }
             "new_macro" => to_json(commands::new_macro(&self.state, &self.app)?),
+            "select_macro_by_id" => {
+                let id: String = arg(&args, "id")?;
+                to_json(commands::select_macro_by_id(&self.state, &self.app, &id)?)
+            }
+            "duplicate_macro" => {
+                let id: String = arg(&args, "id")?;
+                to_json(commands::duplicate_macro(&self.state, &self.app, &id)?)
+            }
+            "set_macro_folder" => {
+                let (id, folder): (String, String) = (arg(&args, "id")?, arg(&args, "folder")?);
+                to_json(commands::set_macro_folder(&self.state, &self.app, &id, &folder)?)
+            }
+            "delete_macro" => {
+                let id: String = arg(&args, "id")?;
+                to_json(commands::delete_macro(&self.state, &self.app, &id)?)
+            }
+            "toggle_breakpoint" => {
+                let block_id: String = arg(&args, "blockId")?;
+                to_json(commands::toggle_breakpoint(&self.state, &block_id)?)
+            }
+            "clear_breakpoints" => to_json(commands::clear_breakpoints(&self.state)?),
+            "debug_action" => {
+                let action: String = arg(&args, "action")?;
+                to_json(commands::debug_action(&self.state, &action)?)
+            }
+            "set_secret" | "delete_secret" => {
+                let name: String = arg(&args, "name")?;
+                let value: String = if cmd == "set_secret" { arg(&args, "value")? } else { String::new() };
+                let (state, app, set) = (self.state.clone(), self.app.clone(), cmd == "set_secret");
+                to_json(
+                    tokio::task::spawn_blocking(move || {
+                        if set {
+                            commands::set_secret(&state, &app, &name, &value)
+                        } else {
+                            commands::delete_secret(&state, &app, &name)
+                        }
+                    })
+                    .await
+                    .map_err(|e| e.to_string())??,
+                )
+            }
             "new_macro_from_template" => {
                 let template: String = arg(&args, "template")?;
                 to_json(commands::new_macro_from_template(&self.state, &self.app, &template)?)
@@ -272,7 +313,13 @@ impl Backend {
             }
             "preview_value" => {
                 let value: BlockValue = arg(&args, "value")?;
-                to_json(commands::preview_value(&self.state, value)?)
+                // Reporters may block (files, windows, the keyring over D-Bus).
+                let state = self.state.clone();
+                to_json(
+                    tokio::task::spawn_blocking(move || commands::preview_value(&state, value))
+                        .await
+                        .map_err(|e| e.to_string())??,
+                )
             }
             "create_floating_value" => {
                 let x: i32 = arg(&args, "x")?;

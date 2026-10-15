@@ -15,6 +15,7 @@ mod dispatch;
 pub(crate) mod installed_apps;
 pub(crate) mod macro_runs;
 pub(crate) mod macros_thread;
+pub(crate) mod mouse_watch;
 pub(crate) mod razer;
 pub(crate) mod scheduled_run;
 pub(crate) mod screen_pick;
@@ -262,6 +263,7 @@ impl Backend {
         file_watch::start(Arc::clone(&shared), app.clone());
         type_watch::start(Arc::clone(&shared), app.clone());
         system_watch::start(Arc::clone(&shared), app.clone());
+        mouse_watch::start(Arc::clone(&shared), app.clone());
 
         // Pushes run log updates to the UI, at most a few times a second.
         {
@@ -272,6 +274,25 @@ impl Backend {
                 loop {
                     std::thread::sleep(std::time::Duration::from_millis(250));
                     let revision = blockwork_core::run_log::revision();
+                    if revision != seen {
+                        seen = revision;
+                        if let Ok(s) = state.lock() {
+                            state::emit_state_updated(&app, &s);
+                        }
+                    }
+                }
+            });
+        }
+
+        // Republishes state when breakpoints, pauses or waiting strands change.
+        {
+            let (state, app) = (Arc::clone(&shared), app.clone());
+            let _ = std::thread::Builder::new().name("debug-watch".into()).spawn(move || {
+                use blockwork_core::macros::debug;
+                let mut seen = debug::revision();
+                loop {
+                    std::thread::sleep(std::time::Duration::from_millis(100));
+                    let revision = debug::revision();
                     if revision != seen {
                         seen = revision;
                         if let Ok(s) = state.lock() {

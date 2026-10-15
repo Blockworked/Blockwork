@@ -1,6 +1,7 @@
-//! Fires `WhenApp`, `WhenIdle` and `WhenScreenLock` strands. Polls like
-//! `window_watch`: compare each condition with the last poll and fire the
-//! strand when it becomes what the header waits for.
+//! Fires `WhenApp`, `WhenIdle`, `WhenScreenLock`, `WhenNetwork` and
+//! `WhenUsb` strands. Polls like `window_watch`: compare each condition with
+//! the last poll and fire the strand when it becomes what the header waits
+//! for. USB fires once per matching device that comes or goes.
 
 use crate::scheduled_run;
 use crate::state::SharedState;
@@ -19,6 +20,8 @@ enum Condition {
     App { pattern: String, started: bool },
     Idle { secs: f64 },
     Locked(bool),
+    Network(bool),
+    Usb { pattern: String, connected: bool },
 }
 
 struct Watched {
@@ -60,6 +63,8 @@ impl Errors {
 fn run(shared_state: SharedState, app: AppHandle) {
     // (macro_id, strand_id) -> whether the condition held last poll.
     let mut last: HashMap<(String, String), bool> = HashMap::new();
+    // Devices at the last poll; `None` until something watches USB.
+    let mut last_usb: Option<Vec<system::UsbDevice>> = None;
     let mut errors = Errors::default();
     loop {
         std::thread::sleep(POLL_INTERVAL);
@@ -81,6 +86,11 @@ fn run(shared_state: SharedState, app: AppHandle) {
                             _ => continue,
                         },
                         Some(InstructionKind::WhenScreenLock { locked }) => Condition::Locked(*locked),
+                        Some(InstructionKind::WhenNetwork { connected }) => Condition::Network(*connected),
+                        Some(InstructionKind::WhenUsb { pattern, connected }) => Condition::Usb {
+                            pattern: pattern.resolve_vars(&env).eval_text().unwrap_or_default(),
+                            connected: *connected,
+                        },
                         _ => continue,
                     };
                     watched.push(Watched {
@@ -96,6 +106,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
         };
         if watched.is_empty() {
             last.clear();
+            last_usb = None;
             continue;
         }
 
@@ -104,6 +115,19 @@ fn run(shared_state: SharedState, app: AppHandle) {
         let apps = if wants(|c| matches!(c, Condition::App { .. })) { errors.check("App trigger", system::running_apps()) } else { None };
         let idle = if wants(|c| matches!(c, Condition::Idle { .. })) { errors.check("Idle trigger", system::idle_time()) } else { None };
         let locked = if wants(|c| matches!(c, Condition::Locked(_))) { errors.check("Screen lock trigger", system::screen_locked()) } else { None };
+        let online = if wants(|c| matches!(c, Condition::Network(_))) { errors.check("Network trigger", system::network_connected()) } else { None };
+        let usb = if wants(|c| matches!(c, Condition::Usb { .. })) { errors.check("USB trigger", system::usb_devices()) } else { None };
+        // Devices that came and went since the last poll.
+        let (added, removed) = match (&usb, &last_usb) {
+            (Some(now), Some(before)) => (
+                now.iter().filter(|d| !before.iter().any(|b| b.id == d.id)).cloned().collect(),
+                before.iter().filter(|b| !now.iter().any(|d| d.id == b.id)).cloned().collect(),
+            ),
+            _ => (Vec::new(), Vec::new()),
+        };
+        if usb.is_some() || !wants(|c| matches!(c, Condition::Usb { .. })) {
+            last_usb = usb;
+        }
 
         let mut next = HashMap::with_capacity(watched.len());
         for w in watched {
@@ -120,6 +144,17 @@ fn run(shared_state: SharedState, app: AppHandle) {
                     Some(locked) => (locked, *want),
                     None => continue,
                 },
+                Condition::Network(want) => match online {
+                    Some(online) => (online, *want),
+                    None => continue,
+                },
+                Condition::Usb { pattern, connected } => {
+                    let changed: &Vec<system::UsbDevice> = if *connected { &added } else { &removed };
+                    for _ in changed.iter().filter(|d| d.matches(pattern)) {
+                        scheduled_run::fire(w.key.0.clone(), w.body.clone(), Arc::clone(&emulator), speed_multiplier, &w.variables, &w.lists, Arc::clone(&shared_state), app.clone());
+                    }
+                    continue;
+                }
             };
             // The first poll only records a baseline.
             if let Some(&previous) = last.get(&w.key)

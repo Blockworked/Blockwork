@@ -49,9 +49,14 @@ impl Tracker {
 
 impl Drop for Tracker {
     fn drop(&mut self) {
-        if let Ok(mut active) = ACTIVE.lock() {
-            active.retain(|(k, _)| *k != self.key);
-            REVISION.fetch_add(1, Ordering::Relaxed);
+        let Ok(mut active) = ACTIVE.lock() else { return };
+        let Some(pos) = active.iter().position(|(k, _)| *k == self.key) else { return };
+        let (_, block) = active.remove(pos);
+        REVISION.fetch_add(1, Ordering::Relaxed);
+        let last = !active.iter().any(|(_, b)| b.macro_id == block.macro_id);
+        drop(active);
+        if last {
+            crate::macros::debug::run_ended(&block.macro_id);
         }
     }
 }

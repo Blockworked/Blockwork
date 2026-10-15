@@ -665,6 +665,17 @@ fn run_block(
         {
             trace.at(&ins.id);
         }
+        if !ins.kind.is_header() && !matches!(ins.kind, InstructionKind::Comment(_)) {
+            let stopped = || ctx.stop_flag.as_ref().is_some_and(stop_requested);
+            let paused = crate::macros::debug::checkpoint(&ctx.source.macro_id, &ins.id, &stopped, &ctx.variables, &ctx.lists, &ctx.param_env);
+            if !paused.is_zero() {
+                // Waits after the pause keep their spacing instead of catching up.
+                deadline += paused;
+                if stopped() {
+                    break;
+                }
+            }
+        }
 
         match &ins.kind {
             InstructionKind::Comment(_) => {}
@@ -689,6 +700,23 @@ fn run_block(
             InstructionKind::WhenIdle(_) => {}
             InstructionKind::WhenScreenLock { .. } => {}
             InstructionKind::WhenCron(_) => {}
+            InstructionKind::WhenNetwork { .. } => {}
+            InstructionKind::WhenUsb { .. } => {}
+            InstructionKind::WhenMouseButton { .. } => {}
+            InstructionKind::SplitIntoList { text, separator, name } => {
+                let parts = ctx
+                    .resolve(text, depth)
+                    .and_then(|v| v.eval_text())
+                    .and_then(|text| Ok(crate::text::split(&text, &ctx.resolve(separator, depth)?.eval_text()?)));
+                match parts {
+                    Ok(parts) => {
+                        if let Ok(mut lists) = ctx.lists.lock() {
+                            lists.insert(name.clone(), parts.into_iter().map(ListItem::Text).collect());
+                        }
+                    }
+                    Err(e) => soft_fail(ctx, &ins.id, "Split", e)?,
+                }
+            }
             InstructionKind::PasteText(text) => {
                 let pasted = ctx.resolve(text, depth).and_then(|v| v.eval_text()).and_then(|text| paste_text(ctx, text));
                 if let Err(e) = pasted {

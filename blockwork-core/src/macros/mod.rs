@@ -12,6 +12,7 @@ use uuid::Uuid;
 pub mod backend;
 pub mod calls;
 pub mod conditions;
+pub mod debug;
 pub mod fields;
 pub mod locks;
 pub mod loop_control;
@@ -79,7 +80,13 @@ impl BlockKind for InstructionKind {
             | InstructionKind::WhenApp { pattern: value, .. }
             | InstructionKind::WhenIdle(value)
             | InstructionKind::WhenCron(value)
-            | InstructionKind::WithLock { name: value, .. } => f(value, InputValueType::Any),
+            | InstructionKind::WithLock { name: value, .. }
+            | InstructionKind::WhenUsb { pattern: value, .. }
+            | InstructionKind::WhenMouseButton { modifiers: value, .. } => f(value, InputValueType::Any),
+            InstructionKind::SplitIntoList { text, separator, .. } => {
+                f(text, InputValueType::Any);
+                f(separator, InputValueType::Any);
+            }
             InstructionKind::WriteFile { path, text, .. } => {
                 f(path, InputValueType::Any);
                 f(text, InputValueType::Any);
@@ -153,6 +160,7 @@ impl BlockKind for InstructionKind {
             | InstructionKind::WhenPowerUnplugged
             | InstructionKind::WhenClipboardChanged
             | InstructionKind::WhenScreenLock { .. }
+            | InstructionKind::WhenNetwork { .. }
             | InstructionKind::Forever { .. }
             | InstructionKind::OpenApp { .. }
             | InstructionKind::CloseApp { .. }
@@ -184,6 +192,9 @@ impl BlockKind for InstructionKind {
                 | InstructionKind::WhenIdle(_)
                 | InstructionKind::WhenScreenLock { .. }
                 | InstructionKind::WhenCron(_)
+                | InstructionKind::WhenNetwork { .. }
+                | InstructionKind::WhenUsb { .. }
+                | InstructionKind::WhenMouseButton { .. }
         )
     }
 
@@ -238,7 +249,8 @@ impl BlockKind for InstructionKind {
             | InstructionKind::ShiftList { name, .. }
             | InstructionKind::InsertIntoList { name, .. }
             | InstructionKind::ReplaceItemOfList { name, .. }
-            | InstructionKind::ReverseList { name } => Some(name),
+            | InstructionKind::ReverseList { name }
+            | InstructionKind::SplitIntoList { name, .. } => Some(name),
             _ => None,
         }
     }
@@ -588,6 +600,29 @@ pub enum InstructionKind {
     },
     /// Header for a strand fired on a cron schedule, like `*/15 9-17 * * mon-fri`.
     WhenCron(Value),
+    /// Replaces the list `name` with `text` cut at every `separator`.
+    SplitIntoList {
+        text: Value,
+        separator: Value,
+        name: String,
+    },
+    /// Header for a strand fired when the computer goes online (or offline).
+    WhenNetwork {
+        connected: bool,
+    },
+    /// Header for a strand fired when a USB device whose name or ids contain
+    /// `pattern` (any device when empty) is plugged in (or unplugged).
+    WhenUsb {
+        pattern: Value,
+        connected: bool,
+    },
+    /// Header for a strand fired when a mouse button is pressed (or
+    /// released), optionally only while the modifier keys in `modifiers` are held.
+    WhenMouseButton {
+        button: MacroButton,
+        pressed: bool,
+        modifiers: Value,
+    },
 }
 
 impl std::hash::Hash for InstructionKind {
@@ -909,6 +944,27 @@ impl std::hash::Hash for InstructionKind {
                 60u8.hash(state);
                 v.hash(state);
             }
+            Self::SplitIntoList { text, separator, name } => {
+                61u8.hash(state);
+                text.hash(state);
+                separator.hash(state);
+                name.hash(state);
+            }
+            Self::WhenNetwork { connected } => {
+                62u8.hash(state);
+                connected.hash(state);
+            }
+            Self::WhenUsb { pattern, connected } => {
+                63u8.hash(state);
+                pattern.hash(state);
+                connected.hash(state);
+            }
+            Self::WhenMouseButton { button, pressed, modifiers } => {
+                64u8.hash(state);
+                button.hash(state);
+                pressed.hash(state);
+                modifiers.hash(state);
+            }
         }
     }
 }
@@ -1098,6 +1154,28 @@ enum InstructionKindDe {
         body: Vec<Instruction>,
     },
     WhenCron(Value),
+    SplitIntoList {
+        text: Value,
+        separator: Value,
+        name: String,
+    },
+    WhenNetwork {
+        connected: bool,
+    },
+    WhenUsb {
+        pattern: Value,
+        connected: bool,
+    },
+    WhenMouseButton {
+        button: MacroButton,
+        pressed: bool,
+        #[serde(default = "empty_text")]
+        modifiers: Value,
+    },
+}
+
+fn empty_text() -> Value {
+    Value::text("")
 }
 
 fn match_by_title() -> String {
@@ -1288,6 +1366,12 @@ impl From<InstructionKindDe> for InstructionKind {
             InstructionKindDe::WhenScreenLock { locked } => InstructionKind::WhenScreenLock { locked },
             InstructionKindDe::WithLock { name, body } => InstructionKind::WithLock { name, body },
             InstructionKindDe::WhenCron(v) => InstructionKind::WhenCron(v),
+            InstructionKindDe::SplitIntoList { text, separator, name } => InstructionKind::SplitIntoList { text, separator, name },
+            InstructionKindDe::WhenNetwork { connected } => InstructionKind::WhenNetwork { connected },
+            InstructionKindDe::WhenUsb { pattern, connected } => InstructionKind::WhenUsb { pattern, connected },
+            InstructionKindDe::WhenMouseButton { button, pressed, modifiers } => {
+                InstructionKind::WhenMouseButton { button, pressed, modifiers }
+            }
         }
     }
 }
@@ -1368,6 +1452,9 @@ pub struct MacroSettings {
     /// Only on these weekdays, bit 0 = Sunday; 0 means every day.
     #[serde(default)]
     pub active_days: u8,
+    /// Library folder; empty means the top level.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub folder: String,
 }
 
 /// Deserialization shape supporting both the current multi-strand format and

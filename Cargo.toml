@@ -60,6 +60,9 @@ windows-sys = { version = "0.61.2", features = [
     "Win32_System_Diagnostics_ToolHelp",
     "Win32_System_SystemInformation",
     "Win32_Security",
+    "Win32_Security_Credentials",
+    "Win32_NetworkManagement_IpHelper",
+    "Win32_Devices_DeviceAndDriverInstallation",
 ] }
 enigo = { git = "https://github.com/enigo-rs/enigo", rev = "a88d9b7", default-features = false }
 self_update = { version = "1.3.0", default-features = false, features = ["reqwest", "rustls", "github"] }
@@ -72,4 +75,6 @@ arboard = { version = "3.6.1", features = ["wayland-data-control"] }
 base64 = "0.23.1"
 chrono = { version = "0.4", default-features = false, features = ["clock", "serde"] }
 ureq = { version = "3.4", default-features = false, features = ["rustls", "gzip"] }
+regex = "1.13"
+security-framework = { version = "3.7", default-features = false }
 zbus = { version = "5.19", default-features = false, features = ["blocking-api", "async-io"] }

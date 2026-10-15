@@ -26,6 +26,8 @@ fn main() {
         "qml/ActivityPanel.qml",
         "qml/TemplateList.qml",
         "qml/ScreenOverlay.qml",
+        "qml/LibraryPanel.qml",
+        "qml/MacroFiles.qml",
     ];
 
     // Shared Lucide icons (lean set): staged under qml/Lucide/ (gitignored,

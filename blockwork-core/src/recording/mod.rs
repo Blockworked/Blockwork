@@ -1,5 +1,5 @@
 use crate::hotkey_types::{HotkeyAction, HotkeyBinding};
-use crate::input::types::{Axis, Coordinate, Direction, InputToken, MacroKey};
+use crate::input::types::{Axis, Coordinate, Direction, InputToken, MacroButton, MacroKey};
 use crate::input::value::Value;
 use crate::macros::backend::{self, CaptureDecision, CaptureEvent, CaptureTimestamp};
 use crate::macros::{Instruction, InstructionKind};
@@ -92,6 +92,41 @@ fn broadcast_key_event(key: &MacroKey, pressed: bool) {
     let Some(subs) = KEY_SUBSCRIBERS.get() else { return };
     if let Ok(mut subs) = subs.lock() {
         subs.retain(|tx| tx.send(KeyEvent { key: key.clone(), pressed }).is_ok());
+    }
+}
+
+/// A physical mouse button press or release (scrolls arrive as presses of
+/// the scroll "buttons"), with the modifier bits held at the time.
+#[derive(Debug, Clone)]
+pub struct ButtonEvent {
+    pub button: MacroButton,
+    pub pressed: bool,
+    pub modifiers: u8,
+}
+
+static BUTTON_SUBSCRIBERS: OnceLock<Mutex<Vec<std::sync::mpsc::Sender<ButtonEvent>>>> = OnceLock::new();
+
+/// Receives every mouse button event the capture callback sees, for `WhenMouseButton`.
+pub fn subscribe_button_events() -> std::sync::mpsc::Receiver<ButtonEvent> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    if let Ok(mut subs) = BUTTON_SUBSCRIBERS.get_or_init(|| Mutex::new(Vec::new())).lock() {
+        subs.push(tx);
+    }
+    rx
+}
+
+fn broadcast_button_event(event: &CaptureEvent) {
+    let Some(subs) = BUTTON_SUBSCRIBERS.get() else { return };
+    let (button, pressed) = match event {
+        CaptureEvent::ButtonPress(b) => (b.clone(), true),
+        CaptureEvent::ButtonRelease(b) => (b.clone(), false),
+        CaptureEvent::Scroll(_, v) if *v != 0 => (if *v > 0 { MacroButton::ScrollUp } else { MacroButton::ScrollDown }, true),
+        CaptureEvent::Scroll(h, _) if *h != 0 => (if *h > 0 { MacroButton::ScrollRight } else { MacroButton::ScrollLeft }, true),
+        _ => return,
+    };
+    let modifiers = HELD_MODS.load(Ordering::Relaxed);
+    if let Ok(mut subs) = subs.lock() {
+        subs.retain(|tx| tx.send(ButtonEvent { button: button.clone(), pressed, modifiers }).is_ok());
     }
 }
 
@@ -326,6 +361,7 @@ pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp)
     CAPTURE_EPOCH.get_or_init(Instant::now);
     Box::new(move |event: CaptureEvent, ts: CaptureTimestamp| {
             note_input(&event);
+            broadcast_button_event(&event);
             match &event {
                 CaptureEvent::KeyPress(key) => {
                     broadcast_key_event(key, true);

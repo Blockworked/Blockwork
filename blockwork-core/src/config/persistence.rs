@@ -80,7 +80,35 @@ pub fn read_macro_by_id(id: &str) -> Option<Macro> {
     Some(mac)
 }
 
+/// A copy of `mac` with secret values masked in its saved variables and
+/// lists, or `None` when it holds none.
+fn without_secrets(mac: &Macro) -> Option<Macro> {
+    use crate::input::value::Evaluated;
+    use blockstitch_core::graph::ListItem;
+    let secret_var = |v: &Evaluated| matches!(v, Evaluated::Text(t) if crate::secrets::contains_secret(t));
+    let secret_item = |i: &ListItem| matches!(i, ListItem::Text(t) if crate::secrets::contains_secret(t));
+    if !mac.variables.iter().any(|v| secret_var(&v.value)) && !mac.lists.iter().any(|l| l.items.iter().any(secret_item)) {
+        return None;
+    }
+    let mut clean = mac.clone();
+    for var in &mut clean.graph.variables {
+        if let Evaluated::Text(t) = &mut var.value {
+            *t = crate::secrets::redact(t);
+        }
+    }
+    for list in &mut clean.graph.lists {
+        for item in &mut list.items {
+            if let ListItem::Text(t) = item {
+                *t = crate::secrets::redact(t);
+            }
+        }
+    }
+    Some(clean)
+}
+
 pub fn write_macro_file(path: &Path, mac: &Macro) -> Result<(), String> {
+    let clean = without_secrets(mac);
+    let mac = clean.as_ref().unwrap_or(mac);
     let serialized = serde_json::to_string_pretty(mac)
         .map_err(|err| format!("Failed to serialize macro '{}': {}", mac.name, err))?;
 

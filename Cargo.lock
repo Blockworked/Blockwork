@@ -456,6 +456,8 @@ dependencies = [
  "libc",
  "png",
  "rand",
+ "regex",
+ "security-framework",
  "self_update",
  "serde",
  "serde_json",

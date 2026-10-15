@@ -15,8 +15,10 @@ pub mod notify;
 pub mod recording;
 pub mod run_log;
 pub mod screen;
+pub mod secrets;
 pub mod shell;
 pub mod system;
+pub mod text;
 #[cfg(all(feature = "updater", any(windows, target_os = "macos")))]
 pub mod updater;
 pub mod window;

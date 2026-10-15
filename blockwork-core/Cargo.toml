@@ -34,6 +34,8 @@ ureq.workspace = true
 # Screen images: captures, block images as PNG data: URIs (see src/screen/).
 png = "0.18"
 base64.workspace = true
+# Regex text operators.
+regex.workspace = true
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true
@@ -59,5 +61,7 @@ http = { workspace = true, optional = true }
 core-graphics.workspace = true
 core-foundation.workspace = true
 foreign-types.workspace = true
+# Secrets in the Keychain (see src/secrets.rs).
+security-framework.workspace = true
 self_update = { workspace = true, optional = true }
 http = { workspace = true, optional = true }

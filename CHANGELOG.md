@@ -69,6 +69,25 @@ section below as the GitHub release notes, followed by the downloads table.
   times, or on chosen weekdays.
 - "With lock" block: only one strand, across every macro, runs inside a lock
   of the same name at a time.
+- Debugger: right-click a block to toggle a breakpoint, and pause, resume,
+  step one block at a time (F8/F10) or stop a running macro from the bar
+  above the canvas, which shows the paused strand's variables and lists.
+- Secrets: named passwords and API keys in Settings > Integrations, kept in
+  the system keyring (Secret Service, Credential Manager, Keychain) and read
+  with the "secret" block. Their values are masked in the run log, previews
+  and saved or exported macro files, and the import review warns about
+  macros that read them.
+- Text and data blocks: contains / starts with / ends with / matches regex,
+  replace, regex replace and find, split into a list or take one part, letters
+  from/to, trim, number formatting, and timestamps with date formatting,
+  parsing and parts.
+- Macro library: the macro picker is now a searchable list with folders, and
+  each macro can be opened, duplicated, moved to a folder, exported or
+  deleted from it. Import and export use the system file dialog.
+- Triggers for when the network connects or disconnects, when a USB device is
+  plugged in or unplugged, and when a mouse button is pressed or released
+  (optionally with modifier keys), plus "online?" and "USB device plugged in?"
+  reporters.
 
 ### Changed
 - Blocks that fail at run time are reported in the run log instead of only

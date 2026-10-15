@@ -186,7 +186,7 @@ ApplicationWindow {
     Component {
         id: editorComponent
         EditorPage {
-            appState: root.appState; invoke: root.invoke; appBridge: bridge
+            appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: macroFiles
             sidebarWidth: root.sidebarWidth
             onSidebarWidthChanged: root.sidebarWidth = sidebarWidth
             sidebarCollapsed: root.sidebarCollapsed
@@ -194,7 +194,8 @@ ApplicationWindow {
         }
     }
     Component { id: onboardingComponent; OnboardingPage { appState: root.appState; invoke: root.invoke } }
-    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke } }
+    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; macroFiles: macroFiles } }
+    MacroFiles { id: macroFiles; appState: root.appState; invoke: root.invoke; appBridge: bridge }
 
     // Frameless window: hairline outline and edge/corner resize grips.
     Rectangle {

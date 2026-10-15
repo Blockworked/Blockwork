@@ -162,6 +162,27 @@ pub(crate) struct StateDto {
     pub(crate) import_review: Option<ImportReviewDto>,
     pub(crate) globals: Vec<GlobalDto>,
     pub(crate) templates: Vec<crate::templates::TemplateDto>,
+    /// Names only; values stay in the keyring.
+    pub(crate) secret_names: Vec<String>,
+    /// Every macro, for the library.
+    pub(crate) library: Vec<LibraryEntryDto>,
+    /// Block ids with a breakpoint in the open macro.
+    pub(crate) breakpoints: Vec<String>,
+    /// Ids of macros paused by the debugger.
+    pub(crate) paused_macros: Vec<String>,
+    /// Strands waiting at a breakpoint or step, with their variables.
+    pub(crate) paused_strands: Vec<blockwork_core::macros::debug::PausedStrand>,
+}
+
+/// One macro as the library lists it.
+#[derive(Serialize, Clone)]
+pub(crate) struct LibraryEntryDto {
+    pub(crate) id: String,
+    pub(crate) name: String,
+    pub(crate) folder: String,
+    pub(crate) always_listen: bool,
+    /// Whether it has trigger strands (anything but When Ran and custom blocks).
+    pub(crate) has_triggers: bool,
 }
 
 /// A global variable as the settings page lists it.
@@ -245,6 +266,7 @@ pub(crate) struct MacroSettingsDto {
     pub(crate) active_from: String,
     pub(crate) active_until: String,
     pub(crate) active_days: u8,
+    pub(crate) folder: String,
 }
 
 fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
@@ -259,6 +281,7 @@ fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
         active_from,
         active_until,
         active_days: settings.active_days,
+        folder: settings.folder.clone(),
     }
 }
 
@@ -599,6 +622,27 @@ pub(crate) enum InstructionDto {
     WhenCron {
         id: String,
         expression: Value,
+    },
+    SplitIntoList {
+        id: String,
+        text: Value,
+        separator: Value,
+        name: String,
+    },
+    WhenNetwork {
+        id: String,
+        connected: bool,
+    },
+    WhenUsb {
+        id: String,
+        pattern: Value,
+        connected: bool,
+    },
+    WhenMouseButton {
+        id: String,
+        button: String,
+        pressed: bool,
+        modifiers: Value,
     },
 }
 
@@ -989,6 +1033,22 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             body: body.iter().map(instruction_to_dto).collect(),
         },
         InstructionKind::WhenCron(expression) => InstructionDto::WhenCron { id, expression: expression.clone() },
+        InstructionKind::SplitIntoList { text, separator, name } => InstructionDto::SplitIntoList {
+            id,
+            text: text.clone(),
+            separator: separator.clone(),
+            name: name.clone(),
+        },
+        InstructionKind::WhenNetwork { connected } => InstructionDto::WhenNetwork { id, connected: *connected },
+        InstructionKind::WhenUsb { pattern, connected } => {
+            InstructionDto::WhenUsb { id, pattern: pattern.clone(), connected: *connected }
+        }
+        InstructionKind::WhenMouseButton { button, pressed, modifiers } => InstructionDto::WhenMouseButton {
+            id,
+            button: get_mouse_button_names()[mouse_button_to_index(button)].to_string(),
+            pressed: *pressed,
+            modifiers: modifiers.clone(),
+        },
         InstructionKind::Token(token) => match token {
             InputToken::Text(t) => InstructionDto::Text {
                 id,
@@ -1378,6 +1438,25 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
             },
         ),
         InstructionDto::WhenCron { id, expression } => (id, InstructionKind::WhenCron(expression.clone())),
+        InstructionDto::SplitIntoList { id, text, separator, name } => (
+            id,
+            InstructionKind::SplitIntoList { text: text.clone(), separator: separator.clone(), name: name.clone() },
+        ),
+        InstructionDto::WhenNetwork { id, connected } => (id, InstructionKind::WhenNetwork { connected: *connected }),
+        InstructionDto::WhenUsb { id, pattern, connected } => {
+            (id, InstructionKind::WhenUsb { pattern: pattern.clone(), connected: *connected })
+        }
+        InstructionDto::WhenMouseButton { id, button, pressed, modifiers } => {
+            let index = get_mouse_button_names().iter().position(|&n| n == button.as_str())?;
+            (
+                id,
+                InstructionKind::WhenMouseButton {
+                    button: index_to_mouse_button(index),
+                    pressed: *pressed,
+                    modifiers: modifiers.clone(),
+                },
+            )
+        }
     };
     Some(Instruction {
         id: id.clone(),
@@ -1636,9 +1715,34 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         import_review: s.pending_import.as_ref().map(|(_, review)| review.clone()),
         globals: blockwork_core::globals::all()
             .into_iter()
-            .map(|(name, value)| GlobalDto { name, value: value.as_text() })
+            .map(|(name, value)| GlobalDto { name, value: blockwork_core::secrets::redact(&value.as_text()) })
             .collect(),
         templates: crate::templates::list(),
+        secret_names: blockwork_core::secrets::names(),
+        library: s.macros_list.iter().map(library_entry).collect(),
+        breakpoints: s.current_macro.as_ref().map(|m| blockwork_core::macros::debug::breakpoints(&m.id)).unwrap_or_default(),
+        paused_macros: s
+            .macros_list
+            .iter()
+            .filter(|m| blockwork_core::macros::debug::is_paused(&m.id))
+            .map(|m| m.id.clone())
+            .collect(),
+        paused_strands: blockwork_core::macros::debug::paused_strands(),
+    }
+}
+
+fn library_entry(mac: &Macro) -> LibraryEntryDto {
+    use blockwork_core::macros::BlockKind;
+    LibraryEntryDto {
+        id: mac.id.clone(),
+        name: mac.name.clone(),
+        folder: mac.settings.folder.clone(),
+        always_listen: mac.settings.always_listen,
+        has_triggers: mac.strands.iter().any(|st| {
+            st.instructions.first().is_some_and(|i| {
+                i.kind.is_header() && !matches!(i.kind, InstructionKind::WhenRan | InstructionKind::BlockHeader(_))
+            })
+        }),
     }
 }
 

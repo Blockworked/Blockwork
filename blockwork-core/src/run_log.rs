@@ -71,7 +71,7 @@ static ENTRIES: Mutex<VecDeque<Entry>> = Mutex::new(VecDeque::new());
 static REVISION: AtomicU64 = AtomicU64::new(0);
 
 fn push(source: &Source, level: Level, block_id: &str, event: Option<RunEvent>, message: impl Into<String>) {
-    let mut message: String = message.into();
+    let mut message = crate::secrets::redact(&message.into());
     if let Some((cut, _)) = message.char_indices().nth(MAX_MESSAGE_CHARS) {
         message.truncate(cut);
         message.push('…');

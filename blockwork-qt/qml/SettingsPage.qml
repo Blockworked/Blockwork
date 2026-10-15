@@ -8,6 +8,8 @@ Item {
     id: root
     required property var appState
     required property var invoke
+    // Shared import/export flow (MacroFiles in Main.qml).
+    property var macroFiles: null
     function capturingBinding(index){return appState.combo_capture&&appState.combo_capture.kind==="Binding"&&appState.combo_capture.binding_index===index}
     function capturingAction(action){return appState.combo_capture&&appState.combo_capture.kind==="Named"&&JSON.stringify(appState.combo_capture.action)===JSON.stringify(action)}
 
@@ -135,8 +137,8 @@ Item {
                             }
                             Rectangle { Layout.fillWidth: true; Layout.topMargin: 8; height: 1; color: "#3a3b3f" }
                             RowLayout { Layout.fillWidth: true; Layout.topMargin: 16; spacing: 8
-                                BwButton { iconName: "download"; text: "Import macro…"; onClicked: pathDialog.mode = "import", pathDialog.open() }
-                                BwButton { iconName: "upload"; text: "Export macro…"; enabled: appState.macro_selected !== null; onClicked: pathDialog.mode = "export", pathDialog.open() }
+                                BwButton { iconName: "download"; text: "Import macro…"; onClicked: root.macroFiles.importMacro() }
+                                BwButton { iconName: "upload"; text: "Export macro…"; enabled: !!appState.current_macro; onClicked: root.macroFiles.exportMacro(appState.current_macro.id) }
                                 BwButton { iconName: "play"; text: "Replay welcome tour"; onClicked: root.invoke("set_onboarding_done", { done: false }) }
                                 Item { Layout.fillWidth: true }
                             }
@@ -230,6 +232,24 @@ Item {
                             SettingsRow { title: "Start automatically"; detail: "Start the TCP server whenever Blockwork launches."
                                 BwSwitch { Accessible.name: "Start TCP server automatically"; checked: appState.ipc_auto_start; onToggled: checked => root.invoke("set_ipc_auto_start", { enabled: checked }) }
                             }
+                            SettingsRow { title: "Secrets"
+                                detail: "Passwords and API keys macros can use with the \u201csecret\u201d block. They're kept in your system keyring, never in macro files, and show as dots in the run log."
+                            }
+                            Repeater {
+                                model: appState.secret_names || []
+                                delegate: RowLayout {
+                                    required property string modelData
+                                    Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 6; spacing: 10
+                                    LucideIcon { name: "lock"; width: 14; height: 14; color: "#9fa0a6" }
+                                    Text { text: modelData; color: "#e7e7e8"; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
+                                    BwButton { iconName: "pencil"; text: "Change"; onClicked: secretDialog.openFor(modelData) }
+                                    BwButton { iconName: "trash-2"; text: "Delete"; onClicked: root.invoke("delete_secret", { name: modelData }) }
+                                }
+                            }
+                            RowLayout { Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 14; spacing: 8
+                                BwButton { iconName: "plus"; text: "Add secret…"; onClicked: secretDialog.openFor("") }
+                                Item { Layout.fillWidth: true }
+                            }
                             SettingsRow { title: "Command line"
                                 detail: "Scripts and launchers can run macros by name: \u201cblockwork run <name>\u201d (add --wait to return when it ends), \u201cblockwork stop <name>\u201d and \u201cblockwork list\u201d."
                             }
@@ -258,73 +278,25 @@ Item {
         return u.error || "Check for a new release of Blockwork.";
     }
 
-    // An imported macro waits here until the user has seen what it can do.
-    readonly property var importReview: appState.import_review || null
-    readonly property string importReviewKey: importReview ? JSON.stringify(importReview) : ""
-    property var keepSettings: ({})
-    onImportReviewKeyChanged: {
-        if (importReview) { keepSettings = ({}); importDialog.open(); }
-        else importDialog.close();
-    }
     BwDialog {
-        id: importDialog
-        readonly property var caps: root.importReview ? root.importReview.capabilities : []
-        readonly property var customSettings: root.importReview ? root.importReview.custom_settings : []
-        title: root.importReview ? "Import \u201c" + root.importReview.name + "\u201d?" : "Import macro"
+        id: secretDialog
+        property string editing: ""
+        title: editing ? "Change \u201c" + editing + "\u201d" : "Add a secret"
         standardButtons: Dialog.Ok | Dialog.Cancel
-        Component.onCompleted: standardButton(Dialog.Ok).text = "Import"
-        Column { width: 460; spacing: 10
-            Text {
-                width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
-                text: importDialog.caps.length ? "This macro can:" : "This macro only uses blocks that stay inside Blockwork, like waits and variables."
-            }
-            Repeater {
-                model: importDialog.caps
-                delegate: Row {
-                    required property var modelData
-                    spacing: 8
-                    LucideIcon {
-                        anchors.verticalCenter: parent.verticalCenter; width: 16; height: 16
-                        name: modelData.risky ? "triangle-alert" : "check"; color: modelData.risky ? Theme.warning : Theme.textDim
-                    }
-                    Text { text: modelData.label; color: modelData.risky ? Theme.warning : Theme.text; font.pixelSize: 13 }
-                }
-            }
-            Text {
-                visible: importDialog.caps.some(c => c.risky)
-                width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                text: "Only import macros that run commands, go online or write files from people you trust."
-            }
-            Text {
-                visible: importDialog.customSettings.length > 0; topPadding: 6
-                width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
-                text: "It also comes with these settings. Untick any you don't want:"
-            }
-            Repeater {
-                model: importDialog.customSettings
-                delegate: BwCheckBox {
-                    required property var modelData
-                    text: modelData.label; checked: modelData.enabled
-                    onToggled: root.keepSettings[modelData.key] = checked
-                }
-            }
+        function openFor(name) {
+            editing = name; secretName.text = name; secretValue.text = ""; open();
+            if (name) secretValue.forceActiveFocus(); else secretName.forceActiveFocus();
         }
-        onAccepted: root.invoke("confirm_import_macro", { keepSettings: root.keepSettings })
-        onRejected: root.invoke("cancel_import_macro")
-    }
-
-    BwDialog {
-        id: pathDialog
-        property string mode: "import"
-        title: mode === "import" ? "Import macro" : "Export macro"
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        Column { width: 480; spacing: 8
-            Text { text: "File path"; color: "#e7e7e8" }
-            BwTextField { id: filePath; width: parent.width; placeholderText: "C:/path/to/macro.macro" }
+        Column { width: 380; spacing: 8
+            Text { text: "Name"; color: "#e7e7e8" }
+            BwTextField { id: secretName; width: parent.width; readOnly: !!secretDialog.editing; placeholderText: "api token" }
+            Text { text: "Value"; color: "#e7e7e8" }
+            BwTextField { id: secretValue; width: parent.width; echoMode: TextInput.Password; placeholderText: "Paste it here"; onAccepted: secretDialog.accept() }
         }
         onAccepted: {
-            if (mode === "import") root.invoke("import_macro", { path: filePath.text });
-            else if (appState.current_macro) root.invoke("export_macro", { macroId: appState.current_macro.id, path: filePath.text });
+            if (secretName.text.trim() && secretValue.text) root.invoke("set_secret", { name: secretName.text.trim(), value: secretValue.text });
+            secretValue.text = "";
         }
+        onRejected: secretValue.text = ""
     }
 }

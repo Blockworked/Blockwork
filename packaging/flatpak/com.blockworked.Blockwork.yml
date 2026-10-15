@@ -30,6 +30,8 @@ finish-args:
   - --talk-name=org.freedesktop.ScreenSaver
   - --talk-name=org.gnome.ScreenSaver
   - --system-talk-name=org.freedesktop.login1
+  # Secrets live in the system keyring (Secret Service).
+  - --talk-name=org.freedesktop.secrets
   # File blocks and the file-change trigger work on the user's files.
   - --filesystem=home
 

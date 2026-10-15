@@ -30,8 +30,6 @@ use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 #[derive(Debug)]
 pub(crate) enum MainThreadEvent {
     SetTrayVisible(bool),
-    /// The run log changed, so the tray's recent activity is stale.
-    ActivityChanged,
     OpenUi,
     Quit,
 }
@@ -98,7 +96,6 @@ fn main() {
 
     let mut tray = tray::Tray::new(proxy.clone());
     tray.set_visible(backend.close_to_tray() || BACKGROUND.load(Ordering::Relaxed));
-    watch_activity(proxy.clone());
 
     // Hold the runtime for the life of the process: the event loop below
     // never returns, and dropping it would stop every backend task.
@@ -111,7 +108,6 @@ fn main() {
                 MainThreadEvent::SetTrayVisible(visible) => {
                     tray.set_visible(visible || BACKGROUND.load(Ordering::Relaxed))
                 }
-                MainThreadEvent::ActivityChanged => tray.refresh_activity(),
                 MainThreadEvent::OpenUi => {
                     if !clients.focus_ui() {
                         server::spawn_ui();
@@ -119,23 +115,6 @@ fn main() {
                 }
                 MainThreadEvent::Quit => {
                     backend.request_quit();
-                }
-            }
-        }
-    });
-}
-
-/// Tells the main thread when the run log changes, at most once a second.
-fn watch_activity(proxy: EventLoopProxy<MainThreadEvent>) {
-    std::thread::spawn(move || {
-        let mut seen = blockwork_app::run_log::revision();
-        loop {
-            std::thread::sleep(std::time::Duration::from_secs(1));
-            let revision = blockwork_app::run_log::revision();
-            if revision != seen {
-                seen = revision;
-                if proxy.send_event(MainThreadEvent::ActivityChanged).is_err() {
-                    return;
                 }
             }
         }
