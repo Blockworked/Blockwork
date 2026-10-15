@@ -108,7 +108,16 @@ pub(crate) fn live_macros(s: &crate::state::AppState) -> Vec<&blockwork_core::ma
 pub(crate) fn persist_fired_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str, variables: &VariableStore, lists: &ListStore) {
     let (mac_to_save, dto) = {
         let Ok(mut s) = shared_state.lock() else { return };
-        let Some(mac) = s.macros_list.iter_mut().find(|m| m.id == macro_id) else { return };
+        // Merge values into the open copy rather than replacing it, so edits
+        // made since the last save (or during the run) survive.
+        let open = s.current_macro.as_mut().filter(|m| m.id == macro_id);
+        let mac = match open {
+            Some(mac) => mac,
+            None => match s.macros_list.iter_mut().find(|m| m.id == macro_id) {
+                Some(mac) => mac,
+                None => return,
+            },
+        };
         if let Ok(values) = variables.lock() {
             mac.sync_variables_from(&values);
         }
@@ -116,8 +125,8 @@ pub(crate) fn persist_fired_variables(shared_state: &SharedState, app: &AppHandl
             mac.sync_lists_from(&values);
         }
         let mac_to_save = mac.clone();
-        if s.current_macro.as_ref().is_some_and(|c| c.id == macro_id) {
-            s.current_macro = Some(mac_to_save.clone());
+        if let Some(entry) = s.macros_list.iter_mut().find(|m| m.id == macro_id) {
+            *entry = mac_to_save.clone();
         }
         (mac_to_save, build_state_dto(&s))
     };

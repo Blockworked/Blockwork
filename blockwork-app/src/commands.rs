@@ -128,13 +128,23 @@ fn sync_list_values(s: &mut crate::state::AppState) {
     }
 }
 
-fn auto_save(s: &crate::state::AppState) {
+fn auto_save(s: &mut crate::state::AppState) {
     if let Some(mac) = &s.current_macro {
         if let Err(e) = mac.save() {
             warn!("Failed to auto-save macro: {e}");
         } else {
             config::set_selected_macro_id(Some(&mac.id));
         }
+    }
+    sync_open_macro_into_list(s);
+}
+
+/// Copies the open macro over its `macros_list` entry. Watchers and fired
+/// runs read that list, so a stale entry runs (and saves back) old blocks.
+pub(crate) fn sync_open_macro_into_list(s: &mut crate::state::AppState) {
+    let Some(mac) = &s.current_macro else { return };
+    if let Some(entry) = s.macros_list.iter_mut().find(|m| m.id == mac.id) {
+        *entry = mac.clone();
     }
 }
 
@@ -237,7 +247,7 @@ pub(crate) fn set_title(
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         mac.name = title;
-        auto_save(&s);
+        auto_save(&mut s);
         // Rebuild list so dropdown reflects the new name
         let macros = config::get_macros_from_config();
         s.macro_strs = macros.iter().map(|m| m.name.clone()).collect();
@@ -258,7 +268,7 @@ pub(crate) fn set_macro_speed_multiplier(
             *SPEED_MULTIPLIER_RANGE.start(),
             *SPEED_MULTIPLIER_RANGE.end(),
         );
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -275,7 +285,7 @@ pub(crate) fn set_macro_always_listen(
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         mac.settings.always_listen = enabled;
-        auto_save(&s);
+        auto_save(&mut s);
         refresh_macro_list(&mut s);
     }
     emit_state_updated(&app, &s);
@@ -305,7 +315,7 @@ pub(crate) fn set_macro_conditions(
         mac.settings.power = power;
         mac.settings.active_hours = active_hours;
         mac.settings.active_days = active_days & 0x7f;
-        auto_save(&s);
+        auto_save(&mut s);
         refresh_macro_list(&mut s);
     }
     emit_state_updated(&app, &s);
@@ -321,7 +331,7 @@ pub(crate) fn set_macro_max_run_secs(
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         mac.settings.max_run_secs = seconds;
-        auto_save(&s);
+        auto_save(&mut s);
         refresh_macro_list(&mut s);
     }
     emit_state_updated(&app, &s);
@@ -345,7 +355,7 @@ pub(crate) fn set_macro_max_loop_iterations(
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         mac.settings.max_loop_iterations = iterations;
-        auto_save(&s);
+        auto_save(&mut s);
         refresh_macro_list(&mut s);
     }
     emit_state_updated(&app, &s);
@@ -399,7 +409,7 @@ pub(crate) fn create_variable(
     if let Ok(mut store) = s.variable_values.lock() {
         store.insert(trimmed, Evaluated::Number(0.0));
     }
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -440,7 +450,7 @@ pub(crate) fn rename_variable(
             store.insert(trimmed, v);
         }
     }
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -458,7 +468,7 @@ pub(crate) fn delete_variable(
     if let Ok(mut store) = s.variable_values.lock() {
         store.remove(&name);
     }
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -493,7 +503,7 @@ pub(crate) fn create_list(
     push_undo(&mut s);
     create_list_in(s.current_macro.as_mut().ok_or("No macro selected")?, &name)?;
     sync_list_values(&mut s);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -529,7 +539,7 @@ pub(crate) fn rename_list(
         .graph
         .rename_list(&old_name, &trimmed)?;
     sync_list_values(&mut s);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -556,7 +566,7 @@ pub(crate) fn delete_list(
             .remove_list(&name);
     }
     sync_list_values(&mut s);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -577,7 +587,7 @@ pub(crate) fn set_list_items(
         .graph
         .set_list_items(&name, items)?;
     sync_list_values(&mut s);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -598,7 +608,7 @@ pub(crate) fn set_list_editor_state(
         .ok_or("No macro selected")?
         .graph
         .set_list_editor_state(&name, visible, x, y)?;
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -631,7 +641,7 @@ pub(crate) fn create_block(
     let (x, y) = mac.next_strand_position();
     let id = mac.create_block(pieces, shape, color, x, y);
     mac.set_block_icon(&id, &icon)?;
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(id)
 }
@@ -682,7 +692,7 @@ pub(crate) fn edit_block(
         .as_mut()
         .ok_or("No macro selected")?
         .set_block_icon(&block_id, &icon)?;
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -700,7 +710,7 @@ pub(crate) fn delete_block(
         mac.remove_block(&block_id);
         let surviving: Vec<String> = mac.strands.iter().map(|st| st.id.clone()).collect();
         retain_live_buffers(&mut s.invalid_field_buffers, &surviving);
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1027,7 +1037,7 @@ pub(crate) async fn add_instruction(
         && mac.insert_instruction(&strand_id, &path, ins)?
     {
         s.invalid_field_buffers.clear();
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1253,7 +1263,7 @@ pub(crate) async fn edit_instruction(
     if let Some(mac) = &mut s.current_macro
         && mac.replace_instruction(&strand_id, &path, ins)
     {
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1271,7 +1281,7 @@ pub(crate) fn edit_value_field(
     if let Some(mac) = &mut s.current_macro {
         match mac.edit_value_text(&location, text.clone()) {
             // Text leaves are always valid - no invalid-buffer bookkeeping needed.
-            ValueEdit::Text => auto_save(&s),
+            ValueEdit::Text => auto_save(&mut s),
             // A numeric field keeps the raw text either way, so a
             // half-written number doesn't snap back mid-edit.
             ValueEdit::Number { parsed } => {
@@ -1288,7 +1298,7 @@ pub(crate) fn edit_value_field(
                 }
                 s.invalid_field_buffers.insert(location, text);
                 if parsed {
-                    auto_save(&s);
+                    auto_save(&mut s);
                 }
             }
             ValueEdit::Missing => {}
@@ -1316,7 +1326,7 @@ pub(crate) fn set_value_kind(
         None => Ok(()),
     };
     prune_value_buffers(&mut s.invalid_field_buffers, &location);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     result
 }
@@ -1337,7 +1347,7 @@ pub(crate) fn take_value(
         .as_mut()
         .and_then(|mac| mac.take_value(&location));
     prune_value_buffers(&mut s.invalid_field_buffers, &location);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     taken.ok_or_else(|| "Nothing to take at that location".to_string())
 }
@@ -1357,7 +1367,7 @@ pub(crate) fn put_value(
         mac.put_value(&location, value);
     }
     prune_value_buffers(&mut s.invalid_field_buffers, &location);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -1423,7 +1433,7 @@ pub(crate) fn create_floating_value(
         .as_mut()
         .ok_or("No macro selected")?
         .add_floating_value(x, y, value, origin_block_id);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(id)
 }
@@ -1441,7 +1451,7 @@ pub(crate) fn move_floating_value(
     if let Some(mac) = &mut s.current_macro
         && mac.move_floating_value(&floating_id, x, y)
     {
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1458,7 +1468,7 @@ pub(crate) fn remove_floating_value(
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {
         mac.remove_floating_value(&floating_id);
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1480,7 +1490,7 @@ pub(crate) fn create_comment(
         .as_mut()
         .ok_or("No macro selected")?
         .add_comment(x, y, text, None);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(id)
 }
@@ -1504,7 +1514,7 @@ pub(crate) fn create_attached_comment(
         .as_mut()
         .ok_or("No macro selected")?
         .add_comment(dx, dy, text, Some(instruction_id));
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(id)
 }
@@ -1525,7 +1535,7 @@ pub(crate) fn move_comment(
     if let Some(mac) = &mut s.current_macro
         && mac.move_comment(&comment_id, x, y)
     {
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1541,7 +1551,7 @@ pub(crate) fn remove_comment(
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {
         mac.remove_comment(&comment_id);
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1565,7 +1575,7 @@ pub(crate) fn edit_comment_text(
     if let Some(mac) = &mut s.current_macro
         && mac.set_comment_text(&comment_id, text)
     {
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1583,7 +1593,7 @@ pub(crate) fn set_comment_collapsed(
     if let Some(mac) = &mut s.current_macro
         && mac.set_comment_collapsed(&comment_id, collapsed)
     {
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1610,7 +1620,7 @@ pub(crate) fn remove_instruction(
             mac.graph = graph;
         }
         s.invalid_field_buffers.clear();
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1646,7 +1656,7 @@ pub(crate) fn delete_instruction(
         mac.graph = graph;
     }
     s.invalid_field_buffers.clear();
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(new_id)
 }
@@ -1674,7 +1684,7 @@ pub(crate) fn reorder_instruction(
             mac.graph = graph;
         }
         s.invalid_field_buffers.clear();
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1717,7 +1727,7 @@ pub(crate) fn clear_instructions(
             // "start this macro over from scratch".
             mac.clear_strands();
             s.invalid_field_buffers.clear();
-            auto_save(&s);
+            auto_save(&mut s);
             s.confirm_clear_instructions = false;
             s.clear_confirm_remaining_secs = 0;
         }
@@ -1747,7 +1757,7 @@ fn apply_history_step(
         sync_variable_values(&mut s);
         sync_list_values(&mut s);
         s.invalid_field_buffers.clear();
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(app, &s);
     Ok(())
@@ -1782,7 +1792,7 @@ pub(crate) fn add_strand(
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let (default_x, default_y) = mac.next_strand_position();
     let new_id = mac.add_strand(x.unwrap_or(default_x), y.unwrap_or(default_y), ins);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(new_id)
 }
@@ -1797,7 +1807,7 @@ pub(crate) fn remove_strand(
     if let Some(mac) = &mut s.current_macro {
         mac.remove_strand(&strand_id);
         drop_strand_buffers(&mut s.invalid_field_buffers, &strand_id);
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1816,7 +1826,7 @@ pub(crate) fn move_strand(
     if let Some(mac) = &mut s.current_macro
         && mac.move_strand(&strand_id, x, y)
     {
-        auto_save(&s);
+        auto_save(&mut s);
     }
     emit_state_updated(&app, &s);
     Ok(())
@@ -1842,7 +1852,7 @@ pub(crate) fn split_strand(
         .ok_or("No macro selected")?
         .split_strand(&strand_id, &path, x, y)?;
     s.invalid_field_buffers.clear();
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(new_id)
 }
@@ -1871,7 +1881,7 @@ pub(crate) fn merge_strand(
         mac.graph = graph;
     }
     drop_strand_buffers(&mut s.invalid_field_buffers, &dragged_id);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -1900,7 +1910,7 @@ pub(crate) fn merge_tail(
         mac.graph = graph;
     }
     s.invalid_field_buffers.clear();
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -1926,7 +1936,7 @@ pub(crate) fn paste_instructions(
         .as_mut()
         .ok_or("No macro selected")?
         .add_strand(x, y, ins);
-    auto_save(&s);
+    auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(new_id)
 }
@@ -1943,7 +1953,7 @@ pub(crate) fn set_recording_target(
     if let Some(mac) = &mut s.current_macro {
         if mac.strand(&strand_id).is_some() {
             mac.recording_target = Some(strand_id);
-            auto_save(&s);
+            auto_save(&mut s);
         }
     }
     emit_state_updated(&app, &s);
@@ -2021,7 +2031,7 @@ pub(crate) fn key_capture_event(
                 }
             });
             if captured {
-                auto_save(&s);
+                auto_save(&mut s);
             }
         }
         KeyCaptureTarget::Standalone => s.pending_standalone_key = Some(text),
@@ -2217,6 +2227,7 @@ pub(crate) fn stop_recording_internal(state: &SharedState, app: &AppHandle) {
     let (to_save, dto) = {
         let Ok(mut s) = state.lock() else { return };
         let to_save = stop_recording_impl(&mut s);
+        sync_open_macro_into_list(&mut s);
         (to_save, build_state_dto(&s))
     };
     // The disk write (and the emit below) run after the state lock is

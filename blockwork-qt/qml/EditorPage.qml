@@ -803,7 +803,8 @@ Item {
     BwDialog {
         id: templateDialog; title: "Start from a template"; standardButtons: Dialog.Cancel
         TemplateList {
-            width: 560; templates: appState.templates || []
+            // Cards report no implicit width, so give the dialog one to size from
+            implicitWidth: 560; templates: appState.templates || []
             onPicked: id => { root.invoke("new_macro_from_template", { template: id }); templateDialog.close(); }
         }
     }

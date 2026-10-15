@@ -17,22 +17,24 @@ Item {
         { name: "Editor", icon: "blocks" }, { name: "Integrations", icon: "terminal" }
     ]
 
-    component SettingsRow: ColumnLayout {
+    component SettingsRow: Item {
         id: row
         property string title: ""
         property string detail: ""
         property bool first: false
         default property alias controls: ctl.data
-        Layout.fillWidth: true; spacing: 0
-        Rectangle { Layout.fillWidth: true; height: 1; color: "#3a3b3f"; visible: !row.first }
-        RowLayout {
-            Layout.fillWidth: true; Layout.topMargin: 14; Layout.bottomMargin: 14; spacing: 16
-            ColumnLayout { Layout.fillWidth: true; spacing: 2
-                Text { text: row.title; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                Text { visible: row.detail !== ""; text: row.detail; color: "#9fa0a6"; font.pixelSize: 12; wrapMode: Text.WordWrap; Layout.fillWidth: true }
-            }
-            RowLayout { id: ctl; spacing: 8 }
-        }
+        Layout.fillWidth: true
+        implicitHeight: Math.max(textCol.implicitHeight, ctl.implicitHeight) + 26
+        data: [
+            Rectangle { anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: "#3a3b3f"; visible: !row.first },
+            Column {
+                id: textCol
+                anchors.left: parent.left; anchors.right: ctl.left; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 2
+                Text { width: parent.width; text: row.title; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                Text { width: parent.width; visible: row.detail !== ""; text: row.detail; color: "#9fa0a6"; font.pixelSize: 12; wrapMode: Text.WordWrap }
+            },
+            Row { id: ctl; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 8 }
+        ]
     }
 
     component SubHeading: Text {
@@ -43,16 +45,16 @@ Item {
     ColumnLayout {
         anchors.fill: parent; spacing: 0
         Rectangle {
-            Layout.fillWidth: true; Layout.preferredHeight: 68; color: "#292a2d"; border.color: "#3a3b3f"
+            Layout.fillWidth: true; Layout.preferredHeight: 52; color: "#292a2d"; border.color: "#38393d"
             TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
-            RowLayout { anchors.fill: parent; anchors.margins: 14
+            RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
                 Image {
                     visible: Qt.platform.os !== "osx"
                     source: "qrc:/icons/blockwork.png"; sourceSize: Qt.size(40, 40)
                     Layout.preferredWidth: 20; Layout.preferredHeight: 20; Layout.rightMargin: 2
                     fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
                 }
-                BwButton { iconName: "arrow-left"; text: "Back"; onClicked: root.invoke("close_settings") }
+                BwButton { iconName: "arrow-left"; text: "Back"; implicitHeight: 34; onClicked: root.invoke("close_settings") }
                 Text { text: "Settings"; color: "#e7e7e8"; font.pixelSize: 17; font.weight: Font.Bold }
                 Item { Layout.fillWidth: true }
                 WindowControls { visible: Qt.platform.os !== "osx" }
@@ -160,11 +162,11 @@ Item {
                                         primary: hotkeyRow.capturing; implicitWidth: 150; implicitHeight: 36
                                         onClicked: if (!hotkeyRow.capturing) root.invoke("start_combo_capture", { action: hotkeyRow.modelData.action })
                                     }
-                                    Item { Layout.preferredWidth: 84; Layout.preferredHeight: 36
+                                    Item { width: 84; height: 36
                                         BwButton { anchors.fill: parent; visible: !hotkeyRow.capturing && !hotkeyRow.atDefault; text: "Default"; implicitHeight: 36
                                             onClicked: root.invoke("reset_hotkey_to_default", { action: hotkeyRow.modelData.action }) }
                                     }
-                                    Item { Layout.preferredWidth: 42; Layout.preferredHeight: 36
+                                    Item { width: 42; height: 36
                                         BwButton { anchors.fill: parent; visible: !hotkeyRow.capturing && !!hotkeyRow.binding; iconName: "x"; text: ""; danger: true; implicitHeight: 36
                                             onClicked: root.invoke("clear_named_hotkey", { action: hotkeyRow.modelData.action }) }
                                     }
@@ -185,6 +187,7 @@ Item {
                                         primary: macroRow.capturing; implicitWidth: 150; implicitHeight: 36
                                         onClicked: if (!macroRow.capturing) root.invoke("start_binding_combo_capture", { index: macroRow.modelData.binding_index })
                                     }
+                                    Item { width: 84; height: 36 }
                                     BwButton { iconName: "x"; text: ""; danger: true; implicitWidth: 42; implicitHeight: 36
                                         onClicked: root.invoke("remove_hotkey_binding", { index: macroRow.modelData.binding_index }) }
                                 }
