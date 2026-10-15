@@ -268,18 +268,20 @@ fn send_state_snapshot(backend: &Backend, tx: &mpsc::Sender<String>) {
     }
 }
 
-/// Launches the editor UI. The UI passes its own launch command down when it
+/// The editor UI's launch command. The UI passes its own down when it
 /// starts the daemon (`BLOCKWORK_UI_EXE`) - inside Flatpak that's the
 /// `/app/bin/blockwork` wrapper rather than the bare binary, and in a macOS
 /// bundle the UI binary is named after the app.
+pub(crate) fn ui_program() -> Option<std::path::PathBuf> {
+    std::env::var_os("BLOCKWORK_UI_EXE").map(std::path::PathBuf::from).or_else(|| {
+        let exe = std::env::current_exe().ok()?;
+        Some(exe.with_file_name(format!("blockwork{}", std::env::consts::EXE_SUFFIX)))
+    })
+}
+
+/// Launches the editor UI.
 pub(crate) fn spawn_ui() {
-    let program = std::env::var_os("BLOCKWORK_UI_EXE")
-        .map(std::path::PathBuf::from)
-        .or_else(|| {
-            let exe = std::env::current_exe().ok()?;
-            Some(exe.with_file_name(format!("blockwork{}", std::env::consts::EXE_SUFFIX)))
-        });
-    let Some(program) = program else {
+    let Some(program) = ui_program() else {
         tracing::warn!("Can't tell where the Blockwork UI binary is");
         return;
     };

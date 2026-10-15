@@ -88,8 +88,30 @@ section below as the GitHub release notes, followed by the downloads table.
   plugged in or unplugged, and when a mouse button is pressed or released
   (optionally with modifier keys), plus "online?" and "USB device plugged in?"
   reporters.
+- Dialog blocks: ask for text, ask yes or no, choose from a list and show a
+  message. They work with the editor closed; cancelling stops the run unless
+  a try block catches it.
+- "Once at" trigger for a single date and time, and a per-macro "catch up on
+  missed schedules" setting that runs schedules missed while Blockwork was
+  closed or the computer slept.
+- Signals: "send signal (and wait)" starts this macro's "when I receive"
+  strands, sharing the run's variables.
+- Webhook trigger: an opt-in local server (Settings > Integrations) that
+  starts macros on a web request with a token, passing the request body.
+- Bundles: export a library folder or a macro (with the macros it runs) as a
+  `.blockwork` file and import it with the same review.
+- Permissions: imported macros ask before running commands, going online,
+  writing files, reading secrets or reading the screen, with "allow this
+  time" and "always allow". Choose what to allow in the import review or in
+  Macro settings > Permissions; grants are kept outside the macro file.
 
 ### Changed
+- Macro files now carry a format version and are upgraded step by step when
+  loaded. Blocks a version can't run become notes on the canvas instead of
+  making the whole macro fail to load, and an upgraded file's original is
+  kept next to it as `.v0.bak`.
+- Macros saved by a newer Blockwork are reported in the run log instead of
+  being skipped silently.
 - Blocks that fail at run time are reported in the run log instead of only
   the console.
 - Click-to-preview won't run shell or web blocks.

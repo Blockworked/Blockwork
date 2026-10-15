@@ -18,6 +18,7 @@
     windows_subsystem = "windows"
 )]
 
+mod prompt;
 mod server;
 mod tray;
 
@@ -65,6 +66,7 @@ fn main() {
     let listener = Arc::new(listener);
 
     blockwork_app::migrate_legacy_app_id();
+    prompt::install();
 
     let backend = {
         let _guard = runtime.enter();

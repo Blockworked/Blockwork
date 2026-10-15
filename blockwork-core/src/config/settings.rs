@@ -55,6 +55,14 @@ pub struct AppSettings {
     pub record_mouse_movement: Option<bool>,
     /// Set once the emergency stop default was added to saved bindings.
     pub emergency_stop_seeded: Option<bool>,
+    /// The local webhook server for `WhenWebhook` triggers; off by default.
+    #[serde(default)]
+    pub webhook_enabled: Option<bool>,
+    #[serde(default)]
+    pub webhook_port: Option<u16>,
+    /// Requests must carry this, so other programs can't fire macros blindly.
+    #[serde(default)]
+    pub webhook_token: Option<String>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {

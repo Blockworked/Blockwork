@@ -23,6 +23,10 @@ pub(crate) mod state;
 pub(crate) mod system_watch;
 pub(crate) mod templates;
 pub(crate) mod time_watch;
+pub(crate) mod webhook;
+
+/// For the daemon, which draws macro dialogs.
+pub use blockwork_core::prompt;
 pub(crate) mod type_watch;
 pub(crate) mod window_watch;
 
@@ -264,6 +268,7 @@ impl Backend {
         type_watch::start(Arc::clone(&shared), app.clone());
         system_watch::start(Arc::clone(&shared), app.clone());
         mouse_watch::start(Arc::clone(&shared), app.clone());
+        webhook::start(Arc::clone(&shared), app.clone());
 
         // Pushes run log updates to the UI, at most a few times a second.
         {

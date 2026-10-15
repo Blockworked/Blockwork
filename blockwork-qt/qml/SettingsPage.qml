@@ -250,6 +250,40 @@ Item {
                                 BwButton { iconName: "plus"; text: "Add secret…"; onClicked: secretDialog.openFor("") }
                                 Item { Layout.fillWidth: true }
                             }
+                            SettingsRow {
+                                readonly property var hook: appState.webhook || ({ enabled: false, port: 8787, token: "", error: "" })
+                                title: !hook.enabled ? "Webhook server off" : hook.error ? "Webhook server not running" : "Webhook server listening on port " + hook.port
+                                detail: hook.error || "Lets other programs and services start macros with a web request to a \u201cwhen webhook is called\u201d block. Only reachable from this computer."
+                                BwTextField {
+                                    id: hookPort; implicitWidth: 100
+                                    text: String(appState.webhook ? appState.webhook.port : 8787); validator: IntValidator { bottom: 1; top: 65535 }
+                                    onEditingFinished: root.invoke("set_webhook", { enabled: !!appState.webhook && appState.webhook.enabled, port: Number(text) || 8787 })
+                                }
+                                BwSwitch {
+                                    Accessible.name: "On"; checked: !!appState.webhook && appState.webhook.enabled
+                                    onToggled: checked => root.invoke("set_webhook", { enabled: checked, port: Number(hookPort.text) || 8787 })
+                                }
+                            }
+                            ColumnLayout {
+                                id: hookInfo
+                                readonly property var hook: appState.webhook || ({})
+                                visible: !!hook.enabled && !!hook.token
+                                Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 14; spacing: 8
+                                readonly property string example: "curl -X POST -H 'X-Blockwork-Token: " + hook.token + "' -d 'hello' http://127.0.0.1:" + hook.port + "/hello"
+                                Text {
+                                    Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#9fa0a6"; font.pixelSize: 12
+                                    text: "Send the token in an X-Blockwork-Token header (or ?token= in the address). For a block listening on \u201chello\u201d:"
+                                }
+                                Rectangle {
+                                    Layout.fillWidth: true; implicitHeight: exampleText.implicitHeight + 16; radius: 6; color: Theme.field; border.color: Theme.borderSoft
+                                    Text { id: exampleText; anchors.fill: parent; anchors.margins: 8; text: hookInfo.example; wrapMode: Text.WrapAnywhere; color: "#e7e7e8"; font.family: "monospace"; font.pixelSize: 12 }
+                                }
+                                RowLayout { spacing: 8
+                                    BwButton { iconName: "copy"; text: "Copy example"; onClicked: root.copyText(hookInfo.example) }
+                                    BwButton { iconName: "copy"; text: "Copy token"; onClicked: root.copyText(hookInfo.hook.token) }
+                                    BwButton { iconName: "refresh-cw"; text: "New token"; onClicked: root.invoke("new_webhook_token") }
+                                }
+                            }
                             SettingsRow { title: "Command line"
                                 detail: "Scripts and launchers can run macros by name: \u201cblockwork run <name>\u201d (add --wait to return when it ends), \u201cblockwork stop <name>\u201d and \u201cblockwork list\u201d."
                             }
@@ -259,6 +293,9 @@ Item {
             }
         }
     }
+
+    TextEdit { id: clipboardHelper; visible: false }
+    function copyText(text) { clipboardHelper.text = text; clipboardHelper.selectAll(); clipboardHelper.copy(); }
 
     function actionLabel(action) {
         if (!action) return "Hotkey";

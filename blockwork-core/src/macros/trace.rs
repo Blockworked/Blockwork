@@ -57,6 +57,7 @@ impl Drop for Tracker {
         drop(active);
         if last {
             crate::macros::debug::run_ended(&block.macro_id);
+            crate::permissions::run_ended(&block.macro_id);
         }
     }
 }

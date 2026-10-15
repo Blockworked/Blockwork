@@ -15,6 +15,7 @@ pub mod conditions;
 pub mod debug;
 pub mod fields;
 pub mod locks;
+pub mod migrate;
 pub mod loop_control;
 pub mod priority;
 pub mod run_registry;
@@ -82,7 +83,18 @@ impl BlockKind for InstructionKind {
             | InstructionKind::WhenCron(value)
             | InstructionKind::WithLock { name: value, .. }
             | InstructionKind::WhenUsb { pattern: value, .. }
-            | InstructionKind::WhenMouseButton { modifiers: value, .. } => f(value, InputValueType::Any),
+            | InstructionKind::WhenMouseButton { modifiers: value, .. }
+            | InstructionKind::AskYesNo { prompt: value, .. }
+            | InstructionKind::AskChoice { prompt: value, .. }
+            | InstructionKind::ShowMessage(value)
+            | InstructionKind::WhenAt(value)
+            | InstructionKind::WhenSignal(value)
+            | InstructionKind::SendSignal { name: value, .. }
+            | InstructionKind::WhenWebhook { path: value, .. } => f(value, InputValueType::Any),
+            InstructionKind::AskText { prompt, default, .. } => {
+                f(prompt, InputValueType::Any);
+                f(default, InputValueType::Any);
+            }
             InstructionKind::SplitIntoList { text, separator, .. } => {
                 f(text, InputValueType::Any);
                 f(separator, InputValueType::Any);
@@ -195,6 +207,9 @@ impl BlockKind for InstructionKind {
                 | InstructionKind::WhenNetwork { .. }
                 | InstructionKind::WhenUsb { .. }
                 | InstructionKind::WhenMouseButton { .. }
+                | InstructionKind::WhenAt(_)
+                | InstructionKind::WhenSignal(_)
+                | InstructionKind::WhenWebhook { .. }
         )
     }
 
@@ -236,7 +251,11 @@ impl BlockKind for InstructionKind {
         match self {
             InstructionKind::SetVariable(name, _)
             | InstructionKind::ChangeVariable(name, _)
-            | InstructionKind::HttpRequest { variable: name, .. } => Some(name),
+            | InstructionKind::HttpRequest { variable: name, .. }
+            | InstructionKind::AskText { name, .. }
+            | InstructionKind::AskYesNo { name, .. }
+            | InstructionKind::AskChoice { name, .. }
+            | InstructionKind::WhenWebhook { variable: name, .. } => Some(name),
             _ => None,
         }
     }
@@ -250,7 +269,8 @@ impl BlockKind for InstructionKind {
             | InstructionKind::InsertIntoList { name, .. }
             | InstructionKind::ReplaceItemOfList { name, .. }
             | InstructionKind::ReverseList { name }
-            | InstructionKind::SplitIntoList { name, .. } => Some(name),
+            | InstructionKind::SplitIntoList { name, .. }
+            | InstructionKind::AskChoice { list: name, .. } => Some(name),
             _ => None,
         }
     }
@@ -623,6 +643,42 @@ pub enum InstructionKind {
         pressed: bool,
         modifiers: Value,
     },
+    /// Asks for text in a dialog and puts the answer in variable `name`.
+    /// Cancelling is an error.
+    AskText {
+        prompt: Value,
+        default: Value,
+        name: String,
+    },
+    /// Asks a yes/no question and puts true or false in variable `name`.
+    AskYesNo {
+        prompt: Value,
+        name: String,
+    },
+    /// Asks to pick an item of list `list` and puts it in variable `name`.
+    AskChoice {
+        prompt: Value,
+        list: String,
+        name: String,
+    },
+    /// Shows a message in a dialog and waits until it's closed.
+    ShowMessage(Value),
+    /// Header for a strand fired once at a date and time, like `2026-12-24 18:00`.
+    WhenAt(Value),
+    /// Header for a strand started by a `SendSignal` of the same name in this macro.
+    WhenSignal(Value),
+    /// Starts this macro's `WhenSignal` strands named `name`, sharing this
+    /// run's variables; with `wait`, until they've all ended.
+    SendSignal {
+        name: Value,
+        wait: bool,
+    },
+    /// Header for a strand fired by a web request to `path` on the local
+    /// webhook server. The request body goes in variable `variable`.
+    WhenWebhook {
+        path: Value,
+        variable: String,
+    },
 }
 
 impl std::hash::Hash for InstructionKind {
@@ -965,6 +1021,45 @@ impl std::hash::Hash for InstructionKind {
                 pressed.hash(state);
                 modifiers.hash(state);
             }
+            Self::AskText { prompt, default, name } => {
+                65u8.hash(state);
+                prompt.hash(state);
+                default.hash(state);
+                name.hash(state);
+            }
+            Self::AskYesNo { prompt, name } => {
+                66u8.hash(state);
+                prompt.hash(state);
+                name.hash(state);
+            }
+            Self::AskChoice { prompt, list, name } => {
+                67u8.hash(state);
+                prompt.hash(state);
+                list.hash(state);
+                name.hash(state);
+            }
+            Self::ShowMessage(v) => {
+                68u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenAt(v) => {
+                69u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenSignal(v) => {
+                70u8.hash(state);
+                v.hash(state);
+            }
+            Self::SendSignal { name, wait } => {
+                71u8.hash(state);
+                name.hash(state);
+                wait.hash(state);
+            }
+            Self::WhenWebhook { path, variable } => {
+                72u8.hash(state);
+                path.hash(state);
+                variable.hash(state);
+            }
         }
     }
 }
@@ -1172,6 +1267,31 @@ enum InstructionKindDe {
         #[serde(default = "empty_text")]
         modifiers: Value,
     },
+    AskText {
+        prompt: Value,
+        default: Value,
+        name: String,
+    },
+    AskYesNo {
+        prompt: Value,
+        name: String,
+    },
+    AskChoice {
+        prompt: Value,
+        list: String,
+        name: String,
+    },
+    ShowMessage(Value),
+    WhenAt(Value),
+    WhenSignal(Value),
+    SendSignal {
+        name: Value,
+        wait: bool,
+    },
+    WhenWebhook {
+        path: Value,
+        variable: String,
+    },
 }
 
 fn empty_text() -> Value {
@@ -1372,6 +1492,14 @@ impl From<InstructionKindDe> for InstructionKind {
             InstructionKindDe::WhenMouseButton { button, pressed, modifiers } => {
                 InstructionKind::WhenMouseButton { button, pressed, modifiers }
             }
+            InstructionKindDe::AskText { prompt, default, name } => InstructionKind::AskText { prompt, default, name },
+            InstructionKindDe::AskYesNo { prompt, name } => InstructionKind::AskYesNo { prompt, name },
+            InstructionKindDe::AskChoice { prompt, list, name } => InstructionKind::AskChoice { prompt, list, name },
+            InstructionKindDe::ShowMessage(v) => InstructionKind::ShowMessage(v),
+            InstructionKindDe::WhenAt(v) => InstructionKind::WhenAt(v),
+            InstructionKindDe::WhenSignal(v) => InstructionKind::WhenSignal(v),
+            InstructionKindDe::SendSignal { name, wait } => InstructionKind::SendSignal { name, wait },
+            InstructionKindDe::WhenWebhook { path, variable } => InstructionKind::WhenWebhook { path, variable },
         }
     }
 }
@@ -1455,6 +1583,10 @@ pub struct MacroSettings {
     /// Library folder; empty means the top level.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub folder: String,
+    /// Runs schedules and "once at" triggers it missed while Blockwork was
+    /// closed or the computer slept, once, when it gets the chance.
+    #[serde(default)]
+    pub catch_up_missed: bool,
 }
 
 /// Deserialization shape supporting both the current multi-strand format and

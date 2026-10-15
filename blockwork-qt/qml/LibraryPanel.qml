@@ -12,6 +12,7 @@ Popup {
     property var runningIds: []
     signal importRequested()
     signal exportRequested(string macroId)
+    signal bundleRequested(var macroIds, string name)
     signal templateRequested()
     signal deleteRequested(string macroId, string name)
 
@@ -104,6 +105,12 @@ Popup {
                         HoverHandler { id: runHover }
                     }
                     LucideIcon {
+                        visible: !row.isFolder && !!row.entry.restricted
+                        name: "lock"; width: 14; height: 14; color: Theme.textDim
+                        ToolTip.visible: shieldHover.hovered; ToolTip.text: "Asks before risky actions (see its Macro settings)"
+                        HoverHandler { id: shieldHover }
+                    }
+                    LucideIcon {
                         visible: !row.isFolder && row.entry.has_triggers && row.entry.always_listen
                         name: "zap"; width: 14; height: 14; color: Theme.accent
                         ToolTip.visible: zapHover.hovered; ToolTip.text: "Listens for its triggers even when it isn't open"
@@ -111,9 +118,9 @@ Popup {
                     }
                     BwButton {
                         id: moreButton
-                        visible: !row.isFolder && (rowHover.hovered || rowMenu.visible)
+                        visible: rowHover.hovered || rowMenu.visible || folderMenu.visible
                         iconName: "ellipsis"; text: ""; flat: true; implicitWidth: 28; implicitHeight: 28
-                        onClicked: rowMenu.popup(moreButton, 0, moreButton.height)
+                        onClicked: (row.isFolder ? folderMenu : rowMenu).popup(moreButton, 0, moreButton.height)
                     }
                 }
                 TapHandler {
@@ -126,9 +133,20 @@ Popup {
                     onTapped: root.openMacro(row.entry.id)
                 }
                 TapHandler {
-                    enabled: !row.isFolder
                     acceptedButtons: Qt.RightButton
-                    onTapped: rowMenu.popup()
+                    onTapped: (row.isFolder ? folderMenu : rowMenu).popup()
+                }
+                BwMenu {
+                    id: folderMenu
+                    implicitWidth: 220
+                    BwMenuItem {
+                        iconName: "package"; text: "Export folder as bundle…"
+                        onTriggered: {
+                            const name = row.modelData.name;
+                            root.close();
+                            root.bundleRequested(root.entries.filter(e => e.folder === name).map(e => e.id), name);
+                        }
+                    }
                 }
                 BwMenu {
                     id: rowMenu
@@ -137,6 +155,7 @@ Popup {
                     BwMenuItem { iconName: "copy"; text: "Duplicate"; onTriggered: { root.invoke("duplicate_macro", { id: row.entry.id }); root.close(); } }
                     BwMenuItem { iconName: "folder"; text: "Move to folder…"; onTriggered: folderDialog.openFor(row.entry) }
                     BwMenuItem { iconName: "upload"; text: "Export…"; onTriggered: { root.close(); root.exportRequested(row.entry.id); } }
+                    BwMenuItem { iconName: "package"; text: "Export as bundle…"; onTriggered: { root.close(); root.bundleRequested([row.entry.id], row.entry.name); } }
                     BwMenuItem { iconName: "trash"; text: "Delete"; danger: true; onTriggered: { root.close(); root.deleteRequested(row.entry.id, row.entry.name); } }
                 }
             }

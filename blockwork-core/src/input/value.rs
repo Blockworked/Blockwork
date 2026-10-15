@@ -69,7 +69,10 @@ static OPERATORS: &[ExtOperator] = &[
         op: "HttpGet",
         arity: 1,
         default_args: one_text,
-        eval: |args| Ok(Evaluated::Text(crate::http::get(&args[0].as_text())?)),
+        eval: |args| {
+            crate::permissions::require("network")?;
+            Ok(Evaluated::Text(crate::http::get(&args[0].as_text())?))
+        },
     },
     ExtOperator {
         kind: "JsonGet",
@@ -85,14 +88,20 @@ static OPERATORS: &[ExtOperator] = &[
         op: "ShellOutput",
         arity: 1,
         default_args: one_text,
-        eval: |args| Ok(Evaluated::Text(crate::shell::run(&args[0].as_text())?.stdout)),
+        eval: |args| {
+            crate::permissions::require("commands")?;
+            Ok(Evaluated::Text(crate::shell::run(&args[0].as_text())?.stdout))
+        },
     },
     ExtOperator {
         kind: "ShellSucceeded",
         op: "ShellSucceeded",
         arity: 1,
         default_args: one_text,
-        eval: |args| Ok(Evaluated::Bool(crate::shell::run(&args[0].as_text())?.success)),
+        eval: |args| {
+            crate::permissions::require("commands")?;
+            Ok(Evaluated::Bool(crate::shell::run(&args[0].as_text())?.success))
+        },
     },
     ExtOperator {
         kind: "ActiveWindowTitle",
@@ -134,7 +143,10 @@ static OPERATORS: &[ExtOperator] = &[
         op: "PixelColor",
         arity: 2,
         default_args: || numbers(&[100.0, 100.0]),
-        eval: |args| Ok(Evaluated::Text(crate::screen::pixel_color(args[0].as_number()?, args[1].as_number()?)?)),
+        eval: |args| {
+            crate::permissions::require("screen")?;
+            Ok(Evaluated::Text(crate::screen::pixel_color(args[0].as_number()?, args[1].as_number()?)?))
+        },
     },
     ExtOperator {
         kind: "AverageColor",
@@ -142,6 +154,7 @@ static OPERATORS: &[ExtOperator] = &[
         arity: 4,
         default_args: || numbers(&[0.0, 0.0, 100.0, 100.0]),
         eval: |args| {
+            crate::permissions::require("screen")?;
             let n = |i: usize| args[i].as_number();
             Ok(Evaluated::Text(crate::screen::average_color(n(0)?, n(1)?, n(2)?, n(3)?)?))
         },
@@ -163,6 +176,7 @@ static OPERATORS: &[ExtOperator] = &[
         arity: 4,
         default_args: || numbers(&[0.0, 0.0, 400.0, 100.0]),
         eval: |args| {
+            crate::permissions::require("screen")?;
             let n = |i: usize| args[i].as_number();
             Ok(Evaluated::Text(crate::screen::read_text(n(0)?, n(1)?, n(2)?, n(3)?)?))
         },
@@ -256,7 +270,10 @@ static OPERATORS: &[ExtOperator] = &[
         op: "Secret",
         arity: 1,
         default_args: one_text,
-        eval: |args| Ok(Evaluated::Text(crate::secrets::get(&args[0].as_text())?)),
+        eval: |args| {
+            crate::permissions::require("secrets")?;
+            Ok(Evaluated::Text(crate::secrets::get(&args[0].as_text())?))
+        },
     },
     ExtOperator {
         kind: "TextCheck",

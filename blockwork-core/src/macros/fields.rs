@@ -62,6 +62,12 @@ pub enum FieldId {
     SplitSeparator,
     UsbPattern,
     MouseModifiers,
+    AskPrompt,
+    AskDefault,
+    MessageText,
+    AtTime,
+    SignalName,
+    WebhookPath,
 }
 
 impl FieldId {
@@ -141,6 +147,12 @@ impl std::fmt::Display for FieldId {
             FieldId::SplitSeparator => write!(f, "SplitSeparator"),
             FieldId::UsbPattern => write!(f, "UsbPattern"),
             FieldId::MouseModifiers => write!(f, "MouseModifiers"),
+            FieldId::AskPrompt => write!(f, "AskPrompt"),
+            FieldId::AskDefault => write!(f, "AskDefault"),
+            FieldId::MessageText => write!(f, "MessageText"),
+            FieldId::AtTime => write!(f, "AtTime"),
+            FieldId::SignalName => write!(f, "SignalName"),
+            FieldId::WebhookPath => write!(f, "WebhookPath"),
         }
     }
 }
@@ -200,6 +212,12 @@ impl std::str::FromStr for FieldId {
             "SplitSeparator" => Ok(FieldId::SplitSeparator),
             "UsbPattern" => Ok(FieldId::UsbPattern),
             "MouseModifiers" => Ok(FieldId::MouseModifiers),
+            "AskPrompt" => Ok(FieldId::AskPrompt),
+            "AskDefault" => Ok(FieldId::AskDefault),
+            "MessageText" => Ok(FieldId::MessageText),
+            "AtTime" => Ok(FieldId::AtTime),
+            "SignalName" => Ok(FieldId::SignalName),
+            "WebhookPath" => Ok(FieldId::WebhookPath),
             _ if s.starts_with("CallArg:") => s["CallArg:".len()..]
                 .parse::<usize>()
                 .map(FieldId::CallArg)
@@ -286,6 +304,12 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
         (InstructionKind::SplitIntoList { separator, .. }, FieldId::SplitSeparator) => Some(separator),
         (InstructionKind::WhenUsb { pattern, .. }, FieldId::UsbPattern) => Some(pattern),
         (InstructionKind::WhenMouseButton { modifiers, .. }, FieldId::MouseModifiers) => Some(modifiers),
+        (InstructionKind::AskText { prompt, .. } | InstructionKind::AskYesNo { prompt, .. } | InstructionKind::AskChoice { prompt, .. }, FieldId::AskPrompt) => Some(prompt),
+        (InstructionKind::AskText { default, .. }, FieldId::AskDefault) => Some(default),
+        (InstructionKind::ShowMessage(v), FieldId::MessageText) => Some(v),
+        (InstructionKind::WhenAt(v), FieldId::AtTime) => Some(v),
+        (InstructionKind::WhenSignal(v) | InstructionKind::SendSignal { name: v, .. }, FieldId::SignalName) => Some(v),
+        (InstructionKind::WhenWebhook { path, .. }, FieldId::WebhookPath) => Some(path),
         _ => None,
     }
 }

@@ -12,6 +12,8 @@ pub mod ipc;
 pub mod key_mapping;
 pub mod macros;
 pub mod notify;
+pub mod permissions;
+pub mod prompt;
 pub mod recording;
 pub mod run_log;
 pub mod screen;

@@ -83,6 +83,9 @@ struct ExecCtx<'a> {
     trace: Option<crate::macros::trace::Tracker>,
     /// Iterations any one loop may run; 0 means no limit.
     max_loop_iterations: u64,
+    /// Signal strands started without waiting; joined when this strand ends
+    /// so the run lasts until they finish.
+    signal_threads: Vec<std::thread::JoinHandle<()>>,
 }
 
 impl<'a> ExecCtx<'a> {
@@ -312,10 +315,85 @@ fn stop_requested(flag: &Arc<Mutex<bool>>) -> bool {
 /// Custom block bodies keyed by block id, shared read-only by a run's strands.
 pub type BlockTable = Arc<HashMap<String, BlockRuntime>>;
 
+/// Block table key prefix for `WhenSignal` strands; can't clash with a block id.
+const SIGNAL_KEY: &str = "\u{1}signal:";
+
+/// The bodies of this run's `WhenSignal` strands listening for `name`.
+fn signal_bodies(ctx: &mut ExecCtx, name: &str, depth: u32) -> Vec<Vec<Instruction>> {
+    let table = Arc::clone(&ctx.block_table);
+    let mut keys: Vec<_> = table.keys().filter(|k| k.starts_with(SIGNAL_KEY)).collect();
+    keys.sort();
+    keys.into_iter()
+        .filter_map(|key| {
+            let body = &table[key].body;
+            let Some(InstructionKind::WhenSignal(listens)) = body.first().map(|i| &i.kind) else { return None };
+            let listens = ctx.resolve(listens, depth).and_then(|v| v.eval_text()).ok()?;
+            listens.trim().eq_ignore_ascii_case(name.trim()).then(|| body[1..].to_vec())
+        })
+        .collect()
+}
+
+/// The ability a block needs permission for, if any.
+fn guarded_ability(kind: &InstructionKind) -> Option<&'static str> {
+    Some(match kind {
+        InstructionKind::Command(_) | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. } => "commands",
+        InstructionKind::HttpRequest { .. } => "network",
+        InstructionKind::WriteFile { .. } => "files_write",
+        InstructionKind::FindImage { .. } | InstructionKind::ClickImage { .. } | InstructionKind::WaitForImage { .. } => "screen",
+        _ => return None,
+    })
+}
+
+/// Shows a dialog for this strand. `None` when there's no answer to use:
+/// cancelled (which stops the run unless a try block catches it), stopped,
+/// or failed.
+fn ask(ctx: &mut ExecCtx, block_id: &str, block: &str, request: crate::prompt::Request) -> Result<Option<crate::prompt::Reply>, String> {
+    let flag = ctx.stop_flag.clone();
+    let stopped = || flag.as_ref().is_some_and(stop_requested);
+    match crate::prompt::ask(&request, &stopped) {
+        Ok(reply) if reply.answer == "cancel" => {
+            if ctx.try_depth > 0 {
+                ctx.error_block = block_id.to_string();
+                return Err(format!("{block}: cancelled"));
+            }
+            crate::run_log::info(&ctx.source, format!("{block}: cancelled, so the run stopped"));
+            if let Some(flag) = &ctx.stop_flag
+                && let Ok(mut running) = flag.lock()
+            {
+                *running = false;
+            }
+            Ok(None)
+        }
+        Ok(reply) => Ok(Some(reply)),
+        Err(_) if stopped() => Ok(None),
+        Err(e) => {
+            soft_fail(ctx, block_id, block, e)?;
+            Ok(None)
+        }
+    }
+}
+
+fn set_variable(ctx: &ExecCtx, name: &str, value: Evaluated) {
+    if name.is_empty() {
+        return;
+    }
+    if let Ok(mut vars) = ctx.variables.lock() {
+        vars.insert(name.to_string(), value);
+    }
+}
+
 impl Macro {
     /// Builds the custom block table from this macro's `BlockHeader` strands.
     pub fn block_table(&self) -> BlockTable {
         let mut table = HashMap::new();
+        // Signal strands ride along under reserved keys, header included,
+        // so every run entry point can reach them without another argument.
+        for (index, strand) in self.graph.strands.iter().enumerate() {
+            if matches!(strand.instructions.first().map(|i| &i.kind), Some(InstructionKind::WhenSignal(_))) {
+                let runtime = BlockRuntime { input_names: Vec::new(), branch_names: Vec::new(), body: strand.instructions.clone() };
+                table.insert(format!("{SIGNAL_KEY}{index}"), runtime);
+            }
+        }
         for strand in &self.graph.strands {
             let Some(InstructionKind::BlockHeader(id)) =
                 strand.instructions.first().map(|i| &i.kind)
@@ -496,6 +574,7 @@ fn run_strand(
         .unwrap_or_else(Instant::now);
     let mut pressed_keys: Vec<MacroKey> = Vec::new();
     let mut pressed_buttons: Vec<MacroButton> = Vec::new();
+    let _permissions = crate::permissions::enter(Arc::clone(&source), stop_flag.clone());
     {
         let mut ctx = ExecCtx {
             emulator: Arc::clone(&emulator),
@@ -513,11 +592,15 @@ fn run_strand(
             try_depth: 0,
             trace: crate::macros::trace::Tracker::new(&source.macro_id),
             max_loop_iterations: max_loop_iterations.into(),
+            signal_threads: Vec::new(),
         };
         // An error reaching the top ends this strand.
         if let Err(e) = run_block(&instructions, &mut ctx, 0, start) {
             warn!("Strand ended with an error: {e}");
             crate::run_log::block_error(&source, &ctx.error_block, e);
+        }
+        for thread in ctx.signal_threads.drain(..) {
+            let _ = thread.join();
         }
     }
 
@@ -677,6 +760,13 @@ fn run_block(
             }
         }
 
+        if let Some(ability) = guarded_ability(&ins.kind)
+            && let Err(e) = crate::permissions::require(ability)
+        {
+            soft_fail(ctx, &ins.id, "Permission", e)?;
+            continue;
+        }
+
         match &ins.kind {
             InstructionKind::Comment(_) => {}
             InstructionKind::WhenRan => {}
@@ -703,6 +793,97 @@ fn run_block(
             InstructionKind::WhenNetwork { .. } => {}
             InstructionKind::WhenUsb { .. } => {}
             InstructionKind::WhenMouseButton { .. } => {}
+            InstructionKind::WhenAt(_) => {}
+            InstructionKind::WhenSignal(_) => {}
+            InstructionKind::WhenWebhook { .. } => {}
+            InstructionKind::AskText { prompt, default, name } => {
+                let request = (|| {
+                    let message = ctx.resolve(prompt, depth)?.eval_text()?;
+                    let mut request = crate::prompt::Request::new(crate::prompt::Kind::Text, &ctx.source.name, message);
+                    request.default = ctx.resolve(default, depth)?.eval_text()?;
+                    Ok::<_, String>(request)
+                })();
+                match request {
+                    Ok(request) => {
+                        if let Some(reply) = ask(ctx, &ins.id, "Ask", request)? {
+                            set_variable(ctx, name, Evaluated::Text(reply.text));
+                        }
+                    }
+                    Err(e) => soft_fail(ctx, &ins.id, "Ask", e)?,
+                }
+            }
+            InstructionKind::AskYesNo { prompt, name } => match ctx.resolve(prompt, depth).and_then(|v| v.eval_text()) {
+                Ok(message) => {
+                    let request = crate::prompt::Request::new(crate::prompt::Kind::Confirm, &ctx.source.name, message);
+                    if let Some(reply) = ask(ctx, &ins.id, "Ask yes or no", request)? {
+                        set_variable(ctx, name, Evaluated::Bool(reply.answer == "yes"));
+                    }
+                }
+                Err(e) => soft_fail(ctx, &ins.id, "Ask yes or no", e)?,
+            },
+            InstructionKind::AskChoice { prompt, list, name } => {
+                let options: Vec<String> = ctx
+                    .lists
+                    .lock()
+                    .ok()
+                    .and_then(|lists| lists.get(list).map(|items| items.iter().map(|i| i.evaluated().as_text()).collect()))
+                    .unwrap_or_default();
+                let message = ctx.resolve(prompt, depth).and_then(|v| v.eval_text());
+                match message {
+                    Ok(_) if options.is_empty() => soft_fail(ctx, &ins.id, "Choose", format!("the list \"{list}\" is empty"))?,
+                    Ok(message) => {
+                        let mut request = crate::prompt::Request::new(crate::prompt::Kind::Choice, &ctx.source.name, message);
+                        request.options = options;
+                        if let Some(reply) = ask(ctx, &ins.id, "Choose", request)? {
+                            set_variable(ctx, name, Evaluated::Text(reply.text));
+                        }
+                    }
+                    Err(e) => soft_fail(ctx, &ins.id, "Choose", e)?,
+                }
+            }
+            InstructionKind::ShowMessage(message) => match ctx.resolve(message, depth).and_then(|v| v.eval_text()) {
+                Ok(message) => {
+                    let request = crate::prompt::Request::new(crate::prompt::Kind::Message, &ctx.source.name, message);
+                    // Closing a message is the same as OK.
+                    let flag = ctx.stop_flag.clone();
+                    let stopped = || flag.as_ref().is_some_and(stop_requested);
+                    if let Err(e) = crate::prompt::ask(&request, &stopped)
+                        && !stopped()
+                    {
+                        soft_fail(ctx, &ins.id, "Show message", e)?;
+                    }
+                }
+                Err(e) => soft_fail(ctx, &ins.id, "Show message", e)?,
+            },
+            InstructionKind::SendSignal { name, wait } => {
+                let name = match ctx.resolve(name, depth).and_then(|v| v.eval_text()) {
+                    Ok(name) => name,
+                    Err(e) => {
+                        soft_fail(ctx, &ins.id, "Send signal", e)?;
+                        continue;
+                    }
+                };
+                let mut threads = Vec::new();
+                for body in signal_bodies(ctx, &name, depth) {
+                    let (source, emulator, stop_flag) = (Arc::clone(&ctx.source), Arc::clone(&ctx.emulator), ctx.stop_flag.clone());
+                    let (variables, lists, table) = (Arc::clone(&ctx.variables), Arc::clone(&ctx.lists), Arc::clone(&ctx.block_table));
+                    let (speed, loops) = (ctx.speed_multiplier, u32::try_from(ctx.max_loop_iterations).unwrap_or(u32::MAX));
+                    let spawned = std::thread::Builder::new().name(format!("signal_{name}")).stack_size(STRAND_STACK_SIZE).spawn(move || {
+                        run_strand(source, body, emulator, stop_flag, speed, variables, lists, table, Duration::ZERO, loops)
+                    });
+                    match spawned {
+                        Ok(thread) => threads.push(thread),
+                        Err(e) => warn!("Failed to start a signal strand: {e}"),
+                    }
+                }
+                if *wait {
+                    for thread in threads {
+                        let _ = thread.join();
+                    }
+                } else {
+                    ctx.signal_threads.extend(threads);
+                }
+            }
             InstructionKind::SplitIntoList { text, separator, name } => {
                 let parts = ctx
                     .resolve(text, depth)
@@ -2714,6 +2895,100 @@ mod tests {
         );
         assert!(started.elapsed() >= Duration::from_millis(60), "waited for the helper");
         assert_eq!(vars.lock().unwrap().get("after"), Some(&Evaluated::Number(1.0)), "an unknown macro is a soft error");
+    }
+
+    /// Answers dialogs by their message: "cancel" cancels, permissions are denied.
+    fn install_test_dialogs() {
+        use crate::prompt::{Kind, Reply};
+        crate::prompt::set_handler(Arc::new(|request: &crate::prompt::Request, _stopped: &dyn Fn() -> bool| {
+            let reply = |answer: &str, text: &str| Ok(Reply { answer: answer.into(), text: text.into() });
+            match request.kind {
+                _ if request.message == "cancel" => reply("cancel", ""),
+                Kind::Text => reply("ok", &format!("{}!", request.default)),
+                Kind::Confirm => reply("yes", ""),
+                Kind::Choice => reply("ok", &request.options[1]),
+                Kind::Message => reply("ok", ""),
+                Kind::Permission => reply("deny", ""),
+            }
+        }));
+    }
+
+    #[test]
+    fn ask_blocks_put_answers_in_variables_and_cancel_stops() {
+        install_test_dialogs();
+        let vars = empty_vars();
+        let lists: ListStore = Arc::new(Mutex::new(HashMap::from([(
+            "colors".to_string(),
+            vec![ListItem::Text("red".into()), ListItem::Text("blue".into())],
+        )])));
+        run_instructions_with_lists(
+            vec![
+                Instruction::new(InstructionKind::AskText { prompt: Value::text("Name?"), default: Value::text("Ada"), name: "name".into() }),
+                Instruction::new(InstructionKind::AskYesNo { prompt: Value::text("Sure?"), name: "sure".into() }),
+                Instruction::new(InstructionKind::AskChoice { prompt: Value::text("Pick"), list: "colors".into(), name: "pick".into() }),
+                Instruction::new(InstructionKind::ShowMessage(Value::text("Done"))),
+                Instruction::new(InstructionKind::AskText { prompt: Value::text("cancel"), default: Value::text(""), name: "never".into() }),
+                set("after", Value::number(1.0)),
+            ],
+            noop_emulator(),
+            None,
+            1.0,
+            Arc::clone(&vars),
+            lists,
+        );
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("name"), Some(&Evaluated::Text("Ada!".into())));
+        assert_eq!(vars.get("sure"), Some(&Evaluated::Bool(true)));
+        assert_eq!(vars.get("pick"), Some(&Evaluated::Text("blue".into())));
+        assert_eq!(vars.get("never"), None);
+        assert_eq!(vars.get("after"), None, "cancel stopped the run");
+    }
+
+    #[test]
+    fn send_signal_and_wait_runs_the_receivers_first() {
+        let mut mac = Macro::new(
+            "Signals".into(),
+            String::new(),
+            vec![
+                Instruction::new(InstructionKind::SendSignal { name: Value::text("Go"), wait: true }),
+                set("seen", Value::Var { name: "x".into() }),
+            ],
+        );
+        mac.graph.strands.push(Strand::with_instructions(0, 200, vec![
+            Instruction::new(InstructionKind::WhenSignal(Value::text("go"))),
+            Instruction::new(InstructionKind::Wait(Value::number(40.0))),
+            set("x", Value::number(5.0)),
+        ]));
+        mac.graph.strands.push(Strand::with_instructions(0, 400, vec![
+            Instruction::new(InstructionKind::WhenSignal(Value::text("other"))),
+            set("wrong", Value::number(1.0)),
+        ]));
+        let vars = empty_vars();
+        mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("seen"), Some(&Evaluated::Number(5.0)));
+        assert_eq!(vars.get("wrong"), None);
+    }
+
+    #[test]
+    fn restricted_macros_skip_blocks_they_may_not_run() {
+        install_test_dialogs();
+        let marker = std::env::temp_dir().join(format!("bw-perm-{}", std::process::id()));
+        let mut mac = Macro::new(
+            "Restricted".into(),
+            String::new(),
+            vec![
+                Instruction::new(InstructionKind::Command(format!("touch '{}'", marker.display()))),
+                set("after", Value::number(1.0)),
+            ],
+        );
+        mac.id = "runner-restricted".into();
+        crate::permissions::restrict(&mac.id, Vec::new());
+        let vars = empty_vars();
+        mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+        crate::permissions::trust("runner-restricted");
+        assert!(!marker.exists(), "the denied command didn't run");
+        assert_eq!(vars.lock().unwrap().get("after"), Some(&Evaluated::Number(1.0)));
     }
 
     #[test]

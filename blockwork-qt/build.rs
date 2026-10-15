@@ -28,6 +28,7 @@ fn main() {
         "qml/ScreenOverlay.qml",
         "qml/LibraryPanel.qml",
         "qml/MacroFiles.qml",
+        "qml/PromptWindow.qml",
     ];
 
     // Shared Lucide icons (lean set): staged under qml/Lucide/ (gitignored,
@@ -43,6 +44,7 @@ fn main() {
             .qml_files([lucide_item]),
     )
     .file("src/app_bridge.rs")
+    .file("src/prompt_bridge.rs")
     .file("src/app_icon.rs")
     .file("src/qt_diagnostics.rs")
     .file("src/window_frame.rs")

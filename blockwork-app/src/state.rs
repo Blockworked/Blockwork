@@ -113,7 +113,7 @@ pub(crate) struct AppState {
     pub(crate) update_check_state: UpdateCheckState,
     /// A macro file the user just picked via `import_macro`, waiting on its
     /// review - `confirm_import_macro`/`cancel_import_macro` resolve it.
-    pub(crate) pending_import: Option<(Macro, ImportReviewDto)>,
+    pub(crate) pending_import: Option<(Vec<Macro>, ImportReviewDto)>,
     /// Set by the emergency stop; watchers fire nothing until it's cleared.
     pub(crate) triggers_paused: bool,
 }
@@ -172,6 +172,9 @@ pub(crate) struct StateDto {
     pub(crate) paused_macros: Vec<String>,
     /// Strands waiting at a breakpoint or step, with their variables.
     pub(crate) paused_strands: Vec<blockwork_core::macros::debug::PausedStrand>,
+    /// What the open macro may do without asking; `None` when it's trusted.
+    pub(crate) permissions: Option<Vec<String>>,
+    pub(crate) webhook: crate::webhook::WebhookDto,
 }
 
 /// One macro as the library lists it.
@@ -183,6 +186,8 @@ pub(crate) struct LibraryEntryDto {
     pub(crate) always_listen: bool,
     /// Whether it has trigger strands (anything but When Ran and custom blocks).
     pub(crate) has_triggers: bool,
+    /// Asks before risky abilities (see `blockwork_core::permissions`).
+    pub(crate) restricted: bool,
 }
 
 /// A global variable as the settings page lists it.
@@ -267,6 +272,7 @@ pub(crate) struct MacroSettingsDto {
     pub(crate) active_until: String,
     pub(crate) active_days: u8,
     pub(crate) folder: String,
+    pub(crate) catch_up_missed: bool,
 }
 
 fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
@@ -282,6 +288,7 @@ fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
         active_until,
         active_days: settings.active_days,
         folder: settings.folder.clone(),
+        catch_up_missed: settings.catch_up_missed,
     }
 }
 
@@ -301,12 +308,18 @@ pub(crate) struct CapabilityDto {
     pub(crate) label: String,
     /// Runs commands, goes online or writes files.
     pub(crate) risky: bool,
+    /// Asks first unless allowed (see `blockwork_core::permissions::GUARDED`).
+    pub(crate) guarded: bool,
 }
 
 /// What the user reviews before the staged `pending_import` macro is added.
 #[derive(Serialize, Clone)]
 pub(crate) struct ImportReviewDto {
     pub(crate) name: String,
+    /// Every macro in a bundle; one name for a single macro.
+    pub(crate) macros: Vec<String>,
+    /// What upgrading older macros changed.
+    pub(crate) notes: Vec<String>,
     pub(crate) capabilities: Vec<CapabilityDto>,
     pub(crate) custom_settings: Vec<CustomMacroSettingDto>,
 }
@@ -643,6 +656,45 @@ pub(crate) enum InstructionDto {
         button: String,
         pressed: bool,
         modifiers: Value,
+    },
+    AskText {
+        id: String,
+        prompt: Value,
+        default: Value,
+        name: String,
+    },
+    AskYesNo {
+        id: String,
+        prompt: Value,
+        name: String,
+    },
+    AskChoice {
+        id: String,
+        prompt: Value,
+        list: String,
+        name: String,
+    },
+    ShowMessage {
+        id: String,
+        message: Value,
+    },
+    WhenAt {
+        id: String,
+        at: Value,
+    },
+    WhenSignal {
+        id: String,
+        name: Value,
+    },
+    SendSignal {
+        id: String,
+        name: Value,
+        wait: bool,
+    },
+    WhenWebhook {
+        id: String,
+        path: Value,
+        variable: String,
     },
 }
 
@@ -1049,6 +1101,20 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             pressed: *pressed,
             modifiers: modifiers.clone(),
         },
+        InstructionKind::AskText { prompt, default, name } => {
+            InstructionDto::AskText { id, prompt: prompt.clone(), default: default.clone(), name: name.clone() }
+        }
+        InstructionKind::AskYesNo { prompt, name } => InstructionDto::AskYesNo { id, prompt: prompt.clone(), name: name.clone() },
+        InstructionKind::AskChoice { prompt, list, name } => {
+            InstructionDto::AskChoice { id, prompt: prompt.clone(), list: list.clone(), name: name.clone() }
+        }
+        InstructionKind::ShowMessage(message) => InstructionDto::ShowMessage { id, message: message.clone() },
+        InstructionKind::WhenAt(at) => InstructionDto::WhenAt { id, at: at.clone() },
+        InstructionKind::WhenSignal(name) => InstructionDto::WhenSignal { id, name: name.clone() },
+        InstructionKind::SendSignal { name, wait } => InstructionDto::SendSignal { id, name: name.clone(), wait: *wait },
+        InstructionKind::WhenWebhook { path, variable } => {
+            InstructionDto::WhenWebhook { id, path: path.clone(), variable: variable.clone() }
+        }
         InstructionKind::Token(token) => match token {
             InputToken::Text(t) => InstructionDto::Text {
                 id,
@@ -1457,6 +1523,20 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
                 },
             )
         }
+        InstructionDto::AskText { id, prompt, default, name } => {
+            (id, InstructionKind::AskText { prompt: prompt.clone(), default: default.clone(), name: name.clone() })
+        }
+        InstructionDto::AskYesNo { id, prompt, name } => (id, InstructionKind::AskYesNo { prompt: prompt.clone(), name: name.clone() }),
+        InstructionDto::AskChoice { id, prompt, list, name } => {
+            (id, InstructionKind::AskChoice { prompt: prompt.clone(), list: list.clone(), name: name.clone() })
+        }
+        InstructionDto::ShowMessage { id, message } => (id, InstructionKind::ShowMessage(message.clone())),
+        InstructionDto::WhenAt { id, at } => (id, InstructionKind::WhenAt(at.clone())),
+        InstructionDto::WhenSignal { id, name } => (id, InstructionKind::WhenSignal(name.clone())),
+        InstructionDto::SendSignal { id, name, wait } => (id, InstructionKind::SendSignal { name: name.clone(), wait: *wait }),
+        InstructionDto::WhenWebhook { id, path, variable } => {
+            (id, InstructionKind::WhenWebhook { path: path.clone(), variable: variable.clone() })
+        }
     };
     Some(Instruction {
         id: id.clone(),
@@ -1728,6 +1808,8 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
             .map(|m| m.id.clone())
             .collect(),
         paused_strands: blockwork_core::macros::debug::paused_strands(),
+        permissions: s.current_macro.as_ref().and_then(|m| blockwork_core::permissions::grants(&m.id)).map(|g| g.allowed),
+        webhook: crate::webhook::dto(),
     }
 }
 
@@ -1740,9 +1822,11 @@ fn library_entry(mac: &Macro) -> LibraryEntryDto {
         always_listen: mac.settings.always_listen,
         has_triggers: mac.strands.iter().any(|st| {
             st.instructions.first().is_some_and(|i| {
-                i.kind.is_header() && !matches!(i.kind, InstructionKind::WhenRan | InstructionKind::BlockHeader(_))
+                i.kind.is_header()
+                    && !matches!(i.kind, InstructionKind::WhenRan | InstructionKind::BlockHeader(_) | InstructionKind::WhenSignal(_))
             })
         }),
+        restricted: blockwork_core::permissions::grants(&mac.id).is_some(),
     }
 }
 

@@ -97,6 +97,28 @@ impl Backend {
                     enabled,
                 )?)
             }
+            "set_macro_catch_up" => {
+                let enabled: bool = arg(&args, "enabled")?;
+                to_json(commands::set_macro_catch_up(&self.state, &self.app, enabled)?)
+            }
+            "set_macro_restricted" => {
+                let restricted: bool = arg(&args, "restricted")?;
+                to_json(commands::set_macro_restricted(&self.state, &self.app, restricted)?)
+            }
+            "set_macro_permission" => {
+                let (kind, allowed): (String, bool) = (arg(&args, "kind")?, arg(&args, "allowed")?);
+                to_json(commands::set_macro_permission(&self.state, &self.app, &kind, allowed)?)
+            }
+            "export_bundle" => {
+                let ids: Vec<String> = arg(&args, "macroIds")?;
+                let (name, path): (String, String) = (arg(&args, "name")?, arg(&args, "path")?);
+                to_json(commands::export_bundle(ids, name, path)?)
+            }
+            "set_webhook" => {
+                let (enabled, port): (bool, u16) = (arg(&args, "enabled")?, arg(&args, "port")?);
+                to_json(crate::webhook::configure(&self.state, &self.app, enabled, port)?)
+            }
+            "new_webhook_token" => to_json(crate::webhook::new_token(&self.state, &self.app)?),
             "set_macro_max_run_secs" => {
                 let seconds: u32 = arg(&args, "seconds")?;
                 to_json(commands::set_macro_max_run_secs(&self.state, &self.app, seconds)?)
@@ -160,8 +182,9 @@ impl Backend {
             }
             "confirm_import_macro" => {
                 let keep_settings: HashMap<String, bool> = arg(&args, "keepSettings")?;
+                let allow: Vec<String> = args.get("allow").cloned().map(serde_json::from_value).transpose().map_err(|e| e.to_string())?.unwrap_or_default();
                 to_json(
-                    commands::confirm_import_macro(&self.state, &self.app, keep_settings).await?,
+                    commands::confirm_import_macro(&self.state, &self.app, keep_settings, allow).await?,
                 )
             }
             "cancel_import_macro" => to_json(commands::cancel_import_macro(&self.state, &self.app)?),

@@ -8,6 +8,7 @@ mod app_icon;
 mod cli;
 mod daemon_client;
 mod native_icon;
+mod prompt_bridge;
 mod qt_diagnostics;
 mod window_frame;
 
@@ -19,6 +20,7 @@ fn main() {
     if let Some(args) = cli::requested() {
         std::process::exit(cli::main(args));
     }
+    let prompt = prompt_bridge::requested();
     // Every control is drawn from the app's own theme; pin the Basic style so the
     // platform style (e.g. Fluent on Windows 11) doesn't add native chrome, shadows
     // or light/dark palettes underneath it. Must be set before the first control.
@@ -46,9 +48,11 @@ fn main() {
                 eprintln!("failed to create QML root object from {}", url);
             })
             .release();
-        engine.load(&QUrl::from(
-            "qrc:/qt/qml/com/blockworked/Blockwork/qml/Main.qml",
-        ));
+        engine.load(&QUrl::from(if prompt {
+            "qrc:/qt/qml/com/blockworked/Blockwork/qml/PromptWindow.qml"
+        } else {
+            "qrc:/qt/qml/com/blockworked/Blockwork/qml/Main.qml"
+        }));
         // The QML root is a plain ApplicationWindow with no icon of its own,
         // so give every existing top-level window the application icon.
         app_icon::apply_to_windows();

@@ -245,6 +245,7 @@ pub(crate) fn duplicate_macro(state: &SharedState, app: &AppHandle, id: &str) ->
     };
     copy.id = uuid::Uuid::new_v4().simple().to_string();
     copy.name = format!("{} copy", copy.name);
+    blockwork_core::permissions::copy(id, &copy.id);
     add_and_select(state, app, copy)
 }
 
@@ -348,6 +349,46 @@ pub(crate) fn set_macro_always_listen(
         refresh_macro_list(&mut s);
     }
     emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Sets whether the open macro runs schedules it missed - see
+/// `MacroSettings::catch_up_missed`.
+pub(crate) fn set_macro_catch_up(state: &SharedState, app: &AppHandle, enabled: bool) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        mac.settings.catch_up_missed = enabled;
+        auto_save(&mut s);
+        refresh_macro_list(&mut s);
+    }
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Makes the open macro ask before risky abilities, or trusts it fully.
+pub(crate) fn set_macro_restricted(state: &SharedState, app: &AppHandle, restricted: bool) -> Result<(), String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    let id = s.current_macro.as_ref().map(|m| m.id.clone()).ok_or("No macro selected")?;
+    if restricted {
+        if blockwork_core::permissions::grants(&id).is_none() {
+            blockwork_core::permissions::restrict(&id, Vec::new());
+        }
+    } else {
+        blockwork_core::permissions::trust(&id);
+    }
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Lets the open, restricted macro use `kind` without asking, or not.
+pub(crate) fn set_macro_permission(state: &SharedState, app: &AppHandle, kind: &str, allowed: bool) -> Result<(), String> {
+    if !blockwork_core::permissions::GUARDED.iter().any(|(k, _)| *k == kind) {
+        return Err(format!("unknown permission {kind}"));
+    }
+    let s = state.lock().map_err(|e| e.to_string())?;
+    let id = s.current_macro.as_ref().map(|m| m.id.clone()).ok_or("No macro selected")?;
+    blockwork_core::permissions::set_allowed(&id, kind, allowed);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -924,6 +965,7 @@ fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
             kind: kind.to_string(),
             label: label.to_string(),
             risky: *risky,
+            guarded: blockwork_core::permissions::GUARDED.iter().any(|(k, _)| k == kind),
         })
         .collect()
 }
@@ -940,12 +982,20 @@ type SettingAccessor = (
     fn(&mut blockwork_core::macros::MacroSettings, bool),
 );
 
-const SETTING_ACCESSORS: &[SettingAccessor] = &[(
-    "always_listen",
-    "Always listen for events, even when a different macro is selected",
-    |s| s.always_listen,
-    |s, v| s.always_listen = v,
-)];
+const SETTING_ACCESSORS: &[SettingAccessor] = &[
+    (
+        "always_listen",
+        "Always listen for events, even when a different macro is selected",
+        |s| s.always_listen,
+        |s, v| s.always_listen = v,
+    ),
+    (
+        "catch_up_missed",
+        "Run schedules it missed while Blockwork was closed or the computer slept",
+        |s| s.catch_up_missed,
+        |s, v| s.catch_up_missed = v,
+    ),
+];
 
 /// Every `MacroSettings` field on `settings` that differs from its default -
 /// shown to the user by `import_macro` for confirmation, since non-default
@@ -982,17 +1032,21 @@ fn apply_setting_overrides(
     }
 }
 
-/// Assigns a fresh id to `mac` (so importing never collides with or
-/// overwrites an existing macro), saves it, and makes it the
-/// selected/current macro.
-fn commit_imported_macro(
-    mut mac: Macro,
+/// Saves imported macros under fresh ids (so importing never overwrites
+/// anything), restricted to the abilities in `allow`, and opens the first.
+fn commit_imported_macros(
+    macros: Vec<Macro>,
+    allow: &[String],
     state: &SharedState,
     app: &AppHandle,
 ) -> Result<(), String> {
-    mac.id = uuid::Uuid::new_v4().simple().to_string();
-    let new_id = mac.id.clone();
-    mac.add()?;
+    let mut first = None;
+    for mut mac in macros {
+        mac.id = uuid::Uuid::new_v4().simple().to_string();
+        blockwork_core::permissions::restrict(&mac.id, allow.to_vec());
+        first.get_or_insert_with(|| mac.id.clone());
+        mac.add()?;
+    }
 
     let mut s = state.lock().map_err(|e| e.to_string())?;
     refresh_macro_list(&mut s);
@@ -1000,12 +1054,12 @@ fn commit_imported_macro(
         .macros_list
         .iter()
         .enumerate()
-        .find(|(_, m)| m.id == new_id)
+        .find(|(_, m)| Some(&m.id) == first.as_ref())
         .map(|(i, m)| (i, m.clone()))
     {
+        config::set_selected_macro_id(Some(&found.id));
         s.macro_selected = Some(idx);
         s.current_macro = Some(found);
-        config::set_selected_macro_id(Some(&new_id));
     }
     s.invalid_field_buffers.clear();
     sync_variable_values(&mut s);
@@ -1014,24 +1068,41 @@ fn commit_imported_macro(
     Ok(())
 }
 
-/// Reads the `.macro` file the user picked in the UI and stages it in
+/// Reads the macro or `.blockwork` bundle the user picked and stages it in
 /// `pending_import` with a review of what it can do (see
-/// `macro_capabilities`) and any non-default settings. The review shows
-/// through `StateDto::import_review`; the frontend resolves it via
-/// `confirm_import_macro`/`cancel_import_macro`.
+/// `macro_capabilities`), any non-default settings and upgrade notes. The
+/// review shows through `StateDto::import_review`; the frontend resolves it
+/// via `confirm_import_macro`/`cancel_import_macro`.
 pub(crate) fn import_macro(
     state: &SharedState,
     app: &AppHandle,
     path: String,
 ) -> Result<(), String> {
-    let mac = config::read_macro_file(std::path::Path::new(&path))?;
+    let file = config::persistence::read_import_file(std::path::Path::new(&path))?;
+    let mut capabilities: Vec<crate::state::CapabilityDto> = Vec::new();
+    let mut custom_settings: Vec<crate::state::CustomMacroSettingDto> = Vec::new();
+    for mac in &file.macros {
+        for cap in macro_capabilities(mac) {
+            if !capabilities.iter().any(|c| c.kind == cap.kind) {
+                capabilities.push(cap);
+            }
+        }
+        for setting in non_default_macro_settings(&mac.settings) {
+            if !custom_settings.iter().any(|c| c.key == setting.key) {
+                custom_settings.push(setting);
+            }
+        }
+    }
+    capabilities.sort_by_key(|c| CAPABILITIES.iter().position(|(kind, ..)| *kind == c.kind));
     let review = crate::state::ImportReviewDto {
-        name: mac.name.clone(),
-        capabilities: macro_capabilities(&mac),
-        custom_settings: non_default_macro_settings(&mac.settings),
+        name: file.name,
+        macros: file.macros.iter().map(|m| m.name.clone()).collect(),
+        notes: file.notes,
+        capabilities,
+        custom_settings,
     };
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.pending_import = Some((mac, review));
+    s.pending_import = Some((file.macros, review));
     emit_state_updated(app, &s);
     Ok(())
 }
@@ -1040,24 +1111,62 @@ pub(crate) fn import_macro(
 /// review. `keep_settings` maps each `ImportReviewDto::custom_settings`
 /// entry's `key` to whether the user kept its imported value (`true`) or
 /// reset it to default (`false`); a key the popup never showed is absent,
-/// which `apply_setting_overrides` treats as "keep".
+/// which `apply_setting_overrides` treats as "keep". `allow` lists the
+/// guarded abilities the user ticked; the rest ask when first used.
 pub(crate) async fn confirm_import_macro(
     state: &SharedState,
     app: &AppHandle,
     keep_settings: HashMap<String, bool>,
+    allow: Vec<String>,
 ) -> Result<(), String> {
-    let mac = {
+    let pending = {
         state
             .lock()
             .map_err(|e| e.to_string())?
             .pending_import
             .take()
     };
-    let Some((mut mac, _)) = mac else {
+    let Some((mut macros, _)) = pending else {
         return Ok(());
     };
-    apply_setting_overrides(&mut mac.settings, &keep_settings);
-    commit_imported_macro(mac, &state, &app)
+    for mac in &mut macros {
+        apply_setting_overrides(&mut mac.settings, &keep_settings);
+    }
+    let allow: Vec<String> = allow
+        .into_iter()
+        .filter(|kind| blockwork_core::permissions::GUARDED.iter().any(|(k, _)| k == kind))
+        .collect();
+    commit_imported_macros(macros, &allow, state, app)
+}
+
+/// Exports macros as one `.blockwork` bundle, adding any macros they run
+/// by name so it works on its own. Returns how many it wrote.
+pub(crate) fn export_bundle(macro_ids: Vec<String>, name: String, path: String) -> Result<usize, String> {
+    let all = config::get_macros_from_config();
+    let mut picked: Vec<Macro> = macro_ids.iter().filter_map(|id| all.iter().find(|m| &m.id == id).cloned()).collect();
+    if picked.is_empty() {
+        return Err("No macros to export".into());
+    }
+    let mut i = 0;
+    while i < picked.len() {
+        let mut targets = Vec::new();
+        picked[i].graph.walk_instructions(&mut |ins| {
+            if let InstructionKind::RunMacro { target: Value::Text { value }, .. } | InstructionKind::StopMacroNamed(Value::Text { value }) = &ins.kind {
+                targets.push(value.trim().to_string());
+            }
+        });
+        for target in targets {
+            let found = all.iter().find(|m| m.name == target).or_else(|| all.iter().find(|m| m.name.eq_ignore_ascii_case(&target)));
+            if let Some(found) = found
+                && !picked.iter().any(|m| m.id == found.id)
+            {
+                picked.push(found.clone());
+            }
+        }
+        i += 1;
+    }
+    config::persistence::write_bundle(std::path::Path::new(&path), name.trim(), &picked)?;
+    Ok(picked.len())
 }
 
 /// Discards an import staged by `import_macro` after the user declines its review.
