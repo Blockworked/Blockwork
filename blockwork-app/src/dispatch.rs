@@ -135,6 +135,16 @@ impl Backend {
                 to_json(commands::set_macro_conditions(&self.state, &self.app, window, power, &from, &until, days)?)
             }
             "list_macros" => to_json(crate::macro_runs::list(&self.state)?),
+            // For the region picker: where a window is, to make a pick window-relative.
+            "window_bounds" => {
+                let pattern: String = arg(&args, "pattern")?;
+                let by: blockwork_core::window::MatchBy = arg::<String>(&args, "by")?.parse()?;
+                to_json(
+                    tokio::task::spawn_blocking(move || blockwork_core::window::bounds(&pattern, by))
+                        .await
+                        .map_err(|e| e.to_string())??,
+                )
+            }
             "screen_grab" => {
                 let (x, y): (f64, f64) = (arg(&args, "x")?, arg(&args, "y")?);
                 let (width, height): (f64, f64) = (arg(&args, "width")?, arg(&args, "height")?);

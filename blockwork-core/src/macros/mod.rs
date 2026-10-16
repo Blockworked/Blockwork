@@ -703,8 +703,9 @@ pub enum InstructionKind {
         path: Value,
         variable: String,
     },
-    /// One detection pass over a matching window: boxes from `detector`
-    /// (a local URL) scoring at least `confidence` percent replace list
+    /// One detection pass over a matching window (or `region` of it, as
+    /// `x,y,width,height`; empty for all): boxes from `detector` (a local
+    /// URL) scoring at least `confidence` percent replace list
     /// `results_list`, one JSON item each, ordered by `sort`.
     DetectObjectsInWindow {
         pattern: Value,
@@ -715,6 +716,7 @@ pub enum InstructionKind {
         sort: String,
         results_list: String,
         count_variable: String,
+        region: String,
     },
     /// Pauses until `label` appears in the window (or with `appear` false,
     /// is gone), failing after `timeout` ms (0 = never).
@@ -726,6 +728,7 @@ pub enum InstructionKind {
         confidence: Value,
         appear: bool,
         timeout: Value,
+        region: String,
     },
     /// One relative mouse move from the window's center toward the screen
     /// point (`target_x`, `target_y`); see `detect::AimController`.
@@ -1132,14 +1135,14 @@ impl std::hash::Hash for InstructionKind {
                 path.hash(state);
                 variable.hash(state);
             }
-            Self::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable } => {
+            Self::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable, region } => {
                 73u8.hash(state);
                 (pattern, by, detector, label, confidence).hash(state);
-                (sort, results_list, count_variable).hash(state);
+                (sort, results_list, count_variable, region).hash(state);
             }
-            Self::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout } => {
+            Self::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout, region } => {
                 74u8.hash(state);
-                (pattern, by, detector, label, confidence, appear, timeout).hash(state);
+                (pattern, by, detector, label, confidence, appear, timeout, region).hash(state);
             }
             Self::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => {
                 75u8.hash(state);
@@ -1391,6 +1394,8 @@ enum InstructionKindDe {
         sort: String,
         results_list: String,
         count_variable: String,
+        #[serde(default)]
+        region: String,
     },
     WaitForDetection {
         pattern: Value,
@@ -1400,6 +1405,8 @@ enum InstructionKindDe {
         confidence: Value,
         appear: bool,
         timeout: Value,
+        #[serde(default)]
+        region: String,
     },
     AimStep {
         pattern: Value,
@@ -1628,11 +1635,11 @@ impl From<InstructionKindDe> for InstructionKind {
             InstructionKindDe::WhenSignal(v) => InstructionKind::WhenSignal(v),
             InstructionKindDe::SendSignal { name, wait } => InstructionKind::SendSignal { name, wait },
             InstructionKindDe::WhenWebhook { path, variable } => InstructionKind::WhenWebhook { path, variable },
-            InstructionKindDe::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable } => {
-                InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable }
+            InstructionKindDe::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable, region } => {
+                InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable, region }
             }
-            InstructionKindDe::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout } => {
-                InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout }
+            InstructionKindDe::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout, region } => {
+                InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout, region }
             }
             InstructionKindDe::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => {
                 InstructionKind::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone }

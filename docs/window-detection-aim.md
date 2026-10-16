@@ -297,6 +297,11 @@ of one color with no model (Pillow and numpy), or `--yolo weights.pt` runs
 an Ultralytics model. With it running, `cargo test -p blockwork-core --lib
 finds_a_red_square -- --ignored` checks the HTTP path end to end.
 
-Not done: M3 (native ONNX backend, model manager and downloads), the
-confirm dialog before a detection macro drives input, a sub-rect region
-picker, and screenshot fixture tests (they need a trained model).
+Also done: aim blocks ask once per macro per session before moving the
+mouse (a yes/no dialog; "no" fails the block, cancel stops the run), and
+the detect blocks take an optional `region` (`x,y,width,height` inside the
+window, picked on screen with the block's region button). The crosshair
+stays the window center when a region is set.
+
+Not done: M3 (native ONNX backend, model manager and downloads) and
+screenshot fixture tests (both need a chosen, trained model).

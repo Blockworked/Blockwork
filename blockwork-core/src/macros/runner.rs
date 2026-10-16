@@ -398,6 +398,7 @@ fn detect_query(
     label: &Value,
     confidence: &Value,
     sort: &str,
+    region: &str,
 ) -> Result<crate::detect::Query, String> {
     Ok(crate::detect::Query {
         pattern: ctx.resolve(pattern, depth)?.eval_text()?,
@@ -406,6 +407,7 @@ fn detect_query(
         label: ctx.resolve(label, depth)?.eval_text()?,
         min_score: (ctx.resolve(confidence, depth)?.eval_number()? / 100.0).clamp(0.0, 1.0),
         sort: sort.parse()?,
+        region: crate::detect::parse_region(region)?,
     })
 }
 
@@ -428,6 +430,32 @@ fn aim_controller(ctx: &mut ExecCtx, depth: u32, gain: &Value, max_step: &Value,
         max_step: ctx.resolve(max_step, depth)?.eval_number()?,
         deadzone: ctx.resolve(deadzone, depth)?.eval_number()?,
     })
+}
+
+/// Macros allowed to aim this session, by id.
+static AIM_ALLOWED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+
+/// Asks once per macro per session before aim blocks move the mouse.
+/// `Ok(false)` means the user said no (already logged as the block's error).
+fn confirm_aim(ctx: &mut ExecCtx, block_id: &str) -> Result<bool, String> {
+    let id = ctx.source.macro_id.clone();
+    if AIM_ALLOWED.lock().unwrap_or_else(|e| e.into_inner()).contains(&id) {
+        return Ok(true);
+    }
+    let message = "This macro moves the mouse toward what it sees on screen. \
+        Only allow it where automation is allowed, never against other players. Let it aim?";
+    let request = crate::prompt::Request::new(crate::prompt::Kind::Confirm, &ctx.source.name, message);
+    match ask(ctx, block_id, "Aim", request)? {
+        Some(reply) if reply.answer == "yes" => {
+            AIM_ALLOWED.lock().unwrap_or_else(|e| e.into_inner()).push(id);
+            Ok(true)
+        }
+        Some(_) => {
+            soft_fail(ctx, block_id, "Aim", "you didn't allow aiming")?;
+            Ok(false)
+        }
+        None => Ok(false),
+    }
 }
 
 /// Steps toward track `target` with a fresh detection each frame until it's
@@ -1212,16 +1240,16 @@ fn run_block(
                     }
                 }
             }
-            InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable } => {
-                let found = detect_query(ctx, depth, pattern, by, detector, label, confidence, sort)
+            InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable, region } => {
+                let found = detect_query(ctx, depth, pattern, by, detector, label, confidence, sort, region)
                     .and_then(|query| detect_into_list(ctx, &query, results_list));
                 match found {
                     Ok(frame) => set_variable(ctx, count_variable, Evaluated::Number(frame.detections.len() as f64)),
                     Err(e) => soft_fail(ctx, &ins.id, "Detect objects", e)?,
                 }
             }
-            InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout } => {
-                let setup = detect_query(ctx, depth, pattern, by, detector, label, confidence, "Score")
+            InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout, region } => {
+                let setup = detect_query(ctx, depth, pattern, by, detector, label, confidence, "Score", region)
                     .and_then(|query| Ok((query, ctx.resolve(timeout, depth)?.eval_number()?.max(0.0))));
                 let (query, timeout) = match setup {
                     Ok(setup) => setup,
@@ -1251,6 +1279,9 @@ fn run_block(
                 }
             }
             InstructionKind::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => {
+                if !confirm_aim(ctx, &ins.id)? {
+                    continue;
+                }
                 let done = (|| {
                     let pattern = ctx.resolve(pattern, depth)?.eval_text()?;
                     let target = (ctx.resolve(target_x, depth)?.eval_number()?, ctx.resolve(target_y, depth)?.eval_number()?);
@@ -1267,6 +1298,9 @@ fn run_block(
                 }
             }
             InstructionKind::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => {
+                if !confirm_aim(ctx, &ins.id)? {
+                    continue;
+                }
                 let setup = (|| {
                     let query = crate::detect::track::query_for(&ctx.source.macro_id, results_list)
                         .ok_or_else(|| format!("detect objects into the list \"{results_list}\" first"))?;

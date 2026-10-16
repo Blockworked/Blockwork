@@ -8,7 +8,7 @@ pub mod aim;
 pub mod http;
 pub mod track;
 
-use crate::screen::{Image, Shot};
+use crate::screen::{Image, Rect, Shot};
 use crate::window::MatchBy;
 use serde::{Deserialize, Serialize};
 
@@ -136,6 +136,23 @@ pub struct Query {
     /// Minimum score, 0 to 1.
     pub min_score: f64,
     pub sort: Sort,
+    /// Only this part of the window, relative to its top-left corner.
+    pub region: Option<Rect>,
+}
+
+/// A block's region text: `x,y,width,height` inside the window, or empty
+/// for the whole window.
+pub fn parse_region(text: &str) -> Result<Option<Rect>, String> {
+    let text = text.trim();
+    if text.is_empty() {
+        return Ok(None);
+    }
+    let bad = || format!("'{text}' isn't a region (use x,y,width,height)");
+    let n: Vec<f64> = text.split(',').map(|v| v.trim().parse().map_err(|_| bad())).collect::<Result<_, _>>()?;
+    match n[..] {
+        [x, y, width, height] if width > 0.0 && height > 0.0 => Ok(Some(Rect { x, y, width, height })),
+        _ => Err(bad()),
+    }
 }
 
 /// One pass's result, in screen coordinates.
@@ -150,6 +167,14 @@ pub struct Frame {
 /// query's filters, mapped to screen coordinates. Not yet sorted or tracked.
 pub fn detect(query: &Query, capture: &dyn WindowCapture, detector: &dyn Detector) -> Result<Frame, String> {
     let shot = capture.capture_window(&query.pattern, query.by)?;
+    // The crosshair stays the window's center even when only part is searched.
+    let crosshair = shot.center();
+    let shot = match query.region {
+        Some(r) => shot
+            .crop(Rect { x: shot.origin.0 + r.x, y: shot.origin.1 + r.y, ..r })
+            .map_err(|_| "the region is outside the window".to_string())?,
+        None => shot,
+    };
     let found = detector.detect(&shot.image)?;
     let label = query.label.trim().to_lowercase();
     let detections = found
@@ -158,7 +183,7 @@ pub fn detect(query: &Query, capture: &dyn WindowCapture, detector: &dyn Detecto
         .filter(|d| d.score >= query.min_score)
         .map(|d| to_screen(&shot, d))
         .collect();
-    Ok(Frame { detections, crosshair: shot.center() })
+    Ok(Frame { detections, crosshair })
 }
 
 fn to_screen(shot: &Shot, d: Detection) -> Detection {
@@ -211,7 +236,7 @@ mod tests {
     }
 
     fn query(label: &str, min_score: f64) -> Query {
-        Query { pattern: String::new(), by: MatchBy::Any, detector: String::new(), label: label.into(), min_score, sort: Sort::Score }
+        Query { pattern: String::new(), by: MatchBy::Any, detector: String::new(), label: label.into(), min_score, sort: Sort::Score, region: None }
     }
 
     #[test]
@@ -223,6 +248,28 @@ mod tests {
         assert_eq!(frame.detections, vec![boxed(120.0, 60.0, 32.0, 64.0, "player", 0.9)]);
         assert_eq!(frame.crosshair, (200.0, 100.0));
         assert_eq!(frame.detections[0].center(), (136.0, 92.0));
+    }
+
+    #[test]
+    fn a_region_searches_part_of_the_window_but_keeps_its_crosshair() {
+        let capture = FakeCapture(Shot { image: Image::new(400, 200), origin: (100.0, 50.0), scale: 2.0 });
+        let detector = FakeDetector(vec![boxed(10.0, 4.0, 20.0, 40.0, "player", 0.9)]);
+        let part = Query { region: Some(Rect { x: 50.0, y: 20.0, width: 60.0, height: 40.0 }), ..query("", 0.0) };
+        let frame = detect(&part, &capture, &detector).unwrap();
+        // Box pixels are relative to the region, which starts at (150, 70) on screen.
+        assert_eq!(frame.detections, vec![boxed(155.0, 72.0, 10.0, 20.0, "player", 0.9)]);
+        assert_eq!(frame.crosshair, (200.0, 100.0));
+        let outside = Query { region: Some(Rect { x: 500.0, y: 0.0, width: 10.0, height: 10.0 }), ..query("", 0.0) };
+        assert!(detect(&outside, &capture, &detector).is_err());
+    }
+
+    #[test]
+    fn regions_parse() {
+        assert_eq!(parse_region(" "), Ok(None));
+        assert_eq!(parse_region("10, 20,300,200"), Ok(Some(Rect { x: 10.0, y: 20.0, width: 300.0, height: 200.0 })));
+        for bad in ["10,20,300", "a,b,c,d", "0,0,0,10", "1,2,3,4,5"] {
+            assert!(parse_region(bad).is_err(), "{bad}");
+        }
     }
 
     #[test]

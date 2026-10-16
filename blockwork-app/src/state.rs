@@ -706,6 +706,8 @@ pub(crate) enum InstructionDto {
         sort: String,
         results_list: String,
         count_variable: String,
+        #[serde(default)]
+        region: String,
     },
     WaitForDetection {
         id: String,
@@ -716,6 +718,8 @@ pub(crate) enum InstructionDto {
         confidence: Value,
         appear: bool,
         timeout: Value,
+        #[serde(default)]
+        region: String,
     },
     AimStep {
         id: String,
@@ -1157,8 +1161,9 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         InstructionKind::WhenWebhook { path, variable } => {
             InstructionDto::WhenWebhook { id, path: path.clone(), variable: variable.clone() }
         }
-        InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable } => {
+        InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable, region } => {
             InstructionDto::DetectObjectsInWindow {
+                region: region.clone(),
                 id,
                 pattern: pattern.clone(),
                 by: by.clone(),
@@ -1170,8 +1175,9 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
                 count_variable: count_variable.clone(),
             }
         }
-        InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout } => {
+        InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout, region } => {
             InstructionDto::WaitForDetection {
+                region: region.clone(),
                 id,
                 pattern: pattern.clone(),
                 by: by.clone(),
@@ -1627,9 +1633,10 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         InstructionDto::WhenWebhook { id, path, variable } => {
             (id, InstructionKind::WhenWebhook { path: path.clone(), variable: variable.clone() })
         }
-        InstructionDto::DetectObjectsInWindow { id, pattern, by, detector, label, confidence, sort, results_list, count_variable } => (
+        InstructionDto::DetectObjectsInWindow { id, pattern, by, detector, label, confidence, sort, results_list, count_variable, region } => (
             id,
             InstructionKind::DetectObjectsInWindow {
+                region: region.clone(),
                 pattern: pattern.clone(),
                 by: by.clone(),
                 detector: detector.clone(),
@@ -1640,9 +1647,10 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
                 count_variable: count_variable.clone(),
             },
         ),
-        InstructionDto::WaitForDetection { id, pattern, by, detector, label, confidence, appear, timeout } => (
+        InstructionDto::WaitForDetection { id, pattern, by, detector, label, confidence, appear, timeout, region } => (
             id,
             InstructionKind::WaitForDetection {
+                region: region.clone(),
                 pattern: pattern.clone(),
                 by: by.clone(),
                 detector: detector.clone(),
@@ -1994,6 +2002,7 @@ mod tests {
                 sort: "Closest".into(),
                 results_list: "players".into(),
                 count_variable: "count".into(),
+                region: "10,20,300,200".into(),
             },
             InstructionKind::WaitForDetection {
                 pattern: t("Minecraft"),
@@ -2003,6 +2012,7 @@ mod tests {
                 confidence: n(40.0),
                 appear: false,
                 timeout: n(500.0),
+                region: String::new(),
             },
             InstructionKind::AimStep {
                 pattern: t(""),
