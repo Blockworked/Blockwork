@@ -154,6 +154,19 @@ impl Backend {
                         .map_err(|e| e.to_string())??,
                 )
             }
+            "list_models" => to_json(blockwork_core::detect::models::catalog()?),
+            "download_model" => {
+                let id: String = arg(&args, "id")?;
+                to_json(
+                    tokio::task::spawn_blocking(move || blockwork_core::detect::models::install(&id))
+                        .await
+                        .map_err(|e| e.to_string())??,
+                )
+            }
+            "import_model" => {
+                let path: String = arg(&args, "path")?;
+                to_json(blockwork_core::detect::models::import(&path)?)
+            }
             "image_from_file" => {
                 let path: String = arg(&args, "path")?;
                 to_json(crate::screen_pick::image_from_file(&path)?)

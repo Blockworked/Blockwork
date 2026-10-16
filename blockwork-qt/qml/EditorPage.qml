@@ -1,5 +1,7 @@
+import QtCore
 import QtQuick
 import QtQuick.Controls
+import QtQuick.Dialogs
 import QtQuick.Layouts
 import com.blockworked.Blockstitch 1.0
 import com.blockworked.Blockwork 1.0
@@ -149,6 +151,11 @@ Item {
             }));
         }
     }
+    function setBlockDetector(request, detector) {
+        const updated = JSON.parse(JSON.stringify(request.instruction || {}));
+        updated.detector = textValue(detector);
+        root.invoke("edit_instruction", { strandId: request.strandId, path: request.path, instruction: updated });
+    }
     function setBlockImage(request, image) {
         const updated = JSON.parse(JSON.stringify(request.instruction || {}));
         updated.image = image;
@@ -172,6 +179,7 @@ Item {
         const request = { kind: "image", strandId: strandId, path: path, instruction: instruction };
         if (action === "captureImage") root.startScreenPick(request);
         else if (action === "loadImage") imageFileDialog.openFor(request);
+        else if (action === "pickModel") modelDialog.openFor(request);
         else if (action === "pickRegion") root.startScreenPick(Object.assign(request, { kind: "region" }));
         else if (action === "clearRegion") {
             const updated = JSON.parse(JSON.stringify(instruction || {}));
@@ -948,6 +956,64 @@ Item {
         }
     }
     BwDialog {
+        id: modelDialog; title: "Choose a detection model"; standardButtons: Dialog.Cancel
+        property var request: null
+        property var models: []
+        property bool busy: false
+        function openFor(req) {
+            request = req; models = []; busy = false; localUrl.text = "";
+            root.daemonCall("list_models", {}, (list, error) => { if (list) models = list; else pickError.show(error); });
+            open();
+        }
+        function use(id) { root.setBlockDetector(request, id); close(); }
+        function download(id) {
+            busy = true;
+            root.daemonCall("download_model", { id: id }, (done, error) => {
+                busy = false;
+                if (done) use(id); else pickError.show(error);
+            });
+        }
+        Column { width: 460; spacing: 10
+            Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
+                text: "Models run inside Blockwork. Pick one, add your own .onnx file, or point the block at a detector running on this computer." }
+            Repeater {
+                model: modelDialog.models
+                delegate: Rectangle {
+                    required property var modelData
+                    width: 460; height: 56; radius: Theme.radius; color: Theme.panelRaised; border.color: Theme.border
+                    RowLayout { anchors.fill: parent; anchors.margins: 10; spacing: 10
+                        Column { Layout.fillWidth: true; spacing: 2
+                            Text { text: modelData.id; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold }
+                            Text { width: parent.width; text: modelData.about; color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideRight }
+                        }
+                        BwButton {
+                            enabled: !modelDialog.busy && (modelData.installed || modelData.downloadable)
+                            text: modelData.installed ? "Use" : modelData.downloadable ? "Download " + modelData.megabytes + " MB" : "Not published yet"
+                            onClicked: modelData.installed ? modelDialog.use(modelData.id) : modelDialog.download(modelData.id)
+                        }
+                    }
+                }
+            }
+            Text { visible: modelDialog.busy; text: "Downloading..."; color: Theme.textDim; font.pixelSize: 12 }
+            BwButton { text: "Add a .onnx file..."; iconName: "folder-open"; enabled: !modelDialog.busy; onClicked: modelFile.open() }
+            Text { text: "Or a detector on this computer"; color: Theme.text; font.pixelSize: 12 }
+            RowLayout { width: parent.width; spacing: 8
+                BwTextField { id: localUrl; Layout.fillWidth: true; placeholderText: root.defaultDetector; onAccepted: useUrl.clicked() }
+                BwButton { id: useUrl; text: "Use"; enabled: localUrl.text.trim().length > 0; onClicked: modelDialog.use(localUrl.text.trim()) }
+            }
+        }
+    }
+    FileDialog {
+        id: modelFile; title: "Add a detection model"; fileMode: FileDialog.OpenFile
+        currentFolder: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+        nameFilters: ["ONNX models (*.onnx)", "All files (*)"]
+        onAccepted: {
+            const text = decodeURIComponent(selectedFile.toString());
+            const path = Qt.platform.os === "windows" ? text.replace(/^file:\/\/\//, "") : text.replace(/^file:\/\//, "");
+            root.daemonCall("import_model", { path: path }, (id, error) => { if (id) modelDialog.use(id); else pickError.show(error); });
+        }
+    }
+    BwDialog {
         id: templateDialog; title: "Start from a template"; standardButtons: Dialog.Cancel
         TemplateList {
             // Cards report no implicit width, so give the dialog one to size from
@@ -1247,7 +1313,7 @@ Item {
                 label("for up to"), value("WaitTimeout", "timeout"), label("ms, within"), value("ImageTolerance", "tolerance"), label("%")] },
             DetectObjectsInWindow: { icon: "aperture", head: [label("detect"), value("DetectLabel", "label"), label("in"),
                 { kind: "dropdown", key: "by", options: root.windowMatchOptions }, value("WindowPattern", "pattern"), ...regionPieces,
-                label("with"), value("DetectorUrl", "detector"), label("at least"), value("DetectConfidence", "confidence"), label("% into"),
+                label("with"), value("DetectorUrl", "detector"), { kind: "button", action: "pickModel", icon: "box" }, label("at least"), value("DetectConfidence", "confidence"), label("% into"),
                 { kind: "dropdown", key: "results_list", options: "lists" },
                 { kind: "dropdown", key: "sort", options: root.detectionSortOptions },
                 label("count in"), { kind: "dropdown", key: "count_variable", options: () => root.variableChoices(), placeholder: "(no variable)" }] },
@@ -1255,7 +1321,7 @@ Item {
                 { kind: "dropdown", key: "appear", options: [{ value: "appears", label: "appears" }, { value: "gone", label: "disappears" }],
                   encode: v => v === "appears", decode: v => v ? "appears" : "gone" },
                 label("in"), { kind: "dropdown", key: "by", options: root.windowMatchOptions }, value("WindowPattern", "pattern"), ...regionPieces,
-                label("with"), value("DetectorUrl", "detector"), label("at least"), value("DetectConfidence", "confidence"),
+                label("with"), value("DetectorUrl", "detector"), { kind: "button", action: "pickModel", icon: "box" }, label("at least"), value("DetectConfidence", "confidence"),
                 label("% for up to"), value("WaitTimeout", "timeout"), label("ms")] },
             AimStep: { icon: "crosshair", head: [label("aim from center of"), { kind: "dropdown", key: "by", options: root.windowMatchOptions },
                 value("WindowPattern", "pattern"), label("toward x"), value("AimTargetX", "target_x"), label("y"), value("AimTargetY", "target_y"),

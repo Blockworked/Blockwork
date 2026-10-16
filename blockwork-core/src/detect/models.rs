@@ -2,6 +2,7 @@
 //! directory, plus known models fetched on first use (with consent) and
 //! pinned by hash.
 
+use serde::Serialize;
 use sha2::{Digest, Sha256};
 use std::path::{Path, PathBuf};
 
@@ -32,7 +33,10 @@ pub fn models_dir() -> Result<PathBuf, String> {
 
 /// Ids of the models in the models folder.
 pub fn installed() -> Vec<String> {
-    let Ok(dir) = models_dir() else { return Vec::new() };
+    models_dir().map(|dir| installed_in(&dir)).unwrap_or_default()
+}
+
+fn installed_in(dir: &Path) -> Vec<String> {
     let mut names: Vec<String> = std::fs::read_dir(dir)
         .into_iter()
         .flatten()
@@ -43,6 +47,69 @@ pub fn installed() -> Vec<String> {
         .collect();
     names.sort();
     names
+}
+
+/// One row of the model picker: a model that's installed, or a known one
+/// that can be downloaded.
+#[derive(Debug, Clone, PartialEq, Serialize)]
+pub struct ModelEntry {
+    pub id: String,
+    pub about: String,
+    pub installed: bool,
+    /// Whether it can be fetched (a known model that has been published).
+    pub downloadable: bool,
+    pub megabytes: Option<u32>,
+}
+
+/// Known models first, then any other `.onnx` files in the models folder.
+pub fn catalog() -> Result<Vec<ModelEntry>, String> {
+    Ok(catalog_in(&models_dir()?))
+}
+
+fn catalog_in(dir: &Path) -> Vec<ModelEntry> {
+    let have = installed_in(dir);
+    let mut rows: Vec<ModelEntry> = KNOWN
+        .iter()
+        .map(|k| ModelEntry {
+            id: k.id.to_string(),
+            about: k.about.to_string(),
+            installed: have.iter().any(|h| h == k.id),
+            downloadable: k.url.is_some(),
+            megabytes: Some(k.megabytes),
+        })
+        .collect();
+    for id in have {
+        if !KNOWN.iter().any(|k| k.id == id) {
+            rows.push(ModelEntry { id, about: "A model file you added".into(), installed: true, downloadable: false, megabytes: None });
+        }
+    }
+    rows
+}
+
+/// Downloads a known model (the caller has the user's consent) and returns its id.
+pub fn install(id: &str) -> Result<String, String> {
+    let known = KNOWN.iter().find(|k| k.id == id).ok_or_else(|| format!("there's no model '{id}'"))?;
+    let url = known.url.ok_or_else(|| format!("the model '{id}' isn't published yet"))?;
+    let dest = models_dir()?.join(format!("{id}.onnx"));
+    download(url, known.sha256, &dest)?;
+    Ok(id.to_string())
+}
+
+/// Copies a `.onnx` file into the models folder and returns the id it's
+/// known by (its file name without the extension).
+pub fn import(path: &str) -> Result<String, String> {
+    import_in(&models_dir()?, path)
+}
+
+fn import_in(dir: &Path, path: &str) -> Result<String, String> {
+    let source = crate::files::expand(path.trim());
+    if !source.is_file() || source.extension().is_none_or(|x| !x.eq_ignore_ascii_case("onnx")) {
+        return Err("pick a .onnx model file".into());
+    }
+    let id = source.file_stem().and_then(|s| s.to_str()).ok_or("that file name isn't usable")?.to_string();
+    std::fs::create_dir_all(dir).map_err(|e| format!("couldn't create {}: {e}", dir.display()))?;
+    std::fs::copy(&source, dir.join(format!("{id}.onnx"))).map_err(|e| format!("couldn't copy the model: {e}"))?;
+    Ok(id)
 }
 
 /// The model file for a block's detector text: a path to a `.onnx` file,
@@ -164,5 +231,21 @@ mod tests {
         assert_eq!(std::fs::read(&dest).unwrap(), body);
         server.join().unwrap();
         let _ = std::fs::remove_dir_all(dir);
+    }
+
+    #[test]
+    fn the_catalog_lists_known_models_then_added_ones_and_import_copies_files() {
+        let dir = temp_dir("catalog");
+        let src = temp_dir("catalog-src");
+        std::fs::write(src.join("mine.onnx"), b"x").unwrap();
+        std::fs::write(src.join("notes.txt"), b"x").unwrap();
+        assert!(import_in(&dir, &src.join("notes.txt").display().to_string()).is_err());
+        assert_eq!(import_in(&dir, &src.join("mine.onnx").display().to_string()), Ok("mine".to_string()));
+        let rows = catalog_in(&dir);
+        assert_eq!(rows[0].id, "mc-player-320-v1");
+        assert!(!rows[0].installed);
+        assert_eq!(rows.last().map(|r| (r.id.as_str(), r.installed)), Some(("mine", true)));
+        let _ = std::fs::remove_dir_all(dir);
+        let _ = std::fs::remove_dir_all(src);
     }
 }
