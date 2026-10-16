@@ -26,7 +26,7 @@ impl HttpDetector {
         }
         let uri: ureq::http::Uri = url.parse().map_err(|_| format!("'{url}' isn't a detector URL"))?;
         if !matches!(uri.scheme_str(), Some("http" | "https")) {
-            return Err(format!("'{url}' isn't a detector URL (built-in models aren't available yet; use a local http:// detector)"));
+            return Err(format!("'{url}' isn't a detector URL (use http:// or https://)"));
         }
         let host = uri.host().unwrap_or_default().trim_matches(['[', ']']);
         if !is_loopback(host) {

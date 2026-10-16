@@ -91,6 +91,21 @@ pub fn post_bytes(url: &str, content_type: &str, body: Vec<u8>) -> Result<String
     Ok(text)
 }
 
+/// Downloads a file's bytes, refusing anything over `limit` bytes.
+pub fn get_bytes(url: &str, limit: u64) -> Result<Vec<u8>, String> {
+    let mut response = agent().get(url).call().map_err(|e| format!("GET {url} failed: {e}"))?;
+    let status = response.status();
+    if status.as_u16() >= 400 {
+        return Err(format!("HTTP {status} from {url}"));
+    }
+    response
+        .body_mut()
+        .with_config()
+        .limit(limit)
+        .read_to_vec()
+        .map_err(|e| format!("couldn't download {url}: {e}"))
+}
+
 pub fn get(url: &str) -> Result<String, String> {
     request("GET", url, "", "")
 }

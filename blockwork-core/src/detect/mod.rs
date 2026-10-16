@@ -6,6 +6,11 @@
 
 pub mod aim;
 pub mod http;
+#[cfg(feature = "onnx")]
+pub mod onnx;
+#[cfg(feature = "onnx")]
+pub mod models;
+pub mod yolo;
 pub mod track;
 
 use crate::screen::{Image, Rect, Shot};
@@ -129,7 +134,8 @@ impl std::str::FromStr for Sort {
 pub struct Query {
     pub pattern: String,
     pub by: MatchBy,
-    /// A local detector URL; see [`http::HttpDetector`].
+    /// A local detector URL (see [`http::HttpDetector`]), or a built-in
+    /// model's id or `.onnx` path (see `models`).
     pub detector: String,
     /// Only this label (any case); empty keeps every label.
     pub label: String,
@@ -205,10 +211,25 @@ pub fn sort(detections: &mut [Detection], sort: Sort, crosshair: (f64, f64)) {
     }
 }
 
+/// The detector a block's text names: a URL is a local detector service;
+/// anything else is a built-in model.
+pub fn detector_for(text: &str) -> Result<Box<dyn Detector>, String> {
+    let text = text.trim();
+    if text.contains("://") {
+        return Ok(Box::new(http::HttpDetector::new(text)?));
+    }
+    #[cfg(feature = "onnx")]
+    {
+        let path = models::resolve(text, &models::ask_to_download)?;
+        Ok(Box::new(onnx::OnnxDetector::load(&path)?))
+    }
+    #[cfg(not(feature = "onnx"))]
+    Err("built-in models aren't part of this build; use a local detector URL".into())
+}
+
 /// [`detect`] with the real screen and the query's detector.
 pub fn detect_on_screen(query: &Query) -> Result<Frame, String> {
-    let detector = http::HttpDetector::new(&query.detector)?;
-    detect(query, &Screen, &detector)
+    detect(query, &Screen, &*detector_for(&query.detector)?)
 }
 
 #[cfg(test)]

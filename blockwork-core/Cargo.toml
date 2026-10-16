@@ -7,13 +7,16 @@ edition.workspace = true
 name = "blockwork_core"
 
 [features]
-default = ["ipc", "updater"]
+default = ["ipc", "updater", "onnx"]
 # Loopback TCP control server; not needed by an embedder (e.g. via
 # blockwork-ffi) that calls into this crate directly and in-process.
 ipc = ["tokio/rt", "tokio/rt-multi-thread", "tokio/macros", "tokio/net", "tokio/io-util", "tokio/time"]
 # Self-update mechanism for the standalone desktop app; inappropriate for a
 # copy of this crate embedded inside another process (e.g. a game).
 updater = ["dep:self_update", "dep:http"]
+# Built-in object detection models (see src/detect/onnx.rs). Pure Rust, so
+# offline and Flatpak builds need no native runtime.
+onnx = ["dep:tract-onnx", "dep:sha2"]
 
 [dependencies]
 blockstitch-core.workspace = true
@@ -36,6 +39,9 @@ png = "0.18"
 base64.workspace = true
 # Regex text operators.
 regex.workspace = true
+tract-onnx = { version = "0.23.9", optional = true }
+# Pins downloaded model files.
+sha2 = { version = "0.10.9", optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

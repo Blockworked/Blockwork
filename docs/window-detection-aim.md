@@ -303,5 +303,23 @@ the detect blocks take an optional `region` (`x,y,width,height` inside the
 window, picked on screen with the block's region button). The crosshair
 stays the window center when a region is set.
 
-Not done: M3 (native ONNX backend, model manager and downloads) and
-screenshot fixture tests (both need a chosen, trained model).
+M3 groundwork: with the default `onnx` cargo feature, a detector that
+isn't a URL is a built-in model, run in-process by tract (pure Rust, so
+offline and Flatpak builds need no native runtime). `detect/yolo.rs`
+letterboxes frames and decodes YOLOv8 output with NMS, reading class names
+from the Ultralytics export's metadata; `detect/models.rs` resolves a
+`.onnx` path or an id in the config folder's `models` directory, and
+fetches known models with consent, pinned by SHA-256. Checked against stock
+YOLOv8n exported at 320 px: on Ultralytics' `bus.jpg` it finds the same four
+objects as Ultralytics itself, in about 37 ms per frame (release, CPU). The
+ignored test `runs_a_yolo_model` repeats this with `BLOCKWORK_TEST_MODEL` and
+`BLOCKWORK_TEST_IMAGE`.
+
+The chosen default is a fine-tuned YOLOv8n (`mc-player-320-v1`). Its
+registry entry has no URL or hash yet because the weights don't exist: it
+still needs a labeled dataset, a training run and hosting. Ultralytics
+weights are AGPL-3.0, so the fine-tuned model is too; Blockwork (GPL-3.0)
+may combine with it, and the model ships as a separate download.
+
+Not done: training and publishing that model, and screenshot fixture
+tests that need it.
