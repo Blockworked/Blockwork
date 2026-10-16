@@ -1,6 +1,7 @@
 //! Linux screen access. X11 is read directly. Wayland has no common capture
-//! API, so `grim` is tried first (wlroots compositors), then the desktop
-//! portal's Screenshot (KDE, GNOME; may ask for permission once).
+//! API, so KWin's ScreenShot2 is tried first (KDE), then `grim` (wlroots
+//! compositors), then the desktop portal's Screenshot (GNOME; slow, and may
+//! ask for permission once).
 
 use super::{Image, Rect, Shot};
 use crate::flatpak::host_command;
@@ -29,7 +30,26 @@ pub(super) fn capture() -> Result<Shot, String> {
 /// Set once `grim` has failed, so later captures go straight to the portal.
 static NO_GRIM: AtomicBool = AtomicBool::new(false);
 
+/// Just the screen rectangle `rect`, when there's a faster way than
+/// cropping a whole-desktop capture.
+pub(super) fn capture_area(rect: Rect) -> Option<Shot> {
+    if !wayland() {
+        return None;
+    }
+    let (x, y) = (rect.x.floor(), rect.y.floor());
+    let (width, height) = ((rect.x + rect.width).ceil() - x, (rect.y + rect.height).ceil() - y);
+    if width < 1.0 || height < 1.0 {
+        return None;
+    }
+    let image = kwin::area(x as i32, y as i32, width as u32, height as u32)?;
+    let scale = image.width as f64 / width;
+    Some(Shot { image, origin: (x, y), scale })
+}
+
 fn wayland_capture() -> Result<Image, String> {
+    if let Some(image) = kwin::workspace() {
+        return Ok(image);
+    }
     if !NO_GRIM.load(Ordering::Relaxed) {
         match grim() {
             Ok(image) => return Ok(image),
@@ -78,6 +98,105 @@ fn parse_ppm(data: &[u8]) -> Result<Image, String> {
     }
     let rgba = pixels.chunks_exact(3).take(width as usize * height as usize).flat_map(|p| [p[0], p[1], p[2], 255]).collect();
     Ok(Image { width, height, rgba })
+}
+
+mod kwin {
+    use super::*;
+    use std::collections::HashMap;
+    use std::io::Read;
+    use std::os::fd::AsFd;
+    use zbus::zvariant::{Fd, OwnedValue, Value};
+
+    /// Set once ScreenShot2 refused a call (not KDE, or a KWin that restricts
+    /// it), so later captures skip it.
+    static UNAVAILABLE: AtomicBool = AtomicBool::new(false);
+
+    pub(super) fn workspace() -> Option<Image> {
+        capture("CaptureWorkspace", None)
+    }
+
+    pub(super) fn area(x: i32, y: i32, width: u32, height: u32) -> Option<Image> {
+        capture("CaptureArea", Some((x, y, width, height)))
+    }
+
+    fn capture(method: &str, area: Option<(i32, i32, u32, u32)>) -> Option<Image> {
+        if UNAVAILABLE.load(Ordering::Relaxed) {
+            return None;
+        }
+        match try_capture(method, area) {
+            Ok(image) => Some(image),
+            Err(e) => {
+                tracing::debug!("KWin {method} failed: {e}");
+                None
+            }
+        }
+    }
+
+    fn try_capture(method: &str, area: Option<(i32, i32, u32, u32)>) -> Result<Image, String> {
+        let connection = crate::kwin::connection()?;
+        let (mut read, write) = std::io::pipe().map_err(|e| e.to_string())?;
+        let mut options: HashMap<&str, Value> = HashMap::new();
+        options.insert("native-resolution", true.into());
+        // Blockwork may run inside the window it's watching (blockwork-ffi).
+        options.insert("hide-caller-windows", false.into());
+        let fd = Fd::from(write.as_fd());
+        let (dest, path, iface) = (Some("org.kde.KWin"), "/org/kde/KWin/ScreenShot2", Some("org.kde.KWin.ScreenShot2"));
+        let reply = match area {
+            Some((x, y, w, h)) => connection.call_method(dest, path, iface, method, &(x, y, w, h, &options, &fd)),
+            None => connection.call_method(dest, path, iface, method, &(&options, &fd)),
+        }
+        .map_err(|e| {
+            if matches!(e, zbus::Error::MethodError(..)) {
+                UNAVAILABLE.store(true, Ordering::Relaxed);
+            }
+            e.to_string()
+        })?;
+        // KWin writes the pixels after replying; closing our end ends the read.
+        drop(fd);
+        drop(write);
+        let mut data = Vec::new();
+        read.read_to_end(&mut data).map_err(|e| e.to_string())?;
+        let results: HashMap<String, OwnedValue> = reply.body().deserialize().map_err(|e| e.to_string())?;
+        let number = |key: &str| results.get(key).and_then(|v| u32::try_from(v).ok()).ok_or(format!("KWin's screenshot has no {key}"));
+        decode(number("format")?, number("width")?, number("height")?, number("stride")?, &data)
+    }
+
+    /// Raw QImage pixels to RGBA. Alpha is dropped: the desktop is opaque.
+    pub(super) fn decode(format: u32, width: u32, height: u32, stride: u32, data: &[u8]) -> Result<Image, String> {
+        // QImage::Format_RGB32/ARGB32/ARGB32_Premultiplied are BGRA bytes on
+        // little-endian; RGBX8888/RGBA8888/RGBA8888_Premultiplied are RGBA.
+        let bgra = match format {
+            4..=6 => true,
+            16..=18 => false,
+            _ => return Err(format!("unsupported KWin screenshot format {format}")),
+        };
+        let (row, stride) = (width as usize * 4, stride as usize);
+        if stride < row || data.len() < stride * (height as usize - 1) + row {
+            return Err("KWin's screenshot was cut short".into());
+        }
+        let mut rgba = Vec::with_capacity(row * height as usize);
+        for y in 0..height as usize {
+            for p in data[y * stride..y * stride + row].chunks_exact(4) {
+                let [r, g, b] = if bgra { [p[2], p[1], p[0]] } else { [p[0], p[1], p[2]] };
+                rgba.extend_from_slice(&[r, g, b, 255]);
+            }
+        }
+        Ok(Image { width, height, rgba })
+    }
+
+    #[cfg(test)]
+    #[test]
+    fn decodes_raw_qimages() {
+        // 2x1 with 4 bytes of row padding.
+        let data = [10, 20, 30, 128, 40, 50, 60, 255, 0, 0, 0, 0];
+        let rgba = decode(18, 2, 1, 12, &data).unwrap();
+        assert_eq!((rgba.pixel(0, 0), rgba.pixel(1, 0)), ([10, 20, 30], [40, 50, 60]));
+        let bgra = decode(6, 2, 1, 12, &data).unwrap();
+        assert_eq!(bgra.pixel(0, 0), [30, 20, 10]);
+        assert_eq!(bgra.rgba[3], 255);
+        assert!(decode(18, 2, 2, 12, &data).is_err());
+        assert!(decode(1, 2, 1, 12, &data).is_err());
+    }
 }
 
 mod portal {

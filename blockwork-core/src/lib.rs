@@ -11,6 +11,8 @@ pub mod input;
 #[cfg(feature = "ipc")]
 pub mod ipc;
 pub mod key_mapping;
+#[cfg(target_os = "linux")]
+pub mod kwin;
 pub mod macros;
 pub mod notify;
 pub mod permissions;

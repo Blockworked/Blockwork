@@ -13,6 +13,10 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetCursorPos, GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
 };
 
+pub(super) fn capture_area(_: Rect) -> Option<Shot> {
+    None
+}
+
 pub(super) fn capture() -> Result<Shot, String> {
     // SAFETY: plain GDI calls; every handle made here is released below.
     unsafe {

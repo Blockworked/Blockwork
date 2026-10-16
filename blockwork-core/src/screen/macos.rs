@@ -7,6 +7,10 @@ use core_graphics::event::CGEvent;
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 use core_graphics::window::{create_image, kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly};
 
+pub(super) fn capture_area(_: Rect) -> Option<Shot> {
+    None
+}
+
 pub(super) fn capture() -> Result<Shot, String> {
     let desktop = super::desktop()?;
     let bounds = CGRect::new(&CGPoint::new(desktop.x, desktop.y), &CGSize::new(desktop.width, desktop.height));

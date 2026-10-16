@@ -37,6 +37,9 @@ mod platform {
     pub(super) fn capture() -> Result<Shot, String> {
         Err(MSG.into())
     }
+    pub(super) fn capture_area(_: Rect) -> Option<Shot> {
+        None
+    }
     pub(super) fn monitors() -> Vec<Rect> {
         Vec::new()
     }
@@ -173,6 +176,9 @@ pub fn find_image(needle: &Image, tolerance: f64) -> Result<Option<(f64, f64)>, 
 /// `pattern` is empty). Anything covering the window is captured too.
 pub fn capture_window(pattern: &str, by: crate::window::MatchBy) -> Result<Shot, String> {
     let bounds = crate::window::bounds(pattern, by)?;
+    if let Some(shot) = platform::capture_area(bounds) {
+        return Ok(shot);
+    }
     capture()?.crop(bounds).map_err(|_| "the window is off screen".to_string())
 }
 
@@ -279,5 +285,44 @@ mod live {
         eprintln!("find {:?} in {:?}", super::find_image(&needle, 5.0), started.elapsed());
         let started = std::time::Instant::now();
         eprintln!("text {:?} in {:?}", super::read_text(0.0, 0.0, 600.0, 120.0), started.elapsed());
+    }
+}
+
+/// Window checks against a test window titled `$BW_LIVE_WINDOW`; run by hand
+/// with `--ignored`.
+#[cfg(test)]
+mod live_window {
+    use crate::window::MatchBy;
+
+    fn title() -> String {
+        std::env::var("BW_LIVE_WINDOW").expect("set BW_LIVE_WINDOW to a test window's title")
+    }
+
+    #[test]
+    #[ignore]
+    fn window_bounds() {
+        let started = std::time::Instant::now();
+        eprintln!("bounds {:?} in {:?}", crate::window::bounds(&title(), MatchBy::Title), started.elapsed());
+    }
+
+    #[test]
+    #[ignore]
+    fn window_capture_rate() {
+        let title = title();
+        for _ in 0..10 {
+            let started = std::time::Instant::now();
+            let shot = super::capture_window(&title, MatchBy::Title).unwrap();
+            eprintln!("capture_window {}x{} origin {:?} scale {} in {:?}", shot.image.width, shot.image.height, shot.origin, shot.scale, started.elapsed());
+        }
+        // Where pure red sits, to check the crop against a centered red marker.
+        let shot = super::capture_window(&title, MatchBy::Title).unwrap();
+        let (w, h) = (shot.image.width, shot.image.height);
+        let red: Vec<(u32, u32)> = (0..h).flat_map(|y| (0..w).map(move |x| (x, y))).filter(|&(x, y)| shot.image.pixel(x, y) == [255, 0, 0]).collect();
+        if let (Some(x0), Some(x1), Some(y0), Some(y1)) =
+            (red.iter().map(|p| p.0).min(), red.iter().map(|p| p.0).max(), red.iter().map(|p| p.1).min(), red.iter().map(|p| p.1).max())
+        {
+            let marker = shot.to_screen((x0 + x1 + 1) as f64 / 2.0, (y0 + y1 + 1) as f64 / 2.0);
+            eprintln!("red marker center {marker:?}, window center {:?}", shot.center());
+        }
     }
 }

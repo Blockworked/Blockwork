@@ -263,8 +263,12 @@ manual, but it validates gain and deadzone values before native blocks exist.
 
 Done:
 
-- `window::bounds` on Hyprland, Sway, KDE (kdotool), X11, Windows (client
-  area) and macOS (whole frame), and `screen::capture_window`.
+- `window::bounds` on Hyprland, Sway, KDE (kdotool to find the window, a
+  KWin script for its client area), X11, Windows (client area) and macOS
+  (whole frame), and `screen::capture_window`. On KDE Wayland that captures
+  just the window's area through KWin's ScreenShot2 (`src/kwin.rs`,
+  `screen/linux.rs`), which KWin 6.8 lets any app call; elsewhere, or if
+  KWin refuses, it crops a whole-desktop capture (grim, then the portal).
 - `blockwork-core/src/detect/`: `WindowCapture`/`Detector` traits, the
   loopback HTTP detector (`detect/http.rs`, reply format in its doc comment),
   the tracker (`detect/track.rs`) and `AimController` (`detect/aim.rs`).

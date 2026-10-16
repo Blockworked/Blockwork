@@ -213,7 +213,7 @@ mod linux {
         match desktop()? {
             Desktop::Hyprland => hypr::bounds(&hypr::find(pattern, by)?),
             Desktop::Sway => sway::bounds(&sway::find(pattern, by)?),
-            Desktop::Kde => kde::parse_geometry(&run("kdotool", &["getwindowgeometry", &kde::find(pattern, by)?])?),
+            Desktop::Kde => kde::bounds(&kde::find(pattern, by)?),
             Desktop::X11 => {
                 let x = x11::X11::connect()?;
                 let w = x.find(pattern, by)?;
@@ -509,6 +509,31 @@ mod linux {
             let (x, y) = field("Position:", ',').ok_or_else(bad)?;
             let (w, h) = field("Geometry:", 'x').ok_or_else(bad)?;
             sized(x, y, w, h)
+        }
+
+        /// The window's content area. kdotool's geometry is the frame,
+        /// title bar included, so ask KWin for the client rect first.
+        pub(super) fn bounds(id: &str) -> Result<Rect, String> {
+            client_geometry(id).or_else(|_| parse_geometry(&run("kdotool", &["getwindowgeometry", id])?))
+        }
+
+        fn client_geometry(id: &str) -> Result<Rect, String> {
+            let script = format!(
+                "const w = workspace.windowList().find(w => w.internalId.toString() === {});\n\
+                 const g = w && w.clientGeometry;\n\
+                 reply(g ? [g.x, g.y, g.width, g.height].join(\",\") : \"\");",
+                crate::kwin::js_string(id)
+            );
+            parse_rect(&crate::kwin::script(&script)?)
+        }
+
+        /// "x,y,width,height", as the client geometry script replies.
+        pub(crate) fn parse_rect(text: &str) -> Result<Rect, String> {
+            let n: Vec<f64> = text.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+            match n[..] {
+                [x, y, w, h] => sized(x, y, w, h),
+                _ => Err(format!("unexpected window geometry '{text}'")),
+            }
         }
 
         pub(super) fn act(action: Action, id: &str) -> Result<(), String> {
@@ -954,6 +979,10 @@ mod tests {
         assert_eq!(linux::kde::parse_geometry(out), Ok(Rect { x: 120.0, y: -40.0, width: 800.0, height: 600.0 }));
         assert!(linux::kde::parse_geometry("Position: 1,2\n  Geometry: 0x0").is_err());
         assert!(linux::kde::parse_geometry("nonsense").is_err());
+        assert_eq!(linux::kde::parse_rect("2427,374,480,360"), Ok(Rect { x: 2427.0, y: 374.0, width: 480.0, height: 360.0 }));
+        assert_eq!(linux::kde::parse_rect("0,13,1707.5,1067").map(|r| r.width), Ok(1707.5));
+        assert!(linux::kde::parse_rect("").is_err());
+        assert!(linux::kde::parse_rect("1,2,0,0").is_err());
     }
 
     #[test]
