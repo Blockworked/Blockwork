@@ -1,4 +1,0 @@
-# Weights Ultralytics downloads while training
-*.pt
-weights/
-__pycache__/
