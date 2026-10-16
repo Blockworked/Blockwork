@@ -133,6 +133,7 @@ mod kwin {
     }
 
     fn try_capture(method: &str, area: Option<(i32, i32, u32, u32)>) -> Result<Image, String> {
+        let _runtime = crate::dbus::enter();
         let connection = crate::kwin::connection()?;
         let (mut read, write) = std::io::pipe().map_err(|e| e.to_string())?;
         let mut options: HashMap<&str, Value> = HashMap::new();
@@ -209,6 +210,7 @@ mod portal {
 
     pub(super) fn screenshot() -> Result<Image, String> {
         let _busy = BUSY.lock().unwrap_or_else(|e| e.into_inner());
+        let _runtime = crate::dbus::enter();
         let unavailable = |e: zbus::Error| format!("couldn't take a screenshot through the desktop portal: {e}");
         let connection = zbus::blocking::Connection::session().map_err(unavailable)?;
         let token = format!("blockwork{}", uuid::Uuid::new_v4().simple());

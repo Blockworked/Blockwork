@@ -28,6 +28,7 @@ struct Bus {
 fn bus() -> Result<&'static Bus, String> {
     static BUS: OnceLock<Result<Bus, String>> = OnceLock::new();
     BUS.get_or_init(|| {
+        let _runtime = crate::dbus::enter();
         let connection = Connection::session().map_err(|e| format!("no session bus: {e}"))?;
         let (tx, rx) = channel();
         connection.object_server().at(PATH, Listener(tx)).map_err(|e| e.to_string())?;
@@ -121,4 +122,17 @@ fn run(bus: &Bus, file: &std::path::Path, plugin: &str, token: &str, replies: &R
 /// A JS string literal (JSON's is valid JS).
 pub fn js_string(text: &str) -> String {
     serde_json::to_string(text).unwrap_or_default()
+}
+
+#[cfg(test)]
+mod tests {
+    #[test]
+    fn connects_from_plain_threads() {
+        // Panicked here when the daemon's tray switched zbus to Tokio.
+        std::thread::spawn(|| {
+            let _ = super::connection();
+        })
+        .join()
+        .unwrap();
+    }
 }

@@ -12,6 +12,8 @@ pub mod input;
 pub mod ipc;
 pub mod key_mapping;
 #[cfg(target_os = "linux")]
+pub mod dbus;
+#[cfg(target_os = "linux")]
 pub mod kwin;
 pub mod macros;
 pub mod notify;

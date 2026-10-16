@@ -56,6 +56,8 @@ wayland-client.workspace = true
 wayland-protocols.workspace = true
 # Desktop notifications over the session bus (see src/notify.rs).
 zbus.workspace = true
+# A runtime for zbus tasks on plain threads (see src/dbus.rs).
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "time"] }
 
 [target.'cfg(windows)'.dependencies]
 enigo.workspace = true
