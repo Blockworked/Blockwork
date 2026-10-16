@@ -70,7 +70,8 @@ impl Detector for OnnxDetector {
 }
 
 /// A real model on a real picture; run by hand with `--ignored`, with
-/// `BLOCKWORK_TEST_MODEL` (a YOLOv8 .onnx) and `BLOCKWORK_TEST_IMAGE` (a PNG).
+/// `BLOCKWORK_TEST_MODEL` (a YOLOv8 .onnx), `BLOCKWORK_TEST_IMAGE` (a PNG)
+/// and optionally `BLOCKWORK_TEST_LABEL` (what must be found; default person).
 #[cfg(test)]
 mod live {
     use super::*;
@@ -92,6 +93,7 @@ mod live {
         for d in found.iter().filter(|d| d.score >= 0.25) {
             eprintln!("{} {:.2} at {:.0},{:.0} {:.0}x{:.0}", d.label, d.score, d.x, d.y, d.w, d.h);
         }
-        assert!(found.iter().any(|d| d.label == "person" && d.score >= 0.25), "{found:?}");
+        let want = std::env::var("BLOCKWORK_TEST_LABEL").unwrap_or("person".into());
+        assert!(found.iter().any(|d| d.label == want && d.score >= 0.25), "{found:?}");
     }
 }
