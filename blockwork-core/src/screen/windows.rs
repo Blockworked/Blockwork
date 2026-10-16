@@ -13,7 +13,7 @@ use windows_sys::Win32::UI::WindowsAndMessaging::{
     GetCursorPos, GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
 };
 
-pub(super) fn capture_area(_: Rect) -> Option<Shot> {
+pub(super) fn capture_area(_: Rect, _native: bool) -> Option<Shot> {
     None
 }
 

@@ -10,6 +10,7 @@ pub mod http;
 pub mod onnx;
 #[cfg(feature = "onnx")]
 pub mod models;
+pub mod overlay;
 pub mod yolo;
 pub mod track;
 
@@ -17,7 +18,7 @@ use crate::screen::{Image, Rect, Shot};
 use crate::window::MatchBy;
 use serde::{Deserialize, Serialize};
 
-pub use aim::AimController;
+pub use aim::{AimController, Glide};
 
 /// One box. In a detector's answer it's in image pixels; everywhere else in
 /// screen coordinates, the space `MoveMouse` and `Shot::to_screen` use.
@@ -98,7 +99,43 @@ pub struct Screen;
 
 impl WindowCapture for Screen {
     fn capture_window(&self, pattern: &str, by: MatchBy) -> Result<Shot, String> {
-        crate::screen::capture_window(pattern, by)
+        crate::screen::capture_window_small(pattern, by)
+    }
+}
+
+/// Captures one window on its own thread, one frame ahead, so a loop of
+/// passes runs at the slower stage's pace instead of capture plus model.
+pub struct Prefetch {
+    frames: std::sync::mpsc::Receiver<(std::time::Instant, Result<Shot, String>)>,
+    taken: std::cell::Cell<Option<std::time::Instant>>,
+}
+
+impl Prefetch {
+    pub fn start(pattern: &str, by: MatchBy) -> Prefetch {
+        // A rendezvous: each capture starts once the previous one is taken.
+        let (tx, frames) = std::sync::mpsc::sync_channel(0);
+        let pattern = pattern.to_string();
+        let _ = std::thread::Builder::new().name("detect-capture".into()).spawn(move || loop {
+            let at = std::time::Instant::now();
+            // Ends once the receiver is dropped.
+            if tx.send((at, crate::screen::capture_window_small(&pattern, by))).is_err() {
+                break;
+            }
+        });
+        Prefetch { frames, taken: std::cell::Cell::new(None) }
+    }
+
+    /// When the last frame handed out was captured.
+    pub fn captured_at(&self) -> Option<std::time::Instant> {
+        self.taken.get()
+    }
+}
+
+impl WindowCapture for Prefetch {
+    fn capture_window(&self, _: &str, _: MatchBy) -> Result<Shot, String> {
+        let (at, shot) = self.frames.recv().map_err(|_| "the capture thread stopped".to_string())?;
+        self.taken.set(Some(at));
+        shot
     }
 }
 
@@ -167,21 +204,31 @@ pub struct Frame {
     pub detections: Vec<Detection>,
     /// The window center, where a first-person game draws its crosshair.
     pub crosshair: (f64, f64),
+    /// The window's height in screen units.
+    pub window_height: f64,
+    /// Time spent getting the frame, and in the detector.
+    pub capture_ms: f64,
+    pub detect_ms: f64,
 }
 
 /// Captures the window, runs the detector and keeps the boxes that pass the
 /// query's filters, mapped to screen coordinates. Not yet sorted or tracked.
 pub fn detect(query: &Query, capture: &dyn WindowCapture, detector: &dyn Detector) -> Result<Frame, String> {
+    let started = std::time::Instant::now();
     let shot = capture.capture_window(&query.pattern, query.by)?;
+    let capture_ms = started.elapsed().as_secs_f64() * 1000.0;
     // The crosshair stays the window's center even when only part is searched.
     let crosshair = shot.center();
+    let window_height = shot.image.height as f64 / shot.scale;
     let shot = match query.region {
         Some(r) => shot
             .crop(Rect { x: shot.origin.0 + r.x, y: shot.origin.1 + r.y, ..r })
             .map_err(|_| "the region is outside the window".to_string())?,
         None => shot,
     };
+    let started = std::time::Instant::now();
     let found = detector.detect(&shot.image)?;
+    let detect_ms = started.elapsed().as_secs_f64() * 1000.0;
     let label = query.label.trim().to_lowercase();
     let detections = found
         .into_iter()
@@ -189,7 +236,7 @@ pub fn detect(query: &Query, capture: &dyn WindowCapture, detector: &dyn Detecto
         .filter(|d| d.score >= query.min_score)
         .map(|d| to_screen(&shot, d))
         .collect();
-    Ok(Frame { detections, crosshair })
+    Ok(Frame { detections, crosshair, window_height, capture_ms, detect_ms })
 }
 
 fn to_screen(shot: &Shot, d: Detection) -> Detection {
@@ -229,7 +276,12 @@ pub fn detector_for(text: &str) -> Result<Box<dyn Detector>, String> {
 
 /// [`detect`] with the real screen and the query's detector.
 pub fn detect_on_screen(query: &Query) -> Result<Frame, String> {
-    detect(query, &Screen, &*detector_for(&query.detector)?)
+    detect_with(query, &Screen)
+}
+
+/// [`detect`] with the query's detector.
+pub fn detect_with(query: &Query, capture: &dyn WindowCapture) -> Result<Frame, String> {
+    detect(query, capture, &*detector_for(&query.detector)?)
 }
 
 #[cfg(test)]

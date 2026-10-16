@@ -86,7 +86,10 @@ Purpose: one proportional relative move toward a screen point.
 Fields:
 
 - `target_x: Value`, `target_y: Value` - screen point from section 3.5.
-- `gain: Value` - pixels of mouse delta per pixel of error, for example 0.4.
+- `gain: Value` - mouse units per pixel of error in a 1000 px tall window,
+  scaled to the window's real height (a first-person view turns the same
+  angle across more pixels in a taller window); about 0.5 for Minecraft's
+  default sensitivity.
 - `max_step: Value` - clamp on each axis per step, pixels.
 - `deadzone: Value` - stop moving inside this pixel radius.
 
@@ -95,7 +98,7 @@ Behavior:
 ```text
 err = target - crosshair
 if len(err) <= deadzone: done
-delta = clamp(err * gain, -max_step, max_step)
+delta = clamp(err * gain * 1000 / window_height, -max_step, max_step)
 move_mouse_rel(round(delta.x), round(delta.y))
 ```
 

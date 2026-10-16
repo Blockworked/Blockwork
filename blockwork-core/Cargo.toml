@@ -7,7 +7,7 @@ edition.workspace = true
 name = "blockwork_core"
 
 [features]
-default = ["ipc", "updater", "onnx"]
+default = ["ipc", "updater", "onnx", "gpu"]
 # Loopback TCP control server; not needed by an embedder (e.g. via
 # blockwork-ffi) that calls into this crate directly and in-process.
 ipc = ["tokio/rt", "tokio/rt-multi-thread", "tokio/macros", "tokio/net", "tokio/io-util", "tokio/time"]
@@ -17,6 +17,9 @@ updater = ["dep:self_update", "dep:http"]
 # Built-in object detection models (see src/detect/onnx.rs). Pure Rust, so
 # offline and Flatpak builds need no native runtime.
 onnx = ["dep:tract-onnx", "dep:sha2"]
+# Runs those models on an NVIDIA GPU when CUDA is installed. CUDA is loaded
+# at runtime, so builds don't need it and machines without it use the CPU.
+gpu = ["onnx", "dep:tract-cuda"]
 
 [dependencies]
 blockstitch-core.workspace = true
@@ -58,6 +61,9 @@ wayland-protocols.workspace = true
 zbus.workspace = true
 # A runtime for zbus tasks on plain threads (see src/dbus.rs).
 tokio = { workspace = true, features = ["rt-multi-thread", "net", "time"] }
+
+[target.'cfg(any(target_os = "linux", windows))'.dependencies]
+tract-cuda = { version = "=0.23.9", optional = true }
 
 [target.'cfg(windows)'.dependencies]
 enigo.workspace = true

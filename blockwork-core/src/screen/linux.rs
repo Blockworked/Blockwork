@@ -32,7 +32,7 @@ static NO_GRIM: AtomicBool = AtomicBool::new(false);
 
 /// Just the screen rectangle `rect`, when there's a faster way than
 /// cropping a whole-desktop capture.
-pub(super) fn capture_area(rect: Rect) -> Option<Shot> {
+pub(super) fn capture_area(rect: Rect, native: bool) -> Option<Shot> {
     if !wayland() {
         return None;
     }
@@ -41,7 +41,7 @@ pub(super) fn capture_area(rect: Rect) -> Option<Shot> {
     if width < 1.0 || height < 1.0 {
         return None;
     }
-    let image = kwin::area(x as i32, y as i32, width as u32, height as u32)?;
+    let image = kwin::area(x as i32, y as i32, width as u32, height as u32, native)?;
     let scale = image.width as f64 / width;
     Some(Shot { image, origin: (x, y), scale })
 }
@@ -112,18 +112,19 @@ mod kwin {
     static UNAVAILABLE: AtomicBool = AtomicBool::new(false);
 
     pub(super) fn workspace() -> Option<Image> {
-        capture("CaptureWorkspace", None)
+        capture("CaptureWorkspace", None, true)
     }
 
-    pub(super) fn area(x: i32, y: i32, width: u32, height: u32) -> Option<Image> {
-        capture("CaptureArea", Some((x, y, width, height)))
+    /// `native` asks for every physical pixel; otherwise it's the logical size.
+    pub(super) fn area(x: i32, y: i32, width: u32, height: u32, native: bool) -> Option<Image> {
+        capture("CaptureArea", Some((x, y, width, height)), native)
     }
 
-    fn capture(method: &str, area: Option<(i32, i32, u32, u32)>) -> Option<Image> {
+    fn capture(method: &str, area: Option<(i32, i32, u32, u32)>, native: bool) -> Option<Image> {
         if UNAVAILABLE.load(Ordering::Relaxed) {
             return None;
         }
-        match try_capture(method, area) {
+        match try_capture(method, area, native) {
             Ok(image) => Some(image),
             Err(e) => {
                 tracing::debug!("KWin {method} failed: {e}");
@@ -132,12 +133,12 @@ mod kwin {
         }
     }
 
-    fn try_capture(method: &str, area: Option<(i32, i32, u32, u32)>) -> Result<Image, String> {
+    fn try_capture(method: &str, area: Option<(i32, i32, u32, u32)>, native: bool) -> Result<Image, String> {
         let _runtime = crate::dbus::enter();
         let connection = crate::kwin::connection()?;
         let (mut read, write) = std::io::pipe().map_err(|e| e.to_string())?;
         let mut options: HashMap<&str, Value> = HashMap::new();
-        options.insert("native-resolution", true.into());
+        options.insert("native-resolution", native.into());
         // Blockwork may run inside the window it's watching (blockwork-ffi).
         options.insert("hide-caller-windows", false.into());
         let fd = Fd::from(write.as_fd());

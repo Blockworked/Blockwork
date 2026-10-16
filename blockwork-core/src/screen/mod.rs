@@ -37,7 +37,7 @@ mod platform {
     pub(super) fn capture() -> Result<Shot, String> {
         Err(MSG.into())
     }
-    pub(super) fn capture_area(_: Rect) -> Option<Shot> {
+    pub(super) fn capture_area(_: Rect, _native: bool) -> Option<Shot> {
         None
     }
     pub(super) fn monitors() -> Vec<Rect> {
@@ -175,11 +175,42 @@ pub fn find_image(needle: &Image, tolerance: f64) -> Result<Option<(f64, f64)>, 
 /// What's inside a matching window right now (the active window when
 /// `pattern` is empty). Anything covering the window is captured too.
 pub fn capture_window(pattern: &str, by: crate::window::MatchBy) -> Result<Shot, String> {
-    let bounds = crate::window::bounds(pattern, by)?;
-    if let Some(shot) = platform::capture_area(bounds) {
+    window_shot(pattern, by, true)
+}
+
+/// [`capture_window`], but where it's cheaper the image may be at the
+/// window's logical size instead of every physical pixel: plenty for a
+/// detector, and a quarter of the work on a 2x screen.
+pub fn capture_window_small(pattern: &str, by: crate::window::MatchBy) -> Result<Shot, String> {
+    window_shot(pattern, by, false)
+}
+
+fn window_shot(pattern: &str, by: crate::window::MatchBy, native: bool) -> Result<Shot, String> {
+    let bounds = window_bounds(pattern, by)?;
+    if let Some(shot) = platform::capture_area(bounds, native) {
         return Ok(shot);
     }
     capture()?.crop(bounds).map_err(|_| "the window is off screen".to_string())
+}
+
+/// How long a window lookup is reused: aiming captures the same window many
+/// times a second, and each lookup is a compositor round trip.
+const BOUNDS_TTL: std::time::Duration = std::time::Duration::from_millis(500);
+
+fn window_bounds(pattern: &str, by: crate::window::MatchBy) -> Result<Rect, String> {
+    use std::time::Instant;
+    static LAST: Mutex<Option<(String, crate::window::MatchBy, Rect, Instant)>> = Mutex::new(None);
+    let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
+    if let Some((p, b, rect, at)) = &*last
+        && p == pattern
+        && *b == by
+        && at.elapsed() < BOUNDS_TTL
+    {
+        return Ok(*rect);
+    }
+    let rect = crate::window::bounds(pattern, by)?;
+    *last = Some((pattern.to_string(), by, rect, Instant::now()));
+    Ok(rect)
 }
 
 /// Every monitor, in screen coordinates.
