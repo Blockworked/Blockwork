@@ -1,6 +1,7 @@
 use crate::input::types::{Coordinate, Direction, InputToken, MacroButton, MacroKey};
 use crate::input::value::{Evaluated, Op, Value};
 use crate::macros::backend::{create_backend, InputBackend};
+use crate::macros::host_clock;
 use crate::macros::priority::raise_current_thread_priority;
 use crate::macros::{BlockKind, Instruction, InstructionKind, Macro};
 use blockstitch_core::graph::{
@@ -86,6 +87,8 @@ struct ExecCtx<'a> {
     /// Signal strands started without waiting; joined when this strand ends
     /// so the run lasts until they finish.
     signal_threads: Vec<std::thread::JoinHandle<()>>,
+    /// Virtual time this strand has waited through in host-clock mode.
+    host_time_ms: f64,
 }
 
 impl<'a> ExecCtx<'a> {
@@ -770,6 +773,9 @@ impl Macro {
         if entry_strands.is_empty() {
             return;
         }
+        if host_clock::enabled() {
+            host_clock::attach(entry_strands.len());
+        }
         // Every entry strand gets its own thread, including the first, so
         // deep recursion errors out on a known stack instead of aborting.
         std::thread::scope(|scope| {
@@ -809,6 +815,17 @@ impl Macro {
 /// stopped, or errored. The returned `Result`/`Option` is discarded - a
 /// `Return` reaching strand level has nowhere to hand its value, and resolve
 /// errors are already `warn!`-logged at their source.
+/// Runs a function when dropped.
+struct Defer(Option<fn()>);
+
+impl Drop for Defer {
+    fn drop(&mut self) {
+        if let Some(f) = self.0.take() {
+            f();
+        }
+    }
+}
+
 fn run_strand(
     source: Arc<crate::run_log::Source>,
     instructions: Vec<Instruction>,
@@ -821,6 +838,7 @@ fn run_strand(
     initial_offset: Duration,
     max_loop_iterations: u32,
 ) {
+    let _detach = host_clock::enabled().then(|| Defer(Some(host_clock::detach)));
     raise_current_thread_priority();
     // Priority-raise happens first (its latency shouldn't eat into the
     // offset), then anchor "now" for this strand's Wait chain, backdated by
@@ -850,6 +868,7 @@ fn run_strand(
             trace: crate::macros::trace::Tracker::new(&source.macro_id),
             max_loop_iterations: max_loop_iterations.into(),
             signal_threads: Vec::new(),
+            host_time_ms: 0.0,
         };
         // An error reaching the top ends this strand.
         if let Err(e) = run_block(&instructions, &mut ctx, 0, start) {
@@ -1679,6 +1698,15 @@ fn run_block(
                 // Clamped since duration may be an Op::Random node with a
                 // negative lower bound; from_secs_f64 panics on negative input.
                 let actual = (duration / ctx.speed_multiplier).max(0.0);
+                if host_clock::enabled() {
+                    ctx.host_time_ms += actual;
+                    let flag = ctx.stop_flag.clone();
+                    let should_stop = move || flag.as_ref().is_some_and(|f| stop_requested(f));
+                    if !host_clock::wait_until(ctx.host_time_ms, &should_stop) {
+                        break;
+                    }
+                    continue;
+                }
                 deadline += Duration::from_secs_f64(actual / 1000.0);
 
                 if let Some(flag) = &ctx.stop_flag {

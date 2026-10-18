@@ -18,6 +18,8 @@ pub mod locks;
 pub mod migrate;
 pub mod loop_control;
 pub mod priority;
+pub mod gdr_import;
+pub mod host_clock;
 pub mod run_registry;
 pub mod runner;
 pub mod thread_pool;

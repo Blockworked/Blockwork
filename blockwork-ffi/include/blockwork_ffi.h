@@ -54,6 +54,72 @@ int32_t blockwork_stop_recording(void);
 int32_t blockwork_run_macro(const char *id_utf8, double elapsed_overshoot_ms);
 
 /**
+ * Starts the selected (or `id_utf8`) macro in lockstep with the host: its
+ * `Wait`s follow the virtual time passed to `blockwork_sync_step`, starting
+ * at 0, and its input is handed to that call's callback instead of the OS.
+ * Returns 0 on success, -1 if no macro is found, -3 if the run thread
+ * couldn't start.
+ */
+int32_t blockwork_sync_begin(const char *id_utf8);
+
+/**
+ * Advances the lockstep run to `time_ms` of virtual time, waits for the
+ * macro to settle there, then calls `callback` for each input it emitted,
+ * in order. No-op when no lockstep run is active. Call from the host's
+ * tick, on the thread that should receive the input. The callback gets the
+ * key or mouse-button name (e.g. "Space", "Left"), whether it is a button,
+ * and whether it went down. Returns the number of
+ * inputs delivered.
+ */
+int32_t blockwork_sync_step(double time_ms, void (*callback)(const char*, bool, bool));
+
+/**
+ * Starts a host-clocked recording, discarding any earlier one. Unlike
+ * `blockwork_start_recording` the host stamps each input itself (with the
+ * physics step it was applied on), so the macro is exact to the host's ticks
+ * and doesn't depend on wall-clock jitter.
+ */
+void blockwork_step_record_begin(void);
+
+/**
+ * Adds one input to the host-clocked recording at `time_ms` of host time.
+ * `secondary` is the second player's button.
+ */
+void blockwork_step_record_input(double time_ms, bool secondary, bool down);
+
+/**
+ * Ends the host-clocked recording and replaces the selected macro's
+ * recording target with it. Returns the number of instructions saved
+ * (0 if nothing was recorded; the macro is left alone), or a negative
+ * error: -2 no usable selected macro, -3 couldn't be saved.
+ */
+int32_t blockwork_step_record_end(void);
+
+/**
+ * Imports a Geometry Dash GDR2 replay (e.g. from zBot) as a new frame-locked
+ * macro, saves it and makes it the selected macro. Returns 0 on success,
+ * -1 for a bad path, -2 if the file can't be read, -3 if it isn't a valid
+ * replay, -4 if the macro couldn't be saved.
+ */
+int32_t blockwork_import_gdr(const char *path_utf8);
+
+/**
+ * Returns the folder replays can be dropped into for import (created if
+ * missing) as a heap-allocated UTF-8 string, or null if it can't be
+ * resolved. Free with `blockwork_free_string`.
+ */
+char *blockwork_imports_dir(void);
+
+/**
+ * Imports every `.gdr` / `.gdr.json` replay waiting in the imports folder
+ * (see `blockwork_imports_dir`), renaming each to `*.imported` so it isn't
+ * imported twice. The last one imported becomes the selected macro.
+ * Returns how many were imported, or a negative number if the folder
+ * can't be read.
+ */
+int32_t blockwork_import_pending_gdrs(void);
+
+/**
  * Stops every in-flight run (single or looping) started via
  * `blockwork_run_macro`.
  */

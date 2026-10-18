@@ -7,6 +7,7 @@ mod wine_bridge;
 
 use blockwork_core::config;
 use blockwork_core::macros::backend::InputBackend;
+use blockwork_core::macros::host_clock;
 use blockwork_core::macros::run_registry;
 use blockwork_core::macros::runner::{self, VariableStore};
 use blockwork_core::macros::{Instruction, Macro, SPEED_MULTIPLIER_RANGE};
@@ -17,6 +18,8 @@ use std::path::PathBuf;
 use std::sync::atomic::{AtomicUsize, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
 
+/// Thread of the current lockstep run, joined before the next one starts.
+static SYNC_RUN: Mutex<Option<std::thread::JoinHandle<()>>> = Mutex::new(None);
 static EMULATOR: OnceLock<Arc<Mutex<dyn InputBackend>>> = OnceLock::new();
 #[cfg(windows)]
 static WINE_BRIDGE: OnceLock<wine_bridge::WineBridge> = OnceLock::new();
@@ -247,6 +250,203 @@ pub extern "C" fn blockwork_run_macro(id_utf8: *const c_char, elapsed_overshoot_
             Ok(_) => 0,
             Err(_) => -3,
         }
+    })
+}
+
+/// Starts the selected (or `id_utf8`) macro in lockstep with the host: its
+/// `Wait`s follow the virtual time passed to `blockwork_sync_step`, starting
+/// at 0, and its input is handed to that call's callback instead of the OS.
+/// Returns 0 on success, -1 if no macro is found, -3 if the run thread
+/// couldn't start.
+#[no_mangle]
+pub extern "C" fn blockwork_sync_begin(id_utf8: *const c_char) -> i32 {
+    let requested_id = unsafe { cstr_to_owned(id_utf8) };
+    catch(move || {
+        let mac = requested_id
+            .and_then(|id| config::get_macro_by_id(&id))
+            .or_else(|| config::get_selected_macro_id().and_then(|id| config::get_macro_by_id(&id)));
+        let Some(mac) = mac else { return -1 };
+
+        // Stop the earlier run and wait for it to fully unwind, so its
+        // trailing `finish` can't land on this run's clock.
+        run_registry::stop_all();
+        if let Some(previous) = SYNC_RUN.lock().ok().and_then(|mut run| run.take()) {
+            let _ = previous.join();
+        }
+        host_clock::finish();
+
+        let emulator: Arc<Mutex<dyn InputBackend>> = Arc::new(Mutex::new(host_clock::HostBackend));
+        let variables: VariableStore =
+            Arc::new(Mutex::new(mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect()));
+        // Waits are in the host's own time, which already carries any game speed.
+        let speed_multiplier = 1.0;
+
+        host_clock::begin();
+        let flag = run_registry::begin_run();
+        let spawned = std::thread::Builder::new().name("macros-sync-run".to_string()).spawn(move || {
+            mac.run_with_offset(emulator, Some(Arc::clone(&flag)), speed_multiplier, variables, std::time::Duration::ZERO);
+            run_registry::end_run(&flag);
+            host_clock::finish();
+        });
+        match spawned {
+            Ok(handle) => {
+                if let Ok(mut run) = SYNC_RUN.lock() {
+                    *run = Some(handle);
+                }
+                0
+            }
+            Err(_) => {
+                host_clock::finish();
+                -3
+            }
+        }
+    })
+}
+
+/// Advances the lockstep run to `time_ms` of virtual time, waits for the
+/// macro to settle there, then calls `callback` for each input it emitted,
+/// in order. No-op when no lockstep run is active. Call from the host's
+/// tick, on the thread that should receive the input. The callback gets the
+/// key or mouse-button name (e.g. "Space", "Left"), whether it is a button,
+/// and whether it went down. Returns the number of
+/// inputs delivered.
+#[no_mangle]
+pub extern "C" fn blockwork_sync_step(time_ms: f64, callback: Option<extern "C" fn(*const c_char, bool, bool)>) -> i32 {
+    catch(move || {
+        let events = host_clock::step(time_ms);
+        if let Some(callback) = callback {
+            for event in &events {
+                if let Ok(name) = CString::new(event.name.as_str()) {
+                    callback(name.as_ptr(), event.is_button, event.down);
+                }
+            }
+        }
+        events.len() as i32
+    })
+}
+
+/// Inputs captured against the host's own clock: (time_ms, secondary, down).
+static STEP_RECORDING: Mutex<Vec<(f64, bool, bool)>> = Mutex::new(Vec::new());
+
+/// Starts a host-clocked recording, discarding any earlier one. Unlike
+/// `blockwork_start_recording` the host stamps each input itself (with the
+/// physics step it was applied on), so the macro is exact to the host's ticks
+/// and doesn't depend on wall-clock jitter.
+#[no_mangle]
+pub extern "C" fn blockwork_step_record_begin() {
+    catch(|| {
+        if let Ok(mut inputs) = STEP_RECORDING.lock() {
+            inputs.clear();
+        }
+        0
+    });
+}
+
+/// Adds one input to the host-clocked recording at `time_ms` of host time.
+/// `secondary` is the second player's button.
+#[no_mangle]
+pub extern "C" fn blockwork_step_record_input(time_ms: f64, secondary: bool, down: bool) {
+    catch(move || {
+        if let Ok(mut inputs) = STEP_RECORDING.lock() {
+            inputs.push((time_ms, secondary, down));
+        }
+        0
+    });
+}
+
+/// Ends the host-clocked recording and replaces the selected macro's
+/// recording target with it. Returns the number of instructions saved
+/// (0 if nothing was recorded; the macro is left alone), or a negative
+/// error: -2 no usable selected macro, -3 couldn't be saved.
+#[no_mangle]
+pub extern "C" fn blockwork_step_record_end() -> i32 {
+    catch(|| {
+        let inputs: Vec<_> = match STEP_RECORDING.lock() {
+            Ok(mut inputs) => std::mem::take(&mut *inputs),
+            Err(_) => return -1,
+        };
+        if inputs.is_empty() {
+            return 0;
+        }
+        let code = blockwork_core::macros::gdr_import::step_inputs_to_instructions(&inputs);
+        let count = code.len() as i32;
+        let Some(id) = config::get_selected_macro_id() else { return -2 };
+        let Some(mut mac) = config::get_macro_by_id(&id) else { return -2 };
+        let strand = mac.recording_target_mut();
+        let keep = if strand.instructions.first().map_or(false, Instruction::is_header) { 1 } else { 0 };
+        strand.instructions.truncate(keep);
+        strand.instructions.extend(code);
+        if let Err(e) = mac.save() {
+            tracing::warn!("blockwork-ffi: failed to save step-recorded macro: {e}");
+            return -3;
+        }
+        config::set_selected_macro_id(Some(&mac.id));
+        count
+    })
+}
+
+/// Imports a Geometry Dash GDR2 replay (e.g. from zBot) as a new frame-locked
+/// macro, saves it and makes it the selected macro. Returns 0 on success,
+/// -1 for a bad path, -2 if the file can't be read, -3 if it isn't a valid
+/// replay, -4 if the macro couldn't be saved.
+#[no_mangle]
+pub extern "C" fn blockwork_import_gdr(path_utf8: *const c_char) -> i32 {
+    let Some(path) = (unsafe { cstr_to_owned(path_utf8) }) else { return -1 };
+    catch(move || {
+        let Ok(bytes) = std::fs::read(&path) else { return -2 };
+        let fallback = std::path::Path::new(&path).file_stem().and_then(|s| s.to_str()).unwrap_or("Replay").to_string();
+        let mac = match blockwork_core::macros::gdr_import::import_gdr(&bytes, &fallback) {
+            Ok(mac) => mac,
+            Err(e) => {
+                tracing::warn!("blockwork-ffi: GDR import failed: {e}");
+                return -3;
+            }
+        };
+        let id = mac.id.clone();
+        if mac.add().is_err() {
+            return -4;
+        }
+        config::set_selected_macro_id(Some(&id));
+        0
+    })
+}
+
+/// Returns the folder replays can be dropped into for import (created if
+/// missing) as a heap-allocated UTF-8 string, or null if it can't be
+/// resolved. Free with `blockwork_free_string`.
+#[no_mangle]
+pub extern "C" fn blockwork_imports_dir() -> *mut c_char {
+    catch_ptr(|| match config::imports_dir() {
+        Ok(dir) => owned_cstring(dir.to_string_lossy().into_owned()),
+        Err(_) => std::ptr::null_mut(),
+    })
+}
+
+/// Imports every `.gdr` / `.gdr.json` replay waiting in the imports folder
+/// (see `blockwork_imports_dir`), renaming each to `*.imported` so it isn't
+/// imported twice. The last one imported becomes the selected macro.
+/// Returns how many were imported, or a negative number if the folder
+/// can't be read.
+#[no_mangle]
+pub extern "C" fn blockwork_import_pending_gdrs() -> i32 {
+    catch(|| {
+        let Ok(dir) = config::imports_dir() else { return -1 };
+        let Ok(entries) = std::fs::read_dir(&dir) else { return -1 };
+        let mut imported = 0;
+        for path in entries.flatten().map(|e| e.path()) {
+            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_ascii_lowercase();
+            if !(name.ends_with(".gdr") || name.ends_with(".gdr2") || name.ends_with(".gdr.json")) {
+                continue;
+            }
+            let Ok(c_path) = CString::new(path.to_string_lossy().into_owned()) else { continue };
+            if blockwork_import_gdr(c_path.as_ptr()) == 0 {
+                let mut done = path.clone().into_os_string();
+                done.push(".imported");
+                let _ = std::fs::rename(&path, done);
+                imported += 1;
+            }
+        }
+        imported
     })
 }
 

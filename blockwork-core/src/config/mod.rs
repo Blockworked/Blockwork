@@ -40,6 +40,14 @@ pub(crate) fn config_root() -> Result<PathBuf, String> {
         .ok_or_else(|| "Unable to resolve config directory".to_string())
 }
 
+/// Folder where replays dropped in by the user wait to be imported, created
+/// on demand.
+pub fn imports_dir() -> Result<PathBuf, String> {
+    let dir = config_root()?.join("imports");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Unable to create {}: {e}", dir.display()))?;
+    Ok(dir)
+}
+
 /// One-time migration for the Macros→Blockwork rename: if the new config
 /// directory (`APP_ID`) doesn't exist yet but the old one (`LEGACY_APP_ID`)
 /// does, moves it wholesale so every saved macro/setting/hotkey survives.
