@@ -155,7 +155,9 @@ pub fn check(source: &Source, kind: &str, stopped: &dyn Fn() -> bool) -> Result<
         return done;
     }
     let name = if source.name.is_empty() { "A macro" } else { source.name.as_str() };
-    let request = Request::new(Kind::Permission, "Allow this macro?", format!("“{name}” wants to {}.", label(kind)));
+    let mut request = Request::new(Kind::Permission, "Allow this macro?", format!("“{name}” wants to {}.", label(kind)));
+    request.subject = name.to_string();
+    request.ability = kind.to_string();
     let answer = prompt::ask(&request, stopped).map(|r| r.answer);
     match answer.as_deref() {
         Ok("always") => {

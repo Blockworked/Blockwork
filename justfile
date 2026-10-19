@@ -43,6 +43,16 @@ test:
 clean:
     cargo clean
 
+# Refresh blockwork-qt/i18n/*.ts from the QML (this repo's and blockstitch's)
+# and compile them to the .qm files the build embeds. Needs Qt's linguist tools.
+translations blockstitch="../blockstitch":
+    #!/bin/sh
+    set -eu
+    bin=$(qtpaths6 --query QT_HOST_BINS 2>/dev/null || qtpaths --query QT_HOST_BINS 2>/dev/null || echo /usr/lib/qt6/bin)
+    "$bin/lupdate" -silent blockwork-qt/qml "{{blockstitch}}/qml/Blockstitch" -extensions qml -no-obsolete -ts $(ls blockwork-qt/i18n/qml_*.ts | grep -v qml_en.ts)
+    "$bin/lupdate" -silent -pluralonly blockwork-qt/qml "{{blockstitch}}/qml/Blockstitch" -extensions qml -no-obsolete -ts blockwork-qt/i18n/qml_en.ts
+    "$bin/lrelease" -silent blockwork-qt/i18n/qml_*.ts
+
 # Work on blockstitch locally: point cargo's blockstitch-core at the same
 # checkout, without touching the committed lockfile.
 blockstitch-local path="../blockstitch":

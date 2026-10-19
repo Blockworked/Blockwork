@@ -1,4 +1,5 @@
 pub mod battery;
+pub mod block_packs;
 pub mod clipboard;
 pub mod config;
 pub mod detect;

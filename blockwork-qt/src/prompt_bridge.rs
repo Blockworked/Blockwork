@@ -37,6 +37,15 @@ pub fn requested() -> bool {
     true
 }
 
+/// The dialog's language from the request; empty means the system's.
+pub fn language() -> String {
+    REQUEST
+        .get()
+        .and_then(|text| serde_json::from_str::<serde_json::Value>(text).ok())
+        .and_then(|v| v.get("language")?.as_str().map(str::to_string))
+        .unwrap_or_default()
+}
+
 pub struct PromptBridgeRust {
     request_json: cxx_qt_lib::QString,
 }

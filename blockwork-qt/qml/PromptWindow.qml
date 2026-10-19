@@ -14,7 +14,7 @@ ApplicationWindow {
     height: Math.min(560, content.implicitHeight + 40)
     minimumWidth: 320
     visible: true
-    title: kind === "permission" ? "Blockwork permission" : (request.title || "Blockwork")
+    title: kind === "permission" ? qsTr("Blockwork permission") : (request.title || qsTr("Blockwork"))
     flags: Qt.Dialog | Qt.WindowStaysOnTopHint
     color: Theme.panel
     palette {
@@ -32,16 +32,31 @@ ApplicationWindow {
         bridge.finish(button, text || "");
     }
     onClosing: answer(kind === "message" ? "ok" : "cancel", "")
-    Component.onCompleted: { raise(); requestActivate(); if (kind === "text") field.forceActiveFocus(); }
+    Component.onCompleted: {
+        raise(); requestActivate(); if (kind === "text") field.forceActiveFocus();
+    }
+    // Permission questions are worded here so they follow the UI language.
+    readonly property string message: {
+        if (kind !== "permission" || !request.ability) return request.message || "";
+        const name = request.subject || "";
+        const phrases = {
+            commands: qsTr("“%1” wants to run commands and open or close apps."),
+            network: qsTr("“%1” wants to go online."),
+            files_write: qsTr("“%1” wants to write to files."),
+            secrets: qsTr("“%1” wants to read your saved secrets."),
+            screen: qsTr("“%1” wants to read the screen.")
+        };
+        return phrases[request.ability] ? phrases[request.ability].arg(name) : (request.message || "");
+    }
 
     // [label, answer, primary] per kind, left to right.
     readonly property var buttons: ({
-        text: [["Cancel", "cancel", false], ["OK", "ok", true]],
-        confirm: [["No", "no", false], ["Yes", "yes", true]],
-        choice: [["Cancel", "cancel", false], ["OK", "ok", true]],
-        message: [["OK", "ok", true]],
-        permission: [["Deny", "deny", false], ["Allow this time", "once", false], ["Always allow", "always", true]]
-    })[kind] || [["OK", "ok", true]]
+        text: [[qsTr("Cancel"), "cancel", false], [qsTr("OK"), "ok", true]],
+        confirm: [[qsTr("No"), "no", false], [qsTr("Yes"), "yes", true]],
+        choice: [[qsTr("Cancel"), "cancel", false], [qsTr("OK"), "ok", true]],
+        message: [[qsTr("OK"), "ok", true]],
+        permission: [[qsTr("Deny"), "deny", false], [qsTr("Allow this time"), "once", false], [qsTr("Always allow"), "always", true]]
+    })[kind] || [[qsTr("OK"), "ok", true]]
     function accept() {
         if (kind === "choice") { if (choices.currentIndex >= 0) answer("ok", request.options[choices.currentIndex]); }
         else if (kind === "text") answer("ok", field.text);
@@ -64,14 +79,14 @@ ApplicationWindow {
             }
             Text {
                 Layout.fillWidth: true
-                text: root.request.message || ""
+                text: root.message
                 wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 14
             }
         }
         Text {
             visible: root.kind === "permission"
             Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-            text: "Macros you import ask before running commands, going online, writing files, reading secrets or reading the screen. Change what this macro may do in its Macro settings."
+            text: qsTr("Macros you import ask before running commands, going online, writing files, reading secrets or reading the screen. Change what this macro may do in its Macro settings.")
         }
         BwTextField {
             id: field

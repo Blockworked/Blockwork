@@ -30,7 +30,7 @@ const CLEAR_CONFIRM_TIMEOUT_SECS: u64 = 3;
 
 /// Checkpoints the canvas before a structural edit, and ends the current
 /// text-edit group so the next keystroke starts a fresh step.
-fn push_undo(s: &mut AppState) {
+pub(crate) fn push_undo(s: &mut AppState) {
     push_undo_for(s, None);
 }
 
@@ -100,7 +100,7 @@ fn refresh_macro_list(s: &mut crate::state::AppState) {
 
 /// Resyncs the live variable store to `current_macro`'s declared variables -
 /// called after `current_macro` is (re)assigned, so stale entries don't linger.
-fn sync_variable_values(s: &mut crate::state::AppState) {
+pub(crate) fn sync_variable_values(s: &mut crate::state::AppState) {
     let values = match &s.current_macro {
         Some(mac) => mac
             .variables
@@ -114,7 +114,7 @@ fn sync_variable_values(s: &mut crate::state::AppState) {
     }
 }
 
-fn sync_list_values(s: &mut crate::state::AppState) {
+pub(crate) fn sync_list_values(s: &mut crate::state::AppState) {
     let values = match &s.current_macro {
         Some(mac) => mac
             .lists
@@ -128,7 +128,7 @@ fn sync_list_values(s: &mut crate::state::AppState) {
     }
 }
 
-fn auto_save(s: &mut crate::state::AppState) {
+pub(crate) fn auto_save(s: &mut crate::state::AppState) {
     if let Some(mac) = &s.current_macro {
         if let Err(e) = mac.save() {
             warn!("Failed to auto-save macro: {e}");
@@ -921,7 +921,7 @@ fn value_capabilities(value: &Value, found: &mut std::collections::HashSet<&'sta
 /// Everything `mac` can do anywhere, nested blocks included, for the import
 /// review. `OpenApp`'s command can be any shell string in a hand-edited
 /// file, so it counts as running commands.
-fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
+pub(crate) fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
     use blockwork_core::macros::BlockKind;
     let mut found = std::collections::HashSet::new();
     mac.graph.walk_instructions(&mut |ins| {
@@ -2811,6 +2811,18 @@ pub(crate) fn set_palette_layout(
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.palette_layout = layout.clone();
     config::update_settings(|settings| settings.palette_layout = Some(layout));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// The UI language, like "de"; empty follows the system.
+pub(crate) fn set_language(state: &SharedState, app: &AppHandle, language: String) -> Result<(), String> {
+    let language = language.trim().to_string();
+    if !language.is_empty() && !language.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+        return Err(format!("Unknown language: {language}"));
+    }
+    config::update_settings(|settings| settings.language = (!language.is_empty()).then_some(language));
+    let s = state.lock().map_err(|e| e.to_string())?;
     emit_state_updated(app, &s);
     Ok(())
 }

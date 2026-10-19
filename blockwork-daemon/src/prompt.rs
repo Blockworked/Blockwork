@@ -20,7 +20,9 @@ fn show(request: &Request, stopped: &dyn Fn() -> bool) -> Result<Reply, String> 
         .stderr(Stdio::null())
         .spawn()
         .map_err(|e| format!("couldn't open the dialog: {e}"))?;
-    let request = serde_json::to_string(request).map_err(|e| e.to_string())?;
+    let mut request = request.clone();
+    request.language = blockwork_app::ui_language();
+    let request = serde_json::to_string(&request).map_err(|e| e.to_string())?;
     if let Some(mut stdin) = child.stdin.take() {
         let _ = stdin.write_all(request.as_bytes());
     }
