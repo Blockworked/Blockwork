@@ -549,10 +549,7 @@ BwDialog {
                 c.lineTo(n, height - .5);
                 c.lineTo(.5, height / 2);
                 c.closePath();
-                const gradient = c.createLinearGradient(0, 0, width, height);
-                gradient.addColorStop(0, "#343538");
-                gradient.addColorStop(1, "#292a2d");
-                c.fillStyle = gradient;
+                c.fillStyle = "#2e2f32";
                 c.fill();
                 c.strokeStyle = piece.selected ? Theme.accent : Theme.border;
                 c.lineWidth = piece.selected ? 2 : 1;
