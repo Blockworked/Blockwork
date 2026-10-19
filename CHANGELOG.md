@@ -11,113 +11,98 @@ section below as the GitHub release notes, followed by the downloads table.
 ## [Unreleased]
 
 ### Added
-- File blocks: write or append to a file, read a file, check a file exists,
-  list a folder, and a "when file changes" trigger.
-- Web blocks: send GET/POST/PUT/PATCH/DELETE requests into a variable, fetch a
-  URL, and read values out of JSON.
+- File blocks:
+  - Write or append to a file, read a file, check a file exists, list a folder.
+  - "When file changes" trigger.
+- Web blocks:
+  - Send GET/POST/PUT/PATCH/DELETE requests into a variable, or fetch a URL.
+  - Read values out of JSON.
+  - Webhook trigger: an opt-in local server (Settings > Integrations) that starts macros on a web request with a token, passing the request body.
 - Shell reporters: a command's output and whether it succeeded.
 - Notify block for desktop notifications.
-- Active window title/app reporters and a "when window is focused/unfocused"
-  trigger (Windows, macOS, X11, Hyprland, Sway, KDE with kdotool).
-- Activity strip under the canvas showing the macro's latest run event; click it to open the run log.
-- Blocks that failed in the last run get a red marker; click a logged error to jump to its block.
-- Tray menu "Recent activity" lists the latest runs, triggers and errors.
-- Error handling: try/on error, throw error, error message, and stop macro.
-- Emergency stop hotkey (Ctrl+Alt+Shift+Esc) that stops every run and pauses
-  triggers until resumed, plus a per-macro time limit.
-- The block each running strand is on is outlined live on the canvas.
-- Retry block: runs its body again after a failure, up to N attempts.
-- Per-macro loop limit that stops runaway loops.
-- Window detection blocks: detect objects in a window with a local detector
-  service, wait for a detection, aim one step toward a point, and aim at a
-  tracked detection, plus "window x/y/width/height/center" and "detection of"
-  reporters. Detectors must run on this computer.
-- Window blocks: focus, minimize, maximize, restore, close, move or resize a
-  window, matched by its title or its app (picked from a dropdown), plus a
-  "window exists?" reporter.
-- Run macro (and continue, or wait for it to finish), stop macro by name, and
-  a "macro is running?" reporter.
-- Global variables: set/change global blocks and a "global" reporter, shared
-  by every macro and kept across restarts. Listed in Settings, where they can
-  be deleted.
-- Command line: `blockwork list`, `blockwork run <name> [--wait]` and
-  `blockwork stop <name>` drive macros through the daemon without a window.
-- Starter templates (auto clicker, text snippet, break reminder, website
-  watcher) in the welcome screen and the macro menu's "New from template".
-- Screen blocks, in a new Screen palette category: color at a point, average
-  color of a region, colors match, text on screen (OCR), mouse position,
-  screen size, monitor count and monitor position/size.
-- Image blocks: find an image on screen, click on it, and wait for it to
-  appear or disappear, with a tolerance. Capture the image straight from the
-  screen or load a PNG.
+- Dialog blocks: ask for text, ask yes or no, choose from a list, show a message.
+  - They work with the editor closed.
+  - Cancelling stops the run unless a try block catches it.
+- Windows:
+  - Active window title/app reporters and a "when window is focused/unfocused" trigger (Windows, macOS, X11, Hyprland, Sway, KDE with kdotool).
+  - Focus, minimize, maximize, restore, close, move or resize a window, matched by title or app (picked from a dropdown), plus a "window exists?" reporter.
+- Window detection blocks:
+  - Detect objects in a window with a local detector service, and wait for a detection.
+  - Aim one step toward a point, or at a tracked detection.
+  - "Window x/y/width/height/center" and "detection of" reporters.
+  - Detectors must run on this computer.
+- Screen blocks, in a new Screen palette category:
+  - Color at a point, average color of a region, colors match.
+  - Text on screen (OCR): Windows/macOS built-ins, or Tesseract on Linux.
+  - Mouse position, screen size, monitor count, monitor position/size.
+- Image blocks:
+  - Find an image on screen, click on it, and wait for it to appear or disappear, with a tolerance.
+  - Capture the image from the screen or load a PNG.
+- Screen picker in the editor toolbar:
+  - A see-through overlay on every monitor: click a point or drag a region to get its coordinates and color, and add matching blocks.
+  - On Wayland, captures go through the desktop portal (KDE and GNOME may ask for permission once) or `grim` on wlroots desktops.
 - "Wait until" block that pauses until a condition is true, with a time limit.
-- Screen picker in the editor toolbar: a see-through overlay on every
-  monitor where you click a point or drag a region on the live screen to get
-  its coordinates and color, and add matching blocks.
-  On Wayland, captures go through the desktop portal (KDE and GNOME may ask
-  for permission once) or `grim` on wlroots desktops. Text recognition uses
-  Windows/macOS built-ins, or Tesseract on Linux.
-- Importing a macro shows what it can do (commands, web, files, input,
-  clipboard, windows, triggers) before it's added.
-- Text expansion: a "when I type" trigger that fires on an abbreviation like
-  `;addr` typed anywhere, optionally erasing it, and a paste block that
-  pastes through the clipboard and puts the old clipboard back. The Text
-  snippet template uses them.
-- Triggers for when an app starts or exits, after N minutes idle, and when
-  the screen locks or unlocks, plus "app is running?", "seconds idle" and
-  "screen is locked?" reporters.
-- "On schedule" trigger with cron expressions (`*/15 9-17 * * mon-fri`,
-  `@hourly`); a broken expression is reported in the run log.
-- Per-macro conditions in Macro settings: triggers and hotkeys only start the
-  macro while a given window is focused, on AC or battery power, between two
-  times, or on chosen weekdays.
-- "With lock" block: only one strand, across every macro, runs inside a lock
-  of the same name at a time.
-- Debugger: right-click a block to toggle a breakpoint, and pause, resume,
-  step one block at a time (F8/F10) or stop a running macro from the bar
-  above the canvas, which shows the paused strand's variables and lists.
-- Secrets: named passwords and API keys in Settings > Integrations, kept in
-  the system keyring (Secret Service, Credential Manager, Keychain) and read
-  with the "secret" block. Their values are masked in the run log, previews
-  and saved or exported macro files, and the import review warns about
-  macros that read them.
-- Text and data blocks: contains / starts with / ends with / matches regex,
-  replace, regex replace and find, split into a list or take one part, letters
-  from/to, trim, number formatting, and timestamps with date formatting,
-  parsing and parts.
-- Macro library: the macro picker is now a searchable list with folders, and
-  each macro can be opened, duplicated, moved to a folder, exported or
-  deleted from it. Import and export use the system file dialog.
-- Triggers for when the network connects or disconnects, when a USB device is
-  plugged in or unplugged, and when a mouse button is pressed or released
-  (optionally with modifier keys), plus "online?" and "USB device plugged in?"
-  reporters.
-- Dialog blocks: ask for text, ask yes or no, choose from a list and show a
-  message. They work with the editor closed; cancelling stops the run unless
-  a try block catches it.
-- "Once at" trigger for a single date and time, and a per-macro "catch up on
-  missed schedules" setting that runs schedules missed while Blockwork was
-  closed or the computer slept.
-- Signals: "send signal (and wait)" starts this macro's "when I receive"
-  strands, sharing the run's variables.
-- Webhook trigger: an opt-in local server (Settings > Integrations) that
-  starts macros on a web request with a token, passing the request body.
-- Bundles: export a library folder or a macro (with the macros it runs) as a
-  `.blockwork` file and import it with the same review.
-- Permissions: imported macros ask before running commands, going online,
-  writing files, reading secrets or reading the screen, with "allow this
-  time" and "always allow". Choose what to allow in the import review or in
-  Macro settings > Permissions; grants are kept outside the macro file.
-- Block library: My Blocks > Browse lists shared block packs from library
-  indexes set in Settings > Editor (the built-in one lives in
-  `community/blocks/`). Packs are checked against the SHA-256 their index
-  pins, reviewed before they're added, and replace their older versions in
-  place. Right-click a custom block to share it, and the blocks it uses, as
-  a `.blockpack` file.
-- Translatable UI: every editor and dialog string goes through Qt's
-  translation system, with a language setting in Settings > General. Ships
-  with English and pirate-speak English. Translation happens on Weblate,
-  and every built-in language shows up in the setting by itself.
+- Error handling:
+  - Try/on error, throw error, error message, stop macro.
+  - Retry block: runs its body again after a failure, up to N attempts.
+  - Per-macro time limit and loop limit.
+- Emergency stop hotkey (Ctrl+Alt+Shift+Esc) that stops every run and pauses triggers until resumed.
+- Run feedback:
+  - The block each running strand is on is outlined live on the canvas.
+  - Blocks that failed in the last run get a red marker; click a logged error to jump to its block.
+  - Activity strip under the canvas shows the latest run event; click it to open the run log.
+  - Tray menu "Recent activity" lists the latest runs, triggers and errors.
+- Debugger:
+  - Right-click a block to toggle a breakpoint.
+  - Pause, resume, step one block at a time (F8/F10) or stop from the bar above the canvas, which shows the paused strand's variables and lists.
+- Macros calling macros:
+  - Run macro (and continue, or wait for it to finish), stop macro by name, "macro is running?" reporter.
+  - Signals: "send signal (and wait)" starts this macro's "when I receive" strands, sharing the run's variables.
+  - "With lock" block: only one strand, across every macro, runs inside a lock of the same name at a time.
+- Global variables:
+  - Set/change global blocks and a "global" reporter, shared by every macro and kept across restarts.
+  - Listed in Settings, where they can be deleted.
+- Secrets:
+  - Named passwords and API keys in Settings > Integrations, kept in the system keyring (Secret Service, Credential Manager, Keychain) and read with the "secret" block.
+  - Values are masked in the run log, previews and saved or exported macro files.
+  - The import review warns about macros that read them.
+- Text and data blocks:
+  - Contains / starts with / ends with / matches regex.
+  - Replace, regex replace and find; split into a list or take one part; letters from/to; trim.
+  - Number formatting, and timestamps with date formatting, parsing and parts.
+- Text expansion:
+  - A "when I type" trigger that fires on an abbreviation like `;addr` typed anywhere, optionally erasing it.
+  - A paste block that pastes through the clipboard and puts the old clipboard back.
+  - The Text snippet template uses them.
+- More triggers and reporters:
+  - App starts or exits, after N minutes idle, screen locks or unlocks.
+  - Network connects or disconnects, USB device plugged in or unplugged.
+  - Mouse button pressed or released (optionally with modifier keys).
+  - Reporters: "app is running?", "seconds idle", "screen is locked?", "online?", "USB device plugged in?".
+- Schedules:
+  - "On schedule" trigger with cron expressions (`*/15 9-17 * * mon-fri`, `@hourly`); a broken expression is reported in the run log.
+  - "Once at" trigger for a single date and time.
+  - Per-macro "catch up on missed schedules" setting that runs schedules missed while Blockwork was closed or the computer slept.
+- Per-macro conditions in Macro settings: triggers and hotkeys only start the macro while a given window is focused, on AC or battery power, between two times, or on chosen weekdays.
+- Macro library:
+  - The macro picker is now a searchable list with folders.
+  - Open, duplicate, move to a folder, export or delete a macro from it.
+  - Import and export use the system file dialog.
+- Importing and sharing macros:
+  - The import review shows what a macro can do (commands, web, files, input, clipboard, windows, triggers) before it's added.
+  - Bundles: export a library folder or a macro (with the macros it runs) as a `.blockwork` file and import it with the same review.
+  - Permissions: imported macros ask before running commands, going online, writing files, reading secrets or reading the screen, with "allow this time" and "always allow".
+  - Choose what to allow in the import review or in Macro settings > Permissions; grants are kept outside the macro file.
+- Block library:
+  - My Blocks > Browse lists shared block packs from library indexes set in Settings > Editor (the built-in one lives in `community/blocks/`).
+  - Packs are checked against the SHA-256 their index pins, reviewed before they're added, and replace their older versions in place.
+  - Right-click a custom block to share it, and the blocks it uses, as a `.blockpack` file.
+- Translatable UI:
+  - Every editor and dialog string goes through Qt's translation system, with a language setting in Settings > General.
+  - Ships with English and pirate-speak English; every built-in language shows up in the setting by itself.
+  - Translation happens on Weblate.
+- Command line: `blockwork list`, `blockwork run <name> [--wait]` and `blockwork stop <name>` drive macros through the daemon without a window.
+- Starter templates (auto clicker, text snippet, break reminder, website watcher) in the welcome screen and the macro menu's "New from template".
 
 ### Changed
 - Macro files now carry a format version and are upgraded step by step when
