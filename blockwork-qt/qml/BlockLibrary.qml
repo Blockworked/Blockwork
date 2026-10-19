@@ -69,7 +69,7 @@ Item {
                     iconName: "refresh-cw"; text: qsTr("Refresh"); enabled: !root.library.loading
                     onClicked: root.invoke("refresh_block_library")
                 }
-                BwButton { iconName: "folder-open"; text: qsTr("From file…"); onClicked: root.addFromFile() }
+                BwButton { iconName: "folder-open"; text: qsTr("From file..."); onClicked: root.addFromFile() }
             }
             Text {
                 visible: !root.macro
@@ -92,7 +92,7 @@ Item {
             Text {
                 visible: root.library.loading
                 color: Theme.textDim; font.pixelSize: 13
-                text: qsTr("Loading the library…")
+                text: qsTr("Loading the library...")
             }
             Text {
                 visible: !root.library.loading && root.library.loaded && browseDialog.shown.length === 0
@@ -125,7 +125,7 @@ Item {
                         Text {
                             visible: text !== ""
                             Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.textDim; font.pixelSize: 11
-                            text: [packRow.modelData.author ? qsTr("by %1").arg(packRow.modelData.author) : "", packRow.modelData.source].filter(s => s).join(" · ")
+                            text: [packRow.modelData.author ? qsTr("by %1").arg(packRow.modelData.author) : "", packRow.modelData.source].filter(s => s).join(" - ")
                         }
                         Text {
                             visible: packRow.modelData.description !== ""
@@ -134,7 +134,7 @@ Item {
                         }
                         Text {
                             Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
-                            text: packRow.modelData.blocks.join("  ·  ")
+                            text: packRow.modelData.blocks.join("  -  ")
                         }
                     }
                     BwButton {
@@ -144,7 +144,7 @@ Item {
                         enabled: !!root.macro && !packRow.fetching && root.library.fetching === "" && (!installed || packRow.modelData.update)
                         primary: !installed || packRow.modelData.update
                         iconName: installed && !packRow.modelData.update ? "check" : "download"
-                        text: packRow.fetching ? qsTr("Downloading…") : packRow.modelData.update ? qsTr("Update")
+                        text: packRow.fetching ? qsTr("Downloading...") : packRow.modelData.update ? qsTr("Update")
                             : installed ? qsTr("Added") : qsTr("Add")
                         onClicked: root.invoke("review_block_pack", { key: packRow.modelData.key })
                     }
@@ -169,7 +169,7 @@ Item {
     BwDialog {
         id: reviewDialog
         readonly property var r: root.review || ({ blocks: [], replaces: [], capabilities: [], notes: [] })
-        title: qsTr("Add “%1”?").arg(r.name || "")
+        title: qsTr("Add \"%1\"?").arg(r.name || "")
         standardButtons: Dialog.Ok | Dialog.Cancel
         Component.onCompleted: standardButton(Dialog.Ok).text = qsTr("Add blocks")
         Column {
@@ -178,7 +178,7 @@ Item {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
                 text: [reviewDialog.r.version ? qsTr("Version %1").arg(reviewDialog.r.version) : "",
                        reviewDialog.r.author ? qsTr("by %1").arg(reviewDialog.r.author) : "",
-                       qsTr("from %1").arg(reviewDialog.r.source)].filter(s => s).join(" · ")
+                       qsTr("from %1").arg(reviewDialog.r.source)].filter(s => s).join(" - ")
             }
             Row {
                 spacing: 6
@@ -198,7 +198,7 @@ Item {
             }
             Text {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
-                text: qsTr("Adds these blocks to “%1”:").arg(reviewDialog.r.macro_name || "")
+                text: qsTr("Adds these blocks to \"%1\":").arg(reviewDialog.r.macro_name || "")
             }
             Repeater {
                 model: reviewDialog.r.blocks
@@ -253,7 +253,7 @@ Item {
         standardButtons: Dialog.Ok | Dialog.Cancel
         property var picked: []
         readonly property var defs: root.macro ? root.macro.block_defs || [] : []
-        Component.onCompleted: standardButton(Dialog.Ok).text = qsTr("Save pack…")
+        Component.onCompleted: standardButton(Dialog.Ok).text = qsTr("Save pack...")
         onOpened: {
             packName.text = picked.length === 1 ? root.blockLabel(defs.find(d => d.id === picked[0]) || {}) : (root.macro ? root.macro.name : "");
             packName.forceActiveFocus();

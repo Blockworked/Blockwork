@@ -69,9 +69,9 @@ Rectangle {
         return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
     }
     function statusText() {
-        if (running) return qsTr("Running · %1").arg(elapsed(lastRunEvent.time_ms));
+        if (running) return qsTr("Running - %1").arg(elapsed(lastRunEvent.time_ms));
         if (!latest) return qsTr("No activity yet");
-        return (latest.level === "Error" ? qsTr("Error: ") : "") + latest.message.split("\n")[0] + "  ·  " + ago(latest.time_ms);
+        return (latest.level === "Error" ? qsTr("Error: ") : "") + latest.message.split("\n")[0] + "  -  " + ago(latest.time_ms);
     }
 
     // Drag the top edge to resize while open.

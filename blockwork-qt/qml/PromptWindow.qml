@@ -40,11 +40,11 @@ ApplicationWindow {
         if (kind !== "permission" || !request.ability) return request.message || "";
         const name = request.subject || "";
         const phrases = {
-            commands: qsTr("“%1” wants to run commands and open or close apps."),
-            network: qsTr("“%1” wants to go online."),
-            files_write: qsTr("“%1” wants to write to files."),
-            secrets: qsTr("“%1” wants to read your saved secrets."),
-            screen: qsTr("“%1” wants to read the screen.")
+            commands: qsTr("\"%1\" wants to run commands and open or close apps."),
+            network: qsTr("\"%1\" wants to go online."),
+            files_write: qsTr("\"%1\" wants to write to files."),
+            secrets: qsTr("\"%1\" wants to read your saved secrets."),
+            screen: qsTr("\"%1\" wants to read the screen.")
         };
         return phrases[request.ability] ? phrases[request.ability].arg(name) : (request.message || "");
     }

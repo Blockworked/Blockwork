@@ -134,8 +134,8 @@ Item {
                                 }
                             }
                             SettingsRow { title: qsTr("Global variables")
-                                detail: (appState.globals || []).length ? qsTr("Shared by every macro and kept after restarts. Set them with the \u201cset global\u201d block.")
-                                    : qsTr("None yet. The \u201cset global\u201d block makes one: a value every macro can read, kept after restarts.")
+                                detail: (appState.globals || []).length ? qsTr("Shared by every macro and kept after restarts. Set them with the \"set global\" block.")
+                                    : qsTr("None yet. The \"set global\" block makes one: a value every macro can read, kept after restarts.")
                             }
                             Repeater {
                                 model: appState.globals || []
@@ -149,8 +149,8 @@ Item {
                             }
                             Rectangle { Layout.fillWidth: true; Layout.topMargin: 8; height: 1; color: "#3a3b3f" }
                             RowLayout { Layout.fillWidth: true; Layout.topMargin: 16; spacing: 8
-                                BwButton { iconName: "download"; text: qsTr("Import macro…"); onClicked: root.macroFiles.importMacro() }
-                                BwButton { iconName: "upload"; text: qsTr("Export macro…"); enabled: !!appState.current_macro; onClicked: root.macroFiles.exportMacro(appState.current_macro.id) }
+                                BwButton { iconName: "download"; text: qsTr("Import macro..."); onClicked: root.macroFiles.importMacro() }
+                                BwButton { iconName: "upload"; text: qsTr("Export macro..."); enabled: !!appState.current_macro; onClicked: root.macroFiles.exportMacro(appState.current_macro.id) }
                                 BwButton { iconName: "play"; text: qsTr("Replay welcome tour"); onClicked: root.invoke("set_onboarding_done", { done: false }) }
                                 Item { Layout.fillWidth: true }
                             }
@@ -172,7 +172,7 @@ Item {
                                     readonly property bool capturing: root.capturingAction(modelData.action)
                                     readonly property bool atDefault: modelData.combo_display == null || (binding ? binding.combo_display : null) === modelData.combo_display
                                     BwButton {
-                                        text: hotkeyRow.capturing ? qsTr("Press shortcut…") : (hotkeyRow.binding ? hotkeyRow.binding.combo_display : qsTr("Not set"))
+                                        text: hotkeyRow.capturing ? qsTr("Press shortcut...") : (hotkeyRow.binding ? hotkeyRow.binding.combo_display : qsTr("Not set"))
                                         primary: hotkeyRow.capturing; implicitWidth: 150; implicitHeight: 36
                                         onClicked: if (!hotkeyRow.capturing) root.invoke("start_combo_capture", { action: hotkeyRow.modelData.action })
                                     }
@@ -197,7 +197,7 @@ Item {
                                     title: modelData.macro_name || "Macro"
                                     readonly property bool capturing: root.capturingBinding(modelData.binding_index)
                                     BwButton {
-                                        text: macroRow.capturing ? qsTr("Press shortcut…") : macroRow.modelData.combo_display
+                                        text: macroRow.capturing ? qsTr("Press shortcut...") : macroRow.modelData.combo_display
                                         primary: macroRow.capturing; implicitWidth: 150; implicitHeight: 36
                                         onClicked: if (!macroRow.capturing) root.invoke("start_binding_combo_capture", { index: macroRow.modelData.binding_index })
                                     }
@@ -210,7 +210,7 @@ Item {
                                 Text { text: qsTr("Add hotkey"); color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
                                 Item { Layout.fillWidth: true }
                                 BwComboBox { id: macroBox; model: appState.macro_names || []; implicitWidth: 210; onActivated: index => root.invoke("set_pending_macro_idx", { index: index }) }
-                                BwButton { text: appState.combo_capture&&appState.combo_capture.kind==="Pending"?qsTr("Press shortcut…"):qsTr("Set combo"); primary:appState.combo_capture&&appState.combo_capture.kind==="Pending"; onClicked: root.invoke("start_pending_combo_capture") }
+                                BwButton { text: appState.combo_capture&&appState.combo_capture.kind==="Pending"?qsTr("Press shortcut..."):qsTr("Set combo"); primary:appState.combo_capture&&appState.combo_capture.kind==="Pending"; onClicked: root.invoke("start_pending_combo_capture") }
                                 BwButton { iconName: "plus"; text: qsTr("Add"); onClicked: root.invoke("add_macro_hotkey") }
                             }
                         }
@@ -243,7 +243,7 @@ Item {
                                         Text { Layout.fillWidth: true; text: modelData.name || modelData.url; color: "#e7e7e8"; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight }
                                         Text {
                                             Layout.fillWidth: true; color: modelData.error ? Theme.warning : "#9fa0a6"; font.pixelSize: 11; elide: Text.ElideMiddle
-                                            text: modelData.error ? modelData.error : modelData.name ? qsTr("%n pack(s)", "", modelData.packs) + " · " + modelData.url : modelData.url
+                                            text: modelData.error ? modelData.error : modelData.name ? qsTr("%n pack(s)", "", modelData.packs) + " - " + modelData.url : modelData.url
                                         }
                                     }
                                     BwButton { iconName: "trash-2"; text: qsTr("Remove"); onClicked: root.invoke("remove_block_library_source", { url: modelData.url }) }
@@ -272,7 +272,7 @@ Item {
                                 BwSwitch { Accessible.name: qsTr("Start TCP server automatically"); checked: appState.ipc_auto_start; onToggled: checked => root.invoke("set_ipc_auto_start", { enabled: checked }) }
                             }
                             SettingsRow { title: qsTr("Secrets")
-                                detail: qsTr("Passwords and API keys macros can use with the \u201csecret\u201d block. They're kept in your system keyring, never in macro files, and show as dots in the run log.")
+                                detail: qsTr("Passwords and API keys macros can use with the \"secret\" block. They're kept in your system keyring, never in macro files, and show as dots in the run log.")
                             }
                             Repeater {
                                 model: appState.secret_names || []
@@ -286,13 +286,13 @@ Item {
                                 }
                             }
                             RowLayout { Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 14; spacing: 8
-                                BwButton { iconName: "plus"; text: qsTr("Add secret…"); onClicked: secretDialog.openFor("") }
+                                BwButton { iconName: "plus"; text: qsTr("Add secret..."); onClicked: secretDialog.openFor("") }
                                 Item { Layout.fillWidth: true }
                             }
                             SettingsRow {
                                 readonly property var hook: appState.webhook || ({ enabled: false, port: 8787, token: "", error: "" })
                                 title: !hook.enabled ? qsTr("Webhook server off") : hook.error ? qsTr("Webhook server not running") : qsTr("Webhook server listening on port %1").arg(hook.port)
-                                detail: hook.error || qsTr("Lets other programs and services start macros with a web request to a \u201cwhen webhook is called\u201d block. Only reachable from this computer.")
+                                detail: hook.error || qsTr("Lets other programs and services start macros with a web request to a \"when webhook is called\" block. Only reachable from this computer.")
                                 BwTextField {
                                     id: hookPort; implicitWidth: 100
                                     text: String(appState.webhook ? appState.webhook.port : 8787); validator: IntValidator { bottom: 1; top: 65535 }
@@ -311,7 +311,7 @@ Item {
                                 readonly property string example: "curl -X POST -H 'X-Blockwork-Token: " + hook.token + "' -d 'hello' http://127.0.0.1:" + hook.port + "/hello"
                                 Text {
                                     Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#9fa0a6"; font.pixelSize: 12
-                                    text: qsTr("Send the token in an X-Blockwork-Token header (or ?token= in the address). For a block listening on \u201chello\u201d:")
+                                    text: qsTr("Send the token in an X-Blockwork-Token header (or ?token= in the address). For a block listening on \"hello\":")
                                 }
                                 Rectangle {
                                     Layout.fillWidth: true; implicitHeight: exampleText.implicitHeight + 16; radius: 6; color: Theme.field; border.color: Theme.borderSoft
@@ -324,7 +324,7 @@ Item {
                                 }
                             }
                             SettingsRow { title: qsTr("Command line")
-                                detail: qsTr("Scripts and launchers can run macros by name: \u201cblockwork run <name>\u201d (add --wait to return when it ends), \u201cblockwork stop <name>\u201d and \u201cblockwork list\u201d.")
+                                detail: qsTr("Scripts and launchers can run macros by name: \"blockwork run <name>\" (add --wait to return when it ends), \"blockwork stop <name>\" and \"blockwork list\".")
                             }
                         }
                     }
@@ -352,7 +352,7 @@ Item {
     }
     function updateTitle() {
         const u = appState.update_check_state || { state: "Idle" };
-        if (u.state === "Checking") return qsTr("Checking for updates…");
+        if (u.state === "Checking") return qsTr("Checking for updates...");
         if (u.state === "UpdateAvailable") return qsTr("Blockwork %1 is available").arg(u.version);
         if (u.state === "UpToDate") return qsTr("Blockwork is up to date");
         if (u.state === "Error") return qsTr("Update check failed");
@@ -366,7 +366,7 @@ Item {
     BwDialog {
         id: secretDialog
         property string editing: ""
-        title: editing ? qsTr("Change \u201c%1\u201d").arg(editing) : qsTr("Add a secret")
+        title: editing ? qsTr("Change \"%1\"").arg(editing) : qsTr("Add a secret")
         standardButtons: Dialog.Ok | Dialog.Cancel
         function openFor(name) {
             editing = name; secretName.text = name; secretValue.text = ""; open();

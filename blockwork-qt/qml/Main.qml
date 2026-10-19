@@ -172,7 +172,7 @@ ApplicationWindow {
         Column {
             anchors.centerIn: parent; spacing: 12
             BusyIndicator { anchors.horizontalCenter: parent.horizontalCenter; running: bridge.lastError.length === 0 }
-            Text { text: bridge.lastError.length ? bridge.lastError : qsTr("Connecting to Blockwork…"); color: bridge.lastError.length ? "#ff7373" : "#e7e7e8"; font.pixelSize: 16 }
+            Text { text: bridge.lastError.length ? bridge.lastError : qsTr("Connecting to Blockwork..."); color: bridge.lastError.length ? "#ff7373" : "#e7e7e8"; font.pixelSize: 16 }
         }
     }
 

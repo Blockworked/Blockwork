@@ -72,14 +72,14 @@ BwDialog {
         BwTextField {
             id: searchField
             Layout.fillWidth: true
-            placeholderText: qsTr("Search apps…")
+            placeholderText: qsTr("Search apps...")
             onTextEdited: root.searchText = text
             Component.onCompleted: forceActiveFocus()
         }
 
         Text {
             visible: root.appsLoading
-            text: qsTr("Loading installed apps…")
+            text: qsTr("Loading installed apps...")
             color: Theme.textDim
             font.pixelSize: 13
         }
@@ -93,7 +93,7 @@ BwDialog {
         }
         Text {
             visible: root.timedOut && root.appsLoading
-            text: qsTr("Taking longer than expected — the background service may be busy. Check the console for [blockwork-qt] lines, then retry.")
+            text: qsTr("Taking longer than expected - the background service may be busy. Check the console for [blockwork-qt] lines, then retry.")
             color: Theme.warning
             font.pixelSize: 12
             wrapMode: Text.WordWrap

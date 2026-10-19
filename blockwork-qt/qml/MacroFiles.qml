@@ -136,7 +136,7 @@ Item {
         readonly property var customSettings: root.importReview ? root.importReview.custom_settings : []
         readonly property var macroNames: root.importReview ? root.importReview.macros || [] : []
         readonly property var notes: root.importReview ? root.importReview.notes || [] : []
-        title: root.importReview ? qsTr("Import “%1”?").arg(root.importReview.name) : qsTr("Import macro")
+        title: root.importReview ? qsTr("Import \"%1\"?").arg(root.importReview.name) : qsTr("Import macro")
         standardButtons: Dialog.Ok | Dialog.Cancel
         Component.onCompleted: standardButton(Dialog.Ok).text = "Import"
         Column { width: 460; spacing: 10

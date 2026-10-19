@@ -31,8 +31,8 @@
     </message>
     <message>
       <location filename="../qml/ActivityPanel.qml" line="72" />
-      <source>Running · %1</source>
-      <translation>Sailin' · %1</translation>
+      <source>Running - %1</source>
+      <translation>Sailin' - %1</translation>
     </message>
     <message>
       <location filename="../qml/ActivityPanel.qml" line="73" />
@@ -87,18 +87,18 @@
     </message>
     <message>
       <location filename="../qml/AppSelectorDialog.qml" line="75" />
-      <source>Search apps…</source>
-      <translation>Search the apps…</translation>
+      <source>Search apps...</source>
+      <translation>Search the apps...</translation>
     </message>
     <message>
       <location filename="../qml/AppSelectorDialog.qml" line="82" />
-      <source>Loading installed apps…</source>
-      <translation>Haulin' in yer installed apps…</translation>
+      <source>Loading installed apps...</source>
+      <translation>Haulin' in yer installed apps...</translation>
     </message>
     <message>
       <location filename="../qml/AppSelectorDialog.qml" line="96" />
-      <source>Taking longer than expected — the background service may be busy. Check the console for [blockwork-qt] lines, then retry.</source>
-      <translation>This be takin' longer than it ought — the crew below decks may be busy. Check the console fer [blockwork-qt] lines, then try again.</translation>
+      <source>Taking longer than expected - the background service may be busy. Check the console for [blockwork-qt] lines, then retry.</source>
+      <translation>This be takin' longer than it ought - the crew below decks may be busy. Check the console fer [blockwork-qt] lines, then try again.</translation>
     </message>
     <message>
       <location filename="../qml/AppSelectorDialog.qml" line="104" />
@@ -219,8 +219,8 @@
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="74" />
-      <source>From file…</source>
-      <translation>From a scroll…</translation>
+      <source>From file...</source>
+      <translation>From a scroll...</translation>
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="79" />
@@ -234,8 +234,8 @@
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="97" />
-      <source>Loading the library…</source>
-      <translation>Haulin' in the treasure hold…</translation>
+      <source>Loading the library...</source>
+      <translation>Haulin' in the treasure hold...</translation>
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="102" />
@@ -255,8 +255,8 @@
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="149" />
-      <source>Downloading…</source>
-      <translation>Haulin' aboard…</translation>
+      <source>Downloading...</source>
+      <translation>Haulin' aboard...</translation>
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="149" />
@@ -290,8 +290,8 @@
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="174" />
-      <source>Add “%1”?</source>
-      <translation>Bring “%1” aboard?</translation>
+      <source>Add "%1"?</source>
+      <translation>Bring "%1" aboard?</translation>
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="176" />
@@ -320,8 +320,8 @@
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="203" />
-      <source>Adds these blocks to “%1”:</source>
-      <translation>Stows these blocks in “%1”:</translation>
+      <source>Adds these blocks to "%1":</source>
+      <translation>Stows these blocks in "%1":</translation>
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="216" />
@@ -350,8 +350,8 @@
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="258" />
-      <source>Save pack…</source>
-      <translation>Stow the pack…</translation>
+      <source>Save pack...</source>
+      <translation>Stow the pack...</translation>
     </message>
     <message>
       <location filename="../qml/BlockLibrary.qml" line="265" />
@@ -781,8 +781,8 @@
     <name>EditorPage</name>
     <message>
       <location filename="../qml/EditorPage.qml" line="76" />
-      <source>Recording in %1s…</source>
-      <translation>Recordin' in %1s…</translation>
+      <source>Recording in %1s...</source>
+      <translation>Recordin' in %1s...</translation>
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="77" />
@@ -1294,8 +1294,8 @@
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="453" />
-      <source>New from template…</source>
-      <translation>New from a chart…</translation>
+      <source>New from template...</source>
+      <translation>New from a chart...</translation>
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="454" />
@@ -1304,8 +1304,8 @@
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="455" />
-      <source>Export…</source>
-      <translation>Ship out…</translation>
+      <source>Export...</source>
+      <translation>Ship out...</translation>
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="456" />
@@ -1383,18 +1383,18 @@
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="544" />
-      <source>Paused before “%1” (%2 strands waiting)</source>
-      <translation>Anchored before “%1” (%2 strands waitin')</translation>
+      <source>Paused before "%1" (%2 strands waiting)</source>
+      <translation>Anchored before "%1" (%2 strands waitin')</translation>
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="545" />
-      <source>Paused before “%1”</source>
-      <translation>Anchored before “%1”</translation>
+      <source>Paused before "%1"</source>
+      <translation>Anchored before "%1"</translation>
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="546" />
-      <source>Pausing at the next block…</source>
-      <translation>Droppin' anchor at the next block…</translation>
+      <source>Pausing at the next block...</source>
+      <translation>Droppin' anchor at the next block...</translation>
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="546" />
@@ -1461,8 +1461,8 @@
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="713" />
-      <source>Recording…</source>
-      <translation>Recordin'…</translation>
+      <source>Recording...</source>
+      <translation>Recordin'...</translation>
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="714" />
@@ -1487,8 +1487,8 @@
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="742" />
-      <source>This removes “%1” from Blockwork.</source>
-      <translation>This sends “%1” to Davy Jones' locker.</translation>
+      <source>This removes "%1" from Blockwork.</source>
+      <translation>This sends "%1" to Davy Jones' locker.</translation>
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="747" />
@@ -1834,8 +1834,8 @@
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="1080" />
-      <source>Delete “%1” and its saved items?</source>
-      <translation>Scuttle “%1” an' its stowed cargo?</translation>
+      <source>Delete "%1" and its saved items?</source>
+      <translation>Scuttle "%1" an' its stowed cargo?</translation>
     </message>
     <message>
       <location filename="../qml/EditorPage.qml" line="1091" />
@@ -3155,8 +3155,8 @@
     <message>
       <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="549" />
       <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="556" />
-      <source>Choose app…</source>
-      <translation>Pick an app…</translation>
+      <source>Choose app...</source>
+      <translation>Pick an app...</translation>
     </message>
     <message>
       <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="555" />
@@ -3331,8 +3331,8 @@
     </message>
     <message>
       <location filename="../qml/LibraryPanel.qml" line="143" />
-      <source>Export folder as bundle…</source>
-      <translation>Ship out folder as a bundle…</translation>
+      <source>Export folder as bundle...</source>
+      <translation>Ship out folder as a bundle...</translation>
     </message>
     <message>
       <location filename="../qml/LibraryPanel.qml" line="154" />
@@ -3346,18 +3346,18 @@
     </message>
     <message>
       <location filename="../qml/LibraryPanel.qml" line="156" />
-      <source>Move to folder…</source>
-      <translation>Move to folder…</translation>
+      <source>Move to folder...</source>
+      <translation>Move to folder...</translation>
     </message>
     <message>
       <location filename="../qml/LibraryPanel.qml" line="157" />
-      <source>Export…</source>
-      <translation>Ship out…</translation>
+      <source>Export...</source>
+      <translation>Ship out...</translation>
     </message>
     <message>
       <location filename="../qml/LibraryPanel.qml" line="158" />
-      <source>Export as bundle…</source>
-      <translation>Ship out as a bundle…</translation>
+      <source>Export as bundle...</source>
+      <translation>Ship out as a bundle...</translation>
     </message>
     <message>
       <location filename="../qml/LibraryPanel.qml" line="159" />
@@ -3386,8 +3386,8 @@
     </message>
     <message>
       <location filename="../qml/LibraryPanel.qml" line="173" />
-      <source>Import…</source>
-      <translation>Bring aboard…</translation>
+      <source>Import...</source>
+      <translation>Bring aboard...</translation>
     </message>
     <message>
       <location filename="../qml/LibraryPanel.qml" line="180" />
@@ -3396,8 +3396,8 @@
     </message>
     <message>
       <location filename="../qml/LibraryPanel.qml" line="187" />
-      <source>Type a new folder name or pick one. Leave it empty to take “%1” out of its folder.</source>
-      <translation>Type a new folder name or pick one. Leave it empty to take “%1” out o' its folder.</translation>
+      <source>Type a new folder name or pick one. Leave it empty to take "%1" out of its folder.</source>
+      <translation>Type a new folder name or pick one. Leave it empty to take "%1" out o' its folder.</translation>
     </message>
     <message>
       <location filename="../qml/LibraryPanel.qml" line="189" />
@@ -3534,8 +3534,8 @@
     </message>
     <message>
       <location filename="../qml/MacroFiles.qml" line="139" />
-      <source>Import “%1”?</source>
-      <translation>Bring “%1” aboard?</translation>
+      <source>Import "%1"?</source>
+      <translation>Bring "%1" aboard?</translation>
     </message>
     <message>
       <location filename="../qml/MacroFiles.qml" line="139" />
@@ -3597,8 +3597,8 @@
     </message>
     <message>
       <location filename="../qml/Main.qml" line="175" />
-      <source>Connecting to Blockwork…</source>
-      <translation>Hailin' Blockwork…</translation>
+      <source>Connecting to Blockwork...</source>
+      <translation>Hailin' Blockwork...</translation>
     </message>
   </context>
   <context>
@@ -3927,8 +3927,8 @@
     </message>
     <message>
       <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="119" />
-      <source>Share as a pack…</source>
-      <translation>Share as a pack…</translation>
+      <source>Share as a pack...</source>
+      <translation>Share as a pack...</translation>
     </message>
     <message>
       <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="120" />
@@ -4084,8 +4084,8 @@
     </message>
     <message>
       <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="364" />
-      <source>No blocks match “%1”</source>
-      <translation>No blocks match “%1”</translation>
+      <source>No blocks match "%1"</source>
+      <translation>No blocks match "%1"</translation>
     </message>
     <message>
       <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="422" />
@@ -4138,28 +4138,28 @@
     </message>
     <message>
       <location filename="../qml/PromptWindow.qml" line="43" />
-      <source>“%1” wants to run commands and open or close apps.</source>
-      <translation>“%1” wants to run commands an' open or close apps.</translation>
+      <source>"%1" wants to run commands and open or close apps.</source>
+      <translation>"%1" wants to run commands an' open or close apps.</translation>
     </message>
     <message>
       <location filename="../qml/PromptWindow.qml" line="44" />
-      <source>“%1” wants to go online.</source>
-      <translation>“%1” wants to sail the open web.</translation>
+      <source>"%1" wants to go online.</source>
+      <translation>"%1" wants to sail the open web.</translation>
     </message>
     <message>
       <location filename="../qml/PromptWindow.qml" line="45" />
-      <source>“%1” wants to write to files.</source>
-      <translation>“%1” wants to write to files.</translation>
+      <source>"%1" wants to write to files.</source>
+      <translation>"%1" wants to write to files.</translation>
     </message>
     <message>
       <location filename="../qml/PromptWindow.qml" line="46" />
-      <source>“%1” wants to read your saved secrets.</source>
-      <translation>“%1” wants to read yer buried secrets.</translation>
+      <source>"%1" wants to read your saved secrets.</source>
+      <translation>"%1" wants to read yer buried secrets.</translation>
     </message>
     <message>
       <location filename="../qml/PromptWindow.qml" line="47" />
-      <source>“%1” wants to read the screen.</source>
-      <translation>“%1” wants to read the screen.</translation>
+      <source>"%1" wants to read the screen.</source>
+      <translation>"%1" wants to read the screen.</translation>
     </message>
     <message>
       <location filename="../qml/PromptWindow.qml" line="54" />
@@ -4312,13 +4312,13 @@
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="137" />
-      <source>Shared by every macro and kept after restarts. Set them with the “set global” block.</source>
-      <translation>Shared by every macro in the fleet an' kept after restarts. Set them with the “set global” block.</translation>
+      <source>Shared by every macro and kept after restarts. Set them with the "set global" block.</source>
+      <translation>Shared by every macro in the fleet an' kept after restarts. Set them with the "set global" block.</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="138" />
-      <source>None yet. The “set global” block makes one: a value every macro can read, kept after restarts.</source>
-      <translation>None yet. The “set global” block makes one: a value every macro can read, kept after restarts.</translation>
+      <source>None yet. The "set global" block makes one: a value every macro can read, kept after restarts.</source>
+      <translation>None yet. The "set global" block makes one: a value every macro can read, kept after restarts.</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="147" />
@@ -4328,13 +4328,13 @@
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="152" />
-      <source>Import macro…</source>
-      <translation>Bring a macro aboard…</translation>
+      <source>Import macro...</source>
+      <translation>Bring a macro aboard...</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="153" />
-      <source>Export macro…</source>
-      <translation>Ship out a macro…</translation>
+      <source>Export macro...</source>
+      <translation>Ship out a macro...</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="154" />
@@ -4350,8 +4350,8 @@
       <location filename="../qml/SettingsPage.qml" line="175" />
       <location filename="../qml/SettingsPage.qml" line="200" />
       <location filename="../qml/SettingsPage.qml" line="213" />
-      <source>Press shortcut…</source>
-      <translation>Press a shortcut…</translation>
+      <source>Press shortcut...</source>
+      <translation>Press a shortcut...</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="175" />
@@ -4503,8 +4503,8 @@
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="275" />
-      <source>Passwords and API keys macros can use with the “secret” block. They're kept in your system keyring, never in macro files, and show as dots in the run log.</source>
-      <translation>Passwords an' API keys macros can use with the “secret” block. They be buried in yer system keyring, never in macro files, an' show as dots in the ship's log.</translation>
+      <source>Passwords and API keys macros can use with the "secret" block. They're kept in your system keyring, never in macro files, and show as dots in the run log.</source>
+      <translation>Passwords an' API keys macros can use with the "secret" block. They be buried in yer system keyring, never in macro files, an' show as dots in the ship's log.</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="284" />
@@ -4513,8 +4513,8 @@
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="289" />
-      <source>Add secret…</source>
-      <translation>Bury a secret…</translation>
+      <source>Add secret...</source>
+      <translation>Bury a secret...</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="294" />
@@ -4533,8 +4533,8 @@
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="295" />
-      <source>Lets other programs and services start macros with a web request to a “when webhook is called” block. Only reachable from this computer.</source>
-      <translation>Lets other programs an' services launch macros with a web request to a “when webhook is called” block. Only reachable from this here computer.</translation>
+      <source>Lets other programs and services start macros with a web request to a "when webhook is called" block. Only reachable from this computer.</source>
+      <translation>Lets other programs an' services launch macros with a web request to a "when webhook is called" block. Only reachable from this here computer.</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="302" />
@@ -4543,8 +4543,8 @@
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="314" />
-      <source>Send the token in an X-Blockwork-Token header (or ?token= in the address). For a block listening on “hello”:</source>
-      <translation>Send the token in an X-Blockwork-Token header (or ?token= in the address). Fer a block listenin' on “hello”:</translation>
+      <source>Send the token in an X-Blockwork-Token header (or ?token= in the address). For a block listening on "hello":</source>
+      <translation>Send the token in an X-Blockwork-Token header (or ?token= in the address). Fer a block listenin' on "hello":</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="321" />
@@ -4568,8 +4568,8 @@
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="327" />
-      <source>Scripts and launchers can run macros by name: “blockwork run &lt;name&gt;” (add --wait to return when it ends), “blockwork stop &lt;name&gt;” and “blockwork list”.</source>
-      <translation>Scripts an' launchers can run macros by name: “blockwork run &lt;name&gt;” (add --wait to return when it ends), “blockwork stop &lt;name&gt;” an' “blockwork list”.</translation>
+      <source>Scripts and launchers can run macros by name: "blockwork run &lt;name&gt;" (add --wait to return when it ends), "blockwork stop &lt;name&gt;" and "blockwork list".</source>
+      <translation>Scripts an' launchers can run macros by name: "blockwork run &lt;name&gt;" (add --wait to return when it ends), "blockwork stop &lt;name&gt;" an' "blockwork list".</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="340" />
@@ -4623,8 +4623,8 @@
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="346" />
-      <source>Checking for updates…</source>
-      <translation>Checkin' fer refits…</translation>
+      <source>Checking for updates...</source>
+      <translation>Checkin' fer refits...</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="347" />
@@ -4653,8 +4653,8 @@
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="360" />
-      <source>Change “%1”</source>
-      <translation>Change “%1”</translation>
+      <source>Change "%1"</source>
+      <translation>Change "%1"</translation>
     </message>
     <message>
       <location filename="../qml/SettingsPage.qml" line="360" />
@@ -4701,8 +4701,8 @@
     </message>
     <message>
       <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="331" />
-      <source>Press keys…</source>
-      <translation>Press keys…</translation>
+      <source>Press keys...</source>
+      <translation>Press keys...</translation>
     </message>
     <message>
       <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="331" />

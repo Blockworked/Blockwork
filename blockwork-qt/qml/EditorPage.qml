@@ -73,7 +73,7 @@ Item {
     }
     function recordingLabel() {
         const phase = appState.recording_phase || { phase: "Idle" };
-        if (phase.phase === "Countdown") return qsTr("Recording in %1s…").arg(phase.countdown);
+        if (phase.phase === "Countdown") return qsTr("Recording in %1s...").arg(phase.countdown);
         if (phase.phase === "Active") return qsTr("Stop recording");
         return qsTr("Record");
     }
@@ -450,9 +450,9 @@ Item {
                         implicitWidth: 200
                         BwMenuItem { iconName: "sliders"; text: qsTr("Macro settings"); enabled: !!root.macro; onTriggered: macroSettings.open() }
                         BwMenuItem { iconName: "plus"; text: qsTr("New macro"); onTriggered: root.invoke("new_macro") }
-                        BwMenuItem { iconName: "sparkles"; text: qsTr("New from template…"); onTriggered: templateDialog.open() }
+                        BwMenuItem { iconName: "sparkles"; text: qsTr("New from template..."); onTriggered: templateDialog.open() }
                         BwMenuItem { iconName: "copy"; text: qsTr("Duplicate macro"); enabled: !!root.macro; onTriggered: root.invoke("duplicate_macro", { id: root.macro.id }) }
-                        BwMenuItem { iconName: "upload"; text: qsTr("Export…"); enabled: !!root.macro && !!root.macroFiles; onTriggered: root.macroFiles.exportMacro(root.macro.id) }
+                        BwMenuItem { iconName: "upload"; text: qsTr("Export..."); enabled: !!root.macro && !!root.macroFiles; onTriggered: root.macroFiles.exportMacro(root.macro.id) }
                         BwMenuItem { iconName: "circle-dot"; text: qsTr("Clear breakpoints"); enabled: (appState.breakpoints || []).length > 0; onTriggered: root.invoke("clear_breakpoints") }
                         BwMenuItem { iconName: "octagon"; text: qsTr("Emergency stop"); danger: true; onTriggered: root.invoke("emergency_stop") }
                         BwMenuItem { iconName: "trash"; text: qsTr("Delete macro"); danger: true; enabled: !!root.macro; onTriggered: removeDialog.open() }
@@ -541,9 +541,9 @@ Item {
                     Text {
                         Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 13
                         text: debugBar.strand
-                            ? (debugBar.paused.length > 1 ? qsTr("Paused before \u201c%1\u201d (%2 strands waiting)").arg(root.blockLabel(debugBar.strand.block_id)).arg(debugBar.paused.length)
-                                 : qsTr("Paused before \u201c%1\u201d").arg(root.blockLabel(debugBar.strand.block_id)))
-                            : debugBar.isPaused ? qsTr("Pausing at the next block…") : qsTr("Running")
+                            ? (debugBar.paused.length > 1 ? qsTr("Paused before \"%1\" (%2 strands waiting)").arg(root.blockLabel(debugBar.strand.block_id)).arg(debugBar.paused.length)
+                                 : qsTr("Paused before \"%1\"").arg(root.blockLabel(debugBar.strand.block_id)))
+                            : debugBar.isPaused ? qsTr("Pausing at the next block...") : qsTr("Running")
                         HoverHandler { cursorShape: debugBar.strand ? Qt.PointingHandCursor : Qt.ArrowCursor }
                         TapHandler { enabled: !!debugBar.strand; onTapped: canvas.revealInstruction(debugBar.strand.block_id) }
                     }
@@ -710,7 +710,7 @@ Item {
                 anchors.fill: parent; color: "#d8222326"; z: 20
                 Column { anchors.centerIn: parent; spacing: 10
                     LucideIcon { anchors.horizontalCenter: parent.horizontalCenter; name: "circle"; color: "#ff4a4a"; width: 48; height: 48; strokeWidth: 7 }
-                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("Recording…"); color: "#ededee"; font.pixelSize: 17; font.weight: Font.Bold }
+                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("Recording..."); color: "#ededee"; font.pixelSize: 17; font.weight: Font.Bold }
                     Text { text: qsTr("Adding and removing instructions is disabled while recording."); color: "#a5a6ab"; font.pixelSize: 14; font.weight: Font.DemiBold }
                 }
             }
@@ -739,7 +739,7 @@ Item {
         id: deleteMacroDialog; title: qsTr("Delete macro?"); standardButtons: Dialog.Yes | Dialog.Cancel
         property string macroId: ""
         property string macroName: ""
-        Text { text: qsTr("This removes \u201c%1\u201d from Blockwork.").arg(deleteMacroDialog.macroName); color: "#e7e7e8" }
+        Text { text: qsTr("This removes \"%1\" from Blockwork.").arg(deleteMacroDialog.macroName); color: "#e7e7e8" }
         onAccepted: root.invoke("delete_macro", { id: macroId })
     }
     BwDialog {
@@ -1077,7 +1077,7 @@ Item {
         id: deleteListDialog
         title: qsTr("Delete list?"); standardButtons: Dialog.Yes | Dialog.Cancel
         property string listName: ""
-        Text { text: qsTr("Delete “%1” and its saved items?").arg(deleteListDialog.listName); color: "#e7e7e8" }
+        Text { text: qsTr("Delete \"%1\" and its saved items?").arg(deleteListDialog.listName); color: "#e7e7e8" }
         onAccepted: root.invoke("delete_list", { name: listName })
     }
     BwDialog {
