@@ -28,5 +28,6 @@ services:
       WEBLATE_REGISTRATION_OPEN: 1
 
       # The account Weblate opens translation pull requests from.
+      WEBLATE_GITHUB_HOST: api.github.com
       WEBLATE_GITHUB_USERNAME: CHANGE_ME
       WEBLATE_GITHUB_TOKEN: CHANGE_ME

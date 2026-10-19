@@ -52,21 +52,28 @@ Sign in as the admin, then:
    - Version control system: **GitHub pull request**
    - Source code repository: `https://github.com/Blockworked/Blockwork.git`
    - Repository branch: `master`
-   - Push branch: `weblate`
+   - Push branch: leave empty. With one set, Weblate pushes straight to
+     that branch of the Blockwork repository instead of its fork.
 3. On the next page:
-   - File format: **Qt Linguist translation file**
+   - File format: **Qt Linguist translation file (version 2)**
    - File mask: `blockwork-qt/i18n/qml_*.ts`
+   - Monolingual base language file: leave empty. These are bilingual
+     files; with `qml_en.ts` here Weblate only sees its plural strings.
+   - Template for new translations: `blockwork-qt/i18n/qml_pirate.ts`
+     (Weblate clears its translations when copying it)
    - Source language: English
    - Adding new translation: **Create new language file**
    - Language code style: **POSIX style using underscore** (`pt_BR`), which
      is what the app's loader expects.
-
-   `qml_en.ts` only holds English plural forms and shows up as the source
-   language, which translators don't edit.
-4. The pirate file uses the code `pirate`, which Weblate creates as a
-   language of its own. Give it a name under **Manage > Languages**.
-5. In the project's **Settings > Workflow**, set the license and turn on
-   **Enable hooks**.
+4. In the component's **Settings > Files**, set **Language filter** to
+   `^(?!en$)[^.]+$`. `qml_en.ts` only holds English plural forms that
+   `just translations` keeps up to date; without the filter Weblate warns
+   about two English files.
+5. In the project's **Settings**, set **Language aliases** to
+   `pirate:en@pirate`, so `qml_pirate.ts` maps to Weblate's own
+   "English (Pirate)" instead of a generated language.
+6. In the project's **Settings > Workflow**, set the license
+   (`GPL-3.0-only`) and turn on **Enable hooks**.
 
 ## GitHub
 
@@ -74,9 +81,14 @@ Sign in as the admin, then:
   payload URL `https://translate.example.com/hooks/github/`, content type
   `application/json`, just the push event. Weblate then pulls new strings
   as soon as they land.
-- Weblate pushes to a `weblate` branch in a fork under its GitHub account
-  and opens a pull request. Merging it runs the Translations workflow,
-  which commits the compiled `.qm` files.
+- Weblate pushes to its fork over SSH. Copy its public key from
+  **Manage > SSH keys** in Weblate and add it to the bot account under
+  GitHub **Settings > SSH and GPG keys**.
+- Weblate pushes to a `weblate-blockwork-ui` branch in a fork under its
+  GitHub account and opens a pull request. Merging it runs the
+  Translations workflow, which commits the compiled `.qm` files.
+- The first pull request reformats `qml_pirate.ts` the way `lupdate`
+  writes it; later ones only touch changed strings.
 
 ## Updating strings
 
