@@ -10,6 +10,7 @@ Item {
     required property var invoke
     // Shared import/export flow (MacroFiles in Main.qml).
     property var macroFiles: null
+    property var translator: null
     function capturingBinding(index){return appState.combo_capture&&appState.combo_capture.kind==="Binding"&&appState.combo_capture.binding_index===index}
     function capturingAction(action){return appState.combo_capture&&appState.combo_capture.kind==="Named"&&JSON.stringify(appState.combo_capture.action)===JSON.stringify(action)}
 
@@ -116,11 +117,10 @@ Item {
                             }
                             SettingsRow { title: qsTr("Language"); detail: qsTr("The language of the editor and macro dialogs. Run log messages stay in English.")
                                 BwComboBox {
-                                    // Each language's own name, so it's findable in any language.
-                                    readonly property var languages: [
-                                        { id: "", text: qsTr("System default") }, { id: "en", text: "English" },
-                                        { id: "pirate", text: "English (Pirate)" }
-                                    ]
+                                    // Every built-in translation, in its own name so it's findable in any language.
+                                    readonly property var languages: [{ id: "", text: qsTr("System default") }, { id: "en", text: "English" }]
+                                        .concat((root.translator ? root.translator.languages() : []).filter(c => c !== "en")
+                                            .map(c => ({ id: c, text: root.languageName(c) })))
                                     model: languages; textRole: "text"; implicitWidth: 210
                                     currentIndex: Math.max(0, languages.findIndex(l => l.id === (appState.language || "")))
                                     onActivated: index => root.invoke("set_language", { language: languages[index].id })
@@ -334,6 +334,15 @@ Item {
     }
 
     TextEdit { id: clipboardHelper; visible: false }
+    // "pt_BR" -> "Português (Brasil)". Codes Qt doesn't know (like "pirate") get a name here.
+    function languageName(code) {
+        if (code === "pirate") return "English (Pirate)"
+        const locale = Qt.locale(code)
+        if (locale.name === "C") return code
+        let name = locale.nativeLanguageName
+        if (code.indexOf("_") > 0) name += " (" + locale.nativeTerritoryName + ")"
+        return name.charAt(0).toUpperCase() + name.slice(1)
+    }
     function copyText(text) { clipboardHelper.text = text; clipboardHelper.selectAll(); clipboardHelper.copy(); }
 
     function actionLabel(action) {

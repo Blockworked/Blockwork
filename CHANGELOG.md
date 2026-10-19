@@ -116,8 +116,8 @@ section below as the GitHub release notes, followed by the downloads table.
   a `.blockpack` file.
 - Translatable UI: every editor and dialog string goes through Qt's
   translation system, with a language setting in Settings > General. Ships
-  with English and pirate-speak English; see `blockwork-qt/i18n/README.md`
-  to add a language.
+  with English and pirate-speak English. Translation happens on Weblate,
+  and every built-in language shows up in the setting by itself.
 
 ### Changed
 - Macro files now carry a format version and are upgraded step by step when
