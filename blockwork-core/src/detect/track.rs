@@ -6,8 +6,10 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 use std::time::{Duration, Instant};
 
-/// Frames a track survives without a match before it's dropped.
+/// A track survives this many frames without a match, and at least
+/// `LOST_AFTER`, so a fast detector doesn't drop a target on a brief miss.
 pub const MAX_MISSES: u32 = 5;
+const LOST_AFTER: Duration = Duration::from_millis(250);
 /// Weight of the newest box in the smoothed one.
 const SMOOTHING: f64 = 0.6;
 /// A tracker idle this long starts over: its objects have moved on. Well
@@ -18,6 +20,7 @@ const STALE_AFTER: Duration = Duration::from_secs(10);
 struct Track {
     box_: Detection,
     misses: u32,
+    seen: Instant,
 }
 
 #[derive(Debug, Default)]
@@ -30,6 +33,10 @@ impl Tracker {
     /// Matches this frame's boxes to existing tracks and returns them with
     /// ids and smoothed positions. Unmatched boxes start new tracks.
     pub fn update(&mut self, found: Vec<Detection>) -> Vec<Detection> {
+        self.update_at(found, Instant::now())
+    }
+
+    fn update_at(&mut self, found: Vec<Detection>, now: Instant) -> Vec<Detection> {
         let mut pairs: Vec<(f64, usize, usize)> = Vec::new();
         for (t, track) in self.tracks.iter().enumerate() {
             for (d, det) in found.iter().enumerate() {
@@ -60,22 +67,24 @@ impl Tracker {
                     let track = &mut self.tracks[t];
                     track.box_ = smooth(&track.box_, det);
                     track.misses = 0;
+                    track.seen = now;
                     track.box_.clone()
                 }
                 None => {
                     self.next_id += 1;
                     let det = Detection { id: Some(self.next_id), ..det };
-                    self.tracks.push(Track { box_: det.clone(), misses: 0 });
+                    self.tracks.push(Track { box_: det.clone(), misses: 0, seen: now });
                     det
                 }
             };
             out.push(tracked);
         }
-        self.tracks.retain(|t| t.misses <= MAX_MISSES);
+        self.tracks.retain(|t| t.misses <= MAX_MISSES || now.duration_since(t.seen) < LOST_AFTER);
         out
     }
 
-    /// Whether track `id` is still alive (seen within the last few frames).
+    /// Whether track `id` is still alive (seen within the last few frames,
+    /// or the last `LOST_AFTER`).
     pub fn alive(&self, id: u64) -> bool {
         self.tracks.iter().any(|t| t.box_.id == Some(id))
     }
@@ -191,17 +200,36 @@ mod tests {
     }
 
     #[test]
-    fn lost_tracks_drop_after_a_few_misses() {
+    fn lost_tracks_drop_after_a_few_slow_misses() {
         let mut t = Tracker::default();
-        t.update(vec![boxed(0.0, 0.0, 10.0, 10.0, "p", 0.9)]);
-        for _ in 0..MAX_MISSES {
-            t.update(vec![]);
+        let start = Instant::now();
+        let frame = |n: u32| start + Duration::from_millis(100) * n;
+        t.update_at(vec![boxed(0.0, 0.0, 10.0, 10.0, "p", 0.9)], frame(0));
+        for n in 1..=MAX_MISSES {
+            t.update_at(vec![], frame(n));
         }
         assert!(t.alive(1));
         // Reappearing within the limit keeps its id.
-        assert_eq!(t.update(vec![boxed(1.0, 0.0, 10.0, 10.0, "p", 0.9)])[0].id, Some(1));
-        for _ in 0..=MAX_MISSES {
-            t.update(vec![]);
+        assert_eq!(t.update_at(vec![boxed(1.0, 0.0, 10.0, 10.0, "p", 0.9)], frame(6))[0].id, Some(1));
+        for n in 7..=7 + MAX_MISSES {
+            t.update_at(vec![], frame(n));
+        }
+        assert!(!t.alive(1));
+    }
+
+    #[test]
+    fn fast_detectors_keep_tracks_through_brief_misses() {
+        // At 140 frames/s, ten missed frames is only about 70 ms.
+        let mut t = Tracker::default();
+        let start = Instant::now();
+        let frame = |n: u32| start + Duration::from_millis(7) * n;
+        t.update_at(vec![boxed(0.0, 0.0, 10.0, 10.0, "p", 0.9)], frame(0));
+        for n in 1..=10 {
+            t.update_at(vec![], frame(n));
+        }
+        assert_eq!(t.update_at(vec![boxed(1.0, 0.0, 10.0, 10.0, "p", 0.9)], frame(11))[0].id, Some(1));
+        for n in 12..=60 {
+            t.update_at(vec![], frame(n));
         }
         assert!(!t.alive(1));
     }
