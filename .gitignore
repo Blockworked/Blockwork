@@ -40,3 +40,5 @@ AppDir/
 .opencode/
 # Staged by blockwork-qt/build.rs from the lucide-qt crate (do not commit).
 blockwork-qt/qml/Lucide/
+
+*.log

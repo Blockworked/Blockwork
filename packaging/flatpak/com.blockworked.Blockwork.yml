@@ -56,10 +56,12 @@ modules:
       # Blockstitch repository, plus the shared Lucide icons from the sibling
       # lucide-qt repository. Sources are placed beside this build directory
       # to preserve the same ../../blockstitch and ../../lucide-qt paths used
-      # by local development.
-      - cp -a .flatpak-blockstitch ../blockstitch
-      - cp -a .flatpak-lucide-qt ../lucide-qt
-      - cargo --offline build --release --workspace --exclude blockwork-linux-bridge
+      # by local development. One command, since each gets a fresh /run/build.
+      - |
+        set -e
+        cp -a .flatpak-blockstitch ../blockstitch
+        cp -a .flatpak-lucide-qt ../lucide-qt
+        cargo --offline build --release --workspace --exclude blockwork-linux-bridge
       - install -Dm755 target/release/blockwork /app/lib/blockwork/blockwork
       - install -Dm755 target/release/blockwork-daemon /app/lib/blockwork/blockwork-daemon
       - mkdir -p /app/bin

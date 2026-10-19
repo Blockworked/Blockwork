@@ -38,12 +38,16 @@ jobs:
             target: aarch64-pc-windows-msvc
             artifact_name: blockwork-windows-arm64.zip
             installer_arch: arm64
+            qt_host: windows_arm64
+            qt_arch: win64_msvc2022_arm64
             experimental: true
 
           - name: macos-arm64
             runner: macos-latest
             target: aarch64-apple-darwin
             artifact_name: blockwork-macos-arm64
+            qt_host: mac
+            qt_arch: clang_64
             experimental: true
 
     steps:
@@ -69,6 +73,24 @@ jobs:
           else
             git clone --depth 1 https://github.com/Blockworked/lucide-qt.git ../lucide-qt
           fi
+
+      # Official Qt builds where CXX-Qt's Qt download is missing or broken.
+      - name: Set up Python
+        if: matrix.qt_arch
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Qt
+        if: matrix.qt_arch
+        shell: bash
+        run: |
+          python -m pip install aqtinstall==3.3.0
+          python -m aqt install-qt ${{ matrix.qt_host }} desktop 6.10.3 ${{ matrix.qt_arch }} --outputdir "$RUNNER_TEMP/Qt"
+          qmake=$(find "$RUNNER_TEMP/Qt/6.10.3" -maxdepth 3 -path '*/bin/*' \( -name qmake -o -name qmake.exe \) | head -n 1)
+          test -n "$qmake"
+          if [[ "$RUNNER_OS" == Windows ]]; then qmake=$(cygpath -w "$qmake"); fi
+          echo "QMAKE=$qmake" >> "$GITHUB_ENV"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -102,6 +124,10 @@ jobs:
 
       - name: Build macOS app bundle
         if: runner.os == 'macOS'
+        env:
+          MACOSX_DEPLOYMENT_TARGET: '13.0'
+          # Newer Xcode clang lists __yield as a builtin but needs arm_acle.h to declare it (Qt's qyieldcpu.h).
+          CXXFLAGS_aarch64_apple_darwin: -include arm_acle.h
         run: ./scripts/build-macos-bundle.sh ${{ matrix.target }}
 
       - name: Zip macOS app bundle
@@ -178,12 +204,16 @@ jobs:
             target: x86_64-unknown-linux-gnu
             artifact_name: blockwork-linux-x86_64
             linux_arch: x86_64
+            qt_host: linux
+            qt_arch: linux_gcc_64
 
           - name: linux-arm64
             runner: ubuntu-24.04-arm
             target: aarch64-unknown-linux-gnu
             artifact_name: blockwork-linux-arm64
             linux_arch: aarch64
+            qt_host: linux_arm64
+            qt_arch: linux_gcc_arm64
 
     steps:
       - name: Checkout
@@ -208,6 +238,24 @@ jobs:
           else
             git clone --depth 1 https://github.com/Blockworked/lucide-qt.git ../lucide-qt
           fi
+
+      # Official Qt builds where CXX-Qt's Qt download is missing or broken.
+      - name: Set up Python
+        if: matrix.qt_arch
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install Qt
+        if: matrix.qt_arch
+        shell: bash
+        run: |
+          python -m pip install aqtinstall==3.3.0
+          python -m aqt install-qt ${{ matrix.qt_host }} desktop 6.10.3 ${{ matrix.qt_arch }} --outputdir "$RUNNER_TEMP/Qt"
+          qmake=$(find "$RUNNER_TEMP/Qt/6.10.3" -maxdepth 3 -path '*/bin/*' \( -name qmake -o -name qmake.exe \) | head -n 1)
+          test -n "$qmake"
+          if [[ "$RUNNER_OS" == Windows ]]; then qmake=$(cygpath -w "$qmake"); fi
+          echo "QMAKE=$qmake" >> "$GITHUB_ENV"
 
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
@@ -240,22 +288,29 @@ jobs:
             libxtst-dev \
             libwayland-dev \
             wayland-protocols \
-            libclang-dev
+            libclang-dev \
+            lld \
+            libxcb-cursor0 \
+            libxcb-icccm4 \
+            libxcb-image0 \
+            libxcb-keysyms1 \
+            libxcb-render-util0 \
+            libxcb-shape0 \
+            libxcb-util1
 
       - name: Build (release)
-        run: cargo build --release --target ${{ matrix.target }}
+        run: cargo build --release --target ${{ matrix.target }} --workspace --exclude blockwork-linux-bridge
 
       - name: Build AppImage
         run: |
           export APPIMAGE_EXTRACT_AND_RUN=1
+          # linuxdeploy-plugin-qt only bundles xcb unless told otherwise.
+          export EXTRA_PLATFORM_PLUGINS=libqwayland.so
           wget -q -O linuxdeploy.AppImage "https://github.com/linuxdeploy/linuxdeploy/releases/download/continuous/linuxdeploy-${{ matrix.linux_arch }}.AppImage"
           wget -q -O linuxdeploy-plugin-appimage.AppImage "https://github.com/linuxdeploy/linuxdeploy-plugin-appimage/releases/download/continuous/linuxdeploy-plugin-appimage-${{ matrix.linux_arch }}.AppImage"
           wget -q -O linuxdeploy-plugin-qt.AppImage "https://github.com/linuxdeploy/linuxdeploy-plugin-qt/releases/download/continuous/linuxdeploy-plugin-qt-${{ matrix.linux_arch }}.AppImage"
           chmod +x linuxdeploy.AppImage linuxdeploy-plugin-appimage.AppImage linuxdeploy-plugin-qt.AppImage
 
-          QMAKE_PATH=$(find "$HOME" -path '*qt_minimal_download*' -type f -name qmake -print -quit)
-          test -n "$QMAKE_PATH"
-          export QMAKE="$QMAKE_PATH"
           export LD_LIBRARY_PATH="$($QMAKE -query QT_INSTALL_LIBS):${LD_LIBRARY_PATH:-}"
           export QML_SOURCES_PATHS="$PWD/blockwork-qt/qml:$PWD/../blockstitch/qml:$PWD/../lucide-qt/qml"
 
