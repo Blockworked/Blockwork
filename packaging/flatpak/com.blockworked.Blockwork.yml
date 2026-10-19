@@ -61,6 +61,9 @@ modules:
         set -e
         cp -a .flatpak-blockstitch ../blockstitch
         cp -a .flatpak-lucide-qt ../lucide-qt
+        # The SDK's Qt; without QMAKE, CXX-Qt only takes exact x.y.0 versions and tries to download one.
+        export QMAKE="$(command -v qmake6 || command -v qmake)"
+        test -n "$QMAKE"
         cargo --offline build --release --workspace --exclude blockwork-linux-bridge
       - install -Dm755 target/release/blockwork /app/lib/blockwork/blockwork
       - install -Dm755 target/release/blockwork-daemon /app/lib/blockwork/blockwork-daemon
