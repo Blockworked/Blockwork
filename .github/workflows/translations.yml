@@ -1,0 +1,35 @@
+name: Translations
+
+# Weblate only commits .ts files, so this compiles the .qm files the build embeds.
+on:
+  push:
+    paths:
+      - 'blockwork-qt/i18n/*.ts'
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+jobs:
+  compile:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install lrelease
+        run: sudo apt-get update && sudo apt-get install -y qt6-l10n-tools
+
+      - name: Compile
+        run: /usr/lib/qt6/bin/lrelease -silent blockwork-qt/i18n/qml_*.ts
+
+      - name: Commit
+        run: |
+          git add blockwork-qt/i18n/*.qm
+          if git diff --cached --quiet; then
+            echo "Translations are up to date"
+            exit 0
+          fi
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git commit -m "Compile translations"
+          git push

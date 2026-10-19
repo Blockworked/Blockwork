@@ -1,6 +1,7 @@
 #include "translations.h"
 
 #include <QtCore/QCoreApplication>
+#include <QtCore/QDir>
 #include <QtCore/QLocale>
 #include <QtCore/QPointer>
 #include <QtCore/QTranslator>
@@ -35,4 +36,13 @@ bool blockwork_set_language(const QString &code)
     if (uiEngine)
         uiEngine->retranslate();
     return found;
+}
+
+QStringList blockwork_languages()
+{
+    QStringList codes;
+    const auto files = QDir(QStringLiteral(":/i18n")).entryList({QStringLiteral("qml_*.qm")}, QDir::Files, QDir::Name);
+    for (const QString &file : files)
+        codes << file.mid(4, file.size() - 7);
+    return codes;
 }

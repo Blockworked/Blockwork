@@ -7,12 +7,15 @@ mod ffi {
     unsafe extern "C++" {
         include!("cxx-qt-lib/qstring.h");
         type QString = cxx_qt_lib::QString;
+        include!("cxx-qt-lib/qstringlist.h");
+        type QStringList = cxx_qt_lib::QStringList;
         include!("cxx-qt-lib/qqmlengine.h");
         type QQmlEngine = cxx_qt_lib::QQmlEngine;
         include!("translations.h");
 
         fn blockwork_set_qml_engine(engine: Pin<&mut QQmlEngine>);
         fn blockwork_set_language(code: &QString) -> bool;
+        fn blockwork_languages() -> QStringList;
     }
 }
 
@@ -23,6 +26,11 @@ pub fn set_engine(engine: Pin<&mut cxx_qt_lib::QQmlEngine>) {
 /// Empty means the system language.
 pub fn set_language(code: &str) -> bool {
     ffi::blockwork_set_language(&cxx_qt_lib::QString::from(code))
+}
+
+/// Codes of the compiled translations.
+pub fn languages() -> cxx_qt_lib::QStringList {
+    ffi::blockwork_languages()
 }
 
 /// The language saved in Settings, read before the daemon connects so the

@@ -22,9 +22,10 @@ weeks), L (multi-week). Finished items are marked (done).
   webhook, bundles and the block library; and the embedding SDK docs for
   `blockwork-ffi` (lockstep host clock, GDR import, step-stamped recording)
   with a worked example (see "Embedding SDK docs" below).
-- **Translations.** The UI is ready for translators (see
-  `blockwork-qt/i18n/README.md`); real languages should come from people,
-  not machine translation. Still English only: run log messages, block
+- **Translations.** Translators work on a self-hosted Weblate; stand up
+  the server and connect the repo (see `packaging/weblate/README.md`).
+  Real languages should come from people, not machine translation. Still
+  English only: run log messages, block
   runtime errors, the tray menu and template names, which come from the
   daemon.
 - **Community block library repo.** The default index points at

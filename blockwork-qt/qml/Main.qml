@@ -200,7 +200,7 @@ ApplicationWindow {
         }
     }
     Component { id: onboardingComponent; OnboardingPage { appState: root.appState; invoke: root.invoke } }
-    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; macroFiles: macroFiles } }
+    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; macroFiles: macroFiles; translator: translator } }
     MacroFiles { id: macroFiles; appState: root.appState; invoke: root.invoke; appBridge: bridge }
     BlockLibrary { id: blockLibrary; appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: macroFiles }
 
