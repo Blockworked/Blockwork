@@ -5,7 +5,7 @@ use std::sync::{Condvar, Mutex, OnceLock};
 
 use enigo::{Coordinate as EnigoCoordinate, Enigo, Mouse, Settings};
 use evdev::{
-    uinput::VirtualDevice, uinput::VirtualDeviceBuilder, AbsoluteAxisCode, AttributeSet, EventType,
+    uinput::VirtualDevice, AbsoluteAxisCode, AttributeSet, EventType,
     InputEvent, KeyCode, PropType, RelativeAxisCode,
 };
 use tracing::warn;
