@@ -14,6 +14,26 @@ Item {
     required property var appBridge
 
     function importMacro() { importDialog.open(); }
+    // What a macro can do, by the daemon's key, in the UI language.
+    function capabilityLabel(cap) {
+        const labels = {
+            commands: qsTr("Runs commands and opens or closes apps"), secrets: qsTr("Reads your saved secrets"),
+            network: qsTr("Goes online"), files_write: qsTr("Writes to files"), files_read: qsTr("Reads files and folders"),
+            input: qsTr("Presses keys, clicks and moves the mouse"), clipboard: qsTr("Reads or changes the clipboard"),
+            windows: qsTr("Reads or controls other apps and windows"),
+            triggers: qsTr("Starts on its own (schedules, keys, typing, apps, idle, windows, files and more)"),
+            screen: qsTr("Reads the screen (colors, images and text)"), macros: qsTr("Runs or stops your other macros"),
+            globals: qsTr("Reads or changes global variables")
+        };
+        return labels[cap.kind] || cap.label;
+    }
+    function settingLabel(setting) {
+        const labels = {
+            always_listen: qsTr("Always listen for events, even when a different macro is selected"),
+            catch_up_missed: qsTr("Run schedules it missed while Blockwork was closed or the computer slept")
+        };
+        return labels[setting.key] || setting.label;
+    }
     function exportMacro(macroId) {
         exportDialog.macroId = macroId;
         daemonCall("export_macro_file_name", { macroId: macroId }, name => {
@@ -58,43 +78,43 @@ Item {
 
     FileDialog {
         id: importDialog
-        title: "Import a macro"
+        title: qsTr("Import a macro")
         fileMode: FileDialog.OpenFile
         currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
-        nameFilters: ["Blockwork macros and bundles (*.macro *.blockwork *.json)", "All files (*)"]
+        nameFilters: [qsTr("Blockwork macros and bundles (*.macro *.blockwork *.json)"), qsTr("All files (*)")]
         onAccepted: root.daemonCall("import_macro", { path: root.localPath(selectedFile) }, () => {})
     }
     FileDialog {
         id: exportDialog
         property string macroId: ""
-        title: "Export macro"
+        title: qsTr("Export macro")
         fileMode: FileDialog.SaveFile
         defaultSuffix: "macro"
-        nameFilters: ["Blockwork macros (*.macro)"]
+        nameFilters: [qsTr("Blockwork macros (*.macro)")]
         onAccepted: root.daemonCall("export_macro", { macroId: macroId, path: root.localPath(selectedFile) }, () => {})
     }
     FileDialog {
         id: bundleDialog
         property var macroIds: []
         property string bundleName: ""
-        title: "Export bundle"
+        title: qsTr("Export bundle")
         fileMode: FileDialog.SaveFile
         defaultSuffix: "blockwork"
-        nameFilters: ["Blockwork bundles (*.blockwork)"]
+        nameFilters: [qsTr("Blockwork bundles (*.blockwork)")]
         onAccepted: root.daemonCall("export_bundle", { macroIds: macroIds, name: bundleName, path: root.localPath(selectedFile) }, count => {
-            exported.message = count === 1 ? "Exported 1 macro." : "Exported " + count + " macros, including any they run.";
+            exported.message = count === 1 ? qsTr("Exported 1 macro.") : qsTr("Exported %1 macros, including any they run.").arg(count);
             exported.open();
         })
     }
     BwDialog {
         id: exported
-        title: "Bundle exported"; standardButtons: Dialog.Ok
+        title: qsTr("Bundle exported"); standardButtons: Dialog.Ok
         property string message: ""
         Text { width: 380; wrapMode: Text.WordWrap; text: exported.message; color: Theme.text; font.pixelSize: 13 }
     }
     BwDialog {
         id: failed
-        title: "Something went wrong"; standardButtons: Dialog.Ok
+        title: qsTr("Something went wrong"); standardButtons: Dialog.Ok
         property string message: ""
         function show(text) { message = text; open(); }
         Text { width: 420; wrapMode: Text.WordWrap; text: failed.message; color: Theme.text; font.pixelSize: 13 }
@@ -116,19 +136,21 @@ Item {
         readonly property var customSettings: root.importReview ? root.importReview.custom_settings : []
         readonly property var macroNames: root.importReview ? root.importReview.macros || [] : []
         readonly property var notes: root.importReview ? root.importReview.notes || [] : []
-        title: root.importReview ? "Import “" + root.importReview.name + "”?" : "Import macro"
+        title: root.importReview ? qsTr("Import “%1”?").arg(root.importReview.name) : qsTr("Import macro")
         standardButtons: Dialog.Ok | Dialog.Cancel
         Component.onCompleted: standardButton(Dialog.Ok).text = "Import"
         Column { width: 460; spacing: 10
             Text {
                 visible: reviewDialog.macroNames.length > 1
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
-                text: "This bundle has " + reviewDialog.macroNames.length + " macros: " + reviewDialog.macroNames.join(", ") + "."
+                text: qsTr("This bundle has %1 macros: %2.").arg(reviewDialog.macroNames.length).arg(reviewDialog.macroNames.join(", "))
             }
             Text {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
-                readonly property string what: reviewDialog.macroNames.length > 1 ? "These macros" : "This macro"
-                text: reviewDialog.caps.length ? what + " can:" : what + " only use blocks that stay inside Blockwork, like waits and variables."
+                readonly property bool many: reviewDialog.macroNames.length > 1
+                text: reviewDialog.caps.length ? (many ? qsTr("These macros can:") : qsTr("This macro can:"))
+                    : many ? qsTr("These macros only use blocks that stay inside Blockwork, like waits and variables.")
+                    : qsTr("This macro only uses blocks that stay inside Blockwork, like waits and variables.")
             }
             Repeater {
                 model: reviewDialog.caps
@@ -139,11 +161,11 @@ Item {
                         anchors.verticalCenter: parent.verticalCenter; width: 16; height: 16
                         name: modelData.risky ? "triangle-alert" : "check"; color: modelData.risky ? Theme.warning : Theme.textDim
                     }
-                    Text { anchors.verticalCenter: parent.verticalCenter; text: modelData.label; color: modelData.risky ? Theme.warning : Theme.text; font.pixelSize: 13 }
+                    Text { anchors.verticalCenter: parent.verticalCenter; text: root.capabilityLabel(modelData); color: modelData.risky ? Theme.warning : Theme.text; font.pixelSize: 13 }
                     BwCheckBox {
                         visible: modelData.guarded
                         anchors.verticalCenter: parent.verticalCenter
-                        text: "allow without asking"
+                        text: qsTr("allow without asking")
                         checked: !root.askFirst[modelData.kind]
                         onToggled: { const next = Object.assign({}, root.askFirst); next[modelData.kind] = !checked; root.askFirst = next; }
                     }
@@ -152,12 +174,12 @@ Item {
             Text {
                 visible: reviewDialog.caps.some(c => c.risky)
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                text: "Only import macros that run commands, go online, write files or read secrets from people you trust. Untick an ability to be asked the first time it's used; you can change this later in Macro settings."
+                text: qsTr("Only import macros that run commands, go online, write files or read secrets from people you trust. Untick an ability to be asked the first time it's used; you can change this later in Macro settings.")
             }
             Text {
                 visible: reviewDialog.notes.length > 0; topPadding: 6
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
-                text: "Made with an older Blockwork, so it was updated:"
+                text: qsTr("Made with an older Blockwork, so it was updated:")
             }
             Repeater {
                 model: reviewDialog.notes
@@ -170,13 +192,13 @@ Item {
             Text {
                 visible: reviewDialog.customSettings.length > 0; topPadding: 6
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
-                text: "It also comes with these settings. Untick any you don't want:"
+                text: qsTr("It also comes with these settings. Untick any you don't want:")
             }
             Repeater {
                 model: reviewDialog.customSettings
                 delegate: BwCheckBox {
                     required property var modelData
-                    text: modelData.label; checked: modelData.enabled
+                    text: root.settingLabel(modelData); checked: modelData.enabled
                     onToggled: root.keepSettings[modelData.key] = checked
                 }
             }

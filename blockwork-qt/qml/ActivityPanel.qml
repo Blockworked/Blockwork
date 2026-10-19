@@ -58,20 +58,20 @@ Rectangle {
 
     function ago(ms) {
         const s = Math.max(0, Math.round((now - ms) / 1000));
-        if (s < 5) return "just now";
-        if (s < 60) return s + "s ago";
-        if (s < 3600) return Math.floor(s / 60) + "m ago";
-        if (s < 86400) return Math.floor(s / 3600) + "h ago";
-        return Qt.formatDate(new Date(ms), "MMM d");
+        if (s < 5) return qsTr("just now");
+        if (s < 60) return qsTr("%1s ago").arg(s);
+        if (s < 3600) return qsTr("%1m ago").arg(Math.floor(s / 60));
+        if (s < 86400) return qsTr("%1h ago").arg(Math.floor(s / 3600));
+        return Qt.locale().toString(new Date(ms), qsTr("MMM d", "date format for older log entries"));
     }
     function elapsed(ms) {
         const s = Math.max(0, Math.floor((now - ms) / 1000));
         return Math.floor(s / 60) + ":" + String(s % 60).padStart(2, "0");
     }
     function statusText() {
-        if (running) return "Running · " + elapsed(lastRunEvent.time_ms);
-        if (!latest) return "No activity yet";
-        return (latest.level === "Error" ? "Error: " : "") + latest.message.split("\n")[0] + "  ·  " + ago(latest.time_ms);
+        if (running) return qsTr("Running · %1").arg(elapsed(lastRunEvent.time_ms));
+        if (!latest) return qsTr("No activity yet");
+        return (latest.level === "Error" ? qsTr("Error: ") : "") + latest.message.split("\n")[0] + "  ·  " + ago(latest.time_ms);
     }
 
     // Drag the top edge to resize while open.
@@ -111,21 +111,21 @@ Rectangle {
                 }
                 Text {
                     visible: root.recentErrors > 0
-                    text: root.recentErrors + (root.recentErrors === 1 ? " error" : " errors"); color: Theme.danger; font.pixelSize: 12; font.weight: Font.DemiBold
+                    text: qsTr("%n error(s)", "", root.recentErrors); color: Theme.danger; font.pixelSize: 12; font.weight: Font.DemiBold
                 }
                 Row {
                     visible: root.expanded; spacing: 4
                     BwButton {
-                        text: "This macro"; implicitHeight: 22; font.pixelSize: 11; primary: !root.allMacros
+                        text: qsTr("This macro"); implicitHeight: 22; font.pixelSize: 11; primary: !root.allMacros
                         onClicked: root.allMacros = false
                     }
                     BwButton {
-                        text: "All"; implicitHeight: 22; font.pixelSize: 11; primary: root.allMacros
+                        text: qsTr("All"); implicitHeight: 22; font.pixelSize: 11; primary: root.allMacros
                         onClicked: root.allMacros = true
                     }
                     BwButton {
                         iconName: "trash"; text: ""; implicitWidth: 22; implicitHeight: 22; enabled: root.entries.length > 0
-                        ToolTip.visible: hovered; ToolTip.text: "Clear the log"
+                        ToolTip.visible: hovered; ToolTip.text: qsTr("Clear the log")
                         onClicked: root.clearRequested()
                     }
                 }
@@ -139,7 +139,7 @@ Rectangle {
             Text {
                 visible: root.shown.length === 0
                 anchors.centerIn: parent; color: Theme.textDim; font.pixelSize: 12
-                text: root.allMacros ? "Nothing yet. Runs, triggers, log blocks and errors show up here." : "Nothing yet for this macro."
+                text: root.allMacros ? qsTr("Nothing yet. Runs, triggers, log blocks and errors show up here.") : qsTr("Nothing yet for this macro.")
             }
             ListView {
                 id: list

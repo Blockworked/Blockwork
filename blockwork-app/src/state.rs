@@ -114,6 +114,8 @@ pub(crate) struct AppState {
     /// A macro file the user just picked via `import_macro`, waiting on its
     /// review - `confirm_import_macro`/`cancel_import_macro` resolve it.
     pub(crate) pending_import: Option<(Vec<Macro>, ImportReviewDto)>,
+    /// A block pack waiting on its review.
+    pub(crate) pending_pack: Option<crate::block_library::PendingPack>,
     /// Set by the emergency stop; watchers fire nothing until it's cleared.
     pub(crate) triggers_paused: bool,
 }
@@ -175,6 +177,10 @@ pub(crate) struct StateDto {
     /// What the open macro may do without asking; `None` when it's trusted.
     pub(crate) permissions: Option<Vec<String>>,
     pub(crate) webhook: crate::webhook::WebhookDto,
+    pub(crate) block_library: crate::block_library::LibraryDto,
+    pub(crate) pack_review: Option<crate::block_library::PackReviewDto>,
+    /// UI language code; empty follows the system.
+    pub(crate) language: String,
 }
 
 /// One macro as the library lists it.
@@ -1958,6 +1964,9 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         paused_strands: blockwork_core::macros::debug::paused_strands(),
         permissions: s.current_macro.as_ref().and_then(|m| blockwork_core::permissions::grants(&m.id)).map(|g| g.allowed),
         webhook: crate::webhook::dto(),
+        block_library: crate::block_library::dto(s),
+        pack_review: s.pending_pack.as_ref().map(|p| p.review.clone()),
+        language: crate::ui_language(),
     }
 }
 

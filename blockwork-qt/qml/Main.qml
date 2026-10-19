@@ -13,7 +13,7 @@ ApplicationWindow {
     minimumWidth: 600 + 2 * 18
     minimumHeight: 640 + 2 * 18
     visible: true
-    title: "Blockwork"
+    title: qsTr("Blockwork")
     // macOS keeps its native title bar.
     readonly property bool customChrome: Qt.platform.os !== "osx"
     readonly property real cornerRadius: customChrome && visibility === Window.Windowed ? 10 : 0
@@ -46,6 +46,12 @@ ApplicationWindow {
         key_capture: null, standalone_key: null, combo_capture: null,
         absolute_mouse_position_available: true, update_check_state: { state: "Idle" }
     })
+
+    // The UI language from Settings; empty follows the system. The saved one
+    // is already applied at startup, so this only handles changes.
+    readonly property string uiLanguage: appState.language || ""
+    onUiLanguageChanged: translator.setLanguage(uiLanguage)
+    Translator { id: translator }
 
     function invoke(command, args) {
         bridge.invokeCommand(command, JSON.stringify(args || {}));
@@ -166,7 +172,7 @@ ApplicationWindow {
         Column {
             anchors.centerIn: parent; spacing: 12
             BusyIndicator { anchors.horizontalCenter: parent.horizontalCenter; running: bridge.lastError.length === 0 }
-            Text { text: bridge.lastError.length ? bridge.lastError : "Connecting to Blockwork…"; color: bridge.lastError.length ? "#ff7373" : "#e7e7e8"; font.pixelSize: 16 }
+            Text { text: bridge.lastError.length ? bridge.lastError : qsTr("Connecting to Blockwork…"); color: bridge.lastError.length ? "#ff7373" : "#e7e7e8"; font.pixelSize: 16 }
         }
     }
 
@@ -186,7 +192,7 @@ ApplicationWindow {
     Component {
         id: editorComponent
         EditorPage {
-            appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: macroFiles
+            appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: macroFiles; blockLibrary: blockLibrary
             sidebarWidth: root.sidebarWidth
             onSidebarWidthChanged: root.sidebarWidth = sidebarWidth
             sidebarCollapsed: root.sidebarCollapsed
@@ -196,6 +202,7 @@ ApplicationWindow {
     Component { id: onboardingComponent; OnboardingPage { appState: root.appState; invoke: root.invoke } }
     Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; macroFiles: macroFiles } }
     MacroFiles { id: macroFiles; appState: root.appState; invoke: root.invoke; appBridge: bridge }
+    BlockLibrary { id: blockLibrary; appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: macroFiles }
 
     // Frameless window: hairline outline and edge/corner resize grips.
     Rectangle {

@@ -24,11 +24,29 @@ pub struct Request {
     pub default: String,
     #[serde(default)]
     pub options: Vec<String>,
+    /// Permission questions: the macro's name and the ability's key, so
+    /// the dialog can word the question in the UI language.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub subject: String,
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub ability: String,
+    /// The UI language from Settings; empty means the system's.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub language: String,
 }
 
 impl Request {
     pub fn new(kind: Kind, title: &str, message: impl Into<String>) -> Self {
-        Request { kind, title: title.to_string(), message: message.into(), default: String::new(), options: Vec::new() }
+        Request {
+            kind,
+            title: title.to_string(),
+            message: message.into(),
+            default: String::new(),
+            options: Vec::new(),
+            subject: String::new(),
+            ability: String::new(),
+            language: String::new(),
+        }
     }
 }
 

@@ -61,7 +61,7 @@ Item {
             screen: modelData
             flags: Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint
             color: "transparent"
-            title: "Pick from the screen"
+            title: qsTr("Pick from the screen")
             Component.onCompleted: { showFullScreen(); raise(); requestActivate(); }
 
             readonly property bool mine: root.selScreen === index && (root.selecting || root.hasSelection)
@@ -143,8 +143,8 @@ Item {
                         anchors.centerIn: parent; spacing: 10
                         LucideIcon { name: "crosshair"; width: 16; height: 16; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
                         Text { text: root.hint; color: Theme.text; font.pixelSize: 13; anchors.verticalCenter: parent.verticalCenter }
-                        BwButton { text: "Cancel"; onClicked: { root.end(); root.canceled(); } }
-                        BwButton { iconName: "check"; text: "Use selection"; primary: true; enabled: root.hasSelection; onClicked: root.accept() }
+                        BwButton { text: qsTr("Cancel"); onClicked: { root.end(); root.canceled(); } }
+                        BwButton { iconName: "check"; text: qsTr("Use selection"); primary: true; enabled: root.hasSelection; onClicked: root.accept() }
                     }
                 }
             }

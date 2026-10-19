@@ -63,6 +63,12 @@ pub struct AppSettings {
     /// Requests must carry this, so other programs can't fire macros blindly.
     #[serde(default)]
     pub webhook_token: Option<String>,
+    /// Block library index addresses; `None` means the built-in one.
+    #[serde(default)]
+    pub block_library_sources: Option<Vec<String>>,
+    /// UI language code like "de"; `None` or empty follows the system.
+    #[serde(default)]
+    pub language: Option<String>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {

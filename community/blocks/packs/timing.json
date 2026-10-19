@@ -1,0 +1,183 @@
+{
+  "author": "Blockwork",
+  "blocks": {
+    "block_defs": [
+      {
+        "color": "#FFAB19",
+        "icon": "clock",
+        "id": "e1461af382f64762b3feb097b13eadb8",
+        "pieces": [
+          {
+            "id": "a615d35e6c0a4939839f21b0ea8e1057",
+            "kind": "Label",
+            "text": "wait"
+          },
+          {
+            "id": "fe40722c84c6402cb64d42cc7a37e07d",
+            "kind": "Input",
+            "name": "seconds",
+            "value_type": "Any"
+          },
+          {
+            "id": "3979a52515b14a88b8654bbcd0932c5d",
+            "kind": "Label",
+            "text": "seconds"
+          }
+        ],
+        "shape": "Normal"
+      },
+      {
+        "color": "#FFAB19",
+        "icon": "clock",
+        "id": "9858935eada646d2aed16adc317aff48",
+        "pieces": [
+          {
+            "id": "431179c3768f499daa4bcd472ea334dd",
+            "kind": "Label",
+            "text": "wait about"
+          },
+          {
+            "id": "39771d99714e41d1bf98f86173b7e21f",
+            "kind": "Input",
+            "name": "ms",
+            "value_type": "Any"
+          },
+          {
+            "id": "d5aa553ea37d4a8099ee978de352d24f",
+            "kind": "Label",
+            "text": "ms"
+          }
+        ],
+        "shape": "Normal"
+      }
+    ],
+    "comments": [],
+    "description": "Wait in seconds, or wait a slightly random time so clicks look less robotic.",
+    "dicts": [],
+    "floating_values": [],
+    "format_version": 1,
+    "id": "",
+    "lists": [],
+    "name": "Timing",
+    "recording_target": null,
+    "settings": {
+      "active_days": 0,
+      "active_hours": null,
+      "always_listen": false,
+      "catch_up_missed": false,
+      "max_loop_iterations": 0,
+      "max_run_secs": 0,
+      "only_in_window": "",
+      "power": "Any"
+    },
+    "speed_multiplier": 1.0,
+    "strands": [
+      {
+        "id": "260be14efea04fe4b2e5a84df70f7192",
+        "instructions": [
+          {
+            "id": "0406b3f77bc147b586f1d49c8a440dd1",
+            "kind": {
+              "BlockHeader": "e1461af382f64762b3feb097b13eadb8"
+            }
+          },
+          {
+            "id": "07e89511f42b429a88d4a95cdfd0b263",
+            "kind": {
+              "Wait": {
+                "args": [
+                  {
+                    "kind": "Param",
+                    "name": "seconds"
+                  },
+                  {
+                    "kind": "Number",
+                    "value": 1000.0
+                  }
+                ],
+                "kind": "Op",
+                "op": "Mul",
+                "saved": {
+                  "kind": "Number",
+                  "value": 0.0
+                }
+              }
+            }
+          }
+        ],
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": "62fa5949887a41e7af6d23b8dc6ef71d",
+        "instructions": [
+          {
+            "id": "7177ad2378024021bd6a09ce5b0e1455",
+            "kind": {
+              "BlockHeader": "9858935eada646d2aed16adc317aff48"
+            }
+          },
+          {
+            "id": "01ac421e8d02454db61b32158f7dc8c2",
+            "kind": {
+              "Wait": {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "kind": "Param",
+                        "name": "ms"
+                      },
+                      {
+                        "kind": "Number",
+                        "value": 0.8
+                      }
+                    ],
+                    "kind": "Op",
+                    "op": "Mul",
+                    "saved": {
+                      "kind": "Number",
+                      "value": 0.0
+                    }
+                  },
+                  {
+                    "args": [
+                      {
+                        "kind": "Param",
+                        "name": "ms"
+                      },
+                      {
+                        "kind": "Number",
+                        "value": 1.2
+                      }
+                    ],
+                    "kind": "Op",
+                    "op": "Mul",
+                    "saved": {
+                      "kind": "Number",
+                      "value": 0.0
+                    }
+                  }
+                ],
+                "kind": "Op",
+                "op": "Random",
+                "saved": {
+                  "kind": "Number",
+                  "value": 0.0
+                }
+              }
+            }
+          }
+        ],
+        "x": 0,
+        "y": 0
+      }
+    ],
+    "variables": []
+  },
+  "blockwork_block_pack": 1,
+  "description": "Wait in seconds, or wait a slightly random time so clicks look less robotic.",
+  "id": "timing",
+  "name": "Timing",
+  "version": "1.0.0"
+}

@@ -10,9 +10,9 @@ Item {
     required property var invoke
 
     readonly property var preferences: [
-        { title: "Start at system startup", detail: "Hotkeys work as soon as you log in.", on: appState.start_at_startup === true, command: "set_start_at_startup" },
-        { title: "Close to tray", detail: "Keep hotkeys active after closing the editor.", on: appState.close_to_tray === true, command: "set_close_to_tray" },
-        { title: "Record mouse movement", detail: "Include cursor paths in recordings.", on: appState.record_mouse_movement === true, command: "toggle_record_mouse_movement" }
+        { title: qsTr("Start at system startup"), detail: qsTr("Hotkeys work as soon as you log in."), on: appState.start_at_startup === true, command: "set_start_at_startup" },
+        { title: qsTr("Close to tray"), detail: qsTr("Keep hotkeys active after closing the editor."), on: appState.close_to_tray === true, command: "set_close_to_tray" },
+        { title: qsTr("Record mouse movement"), detail: qsTr("Include cursor paths in recordings."), on: appState.record_mouse_movement === true, command: "toggle_record_mouse_movement" }
     ]
 
     ColumnLayout {
@@ -27,7 +27,7 @@ Item {
                     Layout.preferredWidth: 20; Layout.preferredHeight: 20
                     fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
                 }
-                Text { text: "Welcome to Blockwork"; color: "#e7e7e8"; font.pixelSize: 15; font.weight: Font.Bold }
+                Text { text: qsTr("Welcome to Blockwork"); color: "#e7e7e8"; font.pixelSize: 15; font.weight: Font.Bold }
                 Item { Layout.fillWidth: true }
                 WindowControls { visible: Qt.platform.os !== "osx" }
             }
@@ -37,10 +37,10 @@ Item {
             Layout.fillWidth: true; Layout.fillHeight: true
             ColumnLayout {
                 anchors.centerIn: parent; width: Math.min(560, parent.width - 48); spacing: 14
-                Text { Layout.alignment: Qt.AlignHCenter; text: "Make it yours"; color: "#e7e7e8"; font.pixelSize: 24; font.weight: Font.DemiBold }
-                Text { Layout.alignment: Qt.AlignHCenter; Layout.bottomMargin: 6; text: "You can change these any time in Settings."; color: "#9fa0a6"; font.pixelSize: 14 }
+                Text { Layout.alignment: Qt.AlignHCenter; text: qsTr("Make it yours"); color: "#e7e7e8"; font.pixelSize: 24; font.weight: Font.DemiBold }
+                Text { Layout.alignment: Qt.AlignHCenter; Layout.bottomMargin: 6; text: qsTr("You can change these any time in Settings."); color: "#9fa0a6"; font.pixelSize: 14 }
                 SectionCard {
-                    Layout.fillWidth: true; title: "Preferences"; iconName: "settings"
+                    Layout.fillWidth: true; title: qsTr("Preferences"); iconName: "settings"
                     Repeater {
                         model: root.preferences
                         delegate: RowLayout {
@@ -58,7 +58,7 @@ Item {
                     }
                 }
                 SectionCard {
-                    Layout.fillWidth: true; title: "Start from a template"; iconName: "sparkles"
+                    Layout.fillWidth: true; title: qsTr("Start from a template"); iconName: "sparkles"
                     TemplateList {
                         Layout.fillWidth: true; templates: appState.templates || []
                         onPicked: id => { root.invoke("new_macro_from_template", { template: id }); root.invoke("set_onboarding_done", { done: true }); }
@@ -66,7 +66,7 @@ Item {
                 }
                 BwButton {
                     Layout.alignment: Qt.AlignHCenter; Layout.topMargin: 10
-                    text: "Get started"; primary: true
+                    text: qsTr("Get started"); primary: true
                     onClicked: root.invoke("set_onboarding_done", { done: true })
                 }
             }

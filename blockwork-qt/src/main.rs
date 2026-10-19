@@ -10,6 +10,8 @@ mod daemon_client;
 mod native_icon;
 mod prompt_bridge;
 mod qt_diagnostics;
+mod translations;
+mod translator;
 mod window_frame;
 
 use cxx_qt::casting::Upcast;
@@ -41,6 +43,10 @@ fn main() {
     // Title-bar, taskbar and dock fallback icon (see src/app_icon.cpp).
     app_icon::apply();
     let mut engine = QQmlApplicationEngine::new();
+    if let Some(engine) = engine.as_mut() {
+        translations::set_engine(engine.upcast_pin());
+    }
+    translations::set_language(&if prompt { prompt_bridge::language() } else { translations::saved_language() });
     if let Some(mut engine) = engine.as_mut() {
         engine
             .as_mut()

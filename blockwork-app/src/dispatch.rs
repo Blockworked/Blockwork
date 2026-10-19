@@ -118,6 +118,37 @@ impl Backend {
                 let (enabled, port): (bool, u16) = (arg(&args, "enabled")?, arg(&args, "port")?);
                 to_json(crate::webhook::configure(&self.state, &self.app, enabled, port)?)
             }
+            "refresh_block_library" => to_json(crate::block_library::refresh(&self.state, &self.app)?),
+            "add_block_library_source" | "remove_block_library_source" => {
+                let url: String = arg(&args, "url")?;
+                if cmd == "add_block_library_source" {
+                    to_json(crate::block_library::add_source(&self.state, &self.app, url)?)
+                } else {
+                    to_json(crate::block_library::remove_source(&self.state, &self.app, url)?)
+                }
+            }
+            "review_block_pack" => {
+                let key: String = arg(&args, "key")?;
+                to_json(crate::block_library::review(&self.state, &self.app, key)?)
+            }
+            "review_block_pack_file" => {
+                let path: String = arg(&args, "path")?;
+                to_json(crate::block_library::review_file(&self.state, &self.app, path)?)
+            }
+            "confirm_block_pack" => to_json(crate::block_library::confirm(&self.state, &self.app)?),
+            "cancel_block_pack" => to_json(crate::block_library::cancel(&self.state, &self.app)?),
+            "export_block_pack" => {
+                let block_ids: Vec<String> = arg(&args, "blockIds")?;
+                let info = blockwork_core::block_packs::PackInfo {
+                    id: String::new(),
+                    name: arg(&args, "name")?,
+                    description: arg::<Option<String>>(&args, "description")?.unwrap_or_default(),
+                    author: arg::<Option<String>>(&args, "author")?.unwrap_or_default(),
+                    version: arg::<Option<String>>(&args, "version")?.unwrap_or_default(),
+                };
+                let path: String = arg(&args, "path")?;
+                to_json(crate::block_library::export(&self.state, block_ids, info, path)?)
+            }
             "new_webhook_token" => to_json(crate::webhook::new_token(&self.state, &self.app)?),
             "set_macro_max_run_secs" => {
                 let seconds: u32 = arg(&args, "seconds")?;
@@ -740,6 +771,10 @@ impl Backend {
                     &self.app,
                     enabled,
                 )?)
+            }
+            "set_language" => {
+                let language: String = arg(&args, "language")?;
+                to_json(commands::set_language(&self.state, &self.app, language)?)
             }
             "set_palette_layout" => {
                 let layout: String = arg(&args, "layout")?;

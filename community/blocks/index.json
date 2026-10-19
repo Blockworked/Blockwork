@@ -1,0 +1,48 @@
+{
+  "blockwork_block_index": 1,
+  "name": "Blockwork community blocks",
+  "packs": [
+    {
+      "id": "mouse-helpers",
+      "name": "Mouse helpers",
+      "description": "Click, double click, right click and drag at a screen position.",
+      "author": "Blockwork",
+      "version": "1.0.0",
+      "url": "packs/mouse-helpers.json",
+      "sha256": "05575edd877593de8e6e0a73de67577b9b74ad4cb7cd74aeaca34989bae29ae4",
+      "blocks": [
+        "click at x (x) y (y)",
+        "double click at x (x) y (y)",
+        "right click at x (x) y (y)",
+        "drag from x (from x) y (from y) to x (to x) y (to y)"
+      ]
+    },
+    {
+      "id": "text-helpers",
+      "name": "Text helpers",
+      "description": "Check for empty text, capitalize the first letter and get the last letter.",
+      "author": "Blockwork",
+      "version": "1.0.0",
+      "url": "packs/text-helpers.json",
+      "sha256": "47a9da87dea2717be0260a7050bc30d6e940609f3283c4b03e6def7a694f6256",
+      "blocks": [
+        "(text) is empty?",
+        "capitalize (text)",
+        "last letter of (text)"
+      ]
+    },
+    {
+      "id": "timing",
+      "name": "Timing",
+      "description": "Wait in seconds, or wait a slightly random time so clicks look less robotic.",
+      "author": "Blockwork",
+      "version": "1.0.0",
+      "url": "packs/timing.json",
+      "sha256": "503f97f1101f7486da8361d72dbbacab2231781c8e86f1e468e7ed0e68a948db",
+      "blocks": [
+        "wait (seconds) seconds",
+        "wait about (ms) ms"
+      ]
+    }
+  ]
+}

@@ -21,12 +21,18 @@ pub(crate) mod scheduled_run;
 pub(crate) mod screen_pick;
 pub(crate) mod state;
 pub(crate) mod system_watch;
+pub(crate) mod block_library;
 pub(crate) mod templates;
 pub(crate) mod time_watch;
 pub(crate) mod webhook;
 
 /// For the daemon, which draws macro dialogs.
 pub use blockwork_core::prompt;
+
+/// The UI language from Settings, like "de"; empty follows the system.
+pub fn ui_language() -> String {
+    blockwork_core::config::load_settings().language.unwrap_or_default()
+}
 pub(crate) mod type_watch;
 pub(crate) mod window_watch;
 
@@ -172,6 +178,7 @@ impl Backend {
             ipc_port_invalid: false,
             update_check_state: UpdateCheckState::Idle,
             pending_import: None,
+            pending_pack: None,
             triggers_paused: false,
         };
 

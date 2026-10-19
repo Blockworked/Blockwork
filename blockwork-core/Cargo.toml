@@ -16,7 +16,7 @@ ipc = ["tokio/rt", "tokio/rt-multi-thread", "tokio/macros", "tokio/net", "tokio/
 updater = ["dep:self_update", "dep:http"]
 # Built-in object detection models (see src/detect/onnx.rs). Pure Rust, so
 # offline and Flatpak builds need no native runtime.
-onnx = ["dep:tract-onnx", "dep:sha2"]
+onnx = ["dep:tract-onnx"]
 # Runs those models on an NVIDIA GPU when CUDA is installed. CUDA is loaded
 # at runtime, so builds don't need it and machines without it use the CPU.
 gpu = ["onnx", "dep:tract-cuda"]
@@ -44,7 +44,7 @@ base64.workspace = true
 regex.workspace = true
 tract-onnx = { version = "0.23.9", optional = true }
 # Pins downloaded model files.
-sha2 = { version = "0.10.9", optional = true }
+sha2 = "0.10.9"
 
 [target.'cfg(unix)'.dependencies]
 libc.workspace = true

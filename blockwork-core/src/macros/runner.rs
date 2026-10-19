@@ -2728,6 +2728,37 @@ mod tests {
     }
 
     #[test]
+    fn shipped_text_helpers_pack_runs() {
+        crate::input::value::register_blockwork_operators();
+        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../community/blocks/packs/text-helpers.json");
+        let pack = crate::block_packs::read_pack(&std::fs::read_to_string(path).unwrap()).unwrap();
+        let id = |name: &str| {
+            pack.content.block_defs.iter().find(|b| crate::block_packs::block_name(b) == name).unwrap().id.clone()
+        };
+        let call = |name: &str, text: &str| Value::Call {
+            block_id: id(name),
+            args: vec![Value::text(text)],
+            branches: vec![],
+            saved: Box::new(Value::number(0.0)),
+        };
+        let set = |var: &str, value: Value| Instruction::new(InstructionKind::SetVariable(var.to_string(), value));
+        let mut mac = Macro::new("t".into(), String::new(), vec![
+            set("cap", call("capitalize (text)", "hello")),
+            set("empty", call("capitalize (text)", "")),
+            set("last", call("last letter of (text)", "abc")),
+            set("blank", call("(text) is empty?", "  ")),
+        ]);
+        crate::block_packs::merge_into(&mut mac, &pack, "");
+        let vars = empty_vars();
+        mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("cap"), Some(&Evaluated::Text("Hello".into())));
+        assert_eq!(vars.get("empty"), Some(&Evaluated::Text(String::new())));
+        assert_eq!(vars.get("last"), Some(&Evaluated::Text("c".into())));
+        assert_eq!(vars.get("blank"), Some(&Evaluated::Bool(true)));
+    }
+
+    #[test]
     fn value_call_to_reporter_block_resolves_and_runs() {
         let vars = empty_vars();
         let mac = macro_with_double_block(vec![Instruction::new(InstructionKind::SetVariable(

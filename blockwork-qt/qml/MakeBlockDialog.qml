@@ -6,7 +6,7 @@ import com.blockworked.Blockstitch 1.0
 
 BwDialog {
     id: root
-    title: editBlockId.length ? "Edit Block" : "Make a Block"
+    title: editBlockId.length ? qsTr("Edit Block") : qsTr("Make a Block")
     width: 720
     // Follow the window only while open; closed, a resize would relayout all of it.
     height: visible ? Math.min(760, parent ? parent.height - 32 : 760) : 760
@@ -100,7 +100,7 @@ BwDialog {
             BwTextField {
                 id: iconSearchField
                 Layout.fillWidth: true
-                placeholderText: "Search icons"
+                placeholderText: qsTr("Search icons")
                 text: root.iconSearch
                 onTextChanged: root.iconSearch = text
             }
@@ -150,7 +150,7 @@ BwDialog {
             }
             Text {
                 visible: iconPopup.shown.length === 0
-                text: "No icons match"
+                text: qsTr("No icons match")
                 color: Theme.textDim
                 Layout.alignment: Qt.AlignHCenter
             }
@@ -252,7 +252,7 @@ BwDialog {
             });
         }
         if (!pieces.count)
-            pieces.append({ pieceKind: "Label", pieceName: "block name", valueType: "Any", pieceId: "" });
+            pieces.append({ pieceKind: "Label", pieceName: qsTr("block name"), valueType: "Any", pieceId: "" });
         selectedPiece = 0;
         editingPiece = -1;
         activeEditor = null;
@@ -464,17 +464,17 @@ BwDialog {
                 continue;
             }
             if (!text.length) {
-                validationError = "Every input and branch needs a name";
+                validationError = qsTr("Every input and branch needs a name");
                 return;
             }
             if (names[text]) {
-                validationError = "Input and branch names must be unique";
+                validationError = qsTr("Input and branch names must be unique");
                 return;
             }
             names[text] = true;
         }
         if (!hasLabel) {
-            validationError = "Give the block a name";
+            validationError = qsTr("Give the block a name");
             return;
         }
         if (editBlockId.length)
@@ -562,7 +562,7 @@ BwDialog {
         Text {
             id: measure
             anchors.centerIn: parent
-            text: piece.editing ? (editor.text || " ") : (piece.pieceName || (piece.isInput ? "value" : "Add label"))
+            text: piece.editing ? (editor.text || " ") : (piece.pieceName || (piece.isInput ? qsTr("value") : qsTr("Add label")))
             color: piece.isInput ? Theme.accent : Theme.text
             font.pixelSize: 13
             font.weight: piece.isInput ? Font.DemiBold : Font.Normal
@@ -612,17 +612,17 @@ BwDialog {
                     model: [
                         {
                             icon: "chevron-down",
-                            tip: "Move left",
+                            tip: qsTr("Move left"),
                             direction: -1
                         },
                         {
                             icon: "x",
-                            tip: "Remove",
+                            tip: qsTr("Remove"),
                             direction: 0
                         },
                         {
                             icon: "chevron-down",
-                            tip: "Move right",
+                            tip: qsTr("Move right"),
                             direction: 1
                         }
                     ]
@@ -867,9 +867,9 @@ BwDialog {
                                         spacing: 2
                                         Repeater {
                                             model: [
-                                                { icon: "chevron-down", tip: "Move branch up", direction: -1 },
-                                                { icon: "x", tip: "Remove branch", direction: 0 },
-                                                { icon: "chevron-down", tip: "Move branch down", direction: 1 }
+                                                { icon: "chevron-down", tip: qsTr("Move branch up"), direction: -1 },
+                                                { icon: "x", tip: qsTr("Remove branch"), direction: 0 },
+                                                { icon: "chevron-down", tip: qsTr("Move branch down"), direction: 1 }
                                             ]
                                             delegate: Button {
                                                 id: branchAction
@@ -908,7 +908,7 @@ BwDialog {
                                 width: Math.max(104, contentWidth + 18)
                                 height: 24
                                 text: modelData.sep
-                                placeholderText: "Add label"
+                                placeholderText: qsTr("Add label")
                                 color: Theme.text
                                 font.pixelSize: 12
                                 verticalAlignment: TextInput.AlignVCenter
@@ -986,13 +986,13 @@ BwDialog {
             Layout.alignment: Qt.AlignHCenter
             spacing: 10
             Text {
-                text: "Icon"
+                text: qsTr("Icon")
                 color: Theme.textDim
                 font.pixelSize: 12
                 Layout.alignment: Qt.AlignVCenter
             }
             BwButton {
-                text: root.blockIcon ? root.blockIcon : "Default"
+                text: root.blockIcon ? root.blockIcon : qsTr("Default")
                 iconName: root.blockIcon || "blocks"
                 implicitHeight: 32
                 onClicked: {
@@ -1004,7 +1004,7 @@ BwDialog {
             }
             BwButton {
                 visible: root.blockIcon.length > 0
-                text: "Reset"
+                text: qsTr("Reset")
                 implicitHeight: 32
                 onClicked: root.blockIcon = ""
             }
@@ -1138,7 +1138,7 @@ BwDialog {
                         Layout.fillWidth: true
                     }
                     BwButton {
-                        text: "Done"
+                        text: qsTr("Done")
                         primary: true
                         implicitWidth: 60
                         onClicked: root.customPickerOpen = false
@@ -1154,28 +1154,28 @@ BwDialog {
             Repeater {
                 model: [
                     {
-                        title: "Add an input",
-                        subtitle: "number or text",
+                        title: qsTr("Add an input"),
+                        subtitle: qsTr("number or text"),
                         sample: "123",
                         kind: "Input",
                         valueType: "Any"
                     },
                     {
-                        title: "Add an input",
-                        subtitle: "boolean",
+                        title: qsTr("Add an input"),
+                        subtitle: qsTr("boolean"),
                         sample: "◇",
                         kind: "Input",
                         valueType: "Bool"
                     },
                     {
-                        title: "Add an input",
-                        subtitle: "branch",
+                        title: qsTr("Add an input"),
+                        subtitle: qsTr("branch"),
                         sample: "⌞",
                         kind: "Branch",
                         valueType: "Any"
                     },
                     {
-                        title: "Add a label",
+                        title: qsTr("Add a label"),
                         subtitle: "",
                         sample: "Abc",
                         kind: "Label",
@@ -1246,20 +1246,20 @@ BwDialog {
             spacing: 8
             BwButton {
                 Layout.fillWidth: true
-                text: root.returnsValue ? "Return Text or Number" : "Normal block"
+                text: root.returnsValue ? qsTr("Return Text or Number") : qsTr("Normal block")
                 primary: root.blockShape === (root.returnsValue ? "ReturnsValue" : "Normal")
                 onClicked: root.blockShape = root.returnsValue ? "ReturnsValue" : "Normal"
             }
             BwButton {
                 Layout.fillWidth: true
-                text: root.returnsValue ? "Return a Boolean" : "Ending block"
+                text: root.returnsValue ? qsTr("Return a Boolean") : qsTr("Ending block")
                 primary: root.blockShape === (root.returnsValue ? "ReturnsBool" : "Ending")
                 onClicked: root.blockShape = root.returnsValue ? "ReturnsBool" : "Ending"
             }
         }
 
         BwCheckBox {
-            text: "Returns a value"
+            text: qsTr("Returns a value")
             checked: root.returnsValue
             onToggled: root.blockShape = checked ? "ReturnsValue" : "Normal"
         }
@@ -1280,11 +1280,11 @@ BwDialog {
                 Layout.fillWidth: true
             }
             BwButton {
-                text: "Cancel"
+                text: qsTr("Cancel")
                 onClicked: root.reject()
             }
             BwButton {
-                text: "OK"
+                text: qsTr("OK")
                 primary: true
                 onClicked: root.submit()
             }

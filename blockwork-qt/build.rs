@@ -29,6 +29,7 @@ fn main() {
         "qml/LibraryPanel.qml",
         "qml/MacroFiles.qml",
         "qml/PromptWindow.qml",
+        "qml/BlockLibrary.qml",
     ];
 
     // Shared Lucide icons (lean set): staged under qml/Lucide/ (gitignored,
@@ -45,6 +46,8 @@ fn main() {
     )
     .file("src/app_bridge.rs")
     .file("src/prompt_bridge.rs")
+    .file("src/translator.rs")
+    .file("src/translations.rs")
     .file("src/app_icon.rs")
     .file("src/qt_diagnostics.rs")
     .file("src/window_frame.rs")
@@ -56,6 +59,8 @@ fn main() {
             .file(QResourceFile::new("../res/icons/blockwork.png").alias("blockwork.png"))
             .file(QResourceFile::new("../res/icons/window-shadow.png").alias("window-shadow.png")),
     ))
+    // UI translations, built from i18n/*.ts by `just translations`.
+    .qrc_resources(translation_resources())
     .qt_module("QuickControls2")
     .qt_module("QuickDialogs2")
     .qt_module("Network");
@@ -70,12 +75,32 @@ fn main() {
                 cc.file("src/qt_diagnostics.cpp");
                 cc.file("src/app_icon.cpp");
                 cc.file("src/window_frame.cpp");
+                cc.file("src/translations.cpp");
                 for dir in &private_includes {
                     cc.include(dir);
                 }
             })
             .build();
     }
+}
+
+/// Every compiled translation in i18n/, served as `:/i18n/qml_<code>.qm`.
+fn translation_resources() -> QResources {
+    println!("cargo:rerun-if-changed=i18n");
+    let mut resource = QResource::new().prefix("/i18n");
+    let mut files: Vec<_> = std::fs::read_dir("i18n")
+        .into_iter()
+        .flatten()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|x| x == "qm"))
+        .collect();
+    files.sort();
+    for path in files {
+        let name = path.file_name().unwrap().to_string_lossy().into_owned();
+        resource = resource.file(QResourceFile::new(format!("i18n/{name}")).alias(name));
+    }
+    QResources::new().resource(resource)
 }
 
 /// `QtCore/<ver>` and `QtGui/<ver>` private header dirs, Linux only.

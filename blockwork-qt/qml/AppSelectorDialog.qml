@@ -5,7 +5,7 @@ import com.blockworked.Blockstitch 1.0
 
 BwDialog {
     id: root
-    title: "Choose an App"
+    title: qsTr("Choose an App")
     width: 640
     // Follow the window only while open; closed, a resize would relayout all of it.
     height: visible ? Math.min(620, parent ? parent.height - 32 : 620) : 620
@@ -72,14 +72,14 @@ BwDialog {
         BwTextField {
             id: searchField
             Layout.fillWidth: true
-            placeholderText: "Search apps…"
+            placeholderText: qsTr("Search apps…")
             onTextEdited: root.searchText = text
             Component.onCompleted: forceActiveFocus()
         }
 
         Text {
             visible: root.appsLoading
-            text: "Loading installed apps…"
+            text: qsTr("Loading installed apps…")
             color: Theme.textDim
             font.pixelSize: 13
         }
@@ -93,7 +93,7 @@ BwDialog {
         }
         Text {
             visible: root.timedOut && root.appsLoading
-            text: "Taking longer than expected — the background service may be busy. Check the console for [blockwork-qt] lines, then retry."
+            text: qsTr("Taking longer than expected — the background service may be busy. Check the console for [blockwork-qt] lines, then retry.")
             color: Theme.warning
             font.pixelSize: 12
             wrapMode: Text.WordWrap
@@ -101,7 +101,7 @@ BwDialog {
         }
         Text {
             visible: !root.appsLoading && root.appsError.length === 0 && root.filteredApps.length === 0
-            text: "No apps found."
+            text: qsTr("No apps found.")
             color: Theme.textDim
             font.pixelSize: 13
         }
@@ -212,10 +212,10 @@ BwDialog {
             Item { Layout.fillWidth: true }
             BwButton {
                 visible: root.timedOut || root.appsError.length > 0
-                text: "Retry"
+                text: qsTr("Retry")
                 onClicked: root.refreshApps()
             }
-            BwButton { text: "Cancel"; onClicked: root.reject() }
+            BwButton { text: qsTr("Cancel"); onClicked: root.reject() }
         }
     }
 }

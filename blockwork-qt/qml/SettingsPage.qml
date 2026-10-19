@@ -15,8 +15,8 @@ Item {
 
     property int tab: 0
     readonly property var tabs: [
-        { name: "General", icon: "settings" }, { name: "Hotkeys", icon: "keyboard" },
-        { name: "Editor", icon: "blocks" }, { name: "Integrations", icon: "terminal" }
+        { name: qsTr("General"), icon: "settings" }, { name: qsTr("Hotkeys"), icon: "keyboard" },
+        { name: qsTr("Editor"), icon: "blocks" }, { name: qsTr("Integrations"), icon: "terminal" }
     ]
 
     component SettingsRow: Item {
@@ -56,8 +56,8 @@ Item {
                     Layout.preferredWidth: 20; Layout.preferredHeight: 20; Layout.rightMargin: 2
                     fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
                 }
-                BwButton { iconName: "arrow-left"; text: "Back"; implicitHeight: 34; onClicked: root.invoke("close_settings") }
-                Text { text: "Settings"; color: "#e7e7e8"; font.pixelSize: 17; font.weight: Font.Bold }
+                BwButton { iconName: "arrow-left"; text: qsTr("Back"); implicitHeight: 34; onClicked: root.invoke("close_settings") }
+                Text { text: qsTr("Settings"); color: "#e7e7e8"; font.pixelSize: 17; font.weight: Font.Bold }
                 Item { Layout.fillWidth: true }
                 WindowControls { visible: Qt.platform.os !== "osx" }
             }
@@ -107,23 +107,35 @@ Item {
 
                         // General
                         ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 0
-                            Text { text: "General"; color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
-                            SettingsRow { first: true; title: "Close to tray"; detail: "Keep hotkeys and schedules active after closing the editor."
+                            Text { text: qsTr("General"); color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            SettingsRow { first: true; title: qsTr("Close to tray"); detail: qsTr("Keep hotkeys and schedules active after closing the editor.")
                                 BwSwitch { checked: appState.close_to_tray; onToggled: checked => root.invoke("set_close_to_tray", { enabled: checked }) }
                             }
-                            SettingsRow { title: "Start at system startup"; detail: "Launch Blockwork in the background when you log in so hotkeys work right away."
+                            SettingsRow { title: qsTr("Start at system startup"); detail: qsTr("Launch Blockwork in the background when you log in so hotkeys work right away.")
                                 BwSwitch { checked: appState.start_at_startup === true; onToggled: checked => root.invoke("set_start_at_startup", { enabled: checked }) }
+                            }
+                            SettingsRow { title: qsTr("Language"); detail: qsTr("The language of the editor and macro dialogs. Run log messages stay in English.")
+                                BwComboBox {
+                                    // Each language's own name, so it's findable in any language.
+                                    readonly property var languages: [
+                                        { id: "", text: qsTr("System default") }, { id: "en", text: "English" },
+                                        { id: "pirate", text: "English (Pirate)" }
+                                    ]
+                                    model: languages; textRole: "text"; implicitWidth: 210
+                                    currentIndex: Math.max(0, languages.findIndex(l => l.id === (appState.language || "")))
+                                    onActivated: index => root.invoke("set_language", { language: languages[index].id })
+                                }
                             }
                             SettingsRow { title: root.updateTitle(); detail: root.updateDetail()
                                 BwButton {
                                     readonly property bool available: appState.update_check_state && appState.update_check_state.state === "UpdateAvailable"
-                                    text: available ? "Install update" : "Check for updates"; primary: available
+                                    text: available ? qsTr("Install update") : qsTr("Check for updates"); primary: available
                                     onClicked: root.invoke(available ? "apply_update" : "check_for_updates")
                                 }
                             }
-                            SettingsRow { title: "Global variables"
-                                detail: (appState.globals || []).length ? "Shared by every macro and kept after restarts. Set them with the \u201cset global\u201d block."
-                                    : "None yet. The \u201cset global\u201d block makes one: a value every macro can read, kept after restarts."
+                            SettingsRow { title: qsTr("Global variables")
+                                detail: (appState.globals || []).length ? qsTr("Shared by every macro and kept after restarts. Set them with the \u201cset global\u201d block.")
+                                    : qsTr("None yet. The \u201cset global\u201d block makes one: a value every macro can read, kept after restarts.")
                             }
                             Repeater {
                                 model: appState.globals || []
@@ -132,22 +144,22 @@ Item {
                                     Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 6; spacing: 10
                                     Text { text: modelData.name; color: "#e7e7e8"; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.maximumWidth: 220 }
                                     Text { text: modelData.value; color: "#9fa0a6"; font.pixelSize: 13; elide: Text.ElideRight; Layout.fillWidth: true }
-                                    BwButton { iconName: "trash-2"; text: "Delete"; onClicked: root.invoke("delete_global", { name: modelData.name }) }
+                                    BwButton { iconName: "trash-2"; text: qsTr("Delete"); onClicked: root.invoke("delete_global", { name: modelData.name }) }
                                 }
                             }
                             Rectangle { Layout.fillWidth: true; Layout.topMargin: 8; height: 1; color: "#3a3b3f" }
                             RowLayout { Layout.fillWidth: true; Layout.topMargin: 16; spacing: 8
-                                BwButton { iconName: "download"; text: "Import macro…"; onClicked: root.macroFiles.importMacro() }
-                                BwButton { iconName: "upload"; text: "Export macro…"; enabled: !!appState.current_macro; onClicked: root.macroFiles.exportMacro(appState.current_macro.id) }
-                                BwButton { iconName: "play"; text: "Replay welcome tour"; onClicked: root.invoke("set_onboarding_done", { done: false }) }
+                                BwButton { iconName: "download"; text: qsTr("Import macro…"); onClicked: root.macroFiles.importMacro() }
+                                BwButton { iconName: "upload"; text: qsTr("Export macro…"); enabled: !!appState.current_macro; onClicked: root.macroFiles.exportMacro(appState.current_macro.id) }
+                                BwButton { iconName: "play"; text: qsTr("Replay welcome tour"); onClicked: root.invoke("set_onboarding_done", { done: false }) }
                                 Item { Layout.fillWidth: true }
                             }
                         }
 
                         // Hotkeys
                         ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 1
-                            Text { text: "Hotkeys"; color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
-                            SubHeading { text: "GLOBAL" }
+                            Text { text: qsTr("Hotkeys"); color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            SubHeading { text: qsTr("GLOBAL") }
                             Repeater {
                                 model: appState.named_hotkey_defaults || []
                                 delegate: SettingsRow {
@@ -160,12 +172,12 @@ Item {
                                     readonly property bool capturing: root.capturingAction(modelData.action)
                                     readonly property bool atDefault: modelData.combo_display == null || (binding ? binding.combo_display : null) === modelData.combo_display
                                     BwButton {
-                                        text: hotkeyRow.capturing ? "Press shortcut…" : (hotkeyRow.binding ? hotkeyRow.binding.combo_display : "Not set")
+                                        text: hotkeyRow.capturing ? qsTr("Press shortcut…") : (hotkeyRow.binding ? hotkeyRow.binding.combo_display : qsTr("Not set"))
                                         primary: hotkeyRow.capturing; implicitWidth: 150; implicitHeight: 36
                                         onClicked: if (!hotkeyRow.capturing) root.invoke("start_combo_capture", { action: hotkeyRow.modelData.action })
                                     }
                                     Item { width: 84; height: 36
-                                        BwButton { anchors.fill: parent; visible: !hotkeyRow.capturing && !hotkeyRow.atDefault; text: "Default"; implicitHeight: 36
+                                        BwButton { anchors.fill: parent; visible: !hotkeyRow.capturing && !hotkeyRow.atDefault; text: qsTr("Default"); implicitHeight: 36
                                             onClicked: root.invoke("reset_hotkey_to_default", { action: hotkeyRow.modelData.action }) }
                                     }
                                     Item { width: 42; height: 36
@@ -174,7 +186,7 @@ Item {
                                     }
                                 }
                             }
-                            SubHeading { text: "PER MACRO"; Layout.topMargin: 24 }
+                            SubHeading { text: qsTr("PER MACRO"); Layout.topMargin: 24 }
                             Repeater {
                                 model: (appState.hotkey_bindings || []).filter(b => b.action && b.action.type === "RunSpecificMacro")
                                 delegate: SettingsRow {
@@ -185,7 +197,7 @@ Item {
                                     title: modelData.macro_name || "Macro"
                                     readonly property bool capturing: root.capturingBinding(modelData.binding_index)
                                     BwButton {
-                                        text: macroRow.capturing ? "Press shortcut…" : macroRow.modelData.combo_display
+                                        text: macroRow.capturing ? qsTr("Press shortcut…") : macroRow.modelData.combo_display
                                         primary: macroRow.capturing; implicitWidth: 150; implicitHeight: 36
                                         onClicked: if (!macroRow.capturing) root.invoke("start_binding_combo_capture", { index: macroRow.modelData.binding_index })
                                     }
@@ -195,45 +207,72 @@ Item {
                                 }
                             }
                             RowLayout { Layout.fillWidth: true; Layout.topMargin: 14; spacing: 8
-                                Text { text: "Add hotkey"; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
+                                Text { text: qsTr("Add hotkey"); color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
                                 Item { Layout.fillWidth: true }
                                 BwComboBox { id: macroBox; model: appState.macro_names || []; implicitWidth: 210; onActivated: index => root.invoke("set_pending_macro_idx", { index: index }) }
-                                BwButton { text: appState.combo_capture&&appState.combo_capture.kind==="Pending"?"Press shortcut…":"Set combo"; primary:appState.combo_capture&&appState.combo_capture.kind==="Pending"; onClicked: root.invoke("start_pending_combo_capture") }
-                                BwButton { iconName: "plus"; text: "Add"; onClicked: root.invoke("add_macro_hotkey") }
+                                BwButton { text: appState.combo_capture&&appState.combo_capture.kind==="Pending"?qsTr("Press shortcut…"):qsTr("Set combo"); primary:appState.combo_capture&&appState.combo_capture.kind==="Pending"; onClicked: root.invoke("start_pending_combo_capture") }
+                                BwButton { iconName: "plus"; text: qsTr("Add"); onClicked: root.invoke("add_macro_hotkey") }
                             }
                         }
 
                         // Editor
                         ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 2
-                            Text { text: "Editor"; color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
-                            SettingsRow { first: true; title: "Block palette layout"; detail: "How the block sidebar is organized in the editor."
+                            Text { text: qsTr("Editor"); color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            SettingsRow { first: true; title: qsTr("Block palette layout"); detail: qsTr("How the block sidebar is organized in the editor.")
                                 BwComboBox {
                                     id: paletteLayoutBox
                                     readonly property var layouts: [
-                                        { id: "rail", text: "Category rail" }, { id: "chips", text: "Chip strip" }, { id: "accordion", text: "Accordion" },
-                                        { id: "flyout", text: "Rail with flyout" }, { id: "tiles", text: "Tile grid" }
+                                        { id: "rail", text: qsTr("Category rail") }, { id: "chips", text: qsTr("Chip strip") }, { id: "accordion", text: qsTr("Accordion") },
+                                        { id: "flyout", text: qsTr("Rail with flyout") }, { id: "tiles", text: qsTr("Tile grid") }
                                     ]
                                     model: layouts; textRole: "text"; implicitWidth: 210
                                     currentIndex: Math.max(0, layouts.findIndex(l => l.id === (appState.palette_layout || "rail")))
                                     onActivated: index => root.invoke("set_palette_layout", { layout: layouts[index].id })
                                 }
                             }
+                            SettingsRow { title: qsTr("Block library")
+                                detail: qsTr("Where My Blocks > Browse finds shared blocks: the address of each library's index.json. Each pack is checked against the checksum its library lists before it's used.")
+                            }
+                            Repeater {
+                                model: appState.block_library ? appState.block_library.sources : []
+                                delegate: RowLayout {
+                                    required property var modelData
+                                    Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 6; spacing: 10
+                                    LucideIcon { name: modelData.error ? "triangle-alert" : "book-open"; width: 14; height: 14; color: modelData.error ? Theme.warning : "#9fa0a6" }
+                                    ColumnLayout { Layout.fillWidth: true; spacing: 1
+                                        Text { Layout.fillWidth: true; text: modelData.name || modelData.url; color: "#e7e7e8"; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                                        Text {
+                                            Layout.fillWidth: true; color: modelData.error ? Theme.warning : "#9fa0a6"; font.pixelSize: 11; elide: Text.ElideMiddle
+                                            text: modelData.error ? modelData.error : modelData.name ? qsTr("%n pack(s)", "", modelData.packs) + " · " + modelData.url : modelData.url
+                                        }
+                                    }
+                                    BwButton { iconName: "trash-2"; text: qsTr("Remove"); onClicked: root.invoke("remove_block_library_source", { url: modelData.url }) }
+                                }
+                            }
+                            RowLayout { Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 14; spacing: 8
+                                BwTextField { id: librarySource; Layout.fillWidth: true; placeholderText: qsTr("https://example.com/blocks/index.json") }
+                                BwButton {
+                                    iconName: "plus"; text: qsTr("Add library"); enabled: librarySource.text.trim() !== ""
+                                    onClicked: { root.invoke("add_block_library_source", { url: librarySource.text.trim() }); librarySource.text = ""; }
+                                }
+                                BwButton { iconName: "refresh-cw"; text: qsTr("Refresh"); onClicked: root.invoke("refresh_block_library") }
+                            }
                         }
 
                         // Integrations
                         ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 3
-                            Text { text: "Integrations"; color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            Text { text: qsTr("Integrations"); color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
                             SettingsRow { first: true
-                                title: appState.ipc_active_port === null ? "TCP server stopped" : "TCP server listening on port " + appState.ipc_active_port
-                                detail: "Allow local integrations to run Blockwork macros."
+                                title: appState.ipc_active_port === null ? qsTr("TCP server stopped") : qsTr("TCP server listening on port %1").arg(appState.ipc_active_port)
+                                detail: qsTr("Allow local integrations to run Blockwork macros.")
                                 BwTextField { id: port; text: appState.ipc_port_text || "47821"; validator: IntValidator { bottom: 1; top: 65535 } implicitWidth: 100; onEditingFinished: root.invoke("set_ipc_port_text", { text: text }) }
-                                BwButton { text: appState.ipc_active_port === null ? "Start" : "Stop"; primary: appState.ipc_active_port === null; onClicked: root.invoke(appState.ipc_active_port === null ? "start_ipc_server" : "stop_ipc_server") }
+                                BwButton { text: appState.ipc_active_port === null ? qsTr("Start") : qsTr("Stop"); primary: appState.ipc_active_port === null; onClicked: root.invoke(appState.ipc_active_port === null ? "start_ipc_server" : "stop_ipc_server") }
                             }
-                            SettingsRow { title: "Start automatically"; detail: "Start the TCP server whenever Blockwork launches."
-                                BwSwitch { Accessible.name: "Start TCP server automatically"; checked: appState.ipc_auto_start; onToggled: checked => root.invoke("set_ipc_auto_start", { enabled: checked }) }
+                            SettingsRow { title: qsTr("Start automatically"); detail: qsTr("Start the TCP server whenever Blockwork launches.")
+                                BwSwitch { Accessible.name: qsTr("Start TCP server automatically"); checked: appState.ipc_auto_start; onToggled: checked => root.invoke("set_ipc_auto_start", { enabled: checked }) }
                             }
-                            SettingsRow { title: "Secrets"
-                                detail: "Passwords and API keys macros can use with the \u201csecret\u201d block. They're kept in your system keyring, never in macro files, and show as dots in the run log."
+                            SettingsRow { title: qsTr("Secrets")
+                                detail: qsTr("Passwords and API keys macros can use with the \u201csecret\u201d block. They're kept in your system keyring, never in macro files, and show as dots in the run log.")
                             }
                             Repeater {
                                 model: appState.secret_names || []
@@ -242,25 +281,25 @@ Item {
                                     Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 6; spacing: 10
                                     LucideIcon { name: "lock"; width: 14; height: 14; color: "#9fa0a6" }
                                     Text { text: modelData; color: "#e7e7e8"; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
-                                    BwButton { iconName: "pencil"; text: "Change"; onClicked: secretDialog.openFor(modelData) }
-                                    BwButton { iconName: "trash-2"; text: "Delete"; onClicked: root.invoke("delete_secret", { name: modelData }) }
+                                    BwButton { iconName: "pencil"; text: qsTr("Change"); onClicked: secretDialog.openFor(modelData) }
+                                    BwButton { iconName: "trash-2"; text: qsTr("Delete"); onClicked: root.invoke("delete_secret", { name: modelData }) }
                                 }
                             }
                             RowLayout { Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 14; spacing: 8
-                                BwButton { iconName: "plus"; text: "Add secret…"; onClicked: secretDialog.openFor("") }
+                                BwButton { iconName: "plus"; text: qsTr("Add secret…"); onClicked: secretDialog.openFor("") }
                                 Item { Layout.fillWidth: true }
                             }
                             SettingsRow {
                                 readonly property var hook: appState.webhook || ({ enabled: false, port: 8787, token: "", error: "" })
-                                title: !hook.enabled ? "Webhook server off" : hook.error ? "Webhook server not running" : "Webhook server listening on port " + hook.port
-                                detail: hook.error || "Lets other programs and services start macros with a web request to a \u201cwhen webhook is called\u201d block. Only reachable from this computer."
+                                title: !hook.enabled ? qsTr("Webhook server off") : hook.error ? qsTr("Webhook server not running") : qsTr("Webhook server listening on port %1").arg(hook.port)
+                                detail: hook.error || qsTr("Lets other programs and services start macros with a web request to a \u201cwhen webhook is called\u201d block. Only reachable from this computer.")
                                 BwTextField {
                                     id: hookPort; implicitWidth: 100
                                     text: String(appState.webhook ? appState.webhook.port : 8787); validator: IntValidator { bottom: 1; top: 65535 }
                                     onEditingFinished: root.invoke("set_webhook", { enabled: !!appState.webhook && appState.webhook.enabled, port: Number(text) || 8787 })
                                 }
                                 BwSwitch {
-                                    Accessible.name: "On"; checked: !!appState.webhook && appState.webhook.enabled
+                                    Accessible.name: qsTr("On"); checked: !!appState.webhook && appState.webhook.enabled
                                     onToggled: checked => root.invoke("set_webhook", { enabled: checked, port: Number(hookPort.text) || 8787 })
                                 }
                             }
@@ -272,20 +311,20 @@ Item {
                                 readonly property string example: "curl -X POST -H 'X-Blockwork-Token: " + hook.token + "' -d 'hello' http://127.0.0.1:" + hook.port + "/hello"
                                 Text {
                                     Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#9fa0a6"; font.pixelSize: 12
-                                    text: "Send the token in an X-Blockwork-Token header (or ?token= in the address). For a block listening on \u201chello\u201d:"
+                                    text: qsTr("Send the token in an X-Blockwork-Token header (or ?token= in the address). For a block listening on \u201chello\u201d:")
                                 }
                                 Rectangle {
                                     Layout.fillWidth: true; implicitHeight: exampleText.implicitHeight + 16; radius: 6; color: Theme.field; border.color: Theme.borderSoft
                                     Text { id: exampleText; anchors.fill: parent; anchors.margins: 8; text: hookInfo.example; wrapMode: Text.WrapAnywhere; color: "#e7e7e8"; font.family: "monospace"; font.pixelSize: 12 }
                                 }
                                 RowLayout { spacing: 8
-                                    BwButton { iconName: "copy"; text: "Copy example"; onClicked: root.copyText(hookInfo.example) }
-                                    BwButton { iconName: "copy"; text: "Copy token"; onClicked: root.copyText(hookInfo.hook.token) }
-                                    BwButton { iconName: "refresh-cw"; text: "New token"; onClicked: root.invoke("new_webhook_token") }
+                                    BwButton { iconName: "copy"; text: qsTr("Copy example"); onClicked: root.copyText(hookInfo.example) }
+                                    BwButton { iconName: "copy"; text: qsTr("Copy token"); onClicked: root.copyText(hookInfo.hook.token) }
+                                    BwButton { iconName: "refresh-cw"; text: qsTr("New token"); onClicked: root.invoke("new_webhook_token") }
                                 }
                             }
-                            SettingsRow { title: "Command line"
-                                detail: "Scripts and launchers can run macros by name: \u201cblockwork run <name>\u201d (add --wait to return when it ends), \u201cblockwork stop <name>\u201d and \u201cblockwork list\u201d."
+                            SettingsRow { title: qsTr("Command line")
+                                detail: qsTr("Scripts and launchers can run macros by name: \u201cblockwork run <name>\u201d (add --wait to return when it ends), \u201cblockwork stop <name>\u201d and \u201cblockwork list\u201d.")
                             }
                         }
                     }
@@ -298,37 +337,37 @@ Item {
     function copyText(text) { clipboardHelper.text = text; clipboardHelper.selectAll(); clipboardHelper.copy(); }
 
     function actionLabel(action) {
-        if (!action) return "Hotkey";
-        const labels = { RunMacro: "Run Macro", StopLoop: "Stop Macro", EmergencyStop: "Emergency Stop (pauses triggers)", NextMacro: "Next Macro", PrevMacro: "Previous Macro", StartRecordingImmediate: "Start Recording (immediate)", StopRecording: "Stop Recording", Undo: "Undo", Redo: "Redo" };
+        if (!action) return qsTr("Hotkey");
+        const labels = { RunMacro: qsTr("Run Macro"), StopLoop: qsTr("Stop Macro"), EmergencyStop: qsTr("Emergency Stop (pauses triggers)"), NextMacro: qsTr("Next Macro"), PrevMacro: qsTr("Previous Macro"), StartRecordingImmediate: qsTr("Start Recording (immediate)"), StopRecording: qsTr("Stop Recording"), Undo: qsTr("Undo"), Redo: qsTr("Redo") };
         return labels[action.type] || action.type;
     }
     function updateTitle() {
         const u = appState.update_check_state || { state: "Idle" };
-        if (u.state === "Checking") return "Checking for updates…";
-        if (u.state === "UpdateAvailable") return "Blockwork " + u.version + " is available";
-        if (u.state === "UpToDate") return "Blockwork is up to date";
-        if (u.state === "Error") return "Update check failed";
-        return "Software updates";
+        if (u.state === "Checking") return qsTr("Checking for updates…");
+        if (u.state === "UpdateAvailable") return qsTr("Blockwork %1 is available").arg(u.version);
+        if (u.state === "UpToDate") return qsTr("Blockwork is up to date");
+        if (u.state === "Error") return qsTr("Update check failed");
+        return qsTr("Software updates");
     }
     function updateDetail() {
         const u = appState.update_check_state || {};
-        return u.error || "Check for a new release of Blockwork.";
+        return u.error || qsTr("Check for a new release of Blockwork.");
     }
 
     BwDialog {
         id: secretDialog
         property string editing: ""
-        title: editing ? "Change \u201c" + editing + "\u201d" : "Add a secret"
+        title: editing ? qsTr("Change \u201c%1\u201d").arg(editing) : qsTr("Add a secret")
         standardButtons: Dialog.Ok | Dialog.Cancel
         function openFor(name) {
             editing = name; secretName.text = name; secretValue.text = ""; open();
             if (name) secretValue.forceActiveFocus(); else secretName.forceActiveFocus();
         }
         Column { width: 380; spacing: 8
-            Text { text: "Name"; color: "#e7e7e8" }
-            BwTextField { id: secretName; width: parent.width; readOnly: !!secretDialog.editing; placeholderText: "api token" }
-            Text { text: "Value"; color: "#e7e7e8" }
-            BwTextField { id: secretValue; width: parent.width; echoMode: TextInput.Password; placeholderText: "Paste it here"; onAccepted: secretDialog.accept() }
+            Text { text: qsTr("Name"); color: "#e7e7e8" }
+            BwTextField { id: secretName; width: parent.width; readOnly: !!secretDialog.editing; placeholderText: qsTr("api token") }
+            Text { text: qsTr("Value"); color: "#e7e7e8" }
+            BwTextField { id: secretValue; width: parent.width; echoMode: TextInput.Password; placeholderText: qsTr("Paste it here"); onAccepted: secretDialog.accept() }
         }
         onAccepted: {
             if (secretName.text.trim() && secretValue.text) root.invoke("set_secret", { name: secretName.text.trim(), value: secretValue.text });

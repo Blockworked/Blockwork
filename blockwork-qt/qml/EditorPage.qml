@@ -13,6 +13,7 @@ Item {
     required property var appBridge
     // Shared import/export flow (MacroFiles in Main.qml).
     property var macroFiles: null
+    property var blockLibrary: null
     readonly property var macro: appState.current_macro
     readonly property bool recording: appState.recording_phase && appState.recording_phase.phase === "Active"
     property string sidebarKey: "a"
@@ -72,9 +73,9 @@ Item {
     }
     function recordingLabel() {
         const phase = appState.recording_phase || { phase: "Idle" };
-        if (phase.phase === "Countdown") return "Recording in " + phase.countdown + "s…";
-        if (phase.phase === "Active") return "Stop recording";
-        return "Record";
+        if (phase.phase === "Countdown") return qsTr("Recording in %1s…").arg(phase.countdown);
+        if (phase.phase === "Active") return qsTr("Stop recording");
+        return qsTr("Record");
     }
     function refreshIds(instruction) {
         const copy = JSON.parse(JSON.stringify(instruction)); copy.id = uuid();
@@ -87,8 +88,8 @@ Item {
     function totalBlocks() { return (root.macro ? root.macro.strands : []).reduce((n, st) => n + st.instructions.length, 0); }
     function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
     function instructionExplainer(type) {
-        const x={WhenAt:"Runs once, at a date and time like 2026-12-24 18:00 (local time). Turn on 'catch up on missed schedules' in Macro settings to still run it if Blockwork was closed or the computer was asleep at that moment.",WhenSignal:"Runs when a 'send signal' block in this macro sends the same name. It shares that run's variables, so one strand can hand work to others.",SendSignal:"Starts this macro's 'when I receive' strands with the same name. With 'and wait' this strand pauses until they've all finished: a way to wait for other strands.",WhenWebhook:"Runs when a web request reaches Blockwork's webhook server at this path. Turn the server on in Settings > Integrations, where its address and token are. The request body goes into the variable.",AskText:"Shows a dialog asking for text and puts the answer in the variable. Cancel stops the run, unless it's inside a try block, where it's an error you can catch.",AskYesNo:"Shows a yes/no question and puts true or false in the variable.",AskChoice:"Shows the items of a list and puts the one you pick in the variable. Cancel stops the run, unless it's inside a try block.",ShowMessage:"Shows a message in a dialog and waits until you close it.",WhenNetwork:"Runs when the computer goes online or offline: when a network route to the internet appears or goes away. Checked once a second.",WhenUsb:"Runs when a USB device is plugged in or unplugged. The text matches the device's name or its vendor:product id (like 046d:c52b); leave it empty for any device. Hubs don't count.",WhenMouseButton:"Runs when a mouse button is pressed or released, or the wheel scrolls. Put modifier keys in the box (like Control+Shift) to only run while exactly those are held; leave it empty to ignore modifiers. The click still goes through to the app.",SplitIntoList:"Cuts the text at every separator and puts the pieces in the list, replacing what was there. An empty separator splits it into letters.",Secret:"The value of a secret saved in Settings > Secrets. It comes from your system keyring, isn't stored in the macro file, and shows as dots in the run log.",NetworkConnected:"Whether the computer has a network route to the internet.",UsbConnected:"Whether a USB device whose name or vendor:product id contains the text is plugged in. Empty matches any device.",TextCheck:"Checks text: contains, starts with, ends with, or matches a regular expression. Case matters.",TextReplace:"Replaces every copy of the first text inside the second with the third.",RegexReplace:"Replaces every match of a regular expression. Use $1, $2 in the replacement for groups.",RegexFind:"The first match of a regular expression, or its first group if it has one. Empty when nothing matches.",SplitPart:"Cuts the text at every separator and gives one piece, counting from 1. Negative numbers count from the end.",SplitCount:"How many pieces the text has when cut at every separator.",Substring:"The letters between two positions, counting from 1, both included.",Trim:"The text without spaces or line breaks at its start and end.",FormatNumber:"The number as text with exactly this many digits after the point.",Timestamp:"The current time as a Unix timestamp: seconds since 1970. Add 86400 for a day later.",FormatDate:"Writes a timestamp as a date in local time. Codes: %Y year, %m month, %d day, %H hour, %M minute, %S second, %A weekday name, %B month name.",ParseDate:"The timestamp of a date written as text, in local time. Leave the format empty for dates like 2026-01-31 09:00, or use codes like %d.%m.%Y.",DatePart:"One part of a timestamp in local time. Weekday is 1 for Sunday to 7 for Saturday.",WhenTyped:"Text expansion: runs when you type the text anywhere, like ;addr. With 'erase it' the typed text is deleted first, so a paste block can replace it. Uses a US keyboard layout for symbols.",PasteText:"Pastes text with Ctrl+V (Cmd+V on macOS), then puts back the text that was on the clipboard. Faster and more reliable than typing for long text. Terminals that paste with Ctrl+Shift+V need a Key block instead.",WhenApp:"Runs when a program whose name contains the text starts or exits. Checked once a second.",WhenIdle:"Runs once you haven't touched the keyboard or mouse for this many minutes. Fires again after the next idle stretch.",WhenScreenLock:"Runs when the screen locks or unlocks.",WhenCron:"Runs on a cron schedule: minute hour day month weekday. Examples: '0 9 * * mon-fri' (9:00 on weekdays), '*/15 * * * *' (every 15 minutes), '@hourly'.",WithLock:"Runs its body while holding a named lock. Only one strand, in any macro, can be inside a lock with the same name at a time; others wait their turn. Use it so two macros don't type over each other.",AppRunning:"Whether a program whose name contains the text is running.",IdleSeconds:"How many seconds since the last keyboard or mouse input.",ScreenLocked:"Whether the screen is locked.",WaitUntil:"Pauses until the condition is true, checking about 10 times a second. If it's still false after the time limit it's an error; 0 waits forever.",FindImage:"Looks for the picture on screen and puts the screen position of its middle in the two variables, or -1 if it isn't there. Click the picture area to capture one. Tolerance is how different the pixels may be, in percent.",ClickImage:"Finds the picture on screen and clicks its middle. It's an error if the picture isn't there. Click the picture area to capture one.",WaitForImage:"Pauses until the picture appears on screen (or goes away). If that hasn't happened within the time limit it's an error; 0 waits forever.",DetectObjectsInWindow:"Captures the window and finds the objects in it, with a built-in model (the name of a .onnx file in Blockwork's models folder, or a path to one) or a detector running on this computer (a local http:// address). Each one becomes a list item, ordered best, closest to the window's center, or largest first; read them with 'detection of'. Objects keep their id from one run of this block to the next. Click the region button to search only part of the window; the aim still uses the window's center. Only use it where automation is allowed, never against other players.",WaitForDetection:"Pauses until the detector sees the label in the window (or stops seeing it). If that hasn't happened within the time limit it's an error; 0 waits forever. Only use it where automation is allowed, never against other players.",AimStep:"Asks once per session before it moves the mouse. Moves the mouse one small step from the window's center toward a screen point. Games that lock the pointer turn the view instead, so repeat it with a fresh detection each time. Gain is mouse movement per pixel off target in a 1000 pixel tall window (it's scaled to the window's height): tune it to your sensitivity; about 0.5 suits Minecraft's default. Only use it where automation is allowed, never against other players.",AimAtDetection:"Asks once per session before it moves the mouse. Follows one item of a detections list: detects again and again while gliding the mouse toward it like a hand would, until it's held at the window's center for the hold time. Gain works as in the aim step block. Puts hit, timeout or lost in the variable. Fill the list with a detect block first. Only use it where automation is allowed, never against other players.",WindowInfo:"The position or size of a window, or its center (where games draw the crosshair), in screen coordinates.",Detection:"One part of a detection from a detect block's list: its box, center, score (0-100), label or tracking id. An item that isn't a detection is an error.",PixelColor:"The color of the screen at a point, as #rrggbb. Use the screen picker in the toolbar to find coordinates.",AverageColor:"The average color of a screen region, as #rrggbb.",ColorsMatch:"Whether two colors are within the given percentage of each other (0 = identical, 100 = black vs white).",ScreenText:"Reads the text in a screen region (OCR). Uses Windows or macOS text recognition, or Tesseract on Linux.",MousePosition:"Where the mouse pointer is, in screen coordinates.",ScreenSize:"The size of the whole desktop, across all monitors.",MonitorInfo:"The position or size of a monitor, counting from 1.",MonitorCount:"How many monitors are connected.",RunMacro:"Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too.",StopMacroNamed:"Stops every run of the named macro.",SetGlobal:"Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts.",ChangeGlobal:"Adds a number to a global variable. A global that was never set counts as 0.",Retry:"Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other.",WindowAction:"Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window.",MoveWindow:"Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating.",WhenWindow:"Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window.",WhenFileChanged:"Runs when the file is created, changed or deleted. Checked once a second.",WriteFile:"Writes text to a file, replacing it, or appends to the end. ~ means your home folder.",HttpRequest:"Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error.",Notify:"Shows a desktop notification.",Log:"Adds a line to the run log.",TryCatch:"Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong.",ThrowError:"Fails with this message. Ends the strand unless a try block catches it.",StopMacro:"Stops every strand of this run.",WhenRan:"Runs this strand when the macro starts.",Key:"Presses, releases, or clicks a key or key combo.",WhenKey:"Runs when a key or key combo is pressed or released.",Wait:"Pauses this strand for the given milliseconds.",Text:"Types the given text.",SetVariable:"Sets a variable to a value.",ChangeVariable:"Adds a number to a variable.",SetClipboard:"Replaces the clipboard text.",If:"Runs its body when the condition is true.",IfElse:"Chooses one of two branches.",Repeat:"Runs its body a fixed number of times.",Forever:"Repeats until stopped.",While:"Repeats while its condition is true."};
-        return x[type]||"A Blockwork instruction block.";
+        const x={WhenAt:qsTr("Runs once, at a date and time like 2026-12-24 18:00 (local time). Turn on 'catch up on missed schedules' in Macro settings to still run it if Blockwork was closed or the computer was asleep at that moment."),WhenSignal:qsTr("Runs when a 'send signal' block in this macro sends the same name. It shares that run's variables, so one strand can hand work to others."),SendSignal:qsTr("Starts this macro's 'when I receive' strands with the same name. With 'and wait' this strand pauses until they've all finished: a way to wait for other strands."),WhenWebhook:qsTr("Runs when a web request reaches Blockwork's webhook server at this path. Turn the server on in Settings > Integrations, where its address and token are. The request body goes into the variable."),AskText:qsTr("Shows a dialog asking for text and puts the answer in the variable. Cancel stops the run, unless it's inside a try block, where it's an error you can catch."),AskYesNo:qsTr("Shows a yes/no question and puts true or false in the variable."),AskChoice:qsTr("Shows the items of a list and puts the one you pick in the variable. Cancel stops the run, unless it's inside a try block."),ShowMessage:qsTr("Shows a message in a dialog and waits until you close it."),WhenNetwork:qsTr("Runs when the computer goes online or offline: when a network route to the internet appears or goes away. Checked once a second."),WhenUsb:qsTr("Runs when a USB device is plugged in or unplugged. The text matches the device's name or its vendor:product id (like 046d:c52b); leave it empty for any device. Hubs don't count."),WhenMouseButton:qsTr("Runs when a mouse button is pressed or released, or the wheel scrolls. Put modifier keys in the box (like Control+Shift) to only run while exactly those are held; leave it empty to ignore modifiers. The click still goes through to the app."),SplitIntoList:qsTr("Cuts the text at every separator and puts the pieces in the list, replacing what was there. An empty separator splits it into letters."),Secret:qsTr("The value of a secret saved in Settings > Secrets. It comes from your system keyring, isn't stored in the macro file, and shows as dots in the run log."),NetworkConnected:qsTr("Whether the computer has a network route to the internet."),UsbConnected:qsTr("Whether a USB device whose name or vendor:product id contains the text is plugged in. Empty matches any device."),TextCheck:qsTr("Checks text: contains, starts with, ends with, or matches a regular expression. Case matters."),TextReplace:qsTr("Replaces every copy of the first text inside the second with the third."),RegexReplace:qsTr("Replaces every match of a regular expression. Use $1, $2 in the replacement for groups."),RegexFind:qsTr("The first match of a regular expression, or its first group if it has one. Empty when nothing matches."),SplitPart:qsTr("Cuts the text at every separator and gives one piece, counting from 1. Negative numbers count from the end."),SplitCount:qsTr("How many pieces the text has when cut at every separator."),Substring:qsTr("The letters between two positions, counting from 1, both included."),Trim:qsTr("The text without spaces or line breaks at its start and end."),FormatNumber:qsTr("The number as text with exactly this many digits after the point."),Timestamp:qsTr("The current time as a Unix timestamp: seconds since 1970. Add 86400 for a day later."),FormatDate:qsTr("Writes a timestamp as a date in local time. Codes: %Y year, %m month, %d day, %H hour, %M minute, %S second, %A weekday name, %B month name."),ParseDate:qsTr("The timestamp of a date written as text, in local time. Leave the format empty for dates like 2026-01-31 09:00, or use codes like %d.%m.%Y."),DatePart:qsTr("One part of a timestamp in local time. Weekday is 1 for Sunday to 7 for Saturday."),WhenTyped:qsTr("Text expansion: runs when you type the text anywhere, like ;addr. With 'erase it' the typed text is deleted first, so a paste block can replace it. Uses a US keyboard layout for symbols."),PasteText:qsTr("Pastes text with Ctrl+V (Cmd+V on macOS), then puts back the text that was on the clipboard. Faster and more reliable than typing for long text. Terminals that paste with Ctrl+Shift+V need a Key block instead."),WhenApp:qsTr("Runs when a program whose name contains the text starts or exits. Checked once a second."),WhenIdle:qsTr("Runs once you haven't touched the keyboard or mouse for this many minutes. Fires again after the next idle stretch."),WhenScreenLock:qsTr("Runs when the screen locks or unlocks."),WhenCron:qsTr("Runs on a cron schedule: minute hour day month weekday. Examples: '0 9 * * mon-fri' (9:00 on weekdays), '*/15 * * * *' (every 15 minutes), '@hourly'."),WithLock:qsTr("Runs its body while holding a named lock. Only one strand, in any macro, can be inside a lock with the same name at a time; others wait their turn. Use it so two macros don't type over each other."),AppRunning:qsTr("Whether a program whose name contains the text is running."),IdleSeconds:qsTr("How many seconds since the last keyboard or mouse input."),ScreenLocked:qsTr("Whether the screen is locked."),WaitUntil:qsTr("Pauses until the condition is true, checking about 10 times a second. If it's still false after the time limit it's an error; 0 waits forever."),FindImage:qsTr("Looks for the picture on screen and puts the screen position of its middle in the two variables, or -1 if it isn't there. Click the picture area to capture one. Tolerance is how different the pixels may be, in percent."),ClickImage:qsTr("Finds the picture on screen and clicks its middle. It's an error if the picture isn't there. Click the picture area to capture one."),WaitForImage:qsTr("Pauses until the picture appears on screen (or goes away). If that hasn't happened within the time limit it's an error; 0 waits forever."),DetectObjectsInWindow:qsTr("Captures the window and finds the objects in it, with a built-in model (the name of a .onnx file in Blockwork's models folder, or a path to one) or a detector running on this computer (a local http:// address). Each one becomes a list item, ordered best, closest to the window's center, or largest first; read them with 'detection of'. Objects keep their id from one run of this block to the next. Click the region button to search only part of the window; the aim still uses the window's center. Only use it where automation is allowed, never against other players."),WaitForDetection:qsTr("Pauses until the detector sees the label in the window (or stops seeing it). If that hasn't happened within the time limit it's an error; 0 waits forever. Only use it where automation is allowed, never against other players."),AimStep:qsTr("Asks once per session before it moves the mouse. Moves the mouse one small step from the window's center toward a screen point. Games that lock the pointer turn the view instead, so repeat it with a fresh detection each time. Gain is mouse movement per pixel off target in a 1000 pixel tall window (it's scaled to the window's height): tune it to your sensitivity; about 0.5 suits Minecraft's default. Only use it where automation is allowed, never against other players."),AimAtDetection:qsTr("Asks once per session before it moves the mouse. Follows one item of a detections list: detects again and again while gliding the mouse toward it like a hand would, until it's held at the window's center for the hold time. Gain works as in the aim step block. Puts hit, timeout or lost in the variable. Fill the list with a detect block first. Only use it where automation is allowed, never against other players."),WindowInfo:qsTr("The position or size of a window, or its center (where games draw the crosshair), in screen coordinates."),Detection:qsTr("One part of a detection from a detect block's list: its box, center, score (0-100), label or tracking id. An item that isn't a detection is an error."),PixelColor:qsTr("The color of the screen at a point, as #rrggbb. Use the screen picker in the toolbar to find coordinates."),AverageColor:qsTr("The average color of a screen region, as #rrggbb."),ColorsMatch:qsTr("Whether two colors are within the given percentage of each other (0 = identical, 100 = black vs white)."),ScreenText:qsTr("Reads the text in a screen region (OCR). Uses Windows or macOS text recognition, or Tesseract on Linux."),MousePosition:qsTr("Where the mouse pointer is, in screen coordinates."),ScreenSize:qsTr("The size of the whole desktop, across all monitors."),MonitorInfo:qsTr("The position or size of a monitor, counting from 1."),MonitorCount:qsTr("How many monitors are connected."),RunMacro:qsTr("Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too."),StopMacroNamed:qsTr("Stops every run of the named macro."),SetGlobal:qsTr("Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts."),ChangeGlobal:qsTr("Adds a number to a global variable. A global that was never set counts as 0."),Retry:qsTr("Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other."),WindowAction:qsTr("Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window."),MoveWindow:qsTr("Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating."),WhenWindow:qsTr("Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window."),WhenFileChanged:qsTr("Runs when the file is created, changed or deleted. Checked once a second."),WriteFile:qsTr("Writes text to a file, replacing it, or appends to the end. ~ means your home folder."),HttpRequest:qsTr("Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error."),Notify:qsTr("Shows a desktop notification."),Log:qsTr("Adds a line to the run log."),TryCatch:qsTr("Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong."),ThrowError:qsTr("Fails with this message. Ends the strand unless a try block catches it."),StopMacro:qsTr("Stops every strand of this run."),WhenRan:qsTr("Runs this strand when the macro starts."),Key:qsTr("Presses, releases, or clicks a key or key combo."),WhenKey:qsTr("Runs when a key or key combo is pressed or released."),Wait:qsTr("Pauses this strand for the given milliseconds."),Text:qsTr("Types the given text."),SetVariable:qsTr("Sets a variable to a value."),ChangeVariable:qsTr("Adds a number to a variable."),SetClipboard:qsTr("Replaces the clipboard text."),If:qsTr("Runs its body when the condition is true."),IfElse:qsTr("Chooses one of two branches."),Repeat:qsTr("Runs its body a fixed number of times."),Forever:qsTr("Repeats until stopped."),While:qsTr("Repeats while its condition is true.")};
+        return x[type]||qsTr("A Blockwork instruction block.");
     }
     // ---- daemon commands whose result QML needs ----
     property int callSeq: 0
@@ -123,8 +124,8 @@ Item {
         // Out of the way, so whatever is behind the editor can be picked.
         savedVisibility = win.visibility;
         win.hide();
-        const hint = { image: "Drag around the image to look for", region: "Drag out the part of the window to search" }[request.kind];
-        root.afterUnmap(() => screenOverlay.begin(!!hint, hint || "Click a point or drag out a region"));
+        const hint = { image: qsTr("Drag around the image to look for"), region: qsTr("Drag out the part of the window to search") }[request.kind];
+        root.afterUnmap(() => screenOverlay.begin(!!hint, hint || qsTr("Click a point or drag out a region")));
     }
     function restoreWindow() {
         const win = Window.window;
@@ -166,7 +167,7 @@ Item {
         root.restoreWindow();
         const ins = request.instruction || {};
         const pattern = ins.pattern && ins.pattern.kind === "Text" ? ins.pattern.value : null;
-        if (pattern === null) { pickError.show("Type the window's name into the block to pick a region of it."); return; }
+        if (pattern === null) { pickError.show(qsTr("Type the window's name into the block to pick a region of it.")); return; }
         root.daemonCall("window_bounds", { pattern: pattern, by: ins.by || "Title" }, (bounds, error) => {
             if (!bounds) { pickError.show(error); return; }
             const r = v => Math.round(v);
@@ -212,13 +213,13 @@ Item {
     property var appPickerRequest: null   // { strandId, path, instruction } for canvas, or { paletteType } for palette
     function openAppPicker(strandId, path, instruction) {
         appPickerRequest = { strandId: strandId, path: path, instruction: instruction };
-        appSelector.title = instruction && instruction.type === "CloseApp" ? "Choose an App to Close" : "Choose an App";
+        appSelector.title = instruction && instruction.type === "CloseApp" ? qsTr("Choose an App to Close") : qsTr("Choose an App");
         appSelector.open();
     }
     function openPaletteAppPicker(instruction) {
         const type = instruction ? instruction.type : "OpenApp";
         appPickerRequest = { paletteType: type };
-        appSelector.title = type === "CloseApp" ? "Choose an App to Close" : "Choose an App";
+        appSelector.title = type === "CloseApp" ? qsTr("Choose an App to Close") : qsTr("Choose an App");
         appSelector.open();
     }
     function resolvePickedIcon(app) {
@@ -401,7 +402,7 @@ Item {
                 }
                 BwButton {
                     iconName: "panel-left"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro
-                    ToolTip.visible: hovered; ToolTip.text: root.sidebarCollapsed ? "Show sidebar" : "Hide sidebar"
+                    ToolTip.visible: hovered; ToolTip.text: root.sidebarCollapsed ? qsTr("Show sidebar") : qsTr("Hide sidebar")
                     onClicked: { root.sidebarToggling = true; root.sidebarCollapsed = !root.sidebarCollapsed; }
                 }
                 Rectangle {
@@ -414,14 +415,14 @@ Item {
                         LucideIcon { name: "blocks"; width: 15; height: 15; color: Theme.textDim }
                         Text {
                             Layout.fillWidth: true; elide: Text.ElideRight; font.pixelSize: 13
-                            text: root.macro ? (root.macro.settings.folder ? root.macro.settings.folder + " / " : "") + root.macro.name : "Choose a macro"
+                            text: root.macro ? (root.macro.settings.folder ? root.macro.settings.folder + " / " : "") + root.macro.name : qsTr("Choose a macro")
                             color: root.macro ? Theme.text : Theme.textDim
                         }
                         LucideIcon { name: "chevron-down"; width: 14; height: 14; color: Theme.textDim }
                     }
                     HoverHandler { id: libraryHover; cursorShape: Qt.PointingHandCursor }
                     TapHandler { onTapped: library.visible ? library.close() : library.open() }
-                    ToolTip.visible: libraryHover.hovered && !library.visible; ToolTip.delay: 500; ToolTip.text: "Macro library"
+                    ToolTip.visible: libraryHover.hovered && !library.visible; ToolTip.delay: 500; ToolTip.text: qsTr("Macro library")
                     LibraryPanel {
                         id: library
                         y: libraryButton.height + 4
@@ -437,7 +438,7 @@ Item {
                 BwButton {
                     id: macroMenuButton
                     iconName: "ellipsis"; text: ""; implicitWidth: 34; implicitHeight: 34
-                    ToolTip.visible: hovered && !macroMenu.visible; ToolTip.text: "Macro actions"
+                    ToolTip.visible: hovered && !macroMenu.visible; ToolTip.text: qsTr("Macro actions")
                     property double pressStamp: 0
                     property double closeStamp: 0
                     onPressed: pressStamp = Date.now()
@@ -447,21 +448,21 @@ Item {
                         id: macroMenu
                         onAboutToHide: macroMenuButton.closeStamp = Date.now()
                         implicitWidth: 200
-                        BwMenuItem { iconName: "sliders"; text: "Macro settings"; enabled: !!root.macro; onTriggered: macroSettings.open() }
-                        BwMenuItem { iconName: "plus"; text: "New macro"; onTriggered: root.invoke("new_macro") }
-                        BwMenuItem { iconName: "sparkles"; text: "New from template…"; onTriggered: templateDialog.open() }
-                        BwMenuItem { iconName: "copy"; text: "Duplicate macro"; enabled: !!root.macro; onTriggered: root.invoke("duplicate_macro", { id: root.macro.id }) }
-                        BwMenuItem { iconName: "upload"; text: "Export…"; enabled: !!root.macro && !!root.macroFiles; onTriggered: root.macroFiles.exportMacro(root.macro.id) }
-                        BwMenuItem { iconName: "circle-dot"; text: "Clear breakpoints"; enabled: (appState.breakpoints || []).length > 0; onTriggered: root.invoke("clear_breakpoints") }
-                        BwMenuItem { iconName: "octagon"; text: "Emergency stop"; danger: true; onTriggered: root.invoke("emergency_stop") }
-                        BwMenuItem { iconName: "trash"; text: "Delete macro"; danger: true; enabled: !!root.macro; onTriggered: removeDialog.open() }
+                        BwMenuItem { iconName: "sliders"; text: qsTr("Macro settings"); enabled: !!root.macro; onTriggered: macroSettings.open() }
+                        BwMenuItem { iconName: "plus"; text: qsTr("New macro"); onTriggered: root.invoke("new_macro") }
+                        BwMenuItem { iconName: "sparkles"; text: qsTr("New from template…"); onTriggered: templateDialog.open() }
+                        BwMenuItem { iconName: "copy"; text: qsTr("Duplicate macro"); enabled: !!root.macro; onTriggered: root.invoke("duplicate_macro", { id: root.macro.id }) }
+                        BwMenuItem { iconName: "upload"; text: qsTr("Export…"); enabled: !!root.macro && !!root.macroFiles; onTriggered: root.macroFiles.exportMacro(root.macro.id) }
+                        BwMenuItem { iconName: "circle-dot"; text: qsTr("Clear breakpoints"); enabled: (appState.breakpoints || []).length > 0; onTriggered: root.invoke("clear_breakpoints") }
+                        BwMenuItem { iconName: "octagon"; text: qsTr("Emergency stop"); danger: true; onTriggered: root.invoke("emergency_stop") }
+                        BwMenuItem { iconName: "trash"; text: qsTr("Delete macro"); danger: true; enabled: !!root.macro; onTriggered: removeDialog.open() }
                     }
                 }
                 Item { Layout.fillWidth: true }
                 BwButton {
-                    implicitHeight: 34; iconName: "play"; iconFilled: true; iconColor: Theme.accent; text: toolbar.tier < 2 ? "Run" : ""
+                    implicitHeight: 34; iconName: "play"; iconFilled: true; iconColor: Theme.accent; text: toolbar.tier < 2 ? qsTr("Run") : ""
                     implicitWidth: toolbar.tier < 2 ? 76 : 34
-                    enabled: appState.macro_selected !== null; ToolTip.visible: hovered && toolbar.tier >= 2; ToolTip.text: "Run macro"
+                    enabled: appState.macro_selected !== null; ToolTip.visible: hovered && toolbar.tier >= 2; ToolTip.text: qsTr("Run macro")
                     onClicked: root.invoke("run_macro")
                 }
                 Row {
@@ -475,23 +476,23 @@ Item {
                     }
                     BwButton {
                         iconName: "chevron-down"; text: ""; implicitWidth: 26; implicitHeight: 34
-                        ToolTip.visible: hovered; ToolTip.text: "Recording settings"; onClicked: recordingSettings.open()
+                        ToolTip.visible: hovered; ToolTip.text: qsTr("Recording settings"); onClicked: recordingSettings.open()
                     }
                 }
                 BwButton {
                     iconName: "crosshair"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro
-                    ToolTip.visible: hovered; ToolTip.text: "Pick a point or region from the screen"
+                    ToolTip.visible: hovered; ToolTip.text: qsTr("Pick a point or region from the screen")
                     onClicked: root.startScreenPick({ kind: "tool" })
                 }
                 Item { Layout.fillWidth: true }
-                BwButton { visible: toolbar.tier < 3; iconName: "undo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_undo; ToolTip.visible: hovered; ToolTip.text: "Undo"; onClicked: root.invoke("undo") }
-                BwButton { visible: toolbar.tier < 3; iconName: "redo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_redo; ToolTip.visible: hovered; ToolTip.text: "Redo"; onClicked: root.invoke("redo") }
-                BwButton { visible: toolbar.tier < 3; iconName: "save"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro; ToolTip.visible: hovered; ToolTip.text: "Save macro"; onClicked: root.invoke("save_macro") }
+                BwButton { visible: toolbar.tier < 3; iconName: "undo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_undo; ToolTip.visible: hovered; ToolTip.text: qsTr("Undo"); onClicked: root.invoke("undo") }
+                BwButton { visible: toolbar.tier < 3; iconName: "redo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_redo; ToolTip.visible: hovered; ToolTip.text: qsTr("Redo"); onClicked: root.invoke("redo") }
+                BwButton { visible: toolbar.tier < 3; iconName: "save"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro; ToolTip.visible: hovered; ToolTip.text: qsTr("Save macro"); onClicked: root.invoke("save_macro") }
                 BwButton {
                     id: editMenuButton
                     visible: toolbar.tier >= 3
                     iconName: "ellipsis"; text: ""; implicitWidth: 34; implicitHeight: 34
-                    ToolTip.visible: hovered && !editMenu.visible; ToolTip.text: "Undo, redo and save"
+                    ToolTip.visible: hovered && !editMenu.visible; ToolTip.text: qsTr("Undo, redo and save")
                     property double pressStamp: 0
                     property double closeStamp: 0
                     onPressed: pressStamp = Date.now()
@@ -501,12 +502,12 @@ Item {
                         id: editMenu
                         onAboutToHide: editMenuButton.closeStamp = Date.now()
                         implicitWidth: 170
-                        BwMenuItem { iconName: "undo"; text: "Undo"; enabled: appState.can_undo; onTriggered: root.invoke("undo") }
-                        BwMenuItem { iconName: "redo"; text: "Redo"; enabled: appState.can_redo; onTriggered: root.invoke("redo") }
-                        BwMenuItem { iconName: "save"; text: "Save macro"; enabled: !!root.macro; onTriggered: root.invoke("save_macro") }
+                        BwMenuItem { iconName: "undo"; text: qsTr("Undo"); enabled: appState.can_undo; onTriggered: root.invoke("undo") }
+                        BwMenuItem { iconName: "redo"; text: qsTr("Redo"); enabled: appState.can_redo; onTriggered: root.invoke("redo") }
+                        BwMenuItem { iconName: "save"; text: qsTr("Save macro"); enabled: !!root.macro; onTriggered: root.invoke("save_macro") }
                     }
                 }
-                BwButton { iconName: "settings"; text: ""; implicitWidth: 34; implicitHeight: 34; ToolTip.visible: hovered; ToolTip.text: "Settings"; onClicked: root.invoke("open_settings") }
+                BwButton { iconName: "settings"; text: ""; implicitWidth: 34; implicitHeight: 34; ToolTip.visible: hovered; ToolTip.text: qsTr("Settings"); onClicked: root.invoke("open_settings") }
                 WindowControls { visible: Qt.platform.os !== "osx" }
             }
         }
@@ -516,8 +517,8 @@ Item {
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 10; spacing: 10
                 LucideIcon { name: "pause"; color: Theme.warning; width: 16; height: 16 }
-                Text { Layout.fillWidth: true; text: "Emergency stop: triggers are paused until you resume them."; color: Theme.text; font.pixelSize: 13; elide: Text.ElideRight }
-                BwButton { text: "Resume triggers"; implicitHeight: 28; onClicked: root.invoke("resume_triggers") }
+                Text { Layout.fillWidth: true; text: qsTr("Emergency stop: triggers are paused until you resume them."); color: Theme.text; font.pixelSize: 13; elide: Text.ElideRight }
+                BwButton { text: qsTr("Resume triggers"); implicitHeight: 28; onClicked: root.invoke("resume_triggers") }
             }
         }
         Rectangle {
@@ -540,22 +541,23 @@ Item {
                     Text {
                         Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 13
                         text: debugBar.strand
-                            ? "Paused before \u201c" + root.blockLabel(debugBar.strand.block_id) + "\u201d" + (debugBar.paused.length > 1 ? " (" + debugBar.paused.length + " strands waiting)" : "")
-                            : debugBar.isPaused ? "Pausing at the next block…" : "Running"
+                            ? (debugBar.paused.length > 1 ? qsTr("Paused before \u201c%1\u201d (%2 strands waiting)").arg(root.blockLabel(debugBar.strand.block_id)).arg(debugBar.paused.length)
+                                 : qsTr("Paused before \u201c%1\u201d").arg(root.blockLabel(debugBar.strand.block_id)))
+                            : debugBar.isPaused ? qsTr("Pausing at the next block…") : qsTr("Running")
                         HoverHandler { cursorShape: debugBar.strand ? Qt.PointingHandCursor : Qt.ArrowCursor }
                         TapHandler { enabled: !!debugBar.strand; onTapped: canvas.revealInstruction(debugBar.strand.block_id) }
                     }
-                    BwButton { visible: !debugBar.isPaused; iconName: "pause"; text: "Pause"; implicitHeight: 28; ToolTip.visible: hovered; ToolTip.text: "Pause before the next block (F8)"; onClicked: debugBar.act("pause") }
-                    BwButton { visible: debugBar.isPaused; iconName: "play"; text: "Resume"; implicitHeight: 28; ToolTip.visible: hovered; ToolTip.text: "Run on until the next breakpoint (F8)"; onClicked: debugBar.act("resume") }
-                    BwButton { visible: debugBar.isPaused; iconName: "step-forward"; text: "Step"; implicitHeight: 28; enabled: debugBar.paused.length > 0; ToolTip.visible: hovered; ToolTip.text: "Run one block, then pause again (F10)"; onClicked: debugBar.act("step") }
-                    BwButton { iconName: "square"; text: "Stop"; danger: true; implicitHeight: 28; onClicked: debugBar.act("stop") }
+                    BwButton { visible: !debugBar.isPaused; iconName: "pause"; text: qsTr("Pause"); implicitHeight: 28; ToolTip.visible: hovered; ToolTip.text: qsTr("Pause before the next block (F8)"); onClicked: debugBar.act("pause") }
+                    BwButton { visible: debugBar.isPaused; iconName: "play"; text: qsTr("Resume"); implicitHeight: 28; ToolTip.visible: hovered; ToolTip.text: qsTr("Run on until the next breakpoint (F8)"); onClicked: debugBar.act("resume") }
+                    BwButton { visible: debugBar.isPaused; iconName: "step-forward"; text: qsTr("Step"); implicitHeight: 28; enabled: debugBar.paused.length > 0; ToolTip.visible: hovered; ToolTip.text: qsTr("Run one block, then pause again (F10)"); onClicked: debugBar.act("step") }
+                    BwButton { iconName: "square"; text: qsTr("Stop"); danger: true; implicitHeight: 28; onClicked: debugBar.act("stop") }
                 }
                 Flow {
                     visible: !!debugBar.strand
                     Layout.fillWidth: true; Layout.bottomMargin: 2; spacing: 6
                     Text {
                         visible: !!debugBar.strand && !debugBar.strand.variables.length && !debugBar.strand.lists.length
-                        text: "No variables"; color: Theme.textDim; font.pixelSize: 12
+                        text: qsTr("No variables"); color: Theme.textDim; font.pixelSize: 12
                     }
                     Repeater {
                         model: debugBar.strand ? debugBar.strand.variables.map(v => v[0] + " = " + v[1])
@@ -612,7 +614,7 @@ Item {
                     listInstructionTypes: root.listInstructionTypes
                     extraOperators: root.extraOperators
                     extraCategories: root.extraCategories
-                    appCategories: [{ id: "screen", name: "Screen", icon: "crosshair" }]
+                    appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "crosshair" }]
                     variables: root.macro ? root.macro.variables : []
                     lists: root.macro && root.macro.lists ? root.macro.lists : []
                     blockDefinitions: root.macro ? root.macro.block_defs : []
@@ -630,6 +632,9 @@ Item {
                     onRenameListRequested: name => listDialog.openForRename(name)
                     onDeleteListRequested: name => { deleteListDialog.listName = name; deleteListDialog.open(); }
                     onMakeBlockRequested: blockDialog.openForCreate()
+                    blockLibraryEnabled: !!root.blockLibrary
+                    onBrowseBlocksRequested: root.blockLibrary.browse()
+                    onShareBlockRequested: definition => root.blockLibrary.share(definition)
                     onStandaloneKeyCaptureRequested: root.invoke("start_standalone_key_capture")
                     onAppPickerRequested: instruction => root.openPaletteAppPicker(instruction)
                     onDetailsRequested:(name,identifier,explainer)=>detailsDialog.show(name,identifier,explainer)
@@ -656,7 +661,7 @@ Item {
                     onInstructionRemoved: (strandId, path) => root.removeInstruction(strandId, path)
                     canPaste: root.clipboard.length > 0
                     clearIcon: appState.confirm_clear_instructions ? "triangle-alert" : "trash"
-                    clearText: appState.confirm_clear_instructions ? "Confirm delete (" + appState.confirm_clear_instructions_remaining_secs + "s)?" : "Delete " + root.totalBlocks() + " Blocks"
+                    clearText: appState.confirm_clear_instructions ? qsTr("Confirm delete (%1s)?").arg(appState.confirm_clear_instructions_remaining_secs) : qsTr("Delete %n block(s)", "", root.totalBlocks())
                     onCanvasMenuAction: (action, x, y) => {
                         if (action === "paste" && root.clipboard.length) root.invoke("paste_instructions", { x: x, y: y, instructions: root.clipboard.map(root.refreshIds) });
                     }
@@ -705,8 +710,8 @@ Item {
                 anchors.fill: parent; color: "#d8222326"; z: 20
                 Column { anchors.centerIn: parent; spacing: 10
                     LucideIcon { anchors.horizontalCenter: parent.horizontalCenter; name: "circle"; color: "#ff4a4a"; width: 48; height: 48; strokeWidth: 7 }
-                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: "Recording…"; color: "#ededee"; font.pixelSize: 17; font.weight: Font.Bold }
-                    Text { text: "Adding and removing instructions is disabled while recording."; color: "#a5a6ab"; font.pixelSize: 14; font.weight: Font.DemiBold }
+                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("Recording…"); color: "#ededee"; font.pixelSize: 17; font.weight: Font.Bold }
+                    Text { text: qsTr("Adding and removing instructions is disabled while recording."); color: "#a5a6ab"; font.pixelSize: 14; font.weight: Font.DemiBold }
                 }
             }
         }
@@ -724,26 +729,26 @@ Item {
             Layout.fillWidth: true; Layout.fillHeight: true
             Column { anchors.centerIn: parent; spacing: 8
                 LucideIcon { anchors.horizontalCenter: parent.horizontalCenter; name: "blocks"; color: "#777980"; width: 48; height: 48 }
-                Text { anchors.horizontalCenter: parent.horizontalCenter; text: "No macro selected"; color: "#e7e7e8"; font.pixelSize: 16; font.weight: Font.DemiBold }
-                Text { text: "Choose a macro above or create a new one."; color: "#9fa0a6"; font.pixelSize: 13 }
+                Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("No macro selected"); color: "#e7e7e8"; font.pixelSize: 16; font.weight: Font.DemiBold }
+                Text { text: qsTr("Choose a macro above or create a new one."); color: "#9fa0a6"; font.pixelSize: 13 }
             }
         }
     }
 
     BwDialog {
-        id: deleteMacroDialog; title: "Delete macro?"; standardButtons: Dialog.Yes | Dialog.Cancel
+        id: deleteMacroDialog; title: qsTr("Delete macro?"); standardButtons: Dialog.Yes | Dialog.Cancel
         property string macroId: ""
         property string macroName: ""
-        Text { text: "This removes \u201c" + deleteMacroDialog.macroName + "\u201d from Blockwork."; color: "#e7e7e8" }
+        Text { text: qsTr("This removes \u201c%1\u201d from Blockwork.").arg(deleteMacroDialog.macroName); color: "#e7e7e8" }
         onAccepted: root.invoke("delete_macro", { id: macroId })
     }
     BwDialog {
-        id: removeDialog; title: "Delete macro?"; standardButtons: Dialog.Yes | Dialog.Cancel
-        Text { text: "This removes the selected macro from Blockwork."; color: "#e7e7e8" }
+        id: removeDialog; title: qsTr("Delete macro?"); standardButtons: Dialog.Yes | Dialog.Cancel
+        Text { text: qsTr("This removes the selected macro from Blockwork."); color: "#e7e7e8" }
         onAccepted: root.invoke("remove_macro")
     }
     BwDialog {
-        id: macroSettings; title: "Macro settings"; standardButtons: Dialog.Close
+        id: macroSettings; title: qsTr("Macro settings"); standardButtons: Dialog.Close
         readonly property var settings: root.macro && root.macro.settings ? root.macro.settings : ({})
         function saveConditions(days) {
             root.invoke("set_macro_conditions", { onlyInWindow: condWindow.text, power: powerBox.options[powerBox.currentIndex].value,
@@ -754,10 +759,10 @@ Item {
         contentHeight: settingsColumn.implicitHeight; clip: true; boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
         Column { id: settingsColumn; spacing: 14; width: 360
-            Text { text: "Controls behavior specific to this macro."; color: "#a5a6ab" }
-            Text { text: "Title"; color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Controls behavior specific to this macro."); color: "#a5a6ab" }
+            Text { text: qsTr("Title"); color: "#a1a2a7"; font.pixelSize: 13 }
             BwTextField { width: parent.width; text: root.macro ? root.macro.name : ""; onEditingFinished: root.invoke("set_title", { title: text }) }
-            Text { text: "Speed"; color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Speed"); color: "#a1a2a7"; font.pixelSize: 13 }
             RowLayout { width: parent.width; spacing: 10
                 Slider {
                     id: speed; from: .1; to: 10; value: root.macro ? root.macro.speed_multiplier : 1; Layout.fillWidth: true; implicitHeight: 30
@@ -767,72 +772,72 @@ Item {
                     handle: Rectangle { x: speed.leftPadding + speed.visualPosition * (speed.availableWidth - width); y: speed.topPadding + speed.availableHeight / 2 - height / 2; width: 16; height: 16; radius: 8; color: "white"; border.width: 2; border.color: Theme.accent }
                 }
                 BwTextField { text: Number(speed.value).toFixed(2); Layout.preferredWidth: 62; horizontalAlignment: Text.AlignRight; onEditingFinished: root.invoke("set_macro_speed_multiplier", { multiplier: Number(text) }) }
-                Text { text: "x"; color: "#a1a2a7" }
+                Text { text: qsTr("x"); color: "#a1a2a7" }
             }
             BwSwitch { Accessible.name: "Listen for triggers while Blockwork is open"; checked: root.macro && root.macro.settings ? root.macro.settings.always_listen : false; onToggled: checked => root.invoke("set_macro_always_listen", { enabled: checked }) }
-            Text { text: "Time limit"; color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Time limit"); color: "#a1a2a7"; font.pixelSize: 13 }
             RowLayout { width: parent.width; spacing: 10
-                Text { text: "Stop a run after"; color: Theme.text; font.pixelSize: 13 }
+                Text { text: qsTr("Stop a run after"); color: Theme.text; font.pixelSize: 13 }
                 BwTextField {
                     Layout.preferredWidth: 70; horizontalAlignment: Text.AlignRight
                     validator: IntValidator { bottom: 0; top: 86400 }
                     text: root.macro && root.macro.settings ? String(root.macro.settings.max_run_secs) : "0"
                     onEditingFinished: root.invoke("set_macro_max_run_secs", { seconds: Number(text) || 0 })
                 }
-                Text { Layout.fillWidth: true; text: "seconds (0 = no limit)"; color: "#a1a2a7"; font.pixelSize: 13 }
+                Text { Layout.fillWidth: true; text: qsTr("seconds (0 = no limit)"); color: "#a1a2a7"; font.pixelSize: 13 }
             }
-            Text { text: "Loop limit"; color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Loop limit"); color: "#a1a2a7"; font.pixelSize: 13 }
             RowLayout { width: parent.width; spacing: 10
-                Text { text: "Stop a loop after"; color: Theme.text; font.pixelSize: 13 }
+                Text { text: qsTr("Stop a loop after"); color: Theme.text; font.pixelSize: 13 }
                 BwTextField {
                     Layout.preferredWidth: 90; horizontalAlignment: Text.AlignRight
                     validator: IntValidator { bottom: 0; top: 2000000000 }
                     text: root.macro && root.macro.settings ? String(root.macro.settings.max_loop_iterations || 0) : "0"
                     onEditingFinished: root.invoke("set_macro_max_loop_iterations", { iterations: Number(text) || 0 })
                 }
-                Text { Layout.fillWidth: true; text: "repeats (0 = no limit)"; color: "#a1a2a7"; font.pixelSize: 13 }
+                Text { Layout.fillWidth: true; text: qsTr("repeats (0 = no limit)"); color: "#a1a2a7"; font.pixelSize: 13 }
             }
-            Text { text: "Conditions"; color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Conditions"); color: "#a1a2a7"; font.pixelSize: 13 }
             Text {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                text: "Triggers and hotkeys only start this macro when all of these hold. The Run button ignores them."
+                text: qsTr("Triggers and hotkeys only start this macro when all of these hold. The Run button ignores them.")
             }
             RowLayout { width: parent.width; spacing: 8
-                Text { text: "While"; color: Theme.text; font.pixelSize: 13 }
+                Text { text: qsTr("While"); color: Theme.text; font.pixelSize: 13 }
                 BwTextField {
-                    id: condWindow; Layout.fillWidth: true; placeholderText: "any window"
+                    id: condWindow; Layout.fillWidth: true; placeholderText: qsTr("any window")
                     text: macroSettings.settings.only_in_window || ""
                     onEditingFinished: macroSettings.saveConditions()
                 }
-                Text { text: "is focused"; color: Theme.text; font.pixelSize: 13 }
+                Text { text: qsTr("is focused"); color: Theme.text; font.pixelSize: 13 }
             }
             RowLayout { width: parent.width; spacing: 8
-                Text { text: "On"; color: Theme.text; font.pixelSize: 13 }
+                Text { text: qsTr("On"); color: Theme.text; font.pixelSize: 13 }
                 BwComboBox {
                     id: powerBox; Layout.fillWidth: true; textRole: "text"
-                    readonly property var options: [{ value: "Any", text: "battery or AC power" }, { value: "PluggedIn", text: "AC power only" }, { value: "OnBattery", text: "battery only" }]
+                    readonly property var options: [{ value: "Any", text: qsTr("battery or AC power") }, { value: "PluggedIn", text: qsTr("AC power only") }, { value: "OnBattery", text: qsTr("battery only") }]
                     model: options
                     currentIndex: Math.max(0, options.findIndex(o => o.value === macroSettings.settings.power))
                     onActivated: macroSettings.saveConditions()
                 }
             }
             RowLayout { width: parent.width; spacing: 8
-                Text { text: "Between"; color: Theme.text; font.pixelSize: 13 }
+                Text { text: qsTr("Between"); color: Theme.text; font.pixelSize: 13 }
                 BwTextField {
                     id: condFrom; Layout.preferredWidth: 70; horizontalAlignment: Text.AlignHCenter; placeholderText: "09:00"
                     text: macroSettings.settings.active_from || ""
                     onEditingFinished: if (!!text === !!condUntil.text) macroSettings.saveConditions()
                 }
-                Text { text: "and"; color: Theme.text; font.pixelSize: 13 }
+                Text { text: qsTr("and"); color: Theme.text; font.pixelSize: 13 }
                 BwTextField {
                     id: condUntil; Layout.preferredWidth: 70; horizontalAlignment: Text.AlignHCenter; placeholderText: "17:00"
                     text: macroSettings.settings.active_until || ""
                     onEditingFinished: if (!!text === !!condFrom.text) macroSettings.saveConditions()
                 }
-                Text { Layout.fillWidth: true; text: "(empty = all day)"; color: Theme.textDim; font.pixelSize: 12 }
+                Text { Layout.fillWidth: true; text: qsTr("(empty = all day)"); color: Theme.textDim; font.pixelSize: 12 }
             }
             Row { spacing: 6
-                Text { text: "On"; color: Theme.text; font.pixelSize: 13; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
+                Text { text: qsTr("On"); color: Theme.text; font.pixelSize: 13; anchors.verticalCenter: parent.verticalCenter; rightPadding: 2 }
                 Repeater {
                     model: ["S", "M", "T", "W", "T", "F", "S"]
                     delegate: Rectangle {
@@ -856,7 +861,7 @@ Item {
                     }
                 }
             }
-            Text { text: "Schedules"; color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Schedules"); color: "#a1a2a7"; font.pixelSize: 13 }
             BwSwitch {
                 Accessible.name: "Catch up on missed schedules"
                 checked: !!macroSettings.settings.catch_up_missed
@@ -864,9 +869,9 @@ Item {
             }
             Text {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                text: "Runs a schedule or \"once at\" trigger once if its time passed while Blockwork was closed or the computer was asleep (up to a week back)."
+                text: qsTr("Runs a schedule or \"once at\" trigger once if its time passed while Blockwork was closed or the computer was asleep (up to a week back).")
             }
-            Text { text: "Permissions"; color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Permissions"); color: "#a1a2a7"; font.pixelSize: 13 }
             BwSwitch {
                 Accessible.name: "Ask before risky actions"
                 checked: root.permissions !== null
@@ -875,8 +880,8 @@ Item {
             Text {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
                 text: root.permissions === null
-                    ? "This macro may do anything its blocks say. Imported macros ask first until you allow them."
-                    : "Ticked abilities are allowed. The rest show a dialog the first time the macro tries them."
+                    ? qsTr("This macro may do anything its blocks say. Imported macros ask first until you allow them.")
+                    : qsTr("Ticked abilities are allowed. The rest show a dialog the first time the macro tries them.")
             }
             Repeater {
                 model: root.permissions === null ? [] : root.guardedAbilities
@@ -891,13 +896,13 @@ Item {
         }
     }
     BwDialog {
-        id: pickError; title: "Couldn't read the screen"; standardButtons: Dialog.Ok
+        id: pickError; title: qsTr("Couldn't read the screen"); standardButtons: Dialog.Ok
         property string message: ""
-        function show(text) { message = text || "Unknown error"; open(); }
+        function show(text) { message = text || qsTr("Unknown error"); open(); }
         Text { width: 420; wrapMode: Text.WordWrap; text: pickError.message; color: Theme.text; font.pixelSize: 13 }
     }
     BwDialog {
-        id: pickResult; title: "Picked from the screen"; standardButtons: Dialog.Close
+        id: pickResult; title: qsTr("Picked from the screen"); standardButtons: Dialog.Close
         property var pick: null
         readonly property bool region: !!pick && pick.width > 0 && pick.height > 0
         function show(result) { pick = result; open(); }
@@ -913,8 +918,8 @@ Item {
                     spacing: 6
                     TextEdit {
                         readOnly: true; selectByMouse: true; color: Theme.text; font.pixelSize: 13
-                        text: !pickResult.pick ? "" : "x " + pickResult.pick.x + "   y " + pickResult.pick.y
-                            + (pickResult.region ? "\nwidth " + pickResult.pick.width + "   height " + pickResult.pick.height : "")
+                        text: !pickResult.pick ? "" : qsTr("x %1   y %2").arg(pickResult.pick.x).arg(pickResult.pick.y)
+                            + (pickResult.region ? "\n" + qsTr("width %1   height %2").arg(pickResult.pick.width).arg(pickResult.pick.height) : "")
                     }
                     Row {
                         spacing: 8
@@ -923,14 +928,14 @@ Item {
                     }
                 }
             }
-            Text { text: "Add to the canvas:"; color: Theme.textDim; font.pixelSize: 12 }
+            Text { text: qsTr("Add to the canvas:"); color: Theme.textDim; font.pixelSize: 12 }
             Flow {
                 width: parent.width; spacing: 8
                 Repeater {
                     model: pickResult.region
-                        ? [["ScreenText", "text in this region"], ["AverageColor", "average color here"], ["ClickImage", "click this image"],
-                           ["WaitForImage", "wait for this image"], ["FindImage", "find this image"]]
-                        : [["PixelColor", "color at this point"], ["MoveMouse", "move mouse here"]]
+                        ? [["ScreenText", qsTr("text in this region")], ["AverageColor", qsTr("average color here")], ["ClickImage", qsTr("click this image")],
+                           ["WaitForImage", qsTr("wait for this image")], ["FindImage", qsTr("find this image")]]
+                        : [["PixelColor", qsTr("color at this point")], ["MoveMouse", qsTr("move mouse here")]]
                     delegate: BwButton {
                         required property var modelData
                         text: modelData[1]
@@ -941,12 +946,12 @@ Item {
         }
     }
     BwDialog {
-        id: imageFileDialog; title: "Use an image file"; standardButtons: Dialog.Ok | Dialog.Cancel
+        id: imageFileDialog; title: qsTr("Use an image file"); standardButtons: Dialog.Ok | Dialog.Cancel
         property var request: null
         function openFor(req) { request = req; imagePath.text = ""; open(); imagePath.forceActiveFocus(); }
         Column { width: 420; spacing: 8
-            Text { text: "Path to a PNG image"; color: Theme.text }
-            BwTextField { id: imagePath; width: parent.width; placeholderText: "~/Pictures/button.png"; onAccepted: imageFileDialog.accept() }
+            Text { text: qsTr("Path to a PNG image"); color: Theme.text }
+            BwTextField { id: imagePath; width: parent.width; placeholderText: qsTr("~/Pictures/button.png"); onAccepted: imageFileDialog.accept() }
         }
         onAccepted: {
             const req = request;
@@ -956,7 +961,7 @@ Item {
         }
     }
     BwDialog {
-        id: modelDialog; title: "Choose a detection model"; standardButtons: Dialog.Cancel
+        id: modelDialog; title: qsTr("Choose a detection model"); standardButtons: Dialog.Cancel
         property var request: null
         property var models: []
         property bool busy: false
@@ -975,7 +980,7 @@ Item {
         }
         Column { width: 460; spacing: 10
             Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                text: "Models run inside Blockwork. Pick one, add your own .onnx file, or point the block at a detector running on this computer." }
+                text: qsTr("Models run inside Blockwork. Pick one, add your own .onnx file, or point the block at a detector running on this computer.") }
             Repeater {
                 model: modelDialog.models
                 delegate: Rectangle {
@@ -988,25 +993,25 @@ Item {
                         }
                         BwButton {
                             enabled: !modelDialog.busy && (modelData.installed || modelData.downloadable)
-                            text: modelData.installed ? "Use" : modelData.downloadable ? "Download " + modelData.megabytes + " MB" : "Not published yet"
+                            text: modelData.installed ? qsTr("Use") : modelData.downloadable ? qsTr("Download %1 MB").arg(modelData.megabytes) : qsTr("Not published yet")
                             onClicked: modelData.installed ? modelDialog.use(modelData.id) : modelDialog.download(modelData.id)
                         }
                     }
                 }
             }
-            Text { visible: modelDialog.busy; text: "Downloading..."; color: Theme.textDim; font.pixelSize: 12 }
-            BwButton { text: "Add a .onnx file..."; iconName: "folder-open"; enabled: !modelDialog.busy; onClicked: modelFile.open() }
-            Text { text: "Or a detector on this computer"; color: Theme.text; font.pixelSize: 12 }
+            Text { visible: modelDialog.busy; text: qsTr("Downloading..."); color: Theme.textDim; font.pixelSize: 12 }
+            BwButton { text: qsTr("Add a .onnx file..."); iconName: "folder-open"; enabled: !modelDialog.busy; onClicked: modelFile.open() }
+            Text { text: qsTr("Or a detector on this computer"); color: Theme.text; font.pixelSize: 12 }
             RowLayout { width: parent.width; spacing: 8
                 BwTextField { id: localUrl; Layout.fillWidth: true; placeholderText: root.defaultDetector; onAccepted: useUrl.clicked() }
-                BwButton { id: useUrl; text: "Use"; enabled: localUrl.text.trim().length > 0; onClicked: modelDialog.use(localUrl.text.trim()) }
+                BwButton { id: useUrl; text: qsTr("Use"); enabled: localUrl.text.trim().length > 0; onClicked: modelDialog.use(localUrl.text.trim()) }
             }
         }
     }
     FileDialog {
-        id: modelFile; title: "Add a detection model"; fileMode: FileDialog.OpenFile
+        id: modelFile; title: qsTr("Add a detection model"); fileMode: FileDialog.OpenFile
         currentFolder: StandardPaths.writableLocation(StandardPaths.HomeLocation)
-        nameFilters: ["ONNX models (*.onnx)", "All files (*)"]
+        nameFilters: [qsTr("ONNX models (*.onnx)"), qsTr("All files (*)")]
         onAccepted: {
             const text = decodeURIComponent(selectedFile.toString());
             const path = Qt.platform.os === "windows" ? text.replace(/^file:\/\/\//, "") : text.replace(/^file:\/\//, "");
@@ -1014,7 +1019,7 @@ Item {
         }
     }
     BwDialog {
-        id: templateDialog; title: "Start from a template"; standardButtons: Dialog.Cancel
+        id: templateDialog; title: qsTr("Start from a template"); standardButtons: Dialog.Cancel
         TemplateList {
             // Cards report no implicit width, so give the dialog one to size from
             implicitWidth: 560; templates: appState.templates || []
@@ -1022,23 +1027,23 @@ Item {
         }
     }
     BwDialog {
-        id: recordingSettings; title: "Recording settings"; standardButtons: Dialog.Close
+        id: recordingSettings; title: qsTr("Recording settings"); standardButtons: Dialog.Close
         Column { spacing: 14; width: 390
             BwSwitch { Accessible.name: "Record mouse movement"; checked: appState.record_mouse_movement; onToggled: checked => root.invoke("toggle_record_mouse_movement", { enabled: checked }) }
             BwSwitch { Accessible.name: "Use relative mouse movement"; checked: appState.record_mouse_relative; onToggled: checked => root.invoke("toggle_record_mouse_relative", { relative: checked }) }
-            Text { width: parent.width; wrapMode: Text.WordWrap; text: appState.absolute_mouse_position_available ? "Absolute positioning is available on this system." : "Absolute positioning is unavailable; relative movement will be used."; color: "#9fa0a6"; font.pixelSize: 12 }
+            Text { width: parent.width; wrapMode: Text.WordWrap; text: appState.absolute_mouse_position_available ? qsTr("Absolute positioning is available on this system.") : qsTr("Absolute positioning is unavailable; relative movement will be used."); color: "#9fa0a6"; font.pixelSize: 12 }
         }
     }
     BwDialog {
         id: variableDialog
         property string renameTarget: ""
-        title: renameTarget.length ? "Rename Variable" : "Make a Variable"
+        title: renameTarget.length ? qsTr("Rename Variable") : qsTr("Make a Variable")
         standardButtons: Dialog.Ok | Dialog.Cancel
         function openForCreate() { renameTarget = ""; variableName.text = ""; open(); variableName.forceActiveFocus(); }
         function openForRename(name) { renameTarget = name; variableName.text = name; open(); variableName.forceActiveFocus(); variableName.selectAll(); }
         Column { width: 340; spacing: 8
-            Text { text: "Variable name"; color: "#e7e7e8" }
-            BwTextField { id: variableName; width: parent.width; placeholderText: "score"; onAccepted: variableDialog.accept() }
+            Text { text: qsTr("Variable name"); color: "#e7e7e8" }
+            BwTextField { id: variableName; width: parent.width; placeholderText: qsTr("score"); onAccepted: variableDialog.accept() }
         }
         onAccepted: {
             const name = variableName.text.trim();
@@ -1052,13 +1057,13 @@ Item {
     BwDialog {
         id: listDialog
         property string renameTarget: ""
-        title: renameTarget.length ? "Rename List" : "Make a List"
+        title: renameTarget.length ? qsTr("Rename List") : qsTr("Make a List")
         standardButtons: Dialog.Ok | Dialog.Cancel
         function openForCreate() { renameTarget = ""; listName.text = ""; open(); listName.forceActiveFocus(); }
         function openForRename(name) { renameTarget = name; listName.text = name; open(); listName.forceActiveFocus(); listName.selectAll(); }
         Column { width: 340; spacing: 8
-            Text { text: "List name"; color: "#e7e7e8" }
-            BwTextField { id: listName; width: parent.width; placeholderText: "items" }
+            Text { text: qsTr("List name"); color: "#e7e7e8" }
+            BwTextField { id: listName; width: parent.width; placeholderText: qsTr("items") }
         }
         onAccepted: {
             const name = listName.text.trim();
@@ -1070,9 +1075,9 @@ Item {
     }
     BwDialog {
         id: deleteListDialog
-        title: "Delete list?"; standardButtons: Dialog.Yes | Dialog.Cancel
+        title: qsTr("Delete list?"); standardButtons: Dialog.Yes | Dialog.Cancel
         property string listName: ""
-        Text { text: "Delete “" + deleteListDialog.listName + "” and its saved items?"; color: "#e7e7e8" }
+        Text { text: qsTr("Delete “%1” and its saved items?").arg(deleteListDialog.listName); color: "#e7e7e8" }
         onAccepted: root.invoke("delete_list", { name: listName })
     }
     BwDialog {
@@ -1083,7 +1088,7 @@ Item {
             Row{spacing:9;LucideIcon{name:"info";width:20;height:20;color:Theme.accent;anchors.verticalCenter:parent.verticalCenter}Text{text:detailsDialog.detailName;color:Theme.text;font.pixelSize:17;font.weight:Font.Bold;anchors.verticalCenter:parent.verticalCenter}}
             Rectangle{width:parent.width-36;height:30;radius:5;color:Theme.field;border.color:Theme.border;Text{anchors.centerIn:parent;text:detailsDialog.detailIdentifier;color:Theme.accent;font.family:"monospace";font.pixelSize:12}}
             Text{width:parent.width-36;text:detailsDialog.detailExplainer;color:Theme.textDim;font.pixelSize:13;wrapMode:Text.WordWrap}
-            Row{anchors.right:parent.right;anchors.rightMargin:18;BwButton{text:"Close";onClicked:detailsDialog.close()}}
+            Row{anchors.right:parent.right;anchors.rightMargin:18;BwButton{text:qsTr("Close");onClicked:detailsDialog.close()}}
         }
     }
     MakeBlockDialog {
@@ -1134,23 +1139,25 @@ Item {
         ReadFile: "system", FileExists: "system", ListDirectory: "system", HttpGet: "system", JsonGet: "system",
         ShellOutput: "system", ShellSucceeded: "system", ActiveWindowTitle: "system", ActiveWindowApp: "system"
     })
+    // [[value, label]] as dropdown options.
+    function choices(pairs) { return pairs.map(p => ({ value: p[0], label: p[1] })); }
     function variableChoices() {
-        return [{ value: "", label: "(no variable)" }].concat((root.macro ? root.macro.variables : []).map(v => ({ value: v, label: v })));
+        return [{ value: "", label: qsTr("(no variable)") }].concat((root.macro ? root.macro.variables : []).map(v => ({ value: v, label: v })));
     }
-    readonly property var mouseButtonOptions: [["Left", "left button"], ["Right", "right button"], ["Middle", "middle button"],
-        ["Back", "back button"], ["Forward", "forward button"], ["ScrollUp", "wheel up"], ["ScrollDown", "wheel down"],
-        ["ScrollLeft", "wheel left"], ["ScrollRight", "wheel right"]].map(b => ({ value: b[0], label: b[1] }))
+    readonly property var mouseButtonOptions: [["Left", qsTr("left button")], ["Right", qsTr("right button")], ["Middle", qsTr("middle button")],
+        ["Back", qsTr("back button")], ["Forward", qsTr("forward button")], ["ScrollUp", qsTr("wheel up")], ["ScrollDown", qsTr("wheel down")],
+        ["ScrollLeft", qsTr("wheel left")], ["ScrollRight", qsTr("wheel right")]].map(b => ({ value: b[0], label: b[1] }))
     // What the open macro may do without asking; null when it's trusted.
     readonly property var permissions: appState.permissions === undefined ? null : appState.permissions
     readonly property var guardedAbilities: [
-        { kind: "commands", label: "Run commands and open or close apps" }, { kind: "network", label: "Go online" },
-        { kind: "files_write", label: "Write to files" }, { kind: "secrets", label: "Read your saved secrets" },
-        { kind: "screen", label: "Read the screen" }]
+        { kind: "commands", label: qsTr("Run commands and open or close apps") }, { kind: "network", label: qsTr("Go online") },
+        { kind: "files_write", label: qsTr("Write to files") }, { kind: "secrets", label: qsTr("Read your saved secrets") },
+        { kind: "screen", label: qsTr("Read the screen") }]
     // Which part of a window the window blocks match against.
-    readonly property var windowMatchOptions: [{ value: "Title", label: "window" }, { value: "App", label: "app" }]
+    readonly property var windowMatchOptions: [{ value: "Title", label: qsTr("window") }, { value: "App", label: qsTr("app") }]
     // How a detect block orders its results list.
-    readonly property var detectionSortOptions: [{ value: "Closest", label: "closest first" }, { value: "Score", label: "best first" },
-        { value: "Largest", label: "largest first" }]
+    readonly property var detectionSortOptions: [{ value: "Closest", label: qsTr("closest first") }, { value: "Score", label: qsTr("best first") },
+        { value: "Largest", label: qsTr("largest first") }]
     readonly property string defaultDetector: "http://127.0.0.1:8765/detect"
     // Another macro's name, for the Run macro prefab.
     function otherMacroName() {
@@ -1162,177 +1169,177 @@ Item {
         const label = text => ({ kind: "label", text: text });
         // The image blocks' picture: click to capture from the screen, or load a file.
         const imagePieces = [
-            { kind: "button", action: "captureImage", image: "image", icon: "crosshair", text: i => i && i.image ? "" : "capture image" },
+            { kind: "button", action: "captureImage", image: "image", icon: "crosshair", text: i => i && i.image ? "" : qsTr("capture image") },
             { kind: "button", action: "loadImage", icon: "folder-open" }
         ];
         const value = (field, key) => ({ kind: "value", field: field, key: key });
         // The detect blocks' search area: the whole window, or a part picked on screen.
         const regionPieces = [
-            { kind: "button", action: "pickRegion", icon: "square-dashed", text: i => i && i.region ? "region " + i.region : "whole window" },
+            { kind: "button", action: "pickRegion", icon: "square-dashed", text: i => i && i.region ? qsTr("region %1").arg(i.region) : qsTr("whole window") },
             { kind: "button", action: "clearRegion", icon: "x", when: i => !!i && !!i.region }
         ];
         BlockRegistry.registerOperators({
-            ReadFile: { prefix: "contents of file", result: "text" }, FileExists: { prefix: "file", suffix: "exists?", result: "bool" },
-            ListDirectory: { prefix: "files in folder", result: "text" }, HttpGet: { prefix: "fetch", result: "text" },
-            JsonGet: { prefix: "get", infix: "from JSON", result: "text" },
-            ShellOutput: { prefix: "output of command", result: "text" }, ShellSucceeded: { prefix: "command", suffix: "succeeds?", result: "bool" },
-            ActiveWindowTitle: { prefix: "active window title", result: "text" }, ActiveWindowApp: { prefix: "active app", result: "text" },
-            WindowExists: { prefix: "window", suffix: "exists?", result: "bool" },
-            LastError: { prefix: "error message", result: "text" },
-            MacroRunning: { prefix: "macro", suffix: "is running?", result: "bool" }, GlobalVariable: { prefix: "global", result: "text" },
-            PixelColor: { prefix: "color at x", infix: ["y"], result: "text" },
-            AverageColor: { prefix: "average color at x", infix: ["y", "width", "height"], result: "text" },
-            ColorsMatch: { infix: ["matches", "within"], suffix: "%", result: "bool" },
-            ScreenText: { prefix: "text on screen at x", infix: ["y", "width", "height"], result: "text" },
-            MousePosition: { prefix: "mouse", result: "number", enumArg: { index: 0, options: [{ value: "x", label: "x" }, { value: "y", label: "y" }] } },
-            ScreenSize: { prefix: "screen", result: "number", enumArg: { index: 0, options: [{ value: "width", label: "width" }, { value: "height", label: "height" }] } },
-            MonitorCount: { prefix: "number of monitors", result: "number" },
-            MonitorInfo: { prefix: "monitor", result: "number",
-                enumArg: { index: 1, options: ["x", "y", "width", "height"].map(v => ({ value: v, label: v })) } },
-            WindowInfo: { prefix: "window", result: "number",
-                enumArg: { index: 1, options: ["x", "y", "width", "height", "center x", "center y"].map(v => ({ value: v, label: v })) } },
-            Detection: { infix: "of detection", result: "text",
-                enumArg: { index: 0, options: ["center x", "center y", "x", "y", "width", "height", "score", "label", "id"].map(v => ({ value: v, label: v })) } },
-            AppRunning: { prefix: "app", suffix: "is running?", result: "bool" },
-            IdleSeconds: { prefix: "seconds idle", result: "number" },
-            ScreenLocked: { prefix: "screen is locked?", result: "bool" },
-            NetworkConnected: { prefix: "online?", result: "bool" },
-            UsbConnected: { prefix: "USB device", suffix: "plugged in?", result: "bool" },
-            Secret: { prefix: "secret", result: "text", enumArg: { index: 0, options: () => {
+            ReadFile: { prefix: qsTr("contents of file"), result: "text" }, FileExists: { prefix: qsTr("file"), suffix: qsTr("exists?"), result: "bool" },
+            ListDirectory: { prefix: qsTr("files in folder"), result: "text" }, HttpGet: { prefix: qsTr("fetch"), result: "text" },
+            JsonGet: { prefix: qsTr("get"), infix: qsTr("from JSON"), result: "text" },
+            ShellOutput: { prefix: qsTr("output of command"), result: "text" }, ShellSucceeded: { prefix: qsTr("command"), suffix: qsTr("succeeds?"), result: "bool" },
+            ActiveWindowTitle: { prefix: qsTr("active window title"), result: "text" }, ActiveWindowApp: { prefix: qsTr("active app"), result: "text" },
+            WindowExists: { prefix: qsTr("window"), suffix: qsTr("exists?"), result: "bool" },
+            LastError: { prefix: qsTr("error message"), result: "text" },
+            MacroRunning: { prefix: qsTr("macro"), suffix: qsTr("is running?"), result: "bool" }, GlobalVariable: { prefix: qsTr("global"), result: "text" },
+            PixelColor: { prefix: qsTr("color at x"), infix: [qsTr("y")], result: "text" },
+            AverageColor: { prefix: qsTr("average color at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text" },
+            ColorsMatch: { infix: [qsTr("matches"), qsTr("within")], suffix: "%", result: "bool" },
+            ScreenText: { prefix: qsTr("text on screen at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text" },
+            MousePosition: { prefix: qsTr("mouse"), result: "number", enumArg: { index: 0, options: [{ value: "x", label: qsTr("x") }, { value: "y", label: qsTr("y") }] } },
+            ScreenSize: { prefix: qsTr("screen"), result: "number", enumArg: { index: 0, options: [{ value: "width", label: qsTr("width") }, { value: "height", label: qsTr("height") }] } },
+            MonitorCount: { prefix: qsTr("number of monitors"), result: "number" },
+            MonitorInfo: { prefix: qsTr("monitor"), result: "number",
+                enumArg: { index: 1, options: root.choices([["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")]]) } },
+            WindowInfo: { prefix: qsTr("window"), result: "number",
+                enumArg: { index: 1, options: root.choices([["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")], ["center x", qsTr("center x")], ["center y", qsTr("center y")]]) } },
+            Detection: { infix: qsTr("of detection"), result: "text",
+                enumArg: { index: 0, options: root.choices([["center x", qsTr("center x")], ["center y", qsTr("center y")], ["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")], ["score", qsTr("score")], ["label", qsTr("label")], ["id", qsTr("id")]]) } },
+            AppRunning: { prefix: qsTr("app"), suffix: qsTr("is running?"), result: "bool" },
+            IdleSeconds: { prefix: qsTr("seconds idle"), result: "number" },
+            ScreenLocked: { prefix: qsTr("screen is locked?"), result: "bool" },
+            NetworkConnected: { prefix: qsTr("online?"), result: "bool" },
+            UsbConnected: { prefix: qsTr("USB device"), suffix: qsTr("plugged in?"), result: "bool" },
+            Secret: { prefix: qsTr("secret"), result: "text", enumArg: { index: 0, options: () => {
                 const names = appState.secret_names || [];
-                return names.length ? names.map(n => ({ value: n, label: n })) : [{ value: "", label: "(add one in Settings)" }];
+                return names.length ? names.map(n => ({ value: n, label: n })) : [{ value: "", label: qsTr("(add one in Settings)") }];
             } } },
             TextCheck: { infix: ["", ""], suffix: "?", result: "bool",
-                enumArg: { index: 1, options: ["contains", "starts with", "ends with", "matches regex"].map(v => ({ value: v, label: v })) } },
-            TextReplace: { prefix: "replace", infix: ["in", "with"], result: "text" },
-            RegexReplace: { prefix: "replace regex", infix: ["in", "with"], result: "text" },
-            RegexFind: { prefix: "match of regex", infix: "in", result: "text" },
-            SplitPart: { prefix: "part", infix: ["of", "split by"], result: "text" },
-            SplitCount: { prefix: "number of parts in", infix: "split by", result: "number" },
-            Substring: { prefix: "letters", infix: ["to", "of"], result: "text" },
-            Trim: { prefix: "trim", result: "text" },
-            FormatNumber: { infix: "with", suffix: "decimals", result: "text" },
-            Timestamp: { prefix: "timestamp now", result: "number" },
-            FormatDate: { prefix: "date of", infix: "as", result: "text" },
-            ParseDate: { prefix: "timestamp of", infix: "in format", result: "number" },
-            DatePart: { infix: "of", result: "number",
-                enumArg: { index: 0, options: ["year", "month", "day", "hour", "minute", "second", "weekday"].map(v => ({ value: v, label: v })) } }
+                enumArg: { index: 1, options: root.choices([["contains", qsTr("contains")], ["starts with", qsTr("starts with")], ["ends with", qsTr("ends with")], ["matches regex", qsTr("matches regex")]]) } },
+            TextReplace: { prefix: qsTr("replace"), infix: [qsTr("in"), qsTr("with")], result: "text" },
+            RegexReplace: { prefix: qsTr("replace regex"), infix: [qsTr("in"), qsTr("with")], result: "text" },
+            RegexFind: { prefix: qsTr("match of regex"), infix: qsTr("in"), result: "text" },
+            SplitPart: { prefix: qsTr("part"), infix: [qsTr("of"), qsTr("split by")], result: "text" },
+            SplitCount: { prefix: qsTr("number of parts in"), infix: qsTr("split by"), result: "number" },
+            Substring: { prefix: qsTr("letters"), infix: [qsTr("to"), qsTr("of")], result: "text" },
+            Trim: { prefix: qsTr("trim"), result: "text" },
+            FormatNumber: { infix: qsTr("with"), suffix: qsTr("decimals"), result: "text" },
+            Timestamp: { prefix: qsTr("timestamp now"), result: "number" },
+            FormatDate: { prefix: qsTr("date of"), infix: qsTr("as"), result: "text" },
+            ParseDate: { prefix: qsTr("timestamp of"), infix: qsTr("in format"), result: "number" },
+            DatePart: { infix: qsTr("of"), result: "number",
+                enumArg: { index: 0, options: root.choices([["year", qsTr("year")], ["month", qsTr("month")], ["day", qsTr("day")], ["hour", qsTr("hour")], ["minute", qsTr("minute")], ["second", qsTr("second")], ["weekday", qsTr("weekday")]]) } }
         });
         BlockRegistry.registerRows({
-            WhenAt: { shape: "header", icon: "clock", head: [label("ONCE AT"), value("AtTime", "at")] },
-            WhenSignal: { shape: "header", icon: "corner-down-right", head: [label("WHEN I RECEIVE"), value("SignalName", "name")] },
-            WhenWebhook: { shape: "header", icon: "link", head: [label("WHEN WEBHOOK"), value("WebhookPath", "path"), label("IS CALLED, BODY IN"),
-                { kind: "dropdown", key: "variable", options: () => root.variableChoices(), placeholder: "(no variable)" }] },
-            SendSignal: { icon: "navigation", head: [label("send signal"), value("SignalName", "name"),
-                { kind: "dropdown", key: "wait", options: [{ value: "start", label: "and continue" }, { value: "wait", label: "and wait" }],
+            WhenAt: { shape: "header", icon: "clock", head: [label(qsTr("ONCE AT")), value("AtTime", "at")] },
+            WhenSignal: { shape: "header", icon: "corner-down-right", head: [label(qsTr("WHEN I RECEIVE")), value("SignalName", "name")] },
+            WhenWebhook: { shape: "header", icon: "link", head: [label(qsTr("WHEN WEBHOOK")), value("WebhookPath", "path"), label(qsTr("IS CALLED, BODY IN")),
+                { kind: "dropdown", key: "variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            SendSignal: { icon: "navigation", head: [label(qsTr("send signal")), value("SignalName", "name"),
+                { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
                   encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
-            AskText: { icon: "text-cursor-input", head: [label("ask"), value("AskPrompt", "prompt"), label("default"), value("AskDefault", "default"),
-                label("into"), { kind: "dropdown", key: "name", options: () => root.variableChoices(), placeholder: "(no variable)" }] },
-            AskYesNo: { icon: "circle-check", head: [label("ask yes or no"), value("AskPrompt", "prompt"),
-                label("into"), { kind: "dropdown", key: "name", options: () => root.variableChoices(), placeholder: "(no variable)" }] },
-            AskChoice: { icon: "list-checks", head: [label("choose from"), { kind: "dropdown", key: "list", options: "lists" }, label("asking"),
-                value("AskPrompt", "prompt"), label("into"), { kind: "dropdown", key: "name", options: () => root.variableChoices(), placeholder: "(no variable)" }] },
-            ShowMessage: { icon: "message-square", head: [label("show message"), value("MessageText", "message")] },
-            WhenWindow: { shape: "header", icon: "app-window", head: [label("WHEN WINDOW"), value("WindowPattern", "pattern"), label("IS"),
-                { kind: "dropdown", key: "focused", options: [{ value: "focused", label: "focused" }, { value: "unfocused", label: "unfocused" }],
+            AskText: { icon: "text-cursor-input", head: [label(qsTr("ask")), value("AskPrompt", "prompt"), label(qsTr("default")), value("AskDefault", "default"),
+                label(qsTr("into")), { kind: "dropdown", key: "name", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            AskYesNo: { icon: "circle-check", head: [label(qsTr("ask yes or no")), value("AskPrompt", "prompt"),
+                label(qsTr("into")), { kind: "dropdown", key: "name", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            AskChoice: { icon: "list-checks", head: [label(qsTr("choose from")), { kind: "dropdown", key: "list", options: "lists" }, label(qsTr("asking")),
+                value("AskPrompt", "prompt"), label(qsTr("into")), { kind: "dropdown", key: "name", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            ShowMessage: { icon: "message-square", head: [label(qsTr("show message")), value("MessageText", "message")] },
+            WhenWindow: { shape: "header", icon: "app-window", head: [label(qsTr("WHEN WINDOW")), value("WindowPattern", "pattern"), label(qsTr("IS")),
+                { kind: "dropdown", key: "focused", options: [{ value: "focused", label: qsTr("focused") }, { value: "unfocused", label: qsTr("unfocused") }],
                   encode: v => v === "focused", decode: v => v ? "focused" : "unfocused" }] },
-            WhenFileChanged: { shape: "header", icon: "file", head: [label("WHEN FILE"), value("WatchedFilePath", "path"), label("CHANGES")] },
-            WhenTyped: { shape: "header", icon: "type", head: [label("WHEN I TYPE"), value("TypedText", "text"), label("THEN"),
-                { kind: "dropdown", key: "erase", options: [{ value: "erase", label: "erase it" }, { value: "keep", label: "keep it" }],
+            WhenFileChanged: { shape: "header", icon: "file", head: [label(qsTr("WHEN FILE")), value("WatchedFilePath", "path"), label(qsTr("CHANGES"))] },
+            WhenTyped: { shape: "header", icon: "type", head: [label(qsTr("WHEN I TYPE")), value("TypedText", "text"), label(qsTr("THEN")),
+                { kind: "dropdown", key: "erase", options: [{ value: "erase", label: qsTr("erase it") }, { value: "keep", label: qsTr("keep it") }],
                   encode: v => v === "erase", decode: v => v ? "erase" : "keep" }] },
-            WhenApp: { shape: "header", icon: "app-window", head: [label("WHEN APP"), value("AppPattern", "pattern"),
-                { kind: "dropdown", key: "started", options: [{ value: "starts", label: "starts" }, { value: "exits", label: "exits" }],
+            WhenApp: { shape: "header", icon: "app-window", head: [label(qsTr("WHEN APP")), value("AppPattern", "pattern"),
+                { kind: "dropdown", key: "started", options: [{ value: "starts", label: qsTr("starts") }, { value: "exits", label: qsTr("exits") }],
                   encode: v => v === "starts", decode: v => v ? "starts" : "exits" }] },
-            WhenIdle: { shape: "header", icon: "moon", head: [label("WHEN IDLE FOR"), value("IdleMinutes", "minutes"), label("MINUTES")] },
-            WhenScreenLock: { shape: "header", icon: "lock", head: [label("WHEN SCREEN IS"),
-                { kind: "dropdown", key: "locked", options: [{ value: "locked", label: "locked" }, { value: "unlocked", label: "unlocked" }],
+            WhenIdle: { shape: "header", icon: "moon", head: [label(qsTr("WHEN IDLE FOR")), value("IdleMinutes", "minutes"), label(qsTr("MINUTES"))] },
+            WhenScreenLock: { shape: "header", icon: "lock", head: [label(qsTr("WHEN SCREEN IS")),
+                { kind: "dropdown", key: "locked", options: [{ value: "locked", label: qsTr("locked") }, { value: "unlocked", label: qsTr("unlocked") }],
                   encode: v => v === "locked", decode: v => v ? "locked" : "unlocked" }] },
-            WhenCron: { shape: "header", icon: "clock", head: [label("ON SCHEDULE"), value("CronExpression", "expression")] },
-            WhenNetwork: { shape: "header", icon: "radio", head: [label("WHEN NETWORK"),
-                { kind: "dropdown", key: "connected", options: [{ value: "on", label: "connects" }, { value: "off", label: "disconnects" }],
+            WhenCron: { shape: "header", icon: "clock", head: [label(qsTr("ON SCHEDULE")), value("CronExpression", "expression")] },
+            WhenNetwork: { shape: "header", icon: "radio", head: [label(qsTr("WHEN NETWORK")),
+                { kind: "dropdown", key: "connected", options: [{ value: "on", label: qsTr("connects") }, { value: "off", label: qsTr("disconnects") }],
                   encode: v => v === "on", decode: v => v ? "on" : "off" }] },
-            WhenUsb: { shape: "header", icon: "plug-zap", head: [label("WHEN USB DEVICE"), value("UsbPattern", "pattern"), label("IS"),
-                { kind: "dropdown", key: "connected", options: [{ value: "in", label: "plugged in" }, { value: "out", label: "unplugged" }],
+            WhenUsb: { shape: "header", icon: "plug-zap", head: [label(qsTr("WHEN USB DEVICE")), value("UsbPattern", "pattern"), label(qsTr("IS")),
+                { kind: "dropdown", key: "connected", options: [{ value: "in", label: qsTr("plugged in") }, { value: "out", label: qsTr("unplugged") }],
                   encode: v => v === "in", decode: v => v ? "in" : "out" }] },
-            WhenMouseButton: { shape: "header", icon: "mouse", head: [label("WHEN"),
+            WhenMouseButton: { shape: "header", icon: "mouse", head: [label(qsTr("WHEN")),
                 { kind: "dropdown", key: "button", options: root.mouseButtonOptions },
-                { kind: "dropdown", key: "pressed", options: [{ value: "down", label: "is pressed" }, { value: "up", label: "is released" }],
+                { kind: "dropdown", key: "pressed", options: [{ value: "down", label: qsTr("is pressed") }, { value: "up", label: qsTr("is released") }],
                   encode: v => v === "down", decode: v => v ? "down" : "up" },
-                label("WITH KEYS"), value("MouseModifiers", "modifiers")] },
-            SplitIntoList: { icon: "scissors", head: [label("split"), value("SplitText", "text"), label("by"), value("SplitSeparator", "separator"),
-                label("into"), { kind: "dropdown", key: "name", options: "lists" }] },
-            PasteText: { icon: "clipboard-paste", head: [label("paste"), value("PasteValue", "text")] },
-            WithLock: { icon: "lock", mouths: ["body"], head: [label("with lock"), value("LockName", "name")] },
+                label(qsTr("WITH KEYS")), value("MouseModifiers", "modifiers")] },
+            SplitIntoList: { icon: "scissors", head: [label(qsTr("split")), value("SplitText", "text"), label(qsTr("by")), value("SplitSeparator", "separator"),
+                label(qsTr("into")), { kind: "dropdown", key: "name", options: "lists" }] },
+            PasteText: { icon: "clipboard-paste", head: [label(qsTr("paste")), value("PasteValue", "text")] },
+            WithLock: { icon: "lock", mouths: ["body"], head: [label(qsTr("with lock")), value("LockName", "name")] },
             WriteFile: { icon: "file-text", head: [
-                { kind: "dropdown", key: "append", options: [{ value: "write", label: "write" }, { value: "append", label: "append" }],
+                { kind: "dropdown", key: "append", options: [{ value: "write", label: qsTr("write") }, { value: "append", label: qsTr("append") }],
                   encode: v => v === "append", decode: v => v ? "append" : "write" },
-                value("WriteFileText", "text"), label("to file"), value("WriteFilePath", "path")] },
+                value("WriteFileText", "text"), label(qsTr("to file")), value("WriteFilePath", "path")] },
             // Target first, like "set", so it isn't lost at the end of a long row.
             HttpRequest: { icon: "cloud", head: [
-                label("set"), { kind: "dropdown", key: "variable", options: () => root.variableChoices(), placeholder: "(no variable)" },
-                label("to response of"), { kind: "dropdown", key: "method", options: ["GET", "POST", "PUT", "PATCH", "DELETE"].map(m => ({ value: m, label: m })) },
+                label(qsTr("set")), { kind: "dropdown", key: "variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") },
+                label(qsTr("to response of")), { kind: "dropdown", key: "method", options: ["GET", "POST", "PUT", "PATCH", "DELETE"].map(m => ({ value: m, label: m })) },
                 value("HttpUrl", "url"),
-                Object.assign(label("with body"), { when: i => !i || i.method !== "GET" }), Object.assign(value("HttpBody", "body"), { when: i => !i || i.method !== "GET" }),
-                label("headers"), value("HttpHeaders", "headers")] },
-            Notify: { icon: "message-square", head: [label("notify"), value("NotifyTitle", "title"), label("saying"), value("NotifyMessage", "message")] },
-            Log: { icon: "list", head: [label("log"), value("LogValue", "value")] },
-            TryCatch: { icon: "circle-alert", mouths: ["body", "catch_body"], separators: ["on error"], head: [label("try")] },
-            ThrowError: { shape: "cap", icon: "triangle-alert", head: [label("throw error"), value("ErrorMessage", "message")] },
-            StopMacro: { shape: "cap", icon: "octagon", head: [label("stop macro")] },
-            Retry: { icon: "refresh-cw", mouths: ["body"], head: [label("try up to"), value("RetryCount", "count"), label("times,"),
-                value("RetryDelay", "delay"), label("ms apart")] },
+                Object.assign(label(qsTr("with body")), { when: i => !i || i.method !== "GET" }), Object.assign(value("HttpBody", "body"), { when: i => !i || i.method !== "GET" }),
+                label(qsTr("headers")), value("HttpHeaders", "headers")] },
+            Notify: { icon: "message-square", head: [label(qsTr("notify")), value("NotifyTitle", "title"), label(qsTr("saying")), value("NotifyMessage", "message")] },
+            Log: { icon: "list", head: [label(qsTr("log")), value("LogValue", "value")] },
+            TryCatch: { icon: "circle-alert", mouths: ["body", "catch_body"], separators: [qsTr("on error")], head: [label(qsTr("try"))] },
+            ThrowError: { shape: "cap", icon: "triangle-alert", head: [label(qsTr("throw error")), value("ErrorMessage", "message")] },
+            StopMacro: { shape: "cap", icon: "octagon", head: [label(qsTr("stop macro"))] },
+            Retry: { icon: "refresh-cw", mouths: ["body"], head: [label(qsTr("try up to")), value("RetryCount", "count"), label(qsTr("times,")),
+                value("RetryDelay", "delay"), label(qsTr("ms apart"))] },
             WindowAction: { icon: "app-window", head: [
                 { kind: "dropdown", key: "action", options: ["Focus", "Minimize", "Maximize", "Restore", "Close"].map(a => ({ value: a, label: a.toLowerCase() })) },
                 { kind: "dropdown", key: "by", options: root.windowMatchOptions }, value("WindowPattern", "pattern")] },
             MoveWindow: { icon: "move", head: [
-                { kind: "dropdown", key: "resize", options: [{ value: "move", label: "move" }, { value: "resize", label: "resize" }],
+                { kind: "dropdown", key: "resize", options: [{ value: "move", label: qsTr("move") }, { value: "resize", label: qsTr("resize") }],
                   encode: v => v === "resize", decode: v => v ? "resize" : "move" },
                 { kind: "dropdown", key: "by", options: root.windowMatchOptions }, value("WindowPattern", "pattern"),
-                Object.assign(label("to x"), { when: i => !i || !i.resize }), Object.assign(label("to width"), { when: i => !!i && i.resize }),
+                Object.assign(label(qsTr("to x")), { when: i => !i || !i.resize }), Object.assign(label(qsTr("to width")), { when: i => !!i && i.resize }),
                 value("WindowX", "x"),
-                Object.assign(label("y"), { when: i => !i || !i.resize }), Object.assign(label("height"), { when: i => !!i && i.resize }),
+                Object.assign(label(qsTr("y")), { when: i => !i || !i.resize }), Object.assign(label(qsTr("height")), { when: i => !!i && i.resize }),
                 value("WindowY", "y")] },
-            RunMacro: { icon: "play", head: [label("run macro"), value("MacroTarget", "target"),
-                { kind: "dropdown", key: "wait", options: [{ value: "start", label: "and continue" }, { value: "wait", label: "and wait" }],
+            RunMacro: { icon: "play", head: [label(qsTr("run macro")), value("MacroTarget", "target"),
+                { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
                   encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
-            StopMacroNamed: { icon: "square", head: [label("stop macro"), value("MacroTarget", "target")] },
-            SetGlobal: { icon: "variable", head: [label("set global"), value("GlobalName", "name"), label("to"), value("GlobalValue", "value")] },
-            ChangeGlobal: { icon: "variable", head: [label("change global"), value("GlobalName", "name"), label("by"), value("GlobalValue", "by")] },
-            WaitUntil: { icon: "loader", head: [label("wait until"), { kind: "value", field: "Condition", key: "condition", bool: true },
-                label("for up to"), value("WaitTimeout", "timeout"), label("ms")] },
-            FindImage: { icon: "search", head: [label("find"), ...imagePieces, label("put x in"),
-                { kind: "dropdown", key: "x_variable", options: () => root.variableChoices(), placeholder: "(no variable)" },
-                label("y in"), { kind: "dropdown", key: "y_variable", options: () => root.variableChoices(), placeholder: "(no variable)" },
-                label("within"), value("ImageTolerance", "tolerance"), label("%")] },
-            ClickImage: { icon: "mouse-pointer-click", head: [label("click"),
-                { kind: "dropdown", key: "button", options: [{ value: "Left", label: "left" }, { value: "Right", label: "right" }, { value: "Middle", label: "middle" }] },
-                label("on"), ...imagePieces, label("within"), value("ImageTolerance", "tolerance"), label("%")] },
-            WaitForImage: { icon: "eye", head: [label("wait until"), ...imagePieces,
-                { kind: "dropdown", key: "appear", options: [{ value: "appears", label: "appears" }, { value: "gone", label: "disappears" }],
+            StopMacroNamed: { icon: "square", head: [label(qsTr("stop macro")), value("MacroTarget", "target")] },
+            SetGlobal: { icon: "variable", head: [label(qsTr("set global")), value("GlobalName", "name"), label(qsTr("to")), value("GlobalValue", "value")] },
+            ChangeGlobal: { icon: "variable", head: [label(qsTr("change global")), value("GlobalName", "name"), label(qsTr("by")), value("GlobalValue", "by")] },
+            WaitUntil: { icon: "loader", head: [label(qsTr("wait until")), { kind: "value", field: "Condition", key: "condition", bool: true },
+                label(qsTr("for up to")), value("WaitTimeout", "timeout"), label(qsTr("ms"))] },
+            FindImage: { icon: "search", head: [label(qsTr("find")), ...imagePieces, label(qsTr("put x in")),
+                { kind: "dropdown", key: "x_variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") },
+                label(qsTr("y in")), { kind: "dropdown", key: "y_variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") },
+                label(qsTr("within")), value("ImageTolerance", "tolerance"), label("%")] },
+            ClickImage: { icon: "mouse-pointer-click", head: [label(qsTr("click")),
+                { kind: "dropdown", key: "button", options: [{ value: "Left", label: qsTr("left") }, { value: "Right", label: qsTr("right") }, { value: "Middle", label: qsTr("middle") }] },
+                label(qsTr("on")), ...imagePieces, label(qsTr("within")), value("ImageTolerance", "tolerance"), label("%")] },
+            WaitForImage: { icon: "eye", head: [label(qsTr("wait until")), ...imagePieces,
+                { kind: "dropdown", key: "appear", options: [{ value: "appears", label: qsTr("appears") }, { value: "gone", label: qsTr("disappears") }],
                   encode: v => v === "appears", decode: v => v ? "appears" : "gone" },
-                label("for up to"), value("WaitTimeout", "timeout"), label("ms, within"), value("ImageTolerance", "tolerance"), label("%")] },
-            DetectObjectsInWindow: { icon: "aperture", head: [label("detect"), value("DetectLabel", "label"), label("in"),
+                label(qsTr("for up to")), value("WaitTimeout", "timeout"), label(qsTr("ms, within")), value("ImageTolerance", "tolerance"), label("%")] },
+            DetectObjectsInWindow: { icon: "aperture", head: [label(qsTr("detect")), value("DetectLabel", "label"), label(qsTr("in")),
                 { kind: "dropdown", key: "by", options: root.windowMatchOptions }, value("WindowPattern", "pattern"), ...regionPieces,
-                label("with"), value("DetectorUrl", "detector"), { kind: "button", action: "pickModel", icon: "box" }, label("at least"), value("DetectConfidence", "confidence"), label("% into"),
+                label(qsTr("with")), value("DetectorUrl", "detector"), { kind: "button", action: "pickModel", icon: "box" }, label(qsTr("at least")), value("DetectConfidence", "confidence"), label(qsTr("% into")),
                 { kind: "dropdown", key: "results_list", options: "lists" },
                 { kind: "dropdown", key: "sort", options: root.detectionSortOptions },
-                label("count in"), { kind: "dropdown", key: "count_variable", options: () => root.variableChoices(), placeholder: "(no variable)" }] },
-            WaitForDetection: { icon: "eye", head: [label("wait until"), value("DetectLabel", "label"),
-                { kind: "dropdown", key: "appear", options: [{ value: "appears", label: "appears" }, { value: "gone", label: "disappears" }],
+                label(qsTr("count in")), { kind: "dropdown", key: "count_variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            WaitForDetection: { icon: "eye", head: [label(qsTr("wait until")), value("DetectLabel", "label"),
+                { kind: "dropdown", key: "appear", options: [{ value: "appears", label: qsTr("appears") }, { value: "gone", label: qsTr("disappears") }],
                   encode: v => v === "appears", decode: v => v ? "appears" : "gone" },
-                label("in"), { kind: "dropdown", key: "by", options: root.windowMatchOptions }, value("WindowPattern", "pattern"), ...regionPieces,
-                label("with"), value("DetectorUrl", "detector"), { kind: "button", action: "pickModel", icon: "box" }, label("at least"), value("DetectConfidence", "confidence"),
-                label("% for up to"), value("WaitTimeout", "timeout"), label("ms")] },
-            AimStep: { icon: "crosshair", head: [label("aim from center of"), { kind: "dropdown", key: "by", options: root.windowMatchOptions },
-                value("WindowPattern", "pattern"), label("toward x"), value("AimTargetX", "target_x"), label("y"), value("AimTargetY", "target_y"),
-                label("gain"), value("AimGain", "gain"), label("max step"), value("AimMaxStep", "max_step"),
-                label("deadzone"), value("AimDeadzone", "deadzone")] },
-            AimAtDetection: { icon: "target", head: [label("aim at item"), value("AimIndex", "index"), label("of"),
+                label(qsTr("in")), { kind: "dropdown", key: "by", options: root.windowMatchOptions }, value("WindowPattern", "pattern"), ...regionPieces,
+                label(qsTr("with")), value("DetectorUrl", "detector"), { kind: "button", action: "pickModel", icon: "box" }, label(qsTr("at least")), value("DetectConfidence", "confidence"),
+                label(qsTr("% for up to")), value("WaitTimeout", "timeout"), label(qsTr("ms"))] },
+            AimStep: { icon: "crosshair", head: [label(qsTr("aim from center of")), { kind: "dropdown", key: "by", options: root.windowMatchOptions },
+                value("WindowPattern", "pattern"), label(qsTr("toward x")), value("AimTargetX", "target_x"), label(qsTr("y")), value("AimTargetY", "target_y"),
+                label(qsTr("gain")), value("AimGain", "gain"), label(qsTr("max step")), value("AimMaxStep", "max_step"),
+                label(qsTr("deadzone")), value("AimDeadzone", "deadzone")] },
+            AimAtDetection: { icon: "target", head: [label(qsTr("aim at item")), value("AimIndex", "index"), label(qsTr("of")),
                 { kind: "dropdown", key: "results_list", options: "lists" },
-                label("gain"), value("AimGain", "gain"), label("max step"), value("AimMaxStep", "max_step"),
-                label("deadzone"), value("AimDeadzone", "deadzone"), label("hold"), value("AimSettle", "settle_ms"),
-                label("ms, up to"), value("WaitTimeout", "timeout"), label("ms, result in"),
-                { kind: "dropdown", key: "status_variable", options: () => root.variableChoices(), placeholder: "(no variable)" }] }
+                label(qsTr("gain")), value("AimGain", "gain"), label(qsTr("max step")), value("AimMaxStep", "max_step"),
+                label(qsTr("deadzone")), value("AimDeadzone", "deadzone"), label(qsTr("hold")), value("AimSettle", "settle_ms"),
+                label(qsTr("ms, up to")), value("WaitTimeout", "timeout"), label(qsTr("ms, result in")),
+                { kind: "dropdown", key: "status_variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") }] }
         });
         BlockRegistry.registerPrefabs({
             WhenAt: () => ({ at: textValue(Qt.formatDateTime(new Date(Date.now() + 3600000), "yyyy-MM-dd HH:00")) }),
@@ -1442,15 +1449,18 @@ Item {
     }
     function blockLabel(id) {
         const ins = findInstruction(id);
-        if (!ins) return "a block";
-        if (ins.type === "CallBlock" || ins.type === "BranchCallBlock") { const def = blockDefById(ins.block_id); return def ? "custom block" : "a block"; }
+        if (!ins) return qsTr("a block");
+        if (ins.type === "CallBlock" || ins.type === "BranchCallBlock") { const def = blockDefById(ins.block_id); return def ? qsTr("custom block") : qsTr("a block"); }
         return ins.type.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
     }
 
     // Click-to-preview on operators: the daemon evaluates, the chip shows the answer.
+    // Block labels are read once, so register them again in a new language.
+    readonly property string uiLanguage: appState.language || ""
+    onUiLanguageChanged: Qt.callLater(() => { BlockRegistry.resetOperators(); registerBlocks(); BlockRegistry.blockMenu = [{ id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }]; })
     Component.onCompleted: {
         registerBlocks();
-        BlockRegistry.blockMenu = [{ id: "breakpoint", text: "Toggle breakpoint", icon: "circle-dot" }];
+        BlockRegistry.blockMenu = [{ id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }];
         BlockRegistry.previewHandler = (key, value) => root.appBridge.previewValue(key, JSON.stringify(value));
     }
     Connections {
@@ -1518,7 +1528,7 @@ Item {
                 active: ghost.visible && !!ghost.spec && ghost.spec.kind === "value"
                 sourceComponent: ValueChip {
                     valueData: ghost.spec.value; boxed: true; editable: false
-                    forceBoolean: !!ghost.spec.forceBoolean; callDisplayLabel: ghost.spec.label || "custom block"
+                    forceBoolean: !!ghost.spec.forceBoolean; callDisplayLabel: ghost.spec.label || qsTr("custom block")
                     blockDefinitions: root.macro ? root.macro.block_defs : []
                 }
             }

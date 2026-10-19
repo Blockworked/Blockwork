@@ -108,6 +108,16 @@ section below as the GitHub release notes, followed by the downloads table.
   writing files, reading secrets or reading the screen, with "allow this
   time" and "always allow". Choose what to allow in the import review or in
   Macro settings > Permissions; grants are kept outside the macro file.
+- Block library: My Blocks > Browse lists shared block packs from library
+  indexes set in Settings > Editor (the built-in one lives in
+  `community/blocks/`). Packs are checked against the SHA-256 their index
+  pins, reviewed before they're added, and replace their older versions in
+  place. Right-click a custom block to share it, and the blocks it uses, as
+  a `.blockpack` file.
+- Translatable UI: every editor and dialog string goes through Qt's
+  translation system, with a language setting in Settings > General. Ships
+  with English and pirate-speak English; see `blockwork-qt/i18n/README.md`
+  to add a language.
 
 ### Changed
 - Macro files now carry a format version and are upgraded step by step when

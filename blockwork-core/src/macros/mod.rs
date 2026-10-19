@@ -1735,7 +1735,9 @@ pub struct MacroSettings {
     /// Runs schedules and "once at" triggers it missed while Blockwork was
     /// closed or the computer slept, once, when it gets the chance.
     #[serde(default)]
-    pub catch_up_missed: bool,
+    pub catch_up_missed: bool,    /// Block packs this macro's blocks came from.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub block_packs: Vec<crate::block_packs::PackRecord>,
 }
 
 /// Deserialization shape supporting both the current multi-strand format and
