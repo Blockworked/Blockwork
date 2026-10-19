@@ -30,6 +30,7 @@ static SESSION: Mutex<Vec<(String, String, bool)>> = Mutex::new(Vec::new());
 /// One permission question at a time, so a loop doesn't queue a stack of them.
 static ASKING: Mutex<()> = Mutex::new(());
 
+#[cfg(not(test))]
 const FILE_NAME: &str = "permissions.json";
 
 fn label(kind: &str) -> &'static str {
