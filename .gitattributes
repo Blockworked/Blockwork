@@ -1,3 +1,2 @@
-# Block packs are hash-pinned in community/blocks/index.json, so their bytes
-# must not change with the checkout platform.
-community/blocks/** -text
+# Test copies of packs from Blockworked/Blockwork-community-blocks; hash-pinned.
+blockwork-core/tests/fixtures/blocks/** -text

@@ -312,14 +312,17 @@ Item {
             blockIds: shareDialog.picked, name: packName.text, description: packDescription.text,
             author: packAuthor.text, version: packVersion.text, path: root.localPath(selectedFile)
         }, count => {
-            shared.message = qsTr("Saved %n block(s). Others can add them with My Blocks > Browse > From file.", "", count);
+            shared.message = qsTr("Saved %n block(s). Others can add them with My Blocks > Browse > From file, or you can submit the pack to the community library, where it's reviewed before it's listed.", "", count);
             shared.open();
         })
     }
     AppDialog {
         id: shared
-        title: qsTr("Pack saved"); standardButtons: Dialog.Ok
+        title: qsTr("Pack saved"); standardButtons: Dialog.Ok | Dialog.Close
+        acceptText: qsTr("Submit to community library...")
         property string message: ""
+        // The library site takes uploads after signing in.
+        onAccepted: Qt.openUrlExternally("https://community.blockworked.com/submit")
         Text { width: 400; wrapMode: Text.WordWrap; text: shared.message; color: Theme.text; font.pixelSize: 13 }
     }
     AppDialog {

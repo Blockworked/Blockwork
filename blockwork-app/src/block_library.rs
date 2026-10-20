@@ -99,9 +99,24 @@ fn cache() -> std::sync::MutexGuard<'static, Cache> {
 
 /// The index addresses from Settings; the built-in library until changed.
 pub(crate) fn sources() -> Vec<String> {
-    load_settings()
-        .block_library_sources
-        .unwrap_or_else(|| vec![block_packs::DEFAULT_INDEX.to_string()])
+    let saved = load_settings().block_library_sources;
+    upgrade_sources(saved.unwrap_or_else(|| vec![block_packs::DEFAULT_INDEX.to_string()]))
+}
+
+/// Swaps old built-in addresses for the current one.
+fn upgrade_sources(list: Vec<String>) -> Vec<String> {
+    let mut out: Vec<String> = Vec::new();
+    for url in list {
+        let url = if block_packs::OLD_DEFAULT_INDEXES.contains(&url.as_str()) {
+            block_packs::DEFAULT_INDEX.to_string()
+        } else {
+            url
+        };
+        if !out.contains(&url) {
+            out.push(url);
+        }
+    }
+    out
 }
 
 pub(crate) fn dto(s: &AppState) -> LibraryDto {
@@ -352,8 +367,18 @@ mod tests {
     use super::*;
 
     #[test]
+    fn old_built_in_addresses_move_to_the_new_one() {
+        let mut list: Vec<String> = block_packs::OLD_DEFAULT_INDEXES.iter().map(|u| u.to_string()).collect();
+        list.push("https://example.com/index.json".into());
+        assert_eq!(
+            upgrade_sources(list),
+            [block_packs::DEFAULT_INDEX.to_string(), "https://example.com/index.json".into()]
+        );
+    }
+
+    #[test]
     fn downloads_follow_the_url_rules() {
-        let index = concat!(env!("CARGO_MANIFEST_DIR"), "/../community/blocks/index.json");
+        let index = concat!(env!("CARGO_MANIFEST_DIR"), "/../blockwork-core/tests/fixtures/blocks/index.json");
         assert!(fetch(index, true).is_ok(), "a local library the user added");
         assert!(fetch(&format!("file://{index}"), true).is_ok());
         let refused = fetch(index, false).unwrap_err();

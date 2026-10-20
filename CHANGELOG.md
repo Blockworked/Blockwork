@@ -94,9 +94,10 @@ section below as the GitHub release notes, followed by the downloads table.
   - Permissions: imported macros ask before running commands, going online, writing files, reading secrets or reading the screen, with "allow this time" and "always allow".
   - Choose what to allow in the import review or in Macro settings > Permissions; grants are kept outside the macro file.
 - Block library:
-  - My Blocks > Browse lists shared block packs from library indexes set in Settings > Editor (the built-in one lives in `community/blocks/`).
+  - My Blocks > Browse lists shared block packs from library indexes set in Settings > Editor; the built-in one is https://community.blockworked.com.
   - Packs are checked against the SHA-256 their index pins, reviewed before they're added, and replace their older versions in place.
   - Right-click a custom block to share it, and the blocks it uses, as a `.blockpack` file.
+  - After saving a pack, "Submit to community library..." opens the library site, where you sign in with GitHub or Google and upload it for review.
 - Translatable UI:
   - Every editor and dialog string goes through Qt's translation system, with a language setting in Settings > General.
   - Ships with English and pirate-speak English; every built-in language shows up in the setting by itself.

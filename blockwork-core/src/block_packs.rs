@@ -12,8 +12,13 @@ use std::collections::HashSet;
 pub const PACK_KEY: &str = "blockwork_block_pack";
 /// Top-level key marking a library index.
 pub const INDEX_KEY: &str = "blockwork_block_index";
-/// The library that ships with Blockwork, kept in its own repository.
-pub const DEFAULT_INDEX: &str = "https://raw.githubusercontent.com/Blockworked/Blockwork/master/community/blocks/index.json";
+/// The library that ships with Blockwork, served by community.blockworked.com.
+pub const DEFAULT_INDEX: &str = "https://community.blockworked.com/index.json";
+/// Earlier built-in addresses, swapped for `DEFAULT_INDEX` in saved settings.
+pub const OLD_DEFAULT_INDEXES: [&str; 2] = [
+    "https://raw.githubusercontent.com/Blockworked/Blockwork/master/community/blocks/index.json",
+    "https://raw.githubusercontent.com/Blockworked/Blockwork-community-blocks/master/index.json",
+];
 /// Packs and indexes over this size are refused.
 pub const MAX_DOWNLOAD: u64 = 2 * 1024 * 1024;
 
@@ -451,14 +456,14 @@ mod tests {
     }
 
     #[test]
-    fn shipped_library_matches_its_index() {
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../community/blocks");
+    fn library_fixture_matches_its_index() {
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("tests/fixtures/blocks");
         let text = std::fs::read_to_string(root.join("index.json")).unwrap();
         let index = read_index(&text, &root.join("index.json").to_string_lossy()).unwrap();
         assert!(!index.packs.is_empty());
         for entry in &index.packs {
             let bytes = std::fs::read(&entry.url).unwrap();
-            verify(&bytes, &entry.sha256).expect("rerun scripts/build-block-index.py");
+            verify(&bytes, &entry.sha256).expect("refresh the fixture from the community blocks repo");
             let pack = read_pack(std::str::from_utf8(&bytes).unwrap()).unwrap();
             assert_eq!(pack.info.id, entry.info.id);
             assert!(pack.notes.is_empty(), "{}: {:?}", entry.info.id, pack.notes);
