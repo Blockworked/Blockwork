@@ -20,10 +20,10 @@ version = "0.6.0"
 edition = "2024"
 
 [workspace.dependencies]
-blockstitch-qml = { git = "https://github.com/Blockworked/blockstitch", rev = "3cb6f478" }
+blockstitch-qml = { git = "https://github.com/Blockworked/blockstitch", rev = "aee80af" }
 blockstitch-core = {
     git = "https://github.com/Blockworked/blockstitch",
-    rev = "3cb6f478",
+    rev = "aee80af",
     #path = "../blockstitch/crates/blockstitch-core"
 }
 tracing = "0.1.44"
