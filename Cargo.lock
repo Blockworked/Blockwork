@@ -510,7 +510,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-app"
-version = "0.5.4"
+version = "0.6.0"
 dependencies = [
  "base64 0.23.1",
  "blockstitch-core",
@@ -526,7 +526,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-core"
-version = "0.5.4"
+version = "0.6.0"
 dependencies = [
  "arboard",
  "base64 0.23.1",
@@ -566,7 +566,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-daemon"
-version = "0.5.4"
+version = "0.6.0"
 dependencies = [
  "blockwork-app",
  "blockwork-protocol",
@@ -583,7 +583,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-ffi"
-version = "0.5.4"
+version = "0.6.0"
 dependencies = [
  "blockwork-core",
  "cbindgen",
@@ -596,7 +596,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-linux-bridge"
-version = "0.5.4"
+version = "0.6.0"
 dependencies = [
  "blockwork-core",
  "evdev",
@@ -607,7 +607,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-protocol"
-version = "0.5.4"
+version = "0.6.0"
 dependencies = [
  "dirs 7.0.0",
  "libc",
@@ -619,7 +619,7 @@ dependencies = [
 
 [[package]]
 name = "blockwork-qt"
-version = "0.5.4"
+version = "0.6.0"
 dependencies = [
  "base64 0.23.1",
  "blockstitch-qml",
