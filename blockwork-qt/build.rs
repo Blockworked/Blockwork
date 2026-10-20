@@ -73,6 +73,11 @@ fn main() {
     unsafe {
         builder
             .cc_builder(|cc| {
+                // qmlcachegen emits UTF-8 C++ string literals, including the
+                // pack-review bullets. MSVC otherwise uses the system code page.
+                if cc.get_compiler().is_like_msvc() {
+                    cc.flag("/utf-8");
+                }
                 cc.include("src");
                 cc.file("src/qt_diagnostics.cpp");
                 cc.file("src/app_icon.cpp");

@@ -1,6 +1,6 @@
-//! Finding a small image inside a screenshot: a coarse grayscale search on
-//! shrunken copies picks a few candidates, then a full-color comparison
-//! around each one decides.
+//! Finding a small image inside a screenshot: an exact RGB pass preserves
+//! matches that downsampling would hide. For approximate matches, a coarse
+//! RGB search picks candidates for the full-resolution comparison.
 
 use super::Image;
 
@@ -13,10 +13,18 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
     if needle.width == 0 || needle.height == 0 || needle.width > hay.width || needle.height > hay.height {
         return None;
     }
+    // Neither grayscale nor downsampled color can distinguish every texture.
+    // An exact copy must not depend on surviving a bounded coarse shortlist.
+    if let Some(position) = find_exact(hay, needle) {
+        return Some(position);
+    }
     let max_diff = tolerance.clamp(0.0, 100.0) / 100.0 * 255.0;
+    if max_diff == 0.0 {
+        return None;
+    }
     // Shrink both as far as the needle stays recognizable.
     let factor = [4, 2, 1].into_iter().find(|f| needle.width / f >= 7 && needle.height / f >= 7).unwrap_or(1);
-    let small_hay = Gray::shrink(hay, factor);
+    let small_hay = Rgb::shrink(hay, factor);
 
     // A match can sit at any offset from the shrunken grid, so the needle is
     // shrunk once per offset; the right one lines up exactly.
@@ -24,7 +32,7 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
     for py in 0..factor {
         for px in 0..factor {
             let phase = needle.crop(px, py, needle.width - px, needle.height - py);
-            let small_needle = Gray::shrink(&phase, factor);
+            let small_needle = Rgb::shrink(&phase, factor);
             let area = (small_needle.width as u64 * small_needle.height as u64).max(1);
             for (sum, cx, cy) in coarse(&small_hay, &small_needle) {
                 // Compare per pixel, since phases shrink to different sizes.
@@ -38,9 +46,12 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
 
     let mut best: Option<(f64, u32, u32)> = None;
     let (max_x, max_y) = ((hay.width - needle.width) as i64, (hay.height - needle.height) as i64);
+    // Flat areas can give several phases the same coarse score. Refine a
+    // whole downsampled cell so choosing one phase cannot lose its neighbors.
+    let radius = factor.saturating_sub(1).max(1) as i64;
     for (_, cx, cy) in candidates {
-        for y in (cy - 1).max(0)..=(cy + 1).min(max_y) {
-            for x in (cx - 1).max(0)..=(cx + 1).min(max_x) {
+        for y in (cy - radius).max(0)..=(cy + radius).min(max_y) {
+            for x in (cx - radius).max(0)..=(cx + radius).min(max_x) {
                 let (x, y) = (x as u32, y as u32);
                 let limit = best.map_or(max_diff, |(d, ..)| d.min(max_diff));
                 if let Some(diff) = color_diff(hay, needle, x, y, limit)
@@ -52,6 +63,37 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
         }
     }
     best.map(|(_, x, y)| (x, y))
+}
+
+/// Reject most positions with two RGB pixels before comparing full rows.
+/// Choosing a second pixel unlike the first also rejects flat backgrounds
+/// cheaply when the template contains a small distinctive mark.
+fn find_exact(hay: &Image, needle: &Image) -> Option<(u32, u32)> {
+    let first = needle.pixel(0, 0);
+    let anchor = needle.rgba.chunks_exact(4).enumerate().max_by_key(|(_, pixel)| {
+        pixel[..3].iter().zip(first).map(|(a, b)| a.abs_diff(b) as u32).sum::<u32>()
+    }).map(|(index, _)| index).unwrap_or(0);
+    let (ax, ay) = (anchor % needle.width as usize, anchor / needle.width as usize);
+    let anchor_color = needle.pixel(ax as u32, ay as u32);
+    let row_bytes = needle.width as usize * 4;
+    for y in 0..=hay.height - needle.height {
+        for x in 0..=hay.width - needle.width {
+            if hay.pixel(x, y) != first || hay.pixel(x + ax as u32, y + ay as u32) != anchor_color {
+                continue;
+            }
+            let matches = (0..needle.height).all(|row| {
+                let h = ((y + row) as usize * hay.width as usize + x as usize) * 4;
+                let n = row as usize * row_bytes;
+                hay.rgba[h..h + row_bytes].chunks_exact(4)
+                    .zip(needle.rgba[n..n + row_bytes].chunks_exact(4))
+                    .all(|(a, b)| a[..3] == b[..3])
+            });
+            if matches {
+                return Some((x, y));
+            }
+        }
+    }
+    None
 }
 
 /// Mean per-channel difference of `needle` placed at (`x`, `y`), or `None`
@@ -74,39 +116,41 @@ fn color_diff(hay: &Image, needle: &Image, x: u32, y: u32, limit: f64) -> Option
     Some(sum as f64 / total)
 }
 
-struct Gray {
+struct Rgb {
     width: u32,
     height: u32,
-    pixels: Vec<u8>,
+    pixels: Vec<[u8; 3]>,
 }
 
-impl Gray {
-    /// Grayscale, averaged over `factor`x`factor` blocks.
-    fn shrink(image: &Image, factor: u32) -> Gray {
+impl Rgb {
+    /// Preserve all three channels, averaged over `factor`x`factor` blocks.
+    fn shrink(image: &Image, factor: u32) -> Rgb {
         let (width, height) = (image.width / factor, image.height / factor);
         let mut pixels = Vec::with_capacity(width as usize * height as usize);
         let area = factor * factor;
         for by in 0..height {
             for bx in 0..width {
-                let mut sum = 0u32;
+                let mut sum = [0u32; 3];
                 for dy in 0..factor {
                     let row = (by * factor + dy) as usize * image.width as usize;
                     for dx in 0..factor {
                         let i = (row + (bx * factor + dx) as usize) * 4;
                         let px = &image.rgba[i..i + 3];
-                        sum += (px[0] as u32 * 77 + px[1] as u32 * 150 + px[2] as u32 * 29) >> 8;
+                        for c in 0..3 {
+                            sum[c] += px[c] as u32;
+                        }
                     }
                 }
-                pixels.push((sum / area) as u8);
+                pixels.push(sum.map(|value| (value / area) as u8));
             }
         }
-        Gray { width, height, pixels }
+        Rgb { width, height, pixels }
     }
 }
 
-/// The best few positions by grayscale difference, as (sum, x, y), split
+/// The best few positions by RGB difference, as (sum, x, y), split
 /// across threads by row.
-fn coarse(hay: &Gray, needle: &Gray) -> Vec<(u64, u32, u32)> {
+fn coarse(hay: &Rgb, needle: &Rgb) -> Vec<(u64, u32, u32)> {
     if needle.width == 0 || needle.height == 0 || needle.width > hay.width || needle.height > hay.height {
         return Vec::new();
     }
@@ -127,7 +171,7 @@ fn coarse(hay: &Gray, needle: &Gray) -> Vec<(u64, u32, u32)> {
     all
 }
 
-fn coarse_rows(hay: &Gray, needle: &Gray, start: u32, end: u32) -> Vec<(u64, u32, u32)> {
+fn coarse_rows(hay: &Rgb, needle: &Rgb, start: u32, end: u32) -> Vec<(u64, u32, u32)> {
     let mut best: Vec<(u64, u32, u32)> = Vec::with_capacity(CANDIDATES + 1);
     let (nw, nh) = (needle.width as usize, needle.height as usize);
     for y in start..end {
@@ -137,7 +181,8 @@ fn coarse_rows(hay: &Gray, needle: &Gray, start: u32, end: u32) -> Vec<(u64, u32
             for row in 0..nh {
                 let h = (y as usize + row) * hay.width as usize + x as usize;
                 let n = row * nw;
-                sum += hay.pixels[h..h + nw].iter().zip(&needle.pixels[n..n + nw]).map(|(a, b)| a.abs_diff(*b) as u64).sum::<u64>();
+                sum += hay.pixels[h..h + nw].iter().zip(&needle.pixels[n..n + nw])
+                    .map(|(a, b)| (0..3).map(|c| a[c].abs_diff(b[c]) as u64).sum::<u64>()).sum::<u64>();
                 if sum >= cap {
                     break;
                 }

@@ -54,8 +54,8 @@ ApplicationWindow {
     // The UI language from Settings; empty follows the system. The saved one
     // is already applied at startup, so this only handles changes.
     readonly property string uiLanguage: appState.language || ""
-    onUiLanguageChanged: translator.setLanguage(uiLanguage)
-    Translator { id: translator }
+    onUiLanguageChanged: sharedTranslator.setLanguage(uiLanguage)
+    Translator { id: sharedTranslator }
 
     function invoke(command, args) {
         bridge.invokeCommand(command, JSON.stringify(args || {}));
@@ -196,7 +196,7 @@ ApplicationWindow {
     Component {
         id: editorComponent
         EditorPage {
-            appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: macroFiles; blockLibrary: blockLibrary
+            appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: sharedMacroFiles; blockLibrary: sharedBlockLibrary
             sidebarWidth: root.sidebarWidth
             onSidebarWidthChanged: root.sidebarWidth = sidebarWidth
             sidebarCollapsed: root.sidebarCollapsed
@@ -204,9 +204,10 @@ ApplicationWindow {
         }
     }
     Component { id: onboardingComponent; OnboardingPage { appState: root.appState; invoke: root.invoke } }
-    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; macroFiles: macroFiles; translator: translator } }
-    MacroFiles { id: macroFiles; appState: root.appState; invoke: root.invoke; appBridge: bridge }
-    BlockLibrary { id: blockLibrary; appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: macroFiles }
+    // Distinct IDs avoid resolving a page's injected property to itself.
+    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; macroFiles: sharedMacroFiles; translator: sharedTranslator } }
+    MacroFiles { id: sharedMacroFiles; appState: root.appState; invoke: root.invoke; appBridge: bridge }
+    BlockLibrary { id: sharedBlockLibrary; appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: sharedMacroFiles }
 
     // Frameless window: hairline outline and edge/corner resize grips.
     Rectangle {

@@ -115,10 +115,6 @@ section below as the GitHub release notes, followed by the downloads table.
   the console.
 - Click-to-preview won't run shell or web blocks.
 
-### Fixed
-- Importing a macro that runs commands or has custom settings did nothing in
-  the Qt editor; it now opens the review.
-
 ## [0.5.4] - 2026-09-20
 
 ### Added

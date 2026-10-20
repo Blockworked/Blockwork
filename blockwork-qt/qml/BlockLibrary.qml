@@ -60,8 +60,9 @@ Item {
         readonly property var shown: (root.library.packs || []).filter(p => !query
             || (p.name + " " + p.description + " " + p.author + " " + p.blocks.join(" ")).toLowerCase().indexOf(query) >= 0)
         readonly property var brokenSources: (root.library.sources || []).filter(s => s.error)
-        ColumnLayout {
-            width: 580; spacing: 10
+        width: Math.min(624, parent.width - 32)
+        contentItem: ColumnLayout {
+            implicitWidth: 580; spacing: 10
             RowLayout {
                 Layout.fillWidth: true; spacing: 8
                 BwTextField { id: search; Layout.fillWidth: true; placeholderText: qsTr("Search blocks") }
@@ -250,6 +251,7 @@ Item {
     BwDialog {
         id: shareDialog
         title: qsTr("Share blocks as a pack")
+        width: Math.min(504, parent.width - 32)
         standardButtons: Dialog.Ok | Dialog.Cancel
         property var picked: []
         readonly property var defs: root.macro ? root.macro.block_defs || [] : []
@@ -258,8 +260,8 @@ Item {
             packName.text = picked.length === 1 ? root.blockLabel(defs.find(d => d.id === picked[0]) || {}) : (root.macro ? root.macro.name : "");
             packName.forceActiveFocus();
         }
-        ColumnLayout {
-            width: 460; spacing: 8
+        contentItem: ColumnLayout {
+            implicitWidth: 460; spacing: 8
             Text { text: qsTr("Name"); color: Theme.textDim; font.pixelSize: 12 }
             BwTextField { id: packName; Layout.fillWidth: true }
             Text { text: qsTr("What the blocks do"); color: Theme.textDim; font.pixelSize: 12 }
