@@ -115,6 +115,10 @@ section below as the GitHub release notes, followed by the downloads table.
   the console.
 - Click-to-preview won't run shell or web blocks.
 
+### Fixed
+- On Linux, evdev waits for held keys and mouse buttons to be released before
+  grabbing an input device, preventing stuck input when Blockwork starts.
+
 ## [0.5.4] - 2026-09-20
 
 ### Added
