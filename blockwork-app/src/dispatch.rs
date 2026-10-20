@@ -501,11 +501,13 @@ impl Backend {
             "remove_instruction" => {
                 let strand_id: String = arg(&args, "strandId")?;
                 let path: Vec<PathStep> = arg(&args, "path")?;
+                let count: Option<usize> = arg(&args, "count")?;
                 to_json(commands::remove_instruction(
                     &self.state,
                     &self.app,
                     strand_id,
                     path,
+                    count.unwrap_or(1),
                 )?)
             }
             "reorder_instruction" => {

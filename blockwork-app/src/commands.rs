@@ -1830,6 +1830,7 @@ pub(crate) fn remove_instruction(
     app: &AppHandle,
     strand_id: String,
     path: Vec<PathStep>,
+    count: usize,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     // Work on a copy: a path addressing nothing costs no undo step.
@@ -1840,7 +1841,15 @@ pub(crate) fn remove_instruction(
             return Ok(());
         }
     };
-    if graph.remove_instruction(&strand_id, &path) {
+    // `count` removes a whole tail as one edit (one undo step, one state update).
+    let mut removed = false;
+    for _ in 0..count.max(1) {
+        if !graph.remove_instruction(&strand_id, &path) {
+            break;
+        }
+        removed = true;
+    }
+    if removed {
         push_undo(&mut s);
         if let Some(mac) = &mut s.current_macro {
             mac.graph = graph;
