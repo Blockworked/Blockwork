@@ -9,6 +9,8 @@ use blockstitch_core::graph::{
 };
 use spin_sleep::{SpinSleeper, SpinStrategy};
 use std::collections::HashMap;
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
 use std::process::Command;
 use std::sync::atomic::{AtomicBool, Ordering};
 use std::sync::{Arc, Mutex, OnceLock};
@@ -37,6 +39,11 @@ const MAX_CALL_DEPTH: u32 = 64;
 /// Stack for each entry strand's thread. Interpreting a macro recurses per
 /// nested call and body, which the default 2 MiB can't hold to `MAX_CALL_DEPTH`.
 const STRAND_STACK_SIZE: usize = 8 * 1024 * 1024;
+
+// Macro helpers run inside a desktop app; console executables must not
+// allocate a terminal window each time a strand executes one of them.
+#[cfg(windows)]
+const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
 /// What a `run_block` invocation is telling its caller to do next: the
 /// "did a Return happen" signal, generalized to also carry loop control.
@@ -1742,7 +1749,10 @@ fn run_block(
             }
             InstructionKind::Command(command) => {
                 println!("Running command: {command}");
-                if let Err(e) = Command::new("bash").args(["-c", command]).status() {
+                let mut process = Command::new("bash");
+                #[cfg(windows)]
+                process.creation_flags(CREATE_NO_WINDOW);
+                if let Err(e) = process.args(["-c", command]).status() {
                     soft_fail(ctx, &ins.id, "Command", e)?;
                 }
             }
@@ -2077,6 +2087,7 @@ fn run_block(
 fn open_app(command: &str) -> std::io::Result<()> {
     Command::new("cmd")
         .args(["/C", "start", "", command])
+        .creation_flags(CREATE_NO_WINDOW)
         .spawn()
         .map(|_| ())
 }
@@ -2135,6 +2146,7 @@ fn close_app(command: &str, _name: &str) -> std::io::Result<()> {
     }
     Command::new("taskkill")
         .args(["/IM", &format!("{stem}.exe"), "/F"])
+        .creation_flags(CREATE_NO_WINDOW)
         .status()
         .map(|_| ())
 }

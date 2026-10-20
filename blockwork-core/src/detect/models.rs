@@ -19,8 +19,8 @@ pub struct KnownModel {
 pub const KNOWN: &[KnownModel] = &[KnownModel {
     id: "mc-player-320-v1",
     about: "YOLOv8n fine-tuned on Minecraft players, 320 px input",
-    url: None,
-    sha256: "",
+    url: Some("https://github.com/Blockworked/blockwork-mc-player-model/releases/download/mc-player-320-v1/mc-player-320-v1.onnx"),
+    sha256: "e49f9fbd475894bca3fdca2074d52e68454ca71dd5b9b36fe8f427686e61ca7c",
     megabytes: 12,
 }];
 
@@ -201,7 +201,7 @@ mod tests {
         let file = dir.join("players.onnx").display().to_string();
         assert_eq!(resolve_in(&dir, &file, &never), Ok(dir.join("players.onnx")));
         assert!(resolve_in(&dir, "/nope/missing.onnx", &never).unwrap_err().contains("no model file"));
-        assert!(resolve_in(&dir, "mc-player-320-v1", &never).unwrap_err().contains("isn't published yet"));
+        assert!(resolve_in(&dir, "mc-player-320-v1", &|_| false).unwrap_err().contains("wasn't allowed"));
         assert!(resolve_in(&dir, "mystery", &never).unwrap_err().contains("there's no model 'mystery'"));
         let _ = std::fs::remove_dir_all(dir);
     }
@@ -244,6 +244,8 @@ mod tests {
         let rows = catalog_in(&dir);
         assert_eq!(rows[0].id, "mc-player-320-v1");
         assert!(!rows[0].installed);
+        assert!(rows[0].downloadable);
+        assert_eq!(rows[0].megabytes, Some(12));
         assert_eq!(rows.last().map(|r| (r.id.as_str(), r.installed)), Some(("mine", true)));
         let _ = std::fs::remove_dir_all(dir);
         let _ = std::fs::remove_dir_all(src);

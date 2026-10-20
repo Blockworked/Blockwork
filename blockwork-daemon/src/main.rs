@@ -13,10 +13,7 @@
 //!   was started with `--background` (login autostart).
 //! - Tray "Open" relaunches the UI; tray "Quit" closes the UI and exits.
 
-#![cfg_attr(
-    all(target_os = "windows", not(debug_assertions)),
-    windows_subsystem = "windows"
-)]
+#![cfg_attr(target_os = "windows", windows_subsystem = "windows")]
 
 mod prompt;
 mod server;

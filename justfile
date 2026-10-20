@@ -46,11 +46,11 @@ translations blockstitch="../blockstitch":
     "$bin/lupdate" -silent -pluralonly blockwork-qt/qml "{{blockstitch}}/qml/Blockstitch" -extensions qml -no-obsolete -ts blockwork-qt/i18n/qml_en.ts
     "$bin/lrelease" -silent blockwork-qt/i18n/qml_*.ts
 
-# Work on blockstitch locally: point cargo's blockstitch-core at the same
+# Work on blockstitch locally: point cargo's QML and core crates at the same
 # checkout, without touching the committed lockfile.
 blockstitch-local path="../blockstitch":
     {{mkdir-cargo}}
-    {{ if os() == "windows" { 'echo paths = ["' + replace(clean(justfile_directory() / path), "\\", "/") + '/crates/blockstitch-core"] > .cargo\config.toml' } else { "printf 'paths = [\"%s/crates/blockstitch-core\"]\\n' \"$(realpath " + path + ")\" > .cargo/config.toml" } }}
+    {{ if os() == "windows" { 'echo paths = ["' + replace(clean(justfile_directory() / path), "\\", "/") + '", "' + replace(clean(justfile_directory() / path), "\\", "/") + '/crates/blockstitch-core"] > .cargo\config.toml' } else { "printf 'paths = [\"%s\", \"%s/crates/blockstitch-core\"]\\n' \"$(realpath " + path + ")\" \"$(realpath " + path + ")\" > .cargo/config.toml" } }}
 
 blockstitch-published commit="":
     {{rm-cargo-cfg}}

@@ -102,6 +102,22 @@ impl Detector for OnnxDetector {
 mod live {
     use super::*;
 
+    /// Smoke-test a downloaded model without requiring a screenshot fixture.
+    #[test]
+    #[ignore]
+    fn loads_and_runs_a_model() {
+        let model = std::env::var("BLOCKWORK_TEST_MODEL").expect("set BLOCKWORK_TEST_MODEL");
+        let detector = OnnxDetector::load(Path::new(&model)).unwrap();
+        assert!(detector.size > 0);
+        assert!(!detector.labels.is_empty(), "the model must include label metadata");
+        let image = Image::new(detector.size as u32, detector.size as u32);
+        let found = detector.detect(&image).unwrap();
+        assert!(found.iter().all(|d| d.x.is_finite() && d.y.is_finite()
+            && d.w.is_finite() && d.h.is_finite() && d.score.is_finite()));
+        eprintln!("loaded and ran {model}: input {}, labels {:?}, {} detections on a blank frame",
+            detector.size, detector.labels, found.len());
+    }
+
     #[test]
     #[ignore]
     fn runs_a_yolo_model() {

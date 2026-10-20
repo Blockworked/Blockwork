@@ -131,7 +131,7 @@ impl Daemon {
     }
 }
 
-/// A release Windows build has no console of its own; print to the one it
+/// A Windows build has no console of its own; print to the one it
 /// was started from.
 fn attach_console() {
     #[cfg(windows)]

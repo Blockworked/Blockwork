@@ -318,11 +318,11 @@ objects as Ultralytics itself, in about 37 ms per frame (release, CPU). The
 ignored test `runs_a_yolo_model` repeats this with `BLOCKWORK_TEST_MODEL` and
 `BLOCKWORK_TEST_IMAGE`.
 
-The chosen default is a fine-tuned YOLOv8n (`mc-player-320-v1`). Its
-registry entry has no URL or hash yet because the weights don't exist: it
-still needs a labeled dataset, a training run and hosting. Ultralytics
-weights are AGPL-3.0, so the fine-tuned model is too; Blockwork (GPL-3.0)
-may combine with it, and the model ships as a separate download.
+The chosen default is a fine-tuned YOLOv8n (`mc-player-320-v1`), published
+at https://github.com/Blockworked/blockwork-mc-player-model/releases/tag/mc-player-320-v1.
+The registry pins the release's ONNX download URL and SHA-256. The model
+was trained on 1,945 auto-labeled Minecraft player screenshots with 320 px
+input. Ultralytics weights are AGPL-3.0, so the fine-tuned model is too;
+the model ships as a separate download.
 
-Not done: training and publishing that model, and screenshot fixture
-tests that need it.
+Not done: screenshot fixture tests for the Minecraft model.
