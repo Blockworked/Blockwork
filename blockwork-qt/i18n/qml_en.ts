@@ -15,7 +15,7 @@
 <context>
     <name>BlockCanvas</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1172"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1197"/>
         <source>%n item(s)</source>
         <translation>
             <numerusform>%n item</numerusform>
@@ -23,7 +23,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1216"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1241"/>
         <source>%n entry(s)</source>
         <translation>
             <numerusform>%n entry</numerusform>
@@ -43,17 +43,17 @@
     </message>
     <message numerus="yes">
         <location filename="../qml/BlockLibrary.qml" line="315"/>
-        <source>Saved %n block(s). Others can add them with My Blocks &gt; Browse &gt; From file.</source>
-        <translation>
-            <numerusform>Saved %n block. Others can add it with My Blocks &gt; Browse &gt; From file.</numerusform>
-            <numerusform>Saved %n blocks. Others can add them with My Blocks &gt; Browse &gt; From file.</numerusform>
+        <source>Saved %n block(s). Others can add them with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
         </translation>
     </message>
 </context>
 <context>
     <name>EditorPage</name>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="544"/>
+        <location filename="../qml/EditorPage.qml" line="640"/>
         <source>Paused before &quot;%1&quot; (%n strand(s) waiting)</source>
         <translation>
             <numerusform>Paused before &quot;%1&quot; (%n strand waiting)</numerusform>
@@ -61,7 +61,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="664"/>
+        <location filename="../qml/EditorPage.qml" line="760"/>
         <source>Delete %n block(s)</source>
         <translation>
             <numerusform>Delete %n block</numerusform>
