@@ -6,18 +6,22 @@ import com.blockworked.Blockwork 1.0
 
 ApplicationWindow {
     id: root
+    objectName: "blockworkMainWindow"
     // Room around the frameless window for the drop shadow (KWin only shadows decorated windows).
-    readonly property real shadowMargin: customChrome && visibility === Window.Windowed ? 18 : 0
-    width: 1220 + 2 * 18
-    height: 850 + 2 * 18
-    minimumWidth: 600 + 2 * 18
-    minimumHeight: 640 + 2 * 18
+    // Windows snaps the native bounds, so transparent padding would leave a gap.
+    readonly property real shadowPadding: customChrome && Qt.platform.os !== "windows" ? 18 : 0
+    readonly property real shadowMargin: visibility === Window.Windowed ? shadowPadding : 0
+    width: 1220 + 2 * shadowPadding
+    height: 850 + 2 * shadowPadding
+    minimumWidth: 600 + 2 * shadowPadding
+    minimumHeight: 640 + 2 * shadowPadding
     visible: true
     title: qsTr("Blockwork")
     // macOS keeps its native title bar.
     readonly property bool customChrome: Qt.platform.os !== "osx"
     readonly property real cornerRadius: customChrome && visibility === Window.Windowed ? 10 : 0
-    flags: customChrome ? (Qt.Window | Qt.FramelessWindowHint) : Qt.Window
+    flags: customChrome ? (Qt.Window | Qt.FramelessWindowHint
+        | (Qt.platform.os === "windows" ? Qt.WindowMinMaxButtonsHint | Qt.WindowSystemMenuHint : 0)) : Qt.Window
     color: customChrome ? "transparent" : "#202124"
     property real sidebarWidth: 348
     // True while the window is being resized: the rounded-corner mask layer is

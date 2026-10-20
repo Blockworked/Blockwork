@@ -7,6 +7,8 @@ use core_graphics::event::CGEvent;
 use core_graphics::event_source::{CGEventSource, CGEventSourceStateID};
 use core_graphics::window::{create_image, kCGNullWindowID, kCGWindowImageDefault, kCGWindowListOptionOnScreenOnly};
 
+pub(super) const CHEAP_AREAS: bool = false;
+
 pub(super) fn capture_area(_: Rect, _native: bool) -> Option<Shot> {
     None
 }

@@ -30,6 +30,10 @@ pub(super) fn capture() -> Result<Shot, String> {
 /// Set once `grim` has failed, so later captures go straight to the portal.
 static NO_GRIM: AtomicBool = AtomicBool::new(false);
 
+/// Area captures are a compositor round trip each, so pixel reads share one
+/// desktop capture instead.
+pub(super) const CHEAP_AREAS: bool = false;
+
 /// Just the screen rectangle `rect`, when there's a faster way than
 /// cropping a whole-desktop capture.
 pub(super) fn capture_area(rect: Rect, native: bool) -> Option<Shot> {

@@ -21,6 +21,12 @@ pub mod qobject {
         /// Prints the answer and quits.
         #[qinvokable]
         fn finish(self: &PromptBridge, answer: &QString, text: &QString);
+
+        /// Takes keyboard focus from whatever app has it. The daemon starts
+        /// this process in the background, and Windows keeps those behind.
+        #[qinvokable]
+        #[cxx_name = "bringToFront"]
+        fn bring_to_front(self: &PromptBridge);
     }
 }
 
@@ -63,5 +69,61 @@ impl qobject::PromptBridge {
         let _ = writeln!(out, "{reply}");
         let _ = out.flush();
         std::process::exit(0);
+    }
+
+    fn bring_to_front(&self) {
+        #[cfg(windows)]
+        front::bring_to_front();
+    }
+}
+
+#[cfg(windows)]
+mod front {
+    use windows_sys::Win32::Foundation::{HWND, LPARAM};
+    use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentProcessId, GetCurrentThreadId};
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput};
+    use windows_sys::Win32::UI::WindowsAndMessaging::{
+        BringWindowToTop, EnumWindows, GetForegroundWindow, GetWindowThreadProcessId, IsWindowVisible, SetForegroundWindow,
+    };
+
+    /// Windows only lets the process that sent the last input take focus, so
+    /// send a key no keyboard has (0xE8 is unassigned) first, and borrow the
+    /// foreground window's input queue for the switch.
+    pub(super) fn bring_to_front() {
+        unsafe extern "system" fn first_own(hwnd: HWND, out: LPARAM) -> i32 {
+            let mut pid = 0;
+            // SAFETY: `out` is the HWND passed to EnumWindows below.
+            unsafe {
+                GetWindowThreadProcessId(hwnd, &mut pid);
+                if pid == GetCurrentProcessId() && IsWindowVisible(hwnd) != 0 {
+                    *(out as *mut HWND) = hwnd;
+                    return 0;
+                }
+            }
+            1
+        }
+        // SAFETY: plain Win32 calls; the callback only writes `hwnd`, and the
+        // thread input is detached again before returning.
+        unsafe {
+            let mut hwnd: HWND = std::ptr::null_mut();
+            EnumWindows(Some(first_own), &mut hwnd as *mut HWND as LPARAM);
+            if hwnd.is_null() || GetForegroundWindow() == hwnd {
+                return;
+            }
+            let key = |flags| INPUT {
+                r#type: INPUT_KEYBOARD,
+                Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: 0xE8, wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: 0 } },
+            };
+            let taps = [key(0), key(KEYEVENTF_KEYUP)];
+            SendInput(taps.len() as u32, taps.as_ptr(), std::mem::size_of::<INPUT>() as i32);
+            let theirs = GetWindowThreadProcessId(GetForegroundWindow(), std::ptr::null_mut());
+            let ours = GetCurrentThreadId();
+            let attached = theirs != 0 && theirs != ours && AttachThreadInput(ours, theirs, 1) != 0;
+            BringWindowToTop(hwnd);
+            SetForegroundWindow(hwnd);
+            if attached {
+                AttachThreadInput(ours, theirs, 0);
+            }
+        }
     }
 }

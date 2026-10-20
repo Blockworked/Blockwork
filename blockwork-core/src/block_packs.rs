@@ -289,7 +289,9 @@ pub fn resolve_url(base: &str, url: &str) -> String {
         let origin_end = base.find("://").map(|i| i + 3).and_then(|start| base[start..].find('/').map(|j| start + j));
         return format!("{}/{rest}", origin_end.map_or(base, |end| &base[..end]));
     }
-    let dir = base.rfind('/').map_or(base, |i| &base[..i]);
+    // Local Windows paths use backslashes too.
+    let separators: &[char] = if base.contains("://") { &['/'] } else { &['/', '\\'] };
+    let dir = base.rfind(separators).map_or(base, |i| &base[..i]);
     format!("{dir}/{}", url.trim_start_matches("./"))
 }
 

@@ -185,8 +185,15 @@ fn respond(mut stream: &TcpStream, status: u16, body: serde_json::Value) {
     );
 }
 
-fn handle(stream: TcpStream, token: &str, state: &SharedState, app: &AppHandle) {
+fn prepare(stream: &TcpStream) {
+    // On Windows an accepted socket inherits the listener's non-blocking
+    // mode, and a request that arrives in pieces would fail to read.
+    let _ = stream.set_nonblocking(false);
     let _ = stream.set_read_timeout(Some(Duration::from_secs(5)));
+}
+
+fn handle(stream: TcpStream, token: &str, state: &SharedState, app: &AppHandle) {
+    prepare(&stream);
     let request = match read_request(&stream) {
         Ok(request) => request,
         Err((status, message)) => return respond(&stream, status, serde_json::json!({ "error": message })),
@@ -241,4 +248,34 @@ fn fire(path: &str, body: &str, state: &SharedState, app: &AppHandle) -> usize {
         scheduled_run::fire(id, body, Arc::clone(&emulator), speed, &variables, &lists, Arc::clone(state), app.clone());
     }
     count
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn reads_a_slow_request_from_a_nonblocking_listener() {
+        let listener = TcpListener::bind(("127.0.0.1", 0)).unwrap();
+        listener.set_nonblocking(true).unwrap();
+        let port = listener.local_addr().unwrap().port();
+        let client = std::thread::spawn(move || {
+            let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
+            stream.write_all(b"POST /deploy HTTP/1.1\r\n").unwrap();
+            std::thread::sleep(Duration::from_millis(100));
+            stream.write_all(b"Content-Length: 2\r\n\r\nhi").unwrap();
+            std::thread::sleep(Duration::from_millis(200));
+        });
+        let stream = loop {
+            match listener.accept() {
+                Ok((stream, _)) => break stream,
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(Duration::from_millis(10)),
+                Err(e) => panic!("{e}"),
+            }
+        };
+        prepare(&stream);
+        let request = read_request(&stream).map_err(|(status, _)| status).unwrap();
+        assert_eq!((request.method.as_str(), request.path.as_str(), request.body.as_str()), ("POST", "deploy", "hi"));
+        client.join().unwrap();
+    }
 }

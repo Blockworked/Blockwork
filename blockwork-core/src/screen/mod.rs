@@ -2,7 +2,8 @@
 //! monitor geometry.
 //!
 //! Every coordinate here is a *screen coordinate*: the same space the Move
-//! mouse block's absolute mode uses (logical pixels on scaled displays).
+//! mouse block's absolute mode uses (logical pixels on scaled displays,
+//! except on Windows, where the daemon is DPI aware and they're physical).
 //! Captures can be denser than that (physical pixels), so a [`Shot`] keeps
 //! its origin and scale to map between the two.
 
@@ -34,6 +35,7 @@ use windows as platform;
 mod platform {
     use super::{Rect, Shot};
     const MSG: &str = "reading the screen isn't supported on this platform";
+    pub(super) const CHEAP_AREAS: bool = false;
     pub(super) fn capture() -> Result<Shot, String> {
         Err(MSG.into())
     }
@@ -133,9 +135,20 @@ pub fn capture_fresh() -> Result<Arc<Shot>, String> {
     capture()
 }
 
+/// What's under a screen rectangle: captured on its own where that's cheap,
+/// otherwise cut from the shared desktop capture.
+fn area(rect: Rect) -> Result<Shot, String> {
+    if platform::CHEAP_AREAS
+        && let Some(shot) = platform::capture_area(rect, true)
+    {
+        return Ok(shot);
+    }
+    capture()?.crop(rect)
+}
+
 /// The color at screen point (`x`, `y`) as `#rrggbb`.
 pub fn pixel_color(x: f64, y: f64) -> Result<String, String> {
-    let shot = capture()?;
+    let shot = area(Rect { x, y, width: 1.0, height: 1.0 }).map_err(|_| format!("{x},{y} is off screen"))?;
     let (px, py) = shot.to_image(x, y);
     if px < 0 || py < 0 || px >= shot.image.width as i64 || py >= shot.image.height as i64 {
         return Err(format!("{x},{y} is off screen"));
@@ -145,7 +158,7 @@ pub fn pixel_color(x: f64, y: f64) -> Result<String, String> {
 
 /// The average color of a screen rectangle as `#rrggbb`.
 pub fn average_color(x: f64, y: f64, width: f64, height: f64) -> Result<String, String> {
-    let region = capture()?.region(x, y, width.max(1.0), height.max(1.0))?;
+    let region = area(Rect { x, y, width: width.max(1.0), height: height.max(1.0) })?.image;
     let mut sum = [0u64; 3];
     for px in region.rgba.chunks_exact(4) {
         for c in 0..3 {
@@ -158,8 +171,7 @@ pub fn average_color(x: f64, y: f64, width: f64, height: f64) -> Result<String, 
 
 /// Text read from a screen rectangle; an empty rectangle reads the whole screen.
 pub fn read_text(x: f64, y: f64, width: f64, height: f64) -> Result<String, String> {
-    let shot = capture()?;
-    let image = if width <= 0.0 || height <= 0.0 { shot.image.clone() } else { shot.region(x, y, width, height)? };
+    let image = if width <= 0.0 || height <= 0.0 { capture()?.image.clone() } else { area(Rect { x, y, width, height })?.image };
     ocr::read(&image)
 }
 

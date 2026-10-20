@@ -1,0 +1,3 @@
+# Block packs are hash-pinned in community/blocks/index.json, so their bytes
+# must not change with the checkout platform.
+community/blocks/** -text

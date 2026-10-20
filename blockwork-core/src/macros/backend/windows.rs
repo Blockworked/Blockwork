@@ -55,12 +55,36 @@ struct HookThreadState {
     /// a sentinel - a magic `i32::MIN` here previously caused an overflow
     /// panic on startup.
     last_cursor: Option<(i32, i32)>,
+    /// Wheel movement not yet reported, (horizontal, vertical), in
+    /// `WHEEL_DELTA` (120) units per notch. Touchpads and free-spinning
+    /// wheels send fractions of a notch, which add up here.
+    wheel_rest: (i32, i32),
 }
 
 impl Default for HookThreadState {
     fn default() -> Self {
-        Self { key_held: [false; 256], key_suppressed: [false; 256], last_cursor: None }
+        Self { key_held: [false; 256], key_suppressed: [false; 256], last_cursor: None, wheel_rest: (0, 0) }
     }
+}
+
+/// Pixel `offset` of `size` as SendInput's 0-65535 absolute units. Windows
+/// turns them back into pixels by truncating `units * size / 65536`, so
+/// round up to land on the pixel itself.
+fn normalize(offset: i32, size: i32) -> i32 {
+    let offset = offset.clamp(0, size - 1) as i64;
+    ((offset * 65536 + size as i64 - 1) / size as i64).min(65535) as i32
+}
+
+/// Whole notches in `rest + delta`, keeping the remainder in `rest`.
+fn wheel_notches(rest: &mut i32, delta: i16) -> i32 {
+    // A reversal drops what was left over the other way.
+    if (*rest > 0 && delta < 0) || (*rest < 0 && delta > 0) {
+        *rest = 0;
+    }
+    *rest += delta as i32;
+    let notches = *rest / 120;
+    *rest -= notches * 120;
+    notches
 }
 
 thread_local! {
@@ -231,10 +255,47 @@ impl InputBackend for WinApiBackend {
             .map_err(|e| e.to_string())
     }
 
+    /// enigo maps absolute moves onto the primary monitor, which rounds
+    /// points on monitors left of or above it off by a pixel. This maps them
+    /// onto the whole virtual desktop instead.
     fn move_mouse_abs(&mut self, x: i32, y: i32) -> Result<(), String> {
-        self.enigo
-            .move_mouse(x, y, enigo::Coordinate::Abs)
-            .map_err(|e| e.to_string())
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_MOVE, MOUSEEVENTF_VIRTUALDESK, MOUSEINPUT,
+            SendInput,
+        };
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+        };
+        // SAFETY: plain metrics queries.
+        let (vx, vy, vw, vh) = unsafe {
+            (
+                GetSystemMetrics(SM_XVIRTUALSCREEN),
+                GetSystemMetrics(SM_YVIRTUALSCREEN),
+                GetSystemMetrics(SM_CXVIRTUALSCREEN),
+                GetSystemMetrics(SM_CYVIRTUALSCREEN),
+            )
+        };
+        if vw < 2 || vh < 2 {
+            return self.enigo.move_mouse(x, y, enigo::Coordinate::Abs).map_err(|e| e.to_string());
+        }
+        let input = INPUT {
+            r#type: INPUT_MOUSE,
+            Anonymous: INPUT_0 {
+                mi: MOUSEINPUT {
+                    dx: normalize(x - vx, vw),
+                    dy: normalize(y - vy, vh),
+                    mouseData: 0,
+                    dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        };
+        // SAFETY: one INPUT, its size passed alongside.
+        if unsafe { SendInput(1, &input, std::mem::size_of::<INPUT>() as i32) } != 1 {
+            return Err("Windows blocked the mouse move (is a program running as administrator focused?)".into());
+        }
+        Ok(())
     }
 
     fn scroll(&mut self, amount: i32, axis: Axis) -> Result<(), String> {
@@ -483,8 +544,14 @@ unsafe extern "system" fn mouse_proc(
             WM_MBUTTONUP => Some(CaptureEvent::ButtonRelease(MacroButton::Middle)),
             WM_XBUTTONDOWN => xbutton(high_word).map(CaptureEvent::ButtonPress),
             WM_XBUTTONUP => xbutton(high_word).map(CaptureEvent::ButtonRelease),
-            WM_MOUSEWHEEL => Some(CaptureEvent::Scroll(0, high_word as i32 / 120)),
-            WM_MOUSEHWHEEL => Some(CaptureEvent::Scroll(high_word as i32 / 120, 0)),
+            WM_MOUSEWHEEL => {
+                let notches = HOOK_STATE.with_borrow_mut(|s| wheel_notches(&mut s.wheel_rest.1, high_word));
+                (notches != 0).then_some(CaptureEvent::Scroll(0, notches))
+            }
+            WM_MOUSEHWHEEL => {
+                let notches = HOOK_STATE.with_borrow_mut(|s| wheel_notches(&mut s.wheel_rest.0, high_word));
+                (notches != 0).then_some(CaptureEvent::Scroll(notches, 0))
+            }
             _ => None,
         };
 
@@ -624,5 +691,34 @@ pub fn prepare_for_macro_execution(backend: &Arc<Mutex<dyn InputBackend>>) {
         if unsafe { GetAsyncKeyState(vk as i32) } < 0 {
             let _ = backend.raw_keycode(vk, Direction::Release);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{normalize, wheel_notches};
+
+    #[test]
+    fn wheel_fractions_add_up_to_notches() {
+        let mut rest = 0;
+        assert_eq!(wheel_notches(&mut rest, 240), 2);
+        assert_eq!([30, 30, 30, 30].map(|d| wheel_notches(&mut rest, d)), [0, 0, 0, 1]);
+        assert_eq!(wheel_notches(&mut rest, 90), 0);
+        // Turning back starts over instead of cancelling the 90 first.
+        assert_eq!(wheel_notches(&mut rest, -120), -1);
+        assert_eq!(rest, 0);
+    }
+
+    #[test]
+    fn absolute_moves_land_on_the_pixel() {
+        // What Windows does with the units: truncate back to a pixel.
+        let back = |units: i32, size: i32| (units as i64 * size as i64 / 65536) as i32;
+        for size in [2, 1080, 1707, 6400] {
+            for offset in 0..size {
+                assert_eq!(back(normalize(offset, size), size), offset, "{offset} of {size}");
+            }
+        }
+        assert_eq!(normalize(-5, 100), 0);
+        assert_eq!(normalize(500, 100), normalize(99, 100));
     }
 }

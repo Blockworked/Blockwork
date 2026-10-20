@@ -1,25 +1,11 @@
 name := "blockwork"
 appid := "com.blockworked.Blockwork"
 
-set allow-duplicate-variables
-
-[unix]
 set shell := ["sh", "-cu"]
+set windows-shell := ["cmd.exe", "/Q", "/C"]
 
-[windows]
-set shell := ["cmd.exe", "/Q", "/C"]
-
-[unix]
-TARGET := "target/release/blockwork"
-
-[windows]
-TARGET := "target/release/blockwork.exe"
-
-[unix]
-DAEMON := "target/release/blockwork-daemon"
-
-[windows]
-DAEMON := "target/release/blockwork-daemon.exe"
+TARGET := if os() == "windows" { 'target\release\blockwork.exe' } else { "target/release/blockwork" }
+DAEMON := if os() == "windows" { 'target\release\blockwork-daemon.exe' } else { "target/release/blockwork-daemon" }
 
 LIBDIR := "/usr/lib/blockwork"
 
@@ -34,8 +20,15 @@ default: build
 build *args:
     cargo build --release --workspace --exclude blockwork-linux-bridge {{args}}
 
+[unix]
 run: build
-    {{TARGET}}
+    "{{TARGET}}"
+
+# Stage the Qt DLLs and QML plugins beside both executables before launching.
+[windows]
+run: build
+    pwsh -NoProfile -File scripts/deploy-qt-windows.ps1 -ReleaseDirectory target/release -Destination dist/windows-local
+    dist\windows-local\blockwork.exe
 
 test:
     cargo test --workspace --exclude blockwork-linux-bridge
@@ -65,7 +58,7 @@ blockstitch-published commit="":
     cargo fetch
 
 [linux]
-install:
+install: build
     sudo install -Dm0755 {{TARGET}} {{LIBDIR}}/blockwork
     sudo install -Dm0755 {{DAEMON}} {{LIBDIR}}/blockwork-daemon
     sudo ln -sf {{LIBDIR}}/blockwork /usr/bin/blockwork
@@ -78,16 +71,14 @@ uninstall:
     sudo rm -f /usr/bin/blockwork /usr/share/applications/blockwork.desktop /usr/share/icons/hicolor/256x256/apps/blockwork.png
 
 [windows]
-install:
-    @echo "Windows installs go through the MSIX - see just msix-install."
+install: msix-install
 
 [windows]
 uninstall:
     @echo "Windows uninstalls remove the MSIX package under Settings - Apps."
 
 [macos]
-install:
-    @echo "macOS installs go through the app bundle - see just macos-install."
+install: macos-install
 
 [macos]
 uninstall:

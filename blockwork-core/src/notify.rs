@@ -51,12 +51,16 @@ pub fn show(title: &str, message: &str) -> Result<(), String> {
         xml(title),
         xml(message)
     );
-    std::process::Command::new("powershell")
+    let out = std::process::Command::new("powershell")
         .args(["-NoProfile", "-NonInteractive", "-Command", &script])
         .creation_flags(CREATE_NO_WINDOW)
-        .status()
-        .map_err(|e| format!("couldn't show notification: {e}"))
-        .map(|_| ())
+        .output()
+        .map_err(|e| format!("couldn't show notification: {e}"))?;
+    if !out.status.success() {
+        let err = String::from_utf8_lossy(&out.stderr);
+        return Err(format!("couldn't show notification: {}", err.lines().next().unwrap_or("PowerShell failed").trim()));
+    }
+    Ok(())
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]

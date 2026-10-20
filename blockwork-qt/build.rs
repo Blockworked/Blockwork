@@ -4,6 +4,8 @@ use qt_build_utils::{QResource, QResourceFile, QResources};
 fn main() {
     #[cfg(windows)]
     {
+        // Native snap styles in src/window_frame.cpp.
+        println!("cargo:rustc-link-lib=user32");
         // Explorer, taskbar grouping and the installer pick the exe's embedded
         // icon; the runtime title-bar/taskbar icon is set separately in
         // src/app_icon.cpp from the Qt resource below.

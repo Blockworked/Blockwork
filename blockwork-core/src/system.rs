@@ -330,10 +330,11 @@ pub fn usb_devices() -> Result<Vec<UsbDevice>, String> {
 #[cfg(windows)]
 pub fn usb_devices() -> Result<Vec<UsbDevice>, String> {
     use windows_sys::Win32::Devices::DeviceAndDriverInstallation::{
-        DIGCF_ALLCLASSES, DIGCF_PRESENT, SP_DEVINFO_DATA, SPDRP_DEVICEDESC, SPDRP_FRIENDLYNAME, SPDRP_MFG,
-        SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInfo, SetupDiGetClassDevsW, SetupDiGetDeviceInstanceIdW,
-        SetupDiGetDeviceRegistryPropertyW,
+        DIGCF_ALLCLASSES, DIGCF_PRESENT, SP_DEVINFO_DATA, SPDRP_COMPATIBLEIDS, SPDRP_DEVICEDESC, SPDRP_FRIENDLYNAME,
+        SPDRP_MFG, SPDRP_SERVICE, SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInfo, SetupDiGetClassDevsW,
+        SetupDiGetDeviceInstanceIdW, SetupDiGetDevicePropertyW, SetupDiGetDeviceRegistryPropertyW,
     };
+    use windows_sys::Win32::Devices::Properties::DEVPKEY_Device_BusReportedDeviceDesc;
     use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
 
     let from_wide = |buf: &[u16]| String::from_utf16_lossy(&buf[..buf.iter().position(|&c| c == 0).unwrap_or(buf.len())]);
@@ -362,15 +363,35 @@ pub fn usb_devices() -> Result<Vec<UsbDevice>, String> {
             if upper.contains("ROOT_HUB") || upper.contains("&MI_") {
                 continue;
             }
-            let property = |key| {
-                let mut buf = [0u16; 512];
+            let raw_property = |key| {
+                let mut buf = [0u16; 1024];
                 let ok = SetupDiGetDeviceRegistryPropertyW(list, &info, key, std::ptr::null_mut(), buf.as_mut_ptr().cast(), (buf.len() * 2) as u32, std::ptr::null_mut());
+                (ok != 0).then_some(buf)
+            };
+            let property = |key| raw_property(key).map(|buf| from_wide(&buf)).unwrap_or_default();
+            // Hubs: class 09, or USB\USB20_HUB style ids on the USB 3 stack,
+            // or the hub driver. Compatible ids are a list of strings.
+            let is_hub = raw_property(SPDRP_COMPATIBLEIDS).is_some_and(|buf| {
+                String::from_utf16_lossy(&buf).split('\0').map(str::to_uppercase).any(|id| id == "USB\\CLASS_09" || id.ends_with("_HUB"))
+            }) || property(SPDRP_SERVICE).to_lowercase().starts_with("usbhub");
+            if is_hub {
+                continue;
+            }
+            // The product string the device reports itself; the driver's
+            // name is often just "USB Composite Device".
+            let reported = {
+                let mut buf = [0u16; 512];
+                let mut kind = 0u32;
+                let ok = SetupDiGetDevicePropertyW(list, &info, &DEVPKEY_Device_BusReportedDeviceDesc, &mut kind, buf.as_mut_ptr().cast(), (buf.len() * 2) as u32, std::ptr::null_mut(), 0);
                 if ok == 0 { String::new() } else { from_wide(&buf) }
             };
             let hex_after = |tag: &str| {
                 upper.find(tag).and_then(|at| u32::from_str_radix(upper.get(at + tag.len()..at + tag.len() + 4)?, 16).ok()).unwrap_or(0)
             };
-            let product = Some(property(SPDRP_FRIENDLYNAME)).filter(|p| !p.is_empty()).unwrap_or_else(|| property(SPDRP_DEVICEDESC));
+            let product = [reported, property(SPDRP_FRIENDLYNAME), property(SPDRP_DEVICEDESC)]
+                .into_iter()
+                .find(|p| !p.trim().is_empty())
+                .unwrap_or_default();
             let maker = property(SPDRP_MFG);
             // "(Standard USB Host Controller)" style makers say nothing.
             let maker = if maker.starts_with('(') { String::new() } else { maker };

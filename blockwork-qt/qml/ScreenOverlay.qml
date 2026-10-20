@@ -35,9 +35,14 @@ Item {
     function end() { active = false; }
 
     // Screen coordinates from a point on one overlay. X11 captures native
-    // pixels; elsewhere screen coordinates are Qt's own logical ones.
+    // pixels. So does Windows (the daemon is per-monitor DPI aware), but Qt
+    // keeps each screen's top-left there in native pixels and only scales
+    // what's inside it. Elsewhere screen coordinates are Qt's own logical ones.
     function toScreen(screenInfo, lx, ly) {
-        const f = Qt.platform.pluginName === "xcb" ? screenInfo.devicePixelRatio : 1;
+        const plugin = Qt.platform.pluginName;
+        const f = plugin === "xcb" || plugin === "windows" ? screenInfo.devicePixelRatio : 1;
+        if (plugin === "windows")
+            return { x: screenInfo.virtualX + lx * f, y: screenInfo.virtualY + ly * f, f: f };
         return { x: (screenInfo.virtualX + lx) * f, y: (screenInfo.virtualY + ly) * f, f: f };
     }
     function finish(screenInfo, lx, ly, w, h) {

@@ -35,6 +35,15 @@ ApplicationWindow {
     Component.onCompleted: {
         raise(); requestActivate(); if (kind === "text") field.forceActiveFocus();
     }
+    // The daemon starts dialogs in the background, where some systems
+    // (Windows) won't let them take focus by asking; keep pulling until it's ours.
+    Timer {
+        property int tries: 0
+        interval: 100
+        repeat: true
+        running: !root.active && tries < 20
+        onTriggered: { tries++; bridge.bringToFront(); }
+    }
     // Permission questions are worded here so they follow the UI language.
     readonly property string message: {
         if (kind !== "permission" || !request.ability) return request.message || "";
