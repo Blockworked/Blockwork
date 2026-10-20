@@ -2718,6 +2718,7 @@ checksum = "4050469837a6ff301cd14c1f8f24f88549e6d548f24f64e2148eb0f72cebc51f"
 [[package]]
 name = "lucide-qt"
 version = "0.1.0"
+source = "git+https://github.com/Blockworked/lucide-qt?tag=v0.1.0#c5a4699ad6c59dfdcfd40b0c2ebbd8b9ccad925c"
 
 [[package]]
 name = "mach2"

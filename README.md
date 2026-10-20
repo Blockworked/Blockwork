@@ -7,12 +7,11 @@ and running macros on Windows, Linux, and macOS.
 
 ### Build
 ```bash
-git clone https://github.com/Blockworked/lucide-qt.git lucide-qt
 git clone https://github.com/Blockworked/blockwork.git Blockwork && cd Blockwork
 just
 ```
 
-Keep Lucide Qt beside Blockwork. The Blockstitch core and native QML frontend
+Cargo fetches the Lucide icons (`lucide-qt`) from its tagged release. The Blockstitch core and native QML frontend
 are fetched from the same pinned Git revision, so their APIs stay in sync.
 The build uses an installed Qt 6 when one is available; otherwise CXX-Qt's Qt
 Minimal integration downloads the required Qt SDK. Release packaging uses
