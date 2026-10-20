@@ -8,8 +8,6 @@ Item {
     id: root
     required property var appState
     required property var invoke
-    // Shared import/export flow (MacroFiles in Main.qml).
-    property var macroFiles: null
     property var translator: null
     function capturingBinding(index){return appState.combo_capture&&appState.combo_capture.kind==="Binding"&&appState.combo_capture.binding_index===index}
     function capturingAction(action){return appState.combo_capture&&appState.combo_capture.kind==="Named"&&JSON.stringify(appState.combo_capture.action)===JSON.stringify(action)}
@@ -34,7 +32,7 @@ Item {
                 id: textCol
                 anchors.left: parent.left; anchors.right: ctl.left; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 2
                 Text { width: parent.width; text: row.title; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight }
-                Text { width: parent.width; visible: row.detail !== ""; text: row.detail; color: "#9fa0a6"; font.pixelSize: 12; wrapMode: Text.WordWrap }
+                Text { width: parent.width; visible: row.detail !== ""; text: row.detail; textFormat: Text.PlainText; color: "#9fa0a6"; font.pixelSize: 12; wrapMode: Text.WordWrap }
             },
             Row { id: ctl; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 8 }
         ]
@@ -117,6 +115,7 @@ Item {
                             }
                             SettingsRow { title: qsTr("Language"); detail: qsTr("The language of the editor and macro dialogs. Run log messages stay in English.")
                                 BwComboBox {
+                                    id: languageBox
                                     // Every built-in translation, in its own name so it's findable in any language.
                                     readonly property var languages: [{ id: "", text: qsTr("System default") }, { id: "en", text: "English" }]
                                         .concat((root.translator ? root.translator.languages() : []).filter(c => c !== "en")
@@ -124,6 +123,17 @@ Item {
                                     model: languages; textRole: "text"; implicitWidth: 210
                                     currentIndex: Math.max(0, languages.findIndex(l => l.id === (appState.language || "")))
                                     onActivated: index => root.invoke("set_language", { language: languages[index].id })
+                                    // Text follows its own direction by default, which right-aligns
+                                    // Arabic and Hebrew names; keep every name lined up on the left.
+                                    contentItem: Text { text: languageBox.displayText; color: languageBox.enabled ? Theme.text : Theme.textDim; font: languageBox.font; verticalAlignment: Text.AlignVCenter; horizontalAlignment: Text.AlignLeft; elide: Text.ElideRight }
+                                    delegate: ItemDelegate {
+                                        required property var modelData
+                                        required property int index
+                                        width: ListView.view.width; implicitHeight: 32; highlighted: languageBox.highlightedIndex === index
+                                        HoverHandler { cursorShape: Qt.PointingHandCursor }
+                                        contentItem: Text { text: modelData.text; color: Theme.text; font: languageBox.font; verticalAlignment: Text.AlignVCenter; horizontalAlignment: Text.AlignLeft }
+                                        background: Rectangle { radius: 4; color: parent.highlighted ? "#424348" : "transparent" }
+                                    }
                                 }
                             }
                             SettingsRow { title: root.updateTitle(); detail: root.updateDetail()
@@ -149,8 +159,6 @@ Item {
                             }
                             Rectangle { Layout.fillWidth: true; Layout.topMargin: 8; height: 1; color: "#3a3b3f" }
                             RowLayout { Layout.fillWidth: true; Layout.topMargin: 16; spacing: 8
-                                BwButton { iconName: "download"; text: qsTr("Import macro..."); onClicked: root.macroFiles.importMacro() }
-                                BwButton { iconName: "upload"; text: qsTr("Export macro..."); enabled: !!appState.current_macro; onClicked: root.macroFiles.exportMacro(appState.current_macro.id) }
                                 BwButton { iconName: "play"; text: qsTr("Replay welcome tour"); onClicked: root.invoke("set_onboarding_done", { done: false }) }
                                 Item { Layout.fillWidth: true }
                             }
@@ -194,7 +202,7 @@ Item {
                                     required property var modelData
                                     required property int index
                                     first: index === 0
-                                    title: modelData.macro_name || "Macro"
+                                    title: modelData.macro_name || qsTr("Macro")
                                     readonly property bool capturing: root.capturingBinding(modelData.binding_index)
                                     BwButton {
                                         text: macroRow.capturing ? qsTr("Press shortcut...") : macroRow.modelData.combo_display
@@ -250,7 +258,7 @@ Item {
                                 }
                             }
                             RowLayout { Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 14; spacing: 8
-                                BwTextField { id: librarySource; Layout.fillWidth: true; placeholderText: qsTr("https://example.com/blocks/index.json") }
+                                BwTextField { id: librarySource; Layout.fillWidth: true; placeholderText: "https://example.com/blocks/index.json" }
                                 BwButton {
                                     iconName: "plus"; text: qsTr("Add library"); enabled: librarySource.text.trim() !== ""
                                     onClicked: { root.invoke("add_block_library_source", { url: librarySource.text.trim() }); librarySource.text = ""; }
@@ -363,7 +371,7 @@ Item {
         return u.error || qsTr("Check for a new release of Blockwork.");
     }
 
-    BwDialog {
+    AppDialog {
         id: secretDialog
         property string editing: ""
         title: editing ? qsTr("Change \"%1\"").arg(editing) : qsTr("Add a secret")

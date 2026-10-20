@@ -3,7 +3,7 @@ import QtQuick.Controls
 import QtQuick.Layouts
 import com.blockworked.Blockstitch 1.0
 
-BwDialog {
+AppDialog {
     id: root
     title: qsTr("Choose an App")
     width: 640

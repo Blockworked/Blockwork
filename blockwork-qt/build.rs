@@ -32,6 +32,7 @@ fn main() {
         "qml/MacroFiles.qml",
         "qml/PromptWindow.qml",
         "qml/BlockLibrary.qml",
+        "qml/AppDialog.qml",
     ];
 
     // Shared Lucide icons (lean set): staged under qml/Lucide/ (gitignored,

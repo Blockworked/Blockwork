@@ -9,6 +9,7 @@
 namespace {
 QPointer<QQmlEngine> uiEngine;
 QTranslator *active = nullptr;
+QTranslator *english = nullptr;
 }
 
 void blockwork_set_qml_engine(QQmlEngine &engine)
@@ -18,10 +19,19 @@ void blockwork_set_qml_engine(QQmlEngine &engine)
 
 bool blockwork_set_language(const QString &code)
 {
-    const QString name = code.isEmpty() ? QLocale::system().name() : code;
+    // Untranslated plural messages must still use English singular/plural
+    // forms, even for an unsupported system locale (including the C locale).
+    if (!english) {
+        english = new QTranslator(QCoreApplication::instance());
+        if (english->load(QStringLiteral("qml_en"), QStringLiteral(":/i18n")))
+            QCoreApplication::installTranslator(english);
+    }
     auto *next = new QTranslator(QCoreApplication::instance());
-    // Falls back from qml_de_DE to qml_de.
-    const bool found = next->load(QStringLiteral("qml_") + name, QStringLiteral(":/i18n"));
+    // Locale-aware lookup also finds script catalogs such as zh_Hans for zh_CN.
+    // Explicit codes include custom languages such as "pirate".
+    const bool found = code.isEmpty()
+        ? next->load(QLocale::system(), QStringLiteral("qml"), QStringLiteral("_"), QStringLiteral(":/i18n"))
+        : next->load(QStringLiteral("qml_") + code, QStringLiteral(":/i18n"));
     if (active) {
         QCoreApplication::removeTranslator(active);
         active->deleteLater();

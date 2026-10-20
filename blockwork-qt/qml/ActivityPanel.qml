@@ -71,7 +71,9 @@ Rectangle {
     function statusText() {
         if (running) return qsTr("Running - %1").arg(elapsed(lastRunEvent.time_ms));
         if (!latest) return qsTr("No activity yet");
-        return (latest.level === "Error" ? qsTr("Error: ") : "") + latest.message.split("\n")[0] + "  -  " + ago(latest.time_ms);
+        const message = latest.message.split("\n")[0];
+        const summary = latest.level === "Error" ? qsTr("Error: %1").arg(message) : message;
+        return qsTr("%1 - %2", "log message and relative time").arg(summary).arg(ago(latest.time_ms));
     }
 
     // Drag the top edge to resize while open.

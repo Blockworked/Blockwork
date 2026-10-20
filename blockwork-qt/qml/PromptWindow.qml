@@ -14,7 +14,7 @@ ApplicationWindow {
     height: Math.min(560, content.implicitHeight + 40)
     minimumWidth: 320
     visible: true
-    title: kind === "permission" ? qsTr("Blockwork permission") : (request.title || qsTr("Blockwork"))
+    title: kind === "permission" ? qsTr("Blockwork permission") : (request.title || "Blockwork")
     flags: Qt.Dialog | Qt.WindowStaysOnTopHint
     color: Theme.panel
     palette {

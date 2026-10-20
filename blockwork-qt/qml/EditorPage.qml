@@ -409,7 +409,7 @@ Item {
                     id: libraryButton
                     Layout.preferredWidth: Math.max(110, Math.min(240, toolbar.width * 0.2)); Layout.preferredHeight: 34
                     radius: Theme.radius; color: libraryHover.hovered ? "#3b3c40" : Theme.panelRaised; border.color: library.visible ? Theme.accent : Theme.border
-                    Accessible.role: Accessible.Button; Accessible.name: "Macro library"
+                    Accessible.role: Accessible.Button; Accessible.name: qsTr("Macro library")
                     RowLayout {
                         anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 8; spacing: 7
                         LucideIcon { name: "blocks"; width: 15; height: 15; color: Theme.textDim }
@@ -541,7 +541,7 @@ Item {
                     Text {
                         Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 13
                         text: debugBar.strand
-                            ? (debugBar.paused.length > 1 ? qsTr("Paused before \"%1\" (%2 strands waiting)").arg(root.blockLabel(debugBar.strand.block_id)).arg(debugBar.paused.length)
+                            ? (debugBar.paused.length > 1 ? qsTr("Paused before \"%1\" (%n strand(s) waiting)", "", debugBar.paused.length).arg(root.blockLabel(debugBar.strand.block_id))
                                  : qsTr("Paused before \"%1\"").arg(root.blockLabel(debugBar.strand.block_id)))
                             : debugBar.isPaused ? qsTr("Pausing at the next block...") : qsTr("Running")
                         HoverHandler { cursorShape: debugBar.strand ? Qt.PointingHandCursor : Qt.ArrowCursor }
@@ -735,19 +735,19 @@ Item {
         }
     }
 
-    BwDialog {
+    AppDialog {
         id: deleteMacroDialog; title: qsTr("Delete macro?"); standardButtons: Dialog.Yes | Dialog.Cancel
         property string macroId: ""
         property string macroName: ""
         Text { text: qsTr("This removes \"%1\" from Blockwork.").arg(deleteMacroDialog.macroName); color: "#e7e7e8" }
         onAccepted: root.invoke("delete_macro", { id: macroId })
     }
-    BwDialog {
+    AppDialog {
         id: removeDialog; title: qsTr("Delete macro?"); standardButtons: Dialog.Yes | Dialog.Cancel
         Text { text: qsTr("This removes the selected macro from Blockwork."); color: "#e7e7e8" }
         onAccepted: root.invoke("remove_macro")
     }
-    BwDialog {
+    AppDialog {
         id: macroSettings; title: qsTr("Macro settings"); standardButtons: Dialog.Close
         readonly property var settings: root.macro && root.macro.settings ? root.macro.settings : ({})
         function saveConditions(days) {
@@ -772,9 +772,9 @@ Item {
                     handle: Rectangle { x: speed.leftPadding + speed.visualPosition * (speed.availableWidth - width); y: speed.topPadding + speed.availableHeight / 2 - height / 2; width: 16; height: 16; radius: 8; color: "white"; border.width: 2; border.color: Theme.accent }
                 }
                 BwTextField { text: Number(speed.value).toFixed(2); Layout.preferredWidth: 62; horizontalAlignment: Text.AlignRight; onEditingFinished: root.invoke("set_macro_speed_multiplier", { multiplier: Number(text) }) }
-                Text { text: qsTr("x"); color: "#a1a2a7" }
+                Text { text: "×"; color: "#a1a2a7" }
             }
-            BwSwitch { Accessible.name: "Listen for triggers while Blockwork is open"; checked: root.macro && root.macro.settings ? root.macro.settings.always_listen : false; onToggled: checked => root.invoke("set_macro_always_listen", { enabled: checked }) }
+            BwSwitch { Accessible.name: qsTr("Listen for triggers while Blockwork is open"); checked: root.macro && root.macro.settings ? root.macro.settings.always_listen : false; onToggled: checked => root.invoke("set_macro_always_listen", { enabled: checked }) }
             Text { text: qsTr("Time limit"); color: "#a1a2a7"; font.pixelSize: 13 }
             RowLayout { width: parent.width; spacing: 10
                 Text { text: qsTr("Stop a run after"); color: Theme.text; font.pixelSize: 13 }
@@ -863,7 +863,7 @@ Item {
             }
             Text { text: qsTr("Schedules"); color: "#a1a2a7"; font.pixelSize: 13 }
             BwSwitch {
-                Accessible.name: "Catch up on missed schedules"
+                Accessible.name: qsTr("Catch up on missed schedules")
                 checked: !!macroSettings.settings.catch_up_missed
                 onToggled: checked => root.invoke("set_macro_catch_up", { enabled: checked })
             }
@@ -873,7 +873,7 @@ Item {
             }
             Text { text: qsTr("Permissions"); color: "#a1a2a7"; font.pixelSize: 13 }
             BwSwitch {
-                Accessible.name: "Ask before risky actions"
+                Accessible.name: qsTr("Ask before risky actions")
                 checked: root.permissions !== null
                 onToggled: checked => root.invoke("set_macro_restricted", { restricted: checked })
             }
@@ -895,13 +895,13 @@ Item {
         }
         }
     }
-    BwDialog {
+    AppDialog {
         id: pickError; title: qsTr("Couldn't read the screen"); standardButtons: Dialog.Ok
         property string message: ""
         function show(text) { message = text || qsTr("Unknown error"); open(); }
         Text { width: 420; wrapMode: Text.WordWrap; text: pickError.message; color: Theme.text; font.pixelSize: 13 }
     }
-    BwDialog {
+    AppDialog {
         id: pickResult; title: qsTr("Picked from the screen"); standardButtons: Dialog.Close
         property var pick: null
         readonly property bool region: !!pick && pick.width > 0 && pick.height > 0
@@ -945,13 +945,13 @@ Item {
             }
         }
     }
-    BwDialog {
+    AppDialog {
         id: imageFileDialog; title: qsTr("Use an image file"); standardButtons: Dialog.Ok | Dialog.Cancel
         property var request: null
         function openFor(req) { request = req; imagePath.text = ""; open(); imagePath.forceActiveFocus(); }
         Column { width: 420; spacing: 8
             Text { text: qsTr("Path to a PNG image"); color: Theme.text }
-            BwTextField { id: imagePath; width: parent.width; placeholderText: qsTr("~/Pictures/button.png"); onAccepted: imageFileDialog.accept() }
+            BwTextField { id: imagePath; width: parent.width; placeholderText: "~/Pictures/button.png"; onAccepted: imageFileDialog.accept() }
         }
         onAccepted: {
             const req = request;
@@ -960,7 +960,7 @@ Item {
             });
         }
     }
-    BwDialog {
+    AppDialog {
         id: modelDialog; title: qsTr("Choose a detection model"); standardButtons: Dialog.Cancel
         property var request: null
         property var models: []
@@ -1018,7 +1018,7 @@ Item {
             root.daemonCall("import_model", { path: path }, (id, error) => { if (id) modelDialog.use(id); else pickError.show(error); });
         }
     }
-    BwDialog {
+    AppDialog {
         id: templateDialog; title: qsTr("Start from a template"); standardButtons: Dialog.Cancel
         width: Math.min(604, parent.width - 32)
         height: Math.min(implicitHeight, parent.height - 32)
@@ -1036,15 +1036,15 @@ Item {
             }
         }
     }
-    BwDialog {
+    AppDialog {
         id: recordingSettings; title: qsTr("Recording settings"); standardButtons: Dialog.Close
         Column { spacing: 14; width: 390
-            BwSwitch { Accessible.name: "Record mouse movement"; checked: appState.record_mouse_movement; onToggled: checked => root.invoke("toggle_record_mouse_movement", { enabled: checked }) }
-            BwSwitch { Accessible.name: "Use relative mouse movement"; checked: appState.record_mouse_relative; onToggled: checked => root.invoke("toggle_record_mouse_relative", { relative: checked }) }
+            BwSwitch { Accessible.name: qsTr("Record mouse movement"); checked: appState.record_mouse_movement; onToggled: checked => root.invoke("toggle_record_mouse_movement", { enabled: checked }) }
+            BwSwitch { Accessible.name: qsTr("Use relative mouse movement"); checked: appState.record_mouse_relative; onToggled: checked => root.invoke("toggle_record_mouse_relative", { relative: checked }) }
             Text { width: parent.width; wrapMode: Text.WordWrap; text: appState.absolute_mouse_position_available ? qsTr("Absolute positioning is available on this system.") : qsTr("Absolute positioning is unavailable; relative movement will be used."); color: "#9fa0a6"; font.pixelSize: 12 }
         }
     }
-    BwDialog {
+    AppDialog {
         id: variableDialog
         property string renameTarget: ""
         title: renameTarget.length ? qsTr("Rename Variable") : qsTr("Make a Variable")
@@ -1064,7 +1064,7 @@ Item {
             renameTarget = ""; variableName.clear();
         }
     }
-    BwDialog {
+    AppDialog {
         id: listDialog
         property string renameTarget: ""
         title: renameTarget.length ? qsTr("Rename List") : qsTr("Make a List")
@@ -1083,14 +1083,14 @@ Item {
             renameTarget = ""; listName.clear();
         }
     }
-    BwDialog {
+    AppDialog {
         id: deleteListDialog
         title: qsTr("Delete list?"); standardButtons: Dialog.Yes | Dialog.Cancel
         property string listName: ""
         Text { text: qsTr("Delete \"%1\" and its saved items?").arg(deleteListDialog.listName); color: "#e7e7e8" }
         onAccepted: root.invoke("delete_list", { name: listName })
     }
-    BwDialog {
+    AppDialog {
         id:detailsDialog;standardButtons:Dialog.NoButton;width:430;padding:0;topPadding:0;bottomPadding:0;showClose:false
         property string detailName:"";property string detailIdentifier:"";property string detailExplainer:""
         function show(name,identifier,explainer){detailName=name;detailIdentifier=identifier;detailExplainer=explainer;open()}
@@ -1236,6 +1236,7 @@ Item {
                 enumArg: { index: 0, options: root.choices([["year", qsTr("year")], ["month", qsTr("month")], ["day", qsTr("day")], ["hour", qsTr("hour")], ["minute", qsTr("minute")], ["second", qsTr("second")], ["weekday", qsTr("weekday")]]) } }
         });
         BlockRegistry.registerRows({
+            WhenRan: { shape: "header", icon: "play", head: [label(qsTr("WHEN RUN"))] },
             WhenAt: { shape: "header", icon: "clock", head: [label(qsTr("ONCE AT")), value("AtTime", "at")] },
             WhenSignal: { shape: "header", icon: "corner-down-right", head: [label(qsTr("WHEN I RECEIVE")), value("SignalName", "name")] },
             WhenWebhook: { shape: "header", icon: "link", head: [label(qsTr("WHEN WEBHOOK")), value("WebhookPath", "path"), label(qsTr("IS CALLED, BODY IN")),
@@ -1299,7 +1300,7 @@ Item {
             Retry: { icon: "refresh-cw", mouths: ["body"], head: [label(qsTr("try up to")), value("RetryCount", "count"), label(qsTr("times,")),
                 value("RetryDelay", "delay"), label(qsTr("ms apart"))] },
             WindowAction: { icon: "app-window", head: [
-                { kind: "dropdown", key: "action", options: ["Focus", "Minimize", "Maximize", "Restore", "Close"].map(a => ({ value: a, label: a.toLowerCase() })) },
+                { kind: "dropdown", key: "action", options: root.choices([["Focus", qsTr("focus")], ["Minimize", qsTr("minimize")], ["Maximize", qsTr("maximize")], ["Restore", qsTr("restore")], ["Close", qsTr("close")]]) },
                 { kind: "dropdown", key: "by", options: root.windowMatchOptions }, value("WindowPattern", "pattern")] },
             MoveWindow: { icon: "move", head: [
                 { kind: "dropdown", key: "resize", options: [{ value: "move", label: qsTr("move") }, { value: "resize", label: qsTr("resize") }],
@@ -1356,10 +1357,10 @@ Item {
             WhenSignal: { name: textValue("go") },
             WhenWebhook: () => ({ path: textValue("hello"), variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
             SendSignal: { name: textValue("go"), wait: true },
-            AskText: () => ({ prompt: textValue("What's your name?"), default: textValue(""), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
-            AskYesNo: () => ({ prompt: textValue("Continue?"), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
-            AskChoice: () => ({ prompt: textValue("Pick one"), list: root.firstListName(), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
-            ShowMessage: { message: textValue("Done!") },
+            AskText: () => ({ prompt: textValue(qsTr("What's your name?")), default: textValue(""), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
+            AskYesNo: () => ({ prompt: textValue(qsTr("Continue?")), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
+            AskChoice: () => ({ prompt: textValue(qsTr("Pick one")), list: root.firstListName(), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
+            ShowMessage: { message: textValue(qsTr("Done!")) },
             WhenWindow: { pattern: textValue("Firefox"), focused: true },
             WhenFileChanged: { path: textValue("~/notes.txt") },
             WhenTyped: { text: textValue(";addr"), erase: true },
@@ -1371,15 +1372,15 @@ Item {
             WhenUsb: { pattern: textValue(""), connected: true },
             WhenMouseButton: { button: "Back", pressed: true, modifiers: textValue("") },
             SplitIntoList: () => ({ text: textValue("a,b,c"), separator: textValue(","), name: root.firstListName() }),
-            PasteText: { text: textValue("Hello!") },
+            PasteText: { text: textValue(qsTr("Hello!")) },
             WithLock: { name: textValue("keyboard"), body: [] },
             WriteFile: { path: textValue("~/notes.txt"), text: textValue("hello"), append: true },
             HttpRequest: () => ({ method: "GET", url: textValue("https://example.com"), body: textValue(""), headers: textValue(""),
                 variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
-            Notify: { title: textValue("Blockwork"), message: textValue("Done!") },
-            Log: { value: textValue("checkpoint") },
+            Notify: { title: textValue("Blockwork"), message: textValue(qsTr("Done!")) },
+            Log: { value: textValue(qsTr("checkpoint")) },
             TryCatch: { body: [], catch_body: [] },
-            ThrowError: { message: textValue("something went wrong") },
+            ThrowError: { message: textValue(qsTr("something went wrong")) },
             StopMacro: {},
             Retry: { count: numberValue(3), delay: numberValue(1000), body: [] },
             WindowAction: { action: "Focus", by: "Title", pattern: textValue("Firefox") },

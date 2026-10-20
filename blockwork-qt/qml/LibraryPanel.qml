@@ -95,7 +95,7 @@ Popup {
                     Text {
                         Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 13
                         font.weight: row.isFolder || row.current ? Font.DemiBold : Font.Normal
-                        text: row.isFolder ? row.modelData.name : (row.entry.name || "Untitled")
+                        text: row.isFolder ? row.modelData.name : (row.entry.name || qsTr("Untitled"))
                     }
                     Text { visible: row.isFolder; text: row.modelData.count || ""; color: Theme.textDim; font.pixelSize: 11 }
                     Rectangle {
@@ -174,7 +174,7 @@ Popup {
         }
     }
 
-    BwDialog {
+    AppDialog {
         id: folderDialog
         property var entry: null
         title: qsTr("Move to folder")

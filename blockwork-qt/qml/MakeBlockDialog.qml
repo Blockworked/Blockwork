@@ -4,7 +4,7 @@ import QtQuick.Layouts
 import QtQuick.Shapes
 import com.blockworked.Blockstitch 1.0
 
-BwDialog {
+AppDialog {
     id: root
     title: editBlockId.length ? qsTr("Edit Block") : qsTr("Make a Block")
     width: 720
@@ -266,7 +266,7 @@ BwDialog {
         pieces.clear();
         pieces.append({
             pieceKind: "Label",
-            pieceName: "block name",
+            pieceName: qsTr("block name"),
             valueType: "Any",
             pieceId: ""
         });
@@ -316,7 +316,7 @@ BwDialog {
                 valueType: "Any",
                 pieceId: ""
             });
-        const name = kind === "Label" ? "label" : nextName(kind === "Branch" ? "branch" : "value");
+        const name = kind === "Label" ? qsTr("label") : nextName(kind === "Branch" ? qsTr("branch") : qsTr("value"));
         const insertAt = kind === "Label" && hasBranches ? firstBranchIndex() : pieces.count;
         pieces.insert(insertAt, {
             pieceKind: kind,

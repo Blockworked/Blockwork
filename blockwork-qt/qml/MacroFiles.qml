@@ -102,17 +102,17 @@ Item {
         defaultSuffix: "blockwork"
         nameFilters: [qsTr("Blockwork bundles (*.blockwork)")]
         onAccepted: root.daemonCall("export_bundle", { macroIds: macroIds, name: bundleName, path: root.localPath(selectedFile) }, count => {
-            exported.message = count === 1 ? qsTr("Exported 1 macro.") : qsTr("Exported %1 macros, including any they run.").arg(count);
+            exported.message = qsTr("Exported %n macro(s), including any macros they run.", "", count);
             exported.open();
         })
     }
-    BwDialog {
+    AppDialog {
         id: exported
         title: qsTr("Bundle exported"); standardButtons: Dialog.Ok
         property string message: ""
         Text { width: 380; wrapMode: Text.WordWrap; text: exported.message; color: Theme.text; font.pixelSize: 13 }
     }
-    BwDialog {
+    AppDialog {
         id: failed
         title: qsTr("Something went wrong"); standardButtons: Dialog.Ok
         property string message: ""
@@ -130,7 +130,7 @@ Item {
         if (importReview) { keepSettings = ({}); askFirst = ({}); reviewDialog.open(); }
         else reviewDialog.close();
     }
-    BwDialog {
+    AppDialog {
         id: reviewDialog
         readonly property var caps: root.importReview ? root.importReview.capabilities : []
         readonly property var customSettings: root.importReview ? root.importReview.custom_settings : []
@@ -138,12 +138,12 @@ Item {
         readonly property var notes: root.importReview ? root.importReview.notes || [] : []
         title: root.importReview ? qsTr("Import \"%1\"?").arg(root.importReview.name) : qsTr("Import macro")
         standardButtons: Dialog.Ok | Dialog.Cancel
-        Component.onCompleted: standardButton(Dialog.Ok).text = "Import"
+        acceptText: qsTr("Import")
         Column { width: 460; spacing: 10
             Text {
                 visible: reviewDialog.macroNames.length > 1
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
-                text: qsTr("This bundle has %1 macros: %2.").arg(reviewDialog.macroNames.length).arg(reviewDialog.macroNames.join(", "))
+                text: qsTr("This bundle has %n macro(s): %1.", "", reviewDialog.macroNames.length).arg(reviewDialog.macroNames.join(", "))
             }
             Text {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13

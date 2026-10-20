@@ -53,7 +53,7 @@ Item {
         }
     }
 
-    BwDialog {
+    AppDialog {
         id: browseDialog
         title: qsTr("Block library")
         readonly property string query: search.text.trim().toLowerCase()
@@ -167,12 +167,12 @@ Item {
     readonly property var review: appState.pack_review || null
     readonly property string reviewKey: review ? JSON.stringify(review) : ""
     onReviewKeyChanged: review ? reviewDialog.open() : reviewDialog.close()
-    BwDialog {
+    AppDialog {
         id: reviewDialog
         readonly property var r: root.review || ({ blocks: [], replaces: [], capabilities: [], notes: [] })
         title: qsTr("Add \"%1\"?").arg(r.name || "")
         standardButtons: Dialog.Ok | Dialog.Cancel
-        Component.onCompleted: standardButton(Dialog.Ok).text = qsTr("Add blocks")
+        acceptText: qsTr("Add blocks")
         Column {
             width: 470; spacing: 10
             Text {
@@ -212,7 +212,7 @@ Item {
             Text {
                 visible: reviewDialog.r.replaces.length > 0
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.warning; font.pixelSize: 12
-                text: qsTr("This macro already has %1 of them from an earlier version. They're replaced, along with any changes you made to them; blocks that use them keep working.").arg(reviewDialog.r.replaces.length)
+                text: qsTr("This macro already has %n block(s) from an earlier version. They're replaced, along with any changes you made to them; blocks that use them keep working.", "", reviewDialog.r.replaces.length)
             }
             Text {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
@@ -248,14 +248,14 @@ Item {
         onRejected: root.invoke("cancel_block_pack")
     }
 
-    BwDialog {
+    AppDialog {
         id: shareDialog
         title: qsTr("Share blocks as a pack")
         width: Math.min(504, parent.width - 32)
         standardButtons: Dialog.Ok | Dialog.Cancel
         property var picked: []
         readonly property var defs: root.macro ? root.macro.block_defs || [] : []
-        Component.onCompleted: standardButton(Dialog.Ok).text = qsTr("Save pack...")
+        acceptText: qsTr("Save pack...")
         onOpened: {
             packName.text = picked.length === 1 ? root.blockLabel(defs.find(d => d.id === picked[0]) || {}) : (root.macro ? root.macro.name : "");
             packName.forceActiveFocus();
@@ -312,18 +312,17 @@ Item {
             blockIds: shareDialog.picked, name: packName.text, description: packDescription.text,
             author: packAuthor.text, version: packVersion.text, path: root.localPath(selectedFile)
         }, count => {
-            shared.message = count === 1 ? qsTr("Saved 1 block. Others can add it with My Blocks > Browse > From file.")
-                : qsTr("Saved %1 blocks. Others can add them with My Blocks > Browse > From file.").arg(count);
+            shared.message = qsTr("Saved %n block(s). Others can add them with My Blocks > Browse > From file.", "", count);
             shared.open();
         })
     }
-    BwDialog {
+    AppDialog {
         id: shared
         title: qsTr("Pack saved"); standardButtons: Dialog.Ok
         property string message: ""
         Text { width: 400; wrapMode: Text.WordWrap; text: shared.message; color: Theme.text; font.pixelSize: 13 }
     }
-    BwDialog {
+    AppDialog {
         id: failed
         title: qsTr("Something went wrong"); standardButtons: Dialog.Ok
         property string message: ""

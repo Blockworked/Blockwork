@@ -5,6 +5,7 @@ on:
   push:
     paths:
       - 'blockwork-qt/i18n/*.ts'
+      - 'scripts/check-translations.py'
   workflow_dispatch:
 
 permissions:
@@ -20,7 +21,9 @@ jobs:
         run: sudo apt-get update && sudo apt-get install -y qt6-l10n-tools
 
       - name: Compile
-        run: /usr/lib/qt6/bin/lrelease -silent blockwork-qt/i18n/qml_*.ts
+        run: |
+          python3 scripts/check-translations.py
+          /usr/lib/qt6/bin/lrelease -silent blockwork-qt/i18n/qml_*.ts
 
       - name: Commit
         run: |

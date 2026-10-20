@@ -16,7 +16,7 @@ ApplicationWindow {
     minimumWidth: 600 + 2 * shadowPadding
     minimumHeight: 640 + 2 * shadowPadding
     visible: true
-    title: qsTr("Blockwork")
+    title: "Blockwork"
     // macOS keeps its native title bar.
     readonly property bool customChrome: Qt.platform.os !== "osx"
     readonly property real cornerRadius: customChrome && visibility === Window.Windowed ? 10 : 0
@@ -205,7 +205,7 @@ ApplicationWindow {
     }
     Component { id: onboardingComponent; OnboardingPage { appState: root.appState; invoke: root.invoke } }
     // Distinct IDs avoid resolving a page's injected property to itself.
-    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; macroFiles: sharedMacroFiles; translator: sharedTranslator } }
+    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; translator: sharedTranslator } }
     MacroFiles { id: sharedMacroFiles; appState: root.appState; invoke: root.invoke; appBridge: bridge }
     BlockLibrary { id: sharedBlockLibrary; appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: sharedMacroFiles }
 
