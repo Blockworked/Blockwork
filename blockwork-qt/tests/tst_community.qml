@@ -61,6 +61,80 @@ Item {
             compare(pieces[1].default_value.value, "");
             compare(pieces[2].default_value.value, 1);
         }
+        function named(object, name) {
+            return findChild(object, name);
+        }
+        function test_default_parameter_editor() {
+            const dialog = createTemporaryObject(blockDialogComponent, scene);
+            verify(!!dialog);
+            dialog.openForEdit({id:"defaults", pieces:[
+                {kind:"Label",id:"label",text:"example"},
+                {kind:"Input",id:"count",name:"count",value_type:"Any",default_value:{kind:"Number",value:4}},
+                {kind:"Input",id:"text",name:"text",value_type:"Any",default_value:{kind:"Text",value:""}},
+                {kind:"Input",id:"flag",name:"enabled",value_type:"Bool",default_value:{kind:"Bool",value:true}}
+            ]});
+            tryCompare(dialog, "opened", true);
+            compare(dialog.resultPieces().length, 4);
+            const defaults = named(dialog, "defaultParametersPopup");
+            const publishing = named(dialog, "publishingPopup");
+            verify(!defaults.visible);
+            verify(!publishing.visible);
+            mouseClick(named(dialog, "defaultParametersButton"));
+            tryCompare(defaults, "visible", true);
+            verify(!publishing.visible);
+            const repeater = named(defaults, "defaultParameterRows");
+            verify(!!repeater);
+            compare(repeater.count, 4);
+            const rows = [1, 2, 3].map(i => repeater.itemAt(i));
+            compare(rows.length, 3);
+            const count = rows.find(o => o.pieceName === "count");
+            const number = named(count, "defaultNumberValue");
+            compare(number.text, "4");
+            number.forceActiveFocus();
+            number.selectAll();
+            keyClick(Qt.Key_9);
+            compare(dialog.resultPieces()[1].default_value.value, 9);
+            const textRow = rows.find(o => o.pieceName === "text");
+            const text = named(textRow, "defaultTextValue");
+            text.forceActiveFocus();
+            keyClick(Qt.Key_A);
+            compare(dialog.resultPieces()[2].default_value.value, "a");
+            mouseClick(named(rows.find(o => o.pieceName === "enabled"), "defaultBooleanValue"));
+            compare(dialog.resultPieces()[3].default_value.value, false);
+            dialog.setInputDefault(1, "Number", "bad");
+            verify(!dialog.defaultsValid());
+            dialog.setInputDefault(1, "Number", "-2.5");
+            verify(dialog.defaultsValid());
+            dialog.selectedPiece = 1;
+            dialog.moveSelected(1);
+            compare(dialog.resultPieces()[2].id, "count");
+            compare(dialog.resultPieces()[2].default_value.value, -2.5);
+            defaults.close();
+            mouseClick(named(dialog, "publishingButton"));
+            tryCompare(publishing, "visible", true);
+            verify(!defaults.visible);
+            const identifier = named(publishing, "publishingIdentifier");
+            identifier.forceActiveFocus();
+            keyClick(Qt.Key_X);
+            compare(identifier.text, "x");
+            let saved = null;
+            dialog.editRequested.connect((id, pieces) => { saved = pieces; });
+            dialog.submit();
+            verify(!!saved);
+            compare(saved[2].default_value.value, -2.5);
+            compare(saved[1].default_value.value, "a");
+            compare(saved[3].default_value.value, false);
+            tryCompare(dialog, "visible", false);
+            dialog.openForCreate();
+            tryCompare(dialog, "opened", true);
+            compare(identifier.text, "");
+            dialog.addPiece("Input", "Any");
+            dialog.commitPiece();
+            dialog.setInputDefault(1, "Text", "");
+            compare(dialog.resultPieces()[1].default_value.kind, "Text");
+            compare(dialog.resultPieces()[1].default_value.value, "");
+            dialog.close();
+        }
         function test_pack_input_defaults() {
             const definition = {id:"defaults",shape:"Normal",pieces:[
                 {kind:"Label",text:"example"},

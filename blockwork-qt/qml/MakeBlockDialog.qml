@@ -170,6 +170,154 @@ AppDialog {
         }
     }
 
+    Popup {
+        id: publishingPopup
+        objectName: "publishingPopup"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(540, parent.width - 48)
+        padding: 20
+        modal: true
+        focus: true
+        background: Rectangle { radius: Theme.radius; color: Theme.panel; border.color: Theme.border }
+        contentItem: ColumnLayout {
+            spacing: 12
+            Label { text: qsTr("Publishing"); color: Theme.text; font.bold: true; font.pixelSize: 20 }
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Details shown when sharing this block in a community pack.")
+                wrapMode: Text.WordWrap
+                color: Theme.textDim
+            }
+            Label { text: qsTr("Identifier"); color: Theme.text }
+            BwTextField {
+                id: detailId
+                objectName: "publishingIdentifier"
+                Layout.fillWidth: true
+                placeholderText: qsTr("AUTHOR_BLOCKNAME")
+            }
+            Label { text: qsTr("Description"); color: Theme.text }
+            BwTextField {
+                id: detailDescription
+                Layout.fillWidth: true
+                placeholderText: qsTr("Description for Details (optional)")
+            }
+            BwButton { Layout.alignment: Qt.AlignRight; text: qsTr("Done"); onClicked: publishingPopup.close() }
+        }
+    }
+
+    Popup {
+        id: defaultsPopup
+        objectName: "defaultParametersPopup"
+        parent: Overlay.overlay
+        anchors.centerIn: parent
+        width: Math.min(560, parent.width - 48)
+        height: Math.min(560, parent.height - 48)
+        padding: 20
+        modal: true
+        focus: true
+        background: Rectangle { radius: Theme.radius; color: Theme.panel; border.color: Theme.border }
+        contentItem: ColumnLayout {
+            spacing: 12
+            Label { text: qsTr("Default parameters"); color: Theme.text; font.bold: true; font.pixelSize: 20 }
+            Label {
+                Layout.fillWidth: true
+                text: qsTr("Starting values for new blocks added from the sidebar. Existing blocks keep their values.")
+                wrapMode: Text.WordWrap
+                color: Theme.textDim
+            }
+            ScrollView {
+                Layout.fillWidth: true
+                Layout.fillHeight: true
+                clip: true
+                contentWidth: availableWidth
+                ColumnLayout {
+                    width: parent.width
+                    spacing: 14
+                    Label {
+                        Layout.fillWidth: true
+                        visible: !root.resultPieces().some(p => p.kind === "Input")
+                        text: qsTr("Add an input to the block to set its default value.")
+                        wrapMode: Text.WordWrap
+                        color: Theme.textDim
+                    }
+                    Repeater {
+                        objectName: "defaultParameterRows"
+                        model: pieces
+                        delegate: ColumnLayout {
+                            id: defaultRow
+                            required property int index
+                            required property string pieceKind
+                            required property string pieceName
+                            required property string valueType
+                            required property string defaultKind
+                            required property string defaultText
+                            readonly property string kind: defaultKind || (valueType === "Bool" ? "Bool" : "Number")
+                            readonly property string value: defaultKind ? defaultText : (valueType === "Bool" ? "false" : "0")
+                            objectName: "defaultParameterRow" + index
+                            visible: pieceKind === "Input"
+                            Layout.fillWidth: true
+                            spacing: 6
+                            Label { text: defaultRow.pieceName; color: Theme.text; font.bold: true }
+                            RowLayout {
+                                Layout.fillWidth: true
+                                BwComboBox {
+                                    objectName: "defaultParameterType"
+                                    visible: defaultRow.valueType !== "Bool"
+                                    model: [qsTr("Number"), qsTr("Text")]
+                                    currentIndex: defaultRow.kind === "Text" ? 1 : 0
+                                    onActivated: root.setInputDefault(defaultRow.index, currentIndex === 1 ? "Text" : "Number", currentIndex === 1 ? "" : "0")
+                                }
+                                BwTextField {
+                                    objectName: "defaultNumberValue"
+                                    visible: defaultRow.kind === "Number"
+                                    Layout.fillWidth: true
+                                    text: defaultRow.value
+                                    onTextEdited: root.setInputDefault(defaultRow.index, "Number", text)
+                                }
+                                BwCheckBox {
+                                    objectName: "defaultBooleanValue"
+                                    visible: defaultRow.valueType === "Bool"
+                                    text: checked ? qsTr("True") : qsTr("False")
+                                    checked: defaultRow.value === "true"
+                                    onToggled: root.setInputDefault(defaultRow.index, "Bool", checked)
+                                }
+                            }
+                            ScrollView {
+                                visible: defaultRow.kind === "Text"
+                                Layout.fillWidth: true
+                                Layout.preferredHeight: 80
+                                contentWidth: availableWidth
+                                TextArea {
+                                    objectName: "defaultTextValue"
+                                    text: defaultRow.value
+                                    color: Theme.text
+                                    wrapMode: TextEdit.Wrap
+                                    selectByMouse: true
+                                    background: Rectangle { color: Theme.field; radius: 6; border.color: Theme.border }
+                                    onTextChanged: {
+                                        if (activeFocus)
+                                            root.setInputDefault(defaultRow.index, "Text", text);
+                                    }
+                                }
+                            }
+                            Label {
+                                visible: defaultRow.kind === "Number" && (!defaultRow.value.trim().length || !isFinite(Number(defaultRow.value)))
+                                text: qsTr("Enter a finite number")
+                                color: Theme.danger
+                            }
+                        }
+                    }
+                }
+            }
+            BwButton {
+                Layout.alignment: Qt.AlignRight
+                text: qsTr("Done")
+                onClicked: { if (root.defaultsValid()) defaultsPopup.close(); }
+            }
+        }
+    }
+
     ListModel {
         id: pieces
     }
@@ -204,7 +352,7 @@ AppDialog {
             pieces.setProperty(branch.sepIndex, "pieceName", text);
         else if (text.length) {
             const insertAt = branch.index + 1;
-            pieces.insert(insertAt, { pieceKind: "Label", pieceName: text, valueType: "Any", pieceId: "" });
+            pieces.insert(insertAt, { pieceKind: "Label", pieceName: text, valueType: "Any", pieceId: "", defaultKind: "", defaultText: "" });
             if (selectedPiece >= insertAt) selectedPiece++;
         }
     }
@@ -261,11 +409,13 @@ AppDialog {
                 pieceKind: p.kind,
                 pieceName: p.kind === "Label" ? p.text : p.name,
                 valueType: p.kind === "Input" ? (p.value_type || "Any") : "Any",
-                pieceId: p.id || ""
+                pieceId: p.id || "",
+                defaultKind: p.default_value ? p.default_value.kind : "",
+                defaultText: p.default_value ? String(p.default_value.value) : ""
             });
         }
         if (!pieces.count)
-            pieces.append({ pieceKind: "Label", pieceName: qsTr("block name"), valueType: "Any", pieceId: "" });
+            pieces.append({ pieceKind: "Label", pieceName: qsTr("block name"), valueType: "Any", pieceId: "", defaultKind: "", defaultText: "" });
         selectedPiece = 0;
         editingPiece = -1;
         activeEditor = null;
@@ -283,7 +433,7 @@ AppDialog {
             pieceKind: "Label",
             pieceName: qsTr("block name"),
             valueType: "Any",
-            pieceId: ""
+            pieceId: "", defaultKind: "", defaultText: ""
         });
         selectedPiece = 0;
         editingPiece = -1;
@@ -331,7 +481,7 @@ AppDialog {
                 pieceKind: "Label",
                 pieceName: "",
                 valueType: "Any",
-                pieceId: ""
+                pieceId: "", defaultKind: "", defaultText: ""
             });
         const name = kind === "Label" ? qsTr("label") : nextName(kind === "Branch" ? qsTr("branch") : qsTr("value"));
         let insertAt = pieces.count;
@@ -346,7 +496,7 @@ AppDialog {
             pieceKind: kind,
             pieceName: name,
             valueType: valueType || "Any",
-            pieceId: ""
+            pieceId: "", defaultKind: "", defaultText: ""
         });
         selectedPiece = insertAt;
         Qt.callLater(() => focusPiece(insertAt));
@@ -447,9 +597,25 @@ AppDialog {
         pieces.remove(selectedPiece);
         selectedPiece = pieces.count ? Math.max(0, Math.min(selectedPiece, pieces.count - 1)) : -1;
     }
-    function inputDefaultForPiece(id, valueType) {
-        const original = pendingDef && (pendingDef.pieces || []).find(p => p.id === id && p.kind === "Input");
-        return original && (original.value_type || "Any") === valueType ? original.default_value : undefined;
+    function setInputDefault(index, kind, text) {
+        pieces.setProperty(index, "defaultKind", kind);
+        pieces.setProperty(index, "defaultText", String(text));
+    }
+    function inputDefaultForPiece(piece) {
+        if (!piece.defaultKind)
+            return undefined;
+        return {kind: piece.defaultKind, value: piece.defaultKind === "Number"
+            ? Number(piece.defaultText) : piece.defaultKind === "Bool"
+            ? piece.defaultText === "true" : piece.defaultText};
+    }
+    function defaultsValid() {
+        for (let i = 0; i < pieces.count; ++i) {
+            const p = pieces.get(i);
+            if (p.pieceKind === "Input" && p.defaultKind === "Number"
+                && (!p.defaultText.trim().length || !isFinite(Number(p.defaultText))))
+                return false;
+        }
+        return true;
     }
     function resultPieces() {
         const out = [];
@@ -474,7 +640,7 @@ AppDialog {
                     id: p.pieceId || uuid(),
                     name: name,
                     value_type: p.valueType,
-                    default_value: root.inputDefaultForPiece(p.pieceId, p.valueType)
+                    default_value: root.inputDefaultForPiece(p)
                 });
         }
         return out;
@@ -482,6 +648,11 @@ AppDialog {
     function submit() {
         commitPiece();
         commitSeparatorEdits();
+        if (!defaultsValid()) {
+            validationError = qsTr("Enter a finite number for each numeric default");
+            defaultsPopup.open();
+            return;
+        }
         let hasLabel = false;
         const names = ({});
         for (let i = 0; i < pieces.count; ++i) {
@@ -521,6 +692,8 @@ AppDialog {
         }
     }
     onClosed: {
+        defaultsPopup.close();
+        publishingPopup.close();
         editBlockId = "";
         pendingDef = null;
     }
@@ -1039,15 +1212,25 @@ AppDialog {
             }
         }
 
-        BwTextField {
-            id: detailId
+        RowLayout {
             Layout.fillWidth: true
-            placeholderText: qsTr("Details ID (AUTHOR_BLOCKNAME)")
-        }
-        BwTextField {
-            id: detailDescription
-            Layout.fillWidth: true
-            placeholderText: qsTr("Description for Details (optional)")
+            BwButton {
+                objectName: "defaultParametersButton"
+                Layout.fillWidth: true
+                text: qsTr("Default parameters")
+                iconName: "sliders-horizontal"
+                onClicked: {
+                    root.commitPiece();
+                    defaultsPopup.open();
+                }
+            }
+            BwButton {
+                objectName: "publishingButton"
+                Layout.fillWidth: true
+                text: qsTr("Publishing")
+                iconName: "upload"
+                onClicked: publishingPopup.open()
+            }
         }
 
         Rectangle {
