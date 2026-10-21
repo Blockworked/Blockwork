@@ -27,7 +27,10 @@ static OPERATORS: &[ExtOperator] = &[
         op: "ClipboardText",
         arity: 0,
         default_args: Vec::new,
-        eval: |_| Ok(Evaluated::Text(crate::clipboard::get_text()?)),
+        eval: |_| {
+            crate::permissions::require("clipboard")?;
+            Ok(Evaluated::Text(crate::clipboard::get_text()?))
+        },
     },
     ExtOperator {
         kind: "ClipboardHasImage",
@@ -48,7 +51,10 @@ static OPERATORS: &[ExtOperator] = &[
         op: "ReadFile",
         arity: 1,
         default_args: one_text,
-        eval: |args| Ok(Evaluated::Text(crate::files::read_text(&args[0].as_text())?)),
+        eval: |args| {
+            crate::permissions::require("files_read")?;
+            Ok(Evaluated::Text(crate::files::read_text(&args[0].as_text())?))
+        },
     },
     ExtOperator {
         kind: "FileExists",
@@ -62,7 +68,10 @@ static OPERATORS: &[ExtOperator] = &[
         op: "ListDirectory",
         arity: 1,
         default_args: one_text,
-        eval: |args| Ok(Evaluated::Text(crate::files::list_dir(&args[0].as_text())?)),
+        eval: |args| {
+            crate::permissions::require("files_read")?;
+            Ok(Evaluated::Text(crate::files::list_dir(&args[0].as_text())?))
+        },
     },
     ExtOperator {
         kind: "HttpGet",
@@ -163,7 +172,10 @@ static OPERATORS: &[ExtOperator] = &[
         op: "GlobalVariable",
         arity: 1,
         default_args: one_text,
-        eval: |args| Ok(crate::globals::get(&args[0].as_text())),
+        eval: |args| {
+            crate::permissions::require("globals")?;
+            Ok(crate::globals::get(&args[0].as_text()))
+        },
     },
     ExtOperator {
         kind: "PixelColor",

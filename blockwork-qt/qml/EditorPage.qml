@@ -1258,7 +1258,9 @@ Item {
     readonly property var guardedAbilities: [
         { kind: "commands", label: qsTr("Run commands and open or close apps") }, { kind: "network", label: qsTr("Go online") },
         { kind: "files_write", label: qsTr("Write to files") }, { kind: "secrets", label: qsTr("Read your saved secrets") },
-        { kind: "screen", label: qsTr("Read the screen") }]
+        { kind: "screen", label: qsTr("Read the screen") }, { kind: "files_read", label: qsTr("Read files and folders") },
+        { kind: "input", label: qsTr("Press keys and move the mouse") }, { kind: "clipboard", label: qsTr("Read the clipboard") },
+        { kind: "macros", label: qsTr("Run or stop your other macros") }, { kind: "globals", label: qsTr("Read or change global variables") }]
     // Which part of a window the window blocks match against.
     readonly property var windowMatchOptions: [{ value: "Title", label: qsTr("window") }, { value: "App", label: qsTr("app") }]
     // How a detect block orders its results list.

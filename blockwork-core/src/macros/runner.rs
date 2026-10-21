@@ -350,18 +350,20 @@ fn signal_bodies(ctx: &mut ExecCtx, name: &str, depth: u32) -> Vec<Vec<Instructi
         .collect()
 }
 
-/// The ability a block needs permission for, if any.
-fn guarded_ability(kind: &InstructionKind) -> Option<&'static str> {
-    Some(match kind {
-        InstructionKind::Command(_) | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. } => "commands",
-        InstructionKind::HttpRequest { .. } => "network",
-        InstructionKind::WriteFile { .. } => "files_write",
-        InstructionKind::FindImage { .. } | InstructionKind::ClickImage { .. } | InstructionKind::WaitForImage { .. } => "screen",
-        InstructionKind::DetectObjectsInWindow { .. }
-        | InstructionKind::WaitForDetection { .. }
-        | InstructionKind::AimAtDetection { .. } => "screen",
-        _ => return None,
-    })
+/// The abilities a block needs permission for.
+fn guarded_abilities(kind: &InstructionKind) -> &'static [&'static str] {
+    match kind {
+        InstructionKind::Command(_) | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. } => &["commands"],
+        InstructionKind::HttpRequest { .. } => &["network"],
+        InstructionKind::WriteFile { .. } => &["files_write"],
+        InstructionKind::FindImage { .. } | InstructionKind::WaitForImage { .. } => &["screen"],
+        InstructionKind::DetectObjectsInWindow { .. } | InstructionKind::WaitForDetection { .. } => &["screen"],
+        InstructionKind::ClickImage { .. } | InstructionKind::AimAtDetection { .. } => &["screen", "input"],
+        InstructionKind::Token(_) | InstructionKind::PasteText(_) | InstructionKind::AimStep { .. } => &["input"],
+        InstructionKind::RunMacro { .. } | InstructionKind::StopMacroNamed(_) => &["macros"],
+        InstructionKind::SetGlobal { .. } | InstructionKind::ChangeGlobal { .. } => &["globals"],
+        _ => &[],
+    }
 }
 
 /// Shows a dialog for this strand. `None` when there's no answer to use:
@@ -1043,9 +1045,7 @@ fn run_block(
             }
         }
 
-        if let Some(ability) = guarded_ability(&ins.kind)
-            && let Err(e) = crate::permissions::require(ability)
-        {
+        if let Some(Err(e)) = guarded_abilities(&ins.kind).iter().map(|a| crate::permissions::require(a)).find(Result::is_err) {
             soft_fail(ctx, &ins.id, "Permission", e)?;
             continue;
         }
@@ -3402,6 +3402,33 @@ mod tests {
         crate::permissions::trust("runner-restricted");
         assert!(!marker.exists(), "the denied command didn't run");
         assert_eq!(vars.lock().unwrap().get("after"), Some(&Evaluated::Number(1.0)));
+    }
+
+    #[test]
+    fn restricted_macros_ask_before_globals_files_and_input() {
+        install_test_dialogs();
+        let read = |op: &str, arg: &str| Value::op(Op::from_name(op), vec![Value::text(arg)]);
+        let mut mac = Macro::new(
+            "Restricted reads".into(),
+            String::new(),
+            vec![
+                Instruction::new(InstructionKind::SetGlobal { name: Value::text("runner-restricted-global"), value: Value::number(1.0) }),
+                set("file", read("ReadFile", "/etc/hostname")),
+                set("global", read("GlobalVariable", "runner-restricted-global")),
+                Instruction::new(InstructionKind::RunMacro { target: Value::text("anything"), wait: true }),
+                set("after", Value::number(1.0)),
+            ],
+        );
+        mac.id = "runner-restricted-reads".into();
+        crate::permissions::restrict(&mac.id, Vec::new());
+        let vars = empty_vars();
+        mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+        crate::permissions::trust("runner-restricted-reads");
+        assert_eq!(crate::globals::get("runner-restricted-global"), Evaluated::Number(0.0));
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("file"), None);
+        assert_eq!(vars.get("global"), None);
+        assert_eq!(vars.get("after"), Some(&Evaluated::Number(1.0)));
     }
 
     #[test]
