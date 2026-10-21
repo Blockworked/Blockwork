@@ -282,88 +282,88 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="137"/>
-        <location filename="../qml/BlockLibrary.qml" line="206"/>
+        <location filename="../qml/BlockLibrary.qml" line="135"/>
+        <location filename="../qml/BlockLibrary.qml" line="199"/>
         <source>by %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="147"/>
+        <location filename="../qml/BlockLibrary.qml" line="145"/>
         <source>Verified official pack</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="173"/>
+        <location filename="../qml/BlockLibrary.qml" line="166"/>
         <source>Downloading...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="173"/>
+        <location filename="../qml/BlockLibrary.qml" line="166"/>
         <source>Update</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="174"/>
+        <location filename="../qml/BlockLibrary.qml" line="167"/>
         <source>Added</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="174"/>
+        <location filename="../qml/BlockLibrary.qml" line="167"/>
         <source>Add</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="184"/>
+        <location filename="../qml/BlockLibrary.qml" line="177"/>
         <source>Add blocks from a pack</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="187"/>
+        <location filename="../qml/BlockLibrary.qml" line="180"/>
         <source>Block packs (*.blockpack *.json)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="187"/>
+        <location filename="../qml/BlockLibrary.qml" line="180"/>
         <source>All files (*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="198"/>
+        <location filename="../qml/BlockLibrary.qml" line="191"/>
         <source>Add &quot;%1&quot;?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="200"/>
+        <location filename="../qml/BlockLibrary.qml" line="193"/>
         <source>Add blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="205"/>
+        <location filename="../qml/BlockLibrary.qml" line="198"/>
         <source>Version %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="207"/>
+        <location filename="../qml/BlockLibrary.qml" line="200"/>
         <source>from %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="217"/>
+        <location filename="../qml/BlockLibrary.qml" line="210"/>
         <source>Matches the checksum its library lists.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="217"/>
+        <location filename="../qml/BlockLibrary.qml" line="210"/>
         <source>From a file, so there&apos;s no checksum to compare.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="227"/>
+        <location filename="../qml/BlockLibrary.qml" line="220"/>
         <source>Adds these blocks to &quot;%1&quot;:</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="240"/>
+        <location filename="../qml/BlockLibrary.qml" line="233"/>
         <source>This macro already has %n block(s) from an earlier version. They&apos;re replaced, along with any changes you made to them; blocks that use them keep working.</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -371,77 +371,77 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="244"/>
+        <location filename="../qml/BlockLibrary.qml" line="237"/>
         <source>These blocks can:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="244"/>
+        <location filename="../qml/BlockLibrary.qml" line="237"/>
         <source>These blocks only use blocks that stay inside Blockwork, like waits and variables.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="261"/>
+        <location filename="../qml/BlockLibrary.qml" line="254"/>
         <source>Blocks run with the permissions of the macro you add them to, so only add these from people you trust.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="278"/>
+        <location filename="../qml/BlockLibrary.qml" line="271"/>
         <source>Share blocks as a pack</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="283"/>
+        <location filename="../qml/BlockLibrary.qml" line="276"/>
         <source>Save pack...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="290"/>
+        <location filename="../qml/BlockLibrary.qml" line="283"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="292"/>
+        <location filename="../qml/BlockLibrary.qml" line="285"/>
         <source>What the blocks do</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="298"/>
+        <location filename="../qml/BlockLibrary.qml" line="291"/>
         <source>Author</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="303"/>
+        <location filename="../qml/BlockLibrary.qml" line="296"/>
         <source>Version</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="307"/>
+        <location filename="../qml/BlockLibrary.qml" line="300"/>
         <source>Blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="319"/>
+        <location filename="../qml/BlockLibrary.qml" line="312"/>
         <source>Blocks these use come along, with the variables and lists they need. Secret values are left out. Keep the same name for later versions so they replace the old blocks.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="323"/>
+        <location filename="../qml/BlockLibrary.qml" line="316"/>
         <source>Pick at least one block to share.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="332"/>
+        <location filename="../qml/BlockLibrary.qml" line="325"/>
         <source>Save block pack</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="335"/>
+        <location filename="../qml/BlockLibrary.qml" line="328"/>
         <source>Block packs (*.blockpack)</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="340"/>
+        <location filename="../qml/BlockLibrary.qml" line="333"/>
         <source>Saved %n block(s). Others can add them with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -449,17 +449,17 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="346"/>
+        <location filename="../qml/BlockLibrary.qml" line="339"/>
         <source>Pack saved</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="347"/>
+        <location filename="../qml/BlockLibrary.qml" line="340"/>
         <source>Submit to community library...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="355"/>
+        <location filename="../qml/BlockLibrary.qml" line="348"/>
         <source>Something went wrong</source>
         <translation type="unfinished"></translation>
     </message>

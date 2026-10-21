@@ -34,7 +34,7 @@
 <context>
     <name>BlockLibrary</name>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="240"/>
+        <location filename="../qml/BlockLibrary.qml" line="233"/>
         <source>This macro already has %n block(s) from an earlier version. They&apos;re replaced, along with any changes you made to them; blocks that use them keep working.</source>
         <translation>
             <numerusform>This macro already has %n block from an earlier version. It&apos;s replaced, along with any changes you made to it; blocks that use it keep working.</numerusform>
@@ -42,7 +42,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="340"/>
+        <location filename="../qml/BlockLibrary.qml" line="333"/>
         <source>Saved %n block(s). Others can add them with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</source>
         <translation>
             <numerusform>Saved %n block. Others can add it with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</numerusform>
