@@ -168,7 +168,7 @@ mod tests {
         assert_eq!(substring("héllo", 2.0, 4.0), "éll");
         assert_eq!(substring("abc", 3.0, 10.0), "c");
         assert_eq!(substring("abc", 3.0, 1.0), "");
-        assert_eq!(format_number(3.14159, 2.0), "3.14");
+        assert_eq!(format_number(12.3456, 2.0), "12.35");
         assert_eq!(format_number(2.0, 0.0), "2");
     }
 

@@ -1227,7 +1227,7 @@ Item {
         ["SplitPart", "text", 3, [numberValue(1), textValue("a,b,c"), textValue(",")]],
         ["SplitCount", "number", 2, [textValue("a,b,c"), textValue(",")]],
         ["Substring", "text", 3, [numberValue(1), numberValue(3), textValue("hello")]],
-        ["Trim", "text", 1, [textValue("  hello  ")]], ["FormatNumber", "text", 2, [numberValue(3.14159), numberValue(2)]],
+        ["Trim", "text", 1, [textValue("  hello  ")]], ["FormatNumber", "text", 2, [numberValue(12.3456), numberValue(2)]],
         ["Timestamp", "number", 0], ["FormatDate", "text", 2, [{ kind: "Op", op: "Timestamp", args: [], saved: numberValue(0) }, textValue("%Y-%m-%d %H:%M")]],
         ["ParseDate", "number", 2, [textValue("2026-01-31 09:00"), textValue("")]],
         ["DatePart", "number", 2, [textValue("day"), { kind: "Op", op: "Timestamp", args: [], saved: numberValue(0) }]]

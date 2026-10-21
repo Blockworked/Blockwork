@@ -97,7 +97,7 @@ unsafe fn cstr_to_owned(ptr: *const c_char) -> Option<String> {
 /// `linux_bridge_resource_path_utf8` only matters under Wine on Linux.
 /// Returns 0 on success, -1 if no input backend exists for this platform.
 #[no_mangle]
-pub extern "C" fn blockwork_init(config_dir_override_utf8: *const c_char, linux_bridge_resource_path_utf8: *const c_char) -> i32 {
+pub unsafe extern "C" fn blockwork_init(config_dir_override_utf8: *const c_char, linux_bridge_resource_path_utf8: *const c_char) -> i32 {
     let override_dir = unsafe { cstr_to_owned(config_dir_override_utf8) };
     let linux_bridge_resource_path = unsafe { cstr_to_owned(linux_bridge_resource_path_utf8) };
     catch(move || {
@@ -203,7 +203,7 @@ pub extern "C" fn blockwork_stop_recording() -> i32 {
 /// start - pass 0 if not applicable. Backdates the run's first `Wait`
 /// deadline to the intended start instant via `Macro::run_with_offset`.
 #[no_mangle]
-pub extern "C" fn blockwork_run_macro(id_utf8: *const c_char, elapsed_overshoot_ms: f64) -> i32 {
+pub unsafe extern "C" fn blockwork_run_macro(id_utf8: *const c_char, elapsed_overshoot_ms: f64) -> i32 {
     let requested_id = unsafe { cstr_to_owned(id_utf8) };
     catch(move || {
         let mac = requested_id
@@ -259,7 +259,7 @@ pub extern "C" fn blockwork_run_macro(id_utf8: *const c_char, elapsed_overshoot_
 /// Returns 0 on success, -1 if no macro is found, -3 if the run thread
 /// couldn't start.
 #[no_mangle]
-pub extern "C" fn blockwork_sync_begin(id_utf8: *const c_char) -> i32 {
+pub unsafe extern "C" fn blockwork_sync_begin(id_utf8: *const c_char) -> i32 {
     let requested_id = unsafe { cstr_to_owned(id_utf8) };
     catch(move || {
         let mac = requested_id
@@ -390,7 +390,7 @@ pub extern "C" fn blockwork_step_record_end() -> i32 {
 /// -1 for a bad path, -2 if the file can't be read, -3 if it isn't a valid
 /// replay, -4 if the macro couldn't be saved.
 #[no_mangle]
-pub extern "C" fn blockwork_import_gdr(path_utf8: *const c_char) -> i32 {
+pub unsafe extern "C" fn blockwork_import_gdr(path_utf8: *const c_char) -> i32 {
     let Some(path) = (unsafe { cstr_to_owned(path_utf8) }) else { return -1 };
     catch(move || {
         let Ok(bytes) = std::fs::read(&path) else { return -2 };
@@ -439,7 +439,8 @@ pub extern "C" fn blockwork_import_pending_gdrs() -> i32 {
                 continue;
             }
             let Ok(c_path) = CString::new(path.to_string_lossy().into_owned()) else { continue };
-            if blockwork_import_gdr(c_path.as_ptr()) == 0 {
+            // c_path is a live, NUL-terminated string.
+            if unsafe { blockwork_import_gdr(c_path.as_ptr()) } == 0 {
                 let mut done = path.clone().into_os_string();
                 done.push(".imported");
                 let _ = std::fs::rename(&path, done);
@@ -488,7 +489,7 @@ pub extern "C" fn blockwork_set_speed_multiplier(multiplier: f64) -> i32 {
 /// null/empty), saves it, and marks it the currently-selected macro.
 /// Returns 0 on success, -1 if the new macro couldn't be saved.
 #[no_mangle]
-pub extern "C" fn blockwork_create_macro(name_utf8: *const c_char) -> i32 {
+pub unsafe extern "C" fn blockwork_create_macro(name_utf8: *const c_char) -> i32 {
     let name = unsafe { cstr_to_owned(name_utf8) }
         .filter(|n| !n.is_empty())
         .unwrap_or_else(|| "New Macro".to_string());
@@ -540,7 +541,7 @@ pub extern "C" fn blockwork_get_selected_macro_id() -> *mut c_char {
 /// `blockwork_clear_recording_target_instructions` resolve against. Returns 0
 /// on success, -1 if no macro with that id exists.
 #[no_mangle]
-pub extern "C" fn blockwork_select_macro(id_utf8: *const c_char) -> i32 {
+pub unsafe extern "C" fn blockwork_select_macro(id_utf8: *const c_char) -> i32 {
     let Some(id) = (unsafe { cstr_to_owned(id_utf8) }) else { return -1 };
     catch(move || {
         if config::get_macro_by_id(&id).is_none() {
@@ -557,7 +558,7 @@ pub extern "C" fn blockwork_select_macro(id_utf8: *const c_char) -> i32 {
 /// currently selected, -2 selected macro couldn't be loaded, -3 the
 /// trimmed name was empty, -4 couldn't be saved back to disk.
 #[no_mangle]
-pub extern "C" fn blockwork_rename_macro(name_utf8: *const c_char) -> i32 {
+pub unsafe extern "C" fn blockwork_rename_macro(name_utf8: *const c_char) -> i32 {
     let name = unsafe { cstr_to_owned(name_utf8) }.unwrap_or_default();
     catch(move || {
         let Some(id) = config::get_selected_macro_id() else { return -1 };
@@ -629,7 +630,7 @@ pub extern "C" fn blockwork_clear_recording_target_instructions() -> i32 {
 /// Frees a string previously returned by `blockwork_list_macros` or
 /// `blockwork_get_selected_macro_id`. Safe to call with null (no-op).
 #[no_mangle]
-pub extern "C" fn blockwork_free_string(ptr: *mut c_char) {
+pub unsafe extern "C" fn blockwork_free_string(ptr: *mut c_char) {
     if ptr.is_null() {
         return;
     }

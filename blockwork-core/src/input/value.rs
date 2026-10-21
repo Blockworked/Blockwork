@@ -380,7 +380,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "FormatNumber",
         op: "FormatNumber",
         arity: 2,
-        default_args: || numbers(&[3.14159, 2.0]),
+        default_args: || numbers(&[12.3456, 2.0]),
         eval: |args| Ok(Evaluated::Text(crate::text::format_number(args[0].as_number()?, args[1].as_number()?))),
     },
     ExtOperator {
