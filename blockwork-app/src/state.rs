@@ -1940,7 +1940,7 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         invalid_field_buffers,
         ipc_port_text: s.ipc_port_text.clone(),
         ipc_port_invalid: s.ipc_port_invalid,
-        emulator_available: s.emulator.is_some(),
+        emulator_available: !blockwork_core::macros::runner::emulator_failed(),
         grab_available: !blockwork_core::recording::grab_failed(),
         razer_permission_warning: crate::razer::permission_warning(),
         update_check_state,

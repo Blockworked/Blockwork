@@ -49,6 +49,65 @@ pub trait InputBackend: Send + 'static {
     fn ensure_absolute_mouse_support(&mut self) -> Result<(), String> {
         Ok(())
     }
+    /// Why this backend can't send input at all, for `UnavailableBackend`.
+    fn unavailable_reason(&self) -> Option<String> {
+        None
+    }
+}
+
+/// Stands in when the platform backend can't start (no `/dev/uinput` access
+/// on Linux), so macros still run: blocks that don't send input work, and
+/// the ones that do fail with `reason` instead of the run silently not
+/// starting.
+pub struct UnavailableBackend {
+    reason: String,
+}
+
+impl UnavailableBackend {
+    pub fn new() -> Self {
+        let reason = if cfg!(target_os = "linux") {
+            "input emulation isn't available: Blockwork can't open /dev/uinput, so it can't press keys or move the mouse"
+        } else {
+            "input emulation isn't available on this system, so Blockwork can't press keys or move the mouse"
+        };
+        UnavailableBackend { reason: reason.to_string() }
+    }
+}
+
+impl Default for UnavailableBackend {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
+impl InputBackend for UnavailableBackend {
+    fn key(&mut self, _: MacroKey, _: Direction) -> Result<(), String> {
+        Err(self.reason.clone())
+    }
+    fn raw_keycode(&mut self, _: u16, _: Direction) -> Result<(), String> {
+        Err(self.reason.clone())
+    }
+    fn button(&mut self, _: MacroButton, _: Direction) -> Result<(), String> {
+        Err(self.reason.clone())
+    }
+    fn move_mouse_rel(&mut self, _: i32, _: i32) -> Result<(), String> {
+        Err(self.reason.clone())
+    }
+    fn move_mouse_abs(&mut self, _: i32, _: i32) -> Result<(), String> {
+        Err(self.reason.clone())
+    }
+    fn scroll(&mut self, _: i32, _: Axis) -> Result<(), String> {
+        Err(self.reason.clone())
+    }
+    fn text(&mut self, _: &str) -> Result<(), String> {
+        Err(self.reason.clone())
+    }
+    fn cursor_pos(&self) -> Option<(i32, i32)> {
+        None
+    }
+    fn unavailable_reason(&self) -> Option<String> {
+        Some(self.reason.clone())
+    }
 }
 
 /// Whether this is a Wayland session, where absolute recording tracks the

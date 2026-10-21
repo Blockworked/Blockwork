@@ -96,6 +96,10 @@ struct ExecCtx<'a> {
     signal_threads: Vec<std::thread::JoinHandle<()>>,
     /// Virtual time this strand has waited through in host-clock mode.
     host_time_ms: f64,
+    /// Set when the backend can't send input; input blocks are skipped and
+    /// the first one reports why.
+    input_unavailable: Option<String>,
+    input_unavailable_reported: bool,
 }
 
 impl<'a> ExecCtx<'a> {
@@ -878,6 +882,8 @@ fn run_strand(
             max_loop_iterations: max_loop_iterations.into(),
             signal_threads: Vec::new(),
             host_time_ms: 0.0,
+            input_unavailable: emulator.lock().ok().and_then(|em| em.unavailable_reason()),
+            input_unavailable_reported: false,
         };
         // An error reaching the top ends this strand.
         if let Err(e) = run_block(&instructions, &mut ctx, 0, start) {
@@ -1756,6 +1762,13 @@ fn run_block(
                     soft_fail(ctx, &ins.id, "Command", e)?;
                 }
             }
+            InstructionKind::Token(_) if ctx.input_unavailable.is_some() => {
+                if !ctx.input_unavailable_reported {
+                    ctx.input_unavailable_reported = true;
+                    let reason = ctx.input_unavailable.clone().unwrap_or_default();
+                    soft_fail(ctx, &ins.id, "Input", reason)?;
+                }
+            }
             InstructionKind::Token(token) => match token {
                 InputToken::Text(value) => {
                     let text = match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {
@@ -2173,6 +2186,12 @@ fn close_app(_command: &str, _name: &str) -> std::io::Result<()> {
         std::io::ErrorKind::Unsupported,
         "closing apps is not supported on this platform",
     ))
+}
+
+/// `make_backend`, or an `UnavailableBackend` when there is none, so macros
+/// still run and their input blocks say why they can't.
+pub fn make_backend_or_unavailable() -> Arc<Mutex<dyn InputBackend>> {
+    make_backend().unwrap_or_else(|| Arc::new(Mutex::new(crate::macros::backend::UnavailableBackend::new())))
 }
 
 pub fn make_backend() -> Option<Arc<Mutex<dyn InputBackend>>> {
@@ -3550,6 +3569,33 @@ mod tests {
         assert_eq!(errors.len(), 1);
         assert_eq!(errors[0].block_id, throw.id);
         assert_eq!(errors[0].message, "boom");
+    }
+
+    #[test]
+    fn without_input_emulation_other_blocks_run_and_input_reports_once() {
+        let _log = crate::run_log::TEST_LOCK.lock().unwrap_or_else(|e| e.into_inner());
+        let text = || Instruction::new(InstructionKind::Token(InputToken::Text(Value::text("hi"))));
+        let first = text();
+        let vars = empty_vars();
+        run_fired_strand(
+            crate::run_log::Source::for_macro("no-input-test", "No input"),
+            vec![first.clone(), text(), set("after", Value::number(1.0))],
+            Arc::new(Mutex::new(crate::macros::backend::UnavailableBackend::new())),
+            None,
+            1.0,
+            Arc::clone(&vars),
+            Arc::new(Mutex::new(HashMap::new())),
+            Arc::new(HashMap::new()),
+            0,
+        );
+        assert_eq!(vars.lock().unwrap().get("after"), Some(&Evaluated::Number(1.0)));
+        let errors: Vec<_> = crate::run_log::snapshot()
+            .into_iter()
+            .filter(|e| e.macro_id == "no-input-test" && e.level == crate::run_log::Level::Error)
+            .collect();
+        assert_eq!(errors.len(), 1);
+        assert_eq!(errors[0].block_id, first.id);
+        assert!(errors[0].message.contains("input emulation isn't available"), "{}", errors[0].message);
     }
 
     #[test]

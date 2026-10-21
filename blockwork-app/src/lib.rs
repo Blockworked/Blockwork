@@ -37,7 +37,7 @@ pub(crate) mod type_watch;
 pub(crate) mod window_watch;
 
 use crate::state::{AppState, History, UNDO_STACK_LIMIT, Page, RecordingPhase, SharedState, UpdateCheckState};
-use blockwork_core::macros::runner::make_backend;
+use blockwork_core::macros::runner::make_backend_or_unavailable;
 use blockwork_core::macros::thread_pool::ThreadPool;
 use blockwork_core::recording::QueueSignal;
 use blockwork_core::{config, recording};
@@ -127,7 +127,9 @@ impl Backend {
         let settings = config::load_settings();
         // The Linux backend defers the libei portal until an absolute move is
         // selected, so startup itself remains silent.
-        let emulator = make_backend();
+        // Without input emulation macros still run; their input blocks
+        // report that they can't (see `UnavailableBackend`).
+        let emulator = Some(make_backend_or_unavailable());
         let absolute_mouse_position_available =
             blockwork_core::macros::backend::absolute_mouse_position_available();
         let initial_state = AppState {
