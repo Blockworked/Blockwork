@@ -5,7 +5,10 @@
 use crate::macros::{Instruction, Macro};
 use serde_json::{json, Map, Value};
 
-/// The version this build writes. Bump it with a new step in [`STEPS`].
+/// The version this build writes; 1 is the format 0.6.0 shipped. Bump it
+/// with a new step in [`STEPS`] (a no-op one when old files load as they are)
+/// whenever a release adds block kinds or changes their fields, so an older
+/// Blockwork says the file is too new instead of turning blocks into notes.
 pub const FORMAT_VERSION: u64 = 1;
 const VERSION_KEY: &str = "format_version";
 
