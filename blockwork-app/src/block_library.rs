@@ -30,6 +30,8 @@ pub(crate) struct PackDto {
     pub(crate) version: String,
     pub(crate) blocks: Vec<String>,
     pub(crate) source: String,
+    /// Published by the Blockworked team; shows a verified badge.
+    pub(crate) official: bool,
     /// The version the open macro has, or empty.
     pub(crate) installed: String,
     /// Installed, but the library has a different file.
@@ -136,6 +138,7 @@ pub(crate) fn dto(s: &AppState) -> LibraryDto {
                 version: entry.info.version.clone(),
                 blocks: entry.blocks.clone(),
                 source: source.clone(),
+                official: entry.official,
                 installed: installed.map(|r| if r.version.is_empty() { "?".into() } else { r.version.clone() }).unwrap_or_default(),
                 update: installed.is_some_and(|r| r.sha256 != entry.sha256),
             }

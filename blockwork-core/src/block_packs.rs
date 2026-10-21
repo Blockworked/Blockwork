@@ -59,6 +59,10 @@ pub struct IndexEntry {
     /// The block names, for showing before download.
     #[serde(default)]
     pub blocks: Vec<String>,
+    /// Published by the Blockworked team. Only believed from the built-in
+    /// library, since any index could claim it.
+    #[serde(default)]
+    pub official: bool,
 }
 
 #[derive(Debug, Clone, PartialEq)]
@@ -278,6 +282,7 @@ pub fn read_index(text: &str, base_url: &str) -> Result<Index, String> {
         if entry.sha256.len() != 64 || entry.info.id.is_empty() {
             continue;
         }
+        entry.official &= base_url == DEFAULT_INDEX;
         packs.push(entry);
     }
     Ok(Index { name, packs })
@@ -488,5 +493,18 @@ mod tests {
         let index = read_index(&index, base).unwrap();
         assert_eq!(index.packs.len(), 1, "the entry without a real hash is skipped");
         assert_eq!(index.packs[0].url, "https://example.com/blocks/a.json");
+    }
+
+    #[test]
+    fn only_the_built_in_library_marks_packs_official() {
+        let hash = sha256_hex(b"abc");
+        let index = format!(
+            r#"{{"blockwork_block_index":1,"name":"Test","packs":[
+                {{"id":"a","name":"A","url":"a.json","sha256":"{hash}","official":true}},
+                {{"id":"b","name":"B","url":"b.json","sha256":"{hash}"}}]}}"#
+        );
+        let official = |base| read_index(&index, base).unwrap().packs.iter().map(|p| p.official).collect::<Vec<_>>();
+        assert_eq!(official(DEFAULT_INDEX), [true, false], "older indexes without the field have no badge");
+        assert_eq!(official("https://example.com/index.json"), [false, false]);
     }
 }

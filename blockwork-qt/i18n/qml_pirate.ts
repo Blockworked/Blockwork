@@ -282,83 +282,88 @@
         <translation>No packs aboard yet. Add a hold in Settings &gt; Block library, or bring a pack from a scroll.</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="130"/>
-        <location filename="../qml/BlockLibrary.qml" line="182"/>
+        <location filename="../qml/BlockLibrary.qml" line="137"/>
+        <location filename="../qml/BlockLibrary.qml" line="206"/>
         <source>by %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="149"/>
+        <location filename="../qml/BlockLibrary.qml" line="147"/>
+        <source>Verified official pack</source>
+        <translation>Official cargo, sealed by the cap&apos;n</translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockLibrary.qml" line="173"/>
         <source>Downloading...</source>
         <translation>Haulin&apos; aboard...</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="149"/>
+        <location filename="../qml/BlockLibrary.qml" line="173"/>
         <source>Update</source>
         <translation>Refit</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="150"/>
+        <location filename="../qml/BlockLibrary.qml" line="174"/>
         <source>Added</source>
         <translation>Aboard</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="150"/>
+        <location filename="../qml/BlockLibrary.qml" line="174"/>
         <source>Add</source>
         <translation>Bring aboard</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="160"/>
+        <location filename="../qml/BlockLibrary.qml" line="184"/>
         <source>Add blocks from a pack</source>
         <translation>Bring blocks aboard from a pack</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="163"/>
+        <location filename="../qml/BlockLibrary.qml" line="187"/>
         <source>Block packs (*.blockpack *.json)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="163"/>
+        <location filename="../qml/BlockLibrary.qml" line="187"/>
         <source>All files (*)</source>
         <translation>All scrolls (*)</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="174"/>
+        <location filename="../qml/BlockLibrary.qml" line="198"/>
         <source>Add &quot;%1&quot;?</source>
         <translation>Bring &quot;%1&quot; aboard?</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="176"/>
+        <location filename="../qml/BlockLibrary.qml" line="200"/>
         <source>Add blocks</source>
         <translation>Bring the blocks aboard</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="181"/>
+        <location filename="../qml/BlockLibrary.qml" line="205"/>
         <source>Version %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="183"/>
+        <location filename="../qml/BlockLibrary.qml" line="207"/>
         <source>from %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="193"/>
+        <location filename="../qml/BlockLibrary.qml" line="217"/>
         <source>Matches the checksum its library lists.</source>
         <translation>Matches the checksum its treasure hold lists. No foul play here.</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="193"/>
+        <location filename="../qml/BlockLibrary.qml" line="217"/>
         <source>From a file, so there&apos;s no checksum to compare.</source>
         <translation>From a scroll, so there be no checksum to compare.</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="203"/>
+        <location filename="../qml/BlockLibrary.qml" line="227"/>
         <source>Adds these blocks to &quot;%1&quot;:</source>
         <translation>Stows these blocks in &quot;%1&quot;:</translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="216"/>
+        <location filename="../qml/BlockLibrary.qml" line="240"/>
         <source>This macro already has %n block(s) from an earlier version. They&apos;re replaced, along with any changes you made to them; blocks that use them keep working.</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -366,77 +371,77 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="220"/>
+        <location filename="../qml/BlockLibrary.qml" line="244"/>
         <source>These blocks can:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="220"/>
+        <location filename="../qml/BlockLibrary.qml" line="244"/>
         <source>These blocks only use blocks that stay inside Blockwork, like waits and variables.</source>
         <translation>These blocks only use blocks that stay aboard Blockwork, like waits an&apos; variables.</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="237"/>
+        <location filename="../qml/BlockLibrary.qml" line="261"/>
         <source>Blocks run with the permissions of the macro you add them to, so only add these from people you trust.</source>
         <translation>Blocks sail with the permissions o&apos; the macro ye stow them in, so only bring these aboard from mateys ye trust.</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="254"/>
+        <location filename="../qml/BlockLibrary.qml" line="278"/>
         <source>Share blocks as a pack</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="259"/>
+        <location filename="../qml/BlockLibrary.qml" line="283"/>
         <source>Save pack...</source>
         <translation>Stow the pack...</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="266"/>
+        <location filename="../qml/BlockLibrary.qml" line="290"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="268"/>
+        <location filename="../qml/BlockLibrary.qml" line="292"/>
         <source>What the blocks do</source>
         <translation>What the blocks be doin&apos;</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="274"/>
+        <location filename="../qml/BlockLibrary.qml" line="298"/>
         <source>Author</source>
         <translation>Captain</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="279"/>
+        <location filename="../qml/BlockLibrary.qml" line="303"/>
         <source>Version</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="283"/>
+        <location filename="../qml/BlockLibrary.qml" line="307"/>
         <source>Blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="295"/>
+        <location filename="../qml/BlockLibrary.qml" line="319"/>
         <source>Blocks these use come along, with the variables and lists they need. Secret values are left out. Keep the same name for later versions so they replace the old blocks.</source>
         <translation>Blocks these use come along too, with the variables an&apos; lists they need. Secret values be left ashore. Keep the same name fer later versions so they replace the old blocks.</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="299"/>
+        <location filename="../qml/BlockLibrary.qml" line="323"/>
         <source>Pick at least one block to share.</source>
         <translation>Pick at least one block to share, ye scallywag.</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="308"/>
+        <location filename="../qml/BlockLibrary.qml" line="332"/>
         <source>Save block pack</source>
         <translation>Stow the block pack</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="311"/>
+        <location filename="../qml/BlockLibrary.qml" line="335"/>
         <source>Block packs (*.blockpack)</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="316"/>
+        <location filename="../qml/BlockLibrary.qml" line="340"/>
         <source>Saved %n block(s). Others can add them with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -444,17 +449,17 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="322"/>
+        <location filename="../qml/BlockLibrary.qml" line="346"/>
         <source>Pack saved</source>
         <translation>Pack stowed</translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="323"/>
+        <location filename="../qml/BlockLibrary.qml" line="347"/>
         <source>Submit to community library...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="331"/>
+        <location filename="../qml/BlockLibrary.qml" line="355"/>
         <source>Something went wrong</source>
         <translation>Shiver me timbers, somethin&apos; went wrong</translation>
     </message>
@@ -5058,7 +5063,7 @@
     <message>
         <location filename="../qml/SettingsPage.qml" line="143"/>
         <source>How long menus, dialogs, scrolling and other transitions take. Instant turns animations off.</source>
-        <translation>How long menus, dialogs, scrollin' an' other flourishes take. Instant scuttles the flourishes entirely.</translation>
+        <translation>How long menus, dialogs, scrollin&apos; an&apos; other flourishes take. Instant scuttles the flourishes entirely.</translation>
     </message>
     <message>
         <location filename="../qml/SettingsPage.qml" line="162"/>

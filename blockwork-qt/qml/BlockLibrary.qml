@@ -124,10 +124,34 @@ Item {
                             Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold
                             text: packRow.modelData.name + (packRow.modelData.version ? "  " + packRow.modelData.version : "")
                         }
-                        Text {
-                            visible: text !== ""
-                            Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.textDim; font.pixelSize: 11
-                            text: [packRow.modelData.author ? qsTr("by %1").arg(packRow.modelData.author) : "", packRow.modelData.source].filter(s => s).join(" - ")
+                        RowLayout {
+                            id: byRow
+                            readonly property string author: packRow.modelData.author
+                            readonly property string source: packRow.modelData.source
+                            visible: author !== "" || source !== ""
+                            Layout.fillWidth: true; spacing: 4
+                            Text {
+                                visible: byRow.author !== ""
+                                Layout.maximumWidth: byRow.width - (verifiedBadge.visible ? verifiedBadge.width + byRow.spacing : 0)
+                                elide: Text.ElideRight; color: Theme.textDim; font.pixelSize: 11
+                                text: qsTr("by %1").arg(byRow.author)
+                            }
+                            // Same badge the community library site shows next to the team's packs.
+                            Rectangle {
+                                id: verifiedBadge
+                                visible: byRow.author !== "" && packRow.modelData.official === true
+                                implicitWidth: 13; implicitHeight: 13; radius: 6.5; color: Theme.accent
+                                Accessible.role: Accessible.Graphic; Accessible.name: verifiedTip.text
+                                LucideIcon { anchors.centerIn: parent; width: 9; height: 9; strokeWidth: 3.5; name: "check"; color: "#ffffff" }
+                                HoverHandler { id: badgeHover }
+                                ToolTip { id: verifiedTip; visible: badgeHover.hovered; delay: 300; text: qsTr("Verified official pack") }
+                            }
+                            Text {
+                                visible: byRow.source !== ""
+                                Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.textDim; font.pixelSize: 11
+                                text: (byRow.author !== "" ? "- " : "") + byRow.source
+                            }
+                            Item { visible: byRow.source === ""; Layout.fillWidth: true }
                         }
                         Text {
                             visible: packRow.modelData.description !== ""
