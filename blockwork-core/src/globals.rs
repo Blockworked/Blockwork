@@ -74,12 +74,27 @@ fn schedule_save() {
     });
 }
 
+/// The store as saved: secret values masked, like in macro files, so a
+/// global that held a secret never reaches the disk in plain text.
+fn without_secrets(store: &BTreeMap<String, Evaluated>) -> BTreeMap<String, Evaluated> {
+    store
+        .iter()
+        .map(|(name, value)| {
+            let value = match value {
+                Evaluated::Text(text) => Evaluated::Text(crate::secrets::redact(text)),
+                other => other.clone(),
+            };
+            (name.clone(), value)
+        })
+        .collect()
+}
+
 /// Writes pending changes now.
 pub fn flush() {
     if !DIRTY.swap(false, Ordering::AcqRel) {
         return;
     }
-    let (Some(path), Ok(json)) = (path(), with_store(|store| serde_json::to_string_pretty(store))) else {
+    let (Some(path), Ok(json)) = (path(), with_store(|store| serde_json::to_string_pretty(&without_secrets(store)))) else {
         return;
     };
     if let Some(dir) = path.parent() {
@@ -106,5 +121,17 @@ mod tests {
         assert!(set("  ", Evaluated::Bool(true)).is_err());
         remove("globals-test");
         assert_eq!(get("globals-test"), Evaluated::Number(0.0));
+    }
+
+    #[test]
+    fn saved_globals_mask_secrets() {
+        crate::secrets::set("globals-test-secret", "hunter2-globals").unwrap();
+        let mut store = BTreeMap::new();
+        store.insert("token".to_string(), Evaluated::Text("Bearer hunter2-globals".into()));
+        store.insert("count".to_string(), Evaluated::Number(3.0));
+        let saved = without_secrets(&store);
+        assert_eq!(saved["token"], Evaluated::Text(format!("Bearer {}", crate::secrets::MASK)));
+        assert_eq!(saved["count"], Evaluated::Number(3.0));
+        let _ = crate::secrets::delete("globals-test-secret");
     }
 }
