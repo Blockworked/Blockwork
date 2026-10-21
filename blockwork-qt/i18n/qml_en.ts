@@ -44,9 +44,9 @@
     <message numerus="yes">
         <location filename="../qml/BlockLibrary.qml" line="315"/>
         <source>Saved %n block(s). Others can add them with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Saved %n block. Others can add it with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</numerusform>
+            <numerusform>Saved %n blocks. Others can add them with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</numerusform>
         </translation>
     </message>
 </context>

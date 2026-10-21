@@ -52,7 +52,14 @@ QStringList blockwork_languages()
 {
     QStringList codes;
     const auto files = QDir(QStringLiteral(":/i18n")).entryList({QStringLiteral("qml_*.qm")}, QDir::Files, QDir::Name);
-    for (const QString &file : files)
-        codes << file.mid(4, file.size() - 7);
+    for (const QString &file : files) {
+        const QString code = file.mid(4, file.size() - 7);
+        // Weblate adds a catalog for every language it offers, translated or
+        // not; one with nothing in it would only switch the UI to English.
+        QTranslator catalog;
+        if (code != QStringLiteral("en") && (!catalog.load(QStringLiteral(":/i18n/") + file) || catalog.isEmpty()))
+            continue;
+        codes << code;
+    }
     return codes;
 }
