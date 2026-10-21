@@ -3,6 +3,7 @@
 //! strand's body on its own trigger rather than the user pressing Run.
 
 use crate::state::{build_state_dto, SharedState};
+use blockwork_core::input::value::Evaluated;
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::runner::{run_fired_strand, VariableStore};
 use blockwork_core::run_log;
@@ -31,6 +32,24 @@ pub(crate) fn fire(
     list_defs: &[ListDef],
     shared_state: SharedState,
     app: AppHandle,
+) {
+    fire_with_input(macro_id, instructions, emulator, speed_multiplier, variable_defs, list_defs, shared_state, app, None)
+}
+
+/// `fire`, where `input` is a variable the trigger filled for this run only
+/// (a webhook's request body): it's put back to the given value before the
+/// run's variables are saved, so the input never lands in the macro file.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn fire_with_input(
+    macro_id: String,
+    instructions: Vec<Instruction>,
+    emulator: Arc<Mutex<dyn InputBackend>>,
+    speed_multiplier: f64,
+    variable_defs: &[VariableDef],
+    list_defs: &[ListDef],
+    shared_state: SharedState,
+    app: AppHandle,
+    input: Option<(String, Evaluated)>,
 ) {
     let variables: VariableStore = Arc::new(Mutex::new(variable_defs.iter().map(|v| (v.name.clone(), v.value.clone())).collect()));
     let lists: ListStore = Arc::new(Mutex::new(list_defs.iter().map(|list| (list.name.clone(), list.items.clone())).collect()));
@@ -61,6 +80,11 @@ pub(crate) fn fire(
         run_fired_strand(source, instructions, emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists), block_table, max_loops);
         done.store(true, Ordering::Relaxed);
         run_registry::end_run(&run_flag);
+        if let Some((name, value)) = input
+            && let Ok(mut vars) = variables.lock()
+        {
+            vars.insert(name, value);
+        }
         persist_fired_variables(&shared_state, &app, &macro_id, &variables, &lists);
     });
 }

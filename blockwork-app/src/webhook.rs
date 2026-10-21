@@ -138,7 +138,7 @@ fn read_request(stream: &TcpStream) -> Result<Request, (u16, &'static str)> {
     let query = query
         .split('&')
         .filter_map(|pair| pair.split_once('=').or(Some((pair, ""))))
-        .map(|(k, v)| (k.to_string(), v.to_string()))
+        .map(|(k, v)| (percent_decode(k, true), percent_decode(v, true)))
         .collect();
     let mut headers = HashMap::new();
     for _ in 0..MAX_HEADER_LINES {
@@ -160,11 +160,43 @@ fn read_request(stream: &TcpStream) -> Result<Request, (u16, &'static str)> {
     reader.read_exact(&mut body).map_err(|_| (400, "the body was cut short"))?;
     Ok(Request {
         method: method.to_ascii_uppercase(),
-        path: path.trim_matches('/').to_string(),
+        path: percent_decode(path.trim_matches('/'), false),
         query,
         headers,
         body: String::from_utf8_lossy(&body).into_owned(),
     })
+}
+
+/// Decodes `%XX` escapes, and in a query `+` (a space), so a token or path
+/// a client URL-encoded still matches.
+fn percent_decode(text: &str, query: bool) -> String {
+    let bytes = text.as_bytes();
+    let hex = |b: u8| (b as char).to_digit(16);
+    let mut out = Vec::with_capacity(bytes.len());
+    let mut i = 0;
+    while i < bytes.len() {
+        match bytes[i] {
+            b'%' if i + 2 < bytes.len() => {
+                if let (Some(h), Some(l)) = (hex(bytes[i + 1]), hex(bytes[i + 2])) {
+                    out.push((h * 16 + l) as u8);
+                    i += 3;
+                    continue;
+                }
+                out.push(b'%');
+            }
+            b'+' if query => out.push(b' '),
+            b => out.push(b),
+        }
+        i += 1;
+    }
+    String::from_utf8_lossy(&out).into_owned()
+}
+
+/// Compares in time that doesn't depend on where the first difference is,
+/// so the token can't be guessed a character at a time.
+fn same_token(given: &str, token: &str) -> bool {
+    let (a, b) = (given.as_bytes(), token.as_bytes());
+    a.len() == b.len() && a.iter().zip(b).fold(0u8, |diff, (x, y)| diff | (x ^ y)) == 0
 }
 
 fn respond(mut stream: &TcpStream, status: u16, body: serde_json::Value) {
@@ -208,7 +240,7 @@ fn handle(stream: TcpStream, token: &str, state: &SharedState, app: &AppHandle) 
         .or_else(|| request.headers.get("authorization").and_then(|a| a.strip_prefix("Bearer ")).map(str::to_string))
         .or_else(|| request.query.get("token").cloned())
         .unwrap_or_default();
-    if token.is_empty() || given != token {
+    if token.is_empty() || !same_token(&given, token) {
         return respond(&stream, 401, serde_json::json!({ "error": "missing or wrong token" }));
     }
     let fired = fire(&request.path, &request.body, state, app);
@@ -235,17 +267,19 @@ fn fire(path: &str, body: &str, state: &SharedState, app: &AppHandle) -> usize {
                     continue;
                 }
                 let mut variables = mac.variables.clone();
+                let mut input = None;
                 if let Some(var) = variables.iter_mut().find(|v| v.name == *variable) {
+                    input = Some((var.name.clone(), var.value.clone()));
                     var.value = Evaluated::Text(body.to_string());
                 }
-                fires.push((mac.id.clone(), strand.instructions[1..].to_vec(), variables, mac.lists.clone()));
+                fires.push((mac.id.clone(), strand.instructions[1..].to_vec(), variables, mac.lists.clone(), input));
             }
         }
         (emulator, s.global_speed_multiplier)
     };
     let count = fires.len();
-    for (id, body, variables, lists) in fires {
-        scheduled_run::fire(id, body, Arc::clone(&emulator), speed, &variables, &lists, Arc::clone(state), app.clone());
+    for (id, body, variables, lists, input) in fires {
+        scheduled_run::fire_with_input(id, body, Arc::clone(&emulator), speed, &variables, &lists, Arc::clone(state), app.clone(), input);
     }
     count
 }
@@ -277,5 +311,13 @@ mod tests {
         let request = read_request(&stream).map_err(|(status, _)| status).unwrap();
         assert_eq!((request.method.as_str(), request.path.as_str(), request.body.as_str()), ("POST", "deploy", "hi"));
         client.join().unwrap();
+    }
+
+    #[test]
+    fn decodes_queries_and_compares_tokens() {
+        assert_eq!(percent_decode("a%2Bb+c%zz%4", true), "a+b c%zz%4");
+        assert_eq!(percent_decode("deploy%20now+x", false), "deploy now+x");
+        assert!(same_token("abc", "abc"));
+        assert!(!same_token("abd", "abc") && !same_token("ab", "abc") && !same_token("", "abc"));
     }
 }
