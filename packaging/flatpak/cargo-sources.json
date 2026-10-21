@@ -2,8 +2,8 @@
     {
         "type": "git",
         "url": "https://github.com/blockworked/blockstitch",
-        "commit": "aee80af36c77480d5be6e3f60f0ba6b3dcfbeec3",
-        "dest": "flatpak-cargo/git/blockstitch-aee80af"
+        "commit": "00365f174264076da6f0ebfbb4502576fd585313",
+        "dest": "flatpak-cargo/git/blockstitch-00365f1"
     },
     {
         "type": "git",
@@ -605,7 +605,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-aee80af/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-00365f1/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
         ]
     },
     {
@@ -623,7 +623,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-aee80af/.\" \"cargo/vendor/blockstitch-qml\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-00365f1/.\" \"cargo/vendor/blockstitch-qml\""
         ]
     },
     {
