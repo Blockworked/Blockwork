@@ -58,6 +58,23 @@ Item {
             mouseMove(scene, start.x + 30, start.y + 20, 20);
             verify(!!page.paletteDrag, "Header parameter starts the editor's palette drag");
         }
+        function test_new_custom_calls_keep_pack_defaults() {
+            const page = editor();
+            const definition = {id:"example",shape:"Normal",pieces:[
+                {kind:"Label",text:"example"},
+                {kind:"Input",name:"window",default_value:{kind:"Text",value:""}},
+                {kind:"Input",name:"monitor",default_value:{kind:"Number",value:1}},
+                {kind:"Branch",name:"body"}
+            ]};
+            page.addCustomBlock(definition, 100, 150);
+            const call = scene.calls.find(c => c.command === "add_strand");
+            verify(!!call);
+            compare(call.args.instruction.type, "BranchCallBlock");
+            compare(call.args.instruction.args[0].kind, "Text");
+            compare(call.args.instruction.args[0].value, "");
+            compare(call.args.instruction.args[1].value, 1);
+            compare(call.args.instruction.branches.length, 1);
+        }
         function test_drag_to_canvas_data() { return [{tag:"number",name:"gain",boolean:false},{tag:"boolean",name:"enabled",boolean:true}]; }
         function test_drag_to_canvas(data) {
             const page = editor();

@@ -3,7 +3,7 @@
 
 use crate::input::types::InputToken;
 use crate::input::value::Value;
-use crate::macros::{BlockDef, InputValueType, InstructionKind};
+use crate::macros::{BlockDef, InstructionKind};
 use serde::{Deserialize, Serialize};
 
 /// One addressable value slot on an [`InstructionKind`]. Travels as its
@@ -383,8 +383,7 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
 }
 
 /// The blank a field restores to when its value is dragged out; `None`
-/// means a plain zero. Only boolean slots differ, and a call site's
-/// declared types live on the [`BlockDef`] rather than on the call.
+/// means a plain zero. Custom inputs use the definition's default.
 pub(crate) fn blank_field_value(
     kind: &InstructionKind,
     field: FieldId,
@@ -394,12 +393,7 @@ pub(crate) fn blank_field_value(
         (_, FieldId::Condition) => Some(Value::Bool),
         (_, FieldId::KeyValue) => Some(Value::Text { value: String::new() }),
         (InstructionKind::CallBlock { block_id, .. }, FieldId::CallArg(index)) => {
-            let declared = blocks
-                .iter()
-                .find(|def| def.id == *block_id)?
-                .input_types()
-                .nth(index)?;
-            (declared == InputValueType::Bool).then_some(Value::Bool)
+            blocks.iter().find(|def| def.id == *block_id)?.input_defaults().nth(index)
         }
         _ => None,
     }

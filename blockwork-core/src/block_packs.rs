@@ -240,6 +240,9 @@ pub fn pack_from_macro(mac: &Macro, block_ids: &[String], info: PackInfo) -> Res
         ..MacroGraph::new()
     };
     let info = clean_info(info)?;
+    for def in &content.block_defs {
+        crate::macros::BlockDef::validate_input_defaults(&def.pieces)?;
+    }
     apply_details(&mut content, &info);
     Ok(BlockPack { info, content, notes: Vec::new() })
 }
@@ -309,6 +312,9 @@ pub fn read_pack(text: &str) -> Result<BlockPack, String> {
     content.graph.floating_values.clear();
     if content.block_defs.is_empty() {
         return Err("The block pack has no blocks".into());
+    }
+    for def in &content.block_defs {
+        crate::macros::BlockDef::validate_input_defaults(&def.pieces)?;
     }
     apply_details(&mut content, &info);
     Ok(BlockPack { info, content, notes: upgrade.notes })
@@ -499,6 +505,40 @@ mod tests {
 
     fn call(id: &str) -> InstructionKind {
         InstructionKind::CallBlock { block_id: id.into(), args: Vec::new(), branches: Vec::new() }
+    }
+
+    #[test]
+    fn input_defaults_survive_pack_updates_without_resetting_calls() {
+        use crate::input::value::Evaluated;
+        let mut author = Macro::new("author".into(), String::new(), vec![]);
+        let id = author.create_block(vec![label("example"), BlockPiece::Input {
+            id: "input".into(), name: "text".into(), value_type: Default::default(),
+            default_value: Some(Evaluated::Text("example".into())),
+        }], crate::macros::BlockShape::Normal, "#4C97FF".into(), 0, 0);
+        let info = PackInfo { id: "example".into(), name: "Example".into(), ..PackInfo::default() };
+        let pack = pack_from_macro(&author, &[id.clone()], info).unwrap();
+        let mut pack = read_pack(&write_pack(&pack).unwrap()).unwrap();
+        assert_eq!(pack.content.block_def(&id).unwrap().input_defaults().collect::<Vec<_>>(), vec![Value::text("example")]);
+        let mut target = Macro::new("target".into(), String::new(), vec![]);
+        merge_into(&mut target, &pack, "");
+        target.graph.strands.push(Strand::with_instructions(0, 0, vec![crate::macros::Instruction::new(InstructionKind::CallBlock {
+            block_id: id.clone(), args: vec![Value::text("edited")], branches: vec![],
+        })]));
+        if let BlockPiece::Input { default_value, .. } = &mut pack.content.graph.block_defs[0].pieces[1] {
+            *default_value = Some(Evaluated::Text("new default".into()));
+        }
+        pack.content.graph.block_defs[0].pieces.push(BlockPiece::Input {
+            id: "attempts".into(), name: "attempts".into(), value_type: Default::default(),
+            default_value: Some(Evaluated::Number(3.0)),
+        });
+        merge_into(&mut target, &pack, "");
+        let call = target.strands.last().unwrap().instructions.first().unwrap();
+        let InstructionKind::CallBlock { args, .. } = &call.kind else { panic!("call") };
+        assert_eq!(args, &vec![Value::text("edited"), Value::number(3.0)]);
+        assert_eq!(target.block_def(&id).unwrap().input_defaults().collect::<Vec<_>>(), vec![Value::text("new default"), Value::number(3.0)]);
+        let saved = migrate::to_value(&target).unwrap();
+        let (loaded, _) = migrate::from_value(saved).unwrap();
+        assert_eq!(loaded.block_def(&id).unwrap(), target.block_def(&id).unwrap());
     }
 
     #[test]

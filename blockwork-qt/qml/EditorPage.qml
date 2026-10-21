@@ -66,11 +66,8 @@ Item {
     function firstListName() { return root.macro && root.macro.lists && root.macro.lists.length ? root.macro.lists[0].name : ""; }
     function addBlock(type, x, y) { root.invoke("add_strand", { x: x, y: y, instruction: defaultInstruction(type) }); }
     function addCustomBlock(definition, x, y) {
-        const args = (definition.pieces || []).filter(piece => piece.kind === "Input")
-            .map(piece => piece.value_type === "Bool" ? { kind: "Bool" } : numberValue(0));
-        const branchCount = (definition.pieces || []).filter(piece => piece.kind === "Branch").length;
-        const instruction = { id: uuid(), type: branchCount ? "BranchCallBlock" : "CallBlock", block_id: definition.id, args: args };
-        if (branchCount) instruction.branches = Array.from({ length: branchCount }, () => []);
+        const instruction = palette.customInstruction(definition);
+        instruction.id = uuid();
         root.invoke("add_strand", { x: x, y: y, instruction: instruction });
     }
     function recordingLabel() {
@@ -442,11 +439,8 @@ Item {
             if (spec.kind === "branch") {
                 root.invoke("add_instruction", { strandId: snapTargetId, path: snapPath, instruction: { id: uuid(), type: "RunBranch", name: spec.instruction.name } });
             } else if (spec.kind === "custom") {
-                const args = (spec.definition.pieces || []).filter(piece => piece.kind === "Input")
-                    .map(piece => piece.value_type === "Bool" ? { kind: "Bool" } : numberValue(0));
-                const branchCount = (spec.definition.pieces || []).filter(piece => piece.kind === "Branch").length;
-                const instruction = { id: uuid(), type: branchCount ? "BranchCallBlock" : "CallBlock", block_id: spec.definition.id, args: args };
-                if (branchCount) instruction.branches = Array.from({ length: branchCount }, () => []);
+                const instruction = palette.customInstruction(spec.definition);
+                instruction.id = uuid();
                 root.invoke("add_instruction", { strandId: snapTargetId, path: snapPath, instruction: instruction });
             } else {
                 root.invoke("add_instruction", { strandId: snapTargetId, path: snapPath, instruction: defaultInstruction(spec.type) });

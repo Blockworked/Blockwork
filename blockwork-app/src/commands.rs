@@ -3928,6 +3928,7 @@ mod value_location_tests {
             id: id.to_string(),
             name: name.to_string(),
             value_type: Default::default(),
+            default_value: None,
         }
     }
 
@@ -4090,6 +4091,7 @@ mod value_location_tests {
                 id: "i2".into(),
                 name: "b".into(),
                 value_type: InputValueType::Bool,
+                default_value: None,
             },
         ];
         mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);

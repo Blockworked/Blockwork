@@ -260,7 +260,7 @@ AppDialog {
             pieces.append({
                 pieceKind: p.kind,
                 pieceName: p.kind === "Label" ? p.text : p.name,
-                valueType: p.kind === "Input" ? p.value_type : "Any",
+                valueType: p.kind === "Input" ? (p.value_type || "Any") : "Any",
                 pieceId: p.id || ""
             });
         }
@@ -447,6 +447,10 @@ AppDialog {
         pieces.remove(selectedPiece);
         selectedPiece = pieces.count ? Math.max(0, Math.min(selectedPiece, pieces.count - 1)) : -1;
     }
+    function inputDefaultForPiece(id, valueType) {
+        const original = pendingDef && (pendingDef.pieces || []).find(p => p.id === id && p.kind === "Input");
+        return original && (original.value_type || "Any") === valueType ? original.default_value : undefined;
+    }
     function resultPieces() {
         const out = [];
         for (let i = 0; i < pieces.count; ++i) {
@@ -469,7 +473,8 @@ AppDialog {
                     kind: "Input",
                     id: p.pieceId || uuid(),
                     name: name,
-                    value_type: p.valueType
+                    value_type: p.valueType,
+                    default_value: root.inputDefaultForPiece(p.pieceId, p.valueType)
                 });
         }
         return out;

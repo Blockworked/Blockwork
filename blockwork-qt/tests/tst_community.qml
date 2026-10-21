@@ -36,6 +36,7 @@ Item {
         appBridge: bridge
         macroFiles: null
     }
+    Component { id: blockDialogComponent; MakeBlockDialog {} }
     TestCase {
         name: "ManagedCommunityPacks"
         when: windowShown
@@ -44,6 +45,43 @@ Item {
             for (const child of object.children || []) found = found.concat(all(child));
             if (object.contentItem && (object.children || []).indexOf(object.contentItem) < 0) found = found.concat(all(object.contentItem));
             return found;
+        }
+        function test_editing_preserves_pack_defaults() {
+            const dialog = createTemporaryObject(blockDialogComponent, scene);
+            verify(!!dialog);
+            const definition = {id:"defaults",shape:"Normal",pieces:[
+                {kind:"Label",id:"label",text:"example"},
+                {kind:"Input",id:"text",name:"text",default_value:{kind:"Text",value:""}},
+                {kind:"Input",id:"number",name:"count",value_type:"Any",default_value:{kind:"Number",value:1}}
+            ]};
+            dialog.pendingDef = definition;
+            dialog.loadDef(definition);
+            const pieces = dialog.resultPieces();
+            compare(pieces[1].default_value.kind, "Text");
+            compare(pieces[1].default_value.value, "");
+            compare(pieces[2].default_value.value, 1);
+        }
+        function test_pack_input_defaults() {
+            const definition = {id:"defaults",shape:"Normal",pieces:[
+                {kind:"Label",text:"example"},
+                {kind:"Input",name:"window",default_value:{kind:"Text",value:""}},
+                {kind:"Input",name:"monitor",default_value:{kind:"Number",value:1}},
+                {kind:"Input",name:"enabled",value_type:"Bool",default_value:{kind:"Bool",value:true}},
+                {kind:"Input",name:"legacy"},
+                {kind:"Input",name:"legacy bool",value_type:"Bool"}
+            ]};
+            const command = palette.customInstruction(definition);
+            compare(command.args[0].kind, "Text");
+            compare(command.args[0].value, "");
+            compare(command.args[1].value, 1);
+            compare(command.args[2].op, "True");
+            compare(command.args[3].value, 0);
+            compare(command.args[4].kind, "Bool");
+            const reporter = palette.customValue(definition);
+            compare(JSON.stringify(command.args), JSON.stringify(reporter.args));
+            command.args[1].value = 7;
+            compare(palette.customInstruction(definition).args[1].value, 1);
+            compare(definition.pieces[2].default_value.value, 1);
         }
         function test_community_palette() {
             verify(palette.categories.some(c => c.id === "community"));
