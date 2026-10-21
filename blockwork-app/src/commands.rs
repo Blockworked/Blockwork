@@ -2940,6 +2940,17 @@ pub(crate) fn set_language(state: &SharedState, app: &AppHandle, language: Strin
     Ok(())
 }
 
+/// How times show: "12h", "24h", or empty to follow the system locale.
+pub(crate) fn set_clock_format(state: &SharedState, app: &AppHandle, format: String) -> Result<(), String> {
+    if !matches!(format.as_str(), "" | "12h" | "24h") {
+        return Err(format!("Unknown clock format: {format}"));
+    }
+    config::update_settings(|settings| settings.clock_format = (!format.is_empty()).then_some(format));
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
 /// How long UI animations take, as a duration multiplier: 0 is instant, 1 normal.
 pub(crate) fn set_animation_speed(state: &SharedState, app: &AppHandle, speed: f64) -> Result<(), String> {
     if !speed.is_finite() || !(0.0..=crate::MAX_ANIMATION_SPEED).contains(&speed) {

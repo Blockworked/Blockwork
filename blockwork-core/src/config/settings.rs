@@ -73,6 +73,10 @@ pub struct AppSettings {
     /// 1 (the default) is normal, higher is slower.
     #[serde(default)]
     pub animation_speed: Option<f64>,
+    /// How times show: "12h" (with AM/PM), "24h", or `None`/empty to follow
+    /// the system locale. Saved times are always 24-hour.
+    #[serde(default)]
+    pub clock_format: Option<String>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {

@@ -185,6 +185,8 @@ pub(crate) struct StateDto {
     pub(crate) language: String,
     /// UI animation duration multiplier; 0 is instant, 1 normal.
     pub(crate) animation_speed: f64,
+    /// "12h", "24h", or empty to follow the system locale.
+    pub(crate) clock_format: String,
 }
 
 /// One macro as the library lists it.
@@ -2026,6 +2028,7 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         pack_review: s.pending_pack.as_ref().map(|p| p.review.clone()),
         language: crate::ui_language(),
         animation_speed: crate::animation_speed(),
+        clock_format: blockwork_core::config::load_settings().clock_format.unwrap_or_default(),
     }
 }
 

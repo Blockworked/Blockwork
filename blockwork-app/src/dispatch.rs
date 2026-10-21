@@ -799,6 +799,10 @@ impl Backend {
                 let language: String = arg(&args, "language")?;
                 to_json(commands::set_language(&self.state, &self.app, language)?)
             }
+            "set_clock_format" => {
+                let format: String = arg(&args, "format")?;
+                to_json(commands::set_clock_format(&self.state, &self.app, format)?)
+            }
             "set_animation_speed" => {
                 let speed: f64 = arg(&args, "speed")?;
                 to_json(commands::set_animation_speed(&self.state, &self.app, speed)?)

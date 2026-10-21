@@ -140,6 +140,14 @@ Item {
                                     }
                                 }
                             }
+                            SettingsRow { title: qsTr("Time format"); detail: qsTr("How times show in blocks and pickers.")
+                                BwComboBox {
+                                    readonly property var formats: [{ id: "", text: qsTr("System default") }, { id: "12h", text: qsTr("12-hour (9:30 PM)") }, { id: "24h", text: qsTr("24-hour (21:30)") }]
+                                    model: formats; textRole: "text"; implicitWidth: 210
+                                    currentIndex: Math.max(0, formats.findIndex(f => f.id === (appState.clock_format || "")))
+                                    onActivated: index => root.invoke("set_clock_format", { format: formats[index].id })
+                                }
+                            }
                             SettingsRow { title: qsTr("Animation speed"); detail: qsTr("How long menus, dialogs, scrolling and other transitions take. Instant turns animations off.")
                                 Column {
                                     spacing: 2

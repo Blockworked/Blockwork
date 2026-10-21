@@ -17,8 +17,21 @@ QtObject {
                 qsTr("August"), qsTr("September"), qsTr("October"), qsTr("November"), qsTr("December")][m - 1];
     }
 
+    // "12h", "24h", or "" to follow the system locale (Settings > General).
+    property string clockFormat: ""
+    readonly property bool use12h: clockFormat === "12h" || (clockFormat !== "24h" && /a/i.test(Qt.locale().timeFormat(Locale.ShortFormat)))
+    readonly property string amText: Qt.locale().amText || "AM"
+    readonly property string pmText: Qt.locale().pmText || "PM"
+
     function pad(n) { return String(n).padStart(2, "0"); }
-    function clock(hour, minute) { return pad(hour) + ":" + pad(minute); }
+    // How a time reads: "09:30", or "9:30 AM" on a 12-hour clock.
+    function clock(hour, minute) {
+        if (!use12h) return pad(hour % 24) + ":" + pad(minute);
+        const h = hour % 24;
+        return (h % 12 || 12) + ":" + pad(minute) + " " + (h < 12 ? amText : pmText);
+    }
+    // How a time is saved: always 24-hour "09:30", whatever the clock shows.
+    function stamp(hour, minute) { return pad(hour) + ":" + pad(minute); }
 
     // "09:30", "9", "9:30 pm" -> {hour, minute} (24-hour), or null. Same
     // rules as blockwork-core's `parse_time_of_day`.

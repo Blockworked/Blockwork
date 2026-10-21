@@ -29,10 +29,10 @@ AppDialog {
     readonly property var minuteSteps: [1, 2, 3, 4, 5, 6, 10, 12, 15, 20, 30]
     readonly property var hourSteps: [1, 2, 3, 4, 6, 8, 12]
     readonly property var modes: [
-        { id: "repeat", label: qsTr("Repeat"), icon: "repeat" },
-        { id: "daily", label: qsTr("At a time"), icon: "clock" },
-        { id: "monthly", label: qsTr("Monthly"), icon: "layout-grid" },
-        { id: "custom", label: qsTr("Custom"), icon: "square-code" }
+        { id: "repeat", label: qsTr("Repeat") },
+        { id: "daily", label: qsTr("At a time") },
+        { id: "monthly", label: qsTr("Monthly") },
+        { id: "custom", label: qsTr("Custom") }
     ]
 
     function daysPart() {
@@ -102,7 +102,7 @@ AppDialog {
         signal changed(int h, int m)
         iconName: "clock"; text: Schedules.clock(h, m); implicitHeight: 32
         onClicked: picker.openAt(timeButton, h, m)
-        BwTimePicker { id: picker; onPicked: (h, m) => timeButton.changed(h, m) }
+        BwTimePicker { id: picker; use12h: Schedules.use12h; amText: Schedules.amText; pmText: Schedules.pmText; onPicked: (h, m) => timeButton.changed(h, m) }
     }
     component Choice: BwComboBox {
         id: choice
@@ -120,38 +120,32 @@ AppDialog {
     Column {
         width: 470; spacing: 16
 
-        // The four ways to set it; the highlight slides to the chosen one.
-        Rectangle {
-            width: parent.width; height: 40; radius: 8; color: Theme.field; border.color: Theme.borderSoft
-            Rectangle {
-                readonly property int at: root.modes.findIndex(m => m.id === root.mode)
-                x: 4 + at * (parent.width - 8) / root.modes.length; y: 4
-                width: (parent.width - 8) / root.modes.length; height: parent.height - 8; radius: 6
-                color: Theme.accent
-                Behavior on x { enabled: Motion.enabled; NumberAnimation { duration: Motion.normal; easing.type: Easing.OutCubic } }
-            }
-            Row {
-                x: 4; y: 4
-                Repeater {
-                    model: root.modes
-                    delegate: Item {
-                        required property var modelData
-                        readonly property bool on: root.mode === modelData.id
-                        width: (470 - 8) / root.modes.length; height: 32
-                        Row {
-                            anchors.centerIn: parent; spacing: 6
-                            LucideIcon { name: modelData.icon; width: 14; height: 14; color: on ? "white" : Theme.textDim; anchors.verticalCenter: parent.verticalCenter }
-                            Text { text: modelData.label; color: on ? "white" : Theme.text; font.pixelSize: 13; font.weight: on ? Font.DemiBold : Font.Normal; anchors.verticalCenter: parent.verticalCenter }
-                        }
-                        MouseArea {
-                            anchors.fill: parent; cursorShape: Qt.PointingHandCursor
-                            onClicked: {
-                                if (modelData.id === "custom" && root.mode !== "custom" && root.valid) customField.text = root.expression;
-                                root.mode = modelData.id;
-                            }
-                        }
-                        Accessible.role: Accessible.PageTab; Accessible.name: modelData.label
+        // The four ways to set it, as separate buttons; the chosen one fills in.
+        Row {
+            spacing: 8
+            Repeater {
+                model: root.modes
+                delegate: Rectangle {
+                    required property var modelData
+                    readonly property bool on: root.mode === modelData.id
+                    width: (470 - 3 * 8) / root.modes.length; height: 38; radius: 8
+                    color: on ? Theme.accent : modeMouse.containsMouse ? "#3b3c40" : Theme.panelRaised
+                    border.color: on ? Theme.accentHover : modeMouse.containsMouse ? Theme.accent : Theme.border
+                    Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
+                    Behavior on border.color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
+                    Text {
+                        anchors.centerIn: parent; text: modelData.label
+                        color: on ? "white" : Theme.text; font.pixelSize: 13; font.weight: on ? Font.DemiBold : Font.Normal
                     }
+                    MouseArea {
+                        id: modeMouse
+                        anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor
+                        onClicked: {
+                            if (modelData.id === "custom" && root.mode !== "custom" && root.valid) customField.text = root.expression;
+                            root.mode = modelData.id;
+                        }
+                    }
+                    Accessible.role: Accessible.PageTab; Accessible.name: modelData.label
                 }
             }
         }
@@ -278,24 +272,20 @@ AppDialog {
             Column {
                 id: summaryCol
                 x: 12; y: 10; width: parent.width - 24; spacing: 4
-                Row {
-                    spacing: 8
-                    LucideIcon { name: root.valid ? "clock" : "circle-alert"; width: 16; height: 16; color: root.valid ? Theme.accent : Theme.danger; anchors.verticalCenter: parent.verticalCenter }
-                    Text {
-                        width: summaryCol.width - 24; wrapMode: Text.WordWrap; font.pixelSize: 13; font.weight: Font.DemiBold
+                Text {
+                        width: summaryCol.width; wrapMode: Text.WordWrap; font.pixelSize: 13; font.weight: Font.DemiBold
                         color: root.valid ? Theme.text : Theme.danger
                         text: root.valid ? qsTr("Runs %1").arg(root.summary)
                             : root.noDays ? qsTr("Pick at least one day.")
                             : root.expression.length ? qsTr("Blockwork can't read that schedule, or it never runs.") : qsTr("Type a schedule.")
-                    }
                 }
                 Text {
-                    visible: root.upcoming.length > 0; leftPadding: 24
-                    text: qsTr("Next: %1").arg(root.upcoming.map(d => Schedules.runLabel(d)).join("  ·  "))
+                    visible: root.upcoming.length > 0
+                    text: qsTr("Next: %1").arg(root.upcoming.map(d => Schedules.runLabel(d)).join(", "))
                     color: Theme.textDim; font.pixelSize: 12
                 }
                 Text {
-                    visible: root.valid && root.mode !== "custom"; leftPadding: 24
+                    visible: root.valid && root.mode !== "custom"
                     text: root.expression; color: Theme.textDim; font.pixelSize: 11; font.family: "monospace"; opacity: 0.8
                 }
             }

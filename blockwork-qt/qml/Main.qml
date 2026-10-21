@@ -59,6 +59,7 @@ ApplicationWindow {
 
     // Every animation's duration scales with the Animation speed setting; 0 turns them off.
     Binding { target: Motion; property: "durationScale"; value: root.appState.animation_speed ?? 1 }
+    Binding { target: Schedules; property: "clockFormat"; value: root.appState.clock_format || "" }
 
     function invoke(command, args) {
         bridge.invokeCommand(command, JSON.stringify(args || {}));

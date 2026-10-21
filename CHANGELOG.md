@@ -114,6 +114,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Time and schedule pickers:
   - Click the time on a "when every day at" block to pick it from a popup (tap an hour and a minute, or nudge them), instead of typing it. The time slot also takes a variable or reporter that gives a time like 09:30.
   - "On schedule" reads in words ("weekdays at 09:00", "every 15 minutes") and opens a schedule picker: repeat every few minutes or hours, run at a time on chosen days, or once a month, with the next few runs shown. Cron text still works under Custom, and the slot still takes a reporter.
+  - Settings > General > Time format: 12-hour (with AM/PM), 24-hour, or the system's default, for times in blocks and the pickers.
 
 ### Changed
 - Macro files now carry a format version and are upgraded step by step when

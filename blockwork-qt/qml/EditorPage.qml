@@ -1180,6 +1180,7 @@ Item {
     // The time and schedule pickers behind the time blocks' slots.
     BwTimePicker {
         id: timePicker
+        use12h: Schedules.use12h; amText: Schedules.amText; pmText: Schedules.pmText
         property var location: null
         function openFor(where, value, anchor) {
             location = where;
@@ -1187,7 +1188,7 @@ Item {
             if (anchor) openAt(anchor, t.hour, t.minute);
             else { hour = t.hour; minute = t.minute; x = (parent.width - implicitWidth) / 2; y = (parent.height - implicitHeight) / 2; open(); }
         }
-        onPicked: (h, m) => root.invoke("edit_value_field", { location: location, text: Schedules.clock(h, m) })
+        onPicked: (h, m) => root.invoke("edit_value_field", { location: location, text: Schedules.stamp(h, m) })
     }
     SchedulePicker {
         id: scheduleDialog

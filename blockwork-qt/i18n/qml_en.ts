@@ -102,7 +102,7 @@
 <context>
     <name>Schedules</name>
     <message numerus="yes">
-        <location filename="../qml/Schedules.qml" line="148"/>
+        <location filename="../qml/Schedules.qml" line="161"/>
         <source>every %n minutes</source>
         <translation>
             <numerusform>every %n minute</numerusform>
@@ -110,7 +110,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Schedules.qml" line="155"/>
+        <location filename="../qml/Schedules.qml" line="168"/>
         <source>every %n hours</source>
         <translation>
             <numerusform>every %n hour</numerusform>
@@ -118,7 +118,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/Schedules.qml" line="155"/>
+        <location filename="../qml/Schedules.qml" line="168"/>
         <source>every %n hours at :%1</source>
         <translation>
             <numerusform>every %n hour at :%1</numerusform>
@@ -129,7 +129,7 @@
 <context>
     <name>SettingsPage</name>
     <message numerus="yes">
-        <location filename="../qml/SettingsPage.qml" line="283"/>
+        <location filename="../qml/SettingsPage.qml" line="291"/>
         <source>%n pack(s)</source>
         <translation>
             <numerusform>%n pack</numerusform>
