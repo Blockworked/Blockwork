@@ -75,7 +75,7 @@
       <description>
         <p>A large feature release: macros can now react to what happens on the computer and see the screen.</p>
         <ul>
-          <li>Triggers for typed abbreviations, windows, files, apps, idle time, network, USB devices, schedules and webhooks</li>
+          <li>Triggers for typed abbreviations, windows, files, apps, idle time, network, USB devices, schedules and webhooks, with pickers for times and schedules</li>
           <li>Screen, image, text recognition and window blocks, with a screen picker in the editor</li>
           <li>File, web, shell, notification and dialog blocks</li>
           <li>Error handling, a debugger with breakpoints, and an emergency stop hotkey</li>
