@@ -1,7 +1,7 @@
 //! KWin (KDE Plasma) over D-Bus: a shared session connection, plus short
 //! KWin scripts for window state kdotool doesn't expose.
 
-use std::sync::atomic::{AtomicBool, Ordering};
+use crate::backoff::Backoff;
 use std::sync::mpsc::{channel, Receiver, Sender};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
@@ -43,13 +43,14 @@ pub fn connection() -> Result<&'static Connection, String> {
     bus().map(|b| &b.connection)
 }
 
-/// Set once a script went unanswered (not KWin, or an older one), so later
-/// calls fail fast instead of waiting out the timeout each time.
-static NO_SCRIPTS: AtomicBool = AtomicBool::new(false);
+/// Set when a script went unanswered (not KWin, or an older one), so calls
+/// fail fast for a while instead of waiting out the timeout each time. A
+/// KWin that was only restarting gets used again once the wait is over.
+static NO_SCRIPTS: Backoff = Backoff::new(Duration::from_secs(30));
 
 /// Runs a KWin script and returns the text it passes to `reply(text)`.
 pub fn script(body: &str) -> Result<String, String> {
-    if NO_SCRIPTS.load(Ordering::Relaxed) {
+    if NO_SCRIPTS.waiting() {
         return Err("KWin scripts aren't available".into());
     }
     let bus = bus()?;
@@ -85,7 +86,7 @@ pub fn script(body: &str) -> Result<String, String> {
 
 fn run(bus: &Bus, file: &std::path::Path, plugin: &str, token: &str, replies: &Receiver<(String, String)>) -> Result<String, String> {
     let failed = |e: zbus::Error| {
-        NO_SCRIPTS.store(true, Ordering::Relaxed);
+        NO_SCRIPTS.failed();
         format!("couldn't run a KWin script: {e}")
     };
     let id: i32 = bus
@@ -109,10 +110,13 @@ fn run(bus: &Bus, file: &std::path::Path, plugin: &str, token: &str, replies: &R
         .map_err(failed)?;
     loop {
         match replies.recv_timeout(Duration::from_secs(1)) {
-            Ok((t, text)) if t == token => return Ok(text),
+            Ok((t, text)) if t == token => {
+                NO_SCRIPTS.succeeded();
+                return Ok(text);
+            }
             Ok(_) => continue,
             Err(_) => {
-                NO_SCRIPTS.store(true, Ordering::Relaxed);
+                NO_SCRIPTS.failed();
                 return Err("KWin didn't answer the script".into());
             }
         }

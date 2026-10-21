@@ -7,7 +7,6 @@ use super::{Image, Rect, Shot};
 use crate::flatpak::host_command;
 use crate::macros::backend::{cursor_track, wayland_display, x11_cursor};
 use std::sync::Mutex;
-use std::sync::atomic::{AtomicBool, Ordering};
 use std::time::Duration;
 
 fn wayland() -> bool {
@@ -27,8 +26,9 @@ pub(super) fn capture() -> Result<Shot, String> {
     Ok(Shot { image, origin, scale })
 }
 
-/// Set once `grim` has failed, so later captures go straight to the portal.
-static NO_GRIM: AtomicBool = AtomicBool::new(false);
+/// Set when `grim` has failed, so captures go straight to the portal for a
+/// while instead of trying it every time.
+static NO_GRIM: crate::backoff::Backoff = crate::backoff::Backoff::new(std::time::Duration::from_secs(30));
 
 /// Area captures are a compositor round trip each, so pixel reads share one
 /// desktop capture instead.
@@ -54,10 +54,13 @@ fn wayland_capture() -> Result<Image, String> {
     if let Some(image) = kwin::workspace() {
         return Ok(image);
     }
-    if !NO_GRIM.load(Ordering::Relaxed) {
+    if !NO_GRIM.waiting() {
         match grim() {
-            Ok(image) => return Ok(image),
-            Err(_) => NO_GRIM.store(true, Ordering::Relaxed),
+            Ok(image) => {
+                NO_GRIM.succeeded();
+                return Ok(image);
+            }
+            Err(_) => NO_GRIM.failed(),
         }
     }
     portal::screenshot()
@@ -111,9 +114,9 @@ mod kwin {
     use std::os::fd::AsFd;
     use zbus::zvariant::{Fd, OwnedValue, Value};
 
-    /// Set once ScreenShot2 refused a call (not KDE, or a KWin that restricts
-    /// it), so later captures skip it.
-    static UNAVAILABLE: AtomicBool = AtomicBool::new(false);
+    /// Set when ScreenShot2 refused a call (not KDE, or a KWin that restricts
+    /// it), so captures skip it for a while.
+    static UNAVAILABLE: crate::backoff::Backoff = crate::backoff::Backoff::new(Duration::from_secs(30));
 
     pub(super) fn workspace() -> Option<Image> {
         capture("CaptureWorkspace", None, true)
@@ -125,11 +128,14 @@ mod kwin {
     }
 
     fn capture(method: &str, area: Option<(i32, i32, u32, u32)>, native: bool) -> Option<Image> {
-        if UNAVAILABLE.load(Ordering::Relaxed) {
+        if UNAVAILABLE.waiting() {
             return None;
         }
         match try_capture(method, area, native) {
-            Ok(image) => Some(image),
+            Ok(image) => {
+                UNAVAILABLE.succeeded();
+                Some(image)
+            }
             Err(e) => {
                 tracing::debug!("KWin {method} failed: {e}");
                 None
@@ -153,7 +159,7 @@ mod kwin {
         }
         .map_err(|e| {
             if matches!(e, zbus::Error::MethodError(..)) {
-                UNAVAILABLE.store(true, Ordering::Relaxed);
+                UNAVAILABLE.failed();
             }
             e.to_string()
         })?;
