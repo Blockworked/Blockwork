@@ -44,6 +44,7 @@ pub(crate) struct LibraryDto {
     pub(crate) loading: bool,
     pub(crate) sources: Vec<SourceDto>,
     pub(crate) packs: Vec<PackDto>,
+    pub(crate) installed: Vec<block_packs::PackRecord>,
     /// The key of the pack being downloaded.
     pub(crate) fetching: String,
     pub(crate) error: String,
@@ -157,6 +158,7 @@ pub(crate) fn dto(s: &AppState) -> LibraryDto {
         loading: cache.loading,
         sources,
         packs,
+        installed: records,
         fetching: cache.fetching.clone(),
         error: cache.error.clone(),
     }
@@ -359,6 +361,23 @@ pub(crate) fn confirm(state: &SharedState, app: &AppHandle) -> Result<(), String
     crate::commands::auto_save(&mut s);
     crate::commands::sync_variable_values(&mut s);
     crate::commands::sync_list_values(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn remove(state: &SharedState, app: &AppHandle, pack_id: String) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+    if !mac.settings.block_packs.iter().any(|r| r.id == pack_id) {
+        return Err("That pack isn't installed in this macro".into());
+    }
+    crate::commands::push_undo(&mut s);
+    block_packs::remove_from(
+        s.current_macro.as_mut().ok_or("No macro selected")?,
+        &pack_id,
+    )?;
+    s.invalid_field_buffers.clear();
+    crate::commands::auto_save(&mut s);
     emit_state_updated(app, &s);
     Ok(())
 }

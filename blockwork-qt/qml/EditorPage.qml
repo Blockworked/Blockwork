@@ -185,7 +185,11 @@ Item {
         return h.charAt(0).toUpperCase()+h.slice(1);
     }
     function showDetails(type,fallback) {
-        detailsDialog.show(blockTitle(type),type,instructionExplainer(type)||fallback||qsTr("A Blockwork block."));
+        const def = blockDefById(type);
+        if (def) {
+            const name = (def.pieces || []).map(p => p.kind === "Label" ? p.text : "(" + p.name + ")").join(" ");
+            detailsDialog.show(name, def.identifier || def.id, def.description || fallback || qsTr("A custom block defined in this macro."));
+        } else detailsDialog.show(blockTitle(type),type,instructionExplainer(type)||fallback||qsTr("A Blockwork block."));
     }
     // ---- daemon commands whose result QML needs ----
     property int callSeq: 0
@@ -761,7 +765,7 @@ Item {
                     onShareBlockRequested: definition => root.blockLibrary.share(definition)
                     onStandaloneKeyCaptureRequested: root.invoke("start_standalone_key_capture")
                     onAppPickerRequested: instruction => root.openPaletteAppPicker(instruction)
-                    onDetailsRequested:(name,identifier,explainer)=>name===identifier?root.showDetails(identifier,explainer):detailsDialog.show(name,identifier,explainer)
+                    onDetailsRequested:(name,identifier,explainer)=>root.blockDefById(identifier)||name===identifier?root.showDetails(identifier,explainer):detailsDialog.show(name,identifier,explainer)
                     onValueActivated: value => root.invoke("create_floating_value", { x: 160, y: 140, value: value, originBlockId: null })
                 }
                 }
@@ -1405,8 +1409,8 @@ Item {
     }
     MakeBlockDialog {
         id:blockDialog
-        onCreateRequested:(pieces,shape,color,icon)=>root.invoke("create_block",{pieces:pieces,shape:shape,color:color,icon:icon})
-        onEditRequested:(blockId,pieces,shape,color,icon)=>root.invoke("edit_block",{blockId:blockId,pieces:pieces,shape:shape,color:color,icon:icon})
+        onCreateRequested:(pieces,shape,color,icon,identifier,description)=>root.invoke("create_block",{pieces:pieces,shape:shape,color:color,icon:icon,identifier:identifier,description:description})
+        onEditRequested:(blockId,pieces,shape,color,icon,identifier,description)=>root.invoke("edit_block",{blockId:blockId,pieces:pieces,shape:shape,color:color,icon:icon,identifier:identifier,description:description})
     }
 
     // Blockwork's automation blocks, declared for blockstitch's generic rows.

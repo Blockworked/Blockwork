@@ -403,6 +403,29 @@ pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeRepor
     report
 }
 
+/// Removes a pack's blocks and their calls, preserving blocks another pack owns.
+pub fn remove_from(mac: &mut Macro, pack_id: &str) -> Result<(), String> {
+    let record = mac
+        .settings
+        .block_packs
+        .iter()
+        .find(|r| r.id == pack_id)
+        .cloned()
+        .ok_or("That pack isn't installed in this macro")?;
+    mac.settings.block_packs.retain(|r| r.id != pack_id);
+    for id in record.blocks {
+        if !mac
+            .settings
+            .block_packs
+            .iter()
+            .any(|r| r.blocks.contains(&id))
+        {
+            mac.graph.remove_block(&id);
+        }
+    }
+    Ok(())
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -458,6 +481,69 @@ mod tests {
         assert_eq!(user.block_body(&outer).unwrap().instructions.len(), 3);
         assert_eq!(user.settings.block_packs.len(), 1);
         assert_eq!(user.settings.block_packs[0].version, "2.0");
+    }
+
+    #[test]
+    fn removing_packs_scrubs_nested_calls_and_preserves_shared_blocks() {
+        let mut author = Macro::new("Author".into(), String::new(), Vec::new());
+        let shared = make_block(&mut author, "shared", Vec::new());
+        let outer = make_block(&mut author, "outer", vec![call(&shared)]);
+        let pack = pack_from_macro(&author, &[outer.clone()], PackInfo {
+            id: "first".into(), name: "First".into(), ..Default::default()
+        }).unwrap();
+        let other = pack_from_macro(&author, &[shared.clone()], PackInfo {
+            id: "second".into(), name: "Second".into(), ..Default::default()
+        }).unwrap();
+        let mut mac = Macro::new("User".into(), String::new(), vec![
+            Instruction::new(call(&outer)),
+            Instruction::new(InstructionKind::Repeat {
+                count: Value::number(2.0), body: vec![Instruction::new(call(&outer))],
+            }),
+            Instruction::new(InstructionKind::Log(Value::Call {
+                block_id: outer.clone(), args: vec![], branches: vec![], saved: Box::new(Value::number(0.0)),
+            })),
+        ]);
+        merge_into(&mut mac, &pack, "");
+        merge_into(&mut mac, &other, "");
+        let before = mac.clone();
+        assert!(remove_from(&mut mac, "missing").is_err());
+        assert_eq!(mac, before);
+        remove_from(&mut mac, "first").unwrap();
+        assert!(mac.block_def(&outer).is_none());
+        assert!(mac.block_body(&outer).is_none());
+        assert!(mac.block_def(&shared).is_some());
+        assert_eq!(mac.settings.block_packs.len(), 1);
+        let instructions = &mac.strands[0].instructions;
+        assert_eq!(instructions.len(), 3);
+        assert!(matches!(instructions[0].kind, InstructionKind::WhenRan));
+        let InstructionKind::Repeat { body, .. } = &instructions[1].kind else { panic!("repeat") };
+        assert!(body.is_empty());
+        assert_eq!(instructions[2].kind, InstructionKind::Log(Value::number(0.0)));
+        remove_from(&mut mac, "second").unwrap();
+        assert!(mac.block_defs.is_empty());
+        assert!(mac.settings.block_packs.is_empty());
+    }
+
+    #[test]
+    fn pack_details_survive_export_install_and_save() {
+        let mut author = Macro::new("Author".into(), String::new(), Vec::new());
+        let id = make_block(&mut author, "wait seconds", Vec::new());
+        let def = author.graph.block_def_mut(&id).unwrap();
+        def.identifier = "WaitSeconds".into();
+        def.description = "Pauses playback for the given number of seconds.".into();
+        let pack = pack_from_macro(&author, &[id.clone()], PackInfo {
+            name: "Timing".into(), ..Default::default()
+        }).unwrap();
+        let pack = read_pack(&write_pack(&pack).unwrap()).unwrap();
+        let mut mac = Macro::new("User".into(), String::new(), Vec::new());
+        merge_into(&mut mac, &pack, "");
+        let (saved, _) = migrate::from_value(migrate::to_value(&mac).unwrap()).unwrap();
+        assert_eq!(saved.block_def(&id), author.block_def(&id));
+        let legacy: blockstitch_core::graph::BlockDef = serde_json::from_str(
+            r#"{"id":"legacy","pieces":[],"shape":"Normal"}"#
+        ).unwrap();
+        assert!(legacy.identifier.is_empty());
+        assert!(legacy.description.is_empty());
     }
 
     #[test]

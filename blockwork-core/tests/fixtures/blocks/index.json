@@ -7,9 +7,9 @@
       "name": "Mouse helpers",
       "description": "Click, double click, right click and drag at a screen position.",
       "author": "Blockwork",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "url": "packs/mouse-helpers.json",
-      "sha256": "05575edd877593de8e6e0a73de67577b9b74ad4cb7cd74aeaca34989bae29ae4",
+      "sha256": "89a4e4660dbfb6fd54950b34f14ba1bd7bed4765a180b6d458a311ec5adfaa91",
       "blocks": [
         "click at x (x) y (y)",
         "double click at x (x) y (y)",
@@ -22,9 +22,9 @@
       "name": "Text helpers",
       "description": "Check for empty text, capitalize the first letter and get the last letter.",
       "author": "Blockwork",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "url": "packs/text-helpers.json",
-      "sha256": "47a9da87dea2717be0260a7050bc30d6e940609f3283c4b03e6def7a694f6256",
+      "sha256": "ce3b2cb3aa9978a6b2b0430debe1d49c148c8bf167a12d5b15137e1885933cac",
       "blocks": [
         "(text) is empty?",
         "capitalize (text)",
@@ -36,9 +36,9 @@
       "name": "Timing",
       "description": "Wait in seconds, or wait a slightly random time so clicks look less robotic.",
       "author": "Blockwork",
-      "version": "1.0.0",
+      "version": "1.0.1",
       "url": "packs/timing.json",
-      "sha256": "503f97f1101f7486da8361d72dbbacab2231781c8e86f1e468e7ed0e68a948db",
+      "sha256": "af4c9fac43e398867741efc10eb5e12be64d85c83dbc5234a8a8967eb14acaf1",
       "blocks": [
         "wait (seconds) seconds",
         "wait about (ms) ms"

@@ -135,6 +135,10 @@ impl Backend {
                 let path: String = arg(&args, "path")?;
                 to_json(crate::block_library::review_file(&self.state, &self.app, path)?)
             }
+            "remove_block_pack" => {
+                let pack_id: String = arg(&args, "packId")?;
+                to_json(crate::block_library::remove(&self.state, &self.app, pack_id)?)
+            }
             "confirm_block_pack" => to_json(crate::block_library::confirm(&self.state, &self.app)?),
             "cancel_block_pack" => to_json(crate::block_library::cancel(&self.state, &self.app)?),
             "export_block_pack" => {
@@ -345,6 +349,8 @@ impl Backend {
                     shape,
                     color,
                     icon,
+                    arg(&args, "identifier").unwrap_or_default(),
+                    arg(&args, "description").unwrap_or_default(),
                 )?)
             }
             "edit_block" => {
@@ -361,6 +367,8 @@ impl Backend {
                     shape,
                     color,
                     icon,
+                    arg(&args, "identifier").unwrap_or_default(),
+                    arg(&args, "description").unwrap_or_default(),
                 )?)
             }
             "delete_block" => {

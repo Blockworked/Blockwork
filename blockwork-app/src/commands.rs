@@ -37,7 +37,7 @@ pub(crate) fn push_undo(s: &mut AppState) {
 /// [`push_undo`] for an edit that coalesces with the keystrokes already in
 /// progress at `session` - only the first one checkpoints.
 fn push_undo_for(s: &mut AppState, session: Option<EditSession>) {
-    let snapshot = s.current_macro.as_ref().map(|mac| (mac.graph.clone(), mac.signals.clone()));
+    let snapshot = s.current_macro.as_ref().map(|mac| (mac.graph.clone(), mac.signals.clone(), mac.settings.block_packs.clone()));
     match (snapshot, session) {
         (Some(snapshot), Some(session)) => {
             s.history.push_for_session(snapshot, session);
@@ -817,6 +817,8 @@ pub(crate) fn create_block(
     shape: BlockShape,
     color: String,
     icon: String,
+    identifier: String,
+    description: String,
 ) -> Result<String, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     BlockDef::validate_pieces(&pieces)?;
@@ -826,6 +828,10 @@ pub(crate) fn create_block(
     let (x, y) = mac.next_strand_position();
     let id = mac.create_block(pieces, shape, color, x, y);
     mac.set_block_icon(&id, &icon)?;
+    if let Some(def) = mac.graph.block_def_mut(&id) {
+        def.identifier = identifier.trim().to_string();
+        def.description = description.trim().to_string();
+    }
     auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(id)
@@ -842,6 +848,8 @@ pub(crate) fn edit_block(
     shape: BlockShape,
     color: String,
     icon: String,
+    identifier: String,
+    description: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     // `update_block` re-checks both; doing it first keeps a rejected edit
@@ -877,6 +885,10 @@ pub(crate) fn edit_block(
         .as_mut()
         .ok_or("No macro selected")?
         .set_block_icon(&block_id, &icon)?;
+    if let Some(def) = s.current_macro.as_mut().and_then(|mac| mac.graph.block_def_mut(&block_id)) {
+        def.identifier = identifier.trim().to_string();
+        def.description = description.trim().to_string();
+    }
     auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
@@ -2070,11 +2082,11 @@ fn apply_history_step(
     if let Some(current) = s
         .current_macro
         .as_ref()
-        .map(|mac| (mac.graph.clone(), mac.signals.clone()))
+        .map(|mac| (mac.graph.clone(), mac.signals.clone(), mac.settings.block_packs.clone()))
         && let Some(restored_graph) = step(&mut s.history, current)
     {
         if let Some(mac) = &mut s.current_macro {
-            (mac.graph, mac.signals) = restored_graph;
+            (mac.graph, mac.signals, mac.settings.block_packs) = restored_graph;
             mac.ensure_id();
         }
         sync_variable_values(&mut s);

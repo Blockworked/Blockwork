@@ -4,8 +4,10 @@
     "block_defs": [
       {
         "color": "#59C059",
+        "description": "Returns true if the text is empty after trimming leading and trailing whitespace.",
         "icon": "type",
         "id": "fc92a8c773974daeac539a2ed4075bcb",
+        "identifier": "TextIsEmpty",
         "pieces": [
           {
             "id": "61b9aa3101e04fa8b468d75995c21301",
@@ -23,8 +25,10 @@
       },
       {
         "color": "#59C059",
+        "description": "Returns the text with its first letter uppercased and the remaining text unchanged. Empty text stays empty.",
         "icon": "type",
         "id": "6b2223f7eeff4728844daf2067bd1432",
+        "identifier": "CapitalizeText",
         "pieces": [
           {
             "id": "95727258d68840709f81f53150b37481",
@@ -42,8 +46,10 @@
       },
       {
         "color": "#59C059",
+        "description": "Returns the last letter of the text, or empty text when the input is empty.",
         "icon": "type",
         "id": "da5e037bb4c44340be34f94bff25ad6d",
+        "identifier": "LastLetter",
         "pieces": [
           {
             "id": "a4fbc620961543e29166bff5e281c0bd",
@@ -330,5 +336,5 @@
   "description": "Check for empty text, capitalize the first letter and get the last letter.",
   "id": "text-helpers",
   "name": "Text helpers",
-  "version": "1.0.0"
+  "version": "1.0.1"
 }

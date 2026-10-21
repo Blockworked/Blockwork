@@ -73,6 +73,38 @@ Item {
                 BwButton { iconName: "folder-open"; text: qsTr("From file..."); onClicked: root.addFromFile() }
             }
             Text {
+                visible: (root.library.installed || []).length > 0
+                text: qsTr("Installed in this macro")
+                color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold
+            }
+            ListView {
+                id: installedList
+                visible: count > 0
+                Layout.fillWidth: true
+                Layout.preferredHeight: Math.min(120, contentHeight)
+                model: root.library.installed || []
+                clip: true; spacing: 4
+                ScrollBar.vertical: ScrollBar {}
+                delegate: RowLayout {
+                    required property var modelData
+                    width: installedList.width
+                    Text {
+                        Layout.fillWidth: true; elide: Text.ElideRight
+                        text: modelData.name + (modelData.version ? "  " + modelData.version : "")
+                        color: Theme.text; font.pixelSize: 12
+                    }
+                    BwButton {
+                        text: qsTr("Remove"); iconName: "trash-2"
+                        onClicked: {
+                            removeDialog.packId = modelData.id;
+                            removeDialog.packName = modelData.name;
+                            removeDialog.macroId = root.macro.id;
+                            removeDialog.open();
+                        }
+                    }
+                }
+            }
+            Text {
                 visible: !root.macro
                 Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.warning; font.pixelSize: 12
                 text: qsTr("Open a macro to add blocks to it.")
@@ -169,6 +201,24 @@ Item {
                     }
                 }
             }
+        }
+    }
+
+    AppDialog {
+        id: removeDialog
+        property string packId: ""
+        property string packName: ""
+        property string macroId: ""
+        title: qsTr("Remove %1?").arg(packName)
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        acceptText: qsTr("Remove pack")
+        Text {
+            width: 420; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
+            text: qsTr("Removes this pack's blocks and their uses from the macro. Blocks shared with another installed pack are kept. Variables and lists are kept. You can undo this change.")
+        }
+        onAccepted: {
+            if (root.macro && root.macro.id === macroId)
+                root.daemonCall("remove_block_pack", { packId: packId }, () => {});
         }
     }
 

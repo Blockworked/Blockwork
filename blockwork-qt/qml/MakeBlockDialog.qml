@@ -12,8 +12,8 @@ AppDialog {
     height: visible ? Math.min(760, parent ? parent.height - 32 : 760) : 760
     standardButtons: Dialog.NoButton
 
-    signal createRequested(var pieces, string shape, string color, string icon)
-    signal editRequested(string blockId, var pieces, string shape, string color, string icon)
+    signal createRequested(var pieces, string shape, string color, string icon, string identifier, string description)
+    signal editRequested(string blockId, var pieces, string shape, string color, string icon, string identifier, string description)
 
     // Set while editing an existing block; empty when making a new one.
     property string editBlockId: ""
@@ -271,6 +271,8 @@ AppDialog {
         blockShape = def.shape || "Normal";
         blockColor = def.color || "#4C97FF";
         blockIcon = def.icon || "";
+        detailId.text = def.identifier || "";
+        detailDescription.text = def.description || "";
         validationError = "";
         customPickerOpen = false;
     }
@@ -288,6 +290,8 @@ AppDialog {
         blockShape = "Normal";
         blockColor = "#4C97FF";
         blockIcon = "";
+        detailId.text = "";
+        detailDescription.text = "";
         validationError = "";
         customPickerOpen = false;
         Qt.callLater(() => focusPiece(0));
@@ -490,9 +494,9 @@ AppDialog {
             return;
         }
         if (editBlockId.length)
-            editRequested(editBlockId, resultPieces(), blockShape, blockColor, blockIcon);
+            editRequested(editBlockId, resultPieces(), blockShape, blockColor, blockIcon, detailId.text, detailDescription.text);
         else
-            createRequested(resultPieces(), blockShape, blockColor, blockIcon);
+            createRequested(resultPieces(), blockShape, blockColor, blockIcon, detailId.text, detailDescription.text);
         accept();
     }
     onOpened: {
@@ -1019,6 +1023,17 @@ AppDialog {
                 implicitHeight: 32
                 onClicked: root.blockIcon = ""
             }
+        }
+
+        BwTextField {
+            id: detailId
+            Layout.fillWidth: true
+            placeholderText: qsTr("Details ID (optional)")
+        }
+        BwTextField {
+            id: detailDescription
+            Layout.fillWidth: true
+            placeholderText: qsTr("Description for Details (optional)")
         }
 
         Rectangle {

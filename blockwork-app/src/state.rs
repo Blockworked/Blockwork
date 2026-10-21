@@ -21,7 +21,7 @@ use std::collections::HashMap;
 use crate::AppHandle;
 use std::sync::{Arc, Mutex};
 
-pub(crate) type EditorSnapshot = (MacroGraph, Vec<String>);
+pub(crate) type EditorSnapshot = (MacroGraph, Vec<String>, Vec<blockwork_core::block_packs::PackRecord>);
 
 pub(crate) type SharedState = Arc<Mutex<AppState>>;
 

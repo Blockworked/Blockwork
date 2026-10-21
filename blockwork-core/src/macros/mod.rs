@@ -2259,6 +2259,8 @@ mod tests {
             shape: BlockShape::Ending,
             color: default_block_color(),
             icon: String::new(),
+                    identifier: String::new(),
+                    description: String::new(),
         };
         let json = serde_json::to_string(&def).unwrap();
         assert!(
