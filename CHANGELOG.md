@@ -110,6 +110,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - UI animations: menus and drop-downs fade and grow open, dialogs ease in over a fading backdrop, and buttons, switches, check boxes and list rows ease between hover and pressed states. Panels like the sidebar and run log slide open and shut, and pages and Settings tabs fade in.
 - Smooth scrolling: a mouse wheel notch glides to its spot instead of jumping, in the editor canvas, the block palette, Settings and the other scrolling lists. Jumping to a block from the run log glides there too.
 - Settings > General > Animation speed, a slider from Instant to Slow. Instant turns every animation off.
+- Pinch on a touchpad to zoom the canvas.
 
 ### Changed
 - Macro files now carry a format version and are upgraded step by step when
@@ -127,6 +128,7 @@ section below as the GitHub release notes, followed by the downloads table.
   grabbing an input device, preventing stuck input when Blockwork starts.
 - A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
 - Ctrl+scroll zooms the canvas around the mouse pointer instead of pushing the view right and down, and mouse wheel zoom, the zoom buttons and reset now ease in (follows the animation speed setting).
+- Dragging the canvas with the mouse stops where you let go instead of gliding on, and two-finger touchpad panning is smoothed slightly.
 
 ## [0.5.4] - 2026-09-20
 
