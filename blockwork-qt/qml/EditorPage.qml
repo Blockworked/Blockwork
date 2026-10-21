@@ -1126,9 +1126,10 @@ Item {
         property var devices: []
         property string error: ""
         property bool loaded: false
-        // What the block matches now, if it's plain text.
+        // What the block matches now, if it's plain text. A reporter's request
+        // carries its slot's value; a trigger's, the whole instruction.
         readonly property string current: {
-            const p = request && request.instruction ? request.instruction.pattern : null;
+            const p = !request ? null : request.kind === "value" ? request.value : request.instruction ? request.instruction.pattern : null;
             return p && p.kind === "Text" ? p.value.trim() : "";
         }
         readonly property bool currentPluggedIn: current === "" || devices.some(d => matches(d, current))
@@ -1148,7 +1149,11 @@ Item {
                 if (list) { devices = list; usbDialog.error = ""; } else { devices = []; usbDialog.error = error || ""; }
             });
         }
-        function use(pattern) { root.setBlockUsb(request, pattern); close(); }
+        function use(pattern) {
+            if (request.kind === "value") root.invoke("edit_value_field", { location: request.location, text: pattern });
+            else root.setBlockUsb(request, pattern);
+            close();
+        }
         Timer { interval: 2000; repeat: true; running: usbDialog.visible; onTriggered: usbDialog.refresh() }
         Column { width: 460; spacing: 10
             Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
@@ -1401,7 +1406,7 @@ Item {
             IdleSeconds: { prefix: qsTr("seconds idle"), result: "number" },
             ScreenLocked: { prefix: qsTr("screen is locked?"), result: "bool" },
             NetworkConnected: { prefix: qsTr("online?"), result: "bool" },
-            UsbConnected: { prefix: qsTr("USB device"), suffix: qsTr("plugged in?"), result: "bool" },
+            UsbConnected: { prefix: qsTr("USB device"), suffix: qsTr("plugged in?"), result: "bool", pickArg: { index: 0, action: "pickUsb", icon: "list" } },
             Secret: { prefix: qsTr("secret"), result: "text", enumArg: { index: 0, options: () => {
                 const names = appState.secret_names || [];
                 return names.length ? names.map(n => ({ value: n, label: n })) : [{ value: "", label: qsTr("(add one in Settings)") }];
@@ -1660,6 +1665,10 @@ Item {
         registerBlocks();
         BlockRegistry.blockMenu = [{ id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }];
         BlockRegistry.previewHandler = (key, value) => root.appBridge.previewValue(key, JSON.stringify(value));
+        // Pickers beside a reporter's slot.
+        BlockRegistry.pickHandler = (action, location, value) => {
+            if (action === "pickUsb") usbDialog.openFor({ kind: "value", location: location, value: value });
+        };
     }
     Connections {
         target: root.appBridge
