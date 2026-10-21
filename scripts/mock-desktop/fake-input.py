@@ -3,10 +3,11 @@
 
 Serves the sockets behind fake-evdev.so (see that file): a fake keyboard
 (/dev/input/event0), a fake mouse (/dev/input/event1) and /dev/uinput. What a
-process writes to uinput is injected into the X server with XTest, the way the
-kernel would hand a real virtual device to the desktop, and logged. Events
+process writes to uinput is injected into the desktop, the way the kernel would
+hand a real virtual device to it, and logged: with XTest on X11, and as a
+virtual pointer and keyboard on wlroots Wayland compositors (sway). Events
 "typed" on the fake keyboard and mouse go to every process that opened the
-device and, while nobody holds an EVIOCGRAB on it, to the X server too.
+device and, while nobody holds an EVIOCGRAB on it, to the desktop too.
 
     fake-input.py serve <dir>        run the broker (mock-desktop.sh does this)
     fake-input.py <command...>       drive it; $FAKE_EVDEV_DIR names the broker
@@ -19,7 +20,11 @@ without the KEY_/BTN_ prefix, or numbers):
     type [--delay=MS] TEXT  type text on the fake keyboard (US layout), MS apart (default 50)
     click [BUTTON]        click a mouse button (default left)
     move DX DY            relative mouse motion
-    wheel N               scroll N notches (negative is down)
+    moveto X Y            move the pointer to X,Y on the screen
+    wheel N / hwheel N    scroll N mouse wheel notches (negative is down / right)
+    scroll [--steps=N] DY [DX]  touchpad-style smooth scroll by DY (and DX) pixels in
+                          N frames, then lift the fingers (negative is down / right;
+                          whole wheel notches on X11)
     status                grab state of the devices and uinput clients
     log [N]               the last N (default 20) lines of injected uinput events
     wait-grab [0|1] [S]   wait up to S seconds (default 10) for the devices to be grabbed (1) or released (0)
@@ -77,11 +82,12 @@ def load_codes():
 CODES = load_codes()
 
 
-def code_of(name):
+def code_of(name, button=False):
     if re.fullmatch(r"\d+|0x[0-9a-fA-F]+", name):
         return int(name, 0)
     upper = name.upper()
-    for candidate in (upper, "KEY_" + upper, "BTN_" + upper):
+    prefixes = ("BTN_", "KEY_") if button else ("KEY_", "BTN_")
+    for candidate in (upper,) + tuple(prefix + upper for prefix in prefixes):
         if candidate in CODES:
             return CODES[candidate]
     raise SystemExit(f"fake-input: unknown key {name!r}")
@@ -131,6 +137,17 @@ class X:
         if self.display and (dx or dy):
             self.xtest.fake_input(self.display, self.XC.MotionNotify, True, x=dx, y=dy)
 
+    def move_to(self, x, y):
+        if self.display:
+            self.xtest.fake_input(self.display, self.XC.MotionNotify, False, x=x, y=y)
+            self.flush()
+
+    def scroll(self, dy, dx, steps):
+        # X11 has no smooth scrolling through XTest; whole notches will do.
+        self.wheel(REL_WHEEL, round(dy / 15))
+        self.wheel(REL_HWHEEL, round(dx / 15))
+        self.flush()
+
     def wheel(self, axis, value):
         if not self.display:
             return
@@ -159,10 +176,216 @@ class X:
         self.flush()
 
 
+
+class Wayland(X):
+    """Injects events into a wlroots compositor (sway) as a virtual pointer
+    (zwlr_virtual_pointer_v1) and keyboard (zwp_virtual_keyboard_v1), the way
+    a real device would reach it. A small client for the wire protocol, so it
+    needs nothing beyond Python and libxkbcommon (for the keymap)."""
+
+    WHEEL_STEP = 15  # what libinput reports for one notch, in axis units
+
+    def __init__(self):
+        self.display = None
+        self.sock = None
+        self.next_id = 2
+        self.globals = {}
+        self.mods = 0
+        path = os.environ.get("WAYLAND_DISPLAY", "")
+        if not path:
+            return
+        if not path.startswith("/"):
+            path = os.path.join(os.environ.get("XDG_RUNTIME_DIR", ""), path)
+        try:
+            self.sock = socket.socket(socket.AF_UNIX, socket.SOCK_STREAM)
+            self.sock.connect(path)
+            registry = self.new_id()
+            self.send(1, 1, self.u32(registry))
+            self.roundtrip(registry)
+            missing = [i for i in ("wl_seat", "zwlr_virtual_pointer_manager_v1", "zwp_virtual_keyboard_manager_v1")
+                       if i not in self.globals]
+            if missing:
+                raise RuntimeError(f"the compositor lacks {', '.join(missing)}")
+            seat = self.bind(registry, "wl_seat", 1)
+            pointers = self.bind(registry, "zwlr_virtual_pointer_manager_v1", 1)
+            keyboards = self.bind(registry, "zwp_virtual_keyboard_manager_v1", 1)
+            self.pointer = self.new_id()
+            self.send(pointers, 0, self.u32(seat) + self.u32(self.pointer))
+            self.keyboard = self.new_id()
+            self.send(keyboards, 0, self.u32(seat) + self.u32(self.keyboard))
+            keymap = self.keymap()
+            fd = os.memfd_create("keymap")
+            os.write(fd, keymap)
+            self.send(self.keyboard, 0, self.u32(1) + self.u32(len(keymap)), fds=[fd])
+            os.close(fd)
+            self.roundtrip()
+            self.display = True
+        except Exception as err:  # noqa: BLE001
+            print(f"fake-input: no Wayland injection ({err}); events are logged only", file=sys.stderr)
+            self.display = None
+
+    # Wire protocol: a header of object id and (size << 16 | opcode), then
+    # 32-bit arguments; strings are length-prefixed and padded to 4 bytes.
+    @staticmethod
+    def u32(value):
+        return struct.pack("=I", value & 0xFFFFFFFF)
+
+    @staticmethod
+    def fixed(value):
+        return struct.pack("=i", int(round(value * 256)))
+
+    @staticmethod
+    def string(text):
+        data = text.encode() + b"\0"
+        return struct.pack("=I", len(data)) + data + b"\0" * (-len(data) % 4)
+
+    def new_id(self):
+        self.next_id += 1
+        return self.next_id - 1
+
+    def send(self, obj, opcode, args=b"", fds=()):
+        msg = struct.pack("=II", obj, (8 + len(args)) << 16 | opcode) + args
+        if fds:
+            self.sock.sendmsg([msg], [(socket.SOL_SOCKET, socket.SCM_RIGHTS, struct.pack(f"={len(fds)}i", *fds))])
+        else:
+            self.sock.sendall(msg)
+
+    def bind(self, registry, interface, version):
+        name, available = self.globals[interface]
+        obj = self.new_id()
+        self.send(registry, 0, self.u32(name) + self.string(interface) + self.u32(min(version, available)) + self.u32(obj))
+        return obj
+
+    def roundtrip(self, registry=None):
+        """Waits until the compositor has handled everything sent so far,
+        noting globals and raising protocol errors on the way."""
+        callback = self.new_id()
+        self.send(1, 0, self.u32(callback))
+        buf = b""
+        while True:
+            while len(buf) < 8:
+                chunk = self.sock.recv(65536)
+                if not chunk:
+                    raise RuntimeError("the compositor hung up")
+                buf += chunk
+            obj, word = struct.unpack_from("=II", buf)
+            size, opcode = word >> 16, word & 0xFFFF
+            while len(buf) < size:
+                buf += self.sock.recv(65536)
+            body, buf = buf[8:size], buf[size:]
+            if obj == callback:
+                return
+            if obj == 1 and opcode == 0:
+                _, code, length = struct.unpack_from("=III", body)
+                raise RuntimeError(f"protocol error {code}: {body[12:12 + length - 1].decode(errors='replace')}")
+            if obj == registry and opcode == 0:
+                name, length = struct.unpack_from("=II", body)
+                interface = body[8:8 + length - 1].decode()
+                (version,) = struct.unpack_from("=I", body, 8 + length + (-length % 4))
+                self.globals[interface] = (name, version)
+
+    @staticmethod
+    def keymap():
+        import ctypes
+        xkb = ctypes.CDLL("libxkbcommon.so.0")
+        xkb.xkb_context_new.restype = ctypes.c_void_p
+        xkb.xkb_keymap_new_from_names.restype = ctypes.c_void_p
+        xkb.xkb_keymap_new_from_names.argtypes = [ctypes.c_void_p, ctypes.c_void_p, ctypes.c_int]
+        xkb.xkb_keymap_get_as_string.restype = ctypes.c_void_p
+        xkb.xkb_keymap_get_as_string.argtypes = [ctypes.c_void_p, ctypes.c_int]
+        context = xkb.xkb_context_new(0)
+        keymap = xkb.xkb_keymap_new_from_names(context, None, 0)  # the default, us on pc105
+        if not keymap:
+            raise RuntimeError("libxkbcommon couldn't build a keymap")
+        return ctypes.string_at(xkb.xkb_keymap_get_as_string(keymap, 1)) + b"\0"
+
+    @staticmethod
+    def now():
+        return int(time.monotonic() * 1000)
+
+    # Shift, Control, Mod1 (Alt) and Mod4 (Super) in the default keymap. A
+    # virtual keyboard has to report its modifier state itself.
+    MODIFIERS = {42: 1, 54: 1, 29: 4, 97: 4, 56: 8, 100: 8, 125: 64, 126: 64}
+
+    def key(self, code, pressed):
+        if not self.display:
+            return
+        if code in BUTTONS:
+            self.send(self.pointer, 2, self.u32(self.now()) + self.u32(code) + self.u32(pressed))
+            self.send(self.pointer, 4)
+        elif code < 0x100:
+            self.send(self.keyboard, 1, self.u32(self.now()) + self.u32(code) + self.u32(pressed))
+            if code in self.MODIFIERS:
+                self.mods = self.mods | self.MODIFIERS[code] if pressed else self.mods & ~self.MODIFIERS[code]
+                self.send(self.keyboard, 2, self.u32(self.mods) + self.u32(0) * 3)
+
+    def motion(self, dx, dy):
+        if self.display and (dx or dy):
+            self.send(self.pointer, 0, self.u32(self.now()) + self.fixed(dx) + self.fixed(dy))
+            self.send(self.pointer, 4)
+
+    def move_to(self, x, y):
+        if not self.display:
+            return
+        width, height = (int(v) for v in os.environ.get("MOCK_SIZE", "1920x1080").split("x"))
+        self.send(self.pointer, 1, self.u32(self.now()) + self.u32(x) + self.u32(y) + self.u32(width) + self.u32(height))
+        self.send(self.pointer, 4)
+        self.flush()
+
+    def wheel(self, axis, value):
+        """A mouse wheel: one frame per notch with axis source wheel and a
+        discrete step, as libinput reports it. Positive is up (or left), as
+        with REL_WHEEL; Wayland's axis runs the other way."""
+        if not self.display:
+            return
+        direction = 0 if axis == REL_WHEEL else 1
+        step = -1 if value > 0 else 1
+        for _ in range(abs(value)):
+            self.send(self.pointer, 5, self.u32(0))
+            self.send(self.pointer, 7, self.u32(self.now()) + self.u32(direction)
+                      + self.fixed(step * self.WHEEL_STEP) + self.u32(step))
+            self.send(self.pointer, 4)
+
+    def scroll(self, dy, dx, steps):
+        """A touchpad: small continuous deltas from fingers, then a stop.
+        Positive is up (or left), like `wheel`."""
+        if not self.display:
+            return
+        for i in range(steps):
+            for direction, total in ((0, dy), (1, dx)):
+                if total:
+                    part = total * (i + 1) // steps - total * i // steps
+                    self.send(self.pointer, 5, self.u32(1))
+                    self.send(self.pointer, 3, self.u32(self.now()) + self.u32(direction) + self.fixed(-part))
+            self.send(self.pointer, 4)
+            self.flush()
+            time.sleep(0.012)
+        for direction, total in ((0, dy), (1, dx)):
+            if total:
+                self.send(self.pointer, 5, self.u32(1))
+                self.send(self.pointer, 6, self.u32(self.now()) + self.u32(direction))
+        self.send(self.pointer, 4)
+        self.flush()
+
+    def flush(self):
+        if not self.display:
+            return
+        try:
+            self.roundtrip()
+        except (OSError, RuntimeError) as err:
+            print(f"fake-input: Wayland injection stopped ({err})", file=sys.stderr)
+            self.display = None
+
+
+def desktop():
+    if os.environ.get("DISPLAY"):
+        return X()
+    return Wayland()
+
 class Broker:
     def __init__(self, root):
         self.root = root
-        self.x = X()
+        self.desktop = desktop()
         self.listeners = {}   # listening socket -> node (-1 uinput, -2 control)
         self.clients = {}     # client socket -> state dict
         self.held = {n: set() for n in DEVICES}
@@ -246,7 +469,7 @@ class Broker:
         for _, _, etype, code, value in EVENT.iter_unpack(data[: len(data) // EVENT.size * EVENT.size]):
             if etype == EV_SYN:
                 events, state["pending"] = state["pending"], []
-                self.x.apply(events)
+                self.desktop.apply(events)
                 for e in events:
                     self.log.write(f"{time.time():.3f} {state['name']} {describe(*e)}\n")
             else:
@@ -268,7 +491,7 @@ class Broker:
                 except OSError:
                     self.drop(sock)
         if not self.grabbed(node):
-            self.x.apply(events)
+            self.desktop.apply(events)
 
     def command(self, args):
         if not args:
@@ -310,7 +533,7 @@ class Broker:
                         self.emit(0, [(EV_KEY, 42, 0)])
                     time.sleep(delay)
             elif cmd == "click":
-                code = code_of(rest[0]) if rest else 0x110
+                code = code_of(rest[0], button=True) if rest else 0x110
                 self.emit(1, [(EV_KEY, code, 1)])
                 time.sleep(0.03)
                 self.emit(1, [(EV_KEY, code, 0)])
@@ -318,6 +541,17 @@ class Broker:
                 self.emit(1, [(EV_REL, REL_X, int(rest[0])), (EV_REL, REL_Y, int(rest[1]))])
             elif cmd == "wheel":
                 self.emit(1, [(EV_REL, REL_WHEEL, int(rest[0]))])
+            elif cmd == "hwheel":
+                self.emit(1, [(EV_REL, REL_HWHEEL, int(rest[0]))])
+            # Absolute moves and touchpad scrolling have no evdev mouse
+            # equivalent, so they go to the desktop directly.
+            elif cmd == "moveto":
+                self.desktop.move_to(int(rest[0]), int(rest[1]))
+            elif cmd == "scroll":
+                steps = 10
+                if rest and rest[0].startswith("--steps="):
+                    steps = max(1, int(rest.pop(0).split("=", 1)[1]))
+                self.desktop.scroll(int(rest[0]), int(rest[1]) if len(rest) > 1 else 0, steps)
             elif cmd == "status":
                 lines = [f"event{n} ({d['name']}): {'grabbed' if self.grabbed(n) else 'free'}, "
                          f"{sum(1 for c in self.clients.values() if c['node'] == n)} open, held={sorted(self.held[n])}"

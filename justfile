@@ -36,7 +36,7 @@ test:
 # Run a command (default: the live screen tests) on a headless desktop with
 # a stand-in game window. See docs/mock-desktop.md.
 [linux]
-mock-desktop desktop="x11" *cmd="":
+mock-desktop desktop="sway" *cmd="":
     scripts/mock-desktop.sh run {{desktop}} {{cmd}}
 
 clean:

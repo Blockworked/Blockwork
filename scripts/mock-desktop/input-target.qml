@@ -41,6 +41,6 @@ Window {
         anchors.fill: parent
         acceptedButtons: Qt.AllButtons
         onPressed: mouse => { typed.forceActiveFocus(); root.note("press " + mouse.button + " at " + mouse.x + "," + mouse.y) }
-        onWheel: wheel => root.note("wheel " + wheel.angleDelta.y)
+        onWheel: wheel => root.note("wheel " + wheel.angleDelta.y + " pixel " + wheel.pixelDelta.y + " phase " + wheel.phase)
     }
 }
