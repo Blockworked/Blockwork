@@ -129,6 +129,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
 - Ctrl+scroll zooms the canvas around the mouse pointer instead of pushing the view right and down, and mouse wheel zoom, the zoom buttons and reset now ease in (follows the animation speed setting).
 - Dragging the canvas with the mouse stops where you let go instead of gliding on, and two-finger touchpad panning is smoothed slightly.
+- Every event block label now uses the same bold caption style; newer event blocks (when run, when file changes, when idle and others) were drawn in plain text while the older ones were bold.
 
 ## [0.5.4] - 2026-09-20
 
