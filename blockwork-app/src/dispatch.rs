@@ -216,6 +216,10 @@ impl Backend {
                 let name: String = arg(&args, "name")?;
                 to_json(crate::macro_runs::stop_named(&self.state, &name)?)
             }
+            "create_global" => {
+                let name: String = arg(&args, "name")?;
+                to_json(commands::create_global(&self.state, &self.app, &name)?)
+            }
             "delete_global" => {
                 let name: String = arg(&args, "name")?;
                 to_json(commands::delete_global(&self.state, &self.app, &name)?)
@@ -284,6 +288,9 @@ impl Backend {
                 let name: String = arg(&args, "name")?;
                 to_json(commands::delete_variable(&self.state, &self.app, name)?)
             }
+            "create_signal" => to_json(commands::create_signal(&self.state, &self.app, arg(&args, "name")?)?),
+            "rename_signal" => to_json(commands::rename_signal(&self.state, &self.app, arg(&args, "oldName")?, arg(&args, "newName")?)?),
+            "delete_signal" => to_json(commands::delete_signal(&self.state, &self.app, arg(&args, "name")?)?),
             "create_list" => {
                 let name: String = arg(&args, "name")?;
                 to_json(commands::create_list(&self.state, &self.app, name)?)

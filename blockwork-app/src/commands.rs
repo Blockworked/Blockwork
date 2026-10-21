@@ -16,7 +16,7 @@ use blockwork_core::macros::runner::VariableStore;
 use blockstitch_core::graph::{ListItem, ListStore, resolve_list_reporters};
 use blockwork_core::macros::{
     BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro,
-    MacroGraph, SPEED_MULTIPLIER_RANGE, Strand, loop_control,
+    SPEED_MULTIPLIER_RANGE, Strand, loop_control,
     normalize_block_color as normalize_persisted_block_color,
 };
 use blockwork_core::recording;
@@ -37,7 +37,7 @@ pub(crate) fn push_undo(s: &mut AppState) {
 /// [`push_undo`] for an edit that coalesces with the keystrokes already in
 /// progress at `session` - only the first one checkpoints.
 fn push_undo_for(s: &mut AppState, session: Option<EditSession>) {
-    let snapshot = s.current_macro.as_ref().map(|mac| mac.graph.clone());
+    let snapshot = s.current_macro.as_ref().map(|mac| (mac.graph.clone(), mac.signals.clone()));
     match (snapshot, session) {
         (Some(snapshot), Some(session)) => {
             s.history.push_for_session(snapshot, session);
@@ -129,7 +129,8 @@ pub(crate) fn sync_list_values(s: &mut crate::state::AppState) {
 }
 
 pub(crate) fn auto_save(s: &mut crate::state::AppState) {
-    if let Some(mac) = &s.current_macro {
+    if let Some(mac) = &mut s.current_macro {
+        mac.collect_named_signals();
         if let Err(e) = mac.save() {
             warn!("Failed to auto-save macro: {e}");
         } else {
@@ -438,8 +439,14 @@ pub(crate) fn set_macro_max_run_secs(
     Ok(())
 }
 
-/// Sets how many iterations any one loop of the selected macro may run; 0
-/// means no limit.
+/// Creates an empty global for every macro's name picker.
+pub(crate) fn create_global(state: &SharedState, app: &AppHandle, name: &str) -> Result<(), String> {
+    blockwork_core::globals::create(name)?;
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
 pub(crate) fn delete_global(state: &SharedState, app: &AppHandle, name: &str) -> Result<(), String> {
     blockwork_core::globals::remove(name);
     let s = state.lock().map_err(|e| e.to_string())?;
@@ -447,6 +454,8 @@ pub(crate) fn delete_global(state: &SharedState, app: &AppHandle, name: &str) ->
     Ok(())
 }
 
+/// Sets how many iterations any one loop of the selected macro may run; 0
+/// means no limit.
 pub(crate) fn set_macro_max_loop_iterations(
     state: &SharedState,
     app: &AppHandle,
@@ -573,6 +582,82 @@ pub(crate) fn delete_variable(
     Ok(())
 }
 
+pub(crate) fn create_signal(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let name = s
+        .current_macro
+        .as_ref()
+        .ok_or("No macro selected")?
+        .validate_signal_name(&name, None)?;
+    push_undo(&mut s);
+    s.current_macro.as_mut().unwrap().signals.push(name);
+    auto_save(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn rename_signal(
+    state: &SharedState,
+    app: &AppHandle,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+    let name = mac.validate_signal_name(&new_name, Some(&old_name))?;
+    if !mac.signals.contains(&old_name) {
+        return Err("Signal not found".into());
+    }
+    if name == old_name {
+        return Ok(());
+    }
+    push_undo(&mut s);
+    s.current_macro
+        .as_mut()
+        .unwrap()
+        .rename_signal(&old_name, &name)?;
+    auto_save(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn delete_signal(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+    if !mac.signals.contains(&name) {
+        return Err("Signal not found".into());
+    }
+    let mut used = false;
+    mac.graph.walk_instructions(&mut |ins| {
+        if let InstructionKind::WhenSignal(target)
+        | InstructionKind::SendSignal { name: target, .. } = &ins.kind
+            && !target.expression
+            && let Value::Text { value } = &target.value
+        {
+            used |= value.trim().eq_ignore_ascii_case(&name);
+        }
+    });
+    if used {
+        return Err("This signal is still used by a named signal block. Change or remove those blocks first.".into());
+    }
+    push_undo(&mut s);
+    s.current_macro
+        .as_mut()
+        .unwrap()
+        .signals
+        .retain(|s| s != &name);
+    auto_save(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
 fn create_list_in(mac: &mut Macro, name: &str) -> Result<String, String> {
     let trimmed = mac.graph.create_list(name)?;
     if let Some(list) = mac.graph.lists.iter_mut().find(|list| list.name == trimmed) {
@@ -1976,17 +2061,20 @@ pub(crate) fn clear_instructions(
 fn apply_history_step(
     state: &SharedState,
     app: &AppHandle,
-    step: fn(&mut crate::state::History<MacroGraph>, MacroGraph) -> Option<MacroGraph>,
+    step: fn(
+        &mut crate::state::History<crate::state::EditorSnapshot>,
+        crate::state::EditorSnapshot,
+    ) -> Option<crate::state::EditorSnapshot>,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(current) = s
         .current_macro
         .as_ref()
-        .map(|mac| mac.graph.clone())
+        .map(|mac| (mac.graph.clone(), mac.signals.clone()))
         && let Some(restored_graph) = step(&mut s.history, current)
     {
         if let Some(mac) = &mut s.current_macro {
-            mac.graph = restored_graph;
+            (mac.graph, mac.signals) = restored_graph;
             mac.ensure_id();
         }
         sync_variable_values(&mut s);
@@ -3200,6 +3288,7 @@ mod value_location_tests {
                 }],
                 ..MacroGraph::new()
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: blockwork_core::macros::MacroSettings::default(),
@@ -3619,6 +3708,7 @@ mod value_location_tests {
                 }],
                 ..MacroGraph::new()
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: blockwork_core::macros::MacroSettings::default(),
@@ -4081,6 +4171,7 @@ mod import_review_tests {
                 }],
                 ..MacroGraph::new()
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: blockwork_core::macros::MacroSettings::default(),

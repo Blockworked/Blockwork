@@ -21,6 +21,8 @@ use std::collections::HashMap;
 use crate::AppHandle;
 use std::sync::{Arc, Mutex};
 
+pub(crate) type EditorSnapshot = (MacroGraph, Vec<String>);
+
 pub(crate) type SharedState = Arc<Mutex<AppState>>;
 
 /// How many undo steps the editor keeps.
@@ -96,7 +98,7 @@ pub(crate) struct AppState {
     pub(crate) pending_standalone_key: Option<String>,
     /// Undo/redo over whole-canvas snapshots, plus the key that keeps a run
     /// of keystrokes to one step.
-    pub(crate) history: History<MacroGraph>,
+    pub(crate) history: History<EditorSnapshot>,
     pub(crate) recording_phase: RecordingPhase,
     pub(crate) recording_countdown_generation: u64,
     pub(crate) record_mouse_relative: bool,
@@ -261,6 +263,7 @@ pub(crate) struct MacroDto {
     pub(crate) variables: Vec<String>,
     /// Macro-scoped lists, including their literal items for the list editor.
     pub(crate) lists: Vec<ListDto>,
+    pub(crate) signals: Vec<String>,
     /// User-defined custom blocks ("My Blocks").
     pub(crate) block_defs: Vec<BlockDef>,
     /// Settings edited from the "Macro Settings" popup - see `MacroSettingsDto`.
@@ -692,10 +695,14 @@ pub(crate) enum InstructionDto {
     },
     WhenSignal {
         id: String,
+        #[serde(default)]
+        expression: bool,
         name: Value,
     },
     SendSignal {
         id: String,
+        #[serde(default)]
+        expression: bool,
         name: Value,
         wait: bool,
     },
@@ -1164,8 +1171,8 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
         }
         InstructionKind::ShowMessage(message) => InstructionDto::ShowMessage { id, message: message.clone() },
         InstructionKind::WhenAt(at) => InstructionDto::WhenAt { id, at: at.clone() },
-        InstructionKind::WhenSignal(name) => InstructionDto::WhenSignal { id, name: name.clone() },
-        InstructionKind::SendSignal { name, wait } => InstructionDto::SendSignal { id, name: name.clone(), wait: *wait },
+        InstructionKind::WhenSignal(name) => InstructionDto::WhenSignal { id, name: name.value.clone(), expression: name.expression },
+        InstructionKind::SendSignal { name, wait } => InstructionDto::SendSignal { id, name: name.value.clone(), expression: name.expression, wait: *wait },
         InstructionKind::WhenWebhook { path, variable } => {
             InstructionDto::WhenWebhook { id, path: path.clone(), variable: variable.clone() }
         }
@@ -1636,8 +1643,8 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         }
         InstructionDto::ShowMessage { id, message } => (id, InstructionKind::ShowMessage(message.clone())),
         InstructionDto::WhenAt { id, at } => (id, InstructionKind::WhenAt(at.clone())),
-        InstructionDto::WhenSignal { id, name } => (id, InstructionKind::WhenSignal(name.clone())),
-        InstructionDto::SendSignal { id, name, wait } => (id, InstructionKind::SendSignal { name: name.clone(), wait: *wait }),
+        InstructionDto::WhenSignal { id, name, expression } => (id, InstructionKind::WhenSignal(blockwork_core::macros::SignalName::new(name.clone(), *expression))),
+        InstructionDto::SendSignal { id, name, expression, wait } => (id, InstructionKind::SendSignal { name: blockwork_core::macros::SignalName::new(name.clone(), *expression), wait: *wait }),
         InstructionDto::WhenWebhook { id, path, variable } => {
             (id, InstructionKind::WhenWebhook { path: path.clone(), variable: variable.clone() })
         }
@@ -1721,6 +1728,7 @@ fn macro_to_dto(mac: &Macro) -> MacroDto {
         comments: mac.comments.clone(),
         variables: mac.variables.iter().map(|v| v.name.clone()).collect(),
         lists: mac.lists.iter().map(list_to_dto).collect(),
+        signals: mac.signals.clone(),
         block_defs: mac.block_defs.clone(),
         settings: macro_settings_to_dto(&mac.settings),
     }
@@ -2000,6 +2008,28 @@ pub(crate) fn emit_state_updated(app: &AppHandle, s: &AppState) {
 mod tests {
     use super::*;
     use blockwork_core::macros::Instruction;
+
+    #[test]
+    fn signals_round_trip_through_frontend_without_losing_expression_mode() {
+        use blockwork_core::macros::SignalName;
+        for expression in [false, true] {
+            let target = SignalName::new(Value::text("finished"), expression);
+            for kind in [
+                InstructionKind::WhenSignal(target.clone()),
+                InstructionKind::SendSignal {
+                    name: target.clone(),
+                    wait: true,
+                },
+            ] {
+                let instruction = Instruction::new(kind.clone());
+                let dto = instruction_to_dto(&instruction);
+                let json = serde_json::to_value(&dto).unwrap();
+                assert_eq!(json["expression"], expression);
+                let dto = serde_json::from_value(json).unwrap();
+                assert_eq!(dto_to_instruction(&dto).unwrap().kind, kind);
+            }
+        }
+    }
 
     #[test]
     fn detection_blocks_round_trip_through_dtos() {

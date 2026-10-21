@@ -90,9 +90,8 @@ impl BlockKind for InstructionKind {
             | InstructionKind::AskChoice { prompt: value, .. }
             | InstructionKind::ShowMessage(value)
             | InstructionKind::WhenAt(value)
-            | InstructionKind::WhenSignal(value)
-            | InstructionKind::SendSignal { name: value, .. }
             | InstructionKind::WhenWebhook { path: value, .. } => f(value, InputValueType::Any),
+            InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } => f(&mut name.value, InputValueType::Any),
             InstructionKind::AskText { prompt, default, .. } => {
                 f(prompt, InputValueType::Any);
                 f(default, InputValueType::Any);
@@ -331,6 +330,43 @@ impl BlockKind for InstructionKind {
         field
             .parse()
             .is_ok_and(|field: FieldId| field.requires_integer())
+    }
+}
+
+/// A named choice or an unrestricted expression, both resolved as text at runtime.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(from = "SignalNameDe")]
+pub struct SignalName {
+    pub value: Value,
+    pub expression: bool,
+}
+
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum SignalNameDe {
+    Current { value: Value, expression: bool },
+    Legacy(Value),
+}
+
+impl From<SignalNameDe> for SignalName {
+    fn from(value: SignalNameDe) -> Self {
+        match value {
+            SignalNameDe::Current { value, expression } => Self::new(value, expression),
+            SignalNameDe::Legacy(value) => Self::new(value, false),
+        }
+    }
+}
+
+impl SignalName {
+    pub fn new(value: Value, expression: bool) -> Self {
+        let expression = expression || !matches!(value, Value::Text { .. });
+        Self { value, expression }
+    }
+}
+
+impl From<Value> for SignalName {
+    fn from(value: Value) -> Self {
+        Self::new(value, false)
     }
 }
 
@@ -692,11 +728,11 @@ pub enum InstructionKind {
     /// Header for a strand fired once at a date and time, like `2026-12-24 18:00`.
     WhenAt(Value),
     /// Header for a strand started by a `SendSignal` of the same name in this macro.
-    WhenSignal(Value),
+    WhenSignal(SignalName),
     /// Starts this macro's `WhenSignal` strands named `name`, sharing this
     /// run's variables; with `wait`, until they've all ended.
     SendSignal {
-        name: Value,
+        name: SignalName,
         wait: bool,
     },
     /// Header for a strand fired by a web request to `path` on the local
@@ -1378,9 +1414,9 @@ enum InstructionKindDe {
     },
     ShowMessage(Value),
     WhenAt(Value),
-    WhenSignal(Value),
+    WhenSignal(SignalName),
     SendSignal {
-        name: Value,
+        name: SignalName,
         wait: bool,
     },
     WhenWebhook {
@@ -1664,6 +1700,8 @@ pub struct Macro {
     pub description: String,
     #[serde(flatten)]
     pub graph: MacroGraph,
+    #[serde(default)]
+    pub signals: Vec<String>,
     /// Strand explicitly chosen to receive freshly-recorded input; `None`
     /// falls back to the "first When Ran strand, else first strand" rule.
     /// Kept out of undo/redo (it's a preference, not an instruction edit).
@@ -1754,6 +1792,8 @@ enum MacroDe {
         description: String,
         strands: Vec<Strand>,
         #[serde(default)]
+        signals: Vec<String>,
+        #[serde(default)]
         recording_target: Option<String>,
         #[serde(default = "default_speed_multiplier")]
         speed_multiplier: f64,
@@ -1790,6 +1830,7 @@ impl From<MacroDe> for Macro {
                 name,
                 description,
                 mut strands,
+                signals,
                 recording_target,
                 speed_multiplier,
                 floating_values,
@@ -1822,6 +1863,7 @@ impl From<MacroDe> for Macro {
                         dicts,
                         block_defs,
                     },
+                    signals,
                     recording_target,
                     speed_multiplier,
                     settings,
@@ -1842,6 +1884,7 @@ impl From<MacroDe> for Macro {
                         strands: vec![Strand::with_instructions(0, 0, code)],
                         ..MacroGraph::new()
                     },
+                    signals: Vec::new(),
                     recording_target: None,
                     speed_multiplier: default_speed_multiplier(),
                     settings: MacroSettings::default(),
@@ -1858,6 +1901,7 @@ impl From<MacroDe> for Macro {
         // custom property before the frontend ever sees them.
         mac.graph.normalize_block_colors();
         mac.migrate_legacy_comments();
+        mac.collect_named_signals();
         mac
     }
 }
@@ -1873,10 +1917,85 @@ impl Macro {
                 strands: vec![Strand::with_instructions(0, 0, code)],
                 ..MacroGraph::new()
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: default_speed_multiplier(),
             settings: MacroSettings::default(),
         }
+    }
+
+    /// Keep named references registered when importing or adding blocks.
+    pub fn collect_named_signals(&mut self) {
+        let mut names = Vec::new();
+        self.graph.walk_instructions(&mut |ins| {
+            if let InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } =
+                &ins.kind
+                && !name.expression
+                && let Value::Text { value } = &name.value
+                && !value.trim().is_empty()
+            {
+                names.push(value.trim().to_string());
+            }
+        });
+        let mut unique: Vec<String> = Vec::new();
+        for name in self.signals.iter().chain(names.iter()) {
+            let name = name.trim();
+            if !name.is_empty() && !unique.iter().any(|s| s.eq_ignore_ascii_case(name)) {
+                unique.push(name.to_string());
+            }
+        }
+        self.graph.walk_instructions_mut(&mut |ins| {
+            if let InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } =
+                &mut ins.kind
+                && !name.expression
+                && let Value::Text { value } = &mut name.value
+                && let Some(canonical) =
+                    unique.iter().find(|s| s.eq_ignore_ascii_case(value.trim()))
+            {
+                *value = canonical.clone();
+            }
+        });
+        self.signals = unique;
+    }
+
+    pub fn validate_signal_name(
+        &self,
+        name: &str,
+        replacing: Option<&str>,
+    ) -> Result<String, String> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Signal name can't be empty".into());
+        }
+        if self
+            .signals
+            .iter()
+            .any(|s| Some(s.as_str()) != replacing && s.eq_ignore_ascii_case(name))
+        {
+            return Err(format!("A signal named \"{name}\" already exists"));
+        }
+        Ok(name.to_string())
+    }
+
+    pub fn rename_signal(&mut self, old: &str, new: &str) -> Result<(), String> {
+        let new = self.validate_signal_name(new, Some(old))?;
+        let index = self
+            .signals
+            .iter()
+            .position(|s| s == old)
+            .ok_or("Signal not found")?;
+        self.signals[index] = new.clone();
+        self.graph.walk_instructions_mut(&mut |ins| {
+            if let InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } =
+                &mut ins.kind
+                && !name.expression
+                && let Value::Text { value } = &mut name.value
+                && value.trim().eq_ignore_ascii_case(old)
+            {
+                *value = new.clone();
+            }
+        });
+        Ok(())
     }
 
     /// Whether any instruction, including nested bodies, moves to an
@@ -2019,6 +2138,7 @@ impl std::hash::Hash for Macro {
         self.name.hash(state);
         self.description.hash(state);
         self.graph.hash(state);
+        self.signals.hash(state);
         self.recording_target.hash(state);
         self.speed_multiplier.to_bits().hash(state);
         self.settings.hash(state);
@@ -2030,6 +2150,85 @@ mod tests {
     use super::*;
     use crate::input::value::Evaluated;
     use crate::input::types::Coordinate;
+
+    #[test]
+    fn signal_names_migrate_and_unused_names_survive_round_trip() {
+        let mut mac: Macro = serde_json::from_value(serde_json::json!({
+            "name": "Old macro", "description": "", "signals": ["Unused"],
+            "strands": [{"id": "s", "x": 0, "y": 0, "instructions": [
+                {"id": "send", "kind": {"SendSignal": {"name": {"kind": "Text", "value": " Go "}, "wait": true}}},
+                {"id": "receive", "kind": {"WhenSignal": {"kind": "Text", "value": "go"}}}
+            ]}]
+        })).unwrap();
+        assert_eq!(mac.signals, ["Unused", "Go"]);
+        mac.strands.clear();
+        let restored: Macro = serde_json::from_str(&serde_json::to_string(&mac).unwrap()).unwrap();
+        assert_eq!(restored.signals, ["Unused", "Go"]);
+    }
+
+    #[test]
+    fn signal_rename_updates_nested_named_references_but_preserves_expressions() {
+        let mut mac = Macro::new(
+            "Signals".into(),
+            "".into(),
+            vec![
+                Instruction::new(InstructionKind::WhenSignal(Value::text("go").into())),
+                Instruction::new(InstructionKind::Repeat {
+                    count: Value::number(1.0),
+                    body: vec![
+                        Instruction::new(InstructionKind::SendSignal {
+                            name: Value::text(" GO ").into(),
+                            wait: true,
+                        }),
+                        Instruction::new(InstructionKind::SendSignal {
+                            name: SignalName::new(Value::text("go"), true),
+                            wait: false,
+                        }),
+                    ],
+                }),
+            ],
+        );
+        mac.collect_named_signals();
+        assert!(mac.validate_signal_name(" GO ", None).is_err());
+        assert!(mac.validate_signal_name(" ", None).is_err());
+        mac.rename_signal("go", "finished").unwrap();
+        assert_eq!(mac.signals, ["finished"]);
+        let mut names = Vec::new();
+        mac.graph.walk_instructions(&mut |ins| {
+            if let InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } =
+                &ins.kind
+            {
+                names.push((name.value.clone(), name.expression));
+            }
+        });
+        assert_eq!(
+            names,
+            vec![
+                (Value::text("finished"), false),
+                (Value::text("finished"), false),
+                (Value::text("go"), true)
+            ]
+        );
+        let restored: Macro = serde_json::from_str(&serde_json::to_string(&mac).unwrap()).unwrap();
+        assert_eq!(restored.signals, ["finished"]);
+        assert_eq!(restored.graph, mac.graph);
+    }
+
+    #[test]
+    fn legacy_dynamic_signals_remain_expressions() {
+        let value = Value::Op {
+            op: Op::Join,
+            args: vec![Value::text("task:"), Value::text("42")],
+            saved: Box::new(Value::text("")),
+        };
+        let old = serde_json::json!({"WhenSignal": value});
+        let instruction: InstructionKind = serde_json::from_value(old).unwrap();
+        let InstructionKind::WhenSignal(name) = instruction else {
+            panic!("expected signal receiver");
+        };
+        assert!(name.expression);
+        assert_eq!(name.value, value);
+    }
 
     #[test]
     fn block_def_migrates_legacy_returns_value_true_to_returns_value_shape() {

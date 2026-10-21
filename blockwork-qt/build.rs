@@ -33,6 +33,8 @@ fn main() {
         "qml/PromptWindow.qml",
         "qml/BlockLibrary.qml",
         "qml/AppDialog.qml",
+        "qml/GlobalPicker.qml",
+        "qml/NamePicker.qml",
     ];
 
     // Shared Lucide icons (lean set): staged under qml/Lucide/ (gitignored,

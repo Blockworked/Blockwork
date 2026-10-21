@@ -18,7 +18,9 @@ fn path() -> Option<std::path::PathBuf> {
     if cfg!(test) {
         return None;
     }
-    crate::config::config_root().ok().map(|root| root.join("globals.json"))
+    crate::config::config_root()
+        .ok()
+        .map(|root| root.join("globals.json"))
 }
 
 fn load() -> BTreeMap<String, Evaluated> {
@@ -44,6 +46,25 @@ pub fn set(name: &str, value: Evaluated) -> Result<(), String> {
         return Err("the global variable needs a name".into());
     }
     with_store(|store| store.insert(name.to_string(), value));
+    schedule_save();
+    Ok(())
+}
+
+/// Creates an empty global without overwriting an existing value.
+pub fn create(name: &str) -> Result<(), String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Err("the global variable needs a name".into());
+    }
+    with_store(|store| match store.entry(name.to_string()) {
+        std::collections::btree_map::Entry::Vacant(entry) => {
+            entry.insert(Evaluated::Text(String::new()));
+            Ok(())
+        }
+        std::collections::btree_map::Entry::Occupied(_) => {
+            Err("a global variable with that name already exists".to_string())
+        }
+    })?;
     schedule_save();
     Ok(())
 }
@@ -94,7 +115,10 @@ pub fn flush() {
     if !DIRTY.swap(false, Ordering::AcqRel) {
         return;
     }
-    let (Some(path), Ok(json)) = (path(), with_store(|store| serde_json::to_string_pretty(&without_secrets(store)))) else {
+    let (Some(path), Ok(json)) = (
+        path(),
+        with_store(|store| serde_json::to_string_pretty(&without_secrets(store))),
+    ) else {
         return;
     };
     if let Some(dir) = path.parent() {
@@ -109,6 +133,22 @@ pub fn flush() {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn creating_globals_starts_empty_and_preserves_existing_values() {
+        let name = "globals-create-test";
+        remove(name);
+        assert!(create("  ").is_err());
+        create(&format!(" {name} ")).unwrap();
+        assert_eq!(get(name), Evaluated::Text(String::new()));
+        assert!(all().iter().any(|(key, _)| key == name));
+        set(name, Evaluated::Number(42.0)).unwrap();
+        assert!(create(name).is_err());
+        assert_eq!(get(name), Evaluated::Number(42.0));
+        change(name, 1.0).unwrap();
+        assert_eq!(get(name), Evaluated::Number(43.0));
+        remove(name);
+    }
 
     #[test]
     fn globals_default_to_zero_and_count_up() {
@@ -127,10 +167,16 @@ mod tests {
     fn saved_globals_mask_secrets() {
         crate::secrets::set("globals-test-secret", "hunter2-globals").unwrap();
         let mut store = BTreeMap::new();
-        store.insert("token".to_string(), Evaluated::Text("Bearer hunter2-globals".into()));
+        store.insert(
+            "token".to_string(),
+            Evaluated::Text("Bearer hunter2-globals".into()),
+        );
         store.insert("count".to_string(), Evaluated::Number(3.0));
         let saved = without_secrets(&store);
-        assert_eq!(saved["token"], Evaluated::Text(format!("Bearer {}", crate::secrets::MASK)));
+        assert_eq!(
+            saved["token"],
+            Evaluated::Text(format!("Bearer {}", crate::secrets::MASK))
+        );
         assert_eq!(saved["count"], Evaluated::Number(3.0));
         let _ = crate::secrets::delete("globals-test-secret");
     }

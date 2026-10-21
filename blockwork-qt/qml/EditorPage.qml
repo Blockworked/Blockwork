@@ -28,6 +28,7 @@ Item {
     function uuid() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }); }
     function numberValue(n) { return { kind: "Number", value: n }; }
     function textValue(t) { return { kind: "Text", value: t }; }
+    function firstGlobalName() { return (appState.globals || []).length ? appState.globals[0].name : ""; }
     function defaultInstruction(type) {
         const registered = BlockRegistry.prefab(type);
         if (registered) { registered.id = uuid(); return registered; }
@@ -275,6 +276,23 @@ Item {
             updated.region = [r(x - bounds.x), r(y - bounds.y), r(width), r(height)].join(",");
             root.invoke("edit_instruction", { strandId: request.strandId, path: request.path, instruction: updated });
         });
+    }
+    function pickSignal(location, value) {
+        const strand = canvas.strandById(location.strand_id);
+        const path = location.index;
+        const list = strand ? canvas.listFor(strand, path.slice(0, path.length - 1)) : null;
+        const instruction = list ? list[path[path.length - 1].index] : null;
+        if (!instruction) return;
+        const macroId = root.macro.id, blockId = instruction.id;
+        signalPicker.openFor((name, expression) => {
+            if (!root.macro || root.macro.id !== macroId) return;
+            const current = root.findInstruction(blockId);
+            if (!current) return;
+            const updated = JSON.parse(JSON.stringify(current));
+            updated.expression = expression;
+            if (!expression) updated.name = root.textValue(name);
+            root.invoke("edit_instruction", { strandId: location.strand_id, path: path, instruction: updated });
+        }, value && value.kind === "Text" ? value.value : "");
     }
     function onPieceAction(action, strandId, path, instruction) {
         const request = { kind: "image", strandId: strandId, path: path, instruction: instruction };
@@ -553,6 +571,8 @@ Item {
                         onAboutToHide: macroMenuButton.closeStamp = Date.now()
                         implicitWidth: 200
                         BwMenuItem { iconName: "sliders"; text: qsTr("Macro settings"); enabled: !!root.macro; onTriggered: macroSettings.open() }
+                        BwMenuItem { iconName: "navigation"; text: qsTr("Signals…"); enabled: !!root.macro; onTriggered: signalsDialog.open() }
+                        BwMenuItem { iconName: "variable"; text: qsTr("Globals…"); onTriggered: globalPicker.openFor(null) }
                         BwMenuItem { iconName: "plus"; text: qsTr("New macro"); onTriggered: root.invoke("new_macro") }
                         BwMenuItem { iconName: "sparkles"; text: qsTr("New from template..."); onTriggered: templateDialog.open() }
                         BwMenuItem { iconName: "copy"; text: qsTr("Duplicate macro"); enabled: !!root.macro; onTriggered: root.invoke("duplicate_macro", { id: root.macro.id }) }
@@ -1124,6 +1144,22 @@ Item {
             root.daemonCall("import_model", { path: path }, (id, error) => { if (id) modelDialog.use(id); else pickError.show(error); });
         }
     }
+    NamePicker {
+        id: signalPicker
+        names: root.macro ? root.macro.signals || [] : []
+        chooseTitle: qsTr("Choose a signal")
+        createTitle: qsTr("New signal")
+        newText: qsTr("New signal…")
+        createCommand: "create_signal"
+        scopeText: qsTr("In this macro")
+        allowExpression: true; caseInsensitive: true
+        callCommand: (command, args, done) => root.daemonCall(command, args, done)
+    }
+    GlobalPicker {
+        id: globalPicker
+        globals: root.appState.globals || []
+        callCommand: (command, args, done) => root.daemonCall(command, args, done)
+    }
     AppDialog {
         id: usbDialog; title: qsTr("Choose a USB device"); standardButtons: Dialog.Cancel
         property var request: null
@@ -1262,6 +1298,75 @@ Item {
         }
     }
     AppDialog {
+        id: signalsDialog
+        title: qsTr("Signals"); standardButtons: Dialog.Close
+        Column {
+            width: 400; spacing: 10
+            Text { width: parent.width; text: qsTr("Named signals in this macro. Expressions can also send and receive names outside this list."); wrapMode: Text.WordWrap; color: Theme.textDim }
+            ScrollView {
+                width: parent.width; height: Math.min(300, signalRows.implicitHeight)
+                clip: true
+                Column {
+                    id: signalRows; width: 380; spacing: 6
+                    Repeater {
+                        model: root.macro ? root.macro.signals || [] : []
+                        delegate: RowLayout {
+                            required property string modelData
+                            width: signalRows.width; spacing: 6
+                            Text { Layout.fillWidth: true; text: modelData; elide: Text.ElideRight; color: Theme.text }
+                            BwButton { text: qsTr("Rename"); onClicked: signalDialog.openForRename(modelData) }
+                            BwButton {
+                                text: qsTr("Delete")
+                                onClicked: root.daemonCall("delete_signal", { name: modelData }, (result, error) => { signalsError.text = error || ""; })
+                            }
+                        }
+                    }
+                }
+            }
+            Text { visible: !root.macro || !(root.macro.signals || []).length; text: qsTr("No named signals yet."); color: Theme.textDim }
+            Text { id: signalsError; width: parent.width; visible: text.length > 0; wrapMode: Text.WordWrap; color: Theme.danger }
+            BwButton { text: qsTr("New signal…"); iconName: "plus"; onClicked: signalPicker.openForCreate(null) }
+        }
+        onOpened: signalsError.text = ""
+    }
+    AppDialog {
+        id: signalDialog
+        property string renameTarget: ""
+        property string macroId: ""
+        property bool busy: false
+        title: qsTr("Rename signal")
+        standardButtons: Dialog.NoButton
+        function openForRename(name) {
+            renameTarget = name; signalName.text = name;
+            macroId = root.macro ? root.macro.id : "";
+            signalError.text = ""; busy = false;
+            open(); signalName.forceActiveFocus(); signalName.selectAll();
+        }
+        function submit() {
+            const name = signalName.text.trim();
+            if (busy || !name.length || !root.macro || root.macro.id !== macroId) return;
+            busy = true;
+            root.daemonCall("rename_signal", { oldName: renameTarget, newName: name }, (result, error) => {
+                busy = false;
+                if (error) signalError.text = error;
+                else close();
+            });
+        }
+        Column {
+            width: 400; spacing: 12
+            Text { text: qsTr("Name"); color: Theme.text; font.pixelSize: 13 }
+            BwTextField { id: signalName; width: parent.width; enabled: !signalDialog.busy; onAccepted: signalDialog.submit() }
+            Text { width: parent.width; wrapMode: Text.WordWrap; text: qsTr("Updates named blocks in this macro. Expressions keep their contents."); color: Theme.textDim; font.pixelSize: 13 }
+            Text { id: signalError; width: parent.width; visible: text.length > 0; wrapMode: Text.WordWrap; color: Theme.danger; font.pixelSize: 13 }
+        }
+        footer: DialogButtonBox {
+            alignment: Qt.AlignRight; spacing: 8; padding: 18; topPadding: 8
+            background: null
+            BwButton { text: qsTr("Cancel"); enabled: !signalDialog.busy; onClicked: signalDialog.reject() }
+            BwButton { text: qsTr("Rename"); primary: true; enabled: !signalDialog.busy && signalName.text.trim().length > 0; onClicked: signalDialog.submit() }
+        }
+    }
+    AppDialog {
         id: listDialog
         property string renameTarget: ""
         title: renameTarget.length ? qsTr("Rename List") : qsTr("Make a List")
@@ -1311,7 +1416,7 @@ Item {
         ["JsonGet", "text", 2, [textValue("name"), textValue('{"name": "Blockwork"}')]],
         ["ShellOutput", "text", 1, [textValue("echo hello")]], ["ShellSucceeded", "bool", 1, [textValue("true")]],
         ["ActiveWindowTitle", "text", 0], ["ActiveWindowApp", "text", 0], ["WindowExists", "bool", 1, [textValue("Firefox")]],
-        ["LastError", "text", 0], ["MacroRunning", "bool", 1, [textValue("")]], ["GlobalVariable", "text", 1, [textValue("counter")]],
+        ["LastError", "text", 0], ["MacroRunning", "bool", 1, [textValue("")]], ["GlobalVariable", "text", 1, [textValue(firstGlobalName())]],
         ["PixelColor", "text", 2, [numberValue(100), numberValue(100)]], ["AverageColor", "text", 4, [numberValue(0), numberValue(0), numberValue(100), numberValue(100)]],
         ["ColorsMatch", "bool", 3, [textValue("#ffffff"), textValue("#fafafa"), numberValue(10)]],
         ["ScreenText", "text", 4, [numberValue(0), numberValue(0), numberValue(400), numberValue(100)]],
@@ -1382,6 +1487,7 @@ Item {
             { kind: "button", action: "loadImage", icon: "folder-open" }
         ];
         const value = (field, key) => ({ kind: "value", field: field, key: key });
+        const signalPieces = [{ kind: "value", field: "SignalName", key: "name", pickAction: "pickSignal", expression: "expression" }];
         // The detect blocks' search area: the whole window, or a part picked on screen.
         const regionPieces = [
             { kind: "button", action: "pickRegion", icon: "square-dashed", text: i => i && i.region ? qsTr("region %1").arg(i.region) : qsTr("whole window") },
@@ -1395,7 +1501,8 @@ Item {
             ActiveWindowTitle: { prefix: qsTr("active window title"), result: "text" }, ActiveWindowApp: { prefix: qsTr("active app"), result: "text" },
             WindowExists: { prefix: qsTr("window"), suffix: qsTr("exists?"), result: "bool" },
             LastError: { prefix: qsTr("error message"), result: "text" },
-            MacroRunning: { prefix: qsTr("macro"), suffix: qsTr("is running?"), result: "bool" }, GlobalVariable: { prefix: qsTr("global"), result: "text" },
+            MacroRunning: { prefix: qsTr("macro"), suffix: qsTr("is running?"), result: "bool" },
+            GlobalVariable: { prefix: qsTr("global"), result: "text", pickArg: { index: 0, action: "pickGlobal", icon: "chevron-down" } },
             PixelColor: { prefix: qsTr("color at x"), infix: [qsTr("y")], result: "text" },
             AverageColor: { prefix: qsTr("average color at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text" },
             ColorsMatch: { infix: [qsTr("matches"), qsTr("within")], suffix: "%", result: "bool" },
@@ -1437,10 +1544,10 @@ Item {
         BlockRegistry.registerRows({
             WhenRan: { shape: "header", icon: "play", head: [label(qsTr("WHEN RUN"))] },
             WhenAt: { shape: "header", icon: "clock", head: [label(qsTr("ONCE AT")), value("AtTime", "at")] },
-            WhenSignal: { shape: "header", icon: "corner-down-right", head: [label(qsTr("WHEN I RECEIVE")), value("SignalName", "name")] },
+            WhenSignal: { shape: "header", icon: "corner-down-right", head: [label(qsTr("WHEN I RECEIVE")), ...signalPieces] },
             WhenWebhook: { shape: "header", icon: "link", head: [label(qsTr("WHEN WEBHOOK")), value("WebhookPath", "path"), label(qsTr("IS CALLED, BODY IN")),
                 { kind: "dropdown", key: "variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") }] },
-            SendSignal: { icon: "navigation", head: [label(qsTr("send signal")), value("SignalName", "name"),
+            SendSignal: { icon: "navigation", head: [label(qsTr("send signal")), ...signalPieces,
                 { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
                   encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
             AskText: { icon: "text-cursor-input", head: [label(qsTr("ask")), value("AskPrompt", "prompt"), label(qsTr("default")), value("AskDefault", "default"),
@@ -1513,8 +1620,8 @@ Item {
                 { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
                   encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
             StopMacroNamed: { icon: "square", head: [label(qsTr("stop macro")), value("MacroTarget", "target")] },
-            SetGlobal: { icon: "variable", head: [label(qsTr("set global")), value("GlobalName", "name"), label(qsTr("to")), value("GlobalValue", "value")] },
-            ChangeGlobal: { icon: "variable", head: [label(qsTr("change global")), value("GlobalName", "name"), label(qsTr("by")), value("GlobalValue", "by")] },
+            SetGlobal: { icon: "variable", head: [label(qsTr("set global")), { kind: "value", field: "GlobalName", key: "name", pickAction: "pickGlobal" }, label(qsTr("to")), value("GlobalValue", "value")] },
+            ChangeGlobal: { icon: "variable", head: [label(qsTr("change global")), { kind: "value", field: "GlobalName", key: "name", pickAction: "pickGlobal" }, label(qsTr("by")), value("GlobalValue", "by")] },
             WaitUntil: { icon: "loader", head: [label(qsTr("wait until")), { kind: "value", field: "Condition", key: "condition", bool: true },
                 label(qsTr("for up to")), value("WaitTimeout", "timeout"), label(qsTr("ms"))] },
             FindImage: { icon: "search", head: [label(qsTr("find")), ...imagePieces, label(qsTr("put x in")),
@@ -1553,9 +1660,9 @@ Item {
         });
         BlockRegistry.registerPrefabs({
             WhenAt: () => ({ at: textValue(Qt.formatDateTime(new Date(Date.now() + 3600000), "yyyy-MM-dd HH:00")) }),
-            WhenSignal: { name: textValue("go") },
+            WhenSignal: () => ({ name: textValue(root.macro && root.macro.signals.length ? root.macro.signals[0] : "go"), expression: false }),
             WhenWebhook: () => ({ path: textValue("hello"), variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
-            SendSignal: { name: textValue("go"), wait: true },
+            SendSignal: () => ({ name: textValue(root.macro && root.macro.signals.length ? root.macro.signals[0] : "go"), expression: false, wait: true }),
             AskText: () => ({ prompt: textValue(qsTr("What's your name?")), default: textValue(""), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
             AskYesNo: () => ({ prompt: textValue(qsTr("Continue?")), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
             AskChoice: () => ({ prompt: textValue(qsTr("Pick one")), list: root.firstListName(), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
@@ -1586,8 +1693,8 @@ Item {
             MoveWindow: { pattern: textValue("Firefox"), by: "Title", resize: false, x: numberValue(0), y: numberValue(0) },
             RunMacro: () => ({ target: textValue(root.otherMacroName()), wait: true }),
             StopMacroNamed: () => ({ target: textValue(root.otherMacroName()) }),
-            SetGlobal: { name: textValue("counter"), value: numberValue(0) },
-            ChangeGlobal: { name: textValue("counter"), by: numberValue(1) },
+            SetGlobal: () => ({ name: textValue(firstGlobalName()), value: numberValue(0) }),
+            ChangeGlobal: () => ({ name: textValue(firstGlobalName()), by: numberValue(1) }),
             WaitUntil: { condition: { kind: "Bool" }, timeout: numberValue(0) },
             FindImage: () => ({ image: "", tolerance: numberValue(10), x_variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "",
                 y_variable: root.macro && root.macro.variables.length > 1 ? root.macro.variables[1] : "" }),
@@ -1606,7 +1713,7 @@ Item {
         });
     }
     // The variable dropdowns read macro state through a function, so nudge them.
-    readonly property string variablesKey: JSON.stringify([root.macro ? root.macro.variables : [], appState.secret_names || []])
+    readonly property string variablesKey: JSON.stringify([root.macro ? root.macro.variables : [], root.macro ? root.macro.signals : [], appState.secret_names || []])
     onVariablesKeyChanged: BlockRegistry.revision++
 
     // ---- run log ----
@@ -1649,7 +1756,7 @@ Item {
         const walk = list => {
             for (const i of list || []) {
                 if (i.id === id) return i;
-                for (const key of ["body", "then_body", "else_body"]) { const found = walk(i[key]); if (found) return found; }
+                for (const key of ["body", "then_body", "else_body", "catch_body"]) { const found = walk(i[key]); if (found) return found; }
                 for (const branch of i.branches || []) { const found = walk(branch); if (found) return found; }
             }
             return null;
@@ -1672,9 +1779,11 @@ Item {
         registerBlocks();
         BlockRegistry.blockMenu = [{ id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }];
         BlockRegistry.previewHandler = (key, value) => root.appBridge.previewValue(key, JSON.stringify(value));
-        // Pickers beside a reporter's slot.
+        // Name slots share the same picker in instructions and reporters.
         BlockRegistry.pickHandler = (action, location, value) => {
             if (action === "pickUsb") usbDialog.openFor({ kind: "value", location: location, value: value });
+            else if (action === "pickGlobal") globalPicker.openFor(name => root.invoke("put_value", { location: location, value: root.textValue(name) }), value && value.kind === "Text" ? value.value : "");
+            else if (action === "pickSignal") root.pickSignal(location, value);
         };
     }
     Connections {

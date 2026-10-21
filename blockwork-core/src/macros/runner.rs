@@ -348,7 +348,7 @@ fn signal_bodies(ctx: &mut ExecCtx, name: &str, depth: u32) -> Vec<Vec<Instructi
         .filter_map(|key| {
             let body = &table[key].body;
             let Some(InstructionKind::WhenSignal(listens)) = body.first().map(|i| &i.kind) else { return None };
-            let listens = ctx.resolve(listens, depth).and_then(|v| v.eval_text()).ok()?;
+            let listens = ctx.resolve(&listens.value, depth).and_then(|v| v.eval_text()).ok()?;
             listens.trim().eq_ignore_ascii_case(name.trim()).then(|| body[1..].to_vec())
         })
         .collect()
@@ -1145,7 +1145,7 @@ fn run_block(
                 Err(e) => soft_fail(ctx, &ins.id, "Show message", e)?,
             },
             InstructionKind::SendSignal { name, wait } => {
-                let name = match ctx.resolve(name, depth).and_then(|v| v.eval_text()) {
+                let name = match ctx.resolve(&name.value, depth).and_then(|v| v.eval_text()) {
                     Ok(name) => name,
                     Err(e) => {
                         soft_fail(ctx, &ins.id, "Send signal", e)?;
@@ -2443,6 +2443,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -2475,6 +2476,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -2519,6 +2521,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -2696,6 +2699,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -2756,6 +2760,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -2869,6 +2874,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -2924,6 +2930,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -2985,6 +2992,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -3062,6 +3070,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -3169,6 +3178,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -3386,22 +3396,47 @@ mod tests {
     }
 
     #[test]
+    fn signal_expressions_can_use_unregistered_computed_names() {
+        let mut mac = Macro::new(
+            "Dynamic signals".into(),
+            String::new(),
+            vec![
+                set("target", Value::text("task:42")),
+                Instruction::new(InstructionKind::SendSignal {
+                    name: Value::op(Op::Join, vec![Value::text("task:"), Value::text("42")]).into(),
+                    wait: true,
+                }),
+                set("seen", Value::Var { name: "received".into() }),
+            ],
+        );
+        mac.graph.strands.push(Strand::with_instructions(0, 200, vec![
+            Instruction::new(InstructionKind::WhenSignal(Value::Var { name: "target".into() }.into())),
+            set("received", Value::number(1.0)),
+        ]));
+        mac.collect_named_signals();
+        assert!(mac.signals.is_empty());
+        let vars = empty_vars();
+        mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+        assert_eq!(vars.lock().unwrap().get("seen"), Some(&Evaluated::Number(1.0)));
+    }
+
+    #[test]
     fn send_signal_and_wait_runs_the_receivers_first() {
         let mut mac = Macro::new(
             "Signals".into(),
             String::new(),
             vec![
-                Instruction::new(InstructionKind::SendSignal { name: Value::text("Go"), wait: true }),
+                Instruction::new(InstructionKind::SendSignal { name: Value::text("Go").into(), wait: true }),
                 set("seen", Value::Var { name: "x".into() }),
             ],
         );
         mac.graph.strands.push(Strand::with_instructions(0, 200, vec![
-            Instruction::new(InstructionKind::WhenSignal(Value::text("go"))),
+            Instruction::new(InstructionKind::WhenSignal(Value::text("go").into())),
             Instruction::new(InstructionKind::Wait(Value::number(40.0))),
             set("x", Value::number(5.0)),
         ]));
         mac.graph.strands.push(Strand::with_instructions(0, 400, vec![
-            Instruction::new(InstructionKind::WhenSignal(Value::text("other"))),
+            Instruction::new(InstructionKind::WhenSignal(Value::text("other").into())),
             set("wrong", Value::number(1.0)),
         ]));
         let vars = empty_vars();
@@ -3409,6 +3444,33 @@ mod tests {
         let vars = vars.lock().unwrap();
         assert_eq!(vars.get("seen"), Some(&Evaluated::Number(5.0)));
         assert_eq!(vars.get("wrong"), None);
+    }
+
+    #[test]
+    fn globals_accept_variable_and_computed_names() {
+        crate::input::value::register_blockwork_operators();
+        let name = "runner-dynamic-global-picker";
+        crate::globals::remove(name);
+        crate::globals::create(name).unwrap();
+        let dynamic = Value::Var { name: "target".into() };
+        let computed = Value::op(Op::from_name("Join"), vec![Value::text("runner-dynamic-"), Value::text("global-picker")]);
+        let mac = Macro::new(
+            "Dynamic globals".into(),
+            String::new(),
+            vec![
+                set("target", Value::text(name)),
+                set("initial", Value::op(Op::from_name("GlobalVariable"), vec![dynamic.clone()])),
+                Instruction::new(InstructionKind::SetGlobal { name: dynamic.clone(), value: Value::number(4.0) }),
+                Instruction::new(InstructionKind::ChangeGlobal { name: computed, by: Value::number(3.0) }),
+                set("result", Value::op(Op::from_name("GlobalVariable"), vec![dynamic])),
+            ],
+        );
+        let vars = empty_vars();
+        mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("initial"), Some(&Evaluated::Text(String::new())));
+        assert_eq!(vars.get("result"), Some(&Evaluated::Number(7.0)));
+        crate::globals::remove(name);
     }
 
     #[test]
@@ -3650,6 +3712,7 @@ mod tests {
                 strands: vec![when_ran_strand("a", 5_000.0), stopper],
                 ..MacroGraph::new()
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -3845,6 +3908,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),
@@ -4117,6 +4181,7 @@ mod tests {
                 lists: vec![],
                 dicts: vec![],
             },
+            signals: Vec::new(),
             recording_target: None,
             speed_multiplier: 1.0,
             settings: crate::macros::MacroSettings::default(),

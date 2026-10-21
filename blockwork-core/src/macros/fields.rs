@@ -339,7 +339,7 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
         (InstructionKind::AskText { default, .. }, FieldId::AskDefault) => Some(default),
         (InstructionKind::ShowMessage(v), FieldId::MessageText) => Some(v),
         (InstructionKind::WhenAt(v), FieldId::AtTime) => Some(v),
-        (InstructionKind::WhenSignal(v) | InstructionKind::SendSignal { name: v, .. }, FieldId::SignalName) => Some(v),
+        (InstructionKind::WhenSignal(v) | InstructionKind::SendSignal { name: v, .. }, FieldId::SignalName) => Some(&mut v.value),
         (InstructionKind::WhenWebhook { path, .. }, FieldId::WebhookPath) => Some(path),
         (
             InstructionKind::DetectObjectsInWindow { pattern, .. }
