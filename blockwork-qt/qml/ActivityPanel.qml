@@ -17,6 +17,13 @@ Rectangle {
     signal clearRequested()
 
     implicitHeight: expanded ? panelHeight : stripHeight
+    // Slides open and shut; dragging the edge resizes without lag.
+    Behavior on implicitHeight {
+        enabled: Motion.enabled && !edgeDrag.pressed
+        NumberAnimation { duration: Motion.normal; easing.type: Easing.OutCubic }
+    }
+    // The log stays shown while the panel slides shut.
+    readonly property bool open: expanded || height > stripHeight + 0.5
     color: "#242527"; border.color: "#38393d"
     clip: true
 
@@ -78,6 +85,7 @@ Rectangle {
 
     // Drag the top edge to resize while open.
     MouseArea {
+        id: edgeDrag
         visible: root.expanded
         anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 5; z: 10
         cursorShape: Qt.SizeVerCursor
@@ -101,10 +109,10 @@ Rectangle {
                     width: 8; height: 8; radius: 4
                     color: root.running ? Theme.accent : root.latest && root.latest.level === "Error" ? Theme.danger : "#5d5e63"
                     SequentialAnimation on opacity {
-                        running: root.running; loops: Animation.Infinite
+                        running: root.running && Motion.enabled; loops: Animation.Infinite
                         onRunningChanged: if (!running) parent.opacity = 1
-                        NumberAnimation { to: 0.3; duration: 600 }
-                        NumberAnimation { to: 1; duration: 600 }
+                        NumberAnimation { to: 0.3; duration: Motion.dur(600) }
+                        NumberAnimation { to: 1; duration: Motion.dur(600) }
                     }
                 }
                 Text {
@@ -131,12 +139,15 @@ Rectangle {
                         onClicked: root.clearRequested()
                     }
                 }
-                LucideIcon { name: root.expanded ? "chevron-down" : "chevron-up"; color: Theme.textDim; width: 16; height: 16 }
+                LucideIcon {
+                    name: "chevron-up"; rotation: root.expanded ? 180 : 0; color: Theme.textDim; width: 16; height: 16
+                    Behavior on rotation { enabled: Motion.enabled; NumberAnimation { duration: Motion.normal; easing.type: Easing.OutCubic } }
+                }
             }
         }
-        Rectangle { visible: root.expanded; Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#38393d" }
+        Rectangle { visible: root.open; Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#38393d" }
         Item {
-            visible: root.expanded
+            visible: root.open
             Layout.fillWidth: true; Layout.fillHeight: true
             Text {
                 visible: root.shown.length === 0
@@ -161,6 +172,7 @@ Rectangle {
                     readonly property bool linked: error && !!modelData.block_id && modelData.macro_id === root.macroId
                     width: list.width; height: logRow.implicitHeight + 6; radius: 4
                     color: modelData.seq === root.focusSeq ? "#4dff4848" : rowHover.hovered && linked ? "#40ff4848" : error ? "#26ff4848" : "transparent"
+                    Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                     HoverHandler { id: rowHover; cursorShape: row.linked ? Qt.PointingHandCursor : Qt.ArrowCursor }
                     TapHandler { enabled: row.linked; onTapped: root.blockRequested(row.modelData.block_id) }
                     RowLayout {

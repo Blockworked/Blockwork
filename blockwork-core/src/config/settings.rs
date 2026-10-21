@@ -69,6 +69,10 @@ pub struct AppSettings {
     /// UI language code like "de"; `None` or empty follows the system.
     #[serde(default)]
     pub language: Option<String>,
+    /// Multiplies every UI animation's duration: 0 turns animations off,
+    /// 1 (the default) is normal, higher is slower.
+    #[serde(default)]
+    pub animation_speed: Option<f64>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {

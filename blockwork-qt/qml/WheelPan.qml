@@ -1,6 +1,7 @@
 import QtQuick
+import com.blockworked.Blockstitch 1.0
 
-// Faster wheel/touchpad scrolling for a ScrollView; declare it as a child and set flickable.
+// Smooth wheel/touchpad scrolling for a ScrollView or ListView; declare it as a child and set flickable.
 WheelHandler {
     id: handler
     // the ScrollView's contentItem, e.g. flickable: myScroll.contentItem
@@ -30,10 +31,11 @@ WheelHandler {
     onWheel: event => {
         const f = flickable;
         if (!f) return;
+        // A wheel notch glides to its target; touchpad pans already arrive smooth.
         const tp = isTouchpad(event);
-        let dx = pan(event.angleDelta.x, event.pixelDelta.x, tp), dy = pan(event.angleDelta.y, event.pixelDelta.y, tp);
-        f.contentY = Math.max(0, Math.min(Math.max(0, f.contentHeight - f.height), f.contentY - dy));
-        f.contentX = Math.max(0, Math.min(Math.max(0, f.contentWidth - f.width), f.contentX - dx));
+        smooth.scrollBy(pan(event.angleDelta.x, event.pixelDelta.x, tp), pan(event.angleDelta.y, event.pixelDelta.y, tp), !tp);
         event.accepted = true;
     }
+
+    property SmoothScroll smooth: SmoothScroll { flickable: handler.flickable }
 }

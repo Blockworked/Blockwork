@@ -6,6 +6,19 @@ import com.blockworked.Blockstitch 1.0
 // The macro library: search, folders, and per-macro actions.
 Popup {
     id: root
+    // Drops open from the library button.
+    transformOrigin: Popup.Top
+    enter: Transition {
+        enabled: Motion.enabled
+        ParallelAnimation {
+            NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+            NumberAnimation { property: "scale"; from: 0.95; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
+        }
+    }
+    exit: Transition {
+        enabled: Motion.enabled
+        NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Motion.quick; easing.type: Easing.InCubic }
+    }
     required property var appState
     required property var invoke
     // Ids of macros with a run in flight.
@@ -73,6 +86,7 @@ Popup {
             clip: true; boundsBehavior: Flickable.StopAtBounds
             model: root.rows
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+            WheelPan { flickable: list }
             delegate: Item {
                 id: row
                 required property var modelData
@@ -84,6 +98,7 @@ Popup {
                 Rectangle {
                     anchors.fill: parent; anchors.leftMargin: 6; anchors.rightMargin: 6; radius: 6
                     color: row.current ? "#1d3a55" : rowHover.hovered ? Theme.panelRaised : "transparent"
+                    Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                 }
                 RowLayout {
                     anchors.fill: parent; anchors.leftMargin: row.isFolder || !row.entry.folder ? 16 : 34; anchors.rightMargin: 12; spacing: 8

@@ -108,6 +108,7 @@ Item {
                 clip: true; spacing: 6
                 model: browseDialog.shown
                 ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+                WheelPan { flickable: packList }
                 delegate: Rectangle {
                     id: packRow
                     required property var modelData

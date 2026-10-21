@@ -13,6 +13,9 @@ Item {
     function capturingAction(action){return appState.combo_capture&&appState.combo_capture.kind==="Named"&&JSON.stringify(appState.combo_capture.action)===JSON.stringify(action)}
 
     property int tab: 0
+    // The newly picked tab's page fades in.
+    onTabChanged: if (Motion.enabled) tabFade.restart()
+    NumberAnimation { id: tabFade; target: pane; property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
     readonly property var tabs: [
         { name: qsTr("General"), icon: "settings" }, { name: qsTr("Hotkeys"), icon: "keyboard" },
         { name: qsTr("Editor"), icon: "blocks" }, { name: qsTr("Integrations"), icon: "terminal" }
@@ -79,6 +82,7 @@ Item {
                             required property int index
                             width: parent.width; height: 38; radius: 8
                             color: root.tab === index ? "#2f3b4d" : (navMouse.containsMouse ? "#2e2f33" : "transparent")
+                            Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                             Row { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 10
                                 LucideIcon { name: navItem.modelData.icon; width: 16; height: 16; anchors.verticalCenter: parent.verticalCenter
                                     color: root.tab === navItem.index ? "#6cb2ff" : "#9da0a8" }
@@ -132,7 +136,32 @@ Item {
                                         width: ListView.view.width; implicitHeight: 32; highlighted: languageBox.highlightedIndex === index
                                         HoverHandler { cursorShape: Qt.PointingHandCursor }
                                         contentItem: Text { text: modelData.text; color: Theme.text; font: languageBox.font; verticalAlignment: Text.AlignVCenter; horizontalAlignment: Text.AlignLeft }
-                                        background: Rectangle { radius: 4; color: parent.highlighted ? "#424348" : "transparent" }
+                                        background: Rectangle { radius: 4; color: parent.highlighted ? "#424348" : "transparent"; Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } } }
+                                    }
+                                }
+                            }
+                            SettingsRow { title: qsTr("Animation speed"); detail: qsTr("How long menus, dialogs, scrolling and other transitions take. Instant turns animations off.")
+                                Column {
+                                    spacing: 2
+                                    BwSlider {
+                                        id: animationSlider
+                                        // Duration multipliers, Instant to Slow; Normal sits in the middle.
+                                        readonly property var speeds: [0, 0.25, 0.5, 1, 1.5, 2, 3]
+                                        width: 230; from: 0; to: speeds.length - 1; stepSize: 1; ticks: true
+                                        Accessible.name: qsTr("Animation speed")
+                                        value: {
+                                            const s = appState.animation_speed ?? 1;
+                                            let best = 0;
+                                            speeds.forEach((v, i) => { if (Math.abs(v - s) < Math.abs(speeds[best] - s)) best = i; });
+                                            return best;
+                                        }
+                                        onMoved: root.invoke("set_animation_speed", { speed: speeds[Math.round(value)] })
+                                    }
+                                    Item {
+                                        width: animationSlider.width; height: 16
+                                        Text { x: 0; text: qsTr("Instant", "animation speed"); color: "#9fa0a6"; font.pixelSize: 11 }
+                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("Normal", "animation speed"); color: "#9fa0a6"; font.pixelSize: 11 }
+                                        Text { anchors.right: parent.right; text: qsTr("Slow", "animation speed"); color: "#9fa0a6"; font.pixelSize: 11 }
                                     }
                                 }
                             }

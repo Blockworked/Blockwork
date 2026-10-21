@@ -10,6 +10,11 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ## [Unreleased]
 
+### Added
+- UI animations: menus and drop-downs fade and grow open, dialogs ease in over a fading backdrop, and buttons, switches, check boxes and list rows ease between hover and pressed states. Panels like the sidebar and run log slide open and shut, and pages and Settings tabs fade in.
+- Smooth scrolling: a mouse wheel notch glides to its spot instead of jumping, in the editor canvas, the block palette, Settings and the other scrolling lists. Jumping to a block from the run log glides there too.
+- Settings > General > Animation speed, a slider from Instant to Slow. Instant turns every animation off.
+
 ### Fixed
 - A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
 

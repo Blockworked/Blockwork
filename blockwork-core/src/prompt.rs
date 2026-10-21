@@ -33,6 +33,9 @@ pub struct Request {
     /// The UI language from Settings; empty means the system's.
     #[serde(default, skip_serializing_if = "String::is_empty")]
     pub language: String,
+    /// The UI animation speed from Settings; `None` means normal.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub animation_speed: Option<f64>,
 }
 
 impl Request {
@@ -46,6 +49,7 @@ impl Request {
             subject: String::new(),
             ability: String::new(),
             language: String::new(),
+            animation_speed: None,
         }
     }
 }

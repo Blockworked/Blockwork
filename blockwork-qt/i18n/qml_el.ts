@@ -4,54 +4,54 @@
 <context>
     <name>ActivityPanel</name>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="61"/>
+        <location filename="../qml/ActivityPanel.qml" line="68"/>
         <source>just now</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="62"/>
+        <location filename="../qml/ActivityPanel.qml" line="69"/>
         <source>%1s ago</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="63"/>
+        <location filename="../qml/ActivityPanel.qml" line="70"/>
         <source>%1m ago</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="64"/>
+        <location filename="../qml/ActivityPanel.qml" line="71"/>
         <source>%1h ago</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="65"/>
+        <location filename="../qml/ActivityPanel.qml" line="72"/>
         <source>MMM d</source>
         <comment>date format for older log entries</comment>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="72"/>
+        <location filename="../qml/ActivityPanel.qml" line="79"/>
         <source>Running - %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="73"/>
+        <location filename="../qml/ActivityPanel.qml" line="80"/>
         <source>No activity yet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="75"/>
+        <location filename="../qml/ActivityPanel.qml" line="82"/>
         <source>Error: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="76"/>
+        <location filename="../qml/ActivityPanel.qml" line="83"/>
         <source>%1 - %2</source>
         <comment>log message and relative time</comment>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/ActivityPanel.qml" line="116"/>
+        <location filename="../qml/ActivityPanel.qml" line="124"/>
         <source>%n error(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -59,27 +59,27 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="121"/>
+        <location filename="../qml/ActivityPanel.qml" line="129"/>
         <source>This macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="125"/>
+        <location filename="../qml/ActivityPanel.qml" line="133"/>
         <source>All</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="130"/>
+        <location filename="../qml/ActivityPanel.qml" line="138"/>
         <source>Clear the log</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="144"/>
+        <location filename="../qml/ActivityPanel.qml" line="155"/>
         <source>Nothing yet. Runs, triggers, log blocks and errors show up here.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="144"/>
+        <location filename="../qml/ActivityPanel.qml" line="155"/>
         <source>Nothing yet for this macro.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -140,12 +140,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppSelectorDialog.qml" line="215"/>
+        <location filename="../qml/AppSelectorDialog.qml" line="217"/>
         <source>Retry</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/AppSelectorDialog.qml" line="218"/>
+        <location filename="../qml/AppSelectorDialog.qml" line="220"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
@@ -158,47 +158,47 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1057"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1064"/>
         <source>Paste</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1058"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1065"/>
         <source>Add Comment</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1138"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1145"/>
         <source>NOTE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1152"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1159"/>
         <source>Delete note</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1161"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1168"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1161"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1168"/>
         <source>Delete value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1184"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1191"/>
         <source>This list is empty.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1195"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1202"/>
         <source>Add item</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1197"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1204"/>
         <source>%n item(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -206,27 +206,27 @@
         </translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1227"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1234"/>
         <source>This dict is empty.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1230"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1237"/>
         <source>key</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1232"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1239"/>
         <source>value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1239"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1246"/>
         <source>Add entry</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1241"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1248"/>
         <source>%n entry(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -282,83 +282,83 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="129"/>
-        <location filename="../qml/BlockLibrary.qml" line="181"/>
+        <location filename="../qml/BlockLibrary.qml" line="130"/>
+        <location filename="../qml/BlockLibrary.qml" line="182"/>
         <source>by %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="148"/>
+        <location filename="../qml/BlockLibrary.qml" line="149"/>
         <source>Downloading...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="148"/>
+        <location filename="../qml/BlockLibrary.qml" line="149"/>
         <source>Update</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="149"/>
+        <location filename="../qml/BlockLibrary.qml" line="150"/>
         <source>Added</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="149"/>
+        <location filename="../qml/BlockLibrary.qml" line="150"/>
         <source>Add</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="159"/>
+        <location filename="../qml/BlockLibrary.qml" line="160"/>
         <source>Add blocks from a pack</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="162"/>
+        <location filename="../qml/BlockLibrary.qml" line="163"/>
         <source>Block packs (*.blockpack *.json)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="162"/>
+        <location filename="../qml/BlockLibrary.qml" line="163"/>
         <source>All files (*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="173"/>
+        <location filename="../qml/BlockLibrary.qml" line="174"/>
         <source>Add &quot;%1&quot;?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="175"/>
+        <location filename="../qml/BlockLibrary.qml" line="176"/>
         <source>Add blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="180"/>
+        <location filename="../qml/BlockLibrary.qml" line="181"/>
         <source>Version %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="182"/>
+        <location filename="../qml/BlockLibrary.qml" line="183"/>
         <source>from %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="192"/>
+        <location filename="../qml/BlockLibrary.qml" line="193"/>
         <source>Matches the checksum its library lists.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="192"/>
+        <location filename="../qml/BlockLibrary.qml" line="193"/>
         <source>From a file, so there&apos;s no checksum to compare.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="202"/>
+        <location filename="../qml/BlockLibrary.qml" line="203"/>
         <source>Adds these blocks to &quot;%1&quot;:</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="215"/>
+        <location filename="../qml/BlockLibrary.qml" line="216"/>
         <source>This macro already has %n block(s) from an earlier version. They&apos;re replaced, along with any changes you made to them; blocks that use them keep working.</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -366,77 +366,77 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="219"/>
+        <location filename="../qml/BlockLibrary.qml" line="220"/>
         <source>These blocks can:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="219"/>
+        <location filename="../qml/BlockLibrary.qml" line="220"/>
         <source>These blocks only use blocks that stay inside Blockwork, like waits and variables.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="236"/>
+        <location filename="../qml/BlockLibrary.qml" line="237"/>
         <source>Blocks run with the permissions of the macro you add them to, so only add these from people you trust.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="253"/>
+        <location filename="../qml/BlockLibrary.qml" line="254"/>
         <source>Share blocks as a pack</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="258"/>
+        <location filename="../qml/BlockLibrary.qml" line="259"/>
         <source>Save pack...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="265"/>
+        <location filename="../qml/BlockLibrary.qml" line="266"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="267"/>
+        <location filename="../qml/BlockLibrary.qml" line="268"/>
         <source>What the blocks do</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="273"/>
+        <location filename="../qml/BlockLibrary.qml" line="274"/>
         <source>Author</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="278"/>
+        <location filename="../qml/BlockLibrary.qml" line="279"/>
         <source>Version</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="282"/>
+        <location filename="../qml/BlockLibrary.qml" line="283"/>
         <source>Blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="294"/>
+        <location filename="../qml/BlockLibrary.qml" line="295"/>
         <source>Blocks these use come along, with the variables and lists they need. Secret values are left out. Keep the same name for later versions so they replace the old blocks.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="298"/>
+        <location filename="../qml/BlockLibrary.qml" line="299"/>
         <source>Pick at least one block to share.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="307"/>
+        <location filename="../qml/BlockLibrary.qml" line="308"/>
         <source>Save block pack</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="310"/>
+        <location filename="../qml/BlockLibrary.qml" line="311"/>
         <source>Block packs (*.blockpack)</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="315"/>
+        <location filename="../qml/BlockLibrary.qml" line="316"/>
         <source>Saved %n block(s). Others can add them with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -444,17 +444,17 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="321"/>
+        <location filename="../qml/BlockLibrary.qml" line="322"/>
         <source>Pack saved</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="322"/>
+        <location filename="../qml/BlockLibrary.qml" line="323"/>
         <source>Submit to community library...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockLibrary.qml" line="330"/>
+        <location filename="../qml/BlockLibrary.qml" line="331"/>
         <source>Something went wrong</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1236,188 +1236,188 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="520"/>
+        <location filename="../qml/EditorPage.qml" line="522"/>
         <source>Choose a macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="514"/>
-        <location filename="../qml/EditorPage.qml" line="527"/>
+        <location filename="../qml/EditorPage.qml" line="516"/>
+        <location filename="../qml/EditorPage.qml" line="529"/>
         <source>Macro library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="543"/>
+        <location filename="../qml/EditorPage.qml" line="545"/>
         <source>Macro actions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="553"/>
-        <location filename="../qml/EditorPage.qml" line="853"/>
+        <location filename="../qml/EditorPage.qml" line="555"/>
+        <location filename="../qml/EditorPage.qml" line="855"/>
         <source>Macro settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="554"/>
+        <location filename="../qml/EditorPage.qml" line="556"/>
         <source>New macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="555"/>
+        <location filename="../qml/EditorPage.qml" line="557"/>
         <source>New from template...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="556"/>
+        <location filename="../qml/EditorPage.qml" line="558"/>
         <source>Duplicate macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="557"/>
+        <location filename="../qml/EditorPage.qml" line="559"/>
         <source>Export...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="558"/>
+        <location filename="../qml/EditorPage.qml" line="560"/>
         <source>Clear breakpoints</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="559"/>
+        <location filename="../qml/EditorPage.qml" line="561"/>
         <source>Emergency stop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="560"/>
+        <location filename="../qml/EditorPage.qml" line="562"/>
         <source>Delete macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="565"/>
+        <location filename="../qml/EditorPage.qml" line="567"/>
         <source>Run</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="567"/>
+        <location filename="../qml/EditorPage.qml" line="569"/>
         <source>Run macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="581"/>
-        <location filename="../qml/EditorPage.qml" line="1230"/>
+        <location filename="../qml/EditorPage.qml" line="583"/>
+        <location filename="../qml/EditorPage.qml" line="1237"/>
         <source>Recording settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="586"/>
+        <location filename="../qml/EditorPage.qml" line="588"/>
         <source>Pick a point or region from the screen</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="590"/>
-        <location filename="../qml/EditorPage.qml" line="607"/>
-        <source>Undo</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="591"/>
-        <location filename="../qml/EditorPage.qml" line="608"/>
-        <source>Redo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="592"/>
         <location filename="../qml/EditorPage.qml" line="609"/>
+        <source>Undo</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/EditorPage.qml" line="593"/>
+        <location filename="../qml/EditorPage.qml" line="610"/>
+        <source>Redo</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/EditorPage.qml" line="594"/>
+        <location filename="../qml/EditorPage.qml" line="611"/>
         <source>Save macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="597"/>
+        <location filename="../qml/EditorPage.qml" line="599"/>
         <source>Undo, redo and save</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="612"/>
+        <location filename="../qml/EditorPage.qml" line="614"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="622"/>
+        <location filename="../qml/EditorPage.qml" line="624"/>
         <source>Emergency stop: triggers are paused until you resume them.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="623"/>
+        <location filename="../qml/EditorPage.qml" line="625"/>
         <source>Resume triggers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="647"/>
+        <location filename="../qml/EditorPage.qml" line="649"/>
         <source>Paused before &quot;%1&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="648"/>
+        <location filename="../qml/EditorPage.qml" line="650"/>
         <source>Pausing at the next block...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="648"/>
+        <location filename="../qml/EditorPage.qml" line="650"/>
         <source>Running</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="652"/>
+        <location filename="../qml/EditorPage.qml" line="654"/>
         <source>Pause</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="652"/>
+        <location filename="../qml/EditorPage.qml" line="654"/>
         <source>Pause before the next block (F8)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="653"/>
+        <location filename="../qml/EditorPage.qml" line="655"/>
         <source>Resume</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="653"/>
+        <location filename="../qml/EditorPage.qml" line="655"/>
         <source>Run on until the next breakpoint (F8)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="654"/>
+        <location filename="../qml/EditorPage.qml" line="656"/>
         <source>Step</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="654"/>
+        <location filename="../qml/EditorPage.qml" line="656"/>
         <source>Run one block, then pause again (F10)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="655"/>
+        <location filename="../qml/EditorPage.qml" line="657"/>
         <source>Stop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="662"/>
+        <location filename="../qml/EditorPage.qml" line="664"/>
         <source>No variables</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="719"/>
+        <location filename="../qml/EditorPage.qml" line="721"/>
         <source>Screen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="766"/>
+        <location filename="../qml/EditorPage.qml" line="768"/>
         <source>Confirm delete (%1s)?</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="766"/>
+        <location filename="../qml/EditorPage.qml" line="768"/>
         <source>Delete %n block(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -1425,66 +1425,66 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="815"/>
+        <location filename="../qml/EditorPage.qml" line="817"/>
         <source>Recording...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="816"/>
+        <location filename="../qml/EditorPage.qml" line="818"/>
         <source>Adding and removing instructions is disabled while recording.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="834"/>
+        <location filename="../qml/EditorPage.qml" line="836"/>
         <source>No macro selected</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="835"/>
+        <location filename="../qml/EditorPage.qml" line="837"/>
         <source>Choose a macro above or create a new one.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="841"/>
-        <location filename="../qml/EditorPage.qml" line="848"/>
+        <location filename="../qml/EditorPage.qml" line="843"/>
+        <location filename="../qml/EditorPage.qml" line="850"/>
         <source>Delete macro?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="844"/>
+        <location filename="../qml/EditorPage.qml" line="846"/>
         <source>This removes &quot;%1&quot; from Blockwork.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="849"/>
+        <location filename="../qml/EditorPage.qml" line="851"/>
         <source>This removes the selected macro from Blockwork.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="864"/>
+        <location filename="../qml/EditorPage.qml" line="868"/>
         <source>Controls behavior specific to this macro.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="865"/>
+        <location filename="../qml/EditorPage.qml" line="869"/>
         <source>Title</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="867"/>
+        <location filename="../qml/EditorPage.qml" line="871"/>
         <source>Speed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1396"/>
-        <location filename="../qml/EditorPage.qml" line="1400"/>
-        <location filename="../qml/EditorPage.qml" line="1402"/>
-        <location filename="../qml/EditorPage.qml" line="1404"/>
+        <location filename="../qml/EditorPage.qml" line="1403"/>
+        <location filename="../qml/EditorPage.qml" line="1407"/>
+        <location filename="../qml/EditorPage.qml" line="1409"/>
+        <location filename="../qml/EditorPage.qml" line="1411"/>
         <source>x</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="880"/>
+        <location filename="../qml/EditorPage.qml" line="884"/>
         <source>Time limit</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2089,7 +2089,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="646"/>
+        <location filename="../qml/EditorPage.qml" line="648"/>
         <source>Paused before &quot;%1&quot; (%n strand(s) waiting)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -2097,1534 +2097,1534 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="879"/>
+        <location filename="../qml/EditorPage.qml" line="883"/>
         <source>Listen for triggers while Blockwork is open</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="882"/>
+        <location filename="../qml/EditorPage.qml" line="886"/>
         <source>Stop a run after</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="889"/>
+        <location filename="../qml/EditorPage.qml" line="893"/>
         <source>seconds (0 = no limit)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="891"/>
+        <location filename="../qml/EditorPage.qml" line="895"/>
         <source>Loop limit</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="893"/>
+        <location filename="../qml/EditorPage.qml" line="897"/>
         <source>Stop a loop after</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="900"/>
+        <location filename="../qml/EditorPage.qml" line="904"/>
         <source>repeats (0 = no limit)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="902"/>
+        <location filename="../qml/EditorPage.qml" line="906"/>
         <source>Conditions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="905"/>
+        <location filename="../qml/EditorPage.qml" line="909"/>
         <source>Triggers and hotkeys only start this macro when all of these hold. The Run button ignores them.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="908"/>
+        <location filename="../qml/EditorPage.qml" line="912"/>
         <source>While</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="910"/>
+        <location filename="../qml/EditorPage.qml" line="914"/>
         <source>any window</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="914"/>
+        <location filename="../qml/EditorPage.qml" line="918"/>
         <source>is focused</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="917"/>
-        <location filename="../qml/EditorPage.qml" line="942"/>
+        <location filename="../qml/EditorPage.qml" line="921"/>
+        <location filename="../qml/EditorPage.qml" line="946"/>
         <source>On</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="920"/>
+        <location filename="../qml/EditorPage.qml" line="924"/>
         <source>battery or AC power</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="920"/>
+        <location filename="../qml/EditorPage.qml" line="924"/>
         <source>AC power only</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="920"/>
+        <location filename="../qml/EditorPage.qml" line="924"/>
         <source>battery only</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="927"/>
+        <location filename="../qml/EditorPage.qml" line="931"/>
         <source>Between</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="933"/>
+        <location filename="../qml/EditorPage.qml" line="937"/>
         <source>and</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="939"/>
+        <location filename="../qml/EditorPage.qml" line="943"/>
         <source>(empty = all day)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="966"/>
+        <location filename="../qml/EditorPage.qml" line="970"/>
         <source>Schedules</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="968"/>
+        <location filename="../qml/EditorPage.qml" line="972"/>
         <source>Catch up on missed schedules</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="974"/>
+        <location filename="../qml/EditorPage.qml" line="978"/>
         <source>Runs a schedule or &quot;once at&quot; trigger once if its time passed while Blockwork was closed or the computer was asleep (up to a week back).</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="976"/>
+        <location filename="../qml/EditorPage.qml" line="980"/>
         <source>Permissions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="978"/>
+        <location filename="../qml/EditorPage.qml" line="982"/>
         <source>Ask before risky actions</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="985"/>
+        <location filename="../qml/EditorPage.qml" line="989"/>
         <source>This macro may do anything its blocks say. Imported macros ask first until you allow them.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="986"/>
+        <location filename="../qml/EditorPage.qml" line="990"/>
         <source>Ticked abilities are allowed. The rest show a dialog the first time the macro tries them.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1001"/>
+        <location filename="../qml/EditorPage.qml" line="1005"/>
         <source>Couldn&apos;t read the screen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1003"/>
+        <location filename="../qml/EditorPage.qml" line="1007"/>
         <source>Unknown error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1007"/>
+        <location filename="../qml/EditorPage.qml" line="1011"/>
         <source>Picked from the screen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1023"/>
+        <location filename="../qml/EditorPage.qml" line="1027"/>
         <source>x %1   y %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1024"/>
+        <location filename="../qml/EditorPage.qml" line="1028"/>
         <source>width %1   height %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1033"/>
+        <location filename="../qml/EditorPage.qml" line="1037"/>
         <source>Add to the canvas:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1038"/>
+        <location filename="../qml/EditorPage.qml" line="1042"/>
         <source>text in this region</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1038"/>
+        <location filename="../qml/EditorPage.qml" line="1042"/>
         <source>average color here</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1038"/>
+        <location filename="../qml/EditorPage.qml" line="1042"/>
         <source>click this image</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1039"/>
+        <location filename="../qml/EditorPage.qml" line="1043"/>
         <source>wait for this image</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1039"/>
+        <location filename="../qml/EditorPage.qml" line="1043"/>
         <source>find this image</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1040"/>
+        <location filename="../qml/EditorPage.qml" line="1044"/>
         <source>color at this point</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1040"/>
+        <location filename="../qml/EditorPage.qml" line="1044"/>
         <source>move mouse here</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1051"/>
+        <location filename="../qml/EditorPage.qml" line="1055"/>
         <source>Use an image file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1055"/>
+        <location filename="../qml/EditorPage.qml" line="1059"/>
         <source>Path to a PNG image</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1066"/>
+        <location filename="../qml/EditorPage.qml" line="1070"/>
         <source>Choose a detection model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1085"/>
+        <location filename="../qml/EditorPage.qml" line="1089"/>
         <source>Models run inside Blockwork. Pick one, add your own .onnx file, or point the block at a detector running on this computer.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1098"/>
-        <location filename="../qml/EditorPage.qml" line="1109"/>
-        <location filename="../qml/EditorPage.qml" line="1193"/>
-        <location filename="../qml/EditorPage.qml" line="1207"/>
+        <location filename="../qml/EditorPage.qml" line="1102"/>
+        <location filename="../qml/EditorPage.qml" line="1113"/>
+        <location filename="../qml/EditorPage.qml" line="1199"/>
+        <location filename="../qml/EditorPage.qml" line="1213"/>
         <source>Use</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1098"/>
+        <location filename="../qml/EditorPage.qml" line="1102"/>
         <source>Download %1 MB</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1098"/>
+        <location filename="../qml/EditorPage.qml" line="1102"/>
         <source>Not published yet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1104"/>
+        <location filename="../qml/EditorPage.qml" line="1108"/>
         <source>Downloading...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1105"/>
+        <location filename="../qml/EditorPage.qml" line="1109"/>
         <source>Add a .onnx file...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1106"/>
+        <location filename="../qml/EditorPage.qml" line="1110"/>
         <source>Or a detector on this computer</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1114"/>
+        <location filename="../qml/EditorPage.qml" line="1118"/>
         <source>Add a detection model</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1116"/>
+        <location filename="../qml/EditorPage.qml" line="1120"/>
         <source>ONNX models (*.onnx)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1116"/>
+        <location filename="../qml/EditorPage.qml" line="1120"/>
         <source>All files (*)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1124"/>
+        <location filename="../qml/EditorPage.qml" line="1128"/>
         <source>Choose a USB device</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1160"/>
+        <location filename="../qml/EditorPage.qml" line="1164"/>
         <source>Pick a device that&apos;s plugged in. The block matches it by its vendor:product id, so it keeps working on any USB port.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1167"/>
+        <location filename="../qml/EditorPage.qml" line="1171"/>
         <source>Chosen now, but not plugged in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1169"/>
+        <location filename="../qml/EditorPage.qml" line="1173"/>
         <source>Keep</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1172"/>
+        <location filename="../qml/EditorPage.qml" line="1176"/>
         <source>Looking for USB devices...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1175"/>
+        <location filename="../qml/EditorPage.qml" line="1179"/>
         <source>No USB devices are plugged in. Plug one in and it shows up here.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1191"/>
+        <location filename="../qml/EditorPage.qml" line="1197"/>
         <source>%1 · id %2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1191"/>
+        <location filename="../qml/EditorPage.qml" line="1197"/>
         <source>id %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1193"/>
+        <location filename="../qml/EditorPage.qml" line="1199"/>
         <source>Chosen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1200"/>
+        <location filename="../qml/EditorPage.qml" line="1206"/>
         <source>Any USB device</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1202"/>
+        <location filename="../qml/EditorPage.qml" line="1208"/>
         <source>Refresh</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1204"/>
+        <location filename="../qml/EditorPage.qml" line="1210"/>
         <source>Or part of a device&apos;s name or id</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1212"/>
+        <location filename="../qml/EditorPage.qml" line="1218"/>
         <source>Start from a template</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1232"/>
+        <location filename="../qml/EditorPage.qml" line="1239"/>
         <source>Record mouse movement</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1233"/>
+        <location filename="../qml/EditorPage.qml" line="1240"/>
         <source>Use relative mouse movement</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1234"/>
+        <location filename="../qml/EditorPage.qml" line="1241"/>
         <source>Absolute positioning is available on this system.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1234"/>
+        <location filename="../qml/EditorPage.qml" line="1241"/>
         <source>Absolute positioning is unavailable; relative movement will be used.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1240"/>
+        <location filename="../qml/EditorPage.qml" line="1247"/>
         <source>Rename Variable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1240"/>
+        <location filename="../qml/EditorPage.qml" line="1247"/>
         <source>Make a Variable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1245"/>
+        <location filename="../qml/EditorPage.qml" line="1252"/>
         <source>Variable name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1246"/>
-        <location filename="../qml/EditorPage.qml" line="1404"/>
+        <location filename="../qml/EditorPage.qml" line="1253"/>
+        <location filename="../qml/EditorPage.qml" line="1411"/>
         <source>score</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1260"/>
+        <location filename="../qml/EditorPage.qml" line="1267"/>
         <source>Rename List</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1260"/>
+        <location filename="../qml/EditorPage.qml" line="1267"/>
         <source>Make a List</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1265"/>
+        <location filename="../qml/EditorPage.qml" line="1272"/>
         <source>List name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1266"/>
+        <location filename="../qml/EditorPage.qml" line="1273"/>
         <source>items</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1278"/>
+        <location filename="../qml/EditorPage.qml" line="1285"/>
         <source>Delete list?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1280"/>
+        <location filename="../qml/EditorPage.qml" line="1287"/>
         <source>Delete &quot;%1&quot; and its saved items?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1291"/>
+        <location filename="../qml/EditorPage.qml" line="1298"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1345"/>
-        <location filename="../qml/EditorPage.qml" line="1435"/>
-        <location filename="../qml/EditorPage.qml" line="1440"/>
+        <location filename="../qml/EditorPage.qml" line="1352"/>
         <location filename="../qml/EditorPage.qml" line="1442"/>
-        <location filename="../qml/EditorPage.qml" line="1444"/>
-        <location filename="../qml/EditorPage.qml" line="1482"/>
-        <location filename="../qml/EditorPage.qml" line="1514"/>
-        <location filename="../qml/EditorPage.qml" line="1515"/>
-        <location filename="../qml/EditorPage.qml" line="1529"/>
-        <location filename="../qml/EditorPage.qml" line="1545"/>
+        <location filename="../qml/EditorPage.qml" line="1447"/>
+        <location filename="../qml/EditorPage.qml" line="1449"/>
+        <location filename="../qml/EditorPage.qml" line="1451"/>
+        <location filename="../qml/EditorPage.qml" line="1489"/>
+        <location filename="../qml/EditorPage.qml" line="1521"/>
+        <location filename="../qml/EditorPage.qml" line="1522"/>
+        <location filename="../qml/EditorPage.qml" line="1536"/>
+        <location filename="../qml/EditorPage.qml" line="1552"/>
         <source>(no variable)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1347"/>
+        <location filename="../qml/EditorPage.qml" line="1354"/>
         <source>left button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1347"/>
+        <location filename="../qml/EditorPage.qml" line="1354"/>
         <source>right button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1347"/>
+        <location filename="../qml/EditorPage.qml" line="1354"/>
         <source>middle button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1348"/>
+        <location filename="../qml/EditorPage.qml" line="1355"/>
         <source>back button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1348"/>
+        <location filename="../qml/EditorPage.qml" line="1355"/>
         <source>forward button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1348"/>
+        <location filename="../qml/EditorPage.qml" line="1355"/>
         <source>wheel up</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1348"/>
+        <location filename="../qml/EditorPage.qml" line="1355"/>
         <source>wheel down</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1349"/>
+        <location filename="../qml/EditorPage.qml" line="1356"/>
         <source>wheel left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1349"/>
+        <location filename="../qml/EditorPage.qml" line="1356"/>
         <source>wheel right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1353"/>
+        <location filename="../qml/EditorPage.qml" line="1360"/>
         <source>Run commands and open or close apps</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1353"/>
+        <location filename="../qml/EditorPage.qml" line="1360"/>
         <source>Go online</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1354"/>
+        <location filename="../qml/EditorPage.qml" line="1361"/>
         <source>Write to files</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1354"/>
+        <location filename="../qml/EditorPage.qml" line="1361"/>
         <source>Read your saved secrets</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1355"/>
+        <location filename="../qml/EditorPage.qml" line="1362"/>
         <source>Read the screen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1355"/>
+        <location filename="../qml/EditorPage.qml" line="1362"/>
         <source>Read files and folders</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1356"/>
+        <location filename="../qml/EditorPage.qml" line="1363"/>
         <source>Press keys and move the mouse</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1356"/>
+        <location filename="../qml/EditorPage.qml" line="1363"/>
         <source>Read the clipboard</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1357"/>
+        <location filename="../qml/EditorPage.qml" line="1364"/>
         <source>Run or stop your other macros</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1357"/>
+        <location filename="../qml/EditorPage.qml" line="1364"/>
         <source>Read or change global variables</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1359"/>
-        <location filename="../qml/EditorPage.qml" line="1389"/>
-        <location filename="../qml/EditorPage.qml" line="1401"/>
+        <location filename="../qml/EditorPage.qml" line="1366"/>
+        <location filename="../qml/EditorPage.qml" line="1396"/>
+        <location filename="../qml/EditorPage.qml" line="1408"/>
         <source>window</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1359"/>
-        <location filename="../qml/EditorPage.qml" line="1405"/>
+        <location filename="../qml/EditorPage.qml" line="1366"/>
+        <location filename="../qml/EditorPage.qml" line="1412"/>
         <source>app</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1361"/>
+        <location filename="../qml/EditorPage.qml" line="1368"/>
         <source>closest first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1361"/>
+        <location filename="../qml/EditorPage.qml" line="1368"/>
         <source>best first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1362"/>
+        <location filename="../qml/EditorPage.qml" line="1369"/>
         <source>largest first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1374"/>
+        <location filename="../qml/EditorPage.qml" line="1381"/>
         <source>capture image</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1380"/>
+        <location filename="../qml/EditorPage.qml" line="1387"/>
         <source>region %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1380"/>
+        <location filename="../qml/EditorPage.qml" line="1387"/>
         <source>whole window</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1384"/>
+        <location filename="../qml/EditorPage.qml" line="1391"/>
         <source>contents of file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1384"/>
+        <location filename="../qml/EditorPage.qml" line="1391"/>
         <source>file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1384"/>
-        <location filename="../qml/EditorPage.qml" line="1389"/>
+        <location filename="../qml/EditorPage.qml" line="1391"/>
+        <location filename="../qml/EditorPage.qml" line="1396"/>
         <source>exists?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1385"/>
+        <location filename="../qml/EditorPage.qml" line="1392"/>
         <source>files in folder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1385"/>
+        <location filename="../qml/EditorPage.qml" line="1392"/>
         <source>fetch</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1386"/>
+        <location filename="../qml/EditorPage.qml" line="1393"/>
         <source>get</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1386"/>
+        <location filename="../qml/EditorPage.qml" line="1393"/>
         <source>from JSON</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1387"/>
+        <location filename="../qml/EditorPage.qml" line="1394"/>
         <source>output of command</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1387"/>
+        <location filename="../qml/EditorPage.qml" line="1394"/>
         <source>command</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1387"/>
+        <location filename="../qml/EditorPage.qml" line="1394"/>
         <source>succeeds?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1388"/>
+        <location filename="../qml/EditorPage.qml" line="1395"/>
         <source>active window title</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1388"/>
+        <location filename="../qml/EditorPage.qml" line="1395"/>
         <source>active app</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1390"/>
+        <location filename="../qml/EditorPage.qml" line="1397"/>
         <source>error message</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1391"/>
+        <location filename="../qml/EditorPage.qml" line="1398"/>
         <source>macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1391"/>
-        <location filename="../qml/EditorPage.qml" line="1405"/>
+        <location filename="../qml/EditorPage.qml" line="1398"/>
+        <location filename="../qml/EditorPage.qml" line="1412"/>
         <source>is running?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1391"/>
+        <location filename="../qml/EditorPage.qml" line="1398"/>
         <source>global</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1392"/>
+        <location filename="../qml/EditorPage.qml" line="1399"/>
         <source>color at x</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1392"/>
-        <location filename="../qml/EditorPage.qml" line="1393"/>
-        <location filename="../qml/EditorPage.qml" line="1395"/>
-        <location filename="../qml/EditorPage.qml" line="1396"/>
+        <location filename="../qml/EditorPage.qml" line="1399"/>
         <location filename="../qml/EditorPage.qml" line="1400"/>
         <location filename="../qml/EditorPage.qml" line="1402"/>
-        <location filename="../qml/EditorPage.qml" line="1404"/>
-        <location filename="../qml/EditorPage.qml" line="1503"/>
-        <location filename="../qml/EditorPage.qml" line="1537"/>
+        <location filename="../qml/EditorPage.qml" line="1403"/>
+        <location filename="../qml/EditorPage.qml" line="1407"/>
+        <location filename="../qml/EditorPage.qml" line="1409"/>
+        <location filename="../qml/EditorPage.qml" line="1411"/>
+        <location filename="../qml/EditorPage.qml" line="1510"/>
+        <location filename="../qml/EditorPage.qml" line="1544"/>
         <source>y</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1393"/>
+        <location filename="../qml/EditorPage.qml" line="1400"/>
         <source>average color at x</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1393"/>
-        <location filename="../qml/EditorPage.qml" line="1395"/>
-        <location filename="../qml/EditorPage.qml" line="1397"/>
         <location filename="../qml/EditorPage.qml" line="1400"/>
         <location filename="../qml/EditorPage.qml" line="1402"/>
         <location filename="../qml/EditorPage.qml" line="1404"/>
+        <location filename="../qml/EditorPage.qml" line="1407"/>
+        <location filename="../qml/EditorPage.qml" line="1409"/>
+        <location filename="../qml/EditorPage.qml" line="1411"/>
         <source>width</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1393"/>
-        <location filename="../qml/EditorPage.qml" line="1395"/>
-        <location filename="../qml/EditorPage.qml" line="1397"/>
         <location filename="../qml/EditorPage.qml" line="1400"/>
         <location filename="../qml/EditorPage.qml" line="1402"/>
         <location filename="../qml/EditorPage.qml" line="1404"/>
-        <location filename="../qml/EditorPage.qml" line="1503"/>
+        <location filename="../qml/EditorPage.qml" line="1407"/>
+        <location filename="../qml/EditorPage.qml" line="1409"/>
+        <location filename="../qml/EditorPage.qml" line="1411"/>
+        <location filename="../qml/EditorPage.qml" line="1510"/>
         <source>height</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1394"/>
+        <location filename="../qml/EditorPage.qml" line="1401"/>
         <source>matches</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1394"/>
-        <location filename="../qml/EditorPage.qml" line="1516"/>
-        <location filename="../qml/EditorPage.qml" line="1519"/>
+        <location filename="../qml/EditorPage.qml" line="1401"/>
+        <location filename="../qml/EditorPage.qml" line="1523"/>
+        <location filename="../qml/EditorPage.qml" line="1526"/>
         <source>within</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1395"/>
+        <location filename="../qml/EditorPage.qml" line="1402"/>
         <source>text on screen at x</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1396"/>
+        <location filename="../qml/EditorPage.qml" line="1403"/>
         <source>mouse</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1397"/>
+        <location filename="../qml/EditorPage.qml" line="1404"/>
         <source>screen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1398"/>
+        <location filename="../qml/EditorPage.qml" line="1405"/>
         <source>number of monitors</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1399"/>
+        <location filename="../qml/EditorPage.qml" line="1406"/>
         <source>monitor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1402"/>
-        <location filename="../qml/EditorPage.qml" line="1404"/>
+        <location filename="../qml/EditorPage.qml" line="1409"/>
+        <location filename="../qml/EditorPage.qml" line="1411"/>
         <source>center x</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1402"/>
-        <location filename="../qml/EditorPage.qml" line="1404"/>
+        <location filename="../qml/EditorPage.qml" line="1409"/>
+        <location filename="../qml/EditorPage.qml" line="1411"/>
         <source>center y</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1403"/>
+        <location filename="../qml/EditorPage.qml" line="1410"/>
         <source>of detection</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1404"/>
+        <location filename="../qml/EditorPage.qml" line="1411"/>
         <source>label</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1404"/>
+        <location filename="../qml/EditorPage.qml" line="1411"/>
         <source>id</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1406"/>
+        <location filename="../qml/EditorPage.qml" line="1413"/>
         <source>seconds idle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1407"/>
+        <location filename="../qml/EditorPage.qml" line="1414"/>
         <source>screen is locked?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1408"/>
+        <location filename="../qml/EditorPage.qml" line="1415"/>
         <source>online?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1409"/>
+        <location filename="../qml/EditorPage.qml" line="1416"/>
         <source>USB device</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1409"/>
+        <location filename="../qml/EditorPage.qml" line="1416"/>
         <source>plugged in?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1410"/>
+        <location filename="../qml/EditorPage.qml" line="1417"/>
         <source>secret</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1412"/>
+        <location filename="../qml/EditorPage.qml" line="1419"/>
         <source>(add one in Settings)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1415"/>
+        <location filename="../qml/EditorPage.qml" line="1422"/>
         <source>contains</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1415"/>
+        <location filename="../qml/EditorPage.qml" line="1422"/>
         <source>starts with</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1415"/>
+        <location filename="../qml/EditorPage.qml" line="1422"/>
         <source>ends with</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1415"/>
+        <location filename="../qml/EditorPage.qml" line="1422"/>
         <source>matches regex</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1416"/>
+        <location filename="../qml/EditorPage.qml" line="1423"/>
         <source>replace</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1416"/>
-        <location filename="../qml/EditorPage.qml" line="1417"/>
-        <location filename="../qml/EditorPage.qml" line="1418"/>
-        <location filename="../qml/EditorPage.qml" line="1524"/>
-        <location filename="../qml/EditorPage.qml" line="1533"/>
+        <location filename="../qml/EditorPage.qml" line="1423"/>
+        <location filename="../qml/EditorPage.qml" line="1424"/>
+        <location filename="../qml/EditorPage.qml" line="1425"/>
+        <location filename="../qml/EditorPage.qml" line="1531"/>
+        <location filename="../qml/EditorPage.qml" line="1540"/>
         <source>in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1416"/>
-        <location filename="../qml/EditorPage.qml" line="1417"/>
         <location filename="../qml/EditorPage.qml" line="1423"/>
-        <location filename="../qml/EditorPage.qml" line="1526"/>
-        <location filename="../qml/EditorPage.qml" line="1534"/>
+        <location filename="../qml/EditorPage.qml" line="1424"/>
+        <location filename="../qml/EditorPage.qml" line="1430"/>
+        <location filename="../qml/EditorPage.qml" line="1533"/>
+        <location filename="../qml/EditorPage.qml" line="1541"/>
         <source>with</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1417"/>
+        <location filename="../qml/EditorPage.qml" line="1424"/>
         <source>replace regex</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1418"/>
+        <location filename="../qml/EditorPage.qml" line="1425"/>
         <source>match of regex</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1419"/>
+        <location filename="../qml/EditorPage.qml" line="1426"/>
         <source>part</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1419"/>
-        <location filename="../qml/EditorPage.qml" line="1421"/>
-        <location filename="../qml/EditorPage.qml" line="1427"/>
-        <location filename="../qml/EditorPage.qml" line="1540"/>
+        <location filename="../qml/EditorPage.qml" line="1426"/>
+        <location filename="../qml/EditorPage.qml" line="1428"/>
+        <location filename="../qml/EditorPage.qml" line="1434"/>
+        <location filename="../qml/EditorPage.qml" line="1547"/>
         <source>of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1419"/>
-        <location filename="../qml/EditorPage.qml" line="1420"/>
+        <location filename="../qml/EditorPage.qml" line="1426"/>
+        <location filename="../qml/EditorPage.qml" line="1427"/>
         <source>split by</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1420"/>
+        <location filename="../qml/EditorPage.qml" line="1427"/>
         <source>number of parts in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1421"/>
+        <location filename="../qml/EditorPage.qml" line="1428"/>
         <source>letters</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1421"/>
-        <location filename="../qml/EditorPage.qml" line="1509"/>
+        <location filename="../qml/EditorPage.qml" line="1428"/>
+        <location filename="../qml/EditorPage.qml" line="1516"/>
         <source>to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1422"/>
+        <location filename="../qml/EditorPage.qml" line="1429"/>
         <source>trim</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1423"/>
+        <location filename="../qml/EditorPage.qml" line="1430"/>
         <source>decimals</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1424"/>
+        <location filename="../qml/EditorPage.qml" line="1431"/>
         <source>timestamp now</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1425"/>
+        <location filename="../qml/EditorPage.qml" line="1432"/>
         <source>date of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1425"/>
+        <location filename="../qml/EditorPage.qml" line="1432"/>
         <source>as</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1426"/>
+        <location filename="../qml/EditorPage.qml" line="1433"/>
         <source>timestamp of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1426"/>
+        <location filename="../qml/EditorPage.qml" line="1433"/>
         <source>in format</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1428"/>
+        <location filename="../qml/EditorPage.qml" line="1435"/>
         <source>year</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1428"/>
+        <location filename="../qml/EditorPage.qml" line="1435"/>
         <source>month</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1428"/>
+        <location filename="../qml/EditorPage.qml" line="1435"/>
         <source>day</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1428"/>
+        <location filename="../qml/EditorPage.qml" line="1435"/>
         <source>hour</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1428"/>
+        <location filename="../qml/EditorPage.qml" line="1435"/>
         <source>minute</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1428"/>
+        <location filename="../qml/EditorPage.qml" line="1435"/>
         <source>second</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1428"/>
+        <location filename="../qml/EditorPage.qml" line="1435"/>
         <source>weekday</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1431"/>
+        <location filename="../qml/EditorPage.qml" line="1438"/>
         <source>WHEN RUN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1432"/>
+        <location filename="../qml/EditorPage.qml" line="1439"/>
         <source>ONCE AT</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1433"/>
+        <location filename="../qml/EditorPage.qml" line="1440"/>
         <source>WHEN I RECEIVE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1434"/>
+        <location filename="../qml/EditorPage.qml" line="1441"/>
         <source>WHEN WEBHOOK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1434"/>
+        <location filename="../qml/EditorPage.qml" line="1441"/>
         <source>IS CALLED, BODY IN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1436"/>
+        <location filename="../qml/EditorPage.qml" line="1443"/>
         <source>send signal</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1437"/>
-        <location filename="../qml/EditorPage.qml" line="1506"/>
+        <location filename="../qml/EditorPage.qml" line="1444"/>
+        <location filename="../qml/EditorPage.qml" line="1513"/>
         <source>and continue</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1437"/>
-        <location filename="../qml/EditorPage.qml" line="1506"/>
+        <location filename="../qml/EditorPage.qml" line="1444"/>
+        <location filename="../qml/EditorPage.qml" line="1513"/>
         <source>and wait</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1439"/>
+        <location filename="../qml/EditorPage.qml" line="1446"/>
         <source>ask</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1439"/>
+        <location filename="../qml/EditorPage.qml" line="1446"/>
         <source>default</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1440"/>
-        <location filename="../qml/EditorPage.qml" line="1442"/>
-        <location filename="../qml/EditorPage.qml" line="1444"/>
-        <location filename="../qml/EditorPage.qml" line="1473"/>
+        <location filename="../qml/EditorPage.qml" line="1447"/>
+        <location filename="../qml/EditorPage.qml" line="1449"/>
+        <location filename="../qml/EditorPage.qml" line="1451"/>
+        <location filename="../qml/EditorPage.qml" line="1480"/>
         <source>into</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1441"/>
+        <location filename="../qml/EditorPage.qml" line="1448"/>
         <source>ask yes or no</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1443"/>
+        <location filename="../qml/EditorPage.qml" line="1450"/>
         <source>choose from</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1443"/>
+        <location filename="../qml/EditorPage.qml" line="1450"/>
         <source>asking</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1445"/>
+        <location filename="../qml/EditorPage.qml" line="1452"/>
         <source>show message</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1446"/>
+        <location filename="../qml/EditorPage.qml" line="1453"/>
         <source>WHEN WINDOW</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1446"/>
-        <location filename="../qml/EditorPage.qml" line="1464"/>
+        <location filename="../qml/EditorPage.qml" line="1453"/>
+        <location filename="../qml/EditorPage.qml" line="1471"/>
         <source>IS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1447"/>
+        <location filename="../qml/EditorPage.qml" line="1454"/>
         <source>focused</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1447"/>
+        <location filename="../qml/EditorPage.qml" line="1454"/>
         <source>unfocused</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1449"/>
+        <location filename="../qml/EditorPage.qml" line="1456"/>
         <source>WHEN FILE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1449"/>
+        <location filename="../qml/EditorPage.qml" line="1456"/>
         <source>CHANGES</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1450"/>
+        <location filename="../qml/EditorPage.qml" line="1457"/>
         <source>WHEN I TYPE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1450"/>
+        <location filename="../qml/EditorPage.qml" line="1457"/>
         <source>THEN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1451"/>
+        <location filename="../qml/EditorPage.qml" line="1458"/>
         <source>erase it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1451"/>
+        <location filename="../qml/EditorPage.qml" line="1458"/>
         <source>keep it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1453"/>
+        <location filename="../qml/EditorPage.qml" line="1460"/>
         <source>WHEN APP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1454"/>
+        <location filename="../qml/EditorPage.qml" line="1461"/>
         <source>starts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1454"/>
+        <location filename="../qml/EditorPage.qml" line="1461"/>
         <source>exits</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1456"/>
+        <location filename="../qml/EditorPage.qml" line="1463"/>
         <source>WHEN IDLE FOR</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1456"/>
+        <location filename="../qml/EditorPage.qml" line="1463"/>
         <source>MINUTES</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1457"/>
+        <location filename="../qml/EditorPage.qml" line="1464"/>
         <source>WHEN SCREEN IS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1458"/>
+        <location filename="../qml/EditorPage.qml" line="1465"/>
         <source>locked</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1458"/>
+        <location filename="../qml/EditorPage.qml" line="1465"/>
         <source>unlocked</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1460"/>
+        <location filename="../qml/EditorPage.qml" line="1467"/>
         <source>ON SCHEDULE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1461"/>
+        <location filename="../qml/EditorPage.qml" line="1468"/>
         <source>WHEN NETWORK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1462"/>
+        <location filename="../qml/EditorPage.qml" line="1469"/>
         <source>connects</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1462"/>
+        <location filename="../qml/EditorPage.qml" line="1469"/>
         <source>disconnects</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1464"/>
+        <location filename="../qml/EditorPage.qml" line="1471"/>
         <source>WHEN USB DEVICE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1465"/>
+        <location filename="../qml/EditorPage.qml" line="1472"/>
         <source>plugged in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1465"/>
+        <location filename="../qml/EditorPage.qml" line="1472"/>
         <source>unplugged</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1467"/>
+        <location filename="../qml/EditorPage.qml" line="1474"/>
         <source>WHEN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1469"/>
+        <location filename="../qml/EditorPage.qml" line="1476"/>
         <source>is pressed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1469"/>
+        <location filename="../qml/EditorPage.qml" line="1476"/>
         <source>is released</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1471"/>
+        <location filename="../qml/EditorPage.qml" line="1478"/>
         <source>WITH KEYS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1472"/>
+        <location filename="../qml/EditorPage.qml" line="1479"/>
         <source>split</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1472"/>
-        <location filename="../qml/EditorPage.qml" line="1510"/>
+        <location filename="../qml/EditorPage.qml" line="1479"/>
+        <location filename="../qml/EditorPage.qml" line="1517"/>
         <source>by</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1474"/>
+        <location filename="../qml/EditorPage.qml" line="1481"/>
         <source>paste</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1475"/>
+        <location filename="../qml/EditorPage.qml" line="1482"/>
         <source>with lock</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1477"/>
+        <location filename="../qml/EditorPage.qml" line="1484"/>
         <source>write</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1477"/>
+        <location filename="../qml/EditorPage.qml" line="1484"/>
         <source>append</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1479"/>
+        <location filename="../qml/EditorPage.qml" line="1486"/>
         <source>to file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1482"/>
+        <location filename="../qml/EditorPage.qml" line="1489"/>
         <source>set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1483"/>
+        <location filename="../qml/EditorPage.qml" line="1490"/>
         <source>to response of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1485"/>
+        <location filename="../qml/EditorPage.qml" line="1492"/>
         <source>with body</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1486"/>
+        <location filename="../qml/EditorPage.qml" line="1493"/>
         <source>headers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1487"/>
+        <location filename="../qml/EditorPage.qml" line="1494"/>
         <source>notify</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1487"/>
+        <location filename="../qml/EditorPage.qml" line="1494"/>
         <source>saying</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1488"/>
+        <location filename="../qml/EditorPage.qml" line="1495"/>
         <source>log</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1489"/>
+        <location filename="../qml/EditorPage.qml" line="1496"/>
         <source>on error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1489"/>
+        <location filename="../qml/EditorPage.qml" line="1496"/>
         <source>try</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1490"/>
+        <location filename="../qml/EditorPage.qml" line="1497"/>
         <source>throw error</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1491"/>
-        <location filename="../qml/EditorPage.qml" line="1508"/>
+        <location filename="../qml/EditorPage.qml" line="1498"/>
+        <location filename="../qml/EditorPage.qml" line="1515"/>
         <source>stop macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1492"/>
+        <location filename="../qml/EditorPage.qml" line="1499"/>
         <source>try up to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1492"/>
+        <location filename="../qml/EditorPage.qml" line="1499"/>
         <source>times,</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1493"/>
+        <location filename="../qml/EditorPage.qml" line="1500"/>
         <source>ms apart</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1495"/>
+        <location filename="../qml/EditorPage.qml" line="1502"/>
         <source>focus</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1495"/>
+        <location filename="../qml/EditorPage.qml" line="1502"/>
         <source>minimize</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1495"/>
+        <location filename="../qml/EditorPage.qml" line="1502"/>
         <source>maximize</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1495"/>
+        <location filename="../qml/EditorPage.qml" line="1502"/>
         <source>restore</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1495"/>
+        <location filename="../qml/EditorPage.qml" line="1502"/>
         <source>close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1498"/>
+        <location filename="../qml/EditorPage.qml" line="1505"/>
         <source>move</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1498"/>
+        <location filename="../qml/EditorPage.qml" line="1505"/>
         <source>resize</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1501"/>
+        <location filename="../qml/EditorPage.qml" line="1508"/>
         <source>to x</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1501"/>
+        <location filename="../qml/EditorPage.qml" line="1508"/>
         <source>to width</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1505"/>
+        <location filename="../qml/EditorPage.qml" line="1512"/>
         <source>run macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1509"/>
+        <location filename="../qml/EditorPage.qml" line="1516"/>
         <source>set global</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1510"/>
+        <location filename="../qml/EditorPage.qml" line="1517"/>
         <source>change global</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1511"/>
-        <location filename="../qml/EditorPage.qml" line="1520"/>
-        <location filename="../qml/EditorPage.qml" line="1530"/>
+        <location filename="../qml/EditorPage.qml" line="1518"/>
+        <location filename="../qml/EditorPage.qml" line="1527"/>
+        <location filename="../qml/EditorPage.qml" line="1537"/>
         <source>wait until</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1512"/>
-        <location filename="../qml/EditorPage.qml" line="1523"/>
+        <location filename="../qml/EditorPage.qml" line="1519"/>
+        <location filename="../qml/EditorPage.qml" line="1530"/>
         <source>for up to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1512"/>
-        <location filename="../qml/EditorPage.qml" line="1535"/>
+        <location filename="../qml/EditorPage.qml" line="1519"/>
+        <location filename="../qml/EditorPage.qml" line="1542"/>
         <source>ms</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1513"/>
+        <location filename="../qml/EditorPage.qml" line="1520"/>
         <source>find</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1513"/>
+        <location filename="../qml/EditorPage.qml" line="1520"/>
         <source>put x in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1515"/>
+        <location filename="../qml/EditorPage.qml" line="1522"/>
         <source>y in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1517"/>
+        <location filename="../qml/EditorPage.qml" line="1524"/>
         <source>click</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1518"/>
+        <location filename="../qml/EditorPage.qml" line="1525"/>
         <source>left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1518"/>
+        <location filename="../qml/EditorPage.qml" line="1525"/>
         <source>right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1518"/>
+        <location filename="../qml/EditorPage.qml" line="1525"/>
         <source>middle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1519"/>
+        <location filename="../qml/EditorPage.qml" line="1526"/>
         <source>on</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1521"/>
-        <location filename="../qml/EditorPage.qml" line="1531"/>
+        <location filename="../qml/EditorPage.qml" line="1528"/>
+        <location filename="../qml/EditorPage.qml" line="1538"/>
         <source>appears</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1521"/>
-        <location filename="../qml/EditorPage.qml" line="1531"/>
+        <location filename="../qml/EditorPage.qml" line="1528"/>
+        <location filename="../qml/EditorPage.qml" line="1538"/>
         <source>disappears</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1523"/>
+        <location filename="../qml/EditorPage.qml" line="1530"/>
         <source>ms, within</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1524"/>
+        <location filename="../qml/EditorPage.qml" line="1531"/>
         <source>detect</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1526"/>
-        <location filename="../qml/EditorPage.qml" line="1534"/>
+        <location filename="../qml/EditorPage.qml" line="1533"/>
+        <location filename="../qml/EditorPage.qml" line="1541"/>
         <source>at least</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1526"/>
+        <location filename="../qml/EditorPage.qml" line="1533"/>
         <source>% into</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1529"/>
+        <location filename="../qml/EditorPage.qml" line="1536"/>
         <source>count in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1535"/>
+        <location filename="../qml/EditorPage.qml" line="1542"/>
         <source>% for up to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1536"/>
+        <location filename="../qml/EditorPage.qml" line="1543"/>
         <source>aim from center of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1537"/>
+        <location filename="../qml/EditorPage.qml" line="1544"/>
         <source>toward x</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1538"/>
-        <location filename="../qml/EditorPage.qml" line="1542"/>
+        <location filename="../qml/EditorPage.qml" line="1545"/>
+        <location filename="../qml/EditorPage.qml" line="1549"/>
         <source>gain</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1538"/>
-        <location filename="../qml/EditorPage.qml" line="1542"/>
+        <location filename="../qml/EditorPage.qml" line="1545"/>
+        <location filename="../qml/EditorPage.qml" line="1549"/>
         <source>max step</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1539"/>
-        <location filename="../qml/EditorPage.qml" line="1543"/>
+        <location filename="../qml/EditorPage.qml" line="1546"/>
+        <location filename="../qml/EditorPage.qml" line="1550"/>
         <source>deadzone</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1540"/>
+        <location filename="../qml/EditorPage.qml" line="1547"/>
         <source>aim at item</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1543"/>
+        <location filename="../qml/EditorPage.qml" line="1550"/>
         <source>hold</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1544"/>
+        <location filename="../qml/EditorPage.qml" line="1551"/>
         <source>ms, up to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1544"/>
+        <location filename="../qml/EditorPage.qml" line="1551"/>
         <source>ms, result in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1552"/>
+        <location filename="../qml/EditorPage.qml" line="1559"/>
         <source>What&apos;s your name?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1553"/>
+        <location filename="../qml/EditorPage.qml" line="1560"/>
         <source>Continue?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1554"/>
+        <location filename="../qml/EditorPage.qml" line="1561"/>
         <source>Pick one</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1555"/>
-        <location filename="../qml/EditorPage.qml" line="1572"/>
+        <location filename="../qml/EditorPage.qml" line="1562"/>
+        <location filename="../qml/EditorPage.qml" line="1579"/>
         <source>Done!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1567"/>
+        <location filename="../qml/EditorPage.qml" line="1574"/>
         <source>Hello!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1573"/>
+        <location filename="../qml/EditorPage.qml" line="1580"/>
         <source>checkpoint</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1575"/>
+        <location filename="../qml/EditorPage.qml" line="1582"/>
         <source>something went wrong</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1655"/>
-        <location filename="../qml/EditorPage.qml" line="1656"/>
+        <location filename="../qml/EditorPage.qml" line="1662"/>
+        <location filename="../qml/EditorPage.qml" line="1663"/>
         <source>a block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1656"/>
-        <location filename="../qml/EditorPage.qml" line="1738"/>
+        <location filename="../qml/EditorPage.qml" line="1663"/>
+        <location filename="../qml/EditorPage.qml" line="1745"/>
         <source>custom block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1663"/>
-        <location filename="../qml/EditorPage.qml" line="1666"/>
+        <location filename="../qml/EditorPage.qml" line="1670"/>
+        <location filename="../qml/EditorPage.qml" line="1673"/>
         <source>Toggle breakpoint</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4055,102 +4055,102 @@
 <context>
     <name>LibraryPanel</name>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="63"/>
+        <location filename="../qml/LibraryPanel.qml" line="76"/>
         <source>Search macros</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="98"/>
+        <location filename="../qml/LibraryPanel.qml" line="113"/>
         <source>Untitled</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="104"/>
+        <location filename="../qml/LibraryPanel.qml" line="119"/>
         <source>Running</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="110"/>
+        <location filename="../qml/LibraryPanel.qml" line="125"/>
         <source>Asks before risky actions (see its Macro settings)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="116"/>
+        <location filename="../qml/LibraryPanel.qml" line="131"/>
         <source>Listens for its triggers even when it isn&apos;t open</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="143"/>
+        <location filename="../qml/LibraryPanel.qml" line="158"/>
         <source>Export folder as bundle...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="154"/>
+        <location filename="../qml/LibraryPanel.qml" line="169"/>
         <source>Open</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="155"/>
+        <location filename="../qml/LibraryPanel.qml" line="170"/>
         <source>Duplicate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="156"/>
+        <location filename="../qml/LibraryPanel.qml" line="171"/>
         <source>Move to folder...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="157"/>
+        <location filename="../qml/LibraryPanel.qml" line="172"/>
         <source>Export...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="158"/>
+        <location filename="../qml/LibraryPanel.qml" line="173"/>
         <source>Export as bundle...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="159"/>
+        <location filename="../qml/LibraryPanel.qml" line="174"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="164"/>
+        <location filename="../qml/LibraryPanel.qml" line="179"/>
         <source>No macros match</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="164"/>
+        <location filename="../qml/LibraryPanel.qml" line="179"/>
         <source>No macros yet</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="170"/>
+        <location filename="../qml/LibraryPanel.qml" line="185"/>
         <source>New</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="171"/>
+        <location filename="../qml/LibraryPanel.qml" line="186"/>
         <source>Template</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="173"/>
+        <location filename="../qml/LibraryPanel.qml" line="188"/>
         <source>Import...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="180"/>
+        <location filename="../qml/LibraryPanel.qml" line="195"/>
         <source>Move to folder</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="187"/>
+        <location filename="../qml/LibraryPanel.qml" line="202"/>
         <source>Type a new folder name or pick one. Leave it empty to take &quot;%1&quot; out of its folder.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/LibraryPanel.qml" line="189"/>
+        <location filename="../qml/LibraryPanel.qml" line="204"/>
         <source>Work</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4347,7 +4347,7 @@
 <context>
     <name>Main</name>
     <message>
-        <location filename="../qml/Main.qml" line="179"/>
+        <location filename="../qml/Main.qml" line="186"/>
         <source>Connecting to Blockwork...</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4365,163 +4365,163 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="103"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="114"/>
         <source>Search icons</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="153"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="165"/>
         <source>No icons match</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="255"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="269"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="267"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="281"/>
         <source>block name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="467"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="479"/>
         <source>Every input and branch needs a name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="471"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="483"/>
         <source>Input and branch names must be unique</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="477"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="489"/>
         <source>Give the block a name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="319"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="562"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="331"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="574"/>
         <source>value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="319"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="331"/>
         <source>label</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="562"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="908"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="574"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="922"/>
         <source>Add label</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="612"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="624"/>
         <source>Move left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="617"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="629"/>
         <source>Remove</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="622"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="634"/>
         <source>Move right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="867"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="880"/>
         <source>Move branch up</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="868"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="881"/>
         <source>Remove branch</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="869"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="882"/>
         <source>Move branch down</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="986"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1000"/>
         <source>Icon</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="992"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1006"/>
         <source>Default</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1004"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1018"/>
         <source>Reset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1138"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1152"/>
         <source>Done</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1154"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="1161"/>
         <location filename="../qml/MakeBlockDialog.qml" line="1168"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1175"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1182"/>
         <source>Add an input</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1155"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1169"/>
         <source>number or text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1162"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1176"/>
         <source>boolean</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="319"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="1169"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="331"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1183"/>
         <source>branch</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1175"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1189"/>
         <source>Add a label</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1246"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1262"/>
         <source>Return Text or Number</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1246"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1262"/>
         <source>Normal block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1252"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1268"/>
         <source>Return a Boolean</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1252"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1268"/>
         <source>Ending block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1259"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1275"/>
         <source>Returns a value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1280"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1296"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1284"/>
+        <location filename="../qml/MakeBlockDialog.qml" line="1300"/>
         <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4857,7 +4857,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="489"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="490"/>
         <source>%n block(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -4865,12 +4865,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="567"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="568"/>
         <source>Release to delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="567"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="568"/>
         <source>Drop here to delete</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4886,76 +4886,76 @@
 <context>
     <name>PromptWindow</name>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="17"/>
+        <location filename="../qml/PromptWindow.qml" line="18"/>
         <source>Blockwork permission</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="52"/>
+        <location filename="../qml/PromptWindow.qml" line="53"/>
         <source>&quot;%1&quot; wants to run commands and open or close apps.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="53"/>
+        <location filename="../qml/PromptWindow.qml" line="54"/>
         <source>&quot;%1&quot; wants to go online.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="54"/>
+        <location filename="../qml/PromptWindow.qml" line="55"/>
         <source>&quot;%1&quot; wants to write to files.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="55"/>
+        <location filename="../qml/PromptWindow.qml" line="56"/>
         <source>&quot;%1&quot; wants to read your saved secrets.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="56"/>
+        <location filename="../qml/PromptWindow.qml" line="57"/>
         <source>&quot;%1&quot; wants to read the screen.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="63"/>
-        <location filename="../qml/PromptWindow.qml" line="65"/>
+        <location filename="../qml/PromptWindow.qml" line="64"/>
+        <location filename="../qml/PromptWindow.qml" line="66"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="63"/>
-        <location filename="../qml/PromptWindow.qml" line="65"/>
+        <location filename="../qml/PromptWindow.qml" line="64"/>
         <location filename="../qml/PromptWindow.qml" line="66"/>
-        <location filename="../qml/PromptWindow.qml" line="68"/>
+        <location filename="../qml/PromptWindow.qml" line="67"/>
+        <location filename="../qml/PromptWindow.qml" line="69"/>
         <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="64"/>
+        <location filename="../qml/PromptWindow.qml" line="65"/>
         <source>No</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="64"/>
+        <location filename="../qml/PromptWindow.qml" line="65"/>
         <source>Yes</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="67"/>
+        <location filename="../qml/PromptWindow.qml" line="68"/>
         <source>Deny</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="67"/>
+        <location filename="../qml/PromptWindow.qml" line="68"/>
         <source>Allow this time</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="67"/>
+        <location filename="../qml/PromptWindow.qml" line="68"/>
         <source>Always allow</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/PromptWindow.qml" line="98"/>
+        <location filename="../qml/PromptWindow.qml" line="99"/>
         <source>Macros you import ask before running commands, going online, writing files, reading secrets or reading the screen. Change what this macro may do in its Macro settings.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4981,204 +4981,233 @@
 <context>
     <name>SettingsPage</name>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="17"/>
-        <location filename="../qml/SettingsPage.qml" line="109"/>
+        <location filename="../qml/SettingsPage.qml" line="20"/>
+        <location filename="../qml/SettingsPage.qml" line="113"/>
         <source>General</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="17"/>
-        <location filename="../qml/SettingsPage.qml" line="169"/>
+        <location filename="../qml/SettingsPage.qml" line="20"/>
+        <location filename="../qml/SettingsPage.qml" line="198"/>
         <source>Hotkeys</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="18"/>
-        <location filename="../qml/SettingsPage.qml" line="228"/>
+        <location filename="../qml/SettingsPage.qml" line="21"/>
+        <location filename="../qml/SettingsPage.qml" line="257"/>
         <source>Editor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="18"/>
-        <location filename="../qml/SettingsPage.qml" line="272"/>
+        <location filename="../qml/SettingsPage.qml" line="21"/>
+        <location filename="../qml/SettingsPage.qml" line="301"/>
         <source>Integrations</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="58"/>
+        <location filename="../qml/SettingsPage.qml" line="61"/>
         <source>Back</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="59"/>
+        <location filename="../qml/SettingsPage.qml" line="62"/>
         <source>Settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="110"/>
+        <location filename="../qml/SettingsPage.qml" line="114"/>
         <source>Close to tray</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="110"/>
+        <location filename="../qml/SettingsPage.qml" line="114"/>
         <source>Keep hotkeys and schedules active after closing the editor.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="113"/>
+        <location filename="../qml/SettingsPage.qml" line="117"/>
         <source>Start at system startup</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="113"/>
+        <location filename="../qml/SettingsPage.qml" line="117"/>
         <source>Launch Blockwork in the background when you log in so hotkeys work right away.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="116"/>
+        <location filename="../qml/SettingsPage.qml" line="120"/>
         <source>Language</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="116"/>
+        <location filename="../qml/SettingsPage.qml" line="120"/>
         <source>The language of the editor and macro dialogs. Run log messages stay in English.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="120"/>
+        <location filename="../qml/SettingsPage.qml" line="124"/>
         <source>System default</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="142"/>
+        <location filename="../qml/SettingsPage.qml" line="143"/>
+        <location filename="../qml/SettingsPage.qml" line="151"/>
+        <source>Animation speed</source>
+        <translation>Ταχύτητα κίνησης</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="143"/>
+        <source>How long menus, dialogs, scrolling and other transitions take. Instant turns animations off.</source>
+        <translation>Πόσο διαρκούν τα μενού, οι διάλογοι, η κύλιση και άλλες μεταβάσεις. Το Άμεσα απενεργοποιεί τα εφέ κίνησης.</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="162"/>
+        <source>Instant</source>
+        <comment>animation speed</comment>
+        <translation>Άμεσα</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="163"/>
+        <source>Normal</source>
+        <comment>animation speed</comment>
+        <translation>Κανονική</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="164"/>
+        <source>Slow</source>
+        <comment>animation speed</comment>
+        <translation>Αργή</translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="171"/>
         <source>Install update</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="142"/>
+        <location filename="../qml/SettingsPage.qml" line="171"/>
         <source>Check for updates</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="146"/>
+        <location filename="../qml/SettingsPage.qml" line="175"/>
         <source>Global variables</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="147"/>
+        <location filename="../qml/SettingsPage.qml" line="176"/>
         <source>Shared by every macro and kept after restarts. Set them with the &quot;set global&quot; block.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="148"/>
+        <location filename="../qml/SettingsPage.qml" line="177"/>
         <source>None yet. The &quot;set global&quot; block makes one: a value every macro can read, kept after restarts.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="157"/>
-        <location filename="../qml/SettingsPage.qml" line="293"/>
+        <location filename="../qml/SettingsPage.qml" line="186"/>
+        <location filename="../qml/SettingsPage.qml" line="322"/>
         <source>Delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="162"/>
+        <location filename="../qml/SettingsPage.qml" line="191"/>
         <source>Replay welcome tour</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="170"/>
+        <location filename="../qml/SettingsPage.qml" line="199"/>
         <source>GLOBAL</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="183"/>
-        <location filename="../qml/SettingsPage.qml" line="208"/>
-        <location filename="../qml/SettingsPage.qml" line="221"/>
+        <location filename="../qml/SettingsPage.qml" line="212"/>
+        <location filename="../qml/SettingsPage.qml" line="237"/>
+        <location filename="../qml/SettingsPage.qml" line="250"/>
         <source>Press shortcut...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="183"/>
+        <location filename="../qml/SettingsPage.qml" line="212"/>
         <source>Not set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="188"/>
+        <location filename="../qml/SettingsPage.qml" line="217"/>
         <source>Default</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="197"/>
+        <location filename="../qml/SettingsPage.qml" line="226"/>
         <source>PER MACRO</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="205"/>
+        <location filename="../qml/SettingsPage.qml" line="234"/>
         <source>Macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="218"/>
+        <location filename="../qml/SettingsPage.qml" line="247"/>
         <source>Add hotkey</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="221"/>
+        <location filename="../qml/SettingsPage.qml" line="250"/>
         <source>Set combo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="222"/>
+        <location filename="../qml/SettingsPage.qml" line="251"/>
         <source>Add</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="229"/>
+        <location filename="../qml/SettingsPage.qml" line="258"/>
         <source>Block palette layout</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="229"/>
+        <location filename="../qml/SettingsPage.qml" line="258"/>
         <source>How the block sidebar is organized in the editor.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="233"/>
+        <location filename="../qml/SettingsPage.qml" line="262"/>
         <source>Category rail</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="233"/>
+        <location filename="../qml/SettingsPage.qml" line="262"/>
         <source>Chip strip</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="233"/>
+        <location filename="../qml/SettingsPage.qml" line="262"/>
         <source>Accordion</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="234"/>
+        <location filename="../qml/SettingsPage.qml" line="263"/>
         <source>Rail with flyout</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="234"/>
+        <location filename="../qml/SettingsPage.qml" line="263"/>
         <source>Tile grid</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="241"/>
+        <location filename="../qml/SettingsPage.qml" line="270"/>
         <source>Block library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="242"/>
+        <location filename="../qml/SettingsPage.qml" line="271"/>
         <source>Where My Blocks &gt; Browse finds shared blocks: the address of each library&apos;s index.json. Each pack is checked against the checksum its library lists before it&apos;s used.</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/SettingsPage.qml" line="254"/>
+        <location filename="../qml/SettingsPage.qml" line="283"/>
         <source>%n pack(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -5186,242 +5215,242 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="257"/>
+        <location filename="../qml/SettingsPage.qml" line="286"/>
         <source>Remove</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="263"/>
+        <location filename="../qml/SettingsPage.qml" line="292"/>
         <source>Add library</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="266"/>
+        <location filename="../qml/SettingsPage.qml" line="295"/>
         <source>Refresh</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="274"/>
+        <location filename="../qml/SettingsPage.qml" line="303"/>
         <source>TCP server stopped</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="274"/>
+        <location filename="../qml/SettingsPage.qml" line="303"/>
         <source>TCP server listening on port %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="275"/>
+        <location filename="../qml/SettingsPage.qml" line="304"/>
         <source>Allow local integrations to run Blockwork macros.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="277"/>
+        <location filename="../qml/SettingsPage.qml" line="306"/>
         <source>Start</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="277"/>
+        <location filename="../qml/SettingsPage.qml" line="306"/>
         <source>Stop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="279"/>
+        <location filename="../qml/SettingsPage.qml" line="308"/>
         <source>Start automatically</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="279"/>
+        <location filename="../qml/SettingsPage.qml" line="308"/>
         <source>Start the TCP server whenever Blockwork launches.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="280"/>
+        <location filename="../qml/SettingsPage.qml" line="309"/>
         <source>Start TCP server automatically</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="282"/>
+        <location filename="../qml/SettingsPage.qml" line="311"/>
         <source>Secrets</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="283"/>
+        <location filename="../qml/SettingsPage.qml" line="312"/>
         <source>Passwords and API keys macros can use with the &quot;secret&quot; block. They&apos;re kept in your system keyring, never in macro files, and show as dots in the run log.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="292"/>
+        <location filename="../qml/SettingsPage.qml" line="321"/>
         <source>Change</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="297"/>
+        <location filename="../qml/SettingsPage.qml" line="326"/>
         <source>Add secret...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="302"/>
+        <location filename="../qml/SettingsPage.qml" line="331"/>
         <source>Webhook server off</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="302"/>
+        <location filename="../qml/SettingsPage.qml" line="331"/>
         <source>Webhook server not running</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="302"/>
+        <location filename="../qml/SettingsPage.qml" line="331"/>
         <source>Webhook server listening on port %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="303"/>
+        <location filename="../qml/SettingsPage.qml" line="332"/>
         <source>Lets other programs and services start macros with a web request to a &quot;when webhook is called&quot; block. Only reachable from this computer.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="310"/>
+        <location filename="../qml/SettingsPage.qml" line="339"/>
         <source>On</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="322"/>
+        <location filename="../qml/SettingsPage.qml" line="351"/>
         <source>Send the token in an X-Blockwork-Token header (or ?token= in the address). For a block listening on &quot;hello&quot;:</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="329"/>
+        <location filename="../qml/SettingsPage.qml" line="358"/>
         <source>Copy example</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="330"/>
+        <location filename="../qml/SettingsPage.qml" line="359"/>
         <source>Copy token</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="331"/>
+        <location filename="../qml/SettingsPage.qml" line="360"/>
         <source>New token</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="334"/>
+        <location filename="../qml/SettingsPage.qml" line="363"/>
         <source>Command line</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="335"/>
+        <location filename="../qml/SettingsPage.qml" line="364"/>
         <source>Scripts and launchers can run macros by name: &quot;blockwork run &lt;name&gt;&quot; (add --wait to return when it ends), &quot;blockwork stop &lt;name&gt;&quot; and &quot;blockwork list&quot;.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="357"/>
+        <location filename="../qml/SettingsPage.qml" line="386"/>
         <source>Hotkey</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="358"/>
+        <location filename="../qml/SettingsPage.qml" line="387"/>
         <source>Run Macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="358"/>
+        <location filename="../qml/SettingsPage.qml" line="387"/>
         <source>Stop Macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="358"/>
+        <location filename="../qml/SettingsPage.qml" line="387"/>
         <source>Emergency Stop (pauses triggers)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="358"/>
+        <location filename="../qml/SettingsPage.qml" line="387"/>
         <source>Next Macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="358"/>
+        <location filename="../qml/SettingsPage.qml" line="387"/>
         <source>Previous Macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="358"/>
+        <location filename="../qml/SettingsPage.qml" line="387"/>
         <source>Start Recording (immediate)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="358"/>
+        <location filename="../qml/SettingsPage.qml" line="387"/>
         <source>Stop Recording</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="358"/>
+        <location filename="../qml/SettingsPage.qml" line="387"/>
         <source>Undo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="358"/>
+        <location filename="../qml/SettingsPage.qml" line="387"/>
         <source>Redo</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="363"/>
+        <location filename="../qml/SettingsPage.qml" line="392"/>
         <source>Checking for updates...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="364"/>
+        <location filename="../qml/SettingsPage.qml" line="393"/>
         <source>Blockwork %1 is available</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="365"/>
+        <location filename="../qml/SettingsPage.qml" line="394"/>
         <source>Blockwork is up to date</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="366"/>
+        <location filename="../qml/SettingsPage.qml" line="395"/>
         <source>Update check failed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="367"/>
+        <location filename="../qml/SettingsPage.qml" line="396"/>
         <source>Software updates</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="371"/>
+        <location filename="../qml/SettingsPage.qml" line="400"/>
         <source>Check for a new release of Blockwork.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="377"/>
+        <location filename="../qml/SettingsPage.qml" line="406"/>
         <source>Change &quot;%1&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="377"/>
+        <location filename="../qml/SettingsPage.qml" line="406"/>
         <source>Add a secret</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="384"/>
+        <location filename="../qml/SettingsPage.qml" line="413"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="385"/>
+        <location filename="../qml/SettingsPage.qml" line="414"/>
         <source>api token</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="386"/>
+        <location filename="../qml/SettingsPage.qml" line="415"/>
         <source>Value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="387"/>
+        <location filename="../qml/SettingsPage.qml" line="416"/>
         <source>Paste it here</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5462,22 +5491,22 @@
 <context>
     <name>WindowControls</name>
     <message>
-        <location filename="../qml/WindowControls.qml" line="29"/>
+        <location filename="../qml/WindowControls.qml" line="30"/>
         <source>Minimize</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/WindowControls.qml" line="32"/>
+        <location filename="../qml/WindowControls.qml" line="33"/>
         <source>Restore</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/WindowControls.qml" line="32"/>
+        <location filename="../qml/WindowControls.qml" line="33"/>
         <source>Maximize</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/WindowControls.qml" line="35"/>
+        <location filename="../qml/WindowControls.qml" line="36"/>
         <source>Close</source>
         <translation type="unfinished"></translation>
     </message>

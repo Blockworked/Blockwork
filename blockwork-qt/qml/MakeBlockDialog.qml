@@ -79,6 +79,17 @@ AppDialog {
     Popup {
         id: iconPopup
         parent: Overlay.overlay
+        enter: Transition {
+            enabled: Motion.enabled
+            ParallelAnimation {
+                NumberAnimation { property: "opacity"; from: 0; to: 1; duration: Motion.slow; easing.type: Easing.OutCubic }
+                NumberAnimation { property: "scale"; from: 0.94; to: 1; duration: Motion.slow; easing.type: Easing.OutCubic }
+            }
+        }
+        exit: Transition {
+            enabled: Motion.enabled
+            NumberAnimation { property: "opacity"; from: 1; to: 0; duration: Motion.normal; easing.type: Easing.InCubic }
+        }
         anchors.centerIn: parent
         modal: true
         focus: true
@@ -123,6 +134,7 @@ AppDialog {
                         anchors.margins: 3
                         radius: 6
                         color: tile.hovered ? "#414246" : Theme.field
+                        Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                         border.color: root.blockIcon === modelData ? Theme.accent : Theme.border
                         border.width: root.blockIcon === modelData ? 2 : 1
                     }
@@ -644,6 +656,7 @@ AppDialog {
                         background: Rectangle {
                             radius: 4
                             color: actionButton.hovered ? "#47484c" : "transparent"
+                            Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                         }
                     }
                 }
@@ -891,6 +904,7 @@ AppDialog {
                                                 background: Rectangle {
                                                     radius: 4
                                                     color: branchAction.hovered ? "#47484c" : "transparent"
+                                                    Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                                                 }
                                             }
                                         }
@@ -1233,6 +1247,8 @@ AppDialog {
                         radius: Theme.radius
                         color: parent.hovered ? "#3b3c40" : Theme.panelRaised
                         border.color: parent.hovered ? Theme.accent : Theme.border
+                        Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
+                        Behavior on border.color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                     }
                 }
             }

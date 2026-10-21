@@ -17,6 +17,7 @@ Row {
         signal activated()
         width: 34; height: 34; radius: 8
         color: hover.hovered ? (close ? "#e5484d" : "#3b3c40") : "transparent"
+        Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
         HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
         TapHandler { onTapped: control.activated() }
         LucideIcon { anchors.centerIn: parent; width: 16; height: 16; name: control.iconName; color: Theme.text }

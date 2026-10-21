@@ -784,6 +784,10 @@ impl Backend {
                 let language: String = arg(&args, "language")?;
                 to_json(commands::set_language(&self.state, &self.app, language)?)
             }
+            "set_animation_speed" => {
+                let speed: f64 = arg(&args, "speed")?;
+                to_json(commands::set_animation_speed(&self.state, &self.app, speed)?)
+            }
             "set_palette_layout" => {
                 let layout: String = arg(&args, "layout")?;
                 to_json(commands::set_palette_layout(

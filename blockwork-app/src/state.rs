@@ -181,6 +181,8 @@ pub(crate) struct StateDto {
     pub(crate) pack_review: Option<crate::block_library::PackReviewDto>,
     /// UI language code; empty follows the system.
     pub(crate) language: String,
+    /// UI animation duration multiplier; 0 is instant, 1 normal.
+    pub(crate) animation_speed: f64,
 }
 
 /// One macro as the library lists it.
@@ -1967,6 +1969,7 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         block_library: crate::block_library::dto(s),
         pack_review: s.pending_pack.as_ref().map(|p| p.review.clone()),
         language: crate::ui_language(),
+        animation_speed: crate::animation_speed(),
     }
 }
 

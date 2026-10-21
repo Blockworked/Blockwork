@@ -33,6 +33,15 @@ pub use blockwork_core::prompt;
 pub fn ui_language() -> String {
     blockwork_core::config::load_settings().language.unwrap_or_default()
 }
+
+/// The slowest animation speed Settings offers.
+pub(crate) const MAX_ANIMATION_SPEED: f64 = 3.0;
+
+/// The UI animation duration multiplier from Settings: 0 is instant, 1 normal.
+pub fn animation_speed() -> f64 {
+    let speed = blockwork_core::config::load_settings().animation_speed.unwrap_or(1.0);
+    if speed.is_finite() { speed.clamp(0.0, MAX_ANIMATION_SPEED) } else { 1.0 }
+}
 pub(crate) mod type_watch;
 pub(crate) mod window_watch;
 

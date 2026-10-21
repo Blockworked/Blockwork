@@ -4,7 +4,7 @@
 <context>
     <name>ActivityPanel</name>
     <message numerus="yes">
-        <location filename="../qml/ActivityPanel.qml" line="116"/>
+        <location filename="../qml/ActivityPanel.qml" line="124"/>
         <source>%n error(s)</source>
         <translation>
             <numerusform>%n error</numerusform>
@@ -15,7 +15,7 @@
 <context>
     <name>BlockCanvas</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1197"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1204"/>
         <source>%n item(s)</source>
         <translation>
             <numerusform>%n item</numerusform>
@@ -23,7 +23,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1241"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1248"/>
         <source>%n entry(s)</source>
         <translation>
             <numerusform>%n entry</numerusform>
@@ -34,7 +34,7 @@
 <context>
     <name>BlockLibrary</name>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="215"/>
+        <location filename="../qml/BlockLibrary.qml" line="216"/>
         <source>This macro already has %n block(s) from an earlier version. They&apos;re replaced, along with any changes you made to them; blocks that use them keep working.</source>
         <translation>
             <numerusform>This macro already has %n block from an earlier version. It&apos;s replaced, along with any changes you made to it; blocks that use it keep working.</numerusform>
@@ -42,7 +42,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="315"/>
+        <location filename="../qml/BlockLibrary.qml" line="316"/>
         <source>Saved %n block(s). Others can add them with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</source>
         <translation>
             <numerusform>Saved %n block. Others can add it with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</numerusform>
@@ -53,7 +53,7 @@
 <context>
     <name>EditorPage</name>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="646"/>
+        <location filename="../qml/EditorPage.qml" line="648"/>
         <source>Paused before &quot;%1&quot; (%n strand(s) waiting)</source>
         <translation>
             <numerusform>Paused before &quot;%1&quot; (%n strand waiting)</numerusform>
@@ -61,7 +61,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="766"/>
+        <location filename="../qml/EditorPage.qml" line="768"/>
         <source>Delete %n block(s)</source>
         <translation>
             <numerusform>Delete %n block</numerusform>
@@ -91,7 +91,7 @@
 <context>
     <name>PalettePanel</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="489"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="490"/>
         <source>%n block(s)</source>
         <translation>
             <numerusform>%n block</numerusform>
@@ -102,7 +102,7 @@
 <context>
     <name>SettingsPage</name>
     <message numerus="yes">
-        <location filename="../qml/SettingsPage.qml" line="254"/>
+        <location filename="../qml/SettingsPage.qml" line="283"/>
         <source>%n pack(s)</source>
         <translation>
             <numerusform>%n pack</numerusform>

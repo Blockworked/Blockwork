@@ -10,6 +10,7 @@ ApplicationWindow {
     id: root
     readonly property var request: { try { return JSON.parse(bridge.requestJson); } catch (e) { return ({}); } }
     readonly property string kind: request.kind || "message"
+    Binding { target: Motion; property: "durationScale"; value: root.request.animation_speed ?? 1 }
     width: 440
     height: Math.min(560, content.implicitHeight + 40)
     minimumWidth: 320
@@ -112,11 +113,13 @@ ApplicationWindow {
             clip: true; currentIndex: 0
             model: root.request.options || []
             ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
+            WheelPan { flickable: choices }
             delegate: Rectangle {
                 required property string modelData
                 required property int index
                 width: choices.width; height: 34; radius: 6
                 color: ListView.isCurrentItem ? "#1d3a55" : hover.hovered ? Theme.panelRaised : "transparent"
+                Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                 HoverHandler { id: hover }
                 Text { anchors.verticalCenter: parent.verticalCenter; x: 10; width: parent.width - 20; text: modelData; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 13 }
                 TapHandler { onTapped: choices.currentIndex = index; onDoubleTapped: root.answer("ok", modelData) }

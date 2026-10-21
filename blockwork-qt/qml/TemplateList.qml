@@ -21,6 +21,8 @@ GridLayout {
             Layout.preferredHeight: Math.max(92, cardContent.implicitHeight + 24)
             radius: 10; color: cardMouse.containsMouse ? "#30343b" : "#2a2b2f"
             border.color: cardMouse.containsMouse ? Theme.accent : "#3a3b3f"
+            Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
+            Behavior on border.color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
             RowLayout {
                 id: cardContent
                 anchors.fill: parent; anchors.margins: 12; spacing: 12

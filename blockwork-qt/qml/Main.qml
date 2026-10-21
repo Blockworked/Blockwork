@@ -57,6 +57,9 @@ ApplicationWindow {
     onUiLanguageChanged: sharedTranslator.setLanguage(uiLanguage)
     Translator { id: sharedTranslator }
 
+    // Every animation's duration scales with the Animation speed setting; 0 turns them off.
+    Binding { target: Motion; property: "durationScale"; value: root.appState.animation_speed ?? 1 }
+
     function invoke(command, args) {
         bridge.invokeCommand(command, JSON.stringify(args || {}));
     }
@@ -163,9 +166,13 @@ ApplicationWindow {
             }
         }
         Loader {
+            id: pageLoader
             anchors.fill: parent
             sourceComponent: root.appState.onboarding_done === false ? onboardingComponent
                 : root.appState.page === "Settings" ? settingsComponent : editorComponent
+            // A new page fades in instead of snapping over the old one.
+            onLoaded: if (Motion.enabled) pageFade.restart()
+            NumberAnimation { id: pageFade; target: pageLoader.item; property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
         }
     }
     Rectangle {

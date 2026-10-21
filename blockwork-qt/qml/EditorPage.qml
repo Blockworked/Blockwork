@@ -505,12 +505,14 @@ Item {
                 BwButton {
                     iconName: "panel-left"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro
                     ToolTip.visible: hovered; ToolTip.text: root.sidebarCollapsed ? qsTr("Show sidebar") : qsTr("Hide sidebar")
-                    onClicked: { root.sidebarToggling = true; root.sidebarCollapsed = !root.sidebarCollapsed; }
+                    onClicked: { root.sidebarToggling = Motion.enabled; root.sidebarCollapsed = !root.sidebarCollapsed; }
                 }
                 Rectangle {
                     id: libraryButton
                     Layout.preferredWidth: Math.max(110, Math.min(240, toolbar.width * 0.2)); Layout.preferredHeight: 34
                     radius: Theme.radius; color: libraryHover.hovered ? "#3b3c40" : Theme.panelRaised; border.color: library.visible ? Theme.accent : Theme.border
+                    Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
+                    Behavior on border.color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                     Accessible.role: Accessible.Button; Accessible.name: qsTr("Macro library")
                     RowLayout {
                         anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 8; spacing: 7
@@ -696,7 +698,7 @@ Item {
                     // Animate only the collapse toggle, not drag-resizing.
                     Behavior on Layout.preferredWidth {
                         enabled: root.sidebarToggling
-                        NumberAnimation { duration: 140; easing.type: Easing.OutCubic; onRunningChanged: if (!running) root.sidebarToggling = false }
+                        NumberAnimation { duration: Motion.normal; easing.type: Easing.OutCubic; onRunningChanged: if (!running) root.sidebarToggling = false }
                     }
                 PalettePanel {
                     id: palette
@@ -857,7 +859,9 @@ Item {
                 activeFrom: condFrom.text, activeUntil: condUntil.text, activeDays: days === undefined ? (settings.active_days || 0) : days });
         }
         Flickable {
+        id: macroSettingsFlick
         implicitWidth: 380; implicitHeight: Math.min(settingsColumn.implicitHeight, root.height - 190)
+        WheelPan { flickable: macroSettingsFlick }
         contentHeight: settingsColumn.implicitHeight; clip: true; boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
         Column { id: settingsColumn; spacing: 14; width: 360
@@ -1175,8 +1179,10 @@ Item {
                 text: qsTr("No USB devices are plugged in. Plug one in and it shows up here."); color: Theme.textDim; font.pixelSize: 12 }
             ScrollView {
                 visible: usbDialog.devices.length > 0
+                id: usbScroll
                 width: 460; height: Math.min(usbList.implicitHeight, 300); clip: true
                 contentWidth: availableWidth
+                WheelPan { flickable: usbScroll.contentItem }
                 Column { id: usbList; width: 460; spacing: 8
                     Repeater {
                         model: usbDialog.devices
@@ -1218,6 +1224,7 @@ Item {
             contentWidth: availableWidth
             clip: true
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            WheelPan { flickable: templateScroll.contentItem }
             TemplateList {
                 id: templateList
                 width: templateScroll.availableWidth
