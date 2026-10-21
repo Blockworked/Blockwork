@@ -82,6 +82,7 @@
           <li>Global variables, secrets kept in the system keyring, and macros that run other macros</li>
           <li>A searchable macro library, shareable bundles and block packs, with a permission review on import</li>
           <li>A translatable interface, a command line, and starter templates</li>
+          <li>Smooth animations and scrolling, with an animation speed setting from instant to slow</li>
         </ul>
       </description>
     </release>

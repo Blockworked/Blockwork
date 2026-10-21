@@ -10,14 +10,6 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ## [Unreleased]
 
-### Added
-- UI animations: menus and drop-downs fade and grow open, dialogs ease in over a fading backdrop, and buttons, switches, check boxes and list rows ease between hover and pressed states. Panels like the sidebar and run log slide open and shut, and pages and Settings tabs fade in.
-- Smooth scrolling: a mouse wheel notch glides to its spot instead of jumping, in the editor canvas, the block palette, Settings and the other scrolling lists. Jumping to a block from the run log glides there too.
-- Settings > General > Animation speed, a slider from Instant to Slow. Instant turns every animation off.
-
-### Fixed
-- A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
-
 ## [0.6.0] - 2026-10-21
 
 ### Added
@@ -114,6 +106,9 @@ section below as the GitHub release notes, followed by the downloads table.
   - Translation happens on Weblate.
 - Command line: `blockwork list`, `blockwork run <name> [--wait]` and `blockwork stop <name>` drive macros through the daemon without a window.
 - Starter templates (auto clicker, text snippet, break reminder, website watcher) in the welcome screen and the macro menu's "New from template".
+- UI animations: menus and drop-downs fade and grow open, dialogs ease in over a fading backdrop, and buttons, switches, check boxes and list rows ease between hover and pressed states. Panels like the sidebar and run log slide open and shut, and pages and Settings tabs fade in.
+- Smooth scrolling: a mouse wheel notch glides to its spot instead of jumping, in the editor canvas, the block palette, Settings and the other scrolling lists. Jumping to a block from the run log glides there too.
+- Settings > General > Animation speed, a slider from Instant to Slow. Instant turns every animation off.
 
 ### Changed
 - Macro files now carry a format version and are upgraded step by step when
@@ -129,6 +124,7 @@ section below as the GitHub release notes, followed by the downloads table.
 ### Fixed
 - On Linux, evdev waits for held keys and mouse buttons to be released before
   grabbing an input device, preventing stuck input when Blockwork starts.
+- A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
 
 ## [0.5.4] - 2026-09-20
 
