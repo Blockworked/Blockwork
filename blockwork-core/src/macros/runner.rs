@@ -1797,10 +1797,19 @@ fn run_block(
                             continue;
                         }
                     };
-                    let keys: Vec<MacroKey> = crate::input::key_names::parse_key_combo(&text)
+                    let mut keys: Vec<MacroKey> = crate::input::key_names::parse_key_combo(&text)
                         .into_iter()
                         .map(normalize_modifier_key)
                         .collect();
+                    // In a combo, `Control+A` means the A key; Shift is
+                    // added only when the combo names it.
+                    if keys.len() > 1 {
+                        for key in &mut keys {
+                            if let MacroKey::Unicode(c) = key {
+                                *c = c.to_ascii_lowercase();
+                            }
+                        }
+                    }
                     if keys.is_empty() {
                         soft_fail(ctx, &ins.id, "Key", format!("no key in '{text}'"))?;
                         continue;
@@ -3596,6 +3605,37 @@ mod tests {
         assert_eq!(errors.len(), 1);
         assert_eq!(errors[0].block_id, first.id);
         assert!(errors[0].message.contains("input emulation isn't available"), "{}", errors[0].message);
+    }
+
+    #[test]
+    fn combo_letters_dont_add_shift() {
+        #[derive(Default)]
+        struct Keys(Arc<Mutex<Vec<(MacroKey, Direction)>>>);
+        impl InputBackend for Keys {
+            fn key(&mut self, key: MacroKey, dir: Direction) -> Result<(), String> {
+                self.0.lock().unwrap().push((key, dir));
+                Ok(())
+            }
+            fn raw_keycode(&mut self, _: u16, _: Direction) -> Result<(), String> { Ok(()) }
+            fn button(&mut self, _: MacroButton, _: Direction) -> Result<(), String> { Ok(()) }
+            fn move_mouse_rel(&mut self, _: i32, _: i32) -> Result<(), String> { Ok(()) }
+            fn move_mouse_abs(&mut self, _: i32, _: i32) -> Result<(), String> { Ok(()) }
+            fn scroll(&mut self, _: i32, _: Axis) -> Result<(), String> { Ok(()) }
+            fn text(&mut self, _: &str) -> Result<(), String> { Ok(()) }
+            fn cursor_pos(&self) -> Option<(i32, i32)> { None }
+        }
+        let keys = Keys::default();
+        let seen = Arc::clone(&keys.0);
+        run_instructions(
+            vec![Instruction::new(InstructionKind::Token(InputToken::Key(Value::text("Control+A"), Direction::Click)))],
+            Arc::new(Mutex::new(keys)),
+            None,
+            1.0,
+            empty_vars(),
+        );
+        let seen = seen.lock().unwrap();
+        assert_eq!(seen.len(), 4);
+        assert_eq!(seen[1], (MacroKey::Unicode('a'), Direction::Press));
     }
 
     #[test]
