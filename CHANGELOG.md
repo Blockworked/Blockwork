@@ -10,6 +10,9 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ## [Unreleased]
 
+### Fixed
+- A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
+
 ## [0.6.0] - 2026-10-21
 
 ### Added
