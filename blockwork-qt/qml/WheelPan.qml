@@ -10,12 +10,9 @@ WheelHandler {
     orientation: Qt.Horizontal | Qt.Vertical
     target: null
 
-    // Touchpads send pixelDelta, a scroll phase or come from a touchpad device; a mouse
-    // wheel sends none of those, only angleDelta in steps of 120 per notch (less on hi-res wheels).
-    function isTouchpad(event) {
-        return event.pixelDelta.x !== 0 || event.pixelDelta.y !== 0 || event.phase !== Qt.NoScrollPhase
-            || (event.device && event.device.type === PointerDevice.TouchPad);
-    }
+    // See SmoothScroll.isTouchpad: a scroll phase or a touchpad device, never pixelDelta,
+    // which mouse wheels send too on Wayland and with libinput on X11.
+    function isTouchpad(event) { return smooth.isTouchpad(event); }
 
     // Wheel: Qt's own Flickable step (wheelScrollLines * 24 px per notch), no acceleration.
     // Touchpad pixelDelta is truncated to ints; angleDelta has the real resolution (~12 per px).
