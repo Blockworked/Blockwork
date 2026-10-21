@@ -88,8 +88,15 @@ Item {
             const ghost = all(page).find(o => o.isValueChip && o.valueData && o.valueData.name === data.name && !o.paletteMode && !o.location);
             verify(!!ghost);
             compare(ghost.refColor, Qt.color("#51b84b"));
-            mouseMove(scene, 1000, 550, 20);
-            mouseRelease(scene, 1000, 550);
+            verify(ghost.dragPreview);
+            const outline = all(ghost).find(o => o.edge !== undefined);
+            verify(!!outline);
+            compare(outline.edge, Qt.color("#51b84b"));
+            const cursor = all(page).find(o => o.objectName === "dragCursor");
+            verify(cursor.visible);
+            compare(cursor.cursorShape, Qt.ClosedHandCursor);
+            mouseMove(scene, 1000, 700, 20);
+            mouseRelease(scene, 1000, 700);
             compare(page.paletteDrag, null);
             const created = scene.calls.filter(c => c.command === "create_floating_value");
             compare(created.length, 1);
@@ -113,16 +120,64 @@ Item {
         }
         function test_floating_parameter_color() {
             const page = editor();
-            const chip = all(page).find(o => o.isValueChip && o.originBlockId === "custom");
+            const chip = all(page).find(o => o.isValueChip && o.originBlockId === "custom" && o.location && o.location.kind === "Floating" && o.valueData.kind === "Param");
             verify(!!chip);
             compare(chip.refColor, Qt.color("#51b84b"));
+        }
+        function canvas(page) {
+            return all(page).find(o => typeof o.parameterOrigin === "function");
+        }
+        function dragExisting(chip) {
+            const at = chip.mapToItem(scene, chip.width / 2, chip.height / 2);
+            mousePress(scene, at.x, at.y);
+            mouseMove(scene, at.x + 80, at.y + 80, 20);
+        }
+        function test_second_drag_keeps_color() {
+            const page = editor();
+            const floating = all(page).find(o => o.isValueChip && o.location && o.location.floating_id === "param");
+            verify(!!floating);
+            dragExisting(floating);
+            verify(canvas(page).dragIsValue);
+            const ghost = all(page).find(o => o.isValueChip && o.dragPreview && o.valueData && o.valueData.kind === "Param" && !o.location);
+            verify(!!ghost);
+            compare(ghost.refColor, Qt.color("#51b84b"));
+            compare(canvas(page).dragValueOrigin, "custom");
+            mouseRelease(scene, 1000, 700);
+        }
+        function test_field_and_nested_parameter_color_data() {
+            return [{tag:"field",nested:false}, {tag:"nested expression",nested:true}];
+        }
+        function test_field_and_nested_parameter_color(data) {
+            const page = editor();
+            const state = JSON.parse(JSON.stringify(page.appState));
+            state.current_macro.strands[0].instructions[1].duration = data.nested
+                ? {kind:"Op",op:"Add",args:[{kind:"Param",name:"gain"},{kind:"Var",name:"ordinary"}]}
+                : {kind:"Param",name:"gain"};
+            page.appState = state;
+            wait(50);
+            const param = all(page).find(o => o.isValueChip && o.location && o.location.strand_id === "definition" && o.valueData && o.valueData.kind === "Param");
+            verify(!!param);
+            compare(param.originBlockId, "custom");
+            compare(param.refColor, Qt.color("#51b84b"));
+            const variable = all(page).find(o => o.isValueChip && o.location && o.valueData && o.valueData.kind === "Var" && o.valueData.name === "ordinary");
+            if (data.nested) { verify(!!variable); compare(variable.refColor, Theme.accent); }
+            dragExisting(param);
+            compare(canvas(page).dragValue.kind, "Param");
+            const ghost = all(page).find(o => o.isValueChip && o.dragPreview && o.valueData && o.valueData.kind === "Param" && !o.location);
+            verify(!!ghost);
+            compare(ghost.refColor, Qt.color("#51b84b"));
+            mouseMove(scene, 1000, 700, 20);
+            mouseRelease(scene, 1000, 700);
+            const created = scene.calls.filter(c => c.command === "create_floating_value");
+            compare(created.length, 1);
+            compare(created[0].args.originBlockId, "custom");
         }
         function test_cancel() {
             const page = editor();
             const chip = parameter(page, "gain");
             startDrag(page, chip);
             page.cancelPaletteDrag();
-            mouseRelease(scene, 1000, 550);
+            mouseRelease(scene, 1000, 700);
             compare(page.paletteDrag, null);
             compare(scene.calls.filter(c => c.command === "create_floating_value" || c.command === "put_value").length, 0);
         }

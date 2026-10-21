@@ -809,7 +809,7 @@ Item {
                     onValueEdited: (location, text) => root.invoke("edit_value_field", { location: location, text: text })
                     onValueTakeRequested: location => root.invoke("take_value", { location: location })
                     onValuePutRequested: (location, value) => root.invoke("put_value", { location: location, value: value })
-                    onValueCreateRequested: (x, y, value) => root.invoke("create_floating_value", { x: x, y: y, value: value, originBlockId: null })
+                    onValueCreateRequested: (x, y, value, originBlockId) => root.invoke("create_floating_value", { x: x, y: y, value: value, originBlockId: originBlockId || null })
                     onValueDragOutside: (location, value, sx, sy) => root.trashDraggedValue(location, value, sx, sy)
                     onCommentForInstructionRequested: instruction => {
                         const existing = (root.macro && root.macro.comments || []).find(c => c.attached_to === instruction.id);
@@ -1859,6 +1859,13 @@ Item {
         onSelected: app => root.applyPickedApp(app)
     }
 
+    MouseArea {
+        objectName: "dragCursor"
+        anchors.fill: parent; z: 501
+        visible: root.paletteDrag !== null || canvas.dragging
+        acceptedButtons: Qt.NoButton
+        cursorShape: Qt.ClosedHandCursor
+    }
     // Follows the pointer while a palette entry is dragged.
     Item {
         id: ghostLayer
@@ -1889,6 +1896,7 @@ Item {
                 scale: canvas.zoom; transformOrigin: Item.TopLeft
                 sourceComponent: ValueChip {
                     valueData: canvas.dragValue; boxed: true; editable: false
+                    originBlockId: canvas.dragValueOrigin; dragPreview: true
                     blockDefinitions: root.macro ? root.macro.block_defs : []
                 }
             }
@@ -1913,7 +1921,7 @@ Item {
                 id: ghostValue
                 active: ghost.visible && !!ghost.spec && ghost.spec.kind === "value"
                 sourceComponent: ValueChip {
-                    valueData: ghost.spec.value; boxed: true; editable: false
+                    valueData: ghost.spec.value; boxed: true; editable: false; dragPreview: true
                     referenceColor: ghost.spec.color || Theme.accent
                     forceBoolean: !!ghost.spec.forceBoolean; callDisplayLabel: ghost.spec.label || qsTr("custom block")
                     blockDefinitions: root.macro ? root.macro.block_defs : []
