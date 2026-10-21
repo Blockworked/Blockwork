@@ -62,13 +62,16 @@ pub(crate) fn start(state: &SharedState, app: &AppHandle, id: &str, reason: &str
     };
     let thread_name = format!("called_{}", mac.name);
     let done = Arc::new(AtomicBool::new(false));
+    // Registered before the thread starts, so the macro already counts as
+    // running when this returns (`blockwork run --wait` polls for that).
+    let run_flag = run_registry::begin_macro_run(&mac.id);
     let task = {
         let (done, state, app, reason) = (Arc::clone(&done), Arc::clone(state), app.clone(), reason.to_string());
+        let run_flag = Arc::clone(&run_flag);
         move || {
             let id = mac.id.clone();
             let source = run_log::Source::for_macro(&mac.id, &mac.name);
             run_log::run_event(&source, run_log::RunEvent::Started, reason);
-            let run_flag = run_registry::begin_macro_run(&mac.id);
             let limit = scheduled_run::limit_run(&source, &run_flag, mac.settings.max_run_secs);
             mac.run_with_lists(emulator, Some(Arc::clone(&run_flag)), speed, Arc::clone(&variables), Arc::clone(&lists));
             limit.store(true, Ordering::Relaxed);
@@ -83,7 +86,10 @@ pub(crate) fn start(state: &SharedState, app: &AppHandle, id: &str, reason: &str
             done.store(true, Ordering::Relaxed);
         }
     };
-    macros_thread::spawn_macro_thread(&mut s.thread_pool, thread_name, task)?;
+    if let Err(e) = macros_thread::spawn_macro_thread(&mut s.thread_pool, thread_name, task) {
+        run_registry::end_run(&run_flag);
+        return Err(e);
+    }
     Ok(done)
 }
 

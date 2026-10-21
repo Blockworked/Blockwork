@@ -59,8 +59,7 @@ async fn run(args: &[String]) -> io::Result<()> {
             let mut daemon = Daemon::connect().await?;
             daemon.call("run_macro_named", json!({ "name": name })).await?;
             if args.iter().any(|a| a == "--wait") {
-                // Give the run a moment to register before polling for its end.
-                tokio::time::sleep(Duration::from_millis(100)).await;
+                // The daemon counts the run as running before it answers.
                 while daemon.list().await?.iter().any(|m| {
                     m["running"] == true && m["name"].as_str().is_some_and(|n| n.eq_ignore_ascii_case(name.trim()))
                 }) {
