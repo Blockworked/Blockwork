@@ -170,7 +170,7 @@ function run(argv) {
     };
     let output = std::process::Command::new("osascript").args(["-l", "JavaScript", "-e", SCRIPT]).arg(&file.0).output();
     Some(match output {
-        Ok(out) if out.status.success() => Ok(rows(&String::from_utf8_lossy(&out.stdout))),
+        Ok(out) if out.status.success() => Ok(String::from_utf8_lossy(&out.stdout).trim_end().to_owned()),
         Ok(out) => Err(format!("macOS text recognition failed: {}", String::from_utf8_lossy(&out.stderr).trim())),
         Err(e) => Err(format!("couldn't run macOS text recognition: {e}")),
     })
