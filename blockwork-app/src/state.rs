@@ -276,6 +276,13 @@ pub(crate) struct BlockDefinitionDto {
     pub(crate) definition: BlockDef,
     pub(crate) read_only: bool,
     pub(crate) pack_name: String,
+    pub(crate) packs: Vec<BlockPackMembershipDto>,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct BlockPackMembershipDto {
+    pub(crate) id: String,
+    pub(crate) name: String,
 }
 
 /// Wire shape for `MacroSettings` - see there for field meanings.
@@ -1760,6 +1767,8 @@ fn macro_to_dto(mac: &Macro) -> MacroDto {
                 definition,
                 read_only: pack.is_some(),
                 pack_name: pack.map(|p| p.name.clone()).unwrap_or_default(),
+                packs: mac.settings.block_packs.iter().filter(|pack| pack.blocks.contains(&def.id))
+                    .map(|pack| BlockPackMembershipDto { id: pack.id.clone(), name: pack.name.clone() }).collect(),
             }
         }).collect(),
         settings: macro_settings_to_dto(&mac.settings),
@@ -2066,6 +2075,8 @@ mod tests {
         let json = serde_json::to_value(&dto).unwrap();
         assert_eq!(json["block_defs"][0]["id"], id);
         assert_eq!(json["block_defs"][0]["read_only"], true);
+        assert_eq!(json["block_defs"][0]["packs"][0]["id"], "timing");
+        assert_eq!(json["block_defs"][0]["packs"][0]["name"], "Timing");
         assert!(mac.block_body(&id).is_some());
         assert!(!serde_json::to_string(&dto).unwrap().contains("Hidden implementation note"));
     }

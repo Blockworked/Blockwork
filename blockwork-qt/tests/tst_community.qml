@@ -12,8 +12,8 @@ Item {
     function invoke(command, args) { invoked = command; scene.args = args; }
     property var definitions: [
         {id:"local",identifier:"Local",shape:"Normal",pieces:[{kind:"Label",text:"local block"}],read_only:false},
-        {id:"community",identifier:"Alice_Community",shape:"Normal",pieces:[{kind:"Label",text:"community block"}],read_only:true,pack_name:"Example"},
-        {id:"reporter",identifier:"Alice_Reporter",shape:"ReturnsValue",pieces:[{kind:"Label",text:"community reporter"}],read_only:true,pack_name:"Example"}
+        {id:"community",identifier:"Alice_Community",shape:"Normal",pieces:[{kind:"Label",text:"community block"}],read_only:true,pack_name:"Command helpers",packs:[{id:"commands",name:"Command helpers"},{id:"text",name:"Text helpers"}]},
+        {id:"reporter",identifier:"Alice_Reporter",shape:"ReturnsValue",pieces:[{kind:"Label",text:"community reporter"}],read_only:true,pack_name:"Text helpers",packs:[{id:"text",name:"Text helpers"}]}
     ]
     property var pack: ({key:"example#pack",id:"pack",name:"Example pack",version:"1.0",description:"An example pack",author:"Alice",blocks:["community block"],installed:"1.0",available:false,update:false,official:false})
     QtObject {
@@ -59,6 +59,46 @@ Item {
                 compare(community.item.extraMenu[0].id, "details");
             }
             verify(!all(palette).some(o => o.modelData && o.modelData.id === "local" && o.item && o.visible));
+        }
+        function test_community_pack_sections_and_search() {
+            palette.category = "community";
+            palette.searchText = "";
+            wait(50);
+            compare(palette.communityPacks.length, 2);
+            compare(palette.communityPacks[0].blocks.length, 1);
+            compare(palette.communityPacks[1].blocks.length, 2);
+            let headings = all(palette).filter(o => o.objectName === "communityPackHeading" && o.visible);
+            compare(headings.map(o => o.text).join(","), "Command helpers,Text helpers");
+            palette.searchText = "reporter";
+            wait(50);
+            headings = all(palette).filter(o => o.objectName === "communityPackHeading" && o.visible);
+            compare(headings.length, 1);
+            compare(headings[0].text, "Text helpers");
+            palette.searchText = "Command helpers";
+            wait(50);
+            verify(!palette.noResults);
+            headings = all(palette).filter(o => o.objectName === "communityPackHeading" && o.visible);
+            compare(headings.length, 1);
+            compare(headings[0].text, "Command helpers");
+            verify(all(palette).some(o => o.modelData && o.modelData.id === "community" && o.item && o.visible));
+            palette.searchText = "";
+        }
+        function test_rail_labels_stay_inside_the_rail() {
+            let label = all(palette).find(o => o.objectName === "paletteCategoryLabel" && o.text === "Community");
+            verify(!!label);
+            verify(!label.truncated);
+            verify(label.mapToItem(palette, 0, 0).x >= 0);
+            verify(label.mapToItem(palette, label.width, 0).x <= palette.railWidth);
+            const longName = "An extraordinarily long translated category";
+            palette.appCategories = [{id:"long", name:longName, icon:"info"}];
+            wait(50);
+            label = all(palette).find(o => o.objectName === "paletteCategoryLabel" && o.text === longName);
+            verify(!!label);
+            verify(label.truncated);
+            compare(label.elide, Text.ElideRight);
+            verify(label.mapToItem(palette, 0, 0).x >= 0);
+            verify(label.mapToItem(palette, label.width, 0).x <= palette.railWidth);
+            palette.appCategories = [];
         }
         function test_library_updates_keep_remove_on_the_card() {
             scene.pack = Object.assign({}, scene.pack, { available: true, update: true });
