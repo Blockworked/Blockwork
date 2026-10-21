@@ -3124,6 +3124,8 @@ fn run_macro_task(
         let playback_guard = blockwork_core::macros::run_registry::begin_run();
         #[cfg(windows)]
         blockwork_core::macros::backend::windows::prepare_for_macro_execution(&prep_backend);
+        #[cfg(not(windows))]
+        blockwork_core::macros::backend::release_held_modifiers();
         task();
         blockwork_core::macros::run_registry::end_run(&playback_guard);
     });

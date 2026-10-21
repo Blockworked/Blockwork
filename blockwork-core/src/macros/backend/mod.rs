@@ -110,6 +110,23 @@ impl InputBackend for UnavailableBackend {
     }
 }
 
+/// Releases modifier keys the user is physically holding, so a macro started
+/// by a hotkey or key trigger doesn't type with the trigger's Ctrl/Alt/Shift
+/// still down. Linux only; Windows does this in `prepare_for_macro_execution`.
+pub fn release_held_modifiers() {
+    release_held_keys(&[]);
+}
+
+/// `release_held_modifiers`, plus `keys` if they're held: a key trigger's own
+/// key is still down when its macro starts, and typing that letter again
+/// while it's held does nothing.
+pub fn release_held_keys(keys: &[MacroKey]) {
+    #[cfg(target_os = "linux")]
+    evdev::release_held_keys(keys);
+    #[cfg(not(target_os = "linux"))]
+    let _ = keys;
+}
+
 /// Whether this is a Wayland session, where absolute recording tracks the
 /// cursor rather than querying it (see `cursor_track`).
 pub fn is_wayland_session() -> bool {

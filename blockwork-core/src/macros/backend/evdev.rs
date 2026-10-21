@@ -29,6 +29,40 @@ static LIBEI_AVAILABLE: AtomicBool = AtomicBool::new(false);
 /// plain re-emitted motion instead of a frozen cursor.
 static DRIVE_FAILED: AtomicBool = AtomicBool::new(false);
 
+/// Keys the desktop currently sees down because their press was re-emitted.
+static PASSED_DOWN: Mutex<Vec<u16>> = Mutex::new(Vec::new());
+
+const MODIFIERS: [KeyCode; 8] = [
+    KeyCode::KEY_LEFTCTRL,
+    KeyCode::KEY_RIGHTCTRL,
+    KeyCode::KEY_LEFTSHIFT,
+    KeyCode::KEY_RIGHTSHIFT,
+    KeyCode::KEY_LEFTALT,
+    KeyCode::KEY_RIGHTALT,
+    KeyCode::KEY_LEFTMETA,
+    KeyCode::KEY_RIGHTMETA,
+];
+
+/// See `super::release_held_keys`. The physical release still gets
+/// re-emitted later; the kernel drops a release for a key that isn't down.
+pub(super) fn release_held_keys(keys: &[MacroKey]) {
+    let extra: Vec<u16> = keys.iter().filter_map(macro_key_to_evdev).map(|(code, _)| code.0).collect();
+    let release = |c: &u16| MODIFIERS.iter().any(|m| m.0 == *c) || extra.contains(c);
+    let held: Vec<u16> = match PASSED_DOWN.lock() {
+        Ok(mut down) => {
+            let held = down.iter().copied().filter(release).collect();
+            down.retain(|c| !release(c));
+            held
+        }
+        Err(_) => return,
+    };
+    for code in held {
+        if let Err(e) = emit_key(KeyCode(code), false) {
+            warn!("Failed to release held modifier {code}: {e}");
+        }
+    }
+}
+
 pub(super) fn libei_available() -> bool {
     LIBEI_AVAILABLE.load(Ordering::Relaxed)
 }
@@ -1074,6 +1108,15 @@ fn spawn_touchpad_reader(mut device: evdev::Device, tx: std::sync::mpsc::SyncSen
 fn reemit(vd: &'static Mutex<VirtualDevice>, events: &[InputEvent]) {
     if events.is_empty() {
         return;
+    }
+    if let Ok(mut down) = PASSED_DOWN.lock() {
+        for event in events.iter().filter(|e| e.event_type() == EventType::KEY) {
+            match event.value() {
+                1 if !down.contains(&event.code()) => down.push(event.code()),
+                0 => down.retain(|c| *c != event.code()),
+                _ => {}
+            }
+        }
     }
     let mut all: Vec<InputEvent> = Vec::with_capacity(events.len() + 1);
     all.extend_from_slice(events);

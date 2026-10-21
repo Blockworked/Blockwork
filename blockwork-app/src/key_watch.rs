@@ -49,6 +49,7 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
         let state_for_match = if event.pressed { &held } else { &before };
 
         let mut fires = Vec::new();
+        let mut trigger_keys: Vec<MacroKey> = Vec::new();
         let emulator;
         let speed_multiplier;
         {
@@ -77,11 +78,15 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
                     if combo.is_empty() || !combo.contains(&key) || !combo_matches(&combo, state_for_match) {
                         continue;
                     }
+                    trigger_keys.extend(combo);
                     fires.push((mac.id.clone(), strand.instructions[1..].to_vec(), mac.variables.clone(), mac.lists.clone()));
                 }
             }
         }
 
+        if !fires.is_empty() {
+            blockwork_core::macros::backend::release_held_keys(&trigger_keys);
+        }
         for (macro_id, body, variables, lists) in fires {
             scheduled_run::fire(macro_id, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
         }
