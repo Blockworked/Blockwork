@@ -61,10 +61,11 @@ fn load_own_macro_file(path: &Path) -> Result<Macro, String> {
     let (mac, upgrade) = read_macro_file_upgrading(path)?;
     if upgrade.changed() {
         if !upgrade.notes.is_empty() {
-            let backup = path.with_extension(format!("{MACRO_FILE_EXTENSION}.v{}.bak", upgrade.from));
-            if !backup.exists()
-                && let Err(e) = fs::copy(path, &backup)
-            {
+            // A fresh backup every time: a file can be salvaged more than
+            // once (opened in an older build, edited in a newer one, opened
+            // in the older one again), and each time loses different blocks.
+            let backup = unused_backup_path(path, upgrade.from);
+            if let Err(e) = fs::copy(path, &backup) {
                 warn!("Failed to back up '{}' before upgrading it: {e}", path.display());
                 return Ok(mac);
             }
@@ -78,6 +79,18 @@ fn load_own_macro_file(path: &Path) -> Result<Macro, String> {
         }
     }
     Ok(mac)
+}
+
+/// `<file>.v<N>.bak`, or `<file>.v<N>.<k>.bak` for the first `k` not taken.
+fn unused_backup_path(path: &Path, from: u64) -> PathBuf {
+    let first = path.with_extension(format!("{MACRO_FILE_EXTENSION}.v{from}.bak"));
+    if !first.exists() {
+        return first;
+    }
+    (2..)
+        .map(|k| path.with_extension(format!("{MACRO_FILE_EXTENSION}.v{from}.{k}.bak")))
+        .find(|p| !p.exists())
+        .expect("an unused backup name")
 }
 
 /// Reads and parses the single macro file for `id` directly, without
@@ -316,6 +329,34 @@ mod tests {
         write_macro_file(&single, &a).unwrap();
         let read = read_import_file(&single).unwrap();
         assert_eq!((read.name.as_str(), read.macros.len()), ("A", 1));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn every_salvage_keeps_its_own_backup() {
+        let dir = std::env::temp_dir().join(format!("bw-salvage-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("m.json");
+        let with_unknown = |text: &str| {
+            let mut value = serde_json::to_value(Macro::new("M".into(), String::new(), Vec::new())).unwrap();
+            value["strands"] = serde_json::json!([{ "id": "s", "x": 0, "y": 0, "instructions": [
+                { "id": "a", "kind": "WhenRan" },
+                { "id": "b", "kind": { "BlockFromTheFuture": text } },
+            ] }]);
+            fs::write(&path, value.to_string()).unwrap();
+        };
+        with_unknown("first");
+        load_own_macro_file(&path).unwrap();
+        with_unknown("second");
+        load_own_macro_file(&path).unwrap();
+        let backups: Vec<String> = fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok()?.file_name().into_string().ok())
+            .filter(|n| n.ends_with(".bak"))
+            .map(|n| fs::read_to_string(dir.join(n)).unwrap())
+            .collect();
+        assert_eq!(backups.len(), 2);
+        assert!(backups.iter().any(|b| b.contains("first")) && backups.iter().any(|b| b.contains("second")));
         let _ = fs::remove_dir_all(&dir);
     }
 }
