@@ -3,6 +3,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Dialogs
 import QtQuick.Layouts
+import BlockworkStyle as Editing
 import com.blockworked.Blockstitch 1.0
 import com.blockworked.Blockwork 1.0
 
@@ -434,7 +435,7 @@ Item {
         const at = canvas.workspacePoint(sx, sy);
         if (!at) return;
         const x = Math.round(at.x - drag.offsetX / canvas.zoom), y = Math.round(at.y - drag.offsetY / canvas.zoom);
-        if (spec.kind === "value") { root.invoke("create_floating_value", { x: x, y: y, value: spec.value, originBlockId: null }); return; }
+        if (spec.kind === "value") { root.invoke("create_floating_value", { x: x, y: y, value: spec.value, originBlockId: spec.originBlockId || null }); return; }
         // Attach into the previewed gap when one is showing, else park as a
         // new detached strand - mirrors the webapp palette drop.
         if (snapValid && snapTargetId) {
@@ -807,6 +808,10 @@ Item {
                     onInstructionDuplicated: (strandId, path, instruction) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: root.refreshIds(instruction) })
                     onInstructionEdited: (strandId, path, instruction) => root.invoke("edit_instruction", { strandId: strandId, path: path, instruction: instruction })
                     onRunBranchRequested: (strandId, path, name) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: { id: root.uuid(), type: "RunBranch", name: name } })
+                    onPaletteDragStarted: (spec, sx, sy, ox, oy) => root.beginPaletteDrag(spec, ox, oy, sx, sy)
+                    onPaletteDragMoved: (sx, sy) => root.movePaletteDrag(sx, sy)
+                    onPaletteDragEnded: (sx, sy) => root.endPaletteDrag(sx, sy)
+                    onPaletteDragCanceled: root.cancelPaletteDrag()
                     onValueEdited: (location, text) => root.invoke("edit_value_field", { location: location, text: text })
                     onValueTakeRequested: location => root.invoke("take_value", { location: location })
                     onValuePutRequested: (location, value) => root.invoke("put_value", { location: location, value: value })
@@ -1048,6 +1053,8 @@ Item {
                 Column {
                     spacing: 6
                     TextEdit {
+                        id: pickCoordinates
+                        ContextMenu.menu: Editing.TextEditingMenu { editor: pickCoordinates }
                         readOnly: true; selectByMouse: true; color: Theme.text; font.pixelSize: 13
                         text: !pickResult.pick ? "" : qsTr("x %1   y %2").arg(pickResult.pick.x).arg(pickResult.pick.y)
                             + (pickResult.region ? "\n" + qsTr("width %1   height %2").arg(pickResult.pick.width).arg(pickResult.pick.height) : "")
@@ -1055,7 +1062,12 @@ Item {
                     Row {
                         spacing: 8
                         Rectangle { width: 18; height: 18; radius: 4; color: pickResult.pick ? pickResult.pick.color : "black"; border.color: Theme.border }
-                        TextEdit { readOnly: true; selectByMouse: true; text: pickResult.pick ? pickResult.pick.color : ""; color: Theme.text; font.pixelSize: 13 }
+                        TextEdit {
+                            id: pickColor
+                            ContextMenu.menu: Editing.TextEditingMenu { editor: pickColor }
+                            readOnly: true; selectByMouse: true
+                            text: pickResult.pick ? pickResult.pick.color : ""; color: Theme.text; font.pixelSize: 13
+                        }
                     }
                 }
             }
@@ -1856,6 +1868,7 @@ Item {
                 active: ghost.visible && !!ghost.spec && ghost.spec.kind === "value"
                 sourceComponent: ValueChip {
                     valueData: ghost.spec.value; boxed: true; editable: false
+                    referenceColor: ghost.spec.color || Theme.accent
                     forceBoolean: !!ghost.spec.forceBoolean; callDisplayLabel: ghost.spec.label || qsTr("custom block")
                     blockDefinitions: root.macro ? root.macro.block_defs : []
                 }

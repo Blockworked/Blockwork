@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import QtQuick.Shapes
+import BlockworkStyle as Editing
 import com.blockworked.Blockstitch 1.0
 
 AppDialog {
@@ -333,7 +334,14 @@ AppDialog {
                 pieceId: ""
             });
         const name = kind === "Label" ? qsTr("label") : nextName(kind === "Branch" ? qsTr("branch") : qsTr("value"));
-        const insertAt = kind === "Label" && hasBranches ? firstBranchIndex() : pieces.count;
+        let insertAt = pieces.count;
+        if (kind !== "Branch") {
+            if (selectedPiece >= 0 && selectedPiece < pieces.count)
+                insertAt = selectedPiece + 1;
+            // Keep header fields before the branch mouths.
+            if (hasBranches)
+                insertAt = Math.min(insertAt, firstBranchIndex());
+        }
         pieces.insert(insertAt, {
             pieceKind: kind,
             pieceName: name,
@@ -529,7 +537,7 @@ AppDialog {
         z: selected ? 20 : 1
 
         function startEdit() {
-            root.beginEdit(pieceIndex, editor);
+            root.beginEdit(pieceIndex, pieceEditor);
         }
 
         Rectangle {
@@ -575,14 +583,15 @@ AppDialog {
         Text {
             id: measure
             anchors.centerIn: parent
-            text: piece.editing ? (editor.text || " ") : (piece.pieceName || (piece.isInput ? qsTr("value") : qsTr("Add label")))
+            text: piece.editing ? (pieceEditor.text || " ") : (piece.pieceName || (piece.isInput ? qsTr("value") : qsTr("Add label")))
             color: piece.isInput ? Theme.accent : Theme.text
             font.pixelSize: 13
             font.weight: piece.isInput ? Font.DemiBold : Font.Normal
             visible: !piece.editing
         }
         TextInput {
-            id: editor
+            id: pieceEditor
+            ContextMenu.menu: Editing.TextEditingMenu { editor: pieceEditor }
             anchors.centerIn: parent
             width: Math.max(20, measure.implicitWidth + 2)
             height: parent.height

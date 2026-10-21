@@ -246,7 +246,21 @@ fn emit_key(key: KeyCode, pressed: bool) -> Result<(), String> {
 fn emit_key_click(key: KeyCode, needs_shift: bool) -> Result<(), String> {
     let vd = get_or_init_virtual_device().map_err(|e| e.to_string())?;
     let mut vd = vd.lock().unwrap();
-    let mut events: Vec<InputEvent> = Vec::with_capacity(6);
+    let mut down = PASSED_DOWN.lock().unwrap();
+    let events = key_click_events(key, needs_shift, down.contains(&key.0));
+    vd.emit(&events).map_err(|e| e.to_string())?;
+    down.retain(|code| *code != key.0);
+    Ok(())
+}
+
+fn key_click_events(key: KeyCode, needs_shift: bool, was_held: bool) -> Vec<InputEvent> {
+    let mut events: Vec<InputEvent> = Vec::with_capacity(8);
+    if was_held {
+        // A second press of a held key is ignored by the input stack.
+        // End the physical press before typing the same key again.
+        events.push(InputEvent::new(EventType::KEY.0, key.0, 0));
+        events.push(syn_event());
+    }
     if needs_shift {
         events.push(InputEvent::new(
             EventType::KEY.0,
@@ -264,7 +278,7 @@ fn emit_key_click(key: KeyCode, needs_shift: bool) -> Result<(), String> {
         ));
     }
     events.push(syn_event());
-    vd.emit(&events).map_err(|e| e.to_string())
+    events
 }
 
 pub struct EvdevBackend;
@@ -1109,21 +1123,90 @@ fn reemit(vd: &'static Mutex<VirtualDevice>, events: &[InputEvent]) {
     if events.is_empty() {
         return;
     }
-    if let Ok(mut down) = PASSED_DOWN.lock() {
-        for event in events.iter().filter(|e| e.event_type() == EventType::KEY) {
-            match event.value() {
-                1 if !down.contains(&event.code()) => down.push(event.code()),
-                0 => down.retain(|c| *c != event.code()),
-                _ => {}
-            }
-        }
-    }
     let mut all: Vec<InputEvent> = Vec::with_capacity(events.len() + 1);
     all.extend_from_slice(events);
     all.push(syn_event());
     if let Ok(mut vd) = vd.lock() {
         if let Err(e) = vd.emit(&all) {
             warn!("evdev re-emit error: {}", e);
+            return;
         }
+        // Keep held state and emission ordered against playback's key taps.
+        if let Ok(mut down) = PASSED_DOWN.lock() {
+            for event in events.iter().filter(|e| e.event_type() == EventType::KEY) {
+                match event.value() {
+                    1 if !down.contains(&event.code()) => down.push(event.code()),
+                    0 => down.retain(|c| *c != event.code()),
+                    _ => {}
+                }
+            }
+        }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn text_expansion_can_retype_its_held_trigger() {
+        // Model the input stack: duplicate presses and stray releases do nothing.
+        let mut held = HashSet::from([KeyCode::KEY_A.0]);
+        let mut text = String::from("a");
+        let events = key_click_events(KeyCode::KEY_BACKSPACE, false, false)
+            .into_iter()
+            .chain(key_click_events(KeyCode::KEY_A, false, true))
+            .chain([InputEvent::new(EventType::KEY.0, KeyCode::KEY_A.0, 0)]);
+        for event in events.filter(|e| e.event_type() == EventType::KEY) {
+            match event.value() {
+                1 if held.insert(event.code()) => {
+                    if event.code() == KeyCode::KEY_BACKSPACE.0 {
+                        text.pop();
+                    } else if event.code() == KeyCode::KEY_A.0 {
+                        text.push('a');
+                    }
+                }
+                0 => {
+                    held.remove(&event.code());
+                }
+                _ => {}
+            }
+        }
+        assert_eq!(text, "a");
+        assert!(held.is_empty());
+    }
+
+    #[test]
+    fn ordinary_taps_do_not_add_a_release() {
+        let events = key_click_events(KeyCode::KEY_A, false, false);
+        let keys: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type() == EventType::KEY)
+            .map(|e| (e.code(), e.value()))
+            .collect();
+        assert_eq!(keys, [(KeyCode::KEY_A.0, 1), (KeyCode::KEY_A.0, 0)]);
+    }
+
+    #[test]
+    fn held_key_is_released_before_shifted_tap() {
+        let events = key_click_events(KeyCode::KEY_A, true, true);
+        assert_eq!(events[0].code(), KeyCode::KEY_A.0);
+        assert_eq!(events[0].value(), 0);
+        assert_eq!(events[1].event_type(), EventType::SYNCHRONIZATION);
+        let keys: Vec<_> = events
+            .iter()
+            .filter(|e| e.event_type() == EventType::KEY)
+            .map(|e| (e.code(), e.value()))
+            .collect();
+        assert_eq!(
+            keys,
+            [
+                (KeyCode::KEY_A.0, 0),
+                (KeyCode::KEY_LEFTSHIFT.0, 1),
+                (KeyCode::KEY_A.0, 1),
+                (KeyCode::KEY_A.0, 0),
+                (KeyCode::KEY_LEFTSHIFT.0, 0),
+            ]
+        );
     }
 }

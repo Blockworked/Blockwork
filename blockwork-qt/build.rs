@@ -49,6 +49,14 @@ fn main() {
             .qml_files(blockwork)
             .qml_files([lucide_item]),
     )
+    .qrc_resources(QResources::new().resource(
+        QResource::new()
+            .prefix("/qt/qml/BlockworkStyle")
+            .file(QResourceFile::new("qml/BlockworkStyle/qmldir").alias("qmldir"))
+            .file(QResourceFile::new("qml/BlockworkStyle/TextField.qml").alias("TextField.qml"))
+            .file(QResourceFile::new("qml/BlockworkStyle/TextArea.qml").alias("TextArea.qml"))
+            .file(QResourceFile::new("qml/BlockworkStyle/TextEditingMenu.qml").alias("TextEditingMenu.qml")),
+    ))
     .file("src/app_bridge.rs")
     .file("src/prompt_bridge.rs")
     .file("src/translator.rs")

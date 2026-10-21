@@ -21,6 +21,7 @@ void blockwork_qt_message_handler(
 
 void install_qt_message_handler()
 {
-    QQuickStyle::setStyle(QStringLiteral("Basic"));
+    QQuickStyle::setStyle(QStringLiteral("BlockworkStyle"));
+    QQuickStyle::setFallbackStyle(QStringLiteral("Basic"));
     qInstallMessageHandler(blockwork_qt_message_handler);
 }

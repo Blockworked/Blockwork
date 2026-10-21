@@ -20,12 +20,10 @@ fn main() {
         std::process::exit(cli::main(args));
     }
     let prompt = prompt_bridge::requested();
-    // Every control is drawn from the app's own theme; pin the Basic style so the
-    // platform style (e.g. Fluent on Windows 11) doesn't add native chrome, shadows
-    // or light/dark palettes underneath it. Must be set before the first control.
+    // Use themed text menus with Basic as the fallback for other controls.
     if std::env::var_os("QT_QUICK_CONTROLS_STYLE").is_none() {
         // SAFETY: still single-threaded; nothing else has started or reads the environment yet.
-        unsafe { std::env::set_var("QT_QUICK_CONTROLS_STYLE", "Basic") };
+        unsafe { std::env::set_var("QT_QUICK_CONTROLS_STYLE", "BlockworkStyle") };
     }
     qt_diagnostics::install();
     tracing_subscriber::fmt::init();

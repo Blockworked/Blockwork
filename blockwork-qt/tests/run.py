@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Run community palette and library tests using source QML without native plugins."""
+"""Run editor, community palette and library tests using source QML without native plugins."""
 
 import os
 from pathlib import Path
@@ -27,6 +27,7 @@ with tempfile.TemporaryDirectory(prefix="blockwork-qml-") as temporary:
             singleton = "singleton " if "pragma Singleton" in file.read_text() else ""
             entries.append(f"{singleton}{file.stem} 1.0 {file.name}")
         (destination / "qmldir").write_text("\n".join(entries) + "\n")
+    shutil.copytree(root / "blockwork-qt/qml/BlockworkStyle", modules / "BlockworkStyle")
     environment = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "QML_DISABLE_DISK_CACHE": "1"}
     result = subprocess.run([
         str(qtbin / "qmltestrunner"), "-input", str(root / "blockwork-qt/tests"), "-import", str(modules),
