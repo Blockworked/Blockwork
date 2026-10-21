@@ -360,16 +360,28 @@ mod linux {
         }
     }
 
-    mod sway {
+    pub(super) mod sway {
         use super::*;
 
-        fn walk<'a>(node: &'a serde_json::Value, out: &mut Vec<&'a serde_json::Value>) {
+        /// The workspace a window is on isn't in its own node; it's noted as
+        /// `workspace` so `act_command` can tell a minimized window.
+        fn walk(node: &serde_json::Value, workspace: &str, out: &mut Vec<serde_json::Value>) {
+            let workspace = match node.get("type").and_then(|t| t.as_str()) {
+                Some("workspace") => node.get("name").and_then(|n| n.as_str()).unwrap_or(workspace),
+                _ => workspace,
+            };
             if node.get("pid").is_some() {
-                out.push(node);
+                let mut window = node.clone();
+                if let Some(fields) = window.as_object_mut() {
+                    fields.remove("nodes");
+                    fields.remove("floating_nodes");
+                    fields.insert("workspace".into(), workspace.into());
+                }
+                out.push(window);
             }
             for key in ["nodes", "floating_nodes"] {
                 for child in node.get(key).and_then(|n| n.as_array()).into_iter().flatten() {
-                    walk(child, out);
+                    walk(child, workspace, out);
                 }
             }
         }
@@ -377,8 +389,8 @@ mod linux {
         fn windows() -> Result<Vec<serde_json::Value>, String> {
             let tree = json("swaymsg", &["-t", "get_tree", "-r"])?;
             let mut out = Vec::new();
-            walk(&tree, &mut out);
-            Ok(out.into_iter().cloned().collect())
+            walk(&tree, "", &mut out);
+            Ok(out)
         }
 
         pub(super) fn info(node: &serde_json::Value) -> ActiveWindow {
@@ -409,16 +421,25 @@ mod linux {
         }
 
         pub(super) fn act(action: Action, node: &serde_json::Value) -> Result<(), String> {
-            command(
-                node,
-                match action {
-                    Action::Focus => "focus",
-                    Action::Close => "kill",
-                    Action::Minimize => "move scratchpad",
-                    Action::Maximize => "fullscreen enable",
-                    Action::Restore => "fullscreen disable",
-                },
-            )
+            command(node, act_command(action, node))
+        }
+
+        /// Sway has no minimize: Minimize parks the window in the scratchpad,
+        /// so Restore has to bring it back out (and tile it again) as well as
+        /// leave fullscreen.
+        pub(crate) fn act_command(action: Action, node: &serde_json::Value) -> &'static str {
+            // Sway parks scratchpad windows on the hidden `__i3_scratch`
+            // workspace; i3-style trees also say so in `scratchpad_state`.
+            let in_scratchpad = node.get("workspace").and_then(|w| w.as_str()) == Some("__i3_scratch")
+                || node.get("scratchpad_state").and_then(|s| s.as_str()).is_some_and(|s| s != "none");
+            match action {
+                Action::Focus => "focus",
+                Action::Close => "kill",
+                Action::Minimize => "move scratchpad",
+                Action::Maximize => "fullscreen enable",
+                Action::Restore if in_scratchpad => "scratchpad show, floating disable",
+                Action::Restore => "fullscreen disable",
+            }
         }
 
         /// `rect` is the container; `window_rect` is the content inside it.
@@ -1075,6 +1096,17 @@ end run"#;
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn sway_restore_brings_minimized_windows_back() {
+        let hidden = serde_json::json!({ "workspace": "__i3_scratch" });
+        let tiled = serde_json::json!({ "workspace": "1", "scratchpad_state": "none" });
+        assert_eq!(linux::sway::act_command(Action::Restore, &serde_json::json!({ "scratchpad_state": "fresh" })), "scratchpad show, floating disable");
+        assert_eq!(linux::sway::act_command(Action::Minimize, &tiled), "move scratchpad");
+        assert_eq!(linux::sway::act_command(Action::Restore, &hidden), "scratchpad show, floating disable");
+        assert_eq!(linux::sway::act_command(Action::Restore, &tiled), "fullscreen disable");
+    }
 
     #[test]
     fn matches_title_or_app_ignoring_case() {
