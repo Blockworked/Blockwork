@@ -184,13 +184,29 @@ fn fetch(url: &str, allow_local: bool) -> Result<Vec<u8>, String> {
         }
         return Ok(bytes);
     }
-    let loopback = ["http://127.0.0.1", "http://localhost", "http://[::1]"]
-        .iter()
-        .any(|p| url.strip_prefix(p).is_some_and(|rest| rest.is_empty() || rest.starts_with([':', '/'])));
-    if !url.starts_with("https://") && !loopback {
+    if !url.starts_with("https://") && !is_loopback_http(url) {
         return Err(format!("Libraries and packs must use https:// ({url})"));
     }
     blockwork_core::http::get_bytes(url, block_packs::MAX_DOWNLOAD)
+}
+
+/// Whether `url` is plain http to this computer. Judged on the whole host,
+/// so `http://localhost:1@example.com` (user info, then another host) and
+/// `http://localhost.example.com` don't count.
+fn is_loopback_http(url: &str) -> bool {
+    let Some(rest) = url.strip_prefix("http://") else { return false };
+    let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
+    if authority.contains('@') {
+        return false;
+    }
+    let host = match authority.strip_prefix('[') {
+        Some(v6) => match v6.split_once(']') {
+            Some((host, port)) if port.is_empty() || port.starts_with(':') => host,
+            _ => return false,
+        },
+        None => authority.split(':').next().unwrap_or_default(),
+    };
+    matches!(host.to_ascii_lowercase().as_str(), "127.0.0.1" | "localhost" | "::1")
 }
 
 /// Fetches every index in the background.
@@ -365,6 +381,24 @@ pub(crate) fn export(state: &SharedState, block_ids: Vec<String>, info: block_pa
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn only_this_computer_may_use_plain_http() {
+        for ok in ["http://127.0.0.1", "http://localhost:8080/index.json", "http://[::1]:9/x", "http://LOCALHOST/?a"] {
+            assert!(is_loopback_http(ok), "{ok}");
+        }
+        for bad in [
+            "http://localhost:1@example.com/index.json",
+            "http://localhost@example.com",
+            "http://localhost.example.com/",
+            "http://127.0.0.1.example.com",
+            "http://[::1].example.com",
+            "http://example.com/?http://localhost",
+            "https://localhost",
+        ] {
+            assert!(!is_loopback_http(bad), "{bad}");
+        }
+    }
 
     #[test]
     fn old_built_in_addresses_move_to_the_new_one() {
