@@ -7,6 +7,8 @@
 //   /dev/input/eventN    -> $FAKE_EVDEV_DIR/eventN.sock; the broker writes the
 //                           device's events, EVIOCGRAB is sent back to it.
 //   opendir(/dev/input)  -> $FAKE_EVDEV_DIR/devinput (one empty file per node)
+//   /sys/bus/usb/devices -> $FAKE_USB_DIR, a sysfs-like tree of fake USB
+//                           devices kept by `fake-input.py usb`.
 //
 // Capability ioctls are answered from $FAKE_EVDEV_DIR/eventN.conf and the held
 // keys (EVIOCGKEY) from eventN.held, both kept by the broker.
@@ -52,6 +54,16 @@ static int classify(const char *path) {
     return -2;
 }
 
+// `path` under $FAKE_USB_DIR when it's in /sys/bus/usb/devices, else `path`.
+static const char *usb_path(const char *path, char *buf, size_t len) {
+    const char *usb = getenv("FAKE_USB_DIR");
+    const char *prefix = "/sys/bus/usb/devices";
+    size_t n = strlen(prefix);
+    if (!usb || !*usb || !path || strncmp(path, prefix, n) != 0 || (path[n] && path[n] != '/')) return path;
+    snprintf(buf, len, "%s%s", usb, path + n);
+    return buf;
+}
+
 static int connect_node(int node) {
     struct sockaddr_un addr = {.sun_family = AF_UNIX};
     if (node < 0)
@@ -87,6 +99,8 @@ static DIR *(*real_opendir)(const char *);
 #define OPEN_BODY(call)                                         \
     int node = classify(path);                                  \
     if (node != -2) return connect_node(node);                  \
+    char usb_buf[4096];                                         \
+    path = usb_path(path, usb_buf, sizeof usb_buf);             \
     mode_t mode = 0;                                            \
     if (flags & (O_CREAT | O_TMPFILE)) {                        \
         va_list ap;                                             \
@@ -119,7 +133,8 @@ DIR *opendir(const char *path) {
         snprintf(redirected, sizeof redirected, "%s/devinput", dir());
         return REAL(opendir)(redirected);
     }
-    return REAL(opendir)(path);
+    char usb_buf[4096];
+    return REAL(opendir)(usb_path(path, usb_buf, sizeof usb_buf));
 }
 
 // Reads the node's "key value..." config line for `key` into `out`.

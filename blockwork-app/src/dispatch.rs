@@ -185,6 +185,12 @@ impl Backend {
                         .map_err(|e| e.to_string())??,
                 )
             }
+            // For the USB device picker.
+            "list_usb_devices" => to_json(
+                tokio::task::spawn_blocking(blockwork_core::system::usb_devices)
+                    .await
+                    .map_err(|e| e.to_string())??,
+            ),
             "list_models" => to_json(blockwork_core::detect::models::catalog()?),
             "download_model" => {
                 let id: String = arg(&args, "id")?;

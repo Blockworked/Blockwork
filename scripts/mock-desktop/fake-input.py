@@ -24,6 +24,12 @@ without the KEY_/BTN_ prefix, or numbers):
     log [N]               the last N (default 20) lines of injected uinput events
     wait-grab [0|1] [S]   wait up to S seconds (default 10) for the devices to be grabbed (1) or released (0)
     wait-log PATTERN [S]  wait until a uinput log line contains PATTERN
+
+USB devices are a sysfs-like tree in $FAKE_USB_DIR that fake-evdev.so shows
+as /sys/bus/usb/devices; they need no broker:
+    usb list                              the fake devices, by port
+    usb plug VVVV:PPPP [PRODUCT [MAKER]]  plug in a device, prints its port
+    usb unplug TEXT                       unplug every device whose port, ids or name contains TEXT
 """
 import os
 import re
@@ -378,6 +384,57 @@ def send(root, args):
     return out.decode().rstrip("\n")
 
 
+def usb(args):
+    root = os.environ.get("FAKE_USB_DIR")
+    if not root:
+        raise SystemExit("fake-input: FAKE_USB_DIR isn't set (run inside scripts/mock-desktop.sh)")
+    os.makedirs(root, exist_ok=True)
+
+    def read(port, name):
+        try:
+            with open(os.path.join(root, port, name)) as f:
+                return f.read().strip()
+        except OSError:
+            return ""
+
+    def devices():
+        for port in sorted(os.listdir(root)):
+            ids = f"{read(port, 'idVendor')}:{read(port, 'idProduct')}"
+            yield port, ids, " ".join(p for p in (read(port, "manufacturer"), read(port, "product")) if p)
+
+    cmd, rest = (args[0], args[1:]) if args else ("list", [])
+    if cmd == "list":
+        for port, ids, name in devices():
+            print(f"{port}\t{ids}\t{name}")
+    elif cmd == "plug" and rest and re.fullmatch(r"[0-9a-fA-F]{4}:[0-9a-fA-F]{4}", rest[0]):
+        vendor, product = rest[0].lower().split(":")
+        n = 1
+        while os.path.exists(os.path.join(root, f"1-{n}")):
+            n += 1
+        port = os.path.join(root, f"1-{n}")
+        os.makedirs(port)
+        files = {"idVendor": vendor, "idProduct": product, "bDeviceClass": "00",
+                 "product": rest[1] if len(rest) > 1 else "", "manufacturer": rest[2] if len(rest) > 2 else ""}
+        for name, value in files.items():
+            if value:
+                with open(os.path.join(port, name), "w") as f:
+                    f.write(value + "\n")
+        print(f"1-{n}")
+    elif cmd == "unplug" and rest:
+        text = rest[0].lower()
+        gone = [port for port, ids, name in devices() if text in port.lower() or text in ids or text in name.lower()]
+        if not gone:
+            raise SystemExit(f"fake-input: no USB device matches {rest[0]!r}")
+        for port in gone:
+            for name in os.listdir(os.path.join(root, port)):
+                os.remove(os.path.join(root, port, name))
+            os.rmdir(os.path.join(root, port))
+            print(port)
+    else:
+        raise SystemExit("usage: usb list | usb plug VVVV:PPPP [PRODUCT [MAKER]] | usb unplug TEXT")
+    return 0
+
+
 def main():
     args = sys.argv[1:]
     if not args or args[0] in ("-h", "--help"):
@@ -390,6 +447,8 @@ def main():
         print(f"fake-input: serving {root}", file=sys.stderr, flush=True)
         broker.run()
         return 0
+    if args[0] == "usb":
+        return usb(args[1:])
     root = os.environ.get("FAKE_EVDEV_DIR")
     if not root:
         raise SystemExit("fake-input: FAKE_EVDEV_DIR isn't set (run inside scripts/mock-desktop.sh)")

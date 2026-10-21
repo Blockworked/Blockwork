@@ -69,6 +69,18 @@ scripts/mock-desktop.sh run x11 sh -c '
 `mock-input type` waits 50 ms between keys unless `--delay=MS` says
 otherwise. Absolute mouse moves need libei, which isn't faked.
 
+The shim also shows `$FAKE_USB_DIR` as `/sys/bus/usb/devices`, so the USB
+trigger, the "USB device plugged in?" reporter and the USB device picker
+see fake devices: a root hub (skipped, like real hubs), a Logitech receiver
+(`046d:c52b`) and a YubiKey (`1050:0407`). Plug in and unplug more while
+Blockwork runs:
+
+```bash
+mock-input usb plug 0781:5581 "Ultra" SanDisk   # prints the new port, like 1-3
+mock-input usb unplug 0781:5581
+mock-input usb list
+```
+
 ## What doesn't work here
 
 - Input outside X11. The fake devices below work on every desktop, but what

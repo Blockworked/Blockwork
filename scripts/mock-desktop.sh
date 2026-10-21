@@ -201,8 +201,16 @@ start_game() {
 # touches those paths, so it's preloaded into everything `cmd` starts.
 start_input() {
     [[ ${MOCK_INPUT:-1} == 1 ]] || return 0
-    export FAKE_EVDEV_DIR=$STATE/input MOCK_INPUT_LOG=$STATE/input-target.log
+    export FAKE_EVDEV_DIR=$STATE/input MOCK_INPUT_LOG=$STATE/input-target.log FAKE_USB_DIR=$STATE/usb
     mkdir -p "$FAKE_EVDEV_DIR" "$STATE/bin"
+    # A root hub (which Blockwork skips) and two devices; `mock-input usb`
+    # plugs in and unplugs more.
+    mkdir -p "$FAKE_USB_DIR/usb1"
+    printf '1d6b\n' >"$FAKE_USB_DIR/usb1/idVendor"
+    printf '0002\n' >"$FAKE_USB_DIR/usb1/idProduct"
+    printf '09\n' >"$FAKE_USB_DIR/usb1/bDeviceClass"
+    python3 "$INPUT_DIR/fake-input.py" usb plug 046d:c52b "USB Receiver" Logitech >/dev/null
+    python3 "$INPUT_DIR/fake-input.py" usb plug 1050:0407 "YubiKey OTP+FIDO+CCID" Yubico >/dev/null
     cc -shared -fPIC -O2 -o "$STATE/fake-evdev.so" "$INPUT_DIR/fake-evdev.c" -ldl
     spawn python3 "$INPUT_DIR/fake-input.py" serve "$FAKE_EVDEV_DIR"
     wait_for '[ -S "$FAKE_EVDEV_DIR/control.sock" ]'

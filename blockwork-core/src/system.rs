@@ -276,12 +276,14 @@ pub fn network_connected() -> Result<bool, String> {
 }
 
 /// A plugged-in USB device.
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, serde::Serialize)]
 pub struct UsbDevice {
     /// Stable while it stays plugged in.
     pub id: String,
     /// Maker and product, as the device reports them.
     pub name: String,
+    /// The maker alone; empty when the device doesn't say.
+    pub maker: String,
     /// `vvvv:pppp` vendor and product ids, in hex.
     pub ids: String,
 }
@@ -302,7 +304,7 @@ impl UsbDevice {
             ("", p) => p.to_string(),
             (m, p) => format!("{m} {p}"),
         };
-        UsbDevice { id, name, ids }
+        UsbDevice { id, name, maker: maker.trim().to_string(), ids }
     }
 }
 
@@ -491,7 +493,7 @@ mod tests {
     #[test]
     fn names_usb_devices_and_reads_ioreg() {
         let d = UsbDevice::named("3-2".into(), "Logitech", "USB Receiver", 0x046d, 0xc52b);
-        assert_eq!((d.name.as_str(), d.ids.as_str()), ("Logitech USB Receiver", "046d:c52b"));
+        assert_eq!((d.name.as_str(), d.maker.as_str(), d.ids.as_str()), ("Logitech USB Receiver", "Logitech", "046d:c52b"));
         assert!(d.matches("receiver") && d.matches("046D:C52B") && d.matches("") && !d.matches("keyboard"));
         assert_eq!(UsbDevice::named("x".into(), "Lenovo", "Lenovo Camera", 1, 2).name, "Lenovo Camera");
         assert_eq!(UsbDevice::named("x".into(), "", "", 1, 2).name, "USB device 0001:0002");

@@ -252,6 +252,11 @@ Item {
         updated.detector = textValue(detector);
         root.invoke("edit_instruction", { strandId: request.strandId, path: request.path, instruction: updated });
     }
+    function setBlockUsb(request, pattern) {
+        const updated = JSON.parse(JSON.stringify(request.instruction || {}));
+        updated.pattern = textValue(pattern);
+        root.invoke("edit_instruction", { strandId: request.strandId, path: request.path, instruction: updated });
+    }
     function setBlockImage(request, image) {
         const updated = JSON.parse(JSON.stringify(request.instruction || {}));
         updated.image = image;
@@ -276,6 +281,7 @@ Item {
         if (action === "captureImage") root.startScreenPick(request);
         else if (action === "loadImage") imageFileDialog.openFor(request);
         else if (action === "pickModel") modelDialog.openFor(request);
+        else if (action === "pickUsb") usbDialog.openFor(request);
         else if (action === "pickRegion") root.startScreenPick(Object.assign(request, { kind: "region" }));
         else if (action === "clearRegion") {
             const updated = JSON.parse(JSON.stringify(instruction || {}));
@@ -1115,6 +1121,89 @@ Item {
         }
     }
     AppDialog {
+        id: usbDialog; title: qsTr("Choose a USB device"); standardButtons: Dialog.Cancel
+        property var request: null
+        property var devices: []
+        property string error: ""
+        property bool loaded: false
+        // What the block matches now, if it's plain text.
+        readonly property string current: {
+            const p = request && request.instruction ? request.instruction.pattern : null;
+            return p && p.kind === "Text" ? p.value.trim() : "";
+        }
+        readonly property bool currentPluggedIn: current === "" || devices.some(d => matches(d, current))
+        function matches(device, pattern) {
+            const p = pattern.toLowerCase();
+            return device.name.toLowerCase().indexOf(p) >= 0 || device.ids.indexOf(p) >= 0;
+        }
+        function openFor(req) {
+            request = req; devices = []; error = ""; loaded = false; customPattern.text = "";
+            refresh();
+            open();
+        }
+        // Devices come and go while it's open, so ask again every few seconds.
+        function refresh() {
+            root.daemonCall("list_usb_devices", {}, (list, error) => {
+                loaded = true;
+                if (list) { devices = list; usbDialog.error = ""; } else { devices = []; usbDialog.error = error || ""; }
+            });
+        }
+        function use(pattern) { root.setBlockUsb(request, pattern); close(); }
+        Timer { interval: 2000; repeat: true; running: usbDialog.visible; onTriggered: usbDialog.refresh() }
+        Column { width: 460; spacing: 10
+            Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
+                text: qsTr("Pick a device that's plugged in. The block matches it by its vendor:product id, so it keeps working on any USB port.") }
+            Rectangle {
+                visible: usbDialog.current !== "" && usbDialog.loaded && !usbDialog.currentPluggedIn
+                width: 460; height: 56; radius: Theme.radius; color: Theme.panelRaised; border.color: Theme.warning
+                RowLayout { anchors.fill: parent; anchors.margins: 10; spacing: 10
+                    Column { Layout.fillWidth: true; spacing: 2
+                        Text { width: parent.width; text: usbDialog.current; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                        Text { text: qsTr("Chosen now, but not plugged in"); color: Theme.warning; font.pixelSize: 11 }
+                    }
+                    BwButton { text: qsTr("Keep"); onClicked: usbDialog.close() }
+                }
+            }
+            Text { visible: !usbDialog.loaded; text: qsTr("Looking for USB devices..."); color: Theme.textDim; font.pixelSize: 12 }
+            Text { visible: usbDialog.error !== ""; width: parent.width; wrapMode: Text.WordWrap; text: usbDialog.error; color: Theme.danger; font.pixelSize: 12 }
+            Text { visible: usbDialog.loaded && usbDialog.error === "" && usbDialog.devices.length === 0; width: parent.width; wrapMode: Text.WordWrap
+                text: qsTr("No USB devices are plugged in. Plug one in and it shows up here."); color: Theme.textDim; font.pixelSize: 12 }
+            ScrollView {
+                visible: usbDialog.devices.length > 0
+                width: 460; height: Math.min(usbList.implicitHeight, 300); clip: true
+                contentWidth: availableWidth
+                Column { id: usbList; width: 460; spacing: 8
+                    Repeater {
+                        model: usbDialog.devices
+                        delegate: Rectangle {
+                            required property var modelData
+                            readonly property bool chosen: usbDialog.current !== "" && usbDialog.matches(modelData, usbDialog.current)
+                            width: 460; height: 56; radius: Theme.radius; color: Theme.panelRaised; border.color: chosen ? Theme.accent : Theme.border
+                            RowLayout { anchors.fill: parent; anchors.margins: 10; spacing: 10
+                                Column { Layout.fillWidth: true; spacing: 2
+                                    Text { width: parent.width; text: modelData.name; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                                    Text { width: parent.width; color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideRight
+                                        text: modelData.maker ? qsTr("%1 · id %2").arg(modelData.maker).arg(modelData.ids) : qsTr("id %1").arg(modelData.ids) }
+                                }
+                                BwButton { text: chosen ? qsTr("Chosen") : qsTr("Use"); onClicked: usbDialog.use(modelData.ids) }
+                            }
+                        }
+                    }
+                }
+            }
+            RowLayout { width: parent.width; spacing: 8
+                BwButton { text: qsTr("Any USB device"); enabled: usbDialog.current !== ""; onClicked: usbDialog.use("") }
+                Item { Layout.fillWidth: true }
+                BwButton { text: qsTr("Refresh"); iconName: "refresh-cw"; onClicked: usbDialog.refresh() }
+            }
+            Text { text: qsTr("Or part of a device's name or id"); color: Theme.text; font.pixelSize: 12 }
+            RowLayout { width: parent.width; spacing: 8
+                BwTextField { id: customPattern; Layout.fillWidth: true; placeholderText: "046d:c52b"; onAccepted: useCustom.clicked() }
+                BwButton { id: useCustom; text: qsTr("Use"); enabled: customPattern.text.trim().length > 0; onClicked: usbDialog.use(customPattern.text.trim()) }
+            }
+        }
+    }
+    AppDialog {
         id: templateDialog; title: qsTr("Start from a template"); standardButtons: Dialog.Cancel
         width: Math.min(604, parent.width - 32)
         height: Math.min(implicitHeight, parent.height - 32)
@@ -1367,7 +1456,7 @@ Item {
             WhenNetwork: { shape: "header", icon: "radio", head: [label(qsTr("WHEN NETWORK")),
                 { kind: "dropdown", key: "connected", options: [{ value: "on", label: qsTr("connects") }, { value: "off", label: qsTr("disconnects") }],
                   encode: v => v === "on", decode: v => v ? "on" : "off" }] },
-            WhenUsb: { shape: "header", icon: "plug-zap", head: [label(qsTr("WHEN USB DEVICE")), value("UsbPattern", "pattern"), label(qsTr("IS")),
+            WhenUsb: { shape: "header", icon: "plug-zap", head: [label(qsTr("WHEN USB DEVICE")), value("UsbPattern", "pattern"), { kind: "button", action: "pickUsb", icon: "list" }, label(qsTr("IS")),
                 { kind: "dropdown", key: "connected", options: [{ value: "in", label: qsTr("plugged in") }, { value: "out", label: qsTr("unplugged") }],
                   encode: v => v === "in", decode: v => v ? "in" : "out" }] },
             WhenMouseButton: { shape: "header", icon: "mouse", head: [label(qsTr("WHEN")),
