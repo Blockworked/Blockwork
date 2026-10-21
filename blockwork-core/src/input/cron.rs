@@ -44,7 +44,7 @@ impl std::str::FromStr for Cron {
         if weekdays & (1 << 7) != 0 {
             weekdays = (weekdays | 1) & !(1 << 7);
         }
-        Ok(Cron {
+        let cron = Cron {
             minutes: field(minute, 0, 59, &[], "minute")?,
             hours: field(hour, 0, 23, &[], "hour")?,
             days: field(day, 1, 31, &[], "day")?,
@@ -52,7 +52,17 @@ impl std::str::FromStr for Cron {
             weekdays,
             days_restricted: !day.starts_with('*'),
             weekdays_restricted: !weekday.starts_with('*'),
-        })
+        };
+        // Days only count alone when the weekday is `*`; then a day no picked
+        // month has (like 31 2, February 31st) would never come.
+        if cron.days_restricted && !cron.weekdays_restricted {
+            const LONGEST: [u32; 12] = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
+            let possible = (1..=12u32).any(|m| has(cron.months, m) && (1..=LONGEST[m as usize - 1]).any(|d| has(cron.days, d)));
+            if !possible {
+                return Err(format!("'{text}' never runs: none of its months has that day"));
+            }
+        }
+        Ok(cron)
     }
 }
 
@@ -188,7 +198,9 @@ mod tests {
     fn shortcuts_and_errors() {
         assert_eq!(cron("@daily"), cron("0 0 * * *"));
         assert!(cron("@hourly").matches(&at(2026, 1, 1, 7, 0)));
-        for bad in ["", "* * * *", "60 * * * *", "*/0 * * * *", "5-1 * * * *", "* * * smarch *", "@sometimes"] {
+        // A weekday makes it run on those days anyway.
+        assert!("0 0 31 2 fri".parse::<Cron>().is_ok());
+        for bad in ["", "* * * *", "60 * * * *", "*/0 * * * *", "5-1 * * * *", "* * * smarch *", "@sometimes", "0 0 31 2 *", "0 0 30-31 feb *"] {
             assert!(bad.parse::<Cron>().is_err(), "{bad} should fail");
         }
     }
