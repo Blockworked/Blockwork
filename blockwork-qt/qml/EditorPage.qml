@@ -188,7 +188,8 @@ Item {
         const def = blockDefById(type);
         if (def) {
             const name = (def.pieces || []).map(p => p.kind === "Label" ? p.text : "(" + p.name + ")").join(" ");
-            detailsDialog.show(name, def.identifier || def.id, def.description || fallback || qsTr("A custom block defined in this macro."));
+            const explainer = def.read_only ? qsTr("A community block from %1.").arg(def.pack_name) : fallback;
+            detailsDialog.show(name, def.identifier || def.id, def.description || explainer || qsTr("A custom block defined in this macro."));
         } else detailsDialog.show(blockTitle(type),type,instructionExplainer(type)||fallback||qsTr("A Blockwork block."));
     }
     // ---- daemon commands whose result QML needs ----
@@ -464,7 +465,7 @@ Item {
     }
     function editBlockById(id) {
         const def = blockDefById(id);
-        if (def) blockDialog.openForEdit(def);
+        if (def && !def.read_only) blockDialog.openForEdit(def);
     }
     // A custom block's header row takes its whole definition with it.
     function removeInstruction(strandId, path) {
@@ -753,7 +754,7 @@ Item {
                     onMakeVariableRequested: variableDialog.openForCreate()
                     onRenameVariableRequested: name => variableDialog.openForRename(name)
                     onDeleteVariableRequested: name => root.invoke("delete_variable", { name: name })
-                    onEditBlockRequested: definition => blockDialog.openForEdit(definition)
+                    onEditBlockRequested: definition => { if (!definition.read_only) blockDialog.openForEdit(definition); }
                     onDeleteBlockRequested: blockId => root.invoke("delete_block", { blockId: blockId })
                     onMakeListRequested: listDialog.openForCreate()
                     onListEditorStateRequested: (name, visible, x, y) => root.invoke("set_list_editor_state", { name: name, visible: visible, x: x, y: y })

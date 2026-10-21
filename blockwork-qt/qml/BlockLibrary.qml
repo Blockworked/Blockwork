@@ -24,6 +24,7 @@ Item {
     }
     function addFromFile() { packFileDialog.open(); }
     function share(definition) {
+        if (definition && definition.read_only) return;
         shareDialog.picked = definition ? [definition.id] : [];
         shareDialog.open();
     }
@@ -57,8 +58,8 @@ Item {
         id: browseDialog
         title: qsTr("Block library")
         readonly property string query: search.text.trim().toLowerCase()
-        readonly property var shown: (root.library.packs || []).filter(p => !query
-            || (p.name + " " + p.description + " " + p.author + " " + p.blocks.join(" ")).toLowerCase().indexOf(query) >= 0)
+        readonly property var shown: (root.library.packs || []).filter(p => (!hideInstalled.checked || !p.installed)
+            && (!query || (p.name + " " + p.description + " " + p.author + " " + p.blocks.join(" ")).toLowerCase().indexOf(query) >= 0))
         readonly property var brokenSources: (root.library.sources || []).filter(s => s.error)
         width: Math.min(624, parent.width - 32)
         contentItem: ColumnLayout {
@@ -72,38 +73,7 @@ Item {
                 }
                 BwButton { iconName: "folder-open"; text: qsTr("From file..."); onClicked: root.addFromFile() }
             }
-            Text {
-                visible: (root.library.installed || []).length > 0
-                text: qsTr("Installed in this macro")
-                color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold
-            }
-            ListView {
-                id: installedList
-                visible: count > 0
-                Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(120, contentHeight)
-                model: root.library.installed || []
-                clip: true; spacing: 4
-                ScrollBar.vertical: ScrollBar {}
-                delegate: RowLayout {
-                    required property var modelData
-                    width: installedList.width
-                    Text {
-                        Layout.fillWidth: true; elide: Text.ElideRight
-                        text: modelData.name + (modelData.version ? "  " + modelData.version : "")
-                        color: Theme.text; font.pixelSize: 12
-                    }
-                    BwButton {
-                        text: qsTr("Remove"); iconName: "trash-2"
-                        onClicked: {
-                            removeDialog.packId = modelData.id;
-                            removeDialog.packName = modelData.name;
-                            removeDialog.macroId = root.macro.id;
-                            removeDialog.open();
-                        }
-                    }
-                }
-            }
+            BwCheckBox { id: hideInstalled; text: qsTr("Hide installed") }
             Text {
                 visible: !root.macro
                 Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.warning; font.pixelSize: 12
@@ -144,31 +114,34 @@ Item {
                 delegate: Rectangle {
                     id: packRow
                     required property var modelData
-                    readonly property bool fetching: root.library.fetching === modelData.key
+                    readonly property bool fetching: modelData.key !== "" && root.library.fetching === modelData.key
+                    readonly property bool installed: modelData.installed !== ""
                     width: packList.width; radius: 8
-                    implicitHeight: packCol.implicitHeight + 20
+                    implicitHeight: Math.max(packCol.implicitHeight, packActions.implicitHeight) + 20
                     color: Theme.panelRaised; border.color: Theme.borderSoft
                     ColumnLayout {
                         id: packCol
-                        anchors.left: parent.left; anchors.right: addButton.left; anchors.top: parent.top
+                        anchors.left: parent.left; anchors.right: packActions.left; anchors.top: parent.top
                         anchors.margins: 10; anchors.rightMargin: 12; spacing: 3
                         Text {
                             Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold
                             text: packRow.modelData.name + (packRow.modelData.version ? "  " + packRow.modelData.version : "")
                         }
-                        RowLayout {
+                        Row {
                             id: byRow
                             readonly property string author: packRow.modelData.author
                             visible: author !== ""
                             Layout.fillWidth: true; spacing: 4
                             Text {
-                                Layout.maximumWidth: byRow.width - (verifiedBadge.visible ? verifiedBadge.width + byRow.spacing : 0)
+                                width: Math.min(implicitWidth, Math.max(0, byRow.width - (verifiedBadge.visible ? verifiedBadge.width + byRow.spacing : 0)))
+                                anchors.verticalCenter: parent.verticalCenter
                                 elide: Text.ElideRight; color: Theme.textDim; font.pixelSize: 11
                                 text: qsTr("by %1").arg(byRow.author)
                             }
                             // Same badge the community library site shows next to the team's packs.
                             Rectangle {
                                 id: verifiedBadge
+                                anchors.verticalCenter: parent.verticalCenter
                                 visible: packRow.modelData.official === true
                                 implicitWidth: 13; implicitHeight: 13; radius: 6.5; color: Theme.accent
                                 Accessible.role: Accessible.Graphic; Accessible.name: verifiedTip.text
@@ -176,7 +149,6 @@ Item {
                                 HoverHandler { id: badgeHover }
                                 ToolTip { id: verifiedTip; visible: badgeHover.hovered; delay: 300; text: qsTr("Verified official pack") }
                             }
-                            Item { Layout.fillWidth: true }
                         }
                         Text {
                             visible: packRow.modelData.description !== ""
@@ -187,17 +159,34 @@ Item {
                             Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
                             text: packRow.modelData.blocks.join("  -  ")
                         }
+                        Text {
+                            visible: packRow.installed
+                            Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
+                            text: !packRow.modelData.available ? qsTr("Installed - unavailable from the library")
+                                : qsTr("Installed %1").arg(packRow.modelData.installed)
+                        }
                     }
-                    BwButton {
-                        id: addButton
+                    Column {
+                        id: packActions
                         anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
-                        readonly property bool installed: packRow.modelData.installed !== ""
-                        enabled: !!root.macro && !packRow.fetching && root.library.fetching === "" && (!installed || packRow.modelData.update)
-                        primary: !installed || packRow.modelData.update
-                        iconName: installed && !packRow.modelData.update ? "check" : "download"
-                        text: packRow.fetching ? qsTr("Downloading...") : packRow.modelData.update ? qsTr("Update")
-                            : installed ? qsTr("Added") : qsTr("Add")
-                        onClicked: root.invoke("review_block_pack", { key: packRow.modelData.key })
+                        spacing: 6
+                        BwButton {
+                            visible: packRow.modelData.available && (!packRow.installed || packRow.modelData.update)
+                            enabled: !!root.macro && !packRow.fetching && root.library.fetching === ""
+                            primary: true; iconName: "download"
+                            text: packRow.fetching ? qsTr("Downloading...") : packRow.installed ? qsTr("Update") : qsTr("Add")
+                            onClicked: root.invoke("review_block_pack", { key: packRow.modelData.key })
+                        }
+                        BwButton {
+                            visible: packRow.installed
+                            text: qsTr("Remove"); iconName: "trash-2"
+                            onClicked: {
+                                removeDialog.packId = packRow.modelData.id;
+                                removeDialog.packName = packRow.modelData.name;
+                                removeDialog.macroId = root.macro.id;
+                                removeDialog.open();
+                            }
+                        }
                     }
                 }
             }
@@ -280,7 +269,7 @@ Item {
             Text {
                 visible: reviewDialog.r.replaces.length > 0
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.warning; font.pixelSize: 12
-                text: qsTr("This macro already has %n block(s) from an earlier version. They're replaced, along with any changes you made to them; blocks that use them keep working.", "", reviewDialog.r.replaces.length)
+                text: qsTr("Replaces %n existing block definition(s). Blocks that use them keep working.", "", reviewDialog.r.replaces.length)
             }
             Text {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
@@ -322,7 +311,7 @@ Item {
         width: Math.min(504, parent.width - 32)
         standardButtons: Dialog.Ok | Dialog.Cancel
         property var picked: []
-        readonly property var defs: root.macro ? root.macro.block_defs || [] : []
+        readonly property var defs: root.macro ? (root.macro.block_defs || []).filter(def => !def.read_only) : []
         acceptText: qsTr("Save pack...")
         onOpened: {
             packName.text = picked.length === 1 ? root.blockLabel(defs.find(d => d.id === picked[0]) || {}) : (root.macro ? root.macro.name : "");

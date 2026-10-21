@@ -36,6 +36,7 @@ pub(crate) struct PackDto {
     pub(crate) installed: String,
     /// Installed, but the library has a different file.
     pub(crate) update: bool,
+    pub(crate) available: bool,
 }
 
 #[derive(Serialize, Clone, Default)]
@@ -44,7 +45,6 @@ pub(crate) struct LibraryDto {
     pub(crate) loading: bool,
     pub(crate) sources: Vec<SourceDto>,
     pub(crate) packs: Vec<PackDto>,
-    pub(crate) installed: Vec<block_packs::PackRecord>,
     /// The key of the pack being downloaded.
     pub(crate) fetching: String,
     pub(crate) error: String,
@@ -122,29 +122,44 @@ fn upgrade_sources(list: Vec<String>) -> Vec<String> {
     out
 }
 
+fn pack_entries(mac: Option<&blockwork_core::macros::Macro>, entries: &[(String, String, IndexEntry)]) -> Vec<PackDto> {
+    let records = mac.map(|m| m.settings.block_packs.as_slice()).unwrap_or_default();
+    let mut packs = Vec::new();
+    for (url, source, entry) in entries {
+        if packs.iter().any(|p: &PackDto| p.id == entry.info.id) { continue; }
+        let installed = records.iter().find(|r| r.id == entry.info.id);
+        packs.push(PackDto {
+            key: format!("{url}#{}", entry.info.id),
+            id: entry.info.id.clone(), name: entry.info.name.clone(),
+            description: entry.info.description.clone(), author: entry.info.author.clone(),
+            version: entry.info.version.clone(), blocks: entry.blocks.clone(),
+            source: source.clone(), official: entry.official,
+            installed: installed.map(|r| if r.version.is_empty() { "?".into() } else { r.version.clone() }).unwrap_or_default(),
+            update: installed.is_some_and(|r| r.sha256 != entry.sha256),
+            available: true,
+        });
+    }
+    for record in records {
+        if packs.iter().any(|p| p.id == record.id) { continue; }
+        packs.push(PackDto {
+            key: String::new(), id: record.id.clone(), name: record.name.clone(),
+            description: record.description.clone(), author: record.author.clone(),
+            version: record.version.clone(),
+            blocks: mac.into_iter().flat_map(|m| m.block_defs.iter())
+                .filter(|def| record.blocks.contains(&def.id)).map(block_packs::block_name).collect(),
+            source: String::new(), official: false,
+            installed: if record.version.is_empty() { "?".into() } else { record.version.clone() },
+            update: false, available: false,
+        });
+    }
+    packs.sort_by(|a, b| a.installed.is_empty().cmp(&b.installed.is_empty())
+        .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    packs
+}
+
 pub(crate) fn dto(s: &AppState) -> LibraryDto {
     let cache = cache();
-    let records = s.current_macro.as_ref().map(|m| m.settings.block_packs.clone()).unwrap_or_default();
-    let packs = cache
-        .packs
-        .iter()
-        .map(|(url, source, entry)| {
-            let installed = records.iter().find(|r| r.id == entry.info.id);
-            PackDto {
-                key: format!("{url}#{}", entry.info.id),
-                id: entry.info.id.clone(),
-                name: entry.info.name.clone(),
-                description: entry.info.description.clone(),
-                author: entry.info.author.clone(),
-                version: entry.info.version.clone(),
-                blocks: entry.blocks.clone(),
-                source: source.clone(),
-                official: entry.official,
-                installed: installed.map(|r| if r.version.is_empty() { "?".into() } else { r.version.clone() }).unwrap_or_default(),
-                update: installed.is_some_and(|r| r.sha256 != entry.sha256),
-            }
-        })
-        .collect();
+    let packs = pack_entries(s.current_macro.as_ref(), &cache.packs);
     // Sources not fetched yet still show in Settings.
     let mut sources = cache.sources.clone();
     for url in self::sources() {
@@ -158,7 +173,6 @@ pub(crate) fn dto(s: &AppState) -> LibraryDto {
         loading: cache.loading,
         sources,
         packs,
-        installed: records,
         fetching: cache.fetching.clone(),
         error: cache.error.clone(),
     }
@@ -403,6 +417,31 @@ pub(crate) fn export(state: &SharedState, block_ids: Vec<String>, info: block_pa
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn installed_packs_stay_in_one_sorted_list_when_the_source_disappears() {
+        use blockwork_core::macros::Macro;
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../blockwork-core/tests/fixtures/blocks");
+        let index = block_packs::read_index(&std::fs::read_to_string(root.join("index.json")).unwrap(), "https://example.com/index.json").unwrap();
+        let entries: Vec<_> = index.packs.into_iter().map(|entry| ("https://example.com/index.json".into(), "Library".into(), entry)).collect();
+        let mut mac = Macro::new("User".into(), String::new(), vec![]);
+        let text = std::fs::read_to_string(root.join("packs/timing.json")).unwrap();
+        let pack = block_packs::read_pack(&text).unwrap();
+        block_packs::merge_into(&mut mac, &pack, &block_packs::sha256_hex(text.as_bytes()));
+        let packs = pack_entries(Some(&mac), &entries);
+        assert_eq!(packs.len(), 3);
+        assert_eq!(packs[0].id, "timing");
+        assert!(packs[0].available);
+        assert!(!packs[0].installed.is_empty());
+        let offline = pack_entries(Some(&mac), &[]);
+        assert_eq!(offline.len(), 1);
+        assert_eq!(offline[0].id, "timing");
+        assert!(!offline[0].available);
+        assert_eq!(offline[0].author, pack.info.author);
+        assert!(!offline[0].blocks.is_empty());
+        block_packs::remove_from(&mut mac, &offline[0].id).unwrap();
+        assert!(pack_entries(Some(&mac), &[]).is_empty());
+    }
 
     #[test]
     fn only_this_computer_may_use_plain_http() {

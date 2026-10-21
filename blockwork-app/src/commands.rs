@@ -825,7 +825,7 @@ pub(crate) fn create_block(
     let color = normalize_block_color(&color)?;
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
-    let (x, y) = mac.next_strand_position();
+    let (x, y) = mac.next_editor_position();
     let id = mac.create_block(pieces, shape, color, x, y);
     mac.set_block_icon(&id, &icon)?;
     if let Some(def) = mac.graph.block_def_mut(&id) {
@@ -852,6 +852,9 @@ pub(crate) fn edit_block(
     description: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
+    blockwork_core::block_packs::check_editable(
+        s.current_macro.as_ref().ok_or("No macro selected")?, &block_id,
+    )?;
     // `update_block` re-checks both; doing it first keeps a rejected edit
     // from leaving a useless undo step.
     BlockDef::validate_pieces(&pieces)?;
@@ -902,6 +905,9 @@ pub(crate) fn delete_block(
     block_id: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
+    blockwork_core::block_packs::check_editable(
+        s.current_macro.as_ref().ok_or("No macro selected")?, &block_id,
+    )?;
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {
         mac.remove_block(&block_id);
@@ -2055,9 +2061,7 @@ pub(crate) fn clear_instructions(
     } else {
         push_undo(&mut s);
         if let Some(mac) = &mut s.current_macro {
-            // Clearing wipes every strand, including "When Ran" blocks -
-            // "start this macro over from scratch".
-            mac.clear_strands();
+            mac.clear_editor();
             s.invalid_field_buffers.clear();
             auto_save(&mut s);
             s.confirm_clear_instructions = false;
@@ -2125,7 +2129,7 @@ pub(crate) fn add_strand(
     };
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
-    let (default_x, default_y) = mac.next_strand_position();
+    let (default_x, default_y) = mac.next_editor_position();
     let new_id = mac.add_strand(x.unwrap_or(default_x), y.unwrap_or(default_y), ins);
     auto_save(&mut s);
     emit_state_updated(&app, &s);

@@ -1028,7 +1028,7 @@ AppDialog {
         BwTextField {
             id: detailId
             Layout.fillWidth: true
-            placeholderText: qsTr("Details ID (optional)")
+            placeholderText: qsTr("Details ID (AUTHOR_BLOCKNAME)")
         }
         BwTextField {
             id: detailDescription

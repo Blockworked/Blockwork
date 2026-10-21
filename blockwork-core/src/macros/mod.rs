@@ -1924,6 +1924,21 @@ impl Macro {
         }
     }
 
+    /// Pack implementation strands stay available to playback, outside the editor.
+    pub fn editor_strands(&self) -> impl Iterator<Item = &Strand> {
+        self.strands.iter().filter(|strand| !crate::block_packs::is_pack_strand(self, strand))
+    }
+
+    pub fn clear_editor(&mut self) {
+        let ids: Vec<_> = self.editor_strands().map(|strand| strand.id.clone()).collect();
+        self.graph.strands.retain(|strand| !ids.contains(&strand.id));
+        self.graph.prune_orphaned_comments();
+    }
+
+    pub fn next_editor_position(&self) -> (i32, i32) {
+        (self.editor_strands().map(|strand| strand.x).max().unwrap_or(0) + 260, 0)
+    }
+
     /// Keep named references registered when importing or adding blocks.
     pub fn collect_named_signals(&mut self) {
         let mut names = Vec::new();
@@ -2098,37 +2113,23 @@ impl Macro {
     /// `recording_target` if it still exists, else the first "When Ran"
     /// strand, else the first strand (creating one if the macro is empty).
     pub fn recording_target_mut(&mut self) -> &mut Strand {
-        if let Some(id) = &self.recording_target
-            && let Some(pos) = self.graph.strands.iter().position(|s| &s.id == id)
-        {
+        if let Some(id) = self.recording_target_id() {
+            let pos = self.graph.strands.iter().position(|strand| strand.id == id).unwrap();
             return &mut self.graph.strands[pos];
         }
-        if let Some(pos) = self
-            .graph
-            .strands
-            .iter()
-            .position(Strand::starts_with_header)
-        {
-            return &mut self.graph.strands[pos];
-        }
-        if self.graph.strands.is_empty() {
-            self.graph.strands.push(Strand::new(0, 0));
-        }
-        &mut self.graph.strands[0]
+        self.graph.strands.push(Strand::new(0, 0));
+        self.graph.strands.last_mut().unwrap()
     }
 
-    /// Read-only counterpart to `recording_target_mut`: same resolution
-    /// order, but never creates a strand.
+    /// Resolves the recording target without entering a pack implementation.
     pub fn recording_target_id(&self) -> Option<String> {
         if let Some(id) = &self.recording_target
-            && self.graph.strands.iter().any(|s| &s.id == id)
+            && self.editor_strands().any(|strand| &strand.id == id)
         {
             return Some(id.clone());
         }
-        if let Some(strand) = self.graph.strands.iter().find(|s| s.starts_with_header()) {
-            return Some(strand.id.clone());
-        }
-        self.graph.strands.first().map(|s| s.id.clone())
+        self.editor_strands().find(|strand| strand.starts_with_header())
+            .or_else(|| self.editor_strands().next()).map(|strand| strand.id.clone())
     }
 }
 

@@ -1,5 +1,5 @@
 {
-  "author": "Blockwork",
+  "author": "Blockworked",
   "blocks": {
     "block_defs": [
       {
@@ -7,7 +7,7 @@
         "description": "Pauses playback for the given number of seconds.",
         "icon": "clock",
         "id": "e1461af382f64762b3feb097b13eadb8",
-        "identifier": "WaitSeconds",
+        "identifier": "Blockworked_WaitSeconds",
         "pieces": [
           {
             "id": "a615d35e6c0a4939839f21b0ea8e1057",
@@ -33,7 +33,7 @@
         "description": "Pauses playback for a random duration between 80% and 120% of the given number of milliseconds.",
         "icon": "clock",
         "id": "9858935eada646d2aed16adc317aff48",
-        "identifier": "WaitAbout",
+        "identifier": "Blockworked_WaitAbout",
         "pieces": [
           {
             "id": "431179c3768f499daa4bcd472ea334dd",
@@ -183,5 +183,5 @@
   "description": "Wait in seconds, or wait a slightly random time so clicks look less robotic.",
   "id": "timing",
   "name": "Timing",
-  "version": "1.0.1"
+  "version": "1.0.2"
 }

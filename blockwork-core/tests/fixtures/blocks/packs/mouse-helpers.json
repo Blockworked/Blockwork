@@ -1,5 +1,5 @@
 {
-  "author": "Blockwork",
+  "author": "Blockworked",
   "blocks": {
     "block_defs": [
       {
@@ -7,7 +7,7 @@
         "description": "Moves the pointer to the absolute screen coordinates x and y, then clicks the left mouse button.",
         "icon": "mouse-pointer-click",
         "id": "d51bebeec5fe4d858ec85930c7d98e1b",
-        "identifier": "ClickAt",
+        "identifier": "Blockworked_ClickAt",
         "pieces": [
           {
             "id": "501323443c3e4609b6e3cc8103d09670",
@@ -39,7 +39,7 @@
         "description": "Moves the pointer to the absolute screen coordinates x and y, then clicks the left mouse button twice with an 80 ms pause.",
         "icon": "mouse-pointer-click",
         "id": "a640af27e528493eb11de96b4ad58889",
-        "identifier": "DoubleClickAt",
+        "identifier": "Blockworked_DoubleClickAt",
         "pieces": [
           {
             "id": "74b246542b874557b9dfffa9ad591808",
@@ -71,7 +71,7 @@
         "description": "Moves the pointer to the absolute screen coordinates x and y, then clicks the right mouse button.",
         "icon": "mouse-pointer-click",
         "id": "834f1bb530ad41a0b4d041b7df2e5e72",
-        "identifier": "RightClickAt",
+        "identifier": "Blockworked_RightClickAt",
         "pieces": [
           {
             "id": "112c0e311dd749b7b301377b6a0954d1",
@@ -103,7 +103,7 @@
         "description": "Drags with the left mouse button from the starting screen coordinates to the destination, pausing 60 ms before and after the move.",
         "icon": "move",
         "id": "732530587c26402d8ced53b147772699",
-        "identifier": "DragBetween",
+        "identifier": "Blockworked_DragBetween",
         "pieces": [
           {
             "id": "ee0a2366ba6e4eb39b2bf90f2fa8ddb7",
@@ -416,5 +416,5 @@
   "description": "Click, double click, right click and drag at a screen position.",
   "id": "mouse-helpers",
   "name": "Mouse helpers",
-  "version": "1.0.1"
+  "version": "1.0.2"
 }

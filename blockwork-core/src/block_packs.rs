@@ -80,9 +80,52 @@ pub struct PackRecord {
     pub version: String,
     #[serde(default)]
     pub sha256: String,
+    #[serde(default)]
+    pub author: String,
+    #[serde(default)]
+    pub description: String,
     /// Ids of the blocks it added.
     #[serde(default)]
     pub blocks: Vec<String>,
+}
+
+/// The installed pack that owns a definition, including older imported packs.
+pub fn owner<'a>(mac: &'a Macro, block_id: &str) -> Option<&'a PackRecord> {
+    mac.settings.block_packs.iter().find(|pack| pack.blocks.iter().any(|id| id == block_id))
+}
+
+pub fn is_pack_strand(mac: &Macro, strand: &Strand) -> bool {
+    strand.block_header_id().is_some_and(|id| owner(mac, id).is_some())
+}
+
+pub fn check_editable(mac: &Macro, block_id: &str) -> Result<(), String> {
+    if owner(mac, block_id).is_some() {
+        return Err("Community blocks are managed as packs. Remove the pack in the block library".into());
+    }
+    Ok(())
+}
+
+/// Public Details ids use the author's name and chosen block name.
+pub fn details_identifier(author: &str, name: &str) -> String {
+    fn part(text: &str) -> String {
+        text.chars().filter(|c| c.is_alphanumeric()).collect()
+    }
+    let author = part(author);
+    let author = if author.is_empty() { "Community" } else { &author };
+    let prefix = format!("{author}_");
+    let name = name.strip_prefix(&prefix).unwrap_or(name);
+    let name = part(name);
+    format!("{prefix}{}", if name.is_empty() { "Block" } else { &name })
+}
+
+fn apply_details(content: &mut Macro, info: &PackInfo) {
+    for def in &mut content.graph.block_defs {
+        let name = if def.identifier.is_empty() { block_name(def) } else { def.identifier.clone() };
+        def.identifier = details_identifier(&info.author, &name);
+        if def.description.trim().is_empty() {
+            def.description = info.description.clone();
+        }
+    }
 }
 
 pub fn sha256_hex(bytes: &[u8]) -> String {
@@ -164,6 +207,9 @@ pub fn pack_from_macro(mac: &Macro, block_ids: &[String], info: PackInfo) -> Res
     if ids.is_empty() {
         return Err("Pick at least one of this macro's blocks".into());
     }
+    for id in &ids {
+        check_editable(mac, id)?;
+    }
     let strands: Vec<Strand> = ids.iter().filter_map(|id| mac.block_body(id).cloned()).collect();
     let used = names_used(&strands);
     let instruction_ids: HashSet<String> = {
@@ -193,7 +239,9 @@ pub fn pack_from_macro(mac: &Macro, block_ids: &[String], info: PackInfo) -> Res
             .collect(),
         ..MacroGraph::new()
     };
-    Ok(BlockPack { info: clean_info(info)?, content, notes: Vec::new() })
+    let info = clean_info(info)?;
+    apply_details(&mut content, &info);
+    Ok(BlockPack { info, content, notes: Vec::new() })
 }
 
 fn clean_info(mut info: PackInfo) -> Result<PackInfo, String> {
@@ -227,6 +275,7 @@ pub fn slug(text: &str) -> String {
 /// The pack file's text; secret values are masked like an export.
 pub fn write_pack(pack: &BlockPack) -> Result<String, String> {
     let mut content = pack.content.clone();
+    apply_details(&mut content, &pack.info);
     for var in &mut content.graph.variables {
         if let crate::input::value::Evaluated::Text(t) = &mut var.value {
             *t = crate::secrets::redact(t);
@@ -261,6 +310,7 @@ pub fn read_pack(text: &str) -> Result<BlockPack, String> {
     if content.block_defs.is_empty() {
         return Err("The block pack has no blocks".into());
     }
+    apply_details(&mut content, &info);
     Ok(BlockPack { info, content, notes: upgrade.notes })
 }
 
@@ -398,6 +448,8 @@ pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeRepor
         name: pack.info.name.clone(),
         version: pack.info.version.clone(),
         sha256: sha256.to_string(),
+        author: pack.info.author.clone(),
+        description: pack.info.description.clone(),
         blocks: pack.content.block_defs.iter().map(|b| b.id.clone()).collect(),
     });
     report
@@ -538,12 +590,62 @@ mod tests {
         let mut mac = Macro::new("User".into(), String::new(), Vec::new());
         merge_into(&mut mac, &pack, "");
         let (saved, _) = migrate::from_value(migrate::to_value(&mac).unwrap()).unwrap();
-        assert_eq!(saved.block_def(&id), author.block_def(&id));
+        let def = saved.block_def(&id).unwrap();
+        assert_eq!(def.identifier, "Community_WaitSeconds");
+        assert_eq!(def.description, author.block_def(&id).unwrap().description);
         let legacy: blockstitch_core::graph::BlockDef = serde_json::from_str(
             r#"{"id":"legacy","pieces":[],"shape":"Normal"}"#
         ).unwrap();
         assert!(legacy.identifier.is_empty());
         assert!(legacy.description.is_empty());
+    }
+
+    #[test]
+    fn installed_implementations_stay_outside_editor_and_recording() {
+        let mut author = Macro::new("Author".into(), String::new(), vec![]);
+        let id = make_block(&mut author, "wait", vec![InstructionKind::Wait(Value::number(1.0))]);
+        let pack = pack_from_macro(&author, &[id.clone()], PackInfo {
+            name: "Timing".into(), author: "Example Author".into(), ..Default::default()
+        }).unwrap();
+        let mut mac = Macro::new("User".into(), String::new(), vec![]);
+        merge_into(&mut mac, &pack, "checksum");
+        assert_eq!(mac.editor_strands().count(), 1);
+        assert!(check_editable(&mac, &id).is_err());
+        assert!(pack_from_macro(&mac, &[id.clone()], pack.info.clone()).is_err());
+        let local = make_block(&mut mac, "calls community", vec![call(&id)]);
+        assert!(check_editable(&mac, &local).is_ok());
+        assert!(pack_from_macro(&mac, &[local], pack.info.clone()).is_err());
+        assert!(mac.block_body(&id).is_some());
+        mac.recording_target = Some(mac.block_body(&id).unwrap().id.clone());
+        assert_ne!(mac.recording_target_id(), mac.recording_target);
+        mac.clear_editor();
+        assert!(mac.editor_strands().next().is_none());
+        assert!(mac.recording_target_id().is_none());
+        assert!(mac.block_body(&id).is_some());
+        let target = mac.recording_target_mut().id.clone();
+        assert_ne!(Some(target), mac.recording_target);
+        assert!(mac.block_body(&id).is_some());
+        let (saved, _) = migrate::from_value(migrate::to_value(&mac).unwrap()).unwrap();
+        assert_eq!(saved.editor_strands().count(), 1);
+        assert!(saved.block_body(&id).is_some());
+    }
+
+    #[test]
+    fn details_ids_use_author_and_block_name_without_changing_internal_ids() {
+        assert_eq!(details_identifier("Example Author", "WaitSeconds"), "ExampleAuthor_WaitSeconds");
+        assert_eq!(details_identifier("ExampleAuthor", "ExampleAuthor_WaitSeconds"), "ExampleAuthor_WaitSeconds");
+        let mut author = Macro::new("Author".into(), String::new(), vec![]);
+        let id = make_block(&mut author, "wait", vec![]);
+        author.graph.block_def_mut(&id).unwrap().identifier = "WaitSeconds".into();
+        author.graph.block_def_mut(&id).unwrap().description = "Author's description".into();
+        let pack = pack_from_macro(&author, &[id.clone()], PackInfo {
+            name: "Timing".into(), author: "Alice".into(), ..Default::default()
+        }).unwrap();
+        let pack = read_pack(&write_pack(&pack).unwrap()).unwrap();
+        let def = pack.content.block_def(&id).unwrap();
+        assert_eq!(def.identifier, "Alice_WaitSeconds");
+        assert_eq!(def.description, "Author's description");
+        assert!(pack.content.block_body(&id).is_some());
     }
 
     #[test]

@@ -17,7 +17,7 @@ pub(crate) use blockwork_core::macros::{
 };
 pub(crate) use blockstitch_core::graph::{ListDef, ListItem};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::collections::{HashMap, HashSet};
 use crate::AppHandle;
 use std::sync::{Arc, Mutex};
 
@@ -265,9 +265,17 @@ pub(crate) struct MacroDto {
     pub(crate) lists: Vec<ListDto>,
     pub(crate) signals: Vec<String>,
     /// User-defined custom blocks ("My Blocks").
-    pub(crate) block_defs: Vec<BlockDef>,
+    pub(crate) block_defs: Vec<BlockDefinitionDto>,
     /// Settings edited from the "Macro Settings" popup - see `MacroSettingsDto`.
     pub(crate) settings: MacroSettingsDto,
+}
+
+#[derive(Serialize, Clone)]
+pub(crate) struct BlockDefinitionDto {
+    #[serde(flatten)]
+    pub(crate) definition: BlockDef,
+    pub(crate) read_only: bool,
+    pub(crate) pack_name: String,
 }
 
 /// Wire shape for `MacroSettings` - see there for field meanings.
@@ -1717,19 +1725,43 @@ fn strand_to_dto(strand: &Strand) -> StrandDto {
 }
 
 fn macro_to_dto(mac: &Macro) -> MacroDto {
+    let mut hidden_instruction_ids = HashSet::new();
+    for strand in mac.strands.iter().filter(|strand| blockwork_core::block_packs::is_pack_strand(mac, strand)) {
+        for ins in &strand.instructions {
+            ins.walk(&mut |ins| { hidden_instruction_ids.insert(ins.id.clone()); });
+        }
+    }
     MacroDto {
         id: mac.id.clone(),
         name: mac.name.clone(),
         description: mac.description.clone(),
-        strands: mac.strands.iter().map(strand_to_dto).collect(),
+        strands: mac.editor_strands()
+            .map(strand_to_dto).collect(),
         recording_target_strand_id: mac.recording_target_id(),
         speed_multiplier: mac.speed_multiplier,
         floating_values: mac.floating_values.clone(),
-        comments: mac.comments.clone(),
+        comments: mac.comments.iter().filter(|comment| {
+            comment.attached_to.as_ref().is_none_or(|id| !hidden_instruction_ids.contains(id))
+        }).cloned().collect(),
         variables: mac.variables.iter().map(|v| v.name.clone()).collect(),
         lists: mac.lists.iter().map(list_to_dto).collect(),
         signals: mac.signals.clone(),
-        block_defs: mac.block_defs.clone(),
+        block_defs: mac.block_defs.iter().map(|def| {
+            let pack = blockwork_core::block_packs::owner(mac, &def.id);
+            let mut definition = def.clone();
+            if let Some(pack) = pack {
+                let name = if definition.identifier.is_empty() {
+                    blockwork_core::block_packs::block_name(def)
+                } else { definition.identifier.clone() };
+                definition.identifier = blockwork_core::block_packs::details_identifier(&pack.author, &name);
+                if definition.description.is_empty() { definition.description = pack.description.clone(); }
+            }
+            BlockDefinitionDto {
+                definition,
+                read_only: pack.is_some(),
+                pack_name: pack.map(|p| p.name.clone()).unwrap_or_default(),
+            }
+        }).collect(),
         settings: macro_settings_to_dto(&mac.settings),
     }
 }
@@ -2008,6 +2040,35 @@ pub(crate) fn emit_state_updated(app: &AppHandle, s: &AppState) {
 mod tests {
     use super::*;
     use blockwork_core::macros::Instruction;
+
+    #[test]
+    fn community_definitions_are_read_only_and_bodies_are_not_sent_to_editor() {
+        use blockwork_core::block_packs::{self, PackInfo};
+        use blockwork_core::macros::BlockShape;
+        let mut author = Macro::new("Author".into(), String::new(), vec![]);
+        let id = author.create_block(vec![], BlockShape::Normal, "#4C97FF".into(), 900, 400);
+        author.graph.block_def_mut(&id).unwrap().identifier = "Wait".into();
+        author.graph.block_def_mut(&id).unwrap().description = "Waits for an interval.".into();
+        let body = author.block_body(&id).unwrap().clone();
+        let note = Comment::new(0, 0, "Hidden implementation note".into(), Some(body.instructions[0].id.clone()));
+        author.graph.comments.push(note);
+        let pack = block_packs::pack_from_macro(&author, &[id.clone()], PackInfo {
+            name: "Timing".into(), author: "Alice".into(), ..Default::default()
+        }).unwrap();
+        let mut mac = Macro::new("User".into(), String::new(), vec![]);
+        block_packs::merge_into(&mut mac, &pack, "");
+        let dto = macro_to_dto(&mac);
+        assert_eq!(dto.strands.len(), 1);
+        assert!(dto.comments.is_empty());
+        assert!(dto.block_defs[0].read_only);
+        assert_eq!(dto.block_defs[0].definition.identifier, "Alice_Wait");
+        assert_eq!(dto.block_defs[0].definition.description, "Waits for an interval.");
+        let json = serde_json::to_value(&dto).unwrap();
+        assert_eq!(json["block_defs"][0]["id"], id);
+        assert_eq!(json["block_defs"][0]["read_only"], true);
+        assert!(mac.block_body(&id).is_some());
+        assert!(!serde_json::to_string(&dto).unwrap().contains("Hidden implementation note"));
+    }
 
     #[test]
     fn signals_round_trip_through_frontend_without_losing_expression_mode() {
