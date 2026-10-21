@@ -22,7 +22,12 @@ enum Mp {
 struct Reader<'a> {
     data: &'a [u8],
     pos: usize,
+    depth: usize,
 }
+
+/// Deeper nesting than any replay has; past it the file is malformed, and
+/// recursing on would overflow the stack.
+const MAX_DEPTH: usize = 64;
 
 impl<'a> Reader<'a> {
     fn take(&mut self, n: usize) -> Result<&'a [u8], String> {
@@ -41,11 +46,27 @@ impl<'a> Reader<'a> {
     }
 
     fn array(&mut self, n: usize) -> Result<Mp, String> {
-        (0..n).map(|_| self.value()).collect::<Result<_, _>>().map(Mp::Array)
+        self.nested(|r| (0..n).map(|_| r.value()).collect::<Result<_, _>>().map(Mp::Array))
     }
 
     fn map(&mut self, n: usize) -> Result<Mp, String> {
-        let mut entries = Vec::with_capacity(n);
+        self.nested(|r| r.entries(n))
+    }
+
+    fn nested(&mut self, f: impl FnOnce(&mut Self) -> Result<Mp, String>) -> Result<Mp, String> {
+        if self.depth >= MAX_DEPTH {
+            return Err("the file is nested too deeply".into());
+        }
+        self.depth += 1;
+        let result = f(self);
+        self.depth -= 1;
+        result
+    }
+
+    fn entries(&mut self, n: usize) -> Result<Mp, String> {
+        // The count comes from the file: every entry takes at least two
+        // bytes, so a bigger count can't be real and mustn't size the Vec.
+        let mut entries = Vec::with_capacity(n.min((self.data.len() - self.pos) / 2));
         for _ in 0..n {
             let key = match self.value()? {
                 Mp::Str(s) => s,
@@ -313,7 +334,7 @@ fn parse_structured(bytes: &[u8]) -> Result<Replay, String> {
     let root = if bytes.iter().find(|b| !b.is_ascii_whitespace()) == Some(&b'{') {
         Mp::from_json(&serde_json::from_slice(bytes).map_err(|e| format!("invalid JSON replay: {e}"))?)
     } else {
-        Reader { data: bytes, pos: 0 }.value()?
+        Reader { data: bytes, pos: 0, depth: 0 }.value()?
     };
     let inputs = match root.get("inputs") {
         Some(Mp::Array(inputs)) => inputs,
@@ -480,5 +501,20 @@ mod tests {
             ext.push(1);
         }
         assert_eq!(stalled_for_test(&ext), vec![3]);
+    }
+
+    #[test]
+    fn rejects_huge_counts_without_allocating() {
+        // map32 / array32 claiming ~4 billion entries in a few bytes.
+        for tag in [0xdf, 0xdd] {
+            let data = [tag, 0xff, 0xff, 0xff, 0xff, 0xa1, b'a'];
+            assert!(import_gdr(&data, "bad").is_err());
+        }
+    }
+
+    #[test]
+    fn rejects_deep_nesting_without_overflowing() {
+        let data = vec![0x91; 200_000];
+        assert!(import_gdr(&data, "bad").is_err());
     }
 }
