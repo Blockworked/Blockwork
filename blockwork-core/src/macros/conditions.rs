@@ -36,8 +36,13 @@ impl MacroSettings {
         }
         if let Some((from, until)) = self.active_hours {
             let minute = (now.hour() * 60 + now.minute()) as u16;
-            // A range like 22:00-06:00 runs past midnight.
-            let inside = if from <= until { minute >= from && minute < until } else { minute >= from || minute < until };
+            // A range like 22:00-06:00 runs past midnight, and one that ends
+            // where it starts (09:00-09:00) is the whole day.
+            let inside = if from < until {
+                minute >= from && minute < until
+            } else {
+                from == until || minute >= from || minute < until
+            };
             if !inside {
                 return Some(format!("only runs from {} to {}", clock(from), clock(until)));
             }
@@ -102,6 +107,9 @@ mod tests {
         assert_eq!(s.check(&at(15, 23, 30), || true, || window("x")), None);
         assert_eq!(s.check(&at(15, 5, 59), || true, || window("x")), None);
         assert_eq!(s.check(&at(15, 6, 0), || true, || window("x")).unwrap(), "only runs from 22:00 to 06:00");
+        s.active_hours = Some((parse_clock("9:00").unwrap(), parse_clock("9:00").unwrap()));
+        assert_eq!(s.check(&at(15, 3, 0), || true, || window("x")), None);
+        assert_eq!(s.check(&at(15, 9, 0), || true, || window("x")), None);
 
         s.active_hours = None;
         s.active_days = 1 << 4; // Thursday
