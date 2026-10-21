@@ -79,17 +79,19 @@ modules:
       - install -Dm644 res/com.blockworked.Blockwork.metainfo.xml /app/share/metainfo/com.blockworked.Blockwork.metainfo.xml
     sources:
       # BEGIN app-source
+      # Point at the release tag (and its commit) when submitting to Flathub.
       - type: git
         url: https://github.com/Blockworked/Blockwork.git
-        branch: main
+        branch: master
       # END app-source
 
       # CI replaces this with the checked-out sibling so coordinated branches
       # can be tested before both repositories are merged.
       # BEGIN blockstitch-source
+      # Keep in step with the blockstitch rev pinned in Cargo.toml.
       - type: git
         url: https://github.com/Blockworked/blockstitch.git
-        branch: main
+        commit: aee80af36c77480d5be6e3f60f0ba6b3dcfbeec3
         dest: .flatpak-blockstitch
       # END blockstitch-source
 

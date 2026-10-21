@@ -26,9 +26,12 @@
       <li>Wait blocks with randomized timing</li>
       <li>Reusable custom blocks with custom colors</li>
       <li>Global hotkeys to start and stop macros</li>
+      <li>Triggers and schedules: text expansion, windows, files, apps, idle time, USB devices and cron</li>
+      <li>Screen, image and window blocks, including text recognition</li>
+      <li>File, web, shell and dialog blocks, with permissions for shared macros</li>
     </ul>
     <p>
-      **Recording input and hotkeys requires your user to be in the input group. See the Help link for setup steps.**
+      <em>Recording input and hotkeys requires your user to be in the input group. See the Help link for setup steps.</em>
     </p>
   </description>
 
@@ -68,6 +71,25 @@
   </screenshots>
 
   <releases>
+    <release version="0.6.0" date="2026-10-21">
+      <description>
+        <p>A large feature release: macros can now react to what happens on the computer and see the screen.</p>
+        <ul>
+          <li>Triggers for typed abbreviations, windows, files, apps, idle time, network, USB devices, schedules and webhooks</li>
+          <li>Screen, image, text recognition and window blocks, with a screen picker in the editor</li>
+          <li>File, web, shell, notification and dialog blocks</li>
+          <li>Error handling, a debugger with breakpoints, and an emergency stop hotkey</li>
+          <li>Global variables, secrets kept in the system keyring, and macros that run other macros</li>
+          <li>A searchable macro library, shareable bundles and block packs, with a permission review on import</li>
+          <li>A translatable interface, a command line, and starter templates</li>
+        </ul>
+      </description>
+    </release>
+    <release version="0.5.4" date="2026-09-20">
+      <description>
+        <p>Blockwork is now available as a Flatpak, and runs as a background daemon with a separate editor window.</p>
+      </description>
+    </release>
     <release version="0.5.3" date="2026-09-14">
       <description>
         <p>The project has moved to the Blockworked organization on GitHub.</p>

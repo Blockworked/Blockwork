@@ -10,6 +10,8 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ## [Unreleased]
 
+## [0.6.0] - 2026-10-21
+
 ### Added
 - File blocks:
   - Write or append to a file, read a file, check a file exists, list a folder.
@@ -255,7 +257,8 @@ Initial release.
 - Global shortcuts (navigation, loop mode) on Linux; global keybinds on Windows.
 - App icons, updater and confirm dialogs, Wayland support.
 
-[Unreleased]: https://github.com/Blockworked/Blockwork/compare/0.5.4...HEAD
+[Unreleased]: https://github.com/Blockworked/Blockwork/compare/0.6.0...HEAD
+[0.6.0]: https://github.com/Blockworked/Blockwork/compare/0.5.4...0.6.0
 [0.5.4]: https://github.com/Blockworked/Blockwork/compare/0.5.3...0.5.4
 [0.5.3]: https://github.com/Blockworked/Blockwork/compare/0.5.2...0.5.3
 [0.5.2]: https://github.com/Blockworked/Blockwork/compare/0.5.1...0.5.2
