@@ -424,6 +424,8 @@ pub(crate) enum InstructionDto {
     WhenTime {
         id: String,
         schedule: TimeSchedule,
+        #[serde(default = "default_schedule_time")]
+        time: Value,
     },
     WhenPowerPluggedIn {
         id: String,
@@ -891,6 +893,10 @@ fn str_to_axis(s: &str) -> Axis {
     }
 }
 
+fn default_schedule_time() -> Value {
+    Value::text("09:00")
+}
+
 fn match_by_title() -> String {
     "Title".into()
 }
@@ -921,9 +927,10 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             id,
             threshold: threshold.clone(),
         },
-        InstructionKind::WhenTime(schedule) => InstructionDto::WhenTime {
+        InstructionKind::WhenTime(schedule, time) => InstructionDto::WhenTime {
             id,
             schedule: *schedule,
+            time: time.clone(),
         },
         InstructionKind::WhenPowerPluggedIn => InstructionDto::WhenPowerPluggedIn { id },
         InstructionKind::WhenPowerUnplugged => InstructionDto::WhenPowerUnplugged { id },
@@ -1339,7 +1346,7 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
             id,
             InstructionKind::WhenBatteryChargedTo(threshold.clone()),
         ),
-        InstructionDto::WhenTime { id, schedule } => (id, InstructionKind::WhenTime(*schedule)),
+        InstructionDto::WhenTime { id, schedule, time } => (id, InstructionKind::WhenTime(*schedule, time.clone())),
         InstructionDto::WhenPowerPluggedIn { id } => (id, InstructionKind::WhenPowerPluggedIn),
         InstructionDto::WhenPowerUnplugged { id } => (id, InstructionKind::WhenPowerUnplugged),
         InstructionDto::WhenClipboardChanged { id } => (id, InstructionKind::WhenClipboardChanged),

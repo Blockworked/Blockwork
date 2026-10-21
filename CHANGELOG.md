@@ -111,6 +111,9 @@ section below as the GitHub release notes, followed by the downloads table.
 - Smooth scrolling: a mouse wheel notch glides to its spot instead of jumping, in the editor canvas, the block palette, Settings and the other scrolling lists. Jumping to a block from the run log glides there too.
 - Settings > General > Animation speed, a slider from Instant to Slow. Instant turns every animation off.
 - Pinch on a touchpad to zoom the canvas.
+- Time and schedule pickers:
+  - Click the time on a "when every day at" block to pick it from a popup (tap an hour and a minute, or nudge them), instead of typing it. The time slot also takes a variable or reporter that gives a time like 09:30.
+  - "On schedule" reads in words ("weekdays at 09:00", "every 15 minutes") and opens a schedule picker: repeat every few minutes or hours, run at a time on chosen days, or once a month, with the next few runs shown. Cron text still works under Custom, and the slot still takes a reporter.
 
 ### Changed
 - Macro files now carry a format version and are upgraded step by step when
@@ -128,6 +131,7 @@ section below as the GitHub release notes, followed by the downloads table.
   grabbing an input device, preventing stuck input when Blockwork starts.
 - A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
 - Ctrl+scroll zooms the canvas around the mouse pointer instead of pushing the view right and down, and mouse wheel zoom, the zoom buttons and reset now ease in (follows the animation speed setting).
+- The "when every day at" block saves its day, weekday, month and time again.
 - Dragging the canvas with the mouse stops where you let go instead of gliding on, and two-finger touchpad panning is smoothed slightly.
 - Every event block label now uses the same bold caption style; newer event blocks (when run, when file changes, when idle and others) were drawn in plain text while the older ones were bold.
 

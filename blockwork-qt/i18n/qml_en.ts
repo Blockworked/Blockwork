@@ -15,7 +15,7 @@
 <context>
     <name>BlockCanvas</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1204"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1300"/>
         <source>%n item(s)</source>
         <translation>
             <numerusform>%n item</numerusform>
@@ -23,7 +23,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1248"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1344"/>
         <source>%n entry(s)</source>
         <translation>
             <numerusform>%n entry</numerusform>
@@ -96,6 +96,33 @@
         <translation>
             <numerusform>%n block</numerusform>
             <numerusform>%n blocks</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
+    <name>Schedules</name>
+    <message numerus="yes">
+        <location filename="../qml/Schedules.qml" line="148"/>
+        <source>every %n minutes</source>
+        <translation>
+            <numerusform>every %n minute</numerusform>
+            <numerusform>every %n minutes</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Schedules.qml" line="155"/>
+        <source>every %n hours</source>
+        <translation>
+            <numerusform>every %n hour</numerusform>
+            <numerusform>every %n hours</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/Schedules.qml" line="155"/>
+        <source>every %n hours at :%1</source>
+        <translation>
+            <numerusform>every %n hour at :%1</numerusform>
+            <numerusform>every %n hours at :%1</numerusform>
         </translation>
     </message>
 </context>

@@ -7,6 +7,7 @@ use crate::scheduled_run;
 use crate::state::SharedState;
 use crate::AppHandle;
 use blockwork_core::input::cron::Cron;
+use blockwork_core::input::schedule::parse_time_of_day;
 use blockwork_core::macros::{InstructionKind, Macro, Strand};
 use blockwork_core::run_log;
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Timelike};
@@ -49,9 +50,10 @@ fn save_last_seen(now: DateTime<Local>) {
 fn missed(strand: &Strand, env: &HashMap<String, blockwork_core::input::value::Evaluated>, from: DateTime<Local>, to: DateTime<Local>) -> bool {
     let from = from.max(to - chrono::Duration::seconds(MAX_CATCH_UP_SECS));
     let matches: Box<dyn Fn(&DateTime<Local>) -> bool> = match strand.instructions.first().map(|i| &i.kind) {
-        Some(InstructionKind::WhenTime(schedule)) => {
-            let schedule = schedule.clone();
-            Box::new(move |t| schedule.matches(t))
+        Some(InstructionKind::WhenTime(schedule, time)) => {
+            let Some((hour, minute)) = time_of_day(time, env) else { return false };
+            let schedule = *schedule;
+            Box::new(move |t| schedule.matches(t, hour, minute))
         }
         Some(InstructionKind::WhenCron(expression)) => {
             let Ok(cron) = expression.resolve_vars(env).eval_text().unwrap_or_default().parse::<Cron>() else { return false };
@@ -71,6 +73,11 @@ fn missed(strand: &Strand, env: &HashMap<String, blockwork_core::input::value::E
         minute += chrono::Duration::minutes(1);
     }
     false
+}
+
+/// A `WhenTime` header's time of day, as 24-hour `(hour, minute)`.
+fn time_of_day(time: &blockwork_core::input::value::Value, env: &HashMap<String, blockwork_core::input::value::Evaluated>) -> Option<(u8, u8)> {
+    parse_time_of_day(&time.resolve_vars(env).eval_text().ok()?).ok()
 }
 
 /// A `WhenAt` header's moment.
@@ -127,8 +134,17 @@ fn run(shared_state: SharedState, app: AppHandle) {
                     }
                 };
                 let due = match strand.instructions.first().map(|i| &i.kind) {
-                    Some(InstructionKind::WhenTime(schedule)) => {
-                        previous.map(|t| t.date()) != Some(minute.date()) && schedule.matches(&now)
+                    Some(InstructionKind::WhenTime(schedule, time)) => {
+                        let text = time.resolve_vars(&env).eval_text().unwrap_or_default();
+                        match parse_time_of_day(&text) {
+                            Ok((hour, minute_of_hour)) => {
+                                previous.map(|t| t.date()) != Some(minute.date()) && schedule.matches(&now, hour, minute_of_hour)
+                            }
+                            Err(e) => {
+                                report(text, format!("When: {e}"));
+                                false
+                            }
+                        }
                     }
                     Some(InstructionKind::WhenCron(expression)) => {
                         let text = expression.resolve_vars(&env).eval_text().unwrap_or_default();
@@ -195,5 +211,9 @@ mod tests {
         let once = strand(InstructionKind::WhenAt(Value::text("2026-03-10 09:15")));
         assert!(missed(&once, &env, at(9, 0), at(9, 20)));
         assert!(!missed(&once, &env, at(9, 20), at(9, 40)));
+
+        let daily = strand(InstructionKind::WhenTime(blockwork_core::input::schedule::TimeSchedule::Daily, Value::text("9:45")));
+        assert!(missed(&daily, &env, at(9, 0), at(10, 0)));
+        assert!(!missed(&daily, &env, at(10, 0), at(11, 0)));
     }
 }

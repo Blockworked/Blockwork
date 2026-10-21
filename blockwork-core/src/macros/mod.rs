@@ -2,7 +2,7 @@
 //! the `Macro` document wrapped around blockstitch's [`BlockGraph`].
 //! [`InstructionKind`]'s [`BlockKind`] impl is the hinge between the two.
 
-use crate::input::schedule::TimeSchedule;
+use crate::input::schedule::{LegacyTimeSchedule, TimeSchedule};
 use crate::input::types::{Direction, InputToken, MacroButton};
 use crate::input::value::{Op, Value};
 use serde::{Deserialize, Serialize};
@@ -188,7 +188,7 @@ impl BlockKind for InstructionKind {
             | InstructionKind::ContinueLoop
             | InstructionKind::StopMacro
             | InstructionKind::TryCatch { .. }
-            | InstructionKind::WhenTime(_)
+            | InstructionKind::WhenTime(..)
             | InstructionKind::WhenPowerPluggedIn
             | InstructionKind::WhenPowerUnplugged
             | InstructionKind::WhenClipboardChanged
@@ -213,7 +213,7 @@ impl BlockKind for InstructionKind {
                 | InstructionKind::BlockHeader(_)
                 | InstructionKind::WhenBatteryDischargedTo(_)
                 | InstructionKind::WhenBatteryChargedTo(_)
-                | InstructionKind::WhenTime(_)
+                | InstructionKind::WhenTime(..)
                 | InstructionKind::WhenPowerPluggedIn
                 | InstructionKind::WhenPowerUnplugged
                 | InstructionKind::WhenClipboardChanged
@@ -397,8 +397,9 @@ pub enum InstructionKind {
     /// Header-only marker, same shape/semantics as `WhenBatteryDischargedTo`
     /// (excluded from Run/Loop, driven by a background watcher - `time_watch`
     /// in the desktop app) but for a recurring point in local time instead
-    /// of a battery level. See `TimeSchedule` for the recurrence shapes.
-    WhenTime(TimeSchedule),
+    /// of a battery level. See `TimeSchedule` for the recurrence shapes; the
+    /// value is the time of day, like `09:30` (see `parse_time_of_day`).
+    WhenTime(TimeSchedule, Value),
     /// Header-only marker, no payload (like `WhenRan`) - excluded from
     /// Run/Loop and driven by the same background watcher as
     /// `WhenBattery*To` (`battery_watch` in the desktop app), which fires
@@ -891,9 +892,10 @@ impl std::hash::Hash for InstructionKind {
                 18u8.hash(state);
                 v.hash(state);
             }
-            Self::WhenTime(s) => {
+            Self::WhenTime(s, t) => {
                 19u8.hash(state);
                 s.hash(state);
+                t.hash(state);
             }
             Self::WhenPowerPluggedIn => {
                 20u8.hash(state);
@@ -1195,6 +1197,15 @@ impl std::hash::Hash for InstructionKind {
     }
 }
 
+/// `WhenTime` as saved now (recurrence + time value), or before the time
+/// became a value (one object with a fixed `hour`/`minute`).
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum WhenTimeDe {
+    Current(TimeSchedule, Value),
+    Legacy(LegacyTimeSchedule),
+}
+
 #[derive(Deserialize)]
 enum InstructionKindDe {
     Token(InputToken),
@@ -1204,7 +1215,7 @@ enum InstructionKindDe {
     WhenRan,
     WhenBatteryDischargedTo(Value),
     WhenBatteryChargedTo(Value),
-    WhenTime(TimeSchedule),
+    WhenTime(WhenTimeDe),
     WhenPowerPluggedIn,
     WhenPowerUnplugged,
     WhenClipboardChanged,
@@ -1532,7 +1543,10 @@ impl From<InstructionKindDe> for InstructionKind {
                 InstructionKind::WhenBatteryDischargedTo(v)
             }
             InstructionKindDe::WhenBatteryChargedTo(v) => InstructionKind::WhenBatteryChargedTo(v),
-            InstructionKindDe::WhenTime(s) => InstructionKind::WhenTime(s),
+            InstructionKindDe::WhenTime(WhenTimeDe::Current(s, t)) => InstructionKind::WhenTime(s, t),
+            InstructionKindDe::WhenTime(WhenTimeDe::Legacy(old)) => {
+                InstructionKind::WhenTime(old.schedule, Value::text(format!("{:02}:{:02}", old.hour, old.minute)))
+            }
             InstructionKindDe::WhenPowerPluggedIn => InstructionKind::WhenPowerPluggedIn,
             InstructionKindDe::WhenPowerUnplugged => InstructionKind::WhenPowerUnplugged,
             InstructionKindDe::WhenClipboardChanged => InstructionKind::WhenClipboardChanged,
@@ -2604,6 +2618,17 @@ mod tests {
             ins,
             Instruction::new(InstructionKind::Wait(Value::number(1000.0)))
         );
+    }
+
+    #[test]
+    fn legacy_when_time_moves_its_clock_into_a_time_value() {
+        use crate::input::schedule::Weekday;
+        let ins: Instruction = serde_json::from_str(r#"{"WhenTime":{"kind":"Weekly","weekday":"Monday","hour":7,"minute":5}}"#).unwrap();
+        let expected = InstructionKind::WhenTime(TimeSchedule::Weekly { weekday: Weekday::Monday }, Value::text("07:05"));
+        assert_eq!(ins, Instruction::new(expected.clone()));
+        // And the new shape reads back as itself.
+        let round: Instruction = serde_json::from_str(&serde_json::to_string(&ins).unwrap()).unwrap();
+        assert_eq!(round, Instruction::new(expected));
     }
 
     #[test]

@@ -1067,7 +1067,7 @@ fn run_block(
             // defensively so the match stays total.
             InstructionKind::WhenBatteryDischargedTo(_) => {}
             InstructionKind::WhenBatteryChargedTo(_) => {}
-            InstructionKind::WhenTime(_) => {}
+            InstructionKind::WhenTime(..) => {}
             InstructionKind::WhenPowerPluggedIn => {}
             InstructionKind::WhenPowerUnplugged => {}
             InstructionKind::WhenClipboardChanged => {}

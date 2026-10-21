@@ -35,6 +35,7 @@ fn main() {
         "qml/AppDialog.qml",
         "qml/GlobalPicker.qml",
         "qml/NamePicker.qml",
+        "qml/SchedulePicker.qml",
     ];
 
     // Shared Lucide icons (lean set): staged under qml/Lucide/ (gitignored,
@@ -46,6 +47,7 @@ fn main() {
         QmlModule::new("com.blockworked.Blockwork")
             .version(1, 0)
             .qml_file(QmlFile::from(lucide_icons).singleton(true))
+            .qml_file(QmlFile::from("qml/Schedules.qml").singleton(true))
             .qml_files(blockwork)
             .qml_files([lucide_item]),
     )
