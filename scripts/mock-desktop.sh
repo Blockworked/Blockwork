@@ -13,12 +13,18 @@
 # `cmd` runs inside the desktop; it defaults to the live screen tests. A
 # screenshot of the desktop is saved to $MOCK_SHOT (default
 # target/mock-desktop-<desktop>.png) when the desktop can take one.
+#
+# Fake input devices are on unless MOCK_INPUT=0: a keyboard, a mouse and
+# /dev/uinput served by scripts/mock-desktop/fake-input.py through an
+# LD_PRELOAD shim, with what is written to uinput injected into X11. Drive them
+# from `cmd` with `mock-input` (see `mock-input --help`).
 set -euo pipefail
 
 QT_PREFIX=${QT_PREFIX:-/opt/qt6}
 PLASMA6_ROOT=${PLASMA6_ROOT:-/opt/plasma6}
 REPO=$(cd "$(dirname "$0")/.." && pwd)
 GAME_QML="$REPO/scripts/mock-desktop/fake-minecraft.qml"
+INPUT_DIR="$REPO/scripts/mock-desktop"
 WIDTH=1920
 HEIGHT=1080
 
@@ -33,7 +39,11 @@ setup() {
         pkg-config clang libgtk-3-dev libxdo-dev libssl-dev libdbus-1-dev libudev-dev \
         libwayland-dev libxkbcommon-dev libgl1-mesa-dev libegl1 libfontconfig1-dev \
         libxcb-cursor0 libxcb-icccm4 libxcb-image0 libxcb-keysyms1 libxcb-render-util0 libxcb-xkb1 \
-        xvfb openbox xdotool imagemagick dbus-x11 sway grim kwin-wayland tesseract-ocr debootstrap
+        xvfb openbox xdotool imagemagick dbus-x11 sway grim kwin-wayland tesseract-ocr debootstrap \
+        gcc python3-pip
+    # The fake input broker injects into X11 with XTest.
+    python3 -c 'import Xlib' 2>/dev/null || pip install -q --break-system-packages python-xlib \
+        || apt-get install -y -qq python3-xlib
     # Blockwork needs Qt 6.10+. download.qt.io (aqt, CXX-Qt's qt_minimal) is
     # often blocked in sandboxes; conda-forge is not.
     if [[ ! -x $QT_PREFIX/bin/qmake6 ]]; then
@@ -173,6 +183,7 @@ start_kwin6() {
 start_game() {
     local qml=$QT_PREFIX/bin/qml6
     [[ -x $qml ]] || qml=$(command -v qml6 || command -v qml) || die "no qml runtime; run setup"
+    QML_BIN=$qml
     local platform=wayland
     [[ $DESKTOP == x11 ]] && platform=xcb
     # Server-side decorations where the desktop has them, so the window's
@@ -184,6 +195,32 @@ start_game() {
         kwin6) wait_for 'kdotool search Minecraft | grep -q .' ;;
         *) sleep 2 ;;
     esac
+}
+
+# Fake keyboard, mouse and /dev/uinput (see the header). The shim only
+# touches those paths, so it's preloaded into everything `cmd` starts.
+start_input() {
+    [[ ${MOCK_INPUT:-1} == 1 ]] || return 0
+    export FAKE_EVDEV_DIR=$STATE/input MOCK_INPUT_LOG=$STATE/input-target.log
+    mkdir -p "$FAKE_EVDEV_DIR" "$STATE/bin"
+    cc -shared -fPIC -O2 -o "$STATE/fake-evdev.so" "$INPUT_DIR/fake-evdev.c" -ldl
+    spawn python3 "$INPUT_DIR/fake-input.py" serve "$FAKE_EVDEV_DIR"
+    wait_for '[ -S "$FAKE_EVDEV_DIR/control.sock" ]'
+    local platform=wayland
+    [[ $DESKTOP == x11 ]] && platform=xcb
+    # `mock-input target` opens a window that logs the input it gets to
+    # $MOCK_INPUT_LOG; everything else goes to the broker.
+    {
+        echo '#!/bin/sh'
+        echo 'if [ "$1" = target ]; then'
+        echo "    QT_QPA_PLATFORM=$platform LD_PRELOAD= setsid '$QML_BIN' '$INPUT_DIR/input-target.qml' >>'$MOCK_INPUT_LOG' 2>&1 &"
+        echo '    exit 0'
+        echo 'fi'
+        echo "exec python3 '$INPUT_DIR/fake-input.py' \"\$@\""
+    } >"$STATE/bin/mock-input"
+    chmod +x "$STATE/bin/mock-input"
+    export PATH=$STATE/bin:$PATH
+    export LD_PRELOAD=$STATE/fake-evdev.so${LD_PRELOAD:+:$LD_PRELOAD}
 }
 
 screenshot() {
@@ -211,6 +248,7 @@ run() {
     [[ -x $QT_PREFIX/bin/qmake6 ]] && export QMAKE=$QT_PREFIX/bin/qmake6
     "start_$DESKTOP"
     start_game
+    start_input
     # The conda-forge Qt isn't on the loader path for the built app.
     [[ -d $QT_PREFIX/lib ]] && export LD_LIBRARY_PATH=$QT_PREFIX/lib${LD_LIBRARY_PATH:+:$LD_LIBRARY_PATH}
     local status=0

@@ -5,7 +5,7 @@ app itself, on a headless desktop with a stand-in Minecraft window
 (`scripts/mock-desktop/fake-minecraft.qml`: sky, ground, a walking blocky
 player, and a pure red marker at the crosshair). It is meant for cloud
 containers and CI on Ubuntu 24.04, where there is no real session, no GPU
-and no `/dev/uinput`.
+and no `/dev/uinput`; fake input devices stand in for the keyboard and mouse.
 
 ```bash
 sudo scripts/mock-desktop.sh setup          # once: packages, Qt 6.10, kdotool, Plasma 6 root
@@ -33,10 +33,47 @@ libraries set up. A screenshot of the desktop lands in
 So on KDE the capture path and the window path can each be exercised, but not
 both in one session. A real Plasma 6 desktop is still needed for that.
 
+## Input devices
+
+Containers have no `/dev/uinput` or `/dev/input/event*`, so the script fakes
+them (turn it off with `MOCK_INPUT=0`):
+
+- `scripts/mock-desktop/fake-evdev.c` is built into an `LD_PRELOAD` shim
+  that every command inherits. It turns opening `/dev/uinput` or
+  `/dev/input/eventN`, and listing `/dev/input`, into Unix sockets served
+  by the broker, and answers the evdev ioctls (capabilities, `EVIOCGKEY`,
+  `EVIOCGRAB`) itself. Other paths go to the real calls.
+- `scripts/mock-desktop/fake-input.py` is the broker. It serves a fake
+  keyboard (`event0`) and mouse (`event1`). What a process writes to uinput
+  is logged and injected into X11 with XTest, the way the kernel would hand
+  a virtual device to the desktop. Events "typed" on the fake devices go to
+  whoever opened them, and to X11 directly while nobody holds a grab, as
+  with real hardware.
+
+So Blockwork's evdev backend runs unchanged: it grabs both devices, its
+hotkeys, triggers and recording see the fake typing, and macros type into
+the X server. Drive it from the command with `mock-input`:
+
+```bash
+scripts/mock-desktop.sh run x11 sh -c '
+  mock-input target                      # a window that logs what it receives
+  ./target/debug/blockwork-daemon & mock-input wait-grab
+  mock-input combo leftctrl leftalt m    # Blockwork default: run the selected macro
+  mock-input type "brb "                 # text expansion
+  mock-input log                         # what Blockwork sent through uinput
+  cat "$MOCK_INPUT_LOG"'                 # what the target window received
+```
+
+`mock-input --help` lists the commands (`tap`, `combo`, `down`/`up`,
+`type`, `click`, `move`, `wheel`, `status`, `wait-grab`, `wait-log`).
+`mock-input type` waits 50 ms between keys unless `--delay=MS` says
+otherwise. Absolute mouse moves need libei, which isn't faked.
+
 ## What doesn't work here
 
-- Input. Recording and playback use `/dev/uinput` and `/dev/input/event*`,
-  which containers don't have; the app logs that the evdev backend is off.
+- Input outside X11. The fake devices below work on every desktop, but what
+  Blockwork types is only injected into the desktop on `x11`; elsewhere it's
+  logged (`mock-input log`) and nothing on screen reacts.
 - Cursor position on Wayland: "this desktop doesn't share the cursor
   position" is expected.
 - The desktop portal (GNOME's capture fallback) isn't set up.
