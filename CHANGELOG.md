@@ -135,6 +135,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - The "when every day at" block saves its day, weekday, month and time again.
 - Dragging the canvas with the mouse stops where you let go instead of gliding on, and two-finger touchpad panning is smoothed slightly.
 - Every event block label now uses the same bold caption style; newer event blocks (when run, when file changes, when idle and others) were drawn in plain text while the older ones were bold.
+- Images taken with the screen picker no longer catch the picker's own close animation (such as KDE's shattering windows) as stray lines and shapes.
 
 ## [0.5.4] - 2026-09-20
 
