@@ -29,7 +29,6 @@ static PROBLEM: Mutex<String> = Mutex::new(String::new());
 pub(crate) struct WebhookDto {
     enabled: bool,
     port: u16,
-    token: String,
     /// Set when the port couldn't be opened.
     error: String,
 }
@@ -39,9 +38,14 @@ pub(crate) fn dto() -> WebhookDto {
     WebhookDto {
         enabled: settings.webhook_enabled.unwrap_or(false),
         port: settings.webhook_port.unwrap_or(DEFAULT_PORT),
-        token: settings.webhook_token.unwrap_or_default(),
         error: PROBLEM.lock().map(|p| p.clone()).unwrap_or_default(),
     }
+}
+
+/// The token, fetched only when the user copies or shows it, so it isn't in
+/// every state update the UI gets.
+pub(crate) fn token() -> String {
+    load_settings().webhook_token.unwrap_or_default()
 }
 
 fn fresh_token() -> String {

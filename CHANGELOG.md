@@ -20,6 +20,7 @@ section below as the GitHub release notes, followed by the downloads table.
   - Send GET/POST/PUT/PATCH/DELETE requests into a variable, or fetch a URL.
   - Read values out of JSON.
   - Webhook trigger: an opt-in local server (Settings > Integrations) that starts macros on a web request with a token, passing the request body.
+    - Its token stays hidden as dots in Settings, so it's safe on a shared screen: copy it (or a ready-made curl example) without showing it, or show it briefly.
 - Shell reporters: a command's output and whether it succeeded.
 - Notify block for desktop notifications.
 - Dialog blocks: ask for text, ask yes or no, choose from a list, show a message.

@@ -154,6 +154,7 @@ impl Backend {
                 to_json(crate::block_library::export(&self.state, block_ids, info, path)?)
             }
             "new_webhook_token" => to_json(crate::webhook::new_token(&self.state, &self.app)?),
+            "webhook_token" => to_json(crate::webhook::token()),
             "set_macro_max_run_secs" => {
                 let seconds: u32 = arg(&args, "seconds")?;
                 to_json(commands::set_macro_max_run_secs(&self.state, &self.app, seconds)?)

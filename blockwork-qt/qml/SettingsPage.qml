@@ -8,6 +8,7 @@ Item {
     id: root
     required property var appState
     required property var invoke
+    property var appBridge: null
     property var translator: null
     function capturingBinding(index){return appState.combo_capture&&appState.combo_capture.kind==="Binding"&&appState.combo_capture.binding_index===index}
     function capturingAction(action){return appState.combo_capture&&appState.combo_capture.kind==="Named"&&JSON.stringify(appState.combo_capture.action)===JSON.stringify(action)}
@@ -335,37 +336,100 @@ Item {
                                 Item { Layout.fillWidth: true }
                             }
                             SettingsRow {
-                                readonly property var hook: appState.webhook || ({ enabled: false, port: 8787, token: "", error: "" })
-                                title: !hook.enabled ? qsTr("Webhook server off") : hook.error ? qsTr("Webhook server not running") : qsTr("Webhook server listening on port %1").arg(hook.port)
-                                detail: hook.error || qsTr("Lets other programs and services start macros with a web request to a \"when webhook is called\" block. Only reachable from this computer.")
-                                BwTextField {
-                                    id: hookPort; implicitWidth: 100
-                                    text: String(appState.webhook ? appState.webhook.port : 8787); validator: IntValidator { bottom: 1; top: 65535 }
-                                    onEditingFinished: root.invoke("set_webhook", { enabled: !!appState.webhook && appState.webhook.enabled, port: Number(text) || 8787 })
+                                id: hookRow
+                                readonly property var hook: appState.webhook || ({ enabled: false, port: 8787, error: "" })
+                                title: qsTr("Webhook server")
+                                detail: hook.error || qsTr("Lets other programs start macros with a web request to a \"when webhook is called\" block. Only reachable from this computer.")
+                                Row {
+                                    anchors.verticalCenter: parent.verticalCenter; spacing: 6
+                                    readonly property color tint: !hookRow.hook.enabled ? "#9fa0a6" : hookRow.hook.error ? Theme.warning : Theme.running
+                                    Rectangle { width: 8; height: 8; radius: 4; color: parent.tint; anchors.verticalCenter: parent.verticalCenter }
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter; color: parent.tint; font.pixelSize: 13
+                                        text: !hookRow.hook.enabled ? qsTr("Off") : hookRow.hook.error ? qsTr("Not running") : qsTr("Listening")
+                                    }
                                 }
-                                BwSwitch {
-                                    Accessible.name: qsTr("On"); checked: !!appState.webhook && appState.webhook.enabled
-                                    onToggled: checked => root.invoke("set_webhook", { enabled: checked, port: Number(hookPort.text) || 8787 })
+                                BwTextField {
+                                    id: hookPort; implicitWidth: 80; Accessible.name: qsTr("Webhook port")
+                                    text: String(hookRow.hook.port); validator: IntValidator { bottom: 1; top: 65535 }
+                                    onEditingFinished: root.invoke("set_webhook", { enabled: !!hookRow.hook.enabled, port: Number(text) || 8787 })
+                                }
+                                // The row's title names the switch, so its own label is clipped off.
+                                Item {
+                                    anchors.verticalCenter: parent.verticalCenter; implicitWidth: 38; implicitHeight: 28; clip: true
+                                    BwSwitch {
+                                        Accessible.name: qsTr("Webhook server"); checked: !!hookRow.hook.enabled
+                                        onToggled: checked => root.invoke("set_webhook", { enabled: checked, port: Number(hookPort.text) || 8787 })
+                                    }
                                 }
                             }
+                            // The token stays hidden: copying fetches it without showing it, and
+                            // Show reveals it until Hide, 30 seconds pass or the window loses focus.
                             ColumnLayout {
                                 id: hookInfo
-                                readonly property var hook: appState.webhook || ({})
-                                visible: !!hook.enabled && !!hook.token
+                                visible: !!hookRow.hook.enabled
                                 Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 14; spacing: 8
-                                readonly property string example: "curl -X POST -H 'X-Blockwork-Token: " + hook.token + "' -d 'hello' http://127.0.0.1:" + hook.port + "/hello"
-                                Text {
-                                    Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#9fa0a6"; font.pixelSize: 12
-                                    text: qsTr("Send the token in an X-Blockwork-Token header (or ?token= in the address). For a block listening on \"hello\":")
+                                property string token: ""
+                                readonly property bool revealed: token !== ""
+                                property bool showExample: false
+                                property string copied: ""
+                                function example(token) { return "curl -X POST -H 'X-Blockwork-Token: " + token + "' -d 'hello' http://127.0.0.1:" + hookRow.hook.port + "/hello" }
+                                function hide() { token = ""; hideTimer.stop() }
+                                function copy(what, text) { root.copyText(text); copied = what; copiedTimer.restart() }
+                                onVisibleChanged: if (!visible) hide()
+                                Timer { id: hideTimer; interval: 30000; onTriggered: hookInfo.hide() }
+                                Timer { id: copiedTimer; interval: 1500; onTriggered: hookInfo.copied = "" }
+                                Connections {
+                                    target: Qt.application
+                                    function onStateChanged() { if (Qt.application.state !== Qt.ApplicationActive) hookInfo.hide() }
                                 }
-                                Rectangle {
-                                    Layout.fillWidth: true; implicitHeight: exampleText.implicitHeight + 16; radius: 6; color: Theme.field; border.color: Theme.borderSoft
-                                    Text { id: exampleText; anchors.fill: parent; anchors.margins: 8; text: hookInfo.example; wrapMode: Text.WrapAnywhere; color: "#e7e7e8"; font.family: "monospace"; font.pixelSize: 12 }
+                                Connections { target: root; function onTabChanged() { hookInfo.hide() } }
+                                RowLayout { Layout.fillWidth: true; spacing: 8
+                                    LucideIcon { name: "lock"; width: 14; height: 14; color: "#9fa0a6" }
+                                    Text { text: qsTr("Token"); color: "#e7e7e8"; font.pixelSize: 13; font.weight: Font.DemiBold }
+                                    Text {
+                                        Layout.fillWidth: true; Layout.leftMargin: 4; elide: Text.ElideRight
+                                        text: hookInfo.revealed ? hookInfo.token : "\u2022".repeat(24)
+                                        color: hookInfo.revealed ? "#e7e7e8" : "#9fa0a6"; font.family: "monospace"; font.pixelSize: 12
+                                        Accessible.name: hookInfo.revealed ? hookInfo.token : qsTr("Hidden token")
+                                    }
+                                    BwButton {
+                                        iconName: hookInfo.revealed ? "lock" : "eye"; text: hookInfo.revealed ? qsTr("Hide") : qsTr("Show")
+                                        onClicked: hookInfo.revealed ? hookInfo.hide() : root.withWebhookToken(token => { hookInfo.token = token; hideTimer.restart() })
+                                    }
+                                    BwButton {
+                                        iconName: hookInfo.copied === "token" ? "check" : "copy"; text: hookInfo.copied === "token" ? qsTr("Copied") : qsTr("Copy")
+                                        onClicked: root.withWebhookToken(token => hookInfo.copy("token", token))
+                                    }
+                                    BwButton { iconName: "refresh-cw"; text: qsTr("New token"); onClicked: { hookInfo.hide(); root.invoke("new_webhook_token") } }
                                 }
-                                RowLayout { spacing: 8
-                                    BwButton { iconName: "copy"; text: qsTr("Copy example"); onClicked: root.copyText(hookInfo.example) }
-                                    BwButton { iconName: "copy"; text: qsTr("Copy token"); onClicked: root.copyText(hookInfo.hook.token) }
-                                    BwButton { iconName: "refresh-cw"; text: qsTr("New token"); onClicked: root.invoke("new_webhook_token") }
+                                Item {
+                                    implicitWidth: expander.implicitWidth; implicitHeight: expander.implicitHeight
+                                    Row { id: expander; spacing: 6
+                                        LucideIcon { name: hookInfo.showExample ? "chevron-down" : "chevron-right"; width: 14; height: 14; color: "#9fa0a6"; anchors.verticalCenter: parent.verticalCenter }
+                                        Text { text: qsTr("How to call it"); color: "#9fa0a6"; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+                                    }
+                                    MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: hookInfo.showExample = !hookInfo.showExample }
+                                }
+                                ColumnLayout {
+                                    visible: hookInfo.showExample; Layout.fillWidth: true; spacing: 8
+                                    Text {
+                                        Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#9fa0a6"; font.pixelSize: 12
+                                        text: qsTr("Send the token in an X-Blockwork-Token header (or ?token= in the address). For a block listening on \"hello\":")
+                                    }
+                                    RowLayout { Layout.fillWidth: true; spacing: 8
+                                        Rectangle {
+                                            Layout.fillWidth: true; implicitHeight: exampleText.implicitHeight + 16; radius: 6; color: Theme.field; border.color: Theme.borderSoft
+                                            Text {
+                                                id: exampleText; anchors.fill: parent; anchors.margins: 8; wrapMode: Text.WrapAnywhere; color: "#e7e7e8"; font.family: "monospace"; font.pixelSize: 12
+                                                text: hookInfo.example(hookInfo.revealed ? hookInfo.token : "<token>")
+                                            }
+                                        }
+                                        BwButton {
+                                            iconName: hookInfo.copied === "example" ? "check" : "copy"; text: hookInfo.copied === "example" ? qsTr("Copied") : qsTr("Copy")
+                                            onClicked: root.withWebhookToken(token => hookInfo.copy("example", hookInfo.example(token)))
+                                        }
+                                    }
                                 }
                             }
                             SettingsRow { title: qsTr("Command line")
@@ -388,7 +452,27 @@ Item {
         if (code.indexOf("_") > 0) name += " (" + locale.nativeTerritoryName + ")"
         return name.charAt(0).toUpperCase() + name.slice(1)
     }
-    function copyText(text) { clipboardHelper.text = text; clipboardHelper.selectAll(); clipboardHelper.copy(); }
+    function copyText(text) { clipboardHelper.text = text; clipboardHelper.selectAll(); clipboardHelper.copy(); clipboardHelper.text = ""; }
+
+    // The webhook token isn't in appState; it's fetched when it's copied or shown.
+    property int callSeq: 0
+    property var callbacks: ({})
+    function withWebhookToken(done) {
+        if (!appBridge) return;
+        const key = "settings" + (++callSeq);
+        callbacks[key] = done;
+        appBridge.callCommand(key, "webhook_token", "{}");
+    }
+    Connections {
+        target: root.appBridge
+        function onReplySerialChanged() {
+            const key = root.appBridge.replyKey, done = root.callbacks[key];
+            if (!done) return;
+            delete root.callbacks[key];
+            const token = root.appBridge.replyError ? "" : JSON.parse(root.appBridge.replyJson || "null");
+            if (token) done(token);
+        }
+    }
 
     function actionLabel(action) {
         if (!action) return qsTr("Hotkey");

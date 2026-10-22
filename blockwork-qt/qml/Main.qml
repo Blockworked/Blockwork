@@ -213,7 +213,7 @@ ApplicationWindow {
     }
     Component { id: onboardingComponent; OnboardingPage { appState: root.appState; invoke: root.invoke } }
     // Distinct IDs avoid resolving a page's injected property to itself.
-    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; translator: sharedTranslator } }
+    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; appBridge: bridge; translator: sharedTranslator } }
     MacroFiles { id: sharedMacroFiles; appState: root.appState; invoke: root.invoke; appBridge: bridge }
     BlockLibrary { id: sharedBlockLibrary; appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: sharedMacroFiles }
 
