@@ -54,6 +54,30 @@ QtObject {
         return t ? clock(t.hour, t.minute) : (String(text).trim().length ? String(text) : qsTr("set time"));
     }
 
+    // ---- dates ----
+
+    // "2026-12-24 18:00" -> {year, month, day, hour, minute}, or null. Reads
+    // the formats blockwork-core's `parse_date` tries when it has none:
+    // dashes or slashes, an optional T and seconds, or just the date (midnight).
+    function parseDateTime(text) {
+        const m = /^(\d{4})([-/])(\d{1,2})\2(\d{1,2})(?:[ T](\d{1,2}):(\d{1,2})(?::(\d{1,2}))?)?$/.exec(String(text).trim());
+        if (!m) return null;
+        const year = Number(m[1]), month = Number(m[3]), day = Number(m[4]);
+        const hour = m[5] === undefined ? 0 : Number(m[5]), minute = m[6] === undefined ? 0 : Number(m[6]);
+        const d = new Date(year, month - 1, day);
+        if (d.getMonth() !== month - 1 || d.getDate() !== day || hour > 23 || minute > 59 || Number(m[7] || 0) > 59) return null;
+        return { year: year, month: month, day: day, hour: hour, minute: minute };
+    }
+    // How a moment is saved: always "2026-12-24 18:00", whatever the clock shows.
+    function dateTimeStamp(year, month, day, hour, minute) { return year + "-" + pad(month) + "-" + pad(day) + " " + stamp(hour, minute); }
+    // How a date and time slot reads on its block: "2026-12-24 6:00 PM" on a
+    // 12-hour clock, as typed when it isn't a date.
+    function dateTimeLabel(text) {
+        const t = parseDateTime(text);
+        if (t) return t.year + "-" + pad(t.month) + "-" + pad(t.day) + " " + clock(t.hour, t.minute);
+        return String(text).trim().length ? String(text) : qsTr("set date and time");
+    }
+
     // ---- cron ----
 
     function expand(text) {
