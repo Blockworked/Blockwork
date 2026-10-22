@@ -137,7 +137,7 @@
 <context>
     <name>SettingsPage</name>
     <message numerus="yes">
-        <location filename="../qml/SettingsPage.qml" line="291"/>
+        <location filename="../qml/SettingsPage.qml" line="292"/>
         <source>%n pack(s)</source>
         <translation>
             <numerusform>%n pack</numerusform>
