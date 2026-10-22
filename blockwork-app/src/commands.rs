@@ -1701,6 +1701,47 @@ pub(crate) fn put_value(
     Ok(())
 }
 
+/// Moves a value block in one edit: into the slot `to`, or parked on open
+/// canvas at `x`/`y` when `to` is none. One undo step and one state update.
+pub(crate) fn move_value(
+    state: &SharedState,
+    app: &AppHandle,
+    from: ValueLocation,
+    to: Option<ValueLocation>,
+    x: i32,
+    y: i32,
+    origin_block_id: Option<String>,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let Some(mut graph) = s.current_macro.as_ref().map(|mac| mac.graph.clone()) else {
+        emit_state_updated(&app, &s);
+        return Err("No macro selected".into());
+    };
+    let Some(value) = graph.take_value(&from) else {
+        emit_state_updated(&app, &s);
+        return Err("Nothing to take at that location".into());
+    };
+    match &to {
+        Some(to) => {
+            graph.put_value(to, value);
+        }
+        None => {
+            graph.add_floating_value(x, y, value, origin_block_id);
+        }
+    }
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.graph = graph;
+    }
+    prune_value_buffers(&mut s.invalid_field_buffers, &from);
+    if let Some(to) = &to {
+        prune_value_buffers(&mut s.invalid_field_buffers, to);
+    }
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
 /// One-shot sample evaluation of a value tree, for the click-to-preview
 /// tooltip on operator blocks - stateless. Uses `eval_text` so text-only
 /// ops (`Join`/`NewLine`/`Tab`) preview without erroring as "not a number".

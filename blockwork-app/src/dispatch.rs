@@ -409,6 +409,22 @@ impl Backend {
                     value,
                 )?)
             }
+            "move_value" => {
+                let from: ValueLocation = arg(&args, "from")?;
+                let to: Option<ValueLocation> = arg(&args, "to")?;
+                let x: Option<i32> = arg(&args, "x")?;
+                let y: Option<i32> = arg(&args, "y")?;
+                let origin_block_id: Option<String> = arg(&args, "originBlockId")?;
+                to_json(commands::move_value(
+                    &self.state,
+                    &self.app,
+                    from,
+                    to,
+                    x.unwrap_or(0),
+                    y.unwrap_or(0),
+                    origin_block_id,
+                )?)
+            }
             "preview_value" => {
                 let value: BlockValue = arg(&args, "value")?;
                 // Reporters may block (files, windows, the keyring over D-Bus).

@@ -380,6 +380,7 @@ Item {
     // ---- dragging a palette entry onto the canvas ----
     property var paletteDrag: null   // { spec, offsetX, offsetY }
     function beginPaletteDrag(spec, ox, oy, sx, sy) {
+        ghostHeld = false;
         paletteDrag = { spec: spec, offsetX: ox, offsetY: oy };
         ghost.spec = spec;
         movePaletteDrag(sx, sy);
@@ -424,18 +425,29 @@ Item {
         const snapTargetId = canvas.paletteSnapTargetId;
         const snapPath = JSON.parse(JSON.stringify(canvas.paletteSnapPath || []));
         const valueTarget = canvas.paletteValueTarget ? JSON.parse(JSON.stringify(canvas.paletteValueTarget)) : null;
-        cancelPaletteDrag();
-        if (!drag || recording) return;
+        const landing = canvas.paletteDropScenePoint();
+        if (!drag || recording) { cancelPaletteDrag(); return; }
+        paletteDrag = null;
+        canvas.updatePaletteValueTarget(null, null);
         const spec = drag.spec;
         // A fresh operator dropped straight onto a value slot fills it.
-        if (spec.kind === "value" && valueTarget) { root.invoke("put_value", { location: valueTarget, value: spec.value }); return; }
+        if (spec.kind === "value" && valueTarget) {
+            canvas.clearSnap(); holdGhost(landing);
+            root.invoke("put_value", { location: valueTarget, value: spec.value });
+            return;
+        }
         const at = canvas.workspacePoint(sx, sy);
-        if (!at) return;
+        if (!at) { cancelPaletteDrag(); return; }
         const x = Math.round(at.x - drag.offsetX / canvas.zoom), y = Math.round(at.y - drag.offsetY / canvas.zoom);
-        if (spec.kind === "value") { root.invoke("create_floating_value", { x: x, y: y, value: spec.value, originBlockId: spec.originBlockId || null }); return; }
+        if (spec.kind === "value") {
+            canvas.clearSnap(); holdGhost(null);
+            root.invoke("create_floating_value", { x: x, y: y, value: spec.value, originBlockId: spec.originBlockId || null });
+            return;
+        }
         // Attach into the previewed gap when one is showing, else park as a
         // new detached strand - mirrors the webapp palette drop.
         if (snapValid && snapTargetId) {
+            canvas.settlePaletteDrop(); holdGhost(landing);
             if (spec.kind === "branch") {
                 root.invoke("add_instruction", { strandId: snapTargetId, path: snapPath, instruction: { id: uuid(), type: "RunBranch", name: spec.instruction.name } });
             } else if (spec.kind === "custom") {
@@ -447,11 +459,30 @@ Item {
             }
             return;
         }
+        canvas.clearSnap(); holdGhost(null);
         if (spec.kind === "branch") root.invoke("add_strand", { x: x, y: y, instruction: { id: uuid(), type: "RunBranch", name: spec.instruction.name } });
         else if (spec.kind === "custom") root.addCustomBlock(spec.definition, x, y);
         else root.addBlock(spec.type, x, y);
     }
-    function cancelPaletteDrag() { paletteDrag = null; ghost.visible = false; ghost.spec = null; canvas.clearSnap(); canvas.updatePaletteValueTarget(null, null); }
+    // Keeps the dropped ghost on screen (moved to `scenePoint` if given)
+    // until the new state shows the real block, so it never blinks out.
+    property bool ghostHeld: false
+    function holdGhost(scenePoint) {
+        if (scenePoint) { const p = ghostLayer.mapFromItem(null, scenePoint.x, scenePoint.y); ghost.x = p.x; ghost.y = p.y; }
+        ghostHeld = true;
+        ghostHeldDoc = macroDocKey();
+        ghostHoldTimer.restart();
+    }
+    // Strands + floating values; unrelated state pushes leave this unchanged.
+    property string ghostHeldDoc: ""
+    function macroDocKey() { return root.macro ? JSON.stringify([root.macro.strands, root.macro.floating_values]) : ""; }
+    function releaseGhost() {
+        if (!ghostHeld) return;
+        ghostHeld = false; ghost.visible = false; ghost.spec = null;
+    }
+    Timer { id: ghostHoldTimer; interval: 1500; onTriggered: root.releaseGhost() }
+    onMacroChanged: if (ghostHeld && macroDocKey() !== ghostHeldDoc) releaseGhost()
+    function cancelPaletteDrag() { paletteDrag = null; ghostHeld = false; ghost.visible = false; ghost.spec = null; canvas.clearSnap(); canvas.updatePaletteValueTarget(null, null); }
     // A canvas block dropped on the sidebar deletes it and everything below it in its stack.
     function blockDefById(id) {
         const defs = root.macro ? root.macro.block_defs : [];
@@ -494,6 +525,7 @@ Item {
     // deletes it (whole floating blocks) - mirrors the webapp trash.
     function trashDraggedValue(location, value, sx, sy) {
         if (root.sidebarCollapsed || !palette.contains(palette.mapFromItem(null, sx, sy))) return;
+        canvas.settleTrashed();
         if (location.kind === "Floating" && !(location.path && location.path.length)) root.invoke("remove_floating_value", { floatingId: location.floating_id });
         else root.invoke("take_value", { location: location });
     }
@@ -810,6 +842,7 @@ Item {
                     onValueTakeRequested: location => root.invoke("take_value", { location: location })
                     onValuePutRequested: (location, value) => root.invoke("put_value", { location: location, value: value })
                     onValueCreateRequested: (x, y, value, originBlockId) => root.invoke("create_floating_value", { x: x, y: y, value: value, originBlockId: originBlockId || null })
+                    onValueMoveRequested: (from, to, x, y, originBlockId) => root.invoke("move_value", { from: from, to: to, x: x, y: y, originBlockId: originBlockId || null })
                     onValueDragOutside: (location, value, sx, sy) => root.trashDraggedValue(location, value, sx, sy)
                     onCommentForInstructionRequested: instruction => {
                         const existing = (root.macro && root.macro.comments || []).find(c => c.attached_to === instruction.id);
