@@ -16,6 +16,8 @@ pub(crate) struct SourceDto {
     pub(crate) name: String,
     pub(crate) error: String,
     pub(crate) packs: usize,
+    /// The built-in library, which can't be removed.
+    pub(crate) builtin: bool,
 }
 
 /// One pack the library offers.
@@ -100,15 +102,15 @@ fn cache() -> std::sync::MutexGuard<'static, Cache> {
     CACHE.lock().unwrap_or_else(|e| e.into_inner())
 }
 
-/// The index addresses from Settings; the built-in library until changed.
+/// The index addresses from Settings, always starting with the built-in library.
 pub(crate) fn sources() -> Vec<String> {
-    let saved = load_settings().block_library_sources;
-    upgrade_sources(saved.unwrap_or_else(|| vec![block_packs::DEFAULT_INDEX.to_string()]))
+    upgrade_sources(load_settings().block_library_sources.unwrap_or_default())
 }
 
-/// Swaps old built-in addresses for the current one.
+/// Swaps old built-in addresses for the current one and puts the built-in
+/// library back if an earlier version let it be removed.
 fn upgrade_sources(list: Vec<String>) -> Vec<String> {
-    let mut out: Vec<String> = Vec::new();
+    let mut out = vec![block_packs::DEFAULT_INDEX.to_string()];
     for url in list {
         let url = if block_packs::OLD_DEFAULT_INDEXES.contains(&url.as_str()) {
             block_packs::DEFAULT_INDEX.to_string()
@@ -164,7 +166,7 @@ pub(crate) fn dto(s: &AppState) -> LibraryDto {
     let mut sources = cache.sources.clone();
     for url in self::sources() {
         if !sources.iter().any(|s| s.url == url) {
-            sources.push(SourceDto { url, name: String::new(), error: String::new(), packs: 0 });
+            sources.push(SourceDto { builtin: url == block_packs::DEFAULT_INDEX, url, name: String::new(), error: String::new(), packs: 0 });
         }
     }
     sources.retain(|s| self::sources().contains(&s.url));
@@ -250,10 +252,10 @@ pub(crate) fn refresh(state: &SharedState, app: &AppHandle) -> Result<(), String
             });
             match result {
                 Ok(index) => {
-                    sources.push(SourceDto { url: url.clone(), name: index.name.clone(), error: String::new(), packs: index.packs.len() });
+                    sources.push(SourceDto { builtin: url == block_packs::DEFAULT_INDEX, url: url.clone(), name: index.name.clone(), error: String::new(), packs: index.packs.len() });
                     packs.extend(index.packs.into_iter().map(|p| (url.clone(), index.name.clone(), p)));
                 }
-                Err(error) => sources.push(SourceDto { url, name: String::new(), error, packs: 0 }),
+                Err(error) => sources.push(SourceDto { builtin: url == block_packs::DEFAULT_INDEX, url, name: String::new(), error, packs: 0 }),
             }
         }
         {
@@ -282,6 +284,9 @@ pub(crate) fn add_source(state: &SharedState, app: &AppHandle, url: String) -> R
 }
 
 pub(crate) fn remove_source(state: &SharedState, app: &AppHandle, url: String) -> Result<(), String> {
+    if url == block_packs::DEFAULT_INDEX {
+        return Err("The built-in library can't be removed".into());
+    }
     let list: Vec<String> = sources().into_iter().filter(|u| *u != url).collect();
     update_settings(|s| s.block_library_sources = Some(list));
     {
@@ -468,6 +473,15 @@ mod tests {
         assert_eq!(
             upgrade_sources(list),
             [block_packs::DEFAULT_INDEX.to_string(), "https://example.com/index.json".into()]
+        );
+    }
+
+    #[test]
+    fn the_built_in_library_always_comes_first() {
+        assert_eq!(upgrade_sources(Vec::new()), [block_packs::DEFAULT_INDEX]);
+        assert_eq!(
+            upgrade_sources(vec!["https://example.com/index.json".into(), block_packs::DEFAULT_INDEX.into()]),
+            [block_packs::DEFAULT_INDEX, "https://example.com/index.json"]
         );
     }
 

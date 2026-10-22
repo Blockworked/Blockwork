@@ -292,7 +292,8 @@ Item {
                                             text: modelData.error ? modelData.error : modelData.name ? qsTr("%n pack(s)", "", modelData.packs) + " - " + modelData.url : modelData.url
                                         }
                                     }
-                                    BwButton { iconName: "trash-2"; text: qsTr("Remove"); onClicked: root.invoke("remove_block_library_source", { url: modelData.url }) }
+                                    Text { visible: modelData.builtin; text: qsTr("Built-in"); color: "#9fa0a6"; font.pixelSize: 12; Layout.rightMargin: 4 }
+                                    BwButton { visible: !modelData.builtin; iconName: "trash-2"; text: qsTr("Remove"); onClicked: root.invoke("remove_block_library_source", { url: modelData.url }) }
                                 }
                             }
                             RowLayout { Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 14; spacing: 8

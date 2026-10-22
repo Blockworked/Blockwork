@@ -98,6 +98,7 @@ section below as the GitHub release notes, followed by the downloads table.
   - Choose what to allow in the import review or in Macro settings > Permissions; grants are kept outside the macro file.
 - Block library:
   - My Blocks > Browse lists shared block packs from library indexes set in Settings > Editor; the built-in one is https://community.blockworked.com.
+  - The built-in library can't be removed, and comes back for anyone who removed it in an earlier build.
   - Packs are checked against the SHA-256 their index pins, reviewed before they're added, and replace their older versions in place.
   - Packs published by the Blockworked team show a blue verified badge next to their publisher in Browse library. Only the built-in library can mark packs this way.
   - Right-click a custom block to share it, and the blocks it uses, as a `.blockpack` file.
