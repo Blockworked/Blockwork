@@ -139,6 +139,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Dragging the canvas with the mouse stops where you let go instead of gliding on, and two-finger touchpad panning is smoothed slightly.
 - Every event block label now uses the same bold caption style; newer event blocks (when run, when file changes, when idle and others) were drawn in plain text while the older ones were bold.
 - Clicking Record during the countdown cancels the recording instead of starting the countdown over, and the Record button's label no longer gets cut off or overlaps its neighbours.
+- Images taken with the screen picker no longer catch the picker's own close animation (such as KDE's shattering windows) as stray lines and shapes.
 
 ## [0.5.4] - 2026-09-20
 

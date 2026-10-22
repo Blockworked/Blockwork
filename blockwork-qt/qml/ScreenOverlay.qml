@@ -19,6 +19,10 @@ Item {
     property int selScreen: -1
     property bool selecting: false
     property bool hasSelection: false
+    // Picked: the overlay draws nothing for a moment before it closes, so a
+    // compositor's close effect (KWin's shattering windows, say) animates an
+    // empty window rather than the selection the capture is about to take.
+    property bool clearing: false
     property real selX: 0
     property real selY: 0
     property real selW: 0
@@ -29,7 +33,7 @@ Item {
 
     function begin(regionOnly, text) {
         requireRegion = regionOnly; hint = text;
-        selScreen = -1; selecting = false; hasSelection = false;
+        selScreen = -1; selecting = false; hasSelection = false; clearing = false;
         active = true;
     }
     function end() { active = false; }
@@ -47,8 +51,15 @@ Item {
     }
     function finish(screenInfo, lx, ly, w, h) {
         const p = toScreen(screenInfo, lx, ly);
-        end();
-        picked(p.x, p.y, w * p.f, h * p.f);
+        clearing = true;
+        closeDelay.pick = [p.x, p.y, w * p.f, h * p.f];
+        closeDelay.restart();
+    }
+    Timer {
+        id: closeDelay
+        interval: 150
+        property var pick: []
+        onTriggered: { root.end(); root.picked(pick[0], pick[1], pick[2], pick[3]); }
     }
     function accept() {
         if (!hasSelection || selScreen < 0) return;
@@ -77,6 +88,7 @@ Item {
 
             Item {
                 anchors.fill: parent
+                visible: !root.clearing
                 focus: true
                 Keys.onEscapePressed: { root.end(); root.canceled(); }
                 Keys.onReturnPressed: root.accept()
