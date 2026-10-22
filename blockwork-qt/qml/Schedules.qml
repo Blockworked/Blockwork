@@ -167,8 +167,8 @@ QtObject {
         if (days.length === 7) return "";
         if (k === "1,2,3,4,5") return qsTr("weekdays");
         if (k === "0,6") return qsTr("weekends");
-        // Monday first reads more naturally.
-        return days.slice().sort((a, b) => ((a + 6) % 7) - ((b + 6) % 7)).map(weekdayShort).join(", ");
+        // Sunday first, like the pickers.
+        return days.slice().sort((a, b) => a - b).map(weekdayShort).join(", ");
     }
     function withDays(text, days) {
         const d = daysLabel(days);

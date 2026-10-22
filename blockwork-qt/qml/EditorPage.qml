@@ -1679,8 +1679,8 @@ Item {
                   return { kind: "Daily" };
               } },
             { kind: "dropdown", key: "schedule", when: i => scheduleOf(i).kind === "Weekly", decode: s => s ? s.weekday : "",
-              options: root.choices([["Monday", qsTr("Monday")], ["Tuesday", qsTr("Tuesday")], ["Wednesday", qsTr("Wednesday")], ["Thursday", qsTr("Thursday")],
-                                     ["Friday", qsTr("Friday")], ["Saturday", qsTr("Saturday")], ["Sunday", qsTr("Sunday")]]),
+              options: root.choices([["Sunday", qsTr("Sunday")], ["Monday", qsTr("Monday")], ["Tuesday", qsTr("Tuesday")], ["Wednesday", qsTr("Wednesday")],
+                                     ["Thursday", qsTr("Thursday")], ["Friday", qsTr("Friday")], ["Saturday", qsTr("Saturday")]]),
               encode: (w, i) => withSchedule(i, { weekday: w }) },
             { kind: "dropdown", key: "schedule", when: i => scheduleOf(i).kind === "Yearly", decode: s => s ? String(s.month) : "",
               options: Array.from({ length: 12 }, (_, m) => ({ value: String(m + 1), label: Schedules.monthName(m + 1) })),

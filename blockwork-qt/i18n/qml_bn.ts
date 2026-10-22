@@ -3270,7 +3270,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1682"/>
+        <location filename="../qml/EditorPage.qml" line="1683"/>
         <source>Thursday</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3285,7 +3285,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1683"/>
+        <location filename="../qml/EditorPage.qml" line="1682"/>
         <source>Sunday</source>
         <translation type="unfinished"></translation>
     </message>

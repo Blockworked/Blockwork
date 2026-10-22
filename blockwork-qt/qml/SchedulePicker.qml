@@ -209,8 +209,8 @@ AppDialog {
                     Row {
                         spacing: 6
                         Repeater {
-                            // Monday first.
-                            model: [1, 2, 3, 4, 5, 6, 0]
+                            // Sunday first.
+                            model: [0, 1, 2, 3, 4, 5, 6]
                             delegate: Rectangle {
                                 required property int modelData
                                 readonly property bool on: root.days[modelData]
