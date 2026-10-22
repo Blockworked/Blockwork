@@ -1588,7 +1588,7 @@
     <message>
         <location filename="../qml/EditorPage.qml" line="103"/>
         <source>Runs once, at a date and time like 2026-12-24 18:00 (local time). Click it to pick the day from a calendar, or drop a reporter that gives one. Turn on &apos;catch up on missed schedules&apos; in Macro settings to still run it if Blockwork was closed or the computer was asleep at that moment.</source>
-        <translation type="unfinished"></translation>
+        <translation>Sets sail once, at a date an&apos; time like 2026-12-24 18:00 (local time). Click it to pick the day from a calendar, or drop a reporter that gives one. Turn on &apos;catch up on missed schedules&apos; in Macro settings to still sail if Blockwork were closed or the computer were asleep at that moment.</translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="104"/>
