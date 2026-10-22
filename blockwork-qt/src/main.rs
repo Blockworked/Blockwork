@@ -2,6 +2,7 @@
 
 mod app_bridge;
 mod app_icon;
+mod application;
 mod cli;
 mod daemon_client;
 mod native_icon;
@@ -12,7 +13,7 @@ mod translator;
 mod window_frame;
 
 use cxx_qt::casting::Upcast;
-use cxx_qt_lib::{QGuiApplication, QQmlApplicationEngine, QQmlEngine, QUrl};
+use cxx_qt_lib::{QQmlApplicationEngine, QQmlEngine, QUrl};
 use std::pin::Pin;
 
 fn main() {
@@ -34,7 +35,7 @@ fn main() {
     blockstitch_qml::init();
     cxx_qt::init_qml_module!("com.blockworked.Blockwork");
 
-    let mut app = QGuiApplication::new();
+    let mut app = application::new();
     // Title-bar, taskbar and dock fallback icon (see src/app_icon.cpp).
     app_icon::apply();
     let mut engine = QQmlApplicationEngine::new();

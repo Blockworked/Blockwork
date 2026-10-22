@@ -64,6 +64,7 @@ fn main() {
     .file("src/translator.rs")
     .file("src/translations.rs")
     .file("src/app_icon.rs")
+    .file("src/application.rs")
     .file("src/qt_diagnostics.rs")
     .file("src/window_frame.rs")
     // Runtime window icon (see src/app_icon.cpp, addressed as ":/icons/..."
@@ -78,7 +79,8 @@ fn main() {
     .qrc_resources(translation_resources())
     .qt_module("QuickControls2")
     .qt_module("QuickDialogs2")
-    .qt_module("Network");
+    .qt_module("Network")
+    .qt_module("Widgets");
 
     // QtGui private headers for the Wayland frame-margin hook (window_frame.cpp).
     let private_includes = qt_private_includes();
@@ -94,6 +96,7 @@ fn main() {
                 cc.include("src");
                 cc.file("src/qt_diagnostics.cpp");
                 cc.file("src/app_icon.cpp");
+                cc.file("src/application.cpp");
                 cc.file("src/window_frame.cpp");
                 cc.file("src/translations.cpp");
                 for dir in &private_includes {
