@@ -115,6 +115,7 @@ section below as the GitHub release notes, followed by the downloads table.
   - Click the time on a "when every day at" block to pick it from a popup (tap an hour and a minute, or nudge them), instead of typing it. The time slot also takes a variable or reporter that gives a time like 09:30.
   - "On schedule" reads in words ("weekdays at 09:00", "every 15 minutes") and opens a schedule picker: repeat every few minutes or hours, run at a time on chosen days, or once a month, with the next few runs shown. Cron text still works under Custom, and the slot still takes a reporter.
   - Settings > General > Time format: 12-hour (with AM/PM), 24-hour, or the system's default, for times in blocks and the pickers.
+- Recording settings > Countdown: how long Record waits before it starts, from off to 10 seconds (3 by default).
 
 ### Changed
 - Macro files now carry a format version and are upgraded step by step when
@@ -126,6 +127,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Blocks that fail at run time are reported in the run log instead of only
   the console.
 - Click-to-preview won't run shell or web blocks.
+- While recording, the canvas shows a card with a live timer, what's being recorded, where the blocks will go, the stop shortcut and a Stop button, instead of a bare "Recording..." message. The countdown shows on the canvas too, which stays locked during it.
 
 ### Fixed
 - On Linux, evdev waits for held keys and mouse buttons to be released before
@@ -135,6 +137,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - The "when every day at" block saves its day, weekday, month and time again.
 - Dragging the canvas with the mouse stops where you let go instead of gliding on, and two-finger touchpad panning is smoothed slightly.
 - Every event block label now uses the same bold caption style; newer event blocks (when run, when file changes, when idle and others) were drawn in plain text while the older ones were bold.
+- Clicking Record during the countdown cancels the recording instead of starting the countdown over, and the Record button's label no longer gets cut off or overlaps its neighbours.
 
 ## [0.5.4] - 2026-09-20
 

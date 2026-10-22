@@ -26,6 +26,7 @@ fn main() {
         "qml/MakeBlockDialog.qml",
         "qml/AppSelectorDialog.qml",
         "qml/ActivityPanel.qml",
+        "qml/RecordingOverlay.qml",
         "qml/TemplateList.qml",
         "qml/ScreenOverlay.qml",
         "qml/LibraryPanel.qml",

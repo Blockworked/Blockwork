@@ -73,6 +73,10 @@ pub struct AppSettings {
     /// 1 (the default) is normal, higher is slower.
     #[serde(default)]
     pub animation_speed: Option<f64>,
+    /// Seconds the Record button counts down before recording starts; 0
+    /// starts at once. `None` means the default of 3.
+    #[serde(default)]
+    pub recording_countdown_secs: Option<u8>,
     /// How times show: "12h" (with AM/PM), "24h", or `None`/empty to follow
     /// the system locale. Saved times are always 24-hour.
     #[serde(default)]

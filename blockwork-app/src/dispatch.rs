@@ -701,6 +701,10 @@ impl Backend {
             }
             "start_recording" => to_json(commands::start_recording(&self.state, &self.app)?),
             "stop_recording" => to_json(commands::stop_recording(&self.state, &self.app)?),
+            "set_recording_countdown" => {
+                let seconds: u8 = arg(&args, "seconds")?;
+                to_json(commands::set_recording_countdown(&self.state, &self.app, seconds)?)
+            }
             "request_absolute_mouse_support" => to_json(
                 commands::request_absolute_mouse_support(&self.state, &self.app).await?,
             ),

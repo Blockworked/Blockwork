@@ -43,7 +43,7 @@ ApplicationWindow {
     property var appState: ({
         macro_names: [], macro_selected: null, current_macro: null, macros_data: [],
         global_speed_multiplier: 1, is_looping: false,
-        recording_phase: { phase: "Idle", countdown: null }, page: "Main",
+        recording_phase: { phase: "Idle", countdown: null }, recording_countdown_secs: 3, page: "Main",
         can_undo: false, can_redo: false, hotkey_bindings: [], named_hotkey_defaults: [],
         ipc_active_port: null, ipc_auto_start: false, ipc_port_text: "47821",
         close_to_tray: false, start_at_startup: false, onboarding_done: true, record_mouse_relative: true, record_mouse_movement: false,

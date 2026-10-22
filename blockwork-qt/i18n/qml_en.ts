@@ -15,7 +15,7 @@
 <context>
     <name>BlockCanvas</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1300"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1358"/>
         <source>%n item(s)</source>
         <translation>
             <numerusform>%n item</numerusform>
@@ -23,7 +23,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1344"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1402"/>
         <source>%n entry(s)</source>
         <translation>
             <numerusform>%n entry</numerusform>
@@ -33,13 +33,6 @@
 </context>
 <context>
     <name>BlockLibrary</name>
-    <message numerus="yes">
-        <source>This macro already has %n block(s) from an earlier version. They&apos;re replaced, along with any changes you made to them; blocks that use them keep working.</source>
-        <translation type="vanished">
-            <numerusform>This macro already has %n block from an earlier version. It&apos;s replaced, along with any changes you made to it; blocks that use it keep working.</numerusform>
-            <numerusform>This macro already has %n blocks from an earlier version. They&apos;re replaced, along with any changes you made to them; blocks that use them keep working.</numerusform>
-        </translation>
-    </message>
     <message numerus="yes">
         <location filename="../qml/BlockLibrary.qml" line="272"/>
         <source>Replaces %n existing block definition(s). Blocks that use them keep working.</source>
@@ -60,7 +53,7 @@
 <context>
     <name>EditorPage</name>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="674"/>
+        <location filename="../qml/EditorPage.qml" line="721"/>
         <source>Paused before &quot;%1&quot; (%n strand(s) waiting)</source>
         <translation>
             <numerusform>Paused before &quot;%1&quot; (%n strand waiting)</numerusform>
@@ -68,11 +61,19 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="794"/>
+        <location filename="../qml/EditorPage.qml" line="841"/>
         <source>Delete %n block(s)</source>
         <translation>
             <numerusform>Delete %n block</numerusform>
             <numerusform>Delete %n blocks</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/EditorPage.qml" line="1377"/>
+        <source>%n second(s)</source>
+        <translation>
+            <numerusform>%n second</numerusform>
+            <numerusform>%n seconds</numerusform>
         </translation>
     </message>
 </context>
@@ -98,7 +99,7 @@
 <context>
     <name>PalettePanel</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="580"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="592"/>
         <source>%n block(s)</source>
         <translation>
             <numerusform>%n block</numerusform>

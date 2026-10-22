@@ -2533,19 +2533,27 @@ pub(crate) fn start_recording(
     app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    if s.current_macro.is_none() {
+    // A second start while counting down or recording must not restart the
+    // countdown; the UI cancels with stop_recording instead.
+    if s.current_macro.is_none() || s.recording_phase != RecordingPhase::Idle {
         return Ok(());
     }
     s.recording_countdown_generation = s.recording_countdown_generation.wrapping_add(1);
     let countdown_gen = s.recording_countdown_generation;
-    s.recording_phase = RecordingPhase::Countdown(3);
+    let secs = crate::recording_countdown_secs();
+    if secs == 0 {
+        begin_recording(&mut s);
+        emit_state_updated(&app, &s);
+        return Ok(());
+    }
+    s.recording_phase = RecordingPhase::Countdown(secs);
     emit_state_updated(&app, &s);
     drop(s);
 
     let state_clone = Arc::clone(&*state);
     let app_clone = app.clone();
     crate::async_runtime::spawn(async move {
-        for n in (0u8..3).rev() {
+        for n in (0..secs).rev() {
             tokio::time::sleep(std::time::Duration::from_secs(1)).await;
             let mut s = match state_clone.lock() {
                 Ok(g) => g,
@@ -2555,10 +2563,7 @@ pub(crate) fn start_recording(
                 return;
             }
             if n == 0 {
-                s.recording_phase = RecordingPhase::Active;
-                recording::reset_timing();
-                seed_recording_mouse_pos(&s);
-                recording::RECORDING_ACTIVE.store(true, Ordering::Relaxed);
+                begin_recording(&mut s);
                 emit_state_updated(&app_clone, &s);
                 return;
             }
@@ -2566,6 +2571,24 @@ pub(crate) fn start_recording(
             emit_state_updated(&app_clone, &s);
         }
     });
+    Ok(())
+}
+
+fn begin_recording(s: &mut crate::state::AppState) {
+    s.recording_phase = RecordingPhase::Active;
+    recording::reset_timing();
+    seed_recording_mouse_pos(s);
+    recording::RECORDING_ACTIVE.store(true, Ordering::Relaxed);
+}
+
+/// Seconds the Record button counts down for, 0 to [`crate::MAX_RECORDING_COUNTDOWN`].
+pub(crate) fn set_recording_countdown(state: &SharedState, app: &AppHandle, seconds: u8) -> Result<(), String> {
+    if seconds > crate::MAX_RECORDING_COUNTDOWN {
+        return Err(format!("Countdown out of range: {seconds}"));
+    }
+    config::update_settings(|settings| settings.recording_countdown_secs = Some(seconds));
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -3236,10 +3259,7 @@ pub(crate) fn handle_hotkey_action(
                 if s.current_macro.is_some() {
                     s.recording_countdown_generation =
                         s.recording_countdown_generation.wrapping_add(1);
-                    s.recording_phase = RecordingPhase::Active;
-                    recording::reset_timing();
-                    seed_recording_mouse_pos(&s);
-                    recording::RECORDING_ACTIVE.store(true, Ordering::Relaxed);
+                    begin_recording(&mut s);
                     emit_state_updated(app, &s);
                 }
             }

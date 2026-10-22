@@ -17,6 +17,9 @@ Item {
     property var blockLibrary: null
     readonly property var macro: appState.current_macro
     readonly property bool recording: appState.recording_phase && appState.recording_phase.phase === "Active"
+    readonly property bool recordingCountdown: !!appState.recording_phase && appState.recording_phase.phase === "Countdown"
+    // Counting down or recording: the canvas stays locked for both.
+    readonly property bool recordingBusy: recording || recordingCountdown
     property string sidebarKey: "a"
     property real sidebarWidth: 348
     property bool sidebarCollapsed: false
@@ -72,9 +75,19 @@ Item {
     }
     function recordingLabel() {
         const phase = appState.recording_phase || { phase: "Idle" };
-        if (phase.phase === "Countdown") return qsTr("Recording in %1s...").arg(phase.countdown);
-        if (phase.phase === "Active") return qsTr("Stop recording");
+        if (phase.phase === "Countdown") return qsTr("Cancel (%1)").arg(phase.countdown);
+        if (phase.phase === "Active") return qsTr("Stop");
         return qsTr("Record");
+    }
+    function recordingTooltip() {
+        if (root.recordingCountdown) return qsTr("Cancel recording");
+        if (root.recording) return qsTr("Stop recording");
+        return qsTr("Record keys and clicks into this macro");
+    }
+    // The Stop Recording hotkey as shown in Settings, or "" when it isn't set.
+    function stopRecordingShortcut() {
+        const b = (appState.hotkey_bindings || []).find(b => b.action && b.action.type === "StopRecording");
+        return b ? b.combo_display : "";
     }
     function refreshIds(instruction) {
         const copy = JSON.parse(JSON.stringify(instruction)); copy.id = uuid();
@@ -426,7 +439,7 @@ Item {
         const snapPath = JSON.parse(JSON.stringify(canvas.paletteSnapPath || []));
         const valueTarget = canvas.paletteValueTarget ? JSON.parse(JSON.stringify(canvas.paletteValueTarget)) : null;
         const landing = canvas.paletteDropScenePoint();
-        if (!drag || recording) { cancelPaletteDrag(); return; }
+        if (!drag || recordingBusy) { cancelPaletteDrag(); return; }
         paletteDrag = null;
         canvas.updatePaletteValueTarget(null, null);
         const spec = drag.spec;
@@ -624,11 +637,19 @@ Item {
                 Row {
                     spacing: -1
                     BwButton {
-                        implicitHeight: 34; iconName: root.recording ? "square" : "circle"; iconFilled: true; iconColor: Theme.danger
+                        id: recordButton
+                        implicitHeight: 34
+                        iconName: root.recording ? "square" : (root.recordingCountdown ? "x" : "circle")
+                        iconFilled: !root.recordingCountdown; iconColor: root.recordingCountdown ? Theme.text : Theme.danger
                         text: toolbar.tier < 1 ? root.recordingLabel() : ""
-                        implicitWidth: toolbar.tier < 1 ? 100 : 34
-                        enabled: appState.macro_selected !== null; ToolTip.visible: hovered && toolbar.tier >= 1; ToolTip.text: root.recordingLabel()
-                        onClicked: root.invoke(root.recording ? "stop_recording" : "start_recording")
+                        // Wide enough for its longest label, so the text never clips and
+                        // the toolbar doesn't shift as the countdown ticks.
+                        implicitWidth: toolbar.tier < 1 ? Math.ceil(Math.max(recordLabelWidth.width, stopLabelWidth.width, cancelLabelWidth.width)) + 16 + 8 + leftPadding + rightPadding : 34
+                        TextMetrics { id: recordLabelWidth; font: recordButton.font; text: qsTr("Record") }
+                        TextMetrics { id: stopLabelWidth; font: recordButton.font; text: qsTr("Stop") }
+                        TextMetrics { id: cancelLabelWidth; font: recordButton.font; text: qsTr("Cancel (%1)").arg(88) }
+                        enabled: appState.macro_selected !== null; ToolTip.visible: hovered; ToolTip.text: root.recordingTooltip()
+                        onClicked: root.invoke(root.recordingBusy ? "stop_recording" : "start_recording")
                     }
                     BwButton {
                         iconName: "chevron-down"; text: ""; implicitWidth: 26; implicitHeight: 34
@@ -808,7 +829,7 @@ Item {
                     lists: root.macro && root.macro.lists ? root.macro.lists : []
                     blockDefinitions: root.macro ? root.macro.block_defs : []
                     keyCapture: appState.key_capture
-                    locked: root.recording
+                    locked: root.recordingBusy
                     onStrandMoved: (strandId, x, y) => root.invoke("move_strand", { strandId: strandId, x: x, y: y })
                     onInstructionSplit: (strandId, path, x, y) => root.invoke("split_strand", { strandId: strandId, path: path, x: x, y: y })
                     onStrandsMerged: (draggedId, targetId, path) => root.invoke("merge_strand", { draggedId: draggedId, targetId: targetId, path: path })
@@ -866,14 +887,13 @@ Item {
                     onListEditorStateChanged: (name, visible, x, y) => root.invoke("set_list_editor_state", { name: name, visible: visible, x: x, y: y })
                 }
             }
-            Rectangle {
-                visible: root.recording
-                anchors.fill: parent; color: "#d8222326"; z: 20
-                Column { anchors.centerIn: parent; spacing: 10
-                    LucideIcon { anchors.horizontalCenter: parent.horizontalCenter; name: "circle"; color: "#ff4a4a"; width: 48; height: 48; strokeWidth: 7 }
-                    Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("Recording..."); color: "#ededee"; font.pixelSize: 17; font.weight: Font.Bold }
-                    Text { text: qsTr("Adding and removing instructions is disabled while recording."); color: "#a5a6ab"; font.pixelSize: 14; font.weight: Font.DemiBold }
-                }
+            RecordingOverlay {
+                anchors.fill: parent; z: 20
+                recording: root.recording
+                countdown: root.recordingCountdown && appState.recording_phase.countdown != null ? appState.recording_phase.countdown : 0
+                mouseMovement: !!appState.record_mouse_movement
+                shortcut: root.stopRecordingShortcut()
+                onStopRequested: root.invoke("stop_recording")
             }
         }
         ActivityPanel {
@@ -1338,6 +1358,27 @@ Item {
             BwSwitch { Accessible.name: qsTr("Record mouse movement"); checked: appState.record_mouse_movement; onToggled: checked => root.invoke("toggle_record_mouse_movement", { enabled: checked }) }
             BwSwitch { Accessible.name: qsTr("Use relative mouse movement"); checked: appState.record_mouse_relative; onToggled: checked => root.invoke("toggle_record_mouse_relative", { relative: checked }) }
             Text { width: parent.width; wrapMode: Text.WordWrap; text: appState.absolute_mouse_position_available ? qsTr("Absolute positioning is available on this system.") : qsTr("Absolute positioning is unavailable; relative movement will be used."); color: "#9fa0a6"; font.pixelSize: 12 }
+            Rectangle { width: parent.width; height: 1; color: Theme.borderSoft }
+            Column { width: parent.width; spacing: 6
+                Text { text: qsTr("Countdown"); color: Theme.text; font.pixelSize: 14 }
+                Text { width: parent.width; wrapMode: Text.WordWrap; text: qsTr("How long Record waits before it starts, so you can switch to the app you want to record."); color: "#9fa0a6"; font.pixelSize: 12 }
+                Row { spacing: 12
+                    BwSlider {
+                        id: countdownSlider
+                        width: 280; from: 0; to: 10; stepSize: 1; ticks: true
+                        anchors.verticalCenter: parent.verticalCenter
+                        Accessible.name: qsTr("Countdown")
+                        value: appState.recording_countdown_secs ?? 3
+                        onMoved: root.invoke("set_recording_countdown", { seconds: Math.round(value) })
+                    }
+                    Text {
+                        anchors.verticalCenter: parent.verticalCenter
+                        readonly property int secs: Math.round(countdownSlider.value)
+                        text: secs === 0 ? qsTr("Off") : qsTr("%n second(s)", "", secs)
+                        color: Theme.text; font.pixelSize: 13
+                    }
+                }
+            }
         }
     }
     AppDialog {

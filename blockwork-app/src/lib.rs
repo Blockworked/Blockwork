@@ -42,6 +42,17 @@ pub fn animation_speed() -> f64 {
     let speed = blockwork_core::config::load_settings().animation_speed.unwrap_or(1.0);
     if speed.is_finite() { speed.clamp(0.0, MAX_ANIMATION_SPEED) } else { 1.0 }
 }
+
+/// The longest recording countdown Recording settings offers, in seconds.
+pub(crate) const MAX_RECORDING_COUNTDOWN: u8 = 10;
+
+/// Seconds the Record button counts down before recording starts.
+pub(crate) fn recording_countdown_secs() -> u8 {
+    blockwork_core::config::load_settings()
+        .recording_countdown_secs
+        .unwrap_or(3)
+        .min(MAX_RECORDING_COUNTDOWN)
+}
 pub(crate) mod type_watch;
 pub(crate) mod window_watch;
 
