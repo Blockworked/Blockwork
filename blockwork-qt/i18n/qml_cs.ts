@@ -4076,12 +4076,12 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="491"/>
-        <source>Text:</source>
+        <source>Text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="498"/>
-        <source>Key:</source>
+        <source>Key</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4114,7 +4114,7 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="514"/>
-        <source>Mouse button:</source>
+        <source>Mouse button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4189,7 +4189,7 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="560"/>
-        <source>Run command:</source>
+        <source>Run command</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4199,7 +4199,7 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="567"/>
-        <source>Open app:</source>
+        <source>Open app</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4210,7 +4210,7 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="574"/>
-        <source>Close app:</source>
+        <source>Close app</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

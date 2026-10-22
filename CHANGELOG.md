@@ -130,6 +130,7 @@ section below as the GitHub release notes, followed by the downloads table.
   the console.
 - Click-to-preview won't run shell or web blocks.
 - While recording, the canvas shows a card with a live timer, what's being recorded, where the blocks will go, the stop shortcut and a Stop button, instead of a bare "Recording..." message. The countdown shows on the canvas too, which stays locked during it.
+- Block text no longer ends labels with a colon, so blocks read as plain sentences ("Run command [cmd]" instead of "Run command: [cmd]").
 
 ### Fixed
 - On Linux, evdev waits for held keys and mouse buttons to be released before
