@@ -92,6 +92,30 @@ Item {
             compare(calls[0].args.path[0].index, 1);
             compare(calls[0].args.instruction.duration.value, 1000, "EditorPage.defaultInstruction, not the palette prefab");
         }
+        function test_sidebar_pickup_matches_canvas_zoom() {
+            const page = editor();
+            page.paletteDrags.canvas.setZoom(1.5);
+            const source = paletteBlock(page, "Wait");
+            const start = source.mapToItem(scene, 12, source.height / 2);
+            mousePress(scene, start.x, start.y);
+            mouseMove(scene, start.x + 30, start.y + 10, 20);
+            const preview = ghost(page);
+            verify(preview.visible);
+            compare(preview.scale, 1.5);
+            const grabbed = preview.mapToItem(scene, 12, source.height / 2);
+            fuzzyCompare(grabbed.x, start.x + 30, 1);
+            fuzzyCompare(grabbed.y, start.y + 10, 1);
+            mouseMove(scene, 900, 650, 20);
+            const top = preview.mapToItem(null, 0, 0);
+            const at = page.paletteDrags.canvas.workspacePoint(top.x, top.y);
+            mouseRelease(scene, 900, 650);
+            const calls = scene.calls.filter(c => c.command === "add_strand");
+            compare(calls.length, 1);
+            compare(calls[0].args.x, Math.round(at.x));
+            compare(calls[0].args.y, Math.round(at.y));
+            verify(page.paletteDrags.holding);
+            compare(preview.scale, 1.5);
+        }
         function test_held_ghost_until_the_macro_shows_it() {
             const page = editor();
             dragFromPalette(page, "Wait", 900, 650);
