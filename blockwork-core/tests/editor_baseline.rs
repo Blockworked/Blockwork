@@ -109,7 +109,6 @@ fn renaming_a_variable_reaches_nested_reads_and_writes() {
 }
 
 #[test]
-#[ignore = "F9: FindImage's outputs are not BlockKind variable targets yet (WP8)"]
 fn renaming_reaches_both_find_image_outputs() {
     let mut mac = load();
     mac.graph.rename_variable("hit x", "px").unwrap();

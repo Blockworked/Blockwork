@@ -187,13 +187,10 @@ fn names_used(strands: &[Strand]) -> HashSet<String> {
     for strand in strands {
         for ins in &strand.instructions {
             ins.walk(&mut |ins| {
+                ins.kind.visit_refs(&mut |_, name| {
+                    out.insert(name.to_string());
+                });
                 let mut kind = ins.kind.clone();
-                if let Some(name) = kind.variable_target_mut() {
-                    out.insert(name.clone());
-                }
-                if let Some(name) = kind.list_target_mut() {
-                    out.insert(name.clone());
-                }
                 kind.visit_values_mut(&mut |value, _| walk_value(value, &mut out));
             });
         }
@@ -573,6 +570,41 @@ mod tests {
         assert_eq!(user.block_body(&outer).unwrap().instructions.len(), 3);
         assert_eq!(user.settings.block_packs.len(), 1);
         assert_eq!(user.settings.block_packs[0].version, "2.0");
+    }
+
+    #[test]
+    fn packs_carry_every_output_variable_of_nested_blocks() {
+        let mut author = Macro::new("Author".into(), String::new(), Vec::new());
+        for name in ["hit x", "hit y", "count", "unused"] {
+            author.create_variable(name).unwrap();
+        }
+        author.create_list("boxes").unwrap();
+        let find = InstructionKind::FindImage {
+            image: String::new(),
+            tolerance: Value::number(0.0),
+            x_variable: "hit x".into(),
+            y_variable: "hit y".into(),
+        };
+        let detect = InstructionKind::DetectObjectsInWindow {
+            pattern: Value::text(""),
+            by: "title".into(),
+            detector: Value::text(""),
+            label: Value::text(""),
+            confidence: Value::number(50.0),
+            sort: "score".into(),
+            results_list: "boxes".into(),
+            count_variable: "count".into(),
+            region: String::new(),
+        };
+        let repeat = InstructionKind::Repeat {
+            count: Value::number(2.0),
+            body: vec![Instruction::new(find), Instruction::new(detect)],
+        };
+        let id = make_block(&mut author, "look", vec![repeat]);
+        let pack = pack_from_macro(&author, &[id], PackInfo { name: "Look".into(), ..Default::default() }).unwrap();
+        let names: Vec<_> = pack.content.variables.iter().map(|v| v.name.as_str()).collect();
+        assert_eq!(names, ["hit x", "hit y", "count"]);
+        assert_eq!(pack.content.lists.iter().map(|l| l.name.as_str()).collect::<Vec<_>>(), ["boxes"]);
     }
 
     #[test]
