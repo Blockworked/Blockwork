@@ -11,10 +11,18 @@ Item {
     QtObject {
         id: bridge
         property int replySerial: 0
+        property string replyKey: ""
+        property string replyJson: "null"
+        property string replyError: ""
+        property string lastError: ""
         property int previewSerial: 0
         property string activeBlocksJson: "[]"
         property string installedAppsError: ""
-        function callCommand(key, command, args) {}
+        // Edits sent for a reply land in the same log, and succeed.
+        function callCommand(key, command, args) {
+            scene.calls.push({command: command, args: JSON.parse(args)});
+            replyKey = key; replyJson = "null"; replyError = ""; replySerial++;
+        }
     }
     Component {
         id: editorComponent
@@ -56,7 +64,7 @@ Item {
             const start = chip.mapToItem(scene, chip.width / 2, chip.height / 2);
             mousePress(scene, start.x, start.y);
             mouseMove(scene, start.x + 30, start.y + 20, 20);
-            verify(!!page.paletteDrag, "Header parameter starts the editor's palette drag");
+            verify(!!page.paletteDrags.drag, "Header parameter starts the editor's palette drag");
         }
         function test_new_custom_calls_keep_pack_defaults() {
             const page = editor();
@@ -66,7 +74,7 @@ Item {
                 {kind:"Input",name:"monitor",default_value:{kind:"Number",value:1}},
                 {kind:"Branch",name:"body"}
             ]};
-            page.addCustomBlock(definition, 100, 150);
+            page.paletteDrags.addAt(page.customEntry(definition), 100, 150);
             const call = scene.calls.find(c => c.command === "add_strand");
             verify(!!call);
             compare(call.args.instruction.type, "BranchCallBlock");
@@ -84,7 +92,7 @@ Item {
             compare(value.refColor, Qt.color("#51b84b"));
             compare(value.booleanShape, data.boolean);
             startDrag(page, chip);
-            compare(page.paletteDrag.spec.originBlockId, "custom");
+            compare(page.paletteDrags.drag.spec.originBlockId, "custom");
             const ghost = all(page).find(o => o.isValueChip && o.valueData && o.valueData.name === data.name && !o.paletteMode && !o.location);
             verify(!!ghost);
             compare(ghost.refColor, Qt.color("#51b84b"));
@@ -97,7 +105,7 @@ Item {
             compare(cursor.cursorShape, Qt.ClosedHandCursor);
             mouseMove(scene, 1000, 700, 20);
             mouseRelease(scene, 1000, 700);
-            compare(page.paletteDrag, null);
+            compare(page.paletteDrags.drag, null);
             const created = scene.calls.filter(c => c.command === "create_floating_value");
             compare(created.length, 1);
             compare(created[0].args.value.kind, "Param");
@@ -176,9 +184,9 @@ Item {
             const page = editor();
             const chip = parameter(page, "gain");
             startDrag(page, chip);
-            page.cancelPaletteDrag();
+            page.paletteDrags.cancel();
             mouseRelease(scene, 1000, 700);
-            compare(page.paletteDrag, null);
+            compare(page.paletteDrags.drag, null);
             compare(scene.calls.filter(c => c.command === "create_floating_value" || c.command === "put_value").length, 0);
         }
     }
