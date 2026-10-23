@@ -542,14 +542,6 @@ pub(crate) fn rename_variable(
     if trimmed == old_name {
         return Ok(());
     }
-    // Find image writes a second variable that blockstitch's rename can't see.
-    graph.walk_instructions_mut(&mut |ins| {
-        if let InstructionKind::FindImage { y_variable, .. } = &mut ins.kind
-            && *y_variable == old_name
-        {
-            y_variable.clone_from(&trimmed);
-        }
-    });
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {
         mac.graph = graph;

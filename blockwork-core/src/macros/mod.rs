@@ -27,7 +27,8 @@ pub mod trace;
 
 pub use blockstitch_core::graph::{
     BlockDef, BlockGraph, BlockKind, BlockPiece, BlockShape, Comment, DictDef, FloatingValue,
-    InputValueType, ListDef, ListItem, VariableDef, default_block_color, normalize_block_color,
+    InputValueType, ListDef, ListItem, RefKind, VariableDef, default_block_color,
+    normalize_block_color,
 };
 pub use fields::FieldId;
 
@@ -54,6 +55,46 @@ const LEGACY_ROOT_STRAND_ID: &str = "root";
 /// Blockwork's half of the block-editor contract: where its instructions
 /// keep values and bodies, which are headers, and how field ids map onto
 /// their slots. Every traversal built on this lives in blockstitch.
+/// Every variable and list name a kind holds as text, for
+/// [`BlockKind::visit_refs_mut`] and [`BlockKind::visit_refs`] alike.
+macro_rules! for_each_ref {
+    ($kind:expr, $f:expr) => {
+        match $kind {
+            InstructionKind::SetVariable(name, _)
+            | InstructionKind::ChangeVariable(name, _)
+            | InstructionKind::HttpRequest { variable: name, .. }
+            | InstructionKind::AskText { name, .. }
+            | InstructionKind::AskYesNo { name, .. }
+            | InstructionKind::WhenWebhook { variable: name, .. } => $f(RefKind::Variable, name),
+            InstructionKind::FindImage { x_variable, y_variable, .. } => {
+                $f(RefKind::Variable, x_variable);
+                $f(RefKind::Variable, y_variable);
+            }
+            InstructionKind::AskChoice { list, name, .. } => {
+                $f(RefKind::List, list);
+                $f(RefKind::Variable, name);
+            }
+            InstructionKind::DetectObjectsInWindow { results_list, count_variable, .. } => {
+                $f(RefKind::List, results_list);
+                $f(RefKind::Variable, count_variable);
+            }
+            InstructionKind::AimAtDetection { results_list, status_variable, .. } => {
+                $f(RefKind::List, results_list);
+                $f(RefKind::Variable, status_variable);
+            }
+            InstructionKind::AddToList { name, .. }
+            | InstructionKind::DeleteOfList { name, .. }
+            | InstructionKind::DeleteAllOfList { name }
+            | InstructionKind::ShiftList { name, .. }
+            | InstructionKind::InsertIntoList { name, .. }
+            | InstructionKind::ReplaceItemOfList { name, .. }
+            | InstructionKind::ReverseList { name }
+            | InstructionKind::SplitIntoList { name, .. } => $f(RefKind::List, name),
+            _ => {}
+        }
+    };
+}
+
 impl BlockKind for InstructionKind {
     const HEADER_LABEL: &'static str = "When Ran/Block Definition";
     // CallBlock branch callbacks need one body slot per branch (up to 255,
@@ -269,36 +310,12 @@ impl BlockKind for InstructionKind {
         }
     }
 
-    fn variable_target_mut(&mut self) -> Option<&mut String> {
-        match self {
-            InstructionKind::SetVariable(name, _)
-            | InstructionKind::ChangeVariable(name, _)
-            | InstructionKind::HttpRequest { variable: name, .. }
-            | InstructionKind::AskText { name, .. }
-            | InstructionKind::AskYesNo { name, .. }
-            | InstructionKind::AskChoice { name, .. }
-            | InstructionKind::WhenWebhook { variable: name, .. }
-            | InstructionKind::DetectObjectsInWindow { count_variable: name, .. }
-            | InstructionKind::AimAtDetection { status_variable: name, .. } => Some(name),
-            _ => None,
-        }
+    fn visit_refs_mut(&mut self, f: &mut dyn FnMut(RefKind, &mut String)) {
+        for_each_ref!(self, f);
     }
 
-    fn list_target_mut(&mut self) -> Option<&mut String> {
-        match self {
-            InstructionKind::AddToList { name, .. }
-            | InstructionKind::DeleteOfList { name, .. }
-            | InstructionKind::DeleteAllOfList { name }
-            | InstructionKind::ShiftList { name, .. }
-            | InstructionKind::InsertIntoList { name, .. }
-            | InstructionKind::ReplaceItemOfList { name, .. }
-            | InstructionKind::ReverseList { name }
-            | InstructionKind::SplitIntoList { name, .. }
-            | InstructionKind::AskChoice { list: name, .. }
-            | InstructionKind::DetectObjectsInWindow { results_list: name, .. }
-            | InstructionKind::AimAtDetection { results_list: name, .. } => Some(name),
-            _ => None,
-        }
+    fn visit_refs(&self, f: &mut dyn FnMut(RefKind, &str)) {
+        for_each_ref!(self, f);
     }
 
     fn calls_block(&self, block_id: &str) -> bool {
