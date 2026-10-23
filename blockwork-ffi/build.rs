@@ -13,9 +13,8 @@ fn main() {
         Ok(bindings) => {
             bindings.write_to_file(PathBuf::from(&crate_dir).join("include/blockwork_ffi.h"));
         }
-        // A generation failure shouldn't fail the whole build (the header is
-        // only needed by the C++ side, not by anything downstream in Cargo);
-        // a stale-but-present header is better than none for local iteration.
+        // Non-fatal: the header is only needed by the C++ side, and a stale
+        // one beats none for local iteration.
         Err(err) => {
             println!("cargo:warning=cbindgen header generation failed: {err}");
         }

@@ -7,14 +7,14 @@ pub use selection::{get_macro_by_id, get_selected_macro_id, set_selected_macro_i
 pub use settings::{load_settings, save_settings, update_settings, AppSettings};
 
 pub const APP_ID: &str = "Blockwork";
-/// The app's previous identifier, back when it was named "Macros" — the OS
+/// The app's previous identifier, back when it was named "Macros" - the OS
 /// config directory this crate reads/writes moved from `<config_root>/Macros`
 /// to `<config_root>/Blockwork` (see `APP_ID`) when the app was renamed.
 /// Kept only for `migrate_legacy_app_id`.
 const LEGACY_APP_ID: &str = "Macros";
 pub const GLOBAL_HOTKEYS_KEY: &str = "global_hotkeys";
 
-use crate::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo, MOD_ALT, MOD_CTRL};
+use crate::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo, MOD_ALT, MOD_CTRL, MOD_SHIFT};
 use crate::macros::Macro;
 use std::path::PathBuf;
 use std::sync::OnceLock;
@@ -22,11 +22,10 @@ use std::sync::OnceLock;
 static CONFIG_DIR_OVERRIDE: OnceLock<PathBuf> = OnceLock::new();
 
 /// Redirects every `config::*`/`Macro::save`/`Macro::remove` file lookup to
-/// `dir/Blockwork` instead of the OS config directory — for an embedder
-/// (e.g. the Geode mod) whose process sees a different filesystem namespace
-/// than wherever the macro files actually live (a Wine prefix's `Z:` mapping
-/// notwithstanding, this keeps the path explicit rather than assumed).
-/// First caller wins; must be called, if at all, before any other
+/// `dir/Blockwork` instead of the OS config directory - for an embedder
+/// (e.g. a host process loading blockwork-ffi) whose process sees a
+/// different filesystem namespace than wherever the macro files actually
+/// live. First caller wins; must be called, if at all, before any other
 /// `config::*` or `recording::*` function.
 pub fn set_config_dir_override(dir: PathBuf) {
     let _ = CONFIG_DIR_OVERRIDE.set(dir);
@@ -41,13 +40,20 @@ pub(crate) fn config_root() -> Result<PathBuf, String> {
         .ok_or_else(|| "Unable to resolve config directory".to_string())
 }
 
+/// Folder where replays dropped in by the user wait to be imported, created
+/// on demand.
+pub fn imports_dir() -> Result<PathBuf, String> {
+    let dir = config_root()?.join("imports");
+    std::fs::create_dir_all(&dir).map_err(|e| format!("Unable to create {}: {e}", dir.display()))?;
+    Ok(dir)
+}
+
 /// One-time migration for the Macros→Blockwork rename: if the new config
 /// directory (`APP_ID`) doesn't exist yet but the old one (`LEGACY_APP_ID`)
-/// does, moves it wholesale so every saved macro/setting/hotkey survives the
-/// rename untouched. A no-op on every launch after the first (new dir
-/// already exists), and skipped entirely under `CONFIG_DIR_OVERRIDE` (the
-/// Geode-embedder path, which was never on the OS config directory to begin
-/// with). Must run before any other `config::*`/`recording::*` call.
+/// does, moves it wholesale so every saved macro/setting/hotkey survives.
+/// A no-op after the first launch, and skipped under `CONFIG_DIR_OVERRIDE`
+/// (the embedder path was never on the OS config directory). Must run
+/// before any other `config::*`/`recording::*` call.
 pub fn migrate_legacy_app_id() {
     if CONFIG_DIR_OVERRIDE.get().is_some() {
         return;
@@ -77,13 +83,32 @@ impl Macro {
 }
 
 pub fn load_hotkey_bindings() -> Vec<HotkeyBinding> {
-    load_settings()
-        .global_hotkeys
-        .unwrap_or_else(default_hotkey_bindings)
+    let settings = load_settings();
+    let Some(mut bindings) = settings.global_hotkeys else {
+        return default_hotkey_bindings();
+    };
+    // Saved bindings predate the kill switch: add its default once, so
+    // removing it later sticks.
+    if !settings.emergency_stop_seeded.unwrap_or(false) {
+        if !bindings.iter().any(|b| b.action == HotkeyAction::EmergencyStop)
+            && let Some(combo) = default_combo_for_action(&HotkeyAction::EmergencyStop)
+        {
+            bindings.push(HotkeyBinding { action: HotkeyAction::EmergencyStop, combo });
+        }
+        let saved = bindings.clone();
+        update_settings(|s| {
+            s.global_hotkeys = Some(saved);
+            s.emergency_stop_seeded = Some(true);
+        });
+    }
+    bindings
 }
 
 pub fn save_hotkey_bindings(bindings: &[HotkeyBinding]) {
-    update_settings(|s| s.global_hotkeys = Some(bindings.to_vec()));
+    update_settings(|s| {
+        s.global_hotkeys = Some(bindings.to_vec());
+        s.emergency_stop_seeded = Some(true);
+    });
 }
 
 pub fn default_combo_for_action(action: &HotkeyAction) -> Option<KeyCombo> {
@@ -104,16 +129,16 @@ fn default_hotkey_bindings() -> Vec<HotkeyBinding> {
             combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT, key: "KeyS".to_string() },
         },
         HotkeyBinding {
+            action: HotkeyAction::EmergencyStop,
+            combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT | MOD_SHIFT, key: "Escape".to_string() },
+        },
+        HotkeyBinding {
             action: HotkeyAction::NextMacro,
             combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT, key: "RightArrow".to_string() },
         },
         HotkeyBinding {
             action: HotkeyAction::PrevMacro,
             combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT, key: "LeftArrow".to_string() },
-        },
-        HotkeyBinding {
-            action: HotkeyAction::ToggleLoop,
-            combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT, key: "KeyL".to_string() },
         },
         HotkeyBinding {
             action: HotkeyAction::StopRecording,

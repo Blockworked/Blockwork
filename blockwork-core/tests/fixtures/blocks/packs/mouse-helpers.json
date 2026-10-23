@@ -1,0 +1,420 @@
+{
+  "author": "Blockworked",
+  "blocks": {
+    "block_defs": [
+      {
+        "color": "#4C97FF",
+        "description": "Moves the pointer to the absolute screen coordinates x and y, then clicks the left mouse button.",
+        "icon": "mouse-pointer-click",
+        "id": "d51bebeec5fe4d858ec85930c7d98e1b",
+        "identifier": "Blockworked_ClickAt",
+        "pieces": [
+          {
+            "id": "501323443c3e4609b6e3cc8103d09670",
+            "kind": "Label",
+            "text": "click at x"
+          },
+          {
+            "id": "4f181de7192d4c19857ea7e237519f80",
+            "kind": "Input",
+            "name": "x",
+            "value_type": "Any"
+          },
+          {
+            "id": "356dfe7bb0f042f6bd398f8eea281ba7",
+            "kind": "Label",
+            "text": "y"
+          },
+          {
+            "id": "8f6e87580ba1406f975e2f27474783d2",
+            "kind": "Input",
+            "name": "y",
+            "value_type": "Any"
+          }
+        ],
+        "shape": "Normal"
+      },
+      {
+        "color": "#4C97FF",
+        "description": "Moves the pointer to the absolute screen coordinates x and y, then clicks the left mouse button twice with an 80 ms pause.",
+        "icon": "mouse-pointer-click",
+        "id": "a640af27e528493eb11de96b4ad58889",
+        "identifier": "Blockworked_DoubleClickAt",
+        "pieces": [
+          {
+            "id": "74b246542b874557b9dfffa9ad591808",
+            "kind": "Label",
+            "text": "double click at x"
+          },
+          {
+            "id": "efe2ae1dadd8454e961ccd944eba7a7f",
+            "kind": "Input",
+            "name": "x",
+            "value_type": "Any"
+          },
+          {
+            "id": "56cac27982af439499e5a021b243d1b8",
+            "kind": "Label",
+            "text": "y"
+          },
+          {
+            "id": "053255da7da44310a37b6d8a0e5350d1",
+            "kind": "Input",
+            "name": "y",
+            "value_type": "Any"
+          }
+        ],
+        "shape": "Normal"
+      },
+      {
+        "color": "#4C97FF",
+        "description": "Moves the pointer to the absolute screen coordinates x and y, then clicks the right mouse button.",
+        "icon": "mouse-pointer-click",
+        "id": "834f1bb530ad41a0b4d041b7df2e5e72",
+        "identifier": "Blockworked_RightClickAt",
+        "pieces": [
+          {
+            "id": "112c0e311dd749b7b301377b6a0954d1",
+            "kind": "Label",
+            "text": "right click at x"
+          },
+          {
+            "id": "2a3cd2d338f84863864b682dc7bf975a",
+            "kind": "Input",
+            "name": "x",
+            "value_type": "Any"
+          },
+          {
+            "id": "12fd02b2f2624a34be9de0185e2904eb",
+            "kind": "Label",
+            "text": "y"
+          },
+          {
+            "id": "a4f6e46c7f8145368e7e88329047052b",
+            "kind": "Input",
+            "name": "y",
+            "value_type": "Any"
+          }
+        ],
+        "shape": "Normal"
+      },
+      {
+        "color": "#4C97FF",
+        "description": "Drags with the left mouse button from the starting screen coordinates to the destination, pausing 60 ms before and after the move.",
+        "icon": "move",
+        "id": "732530587c26402d8ced53b147772699",
+        "identifier": "Blockworked_DragBetween",
+        "pieces": [
+          {
+            "id": "ee0a2366ba6e4eb39b2bf90f2fa8ddb7",
+            "kind": "Label",
+            "text": "drag from x"
+          },
+          {
+            "id": "ef17db65cfbf42038d514fd601131c2a",
+            "kind": "Input",
+            "name": "from x",
+            "value_type": "Any"
+          },
+          {
+            "id": "38fb721222694a128f46b862f18bea88",
+            "kind": "Label",
+            "text": "y"
+          },
+          {
+            "id": "4fb43a58574f40daaf4fb4f2057c4125",
+            "kind": "Input",
+            "name": "from y",
+            "value_type": "Any"
+          },
+          {
+            "id": "74023daff43543109d2e824376046b03",
+            "kind": "Label",
+            "text": "to x"
+          },
+          {
+            "id": "90b867e185d14a1fb4be41bf5017c9e5",
+            "kind": "Input",
+            "name": "to x",
+            "value_type": "Any"
+          },
+          {
+            "id": "f285604482594b86a3382a6feb6b8623",
+            "kind": "Label",
+            "text": "y"
+          },
+          {
+            "id": "ec2f1d5fa96a40adb3896dad1d33a67e",
+            "kind": "Input",
+            "name": "to y",
+            "value_type": "Any"
+          }
+        ],
+        "shape": "Normal"
+      }
+    ],
+    "comments": [],
+    "description": "Click, double click, right click and drag at a screen position.",
+    "dicts": [],
+    "floating_values": [],
+    "format_version": 1,
+    "id": "",
+    "lists": [],
+    "name": "Mouse helpers",
+    "recording_target": null,
+    "settings": {
+      "active_days": 0,
+      "active_hours": null,
+      "always_listen": false,
+      "catch_up_missed": false,
+      "max_loop_iterations": 0,
+      "max_run_secs": 0,
+      "only_in_window": "",
+      "power": "Any"
+    },
+    "speed_multiplier": 1.0,
+    "strands": [
+      {
+        "id": "3a0b013d0fb141af91dc1d439079bab1",
+        "instructions": [
+          {
+            "id": "8f59dfe9247040ab9c5a445602d41593",
+            "kind": {
+              "BlockHeader": "d51bebeec5fe4d858ec85930c7d98e1b"
+            }
+          },
+          {
+            "id": "e9526e7dc37f484f9b8f7bb6cf609f69",
+            "kind": {
+              "Token": {
+                "MoveMouse": [
+                  {
+                    "kind": "Param",
+                    "name": "x"
+                  },
+                  {
+                    "kind": "Param",
+                    "name": "y"
+                  },
+                  "Abs"
+                ]
+              }
+            }
+          },
+          {
+            "id": "f4e7415fcdf845988ec7400370319180",
+            "kind": {
+              "Token": {
+                "Button": [
+                  "Left",
+                  "Click"
+                ]
+              }
+            }
+          }
+        ],
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": "8f13919da9f84099953b8d0453ffd2f0",
+        "instructions": [
+          {
+            "id": "2eba2fd35366409b8fd2e8cebafedbee",
+            "kind": {
+              "BlockHeader": "a640af27e528493eb11de96b4ad58889"
+            }
+          },
+          {
+            "id": "7aa879c7ef2f4839a414e4043454895e",
+            "kind": {
+              "Token": {
+                "MoveMouse": [
+                  {
+                    "kind": "Param",
+                    "name": "x"
+                  },
+                  {
+                    "kind": "Param",
+                    "name": "y"
+                  },
+                  "Abs"
+                ]
+              }
+            }
+          },
+          {
+            "id": "c888f05f20d04523bdaa37a4fcb6bdc4",
+            "kind": {
+              "Token": {
+                "Button": [
+                  "Left",
+                  "Click"
+                ]
+              }
+            }
+          },
+          {
+            "id": "f13c15b7586f44ccad11eb0b5892b7da",
+            "kind": {
+              "Wait": {
+                "kind": "Number",
+                "value": 80.0
+              }
+            }
+          },
+          {
+            "id": "39a7a5a9571e4fe59091022c1eaec346",
+            "kind": {
+              "Token": {
+                "Button": [
+                  "Left",
+                  "Click"
+                ]
+              }
+            }
+          }
+        ],
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": "63fee85df7b04238a267c6419654f286",
+        "instructions": [
+          {
+            "id": "0eed23f7454e42c1b25fe9c9691ce699",
+            "kind": {
+              "BlockHeader": "834f1bb530ad41a0b4d041b7df2e5e72"
+            }
+          },
+          {
+            "id": "c89858f648264223a90d813649071426",
+            "kind": {
+              "Token": {
+                "MoveMouse": [
+                  {
+                    "kind": "Param",
+                    "name": "x"
+                  },
+                  {
+                    "kind": "Param",
+                    "name": "y"
+                  },
+                  "Abs"
+                ]
+              }
+            }
+          },
+          {
+            "id": "2dc91fb231a442808cdd672cb1c86b25",
+            "kind": {
+              "Token": {
+                "Button": [
+                  "Right",
+                  "Click"
+                ]
+              }
+            }
+          }
+        ],
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": "7b0614a018e54baaa1d59f506adfab28",
+        "instructions": [
+          {
+            "id": "8e465966ffa842698cec036d3ddb211d",
+            "kind": {
+              "BlockHeader": "732530587c26402d8ced53b147772699"
+            }
+          },
+          {
+            "id": "55b0ec48b2ff450a958d31081a2b071a",
+            "kind": {
+              "Token": {
+                "MoveMouse": [
+                  {
+                    "kind": "Param",
+                    "name": "from x"
+                  },
+                  {
+                    "kind": "Param",
+                    "name": "from y"
+                  },
+                  "Abs"
+                ]
+              }
+            }
+          },
+          {
+            "id": "04f65e704d1b45ee95d62aa034e1e553",
+            "kind": {
+              "Token": {
+                "Button": [
+                  "Left",
+                  "Press"
+                ]
+              }
+            }
+          },
+          {
+            "id": "6eb855c849894395bd0ecd663966723c",
+            "kind": {
+              "Wait": {
+                "kind": "Number",
+                "value": 60.0
+              }
+            }
+          },
+          {
+            "id": "14fbe18ba5d34360bed491e8a5cd62ea",
+            "kind": {
+              "Token": {
+                "MoveMouse": [
+                  {
+                    "kind": "Param",
+                    "name": "to x"
+                  },
+                  {
+                    "kind": "Param",
+                    "name": "to y"
+                  },
+                  "Abs"
+                ]
+              }
+            }
+          },
+          {
+            "id": "e79021924fbf467495d1ef5d5a725c45",
+            "kind": {
+              "Wait": {
+                "kind": "Number",
+                "value": 60.0
+              }
+            }
+          },
+          {
+            "id": "14f4d4d16b4645f0b8f83c950df31fcc",
+            "kind": {
+              "Token": {
+                "Button": [
+                  "Left",
+                  "Release"
+                ]
+              }
+            }
+          }
+        ],
+        "x": 0,
+        "y": 0
+      }
+    ],
+    "variables": []
+  },
+  "blockwork_block_pack": 1,
+  "description": "Click, double click, right click and drag at a screen position.",
+  "id": "mouse-helpers",
+  "name": "Mouse helpers",
+  "version": "1.0.2"
+}

@@ -1,0 +1,33 @@
+# Copy to docker-compose.override.yml in a checkout of
+# https://github.com/WeblateOrg/docker-compose and fill in every CHANGE_ME.
+services:
+  weblate:
+    # Only the reverse proxy on this machine talks to Weblate.
+    ports:
+      - 127.0.0.1:8080:8080
+    environment:
+      WEBLATE_SITE_DOMAIN: translate.CHANGE_ME.example
+      WEBLATE_SITE_TITLE: Blockwork translations
+      WEBLATE_ENABLE_HTTPS: 1
+      WEBLATE_ALLOWED_HOSTS: translate.CHANGE_ME.example
+      WEBLATE_TIME_ZONE: UTC
+
+      WEBLATE_ADMIN_NAME: CHANGE_ME
+      WEBLATE_ADMIN_EMAIL: CHANGE_ME@example.com
+      WEBLATE_ADMIN_PASSWORD: CHANGE_ME
+      WEBLATE_SERVER_EMAIL: weblate@CHANGE_ME.example
+      WEBLATE_DEFAULT_FROM_EMAIL: weblate@CHANGE_ME.example
+
+      # Sign-up confirmations and notifications need working mail.
+      WEBLATE_EMAIL_HOST: smtp.CHANGE_ME.example
+      WEBLATE_EMAIL_PORT: 587
+      WEBLATE_EMAIL_USE_TLS: 1
+      WEBLATE_EMAIL_HOST_USER: CHANGE_ME
+      WEBLATE_EMAIL_HOST_PASSWORD: CHANGE_ME
+
+      WEBLATE_REGISTRATION_OPEN: 1
+
+      # The account Weblate opens translation pull requests from.
+      WEBLATE_GITHUB_HOST: api.github.com
+      WEBLATE_GITHUB_USERNAME: CHANGE_ME
+      WEBLATE_GITHUB_TOKEN: CHANGE_ME

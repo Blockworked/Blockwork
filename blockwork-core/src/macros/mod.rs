@@ -1,22 +1,59 @@
-use crate::input::schedule::TimeSchedule;
-use crate::input::types::InputToken;
-use crate::input::value::{Evaluated, Op, Value};
+//! Blockwork's block vocabulary - the instructions its canvas speaks - and
+//! the `Macro` document wrapped around blockstitch's [`BlockGraph`].
+//! [`InstructionKind`]'s [`BlockKind`] impl is the hinge between the two.
+
+use crate::input::schedule::{LegacyTimeSchedule, TimeSchedule};
+use crate::input::types::{Direction, InputToken, MacroButton};
+use crate::input::value::{Op, Value};
 use serde::{Deserialize, Serialize};
-use std::collections::HashMap;
+use std::ops::{Deref, DerefMut};
 use uuid::Uuid;
 
+#[cfg(feature = "system")]
 pub mod backend;
+#[cfg(feature = "system")]
+pub mod calls;
+pub mod conditions;
+#[cfg(feature = "system")]
+pub mod debug;
+pub mod fields;
+#[cfg(feature = "system")]
+pub mod locks;
+pub mod migrate;
+pub mod placement;
+#[cfg(feature = "system")]
 pub mod loop_control;
+#[cfg(feature = "system")]
 pub mod priority;
+#[cfg(feature = "system")]
+pub mod gdr_import;
+#[cfg(feature = "system")]
+pub mod host_clock;
+#[cfg(feature = "system")]
 pub mod run_registry;
+#[cfg(feature = "system")]
 pub mod runner;
+#[cfg(feature = "system")]
 pub mod thread_pool;
+#[cfg(feature = "system")]
+pub mod trace;
+
+pub use blockstitch_core::graph::{
+    BlockDef, BlockGraph, BlockKind, BlockPiece, BlockShape, Comment, DictDef, FloatingValue,
+    InputValueType, ListDef, ListItem, RefKind, VariableDef, default_block_color,
+    normalize_block_color,
+};
+pub use fields::FieldId;
+
+/// One instruction on the canvas: Blockwork's [`InstructionKind`] plus the
+/// stable id blockstitch tracks it by.
+pub type Instruction = blockstitch_core::graph::Instruction<InstructionKind>;
+/// One draggable stack of Blockwork instructions.
+pub type Strand = blockstitch_core::graph::Strand<InstructionKind>;
+/// Everything on a macro's canvas - see [`Macro`], which owns one.
+pub type MacroGraph = BlockGraph<InstructionKind>;
 
 fn default_macro_id() -> String {
-    Uuid::new_v4().simple().to_string()
-}
-
-fn default_strand_id() -> String {
     Uuid::new_v4().simple().to_string()
 }
 
@@ -28,612 +65,231 @@ fn default_speed_multiplier() -> f64 {
 /// Kept only so loading an old save file can find and migrate that strand.
 const LEGACY_ROOT_STRAND_ID: &str = "root";
 
-/// One draggable stack of instructions on the canvas. It's an entry point —
-/// one of the possibly-many things a macro runs concurrently — when its
-/// first instruction is `InstructionKind::WhenRan`; otherwise it stays persisted
-/// but inert until dragged under a "When Ran" block.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-pub struct Strand {
-    #[serde(default = "default_strand_id")]
-    pub id: String,
-    #[serde(default)]
-    pub x: i32,
-    #[serde(default)]
-    pub y: i32,
-    #[serde(default)]
-    pub instructions: Vec<Instruction>,
+/// Blockwork's half of the block-editor contract: where its instructions
+/// keep values and bodies, which are headers, and how field ids map onto
+/// their slots. Every traversal built on this lives in blockstitch.
+/// Every variable and list name a kind holds as text, for
+/// [`BlockKind::visit_refs_mut`] and [`BlockKind::visit_refs`] alike.
+macro_rules! for_each_ref {
+    ($kind:expr, $f:expr) => {
+        match $kind {
+            InstructionKind::SetVariable(name, _)
+            | InstructionKind::ChangeVariable(name, _)
+            | InstructionKind::HttpRequest { variable: name, .. }
+            | InstructionKind::AskText { name, .. }
+            | InstructionKind::AskYesNo { name, .. }
+            | InstructionKind::WhenWebhook { variable: name, .. } => $f(RefKind::Variable, name),
+            InstructionKind::FindImage { x_variable, y_variable, .. } => {
+                $f(RefKind::Variable, x_variable);
+                $f(RefKind::Variable, y_variable);
+            }
+            InstructionKind::AskChoice { list, name, .. } => {
+                $f(RefKind::List, list);
+                $f(RefKind::Variable, name);
+            }
+            InstructionKind::DetectObjectsInWindow { results_list, count_variable, .. } => {
+                $f(RefKind::List, results_list);
+                $f(RefKind::Variable, count_variable);
+            }
+            InstructionKind::AimAtDetection { results_list, status_variable, .. } => {
+                $f(RefKind::List, results_list);
+                $f(RefKind::Variable, status_variable);
+            }
+            InstructionKind::AddToList { name, .. }
+            | InstructionKind::DeleteOfList { name, .. }
+            | InstructionKind::DeleteAllOfList { name }
+            | InstructionKind::ShiftList { name, .. }
+            | InstructionKind::InsertIntoList { name, .. }
+            | InstructionKind::ReplaceItemOfList { name, .. }
+            | InstructionKind::ReverseList { name }
+            | InstructionKind::SplitIntoList { name, .. } => $f(RefKind::List, name),
+            _ => {}
+        }
+    };
 }
 
-/// A value block sitting free on the canvas, not embedded in any
-/// instruction's field — the drag-and-drop "parking spot" for a value block
-/// before/after it's placed into a field's slot.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-pub struct FloatingValue {
-    #[serde(default = "default_floating_value_id")]
-    pub id: String,
-    #[serde(default)]
-    pub x: i32,
-    #[serde(default)]
-    pub y: i32,
-    pub value: Value,
-    /// Which custom block's own header this value was dragged out of, if
-    /// any — set only when the value came from a `Value::Param` reporter
-    /// (see `commands::create_floating_value`), since that's the one value
-    /// kind meaningless outside its declaring block. A floating value with
-    /// no such origin (a plain number/operator/variable, or an older save
-    /// from before this field existed — hence `#[serde(default)]`) is just
-    /// `None`. Lets the frontend render a floating `Param` reporter with
-    /// its real declared shape (e.g. a boolean hexagon) instead of guessing
-    /// from name alone.
-    #[serde(default)]
-    pub origin_block_id: Option<String>,
-}
+impl BlockKind for InstructionKind {
+    const HEADER_LABEL: &'static str = "When Ran/Block Definition";
+    // CallBlock branch callbacks need one body slot per branch (up to 255,
+    // see validate_block_pieces), so walks cover every slot and `body_mut`
+    // decides per instruction. Other instructions answer `None` past their
+    // own slots, so the wider loop costs them nothing.
+    const BODY_SLOTS: u8 = u8::MAX;
 
-fn default_floating_value_id() -> String {
-    Uuid::new_v4().simple().to_string()
-}
-
-/// A floating, collapsible note on the canvas — freestanding (`attached_to:
-/// None`, `x`/`y` an absolute canvas position, same convention as
-/// `FloatingValue`) or pinned to an instruction (`attached_to: Some(id)`,
-/// `x`/`y` an *offset* from that instruction's currently-rendered position
-/// instead — the desktop app has no idea where a given instruction renders
-/// on screen, that's purely a frontend DOM-measurement fact, so an attached
-/// note's absolute position is computed frontend-side each render as anchor
-/// row position + this offset, never stored as an absolute coordinate here).
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-pub struct Comment {
-    #[serde(default = "default_comment_id")]
-    pub id: String,
-    #[serde(default)]
-    pub x: i32,
-    #[serde(default)]
-    pub y: i32,
-    #[serde(default)]
-    pub text: String,
-    #[serde(default)]
-    pub collapsed: bool,
-    #[serde(default)]
-    pub attached_to: Option<String>,
-}
-
-fn default_comment_id() -> String {
-    Uuid::new_v4().simple().to_string()
-}
-
-fn default_variable_value() -> Evaluated {
-    Evaluated::Number(0.0)
-}
-
-/// A user-declared macro-wide variable and its current value, mutated by
-/// `SetVariable`/`ChangeVariable` at runtime and persisted with the macro so
-/// it survives an app restart.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-pub struct VariableDef {
-    pub name: String,
-    #[serde(default = "default_variable_value")]
-    pub value: Evaluated,
-}
-
-/// What kind of value an input slot expects — drives the blank default a
-/// fresh call site's argument gets (`Value::number(0.0)` vs `Value::Bool`,
-/// see `reconcile_block_call_args`) and, transitively, whether that slot
-/// renders as the ordinary rounded capsule or a boolean hexagon (purely a
-/// function of the `Value` actually sitting there, same as every built-in
-/// boolean slot — see `blockstitch`'s `ValueBlock.vue`'s `isBool`). `Any`
-/// (number-or-text, free-typed) is the long-standing default; `#[serde(default)]`
-/// on `BlockPiece::Input::value_type` lets an older save missing this field
-/// deserialize as `Any` instead of failing.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-pub enum InputValueType {
-    #[default]
-    Any,
-    Bool,
-}
-
-/// One piece of a custom block's prototype, in declaration order — either
-/// static label text or a named input slot (read in the body via
-/// `Value::Param`). `id` is a stable identifier assigned once and never
-/// regenerated, since `name` changes on rename and can't serve as identity
-/// when reconciling call sites in `reconcile_block_call_args`.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-#[serde(tag = "kind")]
-pub enum BlockPiece {
-    Label {
-        id: String,
-        text: String,
-    },
-    Input {
-        id: String,
-        name: String,
-        #[serde(default)]
-        value_type: InputValueType,
-    },
-}
-
-impl BlockPiece {
-    fn id(&self) -> &str {
+    fn visit_values_mut(&mut self, f: &mut dyn FnMut(&mut Value, InputValueType)) {
         match self {
-            BlockPiece::Label { id, .. } | BlockPiece::Input { id, .. } => id,
-        }
-    }
-}
-
-/// What a custom block's own call site looks like: a plain stackable
-/// instruction (`Normal`), a stackable instruction with no bottom notch so
-/// nothing can be placed below it (`Ending` — same shape family as the
-/// built-in `Return`/`EscapeLoop`/`ContinueLoop`), or a value-position
-/// reporter returning either a number-or-text (`ReturnsValue`, an oval,
-/// today's long-standing `returns_value: true`) or a boolean (`ReturnsBool`,
-/// a hexagon — see `BlockPiece`'s `InputValueType` for the same oval/hexagon
-/// split on an *input*). `Normal`/`Ending` and `ReturnsValue`/`ReturnsBool`
-/// are each a mutually-exclusive pair in the "Make a Block" UI (a "returns a
-/// value" checkbox swaps which pair the two shape buttons offer) — there's
-/// no such thing as an `Ending` reporter or a `Normal` block that also
-/// returns a boolean.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Default)]
-pub enum BlockShape {
-    #[default]
-    Normal,
-    Ending,
-    ReturnsValue,
-    ReturnsBool,
-}
-
-impl BlockShape {
-    /// True for either reporter shape — gates whether `Value::Call` nodes
-    /// referencing this block are meaningful and whether a `Return` inside
-    /// its body is valid placement (see `commands::check_return_placement`).
-    /// Boolean-vs-number/text is a pure rendering concern (which shape the
-    /// reporter draws as, and what a fresh call-site arg defaults to) with
-    /// no effect on execution — `Value::eval`/`Evaluated` are already
-    /// dynamically typed regardless of which reporter shape produced them.
-    pub fn returns_value(self) -> bool {
-        matches!(self, BlockShape::ReturnsValue | BlockShape::ReturnsBool)
-    }
-
-    /// True only for the no-bottom-notch command shape.
-    pub fn is_ending(self) -> bool {
-        matches!(self, BlockShape::Ending)
-    }
-}
-
-/// Old saves only ever had a `returns_value: bool` field; this decodes
-/// either that (`true` migrating to `ReturnsValue`, `false` to `Normal`) or
-/// the current `shape: "Normal" | "Ending" | "ReturnsValue" | "ReturnsBool"`
-/// tag, whichever `BlockDef`'s `#[serde(alias = "returns_value")]` field
-/// actually finds on disk. Mirrors `Value`'s own legacy-tolerant
-/// `Deserialize` impl further down this crate (`input/value.rs`).
-impl<'de> Deserialize<'de> for BlockShape {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'de>,
-    {
-        #[derive(Deserialize)]
-        #[serde(untagged)]
-        enum ShapeDe {
-            Legacy(bool),
-            Current(String),
-        }
-        Ok(match ShapeDe::deserialize(deserializer)? {
-            ShapeDe::Legacy(true) => BlockShape::ReturnsValue,
-            ShapeDe::Legacy(false) => BlockShape::Normal,
-            ShapeDe::Current(s) => match s.as_str() {
-                "Normal" => BlockShape::Normal,
-                "Ending" => BlockShape::Ending,
-                "ReturnsValue" => BlockShape::ReturnsValue,
-                "ReturnsBool" => BlockShape::ReturnsBool,
-                other => {
-                    return Err(serde::de::Error::unknown_variant(
-                        other,
-                        &["Normal", "Ending", "ReturnsValue", "ReturnsBool"],
-                    ));
+            InstructionKind::Token(token) => token.visit_values_mut(f),
+            InstructionKind::Wait(value)
+            | InstructionKind::Return(value)
+            | InstructionKind::WhenBatteryDischargedTo(value)
+            | InstructionKind::WhenBatteryChargedTo(value)
+            | InstructionKind::WhenKey(value, _)
+            | InstructionKind::SetClipboard(value)
+            | InstructionKind::SetVariable(_, value)
+            | InstructionKind::ChangeVariable(_, value)
+            | InstructionKind::Repeat { count: value, .. }
+            | InstructionKind::Log(value)
+            | InstructionKind::ThrowError(value)
+            | InstructionKind::WhenFileChanged(value)
+            | InstructionKind::WhenWindow { pattern: value, .. }
+            | InstructionKind::WhenTyped { text: value, .. }
+            | InstructionKind::PasteText(value)
+            | InstructionKind::WhenApp { pattern: value, .. }
+            | InstructionKind::WhenIdle(value)
+            | InstructionKind::WhenCron(value)
+            | InstructionKind::WithLock { name: value, .. }
+            | InstructionKind::WhenUsb { pattern: value, .. }
+            | InstructionKind::WhenMouseButton { modifiers: value, .. }
+            | InstructionKind::AskYesNo { prompt: value, .. }
+            | InstructionKind::AskChoice { prompt: value, .. }
+            | InstructionKind::ShowMessage(value)
+            | InstructionKind::WhenAt(value)
+            | InstructionKind::WhenWebhook { path: value, .. } => f(value, InputValueType::Any),
+            InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } => f(&mut name.value, InputValueType::Any),
+            InstructionKind::AskText { prompt, default, .. } => {
+                f(prompt, InputValueType::Any);
+                f(default, InputValueType::Any);
+            }
+            InstructionKind::SplitIntoList { text, separator, .. } => {
+                f(text, InputValueType::Any);
+                f(separator, InputValueType::Any);
+            }
+            InstructionKind::WriteFile { path, text, .. } => {
+                f(path, InputValueType::Any);
+                f(text, InputValueType::Any);
+            }
+            InstructionKind::HttpRequest { url, body, headers, .. } => {
+                f(url, InputValueType::Any);
+                f(body, InputValueType::Any);
+                f(headers, InputValueType::Any);
+            }
+            InstructionKind::Notify { title, message } => {
+                f(title, InputValueType::Any);
+                f(message, InputValueType::Any);
+            }
+            InstructionKind::Retry { count, delay, .. } => {
+                f(count, InputValueType::Any);
+                f(delay, InputValueType::Any);
+            }
+            InstructionKind::WindowAction { pattern, .. } => f(pattern, InputValueType::Any),
+            InstructionKind::MoveWindow { pattern, x, y, .. } => {
+                f(pattern, InputValueType::Any);
+                f(x, InputValueType::Any);
+                f(y, InputValueType::Any);
+            }
+            InstructionKind::RunMacro { target, .. } | InstructionKind::StopMacroNamed(target) => {
+                f(target, InputValueType::Any)
+            }
+            InstructionKind::SetGlobal { name, value: other } | InstructionKind::ChangeGlobal { name, by: other } => {
+                f(name, InputValueType::Any);
+                f(other, InputValueType::Any);
+            }
+            InstructionKind::WaitUntil { condition, timeout } => {
+                f(condition, InputValueType::Bool);
+                f(timeout, InputValueType::Any);
+            }
+            InstructionKind::FindImage { tolerance, .. } | InstructionKind::ClickImage { tolerance, .. } => {
+                f(tolerance, InputValueType::Any)
+            }
+            InstructionKind::WaitForImage { tolerance, timeout, .. } => {
+                f(tolerance, InputValueType::Any);
+                f(timeout, InputValueType::Any);
+            }
+            InstructionKind::DetectObjectsInWindow { pattern, detector, label, confidence, .. } => {
+                for v in [pattern, detector, label, confidence] {
+                    f(v, InputValueType::Any);
                 }
-            },
-        })
+            }
+            InstructionKind::WaitForDetection { pattern, detector, label, confidence, timeout, .. } => {
+                for v in [pattern, detector, label, confidence, timeout] {
+                    f(v, InputValueType::Any);
+                }
+            }
+            InstructionKind::AimStep { pattern, target_x, target_y, gain, max_step, deadzone, .. } => {
+                for v in [pattern, target_x, target_y, gain, max_step, deadzone] {
+                    f(v, InputValueType::Any);
+                }
+            }
+            InstructionKind::AimAtDetection { index, gain, max_step, deadzone, timeout, settle_ms, .. } => {
+                for v in [index, gain, max_step, deadzone, timeout, settle_ms] {
+                    f(v, InputValueType::Any);
+                }
+            }
+            // A call site's declared Boolean inputs live on the `BlockDef`,
+            // not here - `BlockGraph::migrate_bool_slots` handles those.
+            InstructionKind::CallBlock { args, .. } => {
+                for arg in args {
+                    f(arg, InputValueType::Any);
+                }
+            }
+            InstructionKind::If { condition, .. }
+            | InstructionKind::IfElse { condition, .. }
+            | InstructionKind::While { condition, .. } => f(condition, InputValueType::Bool),
+            InstructionKind::AddToList { value, .. } | InstructionKind::InsertIntoList { value, .. } => {
+                f(value, InputValueType::Any)
+            }
+            InstructionKind::DeleteOfList { index, .. } => f(index, InputValueType::Any),
+            InstructionKind::ShiftList { amount, .. } => f(amount, InputValueType::Any),
+            InstructionKind::ReplaceItemOfList { index, value, .. } => {
+                f(index, InputValueType::Any);
+                f(value, InputValueType::Any);
+            }
+            InstructionKind::Command(_)
+            | InstructionKind::CommandWait(_)
+            | InstructionKind::Comment(_)
+            | InstructionKind::WhenRan
+            | InstructionKind::BlockHeader(_)
+            | InstructionKind::EscapeLoop
+            | InstructionKind::ContinueLoop
+            | InstructionKind::StopMacro
+            | InstructionKind::TryCatch { .. }
+            | InstructionKind::WhenTime(..)
+            | InstructionKind::WhenPowerPluggedIn
+            | InstructionKind::WhenPowerUnplugged
+            | InstructionKind::WhenClipboardChanged
+            | InstructionKind::WhenScreenLock { .. }
+            | InstructionKind::WhenNetwork { .. }
+            | InstructionKind::Forever { .. }
+            | InstructionKind::OpenApp { .. }
+            | InstructionKind::CloseApp { .. }
+            | InstructionKind::DeleteAllOfList { .. }
+            | InstructionKind::ReverseList { .. }
+            | InstructionKind::RunBranch(_) => {}
+        }
     }
-}
 
-/// A user-defined custom block ("My Blocks") — just the prototype/signature;
-/// its body lives in a separate `Strand` whose `instructions[0]` is
-/// `InstructionKind::BlockHeader(id)`.
-#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
-pub struct BlockDef {
-    pub id: String,
-    pub pieces: Vec<BlockPiece>,
-    #[serde(alias = "returns_value")]
-    pub shape: BlockShape,
-    /// User-selected accent for the block's icon and hover outline. The
-    /// default preserves the established blue treatment for older macros.
-    #[serde(default = "default_block_color")]
-    pub color: String,
-}
-
-/// The legacy/default custom-block accent. Kept as a function so serde can
-/// supply it when loading macros saved before custom colors existed.
-pub fn default_block_color() -> String {
-    "#4C97FF".to_string()
-}
-
-/// Canonicalizes the one color format Blockwork persists and exposes to CSS.
-/// `None` means the supplied value cannot safely be used as a block accent.
-pub fn normalize_block_color(color: &str) -> Option<String> {
-    let color = color.trim();
-    (color.len() == 7
-        && color.starts_with('#')
-        && color[1..].bytes().all(|b| b.is_ascii_hexdigit()))
-    .then(|| color.to_ascii_uppercase())
-}
-
-impl BlockDef {
-    /// Declared input names, in prototype order — the positional key `Call`/
-    /// `CallBlock`'s `args` line up against.
-    pub fn input_names(&self) -> impl Iterator<Item = &str> {
-        self.pieces.iter().filter_map(|p| match p {
-            BlockPiece::Input { name, .. } => Some(name.as_str()),
-            BlockPiece::Label { .. } => None,
-        })
-    }
-}
-
-fn default_block_id() -> String {
-    Uuid::new_v4().simple().to_string()
-}
-
-impl InstructionKind {
-    /// True for "header" blocks (`WhenRan`, `BlockHeader`, and the
-    /// `WhenBattery*To` entry points) — must be first in their strand,
-    /// nothing may stack above them, and they render with a flat top edge.
-    pub fn is_header(&self) -> bool {
+    /// True for "header" blocks (`WhenRan`, `BlockHeader`, and the event
+    /// entry points) - must be first in their strand, nothing may stack
+    /// above them, and they render with a flat top edge.
+    fn is_header(&self) -> bool {
         matches!(
             self,
             InstructionKind::WhenRan
                 | InstructionKind::BlockHeader(_)
                 | InstructionKind::WhenBatteryDischargedTo(_)
                 | InstructionKind::WhenBatteryChargedTo(_)
-                | InstructionKind::WhenTime(_)
+                | InstructionKind::WhenTime(..)
                 | InstructionKind::WhenPowerPluggedIn
                 | InstructionKind::WhenPowerUnplugged
+                | InstructionKind::WhenClipboardChanged
+                | InstructionKind::WhenKey(..)
+                | InstructionKind::WhenWindow { .. }
+                | InstructionKind::WhenFileChanged(_)
+                | InstructionKind::WhenTyped { .. }
+                | InstructionKind::WhenApp { .. }
+                | InstructionKind::WhenIdle(_)
+                | InstructionKind::WhenScreenLock { .. }
+                | InstructionKind::WhenCron(_)
+                | InstructionKind::WhenNetwork { .. }
+                | InstructionKind::WhenUsb { .. }
+                | InstructionKind::WhenMouseButton { .. }
+                | InstructionKind::WhenAt(_)
+                | InstructionKind::WhenSignal(_)
+                | InstructionKind::WhenWebhook { .. }
         )
     }
 
-    /// Renames `Value::Var` reads, plus a `SetVariable`/`ChangeVariable`
-    /// instruction's own target name.
-    pub fn rename_var(&mut self, old: &str, new: &str) {
-        match self {
-            InstructionKind::Wait(value)
-            | InstructionKind::Return(value)
-            | InstructionKind::WhenBatteryDischargedTo(value)
-            | InstructionKind::WhenBatteryChargedTo(value) => value.rename_var(old, new),
-            InstructionKind::Token(token) => token.rename_var(old, new),
-            InstructionKind::SetVariable(name, value)
-            | InstructionKind::ChangeVariable(name, value) => {
-                if name == old {
-                    *name = new.to_string();
-                }
-                value.rename_var(old, new);
-            }
-            InstructionKind::CallBlock { args, .. } => {
-                for a in args.iter_mut() {
-                    a.rename_var(old, new);
-                }
-            }
-            InstructionKind::If { condition, body } => {
-                condition.rename_var(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_var(old, new);
-                }
-            }
-            InstructionKind::IfElse {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                condition.rename_var(old, new);
-                for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
-                    ins.rename_var(old, new);
-                }
-            }
-            InstructionKind::Repeat { count, body } => {
-                count.rename_var(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_var(old, new);
-                }
-            }
-            InstructionKind::Forever { body } => {
-                for ins in body.iter_mut() {
-                    ins.rename_var(old, new);
-                }
-            }
-            InstructionKind::While { condition, body } => {
-                condition.rename_var(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_var(old, new);
-                }
-            }
-            InstructionKind::Command(_)
-            | InstructionKind::Comment(_)
-            | InstructionKind::WhenRan
-            | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop
-            | InstructionKind::ContinueLoop
-            | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn
-            | InstructionKind::WhenPowerUnplugged
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => {}
-        }
-    }
-
-    /// Repairs boolean slots poisoned by the historical `Value::Bool`-less
-    /// bug (see `Value::migrate_bool_slots`) — run once over every
-    /// instruction when a macro loads (`From<MacroDe>`). An `If`/`IfElse`
-    /// condition is the one position this module knows is boolean-typed by
-    /// construction; everything else starts `false` and lets `Value::migrate_bool_slots`
-    /// find any `And`/`Or`/`Not` operands nested further in on its own.
-    pub fn migrate_bool_slots(&mut self) {
-        match self {
-            InstructionKind::Wait(value)
-            | InstructionKind::Return(value)
-            | InstructionKind::WhenBatteryDischargedTo(value)
-            | InstructionKind::WhenBatteryChargedTo(value) => value.migrate_bool_slots(false),
-            InstructionKind::Token(token) => token.migrate_bool_slots(),
-            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
-                value.migrate_bool_slots(false)
-            }
-            InstructionKind::CallBlock { args, .. } => {
-                for a in args.iter_mut() {
-                    a.migrate_bool_slots(false);
-                }
-            }
-            InstructionKind::If { condition, body } => {
-                condition.migrate_bool_slots(true);
-                for ins in body.iter_mut() {
-                    ins.migrate_bool_slots();
-                }
-            }
-            InstructionKind::IfElse {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                condition.migrate_bool_slots(true);
-                for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
-                    ins.migrate_bool_slots();
-                }
-            }
-            InstructionKind::Repeat { count, body } => {
-                count.migrate_bool_slots(false);
-                for ins in body.iter_mut() {
-                    ins.migrate_bool_slots();
-                }
-            }
-            InstructionKind::Forever { body } => {
-                for ins in body.iter_mut() {
-                    ins.migrate_bool_slots();
-                }
-            }
-            InstructionKind::While { condition, body } => {
-                condition.migrate_bool_slots(true);
-                for ins in body.iter_mut() {
-                    ins.migrate_bool_slots();
-                }
-            }
-            InstructionKind::Command(_)
-            | InstructionKind::Comment(_)
-            | InstructionKind::WhenRan
-            | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop
-            | InstructionKind::ContinueLoop
-            | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn
-            | InstructionKind::WhenPowerUnplugged
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => {}
-        }
-    }
-
-    /// Renames every `Value::Param` leaf reading `old` to `new`, keeping a
-    /// block's body working after one of its inputs is renamed.
-    pub fn rename_param(&mut self, old: &str, new: &str) {
-        match self {
-            InstructionKind::Wait(value)
-            | InstructionKind::Return(value)
-            | InstructionKind::WhenBatteryDischargedTo(value)
-            | InstructionKind::WhenBatteryChargedTo(value) => value.rename_param(old, new),
-            InstructionKind::Token(token) => token.rename_param(old, new),
-            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
-                value.rename_param(old, new)
-            }
-            InstructionKind::CallBlock { args, .. } => {
-                for a in args.iter_mut() {
-                    a.rename_param(old, new);
-                }
-            }
-            InstructionKind::If { condition, body } => {
-                condition.rename_param(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_param(old, new);
-                }
-            }
-            InstructionKind::IfElse {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                condition.rename_param(old, new);
-                for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
-                    ins.rename_param(old, new);
-                }
-            }
-            InstructionKind::Repeat { count, body } => {
-                count.rename_param(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_param(old, new);
-                }
-            }
-            InstructionKind::Forever { body } => {
-                for ins in body.iter_mut() {
-                    ins.rename_param(old, new);
-                }
-            }
-            InstructionKind::While { condition, body } => {
-                condition.rename_param(old, new);
-                for ins in body.iter_mut() {
-                    ins.rename_param(old, new);
-                }
-            }
-            InstructionKind::Command(_)
-            | InstructionKind::Comment(_)
-            | InstructionKind::WhenRan
-            | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop
-            | InstructionKind::ContinueLoop
-            | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn
-            | InstructionKind::WhenPowerUnplugged
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => {}
-        }
-    }
-
-    /// Applies `f` to the `args` of every `CallBlock`/`Value::Call` node
-    /// referencing `block_id`, wherever nested. Used to keep call sites'
-    /// argument lists aligned after a block's inputs change.
-    pub fn for_each_call_args_mut(&mut self, block_id: &str, f: &mut dyn FnMut(&mut Vec<Value>)) {
-        match self {
-            InstructionKind::Wait(value)
-            | InstructionKind::Return(value)
-            | InstructionKind::WhenBatteryDischargedTo(value)
-            | InstructionKind::WhenBatteryChargedTo(value) => {
-                value.for_each_call_args_mut(block_id, f)
-            }
-            InstructionKind::Token(token) => token.for_each_call_args_mut(block_id, f),
-            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
-                value.for_each_call_args_mut(block_id, f)
-            }
-            InstructionKind::CallBlock { block_id: id, args } => {
-                if id == block_id {
-                    f(args);
-                }
-                for a in args.iter_mut() {
-                    a.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::If { condition, body } => {
-                condition.for_each_call_args_mut(block_id, f);
-                for ins in body.iter_mut() {
-                    ins.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::IfElse {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                condition.for_each_call_args_mut(block_id, f);
-                for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
-                    ins.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::Repeat { count, body } => {
-                count.for_each_call_args_mut(block_id, f);
-                for ins in body.iter_mut() {
-                    ins.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::Forever { body } => {
-                for ins in body.iter_mut() {
-                    ins.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::While { condition, body } => {
-                condition.for_each_call_args_mut(block_id, f);
-                for ins in body.iter_mut() {
-                    ins.for_each_call_args_mut(block_id, f);
-                }
-            }
-            InstructionKind::Command(_)
-            | InstructionKind::Comment(_)
-            | InstructionKind::WhenRan
-            | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop
-            | InstructionKind::ContinueLoop
-            | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn
-            | InstructionKind::WhenPowerUnplugged
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => {}
-        }
-    }
-
-    /// Replaces every `Value::Call` node referencing `block_id` with a plain
-    /// `0` leaf (a `CallBlock` referencing it is left for the caller to drop
-    /// entirely), so deleting a custom block never leaves a dangling ref.
-    pub fn scrub_block_calls(&mut self, block_id: &str) {
-        match self {
-            InstructionKind::Wait(value)
-            | InstructionKind::Return(value)
-            | InstructionKind::WhenBatteryDischargedTo(value)
-            | InstructionKind::WhenBatteryChargedTo(value) => value.scrub_block_calls(block_id),
-            InstructionKind::Token(token) => token.scrub_block_calls(block_id),
-            InstructionKind::SetVariable(_, value) | InstructionKind::ChangeVariable(_, value) => {
-                value.scrub_block_calls(block_id)
-            }
-            InstructionKind::CallBlock { args, .. } => {
-                for a in args.iter_mut() {
-                    a.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::If { condition, body } => {
-                condition.scrub_block_calls(block_id);
-                for ins in body.iter_mut() {
-                    ins.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::IfElse {
-                condition,
-                then_body,
-                else_body,
-            } => {
-                condition.scrub_block_calls(block_id);
-                for ins in then_body.iter_mut().chain(else_body.iter_mut()) {
-                    ins.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::Repeat { count, body } => {
-                count.scrub_block_calls(block_id);
-                for ins in body.iter_mut() {
-                    ins.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::Forever { body } => {
-                for ins in body.iter_mut() {
-                    ins.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::While { condition, body } => {
-                condition.scrub_block_calls(block_id);
-                for ins in body.iter_mut() {
-                    ins.scrub_block_calls(block_id);
-                }
-            }
-            InstructionKind::Command(_)
-            | InstructionKind::Comment(_)
-            | InstructionKind::WhenRan
-            | InstructionKind::BlockHeader(_)
-            | InstructionKind::EscapeLoop
-            | InstructionKind::ContinueLoop
-            | InstructionKind::WhenTime(_)
-            | InstructionKind::WhenPowerPluggedIn
-            | InstructionKind::WhenPowerUnplugged
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => {}
-        }
-    }
-
-    /// Read-only counterpart to `body_mut`.
-    pub fn body(&self, slot: u8) -> Option<&Vec<Instruction>> {
+    fn body(&self, slot: u8) -> Option<&Vec<Instruction>> {
         match (self, slot) {
             (InstructionKind::If { body, .. }, 0) => Some(body),
             (InstructionKind::IfElse { then_body, .. }, 0) => Some(then_body),
@@ -641,17 +297,16 @@ impl InstructionKind {
             (InstructionKind::Repeat { body, .. }, 0) => Some(body),
             (InstructionKind::Forever { body }, 0) => Some(body),
             (InstructionKind::While { body, .. }, 0) => Some(body),
+            (InstructionKind::TryCatch { body, .. }, 0) => Some(body),
+            (InstructionKind::TryCatch { catch_body, .. }, 1) => Some(catch_body),
+            (InstructionKind::Retry { body, .. }, 0) => Some(body),
+            (InstructionKind::WithLock { body, .. }, 0) => Some(body),
+            (InstructionKind::CallBlock { branches, .. }, slot) => branches.get(slot as usize),
             _ => None,
         }
     }
 
-    /// The nested instruction list for compound-instruction `slot` — `If`'s
-    /// single body (`slot == 0`), or `IfElse`'s `then_body`/`else_body`
-    /// (`slot == 0`/`1`); `Repeat`/`Forever`/`While` each have a single body
-    /// at `slot == 0`, same as `If`. `None` for anything else (including an
-    /// out-of-range slot). The one primitive nested-instruction addressing
-    /// builds on.
-    pub fn body_mut(&mut self, slot: u8) -> Option<&mut Vec<Instruction>> {
+    fn body_mut(&mut self, slot: u8) -> Option<&mut Vec<Instruction>> {
         match (self, slot) {
             (InstructionKind::If { body, .. }, 0) => Some(body),
             (InstructionKind::IfElse { then_body, .. }, 0) => Some(then_body),
@@ -659,552 +314,104 @@ impl InstructionKind {
             (InstructionKind::Repeat { body, .. }, 0) => Some(body),
             (InstructionKind::Forever { body }, 0) => Some(body),
             (InstructionKind::While { body, .. }, 0) => Some(body),
+            (InstructionKind::TryCatch { body, .. }, 0) => Some(body),
+            (InstructionKind::TryCatch { catch_body, .. }, 1) => Some(catch_body),
+            (InstructionKind::Retry { body, .. }, 0) => Some(body),
+            (InstructionKind::WithLock { body, .. }, 0) => Some(body),
+            (InstructionKind::CallBlock { branches, .. }, slot) => branches.get_mut(slot as usize),
             _ => None,
         }
     }
-}
 
-impl Strand {
-    pub fn starts_with_when_ran(&self) -> bool {
-        self.instructions
-            .first()
-            .map_or(false, Instruction::is_header)
+    fn visit_refs_mut(&mut self, f: &mut dyn FnMut(RefKind, &mut String)) {
+        for_each_ref!(self, f);
+    }
+
+    fn visit_refs(&self, f: &mut dyn FnMut(RefKind, &str)) {
+        for_each_ref!(self, f);
+    }
+
+    fn calls_block(&self, block_id: &str) -> bool {
+        matches!(self, InstructionKind::CallBlock { block_id: id, .. } if id == block_id)
+    }
+
+    fn called_block(&self) -> Option<&str> {
+        match self {
+            InstructionKind::CallBlock { block_id, .. } => Some(block_id),
+            _ => None,
+        }
+    }
+
+    fn call_args_mut(&mut self, block_id: &str) -> Option<&mut Vec<Value>> {
+        match self {
+            InstructionKind::CallBlock { block_id: id, args, .. } if id == block_id => Some(args),
+            _ => None,
+        }
+    }
+
+    fn call_branches_mut(&mut self, block_id: &str) -> Option<&mut Vec<Vec<Instruction>>> {
+        match self {
+            InstructionKind::CallBlock { block_id: id, branches, .. } if id == block_id => Some(branches),
+            _ => None,
+        }
+    }
+
+    fn block_header_id(&self) -> Option<&str> {
+        match self {
+            InstructionKind::BlockHeader(id) => Some(id),
+            _ => None,
+        }
+    }
+
+    fn value_slot_mut(&mut self, field: &str) -> Option<&mut Value> {
+        fields::value_slot_mut(self, field.parse().ok()?)
+    }
+
+    fn blank_field_value(&self, field: &str, blocks: &[BlockDef]) -> Option<Value> {
+        fields::blank_field_value(self, field.parse().ok()?, blocks)
+    }
+
+    fn field_requires_integer(&self, field: &str) -> bool {
+        field
+            .parse()
+            .is_ok_and(|field: FieldId| field.requires_integer())
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(from = "MacroDe")]
-pub struct Macro {
-    pub id: String,
-    pub name: String,
-    pub description: String,
-    pub strands: Vec<Strand>,
-    /// Strand explicitly chosen to receive freshly-recorded input; `None`
-    /// falls back to the "first When Ran strand, else first strand" rule.
-    /// Kept out of undo/redo (it's a preference, not an instruction edit).
-    #[serde(default)]
-    pub recording_target: Option<String>,
-    /// Playback speed: every `Wait` duration is divided by this at runtime.
-    /// 1.0 is normal, 2.0 is twice as fast. Clamped to `SPEED_MULTIPLIER_RANGE`.
-    #[serde(default = "default_speed_multiplier")]
-    pub speed_multiplier: f64,
-    /// Value blocks parked on open canvas — see `FloatingValue`.
-    #[serde(default)]
-    pub floating_values: Vec<FloatingValue>,
-    /// Floating/attached notes — see `Comment`.
-    #[serde(default)]
-    pub comments: Vec<Comment>,
-    /// User-declared macro-wide variables — see `VariableDef`.
-    #[serde(default)]
-    pub variables: Vec<VariableDef>,
-    /// User-defined custom blocks ("My Blocks") — see `BlockDef`. Each
-    /// def's body lives in its own header strand within `strands`.
-    #[serde(default)]
-    pub block_defs: Vec<BlockDef>,
-    /// Settings edited from the "Macro Settings" popup — see `MacroSettings`.
-    #[serde(default)]
-    pub settings: MacroSettings,
+/// A named choice or an unrestricted expression, both resolved as text at runtime.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash)]
+#[serde(from = "SignalNameDe")]
+pub struct SignalName {
+    pub value: Value,
+    pub expression: bool,
 }
 
-/// Valid range for both the per-macro and global speed multipliers, enforced
-/// wherever either is set from user input.
-pub const SPEED_MULTIPLIER_RANGE: std::ops::RangeInclusive<f64> = 0.1..=10.0;
-
-/// Per-macro settings edited from the "Macro Settings" popup next to the
-/// macro dropdown — not part of the macro's own behavior, but affecting how
-/// the app treats it. Persisted and exported/imported with the macro like
-/// everything else in `Macro`, so a new field here needs no separate wiring
-/// to survive a save/export round-trip.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
-pub struct MacroSettings {
-    /// When `true`, this macro's `WhenBattery*`/`WhenTime`/`WhenPower*`
-    /// strands are watched by the background watchers (`battery_watch`/
-    /// `time_watch` in the desktop app) even while a different macro is
-    /// selected. By default only the currently selected macro's event
-    /// strands are live.
-    #[serde(default)]
-    pub always_listen: bool,
-}
-
-/// Deserialization shape supporting both the current multi-strand format and
-/// the legacy flat `code: Vec<Instruction>` format from older saves; legacy
-/// macros become a single root strand.
 #[derive(Deserialize)]
 #[serde(untagged)]
-enum MacroDe {
-    Current {
-        #[serde(default = "default_macro_id")]
-        id: String,
-        name: String,
-        description: String,
-        strands: Vec<Strand>,
-        #[serde(default)]
-        recording_target: Option<String>,
-        #[serde(default = "default_speed_multiplier")]
-        speed_multiplier: f64,
-        #[serde(default)]
-        floating_values: Vec<FloatingValue>,
-        #[serde(default)]
-        comments: Vec<Comment>,
-        #[serde(default)]
-        variables: Vec<VariableDef>,
-        #[serde(default)]
-        block_defs: Vec<BlockDef>,
-        #[serde(default)]
-        settings: MacroSettings,
-    },
-    Legacy {
-        #[serde(default = "default_macro_id")]
-        id: String,
-        name: String,
-        description: String,
-        code: Vec<Instruction>,
-    },
+enum SignalNameDe {
+    Current { value: Value, expression: bool },
+    Legacy(Value),
 }
 
-impl From<MacroDe> for Macro {
-    fn from(de: MacroDe) -> Self {
-        let mut mac = match de {
-            MacroDe::Current {
-                id,
-                name,
-                description,
-                mut strands,
-                recording_target,
-                speed_multiplier,
-                floating_values,
-                comments,
-                variables,
-                block_defs,
-                settings,
-            } => {
-                // Pre-"When Ran" saves have a strand id=="root" that was the
-                // implicit entry point; give it a real WhenRan on upgrade.
-                if let Some(legacy) = strands.iter_mut().find(|s| s.id == LEGACY_ROOT_STRAND_ID) {
-                    if !legacy.starts_with_when_ran() {
-                        legacy
-                            .instructions
-                            .insert(0, Instruction::new(InstructionKind::WhenRan));
-                    }
-                }
-                Self {
-                    id,
-                    name,
-                    description,
-                    strands,
-                    recording_target,
-                    speed_multiplier,
-                    floating_values,
-                    comments,
-                    variables,
-                    block_defs,
-                    settings,
-                }
-            }
-            MacroDe::Legacy {
-                id,
-                name,
-                description,
-                mut code,
-            } => {
-                code.insert(0, Instruction::new(InstructionKind::WhenRan));
-                let strand = Strand {
-                    id: default_strand_id(),
-                    x: 0,
-                    y: 0,
-                    instructions: code,
-                };
-                Self {
-                    id,
-                    name,
-                    description,
-                    strands: vec![strand],
-                    recording_target: None,
-                    speed_multiplier: default_speed_multiplier(),
-                    floating_values: Vec::new(),
-                    comments: Vec::new(),
-                    variables: Vec::new(),
-                    block_defs: Vec::new(),
-                    settings: MacroSettings::default(),
-                }
-            }
-        };
-        // Repairs boolean slots poisoned by the historical `Value::Bool`-less
-        // bug (see `Value::migrate_bool_slots`) — a save from before that fix
-        // may have a raw number leaf sitting where a blank hexagon belongs.
-        for strand in mac.strands.iter_mut() {
-            for ins in strand.instructions.iter_mut() {
-                ins.migrate_bool_slots();
-            }
+impl From<SignalNameDe> for SignalName {
+    fn from(value: SignalNameDe) -> Self {
+        match value {
+            SignalNameDe::Current { value, expression } => Self::new(value, expression),
+            SignalNameDe::Legacy(value) => Self::new(value, false),
         }
-        mac.migrate_custom_block_bool_args();
-        for fv in mac.floating_values.iter_mut() {
-            fv.value.migrate_bool_slots(false);
-        }
-        // A macro file may have been created before this field existed (in
-        // which case serde supplied blue), or hand-edited/imported with an
-        // invalid color. Keep all persisted values safe to place in a CSS
-        // custom property before the frontend ever sees them.
-        for def in mac.block_defs.iter_mut() {
-            def.color = normalize_block_color(&def.color).unwrap_or_else(default_block_color);
-        }
-        mac.migrate_legacy_comments();
-        mac
     }
 }
 
-impl Macro {
-    /// Repairs legacy numeric blanks at `CallBlock` argument positions whose
-    /// declared custom-block input is Boolean. Unlike built-in `If`/`While`
-    /// slots, the expected type lives in the referenced `BlockDef`, so the
-    /// generic `InstructionKind::migrate_bool_slots` cannot determine it on
-    /// its own.
-    fn migrate_custom_block_bool_args(&mut self) {
-        let boolean_inputs: HashMap<String, Vec<bool>> = self
-            .block_defs
-            .iter()
-            .map(|definition| {
-                let inputs = definition
-                    .pieces
-                    .iter()
-                    .filter_map(|piece| match piece {
-                        BlockPiece::Input { value_type, .. } => {
-                            Some(*value_type == InputValueType::Bool)
-                        }
-                        BlockPiece::Label { .. } => None,
-                    })
-                    .collect();
-                (definition.id.clone(), inputs)
-            })
-            .collect();
-
-        fn repair(instructions: &mut [Instruction], boolean_inputs: &HashMap<String, Vec<bool>>) {
-            for instruction in instructions {
-                match &mut instruction.kind {
-                    InstructionKind::CallBlock { block_id, args } => {
-                        if let Some(expected) = boolean_inputs.get(block_id) {
-                            for (arg, expects_bool) in args.iter_mut().zip(expected) {
-                                if *expects_bool {
-                                    arg.migrate_bool_slots(true);
-                                }
-                            }
-                        }
-                    }
-                    InstructionKind::If { body, .. }
-                    | InstructionKind::Repeat { body, .. }
-                    | InstructionKind::Forever { body }
-                    | InstructionKind::While { body, .. } => repair(body, boolean_inputs),
-                    InstructionKind::IfElse {
-                        then_body,
-                        else_body,
-                        ..
-                    } => {
-                        repair(then_body, boolean_inputs);
-                        repair(else_body, boolean_inputs);
-                    }
-                    _ => {}
-                }
-            }
-        }
-
-        for strand in &mut self.strands {
-            repair(&mut strand.instructions, &boolean_inputs);
-        }
+impl SignalName {
+    pub fn new(value: Value, expression: bool) -> Self {
+        let expression = expression || !matches!(value, Value::Text { .. });
+        Self { value, expression }
     }
+}
 
-    pub fn new(name: String, description: String, mut code: Vec<Instruction>) -> Self {
-        code.insert(0, Instruction::new(InstructionKind::WhenRan));
-        let strand = Strand {
-            id: default_strand_id(),
-            x: 0,
-            y: 0,
-            instructions: code,
-        };
-        Self {
-            id: default_macro_id(),
-            name,
-            description,
-            strands: vec![strand],
-            recording_target: None,
-            speed_multiplier: default_speed_multiplier(),
-            floating_values: Vec::new(),
-            comments: Vec::new(),
-            variables: Vec::new(),
-            block_defs: Vec::new(),
-            settings: MacroSettings::default(),
-        }
-    }
-
-    pub fn ensure_id(&mut self) {
-        if self.id.trim().is_empty() {
-            self.id = default_macro_id();
-        }
-    }
-
-    pub fn strand(&self, id: &str) -> Option<&Strand> {
-        self.strands.iter().find(|s| s.id == id)
-    }
-
-    pub fn strand_mut(&mut self, id: &str) -> Option<&mut Strand> {
-        self.strands.iter_mut().find(|s| s.id == id)
-    }
-
-    pub fn floating_value_mut(&mut self, id: &str) -> Option<&mut FloatingValue> {
-        self.floating_values.iter_mut().find(|f| f.id == id)
-    }
-
-    pub fn comment_mut(&mut self, id: &str) -> Option<&mut Comment> {
-        self.comments.iter_mut().find(|c| c.id == id)
-    }
-
-    /// Every instruction id currently reachable from any strand, including
-    /// nested bodies (If/IfElse/Repeat/Forever/While) — the "still alive" set
-    /// `prune_orphaned_comments` checks attachments against.
-    fn all_instruction_ids(&self) -> std::collections::HashSet<String> {
-        fn walk(list: &[Instruction], out: &mut std::collections::HashSet<String>) {
-            for ins in list {
-                out.insert(ins.id.clone());
-                for slot in 0..2u8 {
-                    if let Some(body) = ins.body(slot) {
-                        walk(body, out);
-                    }
-                }
-            }
-        }
-        let mut out = std::collections::HashSet::new();
-        for strand in &self.strands {
-            walk(&strand.instructions, &mut out);
-        }
-        out
-    }
-
-    /// Drops any comment attached to an instruction that no longer exists —
-    /// "if the block gets deleted, the comment is deleted." Call after any
-    /// mutation that can remove instructions or whole strands.
-    pub fn prune_orphaned_comments(&mut self) {
-        let live = self.all_instruction_ids();
-        self.comments.retain(|c| {
-            c.attached_to
-                .as_deref()
-                .map_or(true, |id| live.contains(id))
-        });
-    }
-
-    /// One-time upgrade for saves from before floating/attached comments
-    /// existed: pulls every legacy inline `Comment` instruction out of the
-    /// instruction stream and re-homes it as a freestanding `Comment` parked
-    /// near its old strand. Idempotent — a save with no legacy `Comment`
-    /// instructions left is a no-op.
-    fn migrate_legacy_comments(&mut self) {
-        fn extract(list: &mut Vec<Instruction>, out: &mut Vec<String>) {
-            list.retain_mut(|ins| {
-                for slot in 0..2u8 {
-                    if let Some(body) = ins.body_mut(slot) {
-                        extract(body, out);
-                    }
-                }
-                if let InstructionKind::Comment(text) = &ins.kind {
-                    out.push(text.clone());
-                    false
-                } else {
-                    true
-                }
-            });
-        }
-        for strand in &mut self.strands {
-            let mut texts = Vec::new();
-            extract(&mut strand.instructions, &mut texts);
-            for (i, text) in texts.into_iter().enumerate() {
-                self.comments.push(Comment {
-                    id: default_comment_id(),
-                    x: strand.x + 40,
-                    y: strand.y + 40 + i as i32 * 30,
-                    text,
-                    collapsed: false,
-                    attached_to: None,
-                });
-            }
-        }
-    }
-
-    /// Writes live runtime variable values back into this macro's
-    /// `variables` before it's saved to disk, once a run finishes.
-    pub fn sync_variables_from(&mut self, values: &HashMap<String, Evaluated>) {
-        for var in &mut self.variables {
-            if let Some(v) = values.get(&var.name) {
-                var.value = v.clone();
-            }
-        }
-    }
-
-    /// Renames a declared variable and every reference to it (`Value::Var`
-    /// reads, `SetVariable`/`ChangeVariable` targets) across all strands and
-    /// floating values. No-op if `old` isn't declared.
-    pub fn rename_variable(&mut self, old: &str, new: &str) {
-        if let Some(var) = self.variables.iter_mut().find(|v| v.name == old) {
-            var.name = new.to_string();
-        } else {
-            return;
-        }
-        for strand in &mut self.strands {
-            for ins in &mut strand.instructions {
-                ins.rename_var(old, new);
-            }
-        }
-        for fv in &mut self.floating_values {
-            fv.value.rename_var(old, new);
-        }
-    }
-
-    /// Defines a new custom block: appends the `BlockDef` and creates its
-    /// (initially empty) header strand at `(x, y)`. Caller validates
-    /// `pieces` beforehand.
-    pub fn create_block(
-        &mut self,
-        pieces: Vec<BlockPiece>,
-        shape: BlockShape,
-        color: String,
-        x: i32,
-        y: i32,
-    ) -> String {
-        let id = default_block_id();
-        self.block_defs.push(BlockDef {
-            id: id.clone(),
-            pieces,
-            shape,
-            color,
-        });
-        self.strands.push(Strand {
-            id: default_strand_id(),
-            x,
-            y,
-            instructions: vec![Instruction::new(InstructionKind::BlockHeader(id.clone()))],
-        });
-        id
-    }
-
-    /// Renames every `Value::Param` leaf reading `old` to `new`, scoped to
-    /// `block_id`'s own body. The body-side half of reconciling a renamed
-    /// input; caller still needs to update `BlockDef::pieces` separately.
-    pub fn rename_block_input_body(&mut self, block_id: &str, old: &str, new: &str) {
-        for strand in &mut self.strands {
-            if matches!(strand.instructions.first().map(|i| &i.kind), Some(InstructionKind::BlockHeader(id)) if id == block_id)
-            {
-                for ins in &mut strand.instructions {
-                    ins.rename_param(old, new);
-                }
-            }
-        }
-    }
-
-    /// Rebuilds every call site's `args` to line up with `new_pieces`' input
-    /// order, carrying over each surviving input's value by matching
-    /// `BlockPiece::id` (identity survives a rename); removed inputs drop
-    /// their value, added ones get a fresh blank matching their declared
-    /// `value_type` (`0` for `Any`, an empty `Value::Bool` hexagon for
-    /// `Bool`). Call before overwriting `BlockDef::pieces` — `old_pieces`
-    /// must be the pieces beforehand.
-    pub fn reconcile_block_call_args(
-        &mut self,
-        block_id: &str,
-        old_pieces: &[BlockPiece],
-        new_pieces: &[BlockPiece],
-    ) {
-        let old_input_ids: Vec<&str> = old_pieces
-            .iter()
-            .filter(|p| matches!(p, BlockPiece::Input { .. }))
-            .map(BlockPiece::id)
-            .collect();
-        let new_inputs: Vec<(&str, InputValueType)> = new_pieces
-            .iter()
-            .filter_map(|p| match p {
-                BlockPiece::Input { id, value_type, .. } => Some((id.as_str(), *value_type)),
-                BlockPiece::Label { .. } => None,
-            })
-            .collect();
-        // For each new input slot, which old slot (if any) it carries over from.
-        let mapping: Vec<(Option<usize>, InputValueType)> = new_inputs
-            .iter()
-            .map(|(id, value_type)| (old_input_ids.iter().position(|old| old == id), *value_type))
-            .collect();
-
-        let mut rebuild = |args: &mut Vec<Value>| {
-            *args = mapping
-                .iter()
-                .map(|(old_idx, value_type)| {
-                    old_idx
-                        .and_then(|i| args.get(i).cloned())
-                        .unwrap_or_else(|| match value_type {
-                            InputValueType::Any => Value::number(0.0),
-                            InputValueType::Bool => Value::Bool,
-                        })
-                })
-                .collect();
-        };
-        for strand in &mut self.strands {
-            for ins in &mut strand.instructions {
-                ins.for_each_call_args_mut(block_id, &mut rebuild);
-            }
-        }
-        for fv in &mut self.floating_values {
-            fv.value.for_each_call_args_mut(block_id, &mut rebuild);
-        }
-    }
-
-    /// Deletes a custom block entirely: its `BlockDef`, its header strand,
-    /// every `CallBlock` instruction calling it, and every `Value::Call`
-    /// node calling it (collapsed to a plain `0` leaf) so nothing is left
-    /// dangling.
-    pub fn remove_block(&mut self, block_id: &str) {
-        self.block_defs.retain(|b| b.id != block_id);
-        self.strands.retain(|s| !matches!(s.instructions.first().map(|i| &i.kind), Some(InstructionKind::BlockHeader(id)) if id == block_id));
-        for strand in &mut self.strands {
-            strand.instructions.retain(|ins| !matches!(&ins.kind, InstructionKind::CallBlock { block_id: id, .. } if id == block_id));
-            for ins in &mut strand.instructions {
-                ins.scrub_block_calls(block_id);
-            }
-        }
-        for fv in &mut self.floating_values {
-            fv.value.scrub_block_calls(block_id);
-        }
-        self.prune_orphaned_comments();
-    }
-
-    /// Strand that freshly-recorded input gets appended to: the explicit
-    /// `recording_target` if it still exists, else the first "When Ran"
-    /// strand, else the first strand (creating one if the macro is empty).
-    pub fn recording_target_mut(&mut self) -> &mut Strand {
-        if let Some(id) = &self.recording_target {
-            if let Some(pos) = self.strands.iter().position(|s| &s.id == id) {
-                return &mut self.strands[pos];
-            }
-        }
-        if let Some(pos) = self.strands.iter().position(Strand::starts_with_when_ran) {
-            return &mut self.strands[pos];
-        }
-        if self.strands.is_empty() {
-            self.strands.push(Strand {
-                id: default_strand_id(),
-                x: 0,
-                y: 0,
-                instructions: vec![],
-            });
-        }
-        &mut self.strands[0]
-    }
-
-    /// Read-only counterpart to `recording_target_mut`: same resolution
-    /// order, but never creates a strand.
-    pub fn recording_target_id(&self) -> Option<String> {
-        if let Some(id) = &self.recording_target {
-            if self.strands.iter().any(|s| &s.id == id) {
-                return Some(id.clone());
-            }
-        }
-        if let Some(strand) = self.strands.iter().find(|s| s.starts_with_when_ran()) {
-            return Some(strand.id.clone());
-        }
-        self.strands.first().map(|s| s.id.clone())
+impl From<Value> for SignalName {
+    fn from(value: Value) -> Self {
+        Self::new(value, false)
     }
 }
 
@@ -1213,7 +420,11 @@ impl Macro {
 pub enum InstructionKind {
     Token(InputToken),
     Wait(Value),
+    /// Starts a shell command and moves on without waiting for it. Files
+    /// before format version 2 meant `CommandWait` by it (see `migrate`).
     Command(String),
+    /// Runs a shell command and waits for it to finish.
+    CommandWait(String),
     Comment(String),
     /// Marks a strand as an entry point (always at index 0): it runs as its
     /// own concurrent thread when the macro runs. A macro can have several.
@@ -1221,10 +432,10 @@ pub enum InstructionKind {
     /// Header-only marker (like `WhenRan`/`BlockHeader`) for a strand whose
     /// body should run whenever the system's battery charge drops to (or
     /// below) the given percentage. Unlike `WhenRan`, this is *not* an
-    /// entry point Run/Loop invokes — `runner::run_with_offset` skips these
+    /// entry point Run/Loop invokes - `runner::run_with_offset` skips these
     /// strands entirely. Instead they're driven independently by a
     /// long-running background watcher outside a macro run altogether (in
-    /// the desktop app, `src-tauri`'s `battery_watch` module), which polls
+    /// the desktop app, `blockwork-app`'s `battery_watch` module), which polls
     /// the battery, fires the strand's body (everything after this marker)
     /// the moment the condition holds, and won't fire it again until the
     /// battery recovers past the threshold and crosses it again.
@@ -1233,25 +444,36 @@ pub enum InstructionKind {
     /// rises to (or above) the given percentage instead.
     WhenBatteryChargedTo(Value),
     /// Header-only marker, same shape/semantics as `WhenBatteryDischargedTo`
-    /// (excluded from Run/Loop, driven by a background watcher — `time_watch`
+    /// (excluded from Run/Loop, driven by a background watcher - `time_watch`
     /// in the desktop app) but for a recurring point in local time instead
-    /// of a battery level. See `TimeSchedule` for the recurrence shapes.
-    WhenTime(TimeSchedule),
-    /// Header-only marker, no payload (like `WhenRan`) — excluded from
+    /// of a battery level. See `TimeSchedule` for the recurrence shapes; the
+    /// value is the time of day, like `09:30` (see `parse_time_of_day`).
+    WhenTime(TimeSchedule, Value),
+    /// Header-only marker, no payload (like `WhenRan`) - excluded from
     /// Run/Loop and driven by the same background watcher as
     /// `WhenBattery*To` (`battery_watch` in the desktop app), which fires
     /// this strand's body the moment the system starts receiving external
     /// power. See `crate::battery::is_plugged_in`.
     WhenPowerPluggedIn,
     /// Same as `WhenPowerPluggedIn`, but fires when external power is lost
-    /// instead — never fires at all on a system with no battery/UPS, since
+    /// instead - never fires at all on a system with no battery/UPS, since
     /// `is_plugged_in` is always `true` there.
     WhenPowerUnplugged,
+    /// Header-only marker, no payload (like `WhenPowerPluggedIn`) - excluded
+    /// from Run/Loop and driven by a background watcher (`clipboard_watch`
+    /// in the desktop app), which fires this strand's body whenever the
+    /// clipboard's contents change. Edge-triggered like the other watcher
+    /// headers, but with no threshold to recover past - any change fires it.
+    WhenClipboardChanged,
+    /// Header-only marker driven by the key watcher (`key_watch` in the
+    /// desktop app): fires the body when the key combo in the value is
+    /// pressed or released. `Click` is treated as `Press`.
+    WhenKey(Value, Direction),
     /// Launches an installed application, chosen via the desktop app's "Open
-    /// App" picker (`src-tauri`'s `installed_apps` module lists candidates).
+    /// App" picker (`blockwork-app`'s `installed_apps` module lists candidates).
     /// `command` is the already-resolved, platform-specific launch string
     /// (a cleaned freedesktop `Exec=` line on Linux, a `.lnk` path on
-    /// Windows, an `.app` bundle path on macOS) captured at pick time —
+    /// Windows, an `.app` bundle path on macOS) captured at pick time -
     /// running it later never re-queries the installed-app list. `name` and
     /// `icon` (a `data:` URI, when one was found) are cached at the same
     /// time purely for display, so the block keeps showing the right label
@@ -1262,7 +484,7 @@ pub enum InstructionKind {
         icon: Option<String>,
     },
     /// Same picker/payload shape as `OpenApp`, but terminates the app
-    /// instead of launching it — `runner::close_app` derives a process
+    /// instead of launching it - `runner::close_app` derives a process
     /// matcher from `command` (and, on macOS, `name`) rather than executing
     /// it directly. `command`/`name`/`icon` are cached at pick time for the
     /// exact same reason `OpenApp`'s are.
@@ -1271,14 +493,52 @@ pub enum InstructionKind {
         name: String,
         icon: Option<String>,
     },
-    /// `set <name> to <value>` — overwrites the named variable.
+    /// `set <name> to <value>` - overwrites the named variable.
     SetVariable(String, Value),
-    /// `change <name> by <value>` — adds `value` to the named variable.
+    /// `change <name> by <value>` - adds `value` to the named variable.
     /// No-op if `value` isn't numeric; the variable is coerced to `0` first
     /// if it wasn't already numeric.
     ChangeVariable(String, Value),
+    /// `set clipboard to <value>` — overwrites the system clipboard with the
+    /// value's text. See `crate::clipboard::set_text`.
+    SetClipboard(Value),
+    /// Appends a number/text value to a named list. Boolean values are ignored.
+    AddToList {
+        value: Value,
+        name: String,
+    },
+    /// Removes the 1-based item at `index` from a named list.
+    DeleteOfList {
+        index: Value,
+        name: String,
+    },
+    /// Removes every item from a named list.
+    DeleteAllOfList {
+        name: String,
+    },
+    /// Rotates a named list by `amount` positions (positive is toward the end).
+    ShiftList {
+        name: String,
+        amount: Value,
+    },
+    /// Inserts a number/text value at the 1-based `index` in a named list.
+    InsertIntoList {
+        value: Value,
+        index: Value,
+        name: String,
+    },
+    /// Replaces the 1-based item at `index` in a named list with a literal.
+    ReplaceItemOfList {
+        index: Value,
+        name: String,
+        value: Value,
+    },
+    /// Reverses a named list in place.
+    ReverseList {
+        name: String,
+    },
     /// Marks a strand as a custom block's body; the `String` is the
-    /// `BlockDef::id`. Header-only, like `WhenRan`, but never auto-runs —
+    /// `BlockDef::id`. Header-only, like `WhenRan`, but never auto-runs -
     /// only invoked via `CallBlock`/`Value::Call`.
     BlockHeader(String),
     /// Command-position invocation of a `Normal`/`Ending`-shaped custom
@@ -1286,12 +546,16 @@ pub enum InstructionKind {
     CallBlock {
         block_id: String,
         args: Vec<Value>,
+        #[serde(default)]
+        branches: Vec<Vec<Instruction>>,
     },
+    /// Runs one callback branch passed to the enclosing custom-block call.
+    RunBranch(String),
     /// Only meaningful inside a `ReturnsValue`/`ReturnsBool`-shaped block's
     /// body: evaluates `Value` and halts execution, returning the result to
     /// the caller.
     Return(Value),
-    /// `if <condition> then { body }` — runs `body` inline (same strand,
+    /// `if <condition> then { body }` - runs `body` inline (same strand,
     /// same depth) when `condition` evaluates truthy.
     If {
         condition: Value,
@@ -1303,18 +567,18 @@ pub enum InstructionKind {
         then_body: Vec<Instruction>,
         else_body: Vec<Instruction>,
     },
-    /// `repeat <count> { body }` — runs `body` `count` times (rounded,
+    /// `repeat <count> { body }` - runs `body` `count` times (rounded,
     /// clamped to non-negative).
     Repeat {
         count: Value,
         body: Vec<Instruction>,
     },
-    /// `forever { body }` — runs `body` in an unconditional loop; only ends
+    /// `forever { body }` - runs `body` in an unconditional loop; only ends
     /// via `EscapeLoop`, a `Return` inside it, or the run being stopped.
     Forever {
         body: Vec<Instruction>,
     },
-    /// `while <condition> { body }` — re-evaluates `condition` before every
+    /// `while <condition> { body }` - re-evaluates `condition` before every
     /// iteration, running `body` for as long as it's truthy.
     While {
         condition: Value,
@@ -1326,22 +590,258 @@ pub enum InstructionKind {
     /// Skips straight to the next iteration of the nearest enclosing
     /// `Repeat`/`Forever`/`While`. A no-op if not inside a loop.
     ContinueLoop,
-}
-
-impl std::hash::Hash for Macro {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.id.hash(state);
-        self.name.hash(state);
-        self.description.hash(state);
-        self.strands.hash(state);
-        self.recording_target.hash(state);
-        self.speed_multiplier.to_bits().hash(state);
-        self.floating_values.hash(state);
-        self.comments.hash(state);
-        self.variables.hash(state);
-        self.block_defs.hash(state);
-        self.settings.hash(state);
-    }
+    /// `write`/`append <text> to file <path>`.
+    WriteFile {
+        path: Value,
+        text: Value,
+        append: bool,
+    },
+    /// Sends an HTTP request and stores the response body in `variable`
+    /// (skipped when empty). A 4xx/5xx status is an error.
+    HttpRequest {
+        method: String,
+        url: Value,
+        body: Value,
+        headers: Value,
+        variable: String,
+    },
+    /// Shows a desktop notification.
+    Notify {
+        title: Value,
+        message: Value,
+    },
+    /// Writes a line to the run log.
+    Log(Value),
+    /// `try { body } on error { catch_body }`: an error inside `body` stops
+    /// it and runs `catch_body`, where the `LastError` reporter has the message.
+    TryCatch {
+        body: Vec<Instruction>,
+        catch_body: Vec<Instruction>,
+    },
+    /// Fails with the given message: ends the strand unless a `TryCatch`
+    /// catches it.
+    ThrowError(Value),
+    /// Stops every strand of the current run.
+    StopMacro,
+    /// Runs `body`; if a block in it fails, waits `delay` ms and runs it
+    /// again, up to `count` attempts in all.
+    Retry {
+        count: Value,
+        delay: Value,
+        body: Vec<Instruction>,
+    },
+    /// One of `window::ACTIONS` on the first window whose title or app
+    /// (`by`, a `window::MatchBy` name) contains `pattern` (the active
+    /// window when empty).
+    WindowAction {
+        action: String,
+        pattern: Value,
+        by: String,
+    },
+    /// Moves a matching window to (`x`, `y`), or with `resize` sizes it
+    /// to `x` by `y`.
+    MoveWindow {
+        pattern: Value,
+        by: String,
+        resize: bool,
+        x: Value,
+        y: Value,
+    },
+    /// Starts another macro, found by name; with `wait` the strand pauses
+    /// until that run ends.
+    RunMacro {
+        target: Value,
+        wait: bool,
+    },
+    /// Stops every run of the named macro.
+    StopMacroNamed(Value),
+    /// Sets a global variable: shared by every macro and kept across restarts.
+    SetGlobal {
+        name: Value,
+        value: Value,
+    },
+    /// Adds `by` to a global variable.
+    ChangeGlobal {
+        name: Value,
+        by: Value,
+    },
+    /// Pauses until `condition` is true, failing after `timeout` ms (0 = never).
+    WaitUntil {
+        condition: Value,
+        timeout: Value,
+    },
+    /// Looks for `image` (a PNG `data:` URI or file path) on screen and puts
+    /// the screen position of its middle in two variables, -1 if it's not there.
+    FindImage {
+        image: String,
+        tolerance: Value,
+        x_variable: String,
+        y_variable: String,
+    },
+    /// Clicks the middle of `image` on screen; an error if it's not there.
+    ClickImage {
+        image: String,
+        tolerance: Value,
+        button: MacroButton,
+    },
+    /// Pauses until `image` appears (or with `appear` false, disappears),
+    /// failing after `timeout` ms (0 = never).
+    WaitForImage {
+        image: String,
+        tolerance: Value,
+        appear: bool,
+        timeout: Value,
+    },
+    /// Header for a strand fired when a window whose title or app contains
+    /// `pattern` gains (`focused`) or loses focus. Driven by `window_watch`
+    /// in the desktop app, like the other `When*` watcher headers.
+    WhenWindow {
+        pattern: Value,
+        focused: bool,
+    },
+    /// Header for a strand fired when the file at the path is created,
+    /// changed or deleted. Driven by `file_watch` in the desktop app.
+    WhenFileChanged(Value),
+    /// Header for a strand fired when the user types `text` (text
+    /// expansion); with `erase` the typed text is backspaced away first.
+    /// Driven by `type_watch` in the desktop app.
+    WhenTyped {
+        text: Value,
+        erase: bool,
+    },
+    /// Pastes text through the clipboard, then puts the old clipboard back.
+    PasteText(Value),
+    /// Header for a strand fired when a program whose name contains
+    /// `pattern` starts (or with `started` false, exits).
+    WhenApp {
+        pattern: Value,
+        started: bool,
+    },
+    /// Header for a strand fired once there has been no keyboard or mouse
+    /// input for the given number of minutes.
+    WhenIdle(Value),
+    /// Header for a strand fired when the screen locks (or unlocks).
+    WhenScreenLock {
+        locked: bool,
+    },
+    /// Runs `body` while holding the named lock, so only one strand in any
+    /// macro runs a block guarded by the same name at a time.
+    WithLock {
+        name: Value,
+        body: Vec<Instruction>,
+    },
+    /// Header for a strand fired on a cron schedule, like `*/15 9-17 * * mon-fri`.
+    WhenCron(Value),
+    /// Replaces the list `name` with `text` cut at every `separator`.
+    SplitIntoList {
+        text: Value,
+        separator: Value,
+        name: String,
+    },
+    /// Header for a strand fired when the computer goes online (or offline).
+    WhenNetwork {
+        connected: bool,
+    },
+    /// Header for a strand fired when a USB device whose name or ids contain
+    /// `pattern` (any device when empty) is plugged in (or unplugged).
+    WhenUsb {
+        pattern: Value,
+        connected: bool,
+    },
+    /// Header for a strand fired when a mouse button is pressed (or
+    /// released), optionally only while the modifier keys in `modifiers` are held.
+    WhenMouseButton {
+        button: MacroButton,
+        pressed: bool,
+        modifiers: Value,
+    },
+    /// Asks for text in a dialog and puts the answer in variable `name`.
+    /// Cancelling is an error.
+    AskText {
+        prompt: Value,
+        default: Value,
+        name: String,
+    },
+    /// Asks a yes/no question and puts true or false in variable `name`.
+    AskYesNo {
+        prompt: Value,
+        name: String,
+    },
+    /// Asks to pick an item of list `list` and puts it in variable `name`.
+    AskChoice {
+        prompt: Value,
+        list: String,
+        name: String,
+    },
+    /// Shows a message in a dialog and waits until it's closed.
+    ShowMessage(Value),
+    /// Header for a strand fired once at a date and time, like `2026-12-24 18:00`.
+    WhenAt(Value),
+    /// Header for a strand started by a `SendSignal` of the same name in this macro.
+    WhenSignal(SignalName),
+    /// Starts this macro's `WhenSignal` strands named `name`, sharing this
+    /// run's variables; with `wait`, until they've all ended.
+    SendSignal {
+        name: SignalName,
+        wait: bool,
+    },
+    /// Header for a strand fired by a web request to `path` on the local
+    /// webhook server. The request body goes in variable `variable`.
+    WhenWebhook {
+        path: Value,
+        variable: String,
+    },
+    /// One detection pass over a matching window (or `region` of it, as
+    /// `x,y,width,height`; empty for all): boxes from `detector` (a local
+    /// URL) scoring at least `confidence` percent replace list
+    /// `results_list`, one JSON item each, ordered by `sort`.
+    DetectObjectsInWindow {
+        pattern: Value,
+        by: String,
+        detector: Value,
+        label: Value,
+        confidence: Value,
+        sort: String,
+        results_list: String,
+        count_variable: String,
+        region: String,
+    },
+    /// Pauses until `label` appears in the window (or with `appear` false,
+    /// is gone), failing after `timeout` ms (0 = never).
+    WaitForDetection {
+        pattern: Value,
+        by: String,
+        detector: Value,
+        label: Value,
+        confidence: Value,
+        appear: bool,
+        timeout: Value,
+        region: String,
+    },
+    /// One relative mouse move from the window's center toward the screen
+    /// point (`target_x`, `target_y`); see `detect::AimController`.
+    AimStep {
+        pattern: Value,
+        by: String,
+        target_x: Value,
+        target_y: Value,
+        gain: Value,
+        max_step: Value,
+        deadzone: Value,
+    },
+    /// Follows item `index` of a list a `DetectObjectsInWindow` filled,
+    /// re-detecting and stepping until it's held centered for `settle_ms`.
+    /// Writes `hit`, `timeout` or `lost` to `status_variable`.
+    AimAtDetection {
+        results_list: String,
+        index: Value,
+        gain: Value,
+        max_step: Value,
+        deadzone: Value,
+        timeout: Value,
+        settle_ms: Value,
+        status_variable: String,
+    },
 }
 
 impl std::hash::Hash for InstructionKind {
@@ -1357,6 +857,10 @@ impl std::hash::Hash for InstructionKind {
             }
             Self::Command(s) => {
                 2u8.hash(state);
+                s.hash(state);
+            }
+            Self::CommandWait(s) => {
+                77u8.hash(state);
                 s.hash(state);
             }
             Self::Comment(s) => {
@@ -1380,10 +884,19 @@ impl std::hash::Hash for InstructionKind {
                 7u8.hash(state);
                 id.hash(state);
             }
-            Self::CallBlock { block_id, args } => {
+            Self::CallBlock {
+                block_id,
+                args,
+                branches,
+            } => {
                 8u8.hash(state);
                 block_id.hash(state);
                 args.hash(state);
+                branches.hash(state);
+            }
+            Self::RunBranch(name) => {
+                26u8.hash(state);
+                name.hash(state);
             }
             Self::Return(v) => {
                 9u8.hash(state);
@@ -1432,9 +945,10 @@ impl std::hash::Hash for InstructionKind {
                 18u8.hash(state);
                 v.hash(state);
             }
-            Self::WhenTime(s) => {
+            Self::WhenTime(s, t) => {
                 19u8.hash(state);
                 s.hash(state);
+                t.hash(state);
             }
             Self::WhenPowerPluggedIn => {
                 20u8.hash(state);
@@ -1462,8 +976,287 @@ impl std::hash::Hash for InstructionKind {
                 name.hash(state);
                 icon.hash(state);
             }
+            Self::AddToList { value, name } => {
+                24u8.hash(state);
+                value.hash(state);
+                name.hash(state);
+            }
+            Self::DeleteOfList { index, name } => {
+                25u8.hash(state);
+                index.hash(state);
+                name.hash(state);
+            }
+            Self::DeleteAllOfList { name } => {
+                26u8.hash(state);
+                name.hash(state);
+            }
+            Self::ShiftList { name, amount } => {
+                27u8.hash(state);
+                name.hash(state);
+                amount.hash(state);
+            }
+            Self::InsertIntoList { value, index, name } => {
+                28u8.hash(state);
+                value.hash(state);
+                index.hash(state);
+                name.hash(state);
+            }
+            Self::ReplaceItemOfList { index, name, value } => {
+                29u8.hash(state);
+                index.hash(state);
+                name.hash(state);
+                value.hash(state);
+            }
+            Self::ReverseList { name } => {
+                30u8.hash(state);
+                name.hash(state);
+            }
+            Self::SetClipboard(v) => {
+                31u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenClipboardChanged => {
+                32u8.hash(state);
+            }
+            Self::WhenKey(key, direction) => {
+                33u8.hash(state);
+                key.hash(state);
+                direction.hash(state);
+            }
+            Self::WriteFile { path, text, append } => {
+                34u8.hash(state);
+                path.hash(state);
+                text.hash(state);
+                append.hash(state);
+            }
+            Self::HttpRequest {
+                method,
+                url,
+                body,
+                headers,
+                variable,
+            } => {
+                35u8.hash(state);
+                method.hash(state);
+                url.hash(state);
+                body.hash(state);
+                headers.hash(state);
+                variable.hash(state);
+            }
+            Self::Notify { title, message } => {
+                36u8.hash(state);
+                title.hash(state);
+                message.hash(state);
+            }
+            Self::Log(v) => {
+                37u8.hash(state);
+                v.hash(state);
+            }
+            Self::TryCatch { body, catch_body } => {
+                38u8.hash(state);
+                body.hash(state);
+                catch_body.hash(state);
+            }
+            Self::ThrowError(v) => {
+                39u8.hash(state);
+                v.hash(state);
+            }
+            Self::StopMacro => {
+                40u8.hash(state);
+            }
+            Self::WhenWindow { pattern, focused } => {
+                41u8.hash(state);
+                pattern.hash(state);
+                focused.hash(state);
+            }
+            Self::WhenFileChanged(path) => {
+                42u8.hash(state);
+                path.hash(state);
+            }
+            Self::Retry { count, delay, body } => {
+                43u8.hash(state);
+                count.hash(state);
+                delay.hash(state);
+                body.hash(state);
+            }
+            Self::WindowAction { action, pattern, by } => {
+                44u8.hash(state);
+                action.hash(state);
+                pattern.hash(state);
+                by.hash(state);
+            }
+            Self::MoveWindow { pattern, by, resize, x, y } => {
+                45u8.hash(state);
+                pattern.hash(state);
+                by.hash(state);
+                resize.hash(state);
+                x.hash(state);
+                y.hash(state);
+            }
+            Self::RunMacro { target, wait } => {
+                46u8.hash(state);
+                target.hash(state);
+                wait.hash(state);
+            }
+            Self::StopMacroNamed(target) => {
+                47u8.hash(state);
+                target.hash(state);
+            }
+            Self::SetGlobal { name, value } => {
+                48u8.hash(state);
+                name.hash(state);
+                value.hash(state);
+            }
+            Self::ChangeGlobal { name, by } => {
+                49u8.hash(state);
+                name.hash(state);
+                by.hash(state);
+            }
+            Self::WaitUntil { condition, timeout } => {
+                50u8.hash(state);
+                condition.hash(state);
+                timeout.hash(state);
+            }
+            Self::FindImage { image, tolerance, x_variable, y_variable } => {
+                51u8.hash(state);
+                image.hash(state);
+                tolerance.hash(state);
+                x_variable.hash(state);
+                y_variable.hash(state);
+            }
+            Self::ClickImage { image, tolerance, button } => {
+                52u8.hash(state);
+                image.hash(state);
+                tolerance.hash(state);
+                button.hash(state);
+            }
+            Self::WaitForImage { image, tolerance, appear, timeout } => {
+                53u8.hash(state);
+                image.hash(state);
+                tolerance.hash(state);
+                appear.hash(state);
+                timeout.hash(state);
+            }
+            Self::WhenTyped { text, erase } => {
+                54u8.hash(state);
+                text.hash(state);
+                erase.hash(state);
+            }
+            Self::PasteText(v) => {
+                55u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenApp { pattern, started } => {
+                56u8.hash(state);
+                pattern.hash(state);
+                started.hash(state);
+            }
+            Self::WhenIdle(v) => {
+                57u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenScreenLock { locked } => {
+                58u8.hash(state);
+                locked.hash(state);
+            }
+            Self::WithLock { name, body } => {
+                59u8.hash(state);
+                name.hash(state);
+                body.hash(state);
+            }
+            Self::WhenCron(v) => {
+                60u8.hash(state);
+                v.hash(state);
+            }
+            Self::SplitIntoList { text, separator, name } => {
+                61u8.hash(state);
+                text.hash(state);
+                separator.hash(state);
+                name.hash(state);
+            }
+            Self::WhenNetwork { connected } => {
+                62u8.hash(state);
+                connected.hash(state);
+            }
+            Self::WhenUsb { pattern, connected } => {
+                63u8.hash(state);
+                pattern.hash(state);
+                connected.hash(state);
+            }
+            Self::WhenMouseButton { button, pressed, modifiers } => {
+                64u8.hash(state);
+                button.hash(state);
+                pressed.hash(state);
+                modifiers.hash(state);
+            }
+            Self::AskText { prompt, default, name } => {
+                65u8.hash(state);
+                prompt.hash(state);
+                default.hash(state);
+                name.hash(state);
+            }
+            Self::AskYesNo { prompt, name } => {
+                66u8.hash(state);
+                prompt.hash(state);
+                name.hash(state);
+            }
+            Self::AskChoice { prompt, list, name } => {
+                67u8.hash(state);
+                prompt.hash(state);
+                list.hash(state);
+                name.hash(state);
+            }
+            Self::ShowMessage(v) => {
+                68u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenAt(v) => {
+                69u8.hash(state);
+                v.hash(state);
+            }
+            Self::WhenSignal(v) => {
+                70u8.hash(state);
+                v.hash(state);
+            }
+            Self::SendSignal { name, wait } => {
+                71u8.hash(state);
+                name.hash(state);
+                wait.hash(state);
+            }
+            Self::WhenWebhook { path, variable } => {
+                72u8.hash(state);
+                path.hash(state);
+                variable.hash(state);
+            }
+            Self::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable, region } => {
+                73u8.hash(state);
+                (pattern, by, detector, label, confidence).hash(state);
+                (sort, results_list, count_variable, region).hash(state);
+            }
+            Self::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout, region } => {
+                74u8.hash(state);
+                (pattern, by, detector, label, confidence, appear, timeout, region).hash(state);
+            }
+            Self::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => {
+                75u8.hash(state);
+                (pattern, by, target_x, target_y, gain, max_step, deadzone).hash(state);
+            }
+            Self::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => {
+                76u8.hash(state);
+                (results_list, index, gain, max_step, deadzone).hash(state);
+                (timeout, settle_ms, status_variable).hash(state);
+            }
         }
     }
+}
+
+/// `WhenTime` as saved now (recurrence + time value), or before the time
+/// became a value (one object with a fixed `hour`/`minute`).
+#[derive(Deserialize)]
+#[serde(untagged)]
+enum WhenTimeDe {
+    Current(TimeSchedule, Value),
+    Legacy(LegacyTimeSchedule),
 }
 
 #[derive(Deserialize)]
@@ -1471,13 +1264,16 @@ enum InstructionKindDe {
     Token(InputToken),
     Wait(WaitDe),
     Command(String),
+    CommandWait(String),
     Comment(String),
     WhenRan,
     WhenBatteryDischargedTo(Value),
     WhenBatteryChargedTo(Value),
-    WhenTime(TimeSchedule),
+    WhenTime(WhenTimeDe),
     WhenPowerPluggedIn,
     WhenPowerUnplugged,
+    WhenClipboardChanged,
+    WhenKey(Value, Direction),
     OpenApp {
         command: String,
         name: String,
@@ -1490,11 +1286,43 @@ enum InstructionKindDe {
     },
     SetVariable(String, Value),
     ChangeVariable(String, Value),
+    SetClipboard(Value),
+    AddToList {
+        value: Value,
+        name: String,
+    },
+    DeleteOfList {
+        index: Value,
+        name: String,
+    },
+    DeleteAllOfList {
+        name: String,
+    },
+    ShiftList {
+        name: String,
+        amount: Value,
+    },
+    InsertIntoList {
+        value: Value,
+        index: Value,
+        name: String,
+    },
+    ReplaceItemOfList {
+        index: Value,
+        name: String,
+        value: Value,
+    },
+    ReverseList {
+        name: String,
+    },
     BlockHeader(String),
     CallBlock {
         block_id: String,
         args: Vec<Value>,
+        #[serde(default)]
+        branches: Vec<Vec<Instruction>>,
     },
+    RunBranch(String),
     Return(Value),
     If {
         condition: Value,
@@ -1518,6 +1346,198 @@ enum InstructionKindDe {
     },
     EscapeLoop,
     ContinueLoop,
+    WriteFile {
+        path: Value,
+        text: Value,
+        append: bool,
+    },
+    HttpRequest {
+        method: String,
+        url: Value,
+        body: Value,
+        headers: Value,
+        variable: String,
+    },
+    Notify {
+        title: Value,
+        message: Value,
+    },
+    Log(Value),
+    TryCatch {
+        body: Vec<Instruction>,
+        catch_body: Vec<Instruction>,
+    },
+    ThrowError(Value),
+    StopMacro,
+    WhenWindow {
+        pattern: Value,
+        focused: bool,
+    },
+    WhenFileChanged(Value),
+    Retry {
+        count: Value,
+        delay: Value,
+        body: Vec<Instruction>,
+    },
+    WindowAction {
+        action: String,
+        pattern: Value,
+        #[serde(default = "match_by_title")]
+        by: String,
+    },
+    MoveWindow {
+        pattern: Value,
+        #[serde(default = "match_by_title")]
+        by: String,
+        resize: bool,
+        x: Value,
+        y: Value,
+    },
+    RunMacro {
+        target: Value,
+        wait: bool,
+    },
+    StopMacroNamed(Value),
+    SetGlobal {
+        name: Value,
+        value: Value,
+    },
+    ChangeGlobal {
+        name: Value,
+        by: Value,
+    },
+    WaitUntil {
+        condition: Value,
+        timeout: Value,
+    },
+    FindImage {
+        image: String,
+        tolerance: Value,
+        x_variable: String,
+        y_variable: String,
+    },
+    ClickImage {
+        image: String,
+        tolerance: Value,
+        button: MacroButton,
+    },
+    WaitForImage {
+        image: String,
+        tolerance: Value,
+        appear: bool,
+        timeout: Value,
+    },
+    WhenTyped {
+        text: Value,
+        erase: bool,
+    },
+    PasteText(Value),
+    WhenApp {
+        pattern: Value,
+        started: bool,
+    },
+    WhenIdle(Value),
+    WhenScreenLock {
+        locked: bool,
+    },
+    WithLock {
+        name: Value,
+        body: Vec<Instruction>,
+    },
+    WhenCron(Value),
+    SplitIntoList {
+        text: Value,
+        separator: Value,
+        name: String,
+    },
+    WhenNetwork {
+        connected: bool,
+    },
+    WhenUsb {
+        pattern: Value,
+        connected: bool,
+    },
+    WhenMouseButton {
+        button: MacroButton,
+        pressed: bool,
+        #[serde(default = "empty_text")]
+        modifiers: Value,
+    },
+    AskText {
+        prompt: Value,
+        default: Value,
+        name: String,
+    },
+    AskYesNo {
+        prompt: Value,
+        name: String,
+    },
+    AskChoice {
+        prompt: Value,
+        list: String,
+        name: String,
+    },
+    ShowMessage(Value),
+    WhenAt(Value),
+    WhenSignal(SignalName),
+    SendSignal {
+        name: SignalName,
+        wait: bool,
+    },
+    WhenWebhook {
+        path: Value,
+        variable: String,
+    },
+    DetectObjectsInWindow {
+        pattern: Value,
+        by: String,
+        detector: Value,
+        label: Value,
+        confidence: Value,
+        sort: String,
+        results_list: String,
+        count_variable: String,
+        #[serde(default)]
+        region: String,
+    },
+    WaitForDetection {
+        pattern: Value,
+        by: String,
+        detector: Value,
+        label: Value,
+        confidence: Value,
+        appear: bool,
+        timeout: Value,
+        #[serde(default)]
+        region: String,
+    },
+    AimStep {
+        pattern: Value,
+        by: String,
+        target_x: Value,
+        target_y: Value,
+        gain: Value,
+        max_step: Value,
+        deadzone: Value,
+    },
+    AimAtDetection {
+        results_list: String,
+        index: Value,
+        gain: Value,
+        max_step: Value,
+        deadzone: Value,
+        timeout: Value,
+        settle_ms: Value,
+        status_variable: String,
+    },
+}
+
+fn empty_text() -> Value {
+    Value::text("")
+}
+
+fn match_by_title() -> String {
+    "Title".into()
 }
 
 #[derive(Deserialize)]
@@ -1571,15 +1591,21 @@ impl From<InstructionKindDe> for InstructionKind {
             }
             InstructionKindDe::Wait(WaitDe::Current(d)) => InstructionKind::Wait(d),
             InstructionKindDe::Command(s) => InstructionKind::Command(s),
+            InstructionKindDe::CommandWait(s) => InstructionKind::CommandWait(s),
             InstructionKindDe::Comment(s) => InstructionKind::Comment(s),
             InstructionKindDe::WhenRan => InstructionKind::WhenRan,
             InstructionKindDe::WhenBatteryDischargedTo(v) => {
                 InstructionKind::WhenBatteryDischargedTo(v)
             }
             InstructionKindDe::WhenBatteryChargedTo(v) => InstructionKind::WhenBatteryChargedTo(v),
-            InstructionKindDe::WhenTime(s) => InstructionKind::WhenTime(s),
+            InstructionKindDe::WhenTime(WhenTimeDe::Current(s, t)) => InstructionKind::WhenTime(s, t),
+            InstructionKindDe::WhenTime(WhenTimeDe::Legacy(old)) => {
+                InstructionKind::WhenTime(old.schedule, Value::text(format!("{:02}:{:02}", old.hour, old.minute)))
+            }
             InstructionKindDe::WhenPowerPluggedIn => InstructionKind::WhenPowerPluggedIn,
             InstructionKindDe::WhenPowerUnplugged => InstructionKind::WhenPowerUnplugged,
+            InstructionKindDe::WhenClipboardChanged => InstructionKind::WhenClipboardChanged,
+            InstructionKindDe::WhenKey(key, direction) => InstructionKind::WhenKey(key, direction),
             InstructionKindDe::OpenApp {
                 command,
                 name,
@@ -1600,10 +1626,37 @@ impl From<InstructionKindDe> for InstructionKind {
             },
             InstructionKindDe::SetVariable(n, v) => InstructionKind::SetVariable(n, v),
             InstructionKindDe::ChangeVariable(n, v) => InstructionKind::ChangeVariable(n, v),
-            InstructionKindDe::BlockHeader(id) => InstructionKind::BlockHeader(id),
-            InstructionKindDe::CallBlock { block_id, args } => {
-                InstructionKind::CallBlock { block_id, args }
+            InstructionKindDe::SetClipboard(v) => InstructionKind::SetClipboard(v),
+            InstructionKindDe::AddToList { value, name } => {
+                InstructionKind::AddToList { value, name }
             }
+            InstructionKindDe::DeleteOfList { index, name } => {
+                InstructionKind::DeleteOfList { index, name }
+            }
+            InstructionKindDe::DeleteAllOfList { name } => {
+                InstructionKind::DeleteAllOfList { name }
+            }
+            InstructionKindDe::ShiftList { name, amount } => {
+                InstructionKind::ShiftList { name, amount }
+            }
+            InstructionKindDe::InsertIntoList { value, index, name } => {
+                InstructionKind::InsertIntoList { value, index, name }
+            }
+            InstructionKindDe::ReplaceItemOfList { index, name, value } => {
+                InstructionKind::ReplaceItemOfList { index, name, value }
+            }
+            InstructionKindDe::ReverseList { name } => InstructionKind::ReverseList { name },
+            InstructionKindDe::BlockHeader(id) => InstructionKind::BlockHeader(id),
+            InstructionKindDe::CallBlock {
+                block_id,
+                args,
+                branches,
+            } => InstructionKind::CallBlock {
+                block_id,
+                args,
+                branches,
+            },
+            InstructionKindDe::RunBranch(name) => InstructionKind::RunBranch(name),
             InstructionKindDe::Return(v) => InstructionKind::Return(v),
             InstructionKindDe::If { condition, body } => InstructionKind::If { condition, body },
             InstructionKindDe::IfElse {
@@ -1622,99 +1675,630 @@ impl From<InstructionKindDe> for InstructionKind {
             }
             InstructionKindDe::EscapeLoop => InstructionKind::EscapeLoop,
             InstructionKindDe::ContinueLoop => InstructionKind::ContinueLoop,
+            InstructionKindDe::WriteFile { path, text, append } => {
+                InstructionKind::WriteFile { path, text, append }
+            }
+            InstructionKindDe::HttpRequest {
+                method,
+                url,
+                body,
+                headers,
+                variable,
+            } => InstructionKind::HttpRequest {
+                method,
+                url,
+                body,
+                headers,
+                variable,
+            },
+            InstructionKindDe::Notify { title, message } => InstructionKind::Notify { title, message },
+            InstructionKindDe::Log(v) => InstructionKind::Log(v),
+            InstructionKindDe::TryCatch { body, catch_body } => {
+                InstructionKind::TryCatch { body, catch_body }
+            }
+            InstructionKindDe::ThrowError(v) => InstructionKind::ThrowError(v),
+            InstructionKindDe::StopMacro => InstructionKind::StopMacro,
+            InstructionKindDe::WhenWindow { pattern, focused } => {
+                InstructionKind::WhenWindow { pattern, focused }
+            }
+            InstructionKindDe::WhenFileChanged(v) => InstructionKind::WhenFileChanged(v),
+            InstructionKindDe::Retry { count, delay, body } => InstructionKind::Retry { count, delay, body },
+            InstructionKindDe::WindowAction { action, pattern, by } => {
+                InstructionKind::WindowAction { action, pattern, by }
+            }
+            InstructionKindDe::MoveWindow { pattern, by, resize, x, y } => {
+                InstructionKind::MoveWindow { pattern, by, resize, x, y }
+            }
+            InstructionKindDe::RunMacro { target, wait } => InstructionKind::RunMacro { target, wait },
+            InstructionKindDe::StopMacroNamed(v) => InstructionKind::StopMacroNamed(v),
+            InstructionKindDe::SetGlobal { name, value } => InstructionKind::SetGlobal { name, value },
+            InstructionKindDe::ChangeGlobal { name, by } => InstructionKind::ChangeGlobal { name, by },
+            InstructionKindDe::WaitUntil { condition, timeout } => InstructionKind::WaitUntil { condition, timeout },
+            InstructionKindDe::FindImage { image, tolerance, x_variable, y_variable } => {
+                InstructionKind::FindImage { image, tolerance, x_variable, y_variable }
+            }
+            InstructionKindDe::ClickImage { image, tolerance, button } => InstructionKind::ClickImage { image, tolerance, button },
+            InstructionKindDe::WaitForImage { image, tolerance, appear, timeout } => {
+                InstructionKind::WaitForImage { image, tolerance, appear, timeout }
+            }
+            InstructionKindDe::WhenTyped { text, erase } => InstructionKind::WhenTyped { text, erase },
+            InstructionKindDe::PasteText(v) => InstructionKind::PasteText(v),
+            InstructionKindDe::WhenApp { pattern, started } => InstructionKind::WhenApp { pattern, started },
+            InstructionKindDe::WhenIdle(v) => InstructionKind::WhenIdle(v),
+            InstructionKindDe::WhenScreenLock { locked } => InstructionKind::WhenScreenLock { locked },
+            InstructionKindDe::WithLock { name, body } => InstructionKind::WithLock { name, body },
+            InstructionKindDe::WhenCron(v) => InstructionKind::WhenCron(v),
+            InstructionKindDe::SplitIntoList { text, separator, name } => InstructionKind::SplitIntoList { text, separator, name },
+            InstructionKindDe::WhenNetwork { connected } => InstructionKind::WhenNetwork { connected },
+            InstructionKindDe::WhenUsb { pattern, connected } => InstructionKind::WhenUsb { pattern, connected },
+            InstructionKindDe::WhenMouseButton { button, pressed, modifiers } => {
+                InstructionKind::WhenMouseButton { button, pressed, modifiers }
+            }
+            InstructionKindDe::AskText { prompt, default, name } => InstructionKind::AskText { prompt, default, name },
+            InstructionKindDe::AskYesNo { prompt, name } => InstructionKind::AskYesNo { prompt, name },
+            InstructionKindDe::AskChoice { prompt, list, name } => InstructionKind::AskChoice { prompt, list, name },
+            InstructionKindDe::ShowMessage(v) => InstructionKind::ShowMessage(v),
+            InstructionKindDe::WhenAt(v) => InstructionKind::WhenAt(v),
+            InstructionKindDe::WhenSignal(v) => InstructionKind::WhenSignal(v),
+            InstructionKindDe::SendSignal { name, wait } => InstructionKind::SendSignal { name, wait },
+            InstructionKindDe::WhenWebhook { path, variable } => InstructionKind::WhenWebhook { path, variable },
+            InstructionKindDe::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable, region } => {
+                InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable, region }
+            }
+            InstructionKindDe::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout, region } => {
+                InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout, region }
+            }
+            InstructionKindDe::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => {
+                InstructionKind::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone }
+            }
+            InstructionKindDe::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => {
+                InstructionKind::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable }
+            }
         }
     }
 }
 
-fn default_instruction_id() -> String {
-    Uuid::new_v4().simple().to_string()
-}
-
-/// The wrapper every instruction is actually stored as — `id` is a stable
-/// identity (unlike position/path, survives drags/splits/merges/reorders)
-/// that comments attach to (`Comment::attached_to`); `kind` is the actual
-/// instruction data, unchanged in shape from before this wrapper existed.
-/// Equality/hashing deliberately ignore `id` and compare `kind` only — the
-/// rest of this module (block-header lookups, dedup, tests) all compare
-/// instructions structurally, the same as when there was no id at all.
-#[derive(Debug, Clone, Serialize, Deserialize)]
-#[serde(from = "InstructionEnvelope")]
-pub struct Instruction {
+/// One saved macro: a [`MacroGraph`] canvas plus what only Blockwork cares
+/// about - its name, playback speed and recording target. `graph` is
+/// flattened on the wire and [`Deref`]ed, so both shapes are unchanged.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[serde(from = "MacroDe")]
+pub struct Macro {
     pub id: String,
-    pub kind: InstructionKind,
+    pub name: String,
+    pub description: String,
+    #[serde(flatten)]
+    pub graph: MacroGraph,
+    #[serde(default)]
+    pub signals: Vec<String>,
+    /// Strand explicitly chosen to receive freshly-recorded input; `None`
+    /// falls back to the "first When Ran strand, else first strand" rule.
+    /// Kept out of undo/redo (it's a preference, not an instruction edit).
+    #[serde(default)]
+    pub recording_target: Option<String>,
+    /// Playback speed: every `Wait` duration is divided by this at runtime.
+    /// 1.0 is normal, 2.0 is twice as fast. Clamped to [`SPEED_MULTIPLIER_RANGE`].
+    #[serde(default = "default_speed_multiplier")]
+    pub speed_multiplier: f64,
+    /// Settings edited from the "Macro Settings" popup - see [`MacroSettings`].
+    #[serde(default)]
+    pub settings: MacroSettings,
 }
 
-impl Instruction {
-    pub fn new(kind: InstructionKind) -> Self {
-        Self {
-            id: default_instruction_id(),
-            kind,
-        }
-    }
+impl Deref for Macro {
+    type Target = MacroGraph;
 
-    pub fn is_header(&self) -> bool {
-        self.kind.is_header()
-    }
-    pub fn rename_var(&mut self, old: &str, new: &str) {
-        self.kind.rename_var(old, new)
-    }
-    pub fn migrate_bool_slots(&mut self) {
-        self.kind.migrate_bool_slots()
-    }
-    pub fn rename_param(&mut self, old: &str, new: &str) {
-        self.kind.rename_param(old, new)
-    }
-    pub fn for_each_call_args_mut(&mut self, block_id: &str, f: &mut dyn FnMut(&mut Vec<Value>)) {
-        self.kind.for_each_call_args_mut(block_id, f)
-    }
-    pub fn scrub_block_calls(&mut self, block_id: &str) {
-        self.kind.scrub_block_calls(block_id)
-    }
-    pub fn body(&self, slot: u8) -> Option<&Vec<Instruction>> {
-        self.kind.body(slot)
-    }
-    pub fn body_mut(&mut self, slot: u8) -> Option<&mut Vec<Instruction>> {
-        self.kind.body_mut(slot)
+    fn deref(&self) -> &MacroGraph {
+        &self.graph
     }
 }
 
-impl PartialEq for Instruction {
-    fn eq(&self, other: &Self) -> bool {
-        self.kind == other.kind
+impl DerefMut for Macro {
+    fn deref_mut(&mut self) -> &mut MacroGraph {
+        &mut self.graph
     }
 }
 
-impl std::hash::Hash for Instruction {
-    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
-        self.kind.hash(state);
-    }
+/// Valid range for both the per-macro and global speed multipliers, enforced
+/// wherever either is set from user input.
+pub const SPEED_MULTIPLIER_RANGE: std::ops::RangeInclusive<f64> = 0.1..=10.0;
+
+/// Per-macro settings edited from the "Macro Settings" popup next to the
+/// macro dropdown - not part of the macro's own behavior, but affecting how
+/// the app treats it. Persisted and exported/imported with the macro like
+/// everything else in `Macro`, so a new field here needs no separate wiring
+/// to survive a save/export round-trip.
+#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+pub struct MacroSettings {
+    /// When `true`, this macro's `WhenBattery*`/`WhenTime`/`WhenPower*`
+    /// strands are watched by the background watchers (`battery_watch`/
+    /// `time_watch` in the desktop app) even while a different macro is
+    /// selected. By default only the currently selected macro's event
+    /// strands are live.
+    #[serde(default)]
+    pub always_listen: bool,
+    /// Stops a run (or a trigger-fired strand) after this many seconds;
+    /// 0 means no limit.
+    #[serde(default)]
+    pub max_run_secs: u32,
+    /// Stops any one loop after this many iterations; 0 means no limit.
+    #[serde(default)]
+    pub max_loop_iterations: u32,
+    /// Triggers and hotkeys only start the macro while a window whose
+    /// title or app contains this is focused; empty means any window.
+    #[serde(default)]
+    pub only_in_window: String,
+    #[serde(default)]
+    pub power: conditions::PowerCondition,
+    /// Only from/until these minutes after midnight (may wrap past midnight).
+    #[serde(default)]
+    pub active_hours: Option<(u16, u16)>,
+    /// Only on these weekdays, bit 0 = Sunday; 0 means every day.
+    #[serde(default)]
+    pub active_days: u8,
+    /// Library folder; empty means the top level.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub folder: String,
+    /// Runs schedules and "once at" triggers it missed while Blockwork was
+    /// closed or the computer slept, once, when it gets the chance.
+    #[serde(default)]
+    pub catch_up_missed: bool,    /// Block packs this macro's blocks came from.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub block_packs: Vec<crate::block_packs::PackRecord>,
 }
 
-/// Wire shape for `Instruction`: today's shape (`{"id": "...", "kind": ...}`)
-/// or, for a save from before ids existed, the bare `InstructionKind` value
-/// with no envelope at all — same "try new shape, fall back to old" pattern
-/// as `WaitDe` above, just one level up. A legacy instruction gets a fresh id
-/// generated on load; harmless since nothing could have referenced it by id yet.
+/// Deserialization shape supporting both the current multi-strand format and
+/// the legacy flat `code: Vec<Instruction>` format from older saves; legacy
+/// macros become a single root strand. The canvas collections are listed out
+/// rather than flattened, so the untagged split stays a field-by-field match.
 #[derive(Deserialize)]
 #[serde(untagged)]
-enum InstructionEnvelope {
-    Current { id: String, kind: InstructionKind },
-    Legacy(InstructionKind),
+enum MacroDe {
+    Current {
+        #[serde(default = "default_macro_id")]
+        id: String,
+        name: String,
+        description: String,
+        strands: Vec<Strand>,
+        #[serde(default)]
+        signals: Vec<String>,
+        #[serde(default)]
+        recording_target: Option<String>,
+        #[serde(default = "default_speed_multiplier")]
+        speed_multiplier: f64,
+        #[serde(default)]
+        floating_values: Vec<FloatingValue>,
+        #[serde(default)]
+        comments: Vec<Comment>,
+        #[serde(default)]
+        variables: Vec<VariableDef>,
+        #[serde(default)]
+        block_defs: Vec<BlockDef>,
+        #[serde(default)]
+        settings: MacroSettings,
+        #[serde(default)]
+        lists: Vec<ListDef>,
+        // Carried for round-trip only, Blockwork has no dict blocks or UI.
+        #[serde(default)]
+        dicts: Vec<DictDef>,
+    },
+    Legacy {
+        #[serde(default = "default_macro_id")]
+        id: String,
+        name: String,
+        description: String,
+        code: Vec<Instruction>,
+    },
 }
 
-impl From<InstructionEnvelope> for Instruction {
-    fn from(env: InstructionEnvelope) -> Self {
-        match env {
-            InstructionEnvelope::Current { id, kind } => Instruction { id, kind },
-            InstructionEnvelope::Legacy(kind) => Instruction::new(kind),
+impl From<MacroDe> for Macro {
+    fn from(de: MacroDe) -> Self {
+        let mut mac = match de {
+            MacroDe::Current {
+                id,
+                name,
+                description,
+                mut strands,
+                signals,
+                recording_target,
+                speed_multiplier,
+                floating_values,
+                comments,
+                variables,
+                block_defs,
+                settings,
+                lists,
+                dicts,
+            } => {
+                // Pre-"When Ran" saves have a strand id=="root" that was the
+                // implicit entry point; give it a real WhenRan on upgrade.
+                if let Some(legacy) = strands.iter_mut().find(|s| s.id == LEGACY_ROOT_STRAND_ID)
+                    && !legacy.starts_with_header()
+                {
+                    legacy
+                        .instructions
+                        .insert(0, Instruction::new(InstructionKind::WhenRan));
+                }
+                Self {
+                    id,
+                    name,
+                    description,
+                    graph: MacroGraph {
+                        strands,
+                        floating_values,
+                        comments,
+                        variables,
+                        lists,
+                        dicts,
+                        block_defs,
+                    },
+                    signals,
+                    recording_target,
+                    speed_multiplier,
+                    settings,
+                }
+            }
+            MacroDe::Legacy {
+                id,
+                name,
+                description,
+                mut code,
+            } => {
+                code.insert(0, Instruction::new(InstructionKind::WhenRan));
+                Self {
+                    id,
+                    name,
+                    description,
+                    graph: MacroGraph {
+                        strands: vec![Strand::with_instructions(0, 0, code)],
+                        ..MacroGraph::new()
+                    },
+                    signals: Vec::new(),
+                    recording_target: None,
+                    speed_multiplier: default_speed_multiplier(),
+                    settings: MacroSettings::default(),
+                }
+            }
+        };
+        // Repairs boolean slots poisoned by the historical `Value::Bool`-less
+        // bug (see `Value::migrate_bool_slots`) - a save from before that fix
+        // may have a raw number leaf sitting where a blank hexagon belongs.
+        mac.graph.migrate_bool_slots();
+        // A macro file may have been created before block colors existed (in
+        // which case serde supplied blue), or hand-edited/imported with an
+        // invalid color. Keep all persisted values safe to place in a CSS
+        // custom property before the frontend ever sees them.
+        mac.graph.normalize_block_colors();
+        mac.migrate_legacy_comments();
+        mac.collect_named_signals();
+        mac
+    }
+}
+
+impl Macro {
+    pub fn new(name: String, description: String, mut code: Vec<Instruction>) -> Self {
+        code.insert(0, Instruction::new(InstructionKind::WhenRan));
+        Self {
+            id: default_macro_id(),
+            name,
+            description,
+            graph: MacroGraph {
+                strands: vec![Strand::with_instructions(0, 0, code)],
+                ..MacroGraph::new()
+            },
+            signals: Vec::new(),
+            recording_target: None,
+            speed_multiplier: default_speed_multiplier(),
+            settings: MacroSettings::default(),
         }
+    }
+
+    /// Pack implementation strands stay available to playback, outside the editor.
+    pub fn editor_strands(&self) -> impl Iterator<Item = &Strand> {
+        self.strands.iter().filter(|strand| !crate::block_packs::is_pack_strand(self, strand))
+    }
+
+    pub fn clear_editor(&mut self) {
+        let ids: Vec<_> = self.editor_strands().map(|strand| strand.id.clone()).collect();
+        self.graph.strands.retain(|strand| !ids.contains(&strand.id));
+        self.graph.prune_orphaned_comments();
+    }
+
+    pub fn next_editor_position(&self) -> (i32, i32) {
+        (self.editor_strands().map(|strand| strand.x).max().unwrap_or(0) + 260, 0)
+    }
+
+    /// Keep named references registered when importing or adding blocks.
+    pub fn collect_named_signals(&mut self) {
+        let mut names = Vec::new();
+        self.graph.walk_instructions(&mut |ins| {
+            if let InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } =
+                &ins.kind
+                && !name.expression
+                && let Value::Text { value } = &name.value
+                && !value.trim().is_empty()
+            {
+                names.push(value.trim().to_string());
+            }
+        });
+        let mut unique: Vec<String> = Vec::new();
+        for name in self.signals.iter().chain(names.iter()) {
+            let name = name.trim();
+            if !name.is_empty() && !unique.iter().any(|s| s.eq_ignore_ascii_case(name)) {
+                unique.push(name.to_string());
+            }
+        }
+        self.graph.walk_instructions_mut(&mut |ins| {
+            if let InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } =
+                &mut ins.kind
+                && !name.expression
+                && let Value::Text { value } = &mut name.value
+                && let Some(canonical) =
+                    unique.iter().find(|s| s.eq_ignore_ascii_case(value.trim()))
+            {
+                *value = canonical.clone();
+            }
+        });
+        self.signals = unique;
+    }
+
+    pub fn validate_signal_name(
+        &self,
+        name: &str,
+        replacing: Option<&str>,
+    ) -> Result<String, String> {
+        let name = name.trim();
+        if name.is_empty() {
+            return Err("Signal name can't be empty".into());
+        }
+        if self
+            .signals
+            .iter()
+            .any(|s| Some(s.as_str()) != replacing && s.eq_ignore_ascii_case(name))
+        {
+            return Err(format!("A signal named \"{name}\" already exists"));
+        }
+        Ok(name.to_string())
+    }
+
+    pub fn rename_signal(&mut self, old: &str, new: &str) -> Result<(), String> {
+        let new = self.validate_signal_name(new, Some(old))?;
+        let index = self
+            .signals
+            .iter()
+            .position(|s| s == old)
+            .ok_or("Signal not found")?;
+        self.signals[index] = new.clone();
+        self.graph.walk_instructions_mut(&mut |ins| {
+            if let InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } =
+                &mut ins.kind
+                && !name.expression
+                && let Value::Text { value } = &mut name.value
+                && value.trim().eq_ignore_ascii_case(old)
+            {
+                *value = new.clone();
+            }
+        });
+        Ok(())
+    }
+
+    /// Whether any instruction, including nested bodies, moves to an
+    /// absolute screen position.
+    pub fn has_absolute_mouse_move(&self) -> bool {
+        let mut found = false;
+        self.graph.walk_instructions(&mut |ins| {
+            found |= matches!(
+                &ins.kind,
+                InstructionKind::Token(InputToken::MoveMouse(
+                    _,
+                    _,
+                    crate::input::types::Coordinate::Abs
+                ))
+            );
+        });
+        found
+    }
+
+    pub fn ensure_id(&mut self) {
+        if self.id.trim().is_empty() {
+            self.id = default_macro_id();
+        }
+    }
+
+    /// Renames a branch callback (`RunBranch(old)` blocks) inside the named
+    /// custom block's own body, keeping it working after the prototype's
+    /// branch piece is renamed. No-op if the block has no such body strand.
+    pub fn rename_block_branch_body(&mut self, block_id: &str, old: &str, new: &str) {
+        let Some(strand) = self.graph.strands.iter_mut().find(|s| {
+            matches!(
+                s.instructions.first().map(|i| &i.kind),
+                Some(InstructionKind::BlockHeader(id)) if id == block_id
+            )
+        }) else {
+            return;
+        };
+        for ins in &mut strand.instructions {
+            ins.walk_mut(&mut |child| {
+                if let InstructionKind::RunBranch(name) = &mut child.kind
+                    && name == old
+                {
+                    *name = new.to_string();
+                }
+            });
+        }
+    }
+
+    /// Defines a new custom block, with Blockwork's own header instruction
+    /// at the top of its body strand.
+    pub fn create_block(
+        &mut self,
+        pieces: Vec<BlockPiece>,
+        shape: BlockShape,
+        color: String,
+        x: i32,
+        y: i32,
+    ) -> String {
+        self.graph.create_block(pieces, shape, color, x, y, |id| {
+            InstructionKind::BlockHeader(id.to_string())
+        })
+    }
+
+    /// One-time upgrade for saves from before floating/attached comments
+    /// existed: pulls every legacy inline `Comment` instruction out of the
+    /// instruction stream and re-homes it as a freestanding `Comment` parked
+    /// near its old strand. Idempotent - a save with no legacy `Comment`
+    /// instructions left is a no-op.
+    fn migrate_legacy_comments(&mut self) {
+        fn extract(list: &mut Vec<Instruction>, out: &mut Vec<String>) {
+            list.retain_mut(|ins| {
+                for slot in 0..2u8 {
+                    if let Some(body) = ins.body_mut(slot) {
+                        extract(body, out);
+                    }
+                }
+                if let InstructionKind::Comment(text) = &ins.kind {
+                    out.push(text.clone());
+                    false
+                } else {
+                    true
+                }
+            });
+        }
+        for strand in &mut self.graph.strands {
+            let mut texts = Vec::new();
+            extract(&mut strand.instructions, &mut texts);
+            for (i, text) in texts.into_iter().enumerate() {
+                self.graph.comments.push(Comment::new(
+                    strand.x + 40,
+                    strand.y + 40 + i as i32 * 30,
+                    text,
+                    None,
+                ));
+            }
+        }
+    }
+
+    /// Strand that freshly-recorded input gets appended to: the explicit
+    /// `recording_target` if it still exists, else the first "When Ran"
+    /// strand, else the first strand (creating one if the macro is empty).
+    pub fn recording_target_mut(&mut self) -> &mut Strand {
+        if let Some(id) = self.recording_target_id() {
+            let pos = self.graph.strands.iter().position(|strand| strand.id == id).unwrap();
+            return &mut self.graph.strands[pos];
+        }
+        self.graph.strands.push(Strand::new(0, 0));
+        self.graph.strands.last_mut().unwrap()
+    }
+
+    /// Resolves the recording target without entering a pack implementation.
+    pub fn recording_target_id(&self) -> Option<String> {
+        if let Some(id) = &self.recording_target
+            && self.editor_strands().any(|strand| &strand.id == id)
+        {
+            return Some(id.clone());
+        }
+        self.editor_strands().find(|strand| strand.starts_with_header())
+            .or_else(|| self.editor_strands().next()).map(|strand| strand.id.clone())
+    }
+}
+
+impl std::hash::Hash for Macro {
+    fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
+        self.id.hash(state);
+        self.name.hash(state);
+        self.description.hash(state);
+        self.graph.hash(state);
+        self.signals.hash(state);
+        self.recording_target.hash(state);
+        self.speed_multiplier.to_bits().hash(state);
+        self.settings.hash(state);
     }
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::input::value::Evaluated;
     use crate::input::types::Coordinate;
+
+    #[test]
+    fn signal_names_migrate_and_unused_names_survive_round_trip() {
+        let mut mac: Macro = serde_json::from_value(serde_json::json!({
+            "name": "Old macro", "description": "", "signals": ["Unused"],
+            "strands": [{"id": "s", "x": 0, "y": 0, "instructions": [
+                {"id": "send", "kind": {"SendSignal": {"name": {"kind": "Text", "value": " Go "}, "wait": true}}},
+                {"id": "receive", "kind": {"WhenSignal": {"kind": "Text", "value": "go"}}}
+            ]}]
+        })).unwrap();
+        assert_eq!(mac.signals, ["Unused", "Go"]);
+        mac.strands.clear();
+        let restored: Macro = serde_json::from_str(&serde_json::to_string(&mac).unwrap()).unwrap();
+        assert_eq!(restored.signals, ["Unused", "Go"]);
+    }
+
+    #[test]
+    fn signal_rename_updates_nested_named_references_but_preserves_expressions() {
+        let mut mac = Macro::new(
+            "Signals".into(),
+            "".into(),
+            vec![
+                Instruction::new(InstructionKind::WhenSignal(Value::text("go").into())),
+                Instruction::new(InstructionKind::Repeat {
+                    count: Value::number(1.0),
+                    body: vec![
+                        Instruction::new(InstructionKind::SendSignal {
+                            name: Value::text(" GO ").into(),
+                            wait: true,
+                        }),
+                        Instruction::new(InstructionKind::SendSignal {
+                            name: SignalName::new(Value::text("go"), true),
+                            wait: false,
+                        }),
+                    ],
+                }),
+            ],
+        );
+        mac.collect_named_signals();
+        assert!(mac.validate_signal_name(" GO ", None).is_err());
+        assert!(mac.validate_signal_name(" ", None).is_err());
+        mac.rename_signal("go", "finished").unwrap();
+        assert_eq!(mac.signals, ["finished"]);
+        let mut names = Vec::new();
+        mac.graph.walk_instructions(&mut |ins| {
+            if let InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } =
+                &ins.kind
+            {
+                names.push((name.value.clone(), name.expression));
+            }
+        });
+        assert_eq!(
+            names,
+            vec![
+                (Value::text("finished"), false),
+                (Value::text("finished"), false),
+                (Value::text("go"), true)
+            ]
+        );
+        let restored: Macro = serde_json::from_str(&serde_json::to_string(&mac).unwrap()).unwrap();
+        assert_eq!(restored.signals, ["finished"]);
+        assert_eq!(restored.graph, mac.graph);
+    }
+
+    #[test]
+    fn legacy_dynamic_signals_remain_expressions() {
+        let value = Value::Op {
+            op: Op::Join,
+            args: vec![Value::text("task:"), Value::text("42")],
+            saved: Box::new(Value::text("")),
+        };
+        let old = serde_json::json!({"WhenSignal": value});
+        let instruction: InstructionKind = serde_json::from_value(old).unwrap();
+        let InstructionKind::WhenSignal(name) = instruction else {
+            panic!("expected signal receiver");
+        };
+        assert!(name.expression);
+        assert_eq!(name.value, value);
+    }
 
     #[test]
     fn block_def_migrates_legacy_returns_value_true_to_returns_value_shape() {
@@ -1744,6 +2328,9 @@ mod tests {
             pieces: vec![],
             shape: BlockShape::Ending,
             color: default_block_color(),
+            icon: String::new(),
+                    identifier: String::new(),
+                    description: String::new(),
         };
         let json = serde_json::to_string(&def).unwrap();
         assert!(
@@ -1774,10 +2361,46 @@ mod tests {
     }
 
     #[test]
+    fn macro_lists_live_in_the_graph_but_stay_flat_on_the_wire() {
+        // Lists moved to blockstitch's `BlockGraph`, reached via `Deref`;
+        // the save shape keeps `lists` next to `strands` either way.
+        let mac: Macro = serde_json::from_str(
+            r#"{"id":"m1","name":"Test","description":"","strands":[],"lists":[{"name":"queue","items":[{"kind":"Number","value":1.0}]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(mac.graph.lists.len(), 1);
+        assert_eq!(mac.graph.lists[0].name, "queue");
+        assert_eq!(mac.lists[0].name, "queue");
+        let json = serde_json::to_string(&mac).unwrap();
+        assert!(json.contains(r#""lists":[{"name":"queue""#), "got: {json}");
+        let back: Macro = serde_json::from_str(&json).unwrap();
+        assert_eq!(back, mac);
+    }
+
+    #[test]
     fn new_macro_defaults_to_one_when_ran_strand() {
         let mac = Macro::new("Test".into(), "".into(), vec![]);
         assert_eq!(mac.strands.len(), 1);
-        assert!(mac.strands[0].starts_with_when_ran());
+        assert!(mac.strands[0].starts_with_header());
+    }
+
+    #[test]
+    fn detects_absolute_mouse_moves_in_nested_bodies() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        mac.strands[0]
+            .instructions
+            .push(Instruction::new(InstructionKind::If {
+                condition: Value::Bool,
+                body: vec![Instruction::new(InstructionKind::Token(
+                    InputToken::MoveMouse(
+                        Value::number(10.0),
+                        Value::number(20.0),
+                        Coordinate::Abs,
+                    ),
+                ))],
+            }));
+
+        assert!(mac.has_absolute_mouse_move());
     }
 
     #[test]
@@ -1804,7 +2427,7 @@ mod tests {
         ]}"#;
         let mac: Macro = serde_json::from_str(json).unwrap();
         let root = mac.strand("root").unwrap();
-        assert!(root.starts_with_when_ran());
+        assert!(root.starts_with_header());
         assert_eq!(
             root.instructions,
             vec![Instruction::new(InstructionKind::WhenRan)]
@@ -1872,7 +2495,7 @@ mod tests {
             attached_to: None,
         });
 
-        // Remove the Wait instruction (index 1 — index 0 is the WhenRan header).
+        // Remove the Wait instruction (index 1 - index 0 is the WhenRan header).
         mac.strands[0].instructions.remove(1);
         mac.prune_orphaned_comments();
 
@@ -1942,7 +2565,7 @@ mod tests {
 
     #[test]
     fn migrate_bool_slots_repairs_poisoned_operand_nested_inside_condition() {
-        // The poisoned `Number` can be arbitrarily deep — here inside an
+        // The poisoned `Number` can be arbitrarily deep - here inside an
         // `And` that itself is the `If`'s condition. Its sibling (a real
         // comparison) must survive untouched.
         let json = r#"{"id":"m1","name":"Old","description":"","strands":[
@@ -2005,7 +2628,7 @@ mod tests {
 
     #[test]
     fn migrate_bool_slots_leaves_legitimately_numeric_fields_alone() {
-        // A `Wait` duration is never boolean-typed — a `Number` there is
+        // A `Wait` duration is never boolean-typed - a `Number` there is
         // always legitimate and must not be touched.
         let json = r#"{"id":"m1","name":"Old","description":"","strands":[
             {"id":"root","x":0,"y":0,"instructions":["WhenRan",{"Wait":{"kind":"Number","value":0.0}}]}
@@ -2050,6 +2673,17 @@ mod tests {
             ins,
             Instruction::new(InstructionKind::Wait(Value::number(1000.0)))
         );
+    }
+
+    #[test]
+    fn legacy_when_time_moves_its_clock_into_a_time_value() {
+        use crate::input::schedule::Weekday;
+        let ins: Instruction = serde_json::from_str(r#"{"WhenTime":{"kind":"Weekly","weekday":"Monday","hour":7,"minute":5}}"#).unwrap();
+        let expected = InstructionKind::WhenTime(TimeSchedule::Weekly { weekday: Weekday::Monday }, Value::text("07:05"));
+        assert_eq!(ins, Instruction::new(expected.clone()));
+        // And the new shape reads back as itself.
+        let round: Instruction = serde_json::from_str(&serde_json::to_string(&ins).unwrap()).unwrap();
+        assert_eq!(round, Instruction::new(expected));
     }
 
     #[test]
@@ -2111,7 +2745,7 @@ mod tests {
             origin_block_id: None,
         });
 
-        mac.rename_variable("x", "y");
+        mac.rename_variable("x", "y").unwrap();
 
         assert_eq!(mac.variables[0].name, "y");
         let strand = &mac.strands[0];
@@ -2146,7 +2780,7 @@ mod tests {
     }
 
     #[test]
-    fn rename_variable_is_a_no_op_for_undeclared_name() {
+    fn rename_variable_rejects_an_undeclared_name_and_changes_nothing() {
         let mut mac = Macro::new(
             "Test".into(),
             "".into(),
@@ -2156,7 +2790,7 @@ mod tests {
                 },
             )))],
         );
-        mac.rename_variable("x", "y");
+        assert!(mac.rename_variable("x", "y").is_err());
         assert_eq!(
             mac.strands[0].instructions[1],
             Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var {
@@ -2167,7 +2801,7 @@ mod tests {
 
     #[test]
     fn rename_var_reaches_into_if_body_and_condition() {
-        let mut ins = InstructionKind::If {
+        let mut ins = Instruction::new(InstructionKind::If {
             condition: Value::Var {
                 name: "x".to_string(),
             },
@@ -2177,9 +2811,9 @@ mod tests {
                     name: "x".to_string(),
                 },
             ))],
-        };
+        });
         ins.rename_var("x", "y");
-        match &ins {
+        match &ins.kind {
             InstructionKind::If { condition, body } => {
                 assert_eq!(
                     *condition,
@@ -2203,7 +2837,7 @@ mod tests {
 
     #[test]
     fn rename_var_reaches_into_if_else_both_branches() {
-        let mut ins = InstructionKind::IfElse {
+        let mut ins = Instruction::new(InstructionKind::IfElse {
             condition: Value::Var {
                 name: "x".to_string(),
             },
@@ -2215,9 +2849,9 @@ mod tests {
                 "x".to_string(),
                 Value::number(2.0),
             ))],
-        };
+        });
         ins.rename_var("x", "y");
-        match &ins {
+        match &ins.kind {
             InstructionKind::IfElse {
                 then_body,
                 else_body,
@@ -2244,19 +2878,20 @@ mod tests {
 
     #[test]
     fn scrub_block_calls_reaches_into_nested_if_body() {
-        let mut ins = InstructionKind::If {
+        let mut ins = Instruction::new(InstructionKind::If {
             condition: Value::number(1.0),
             body: vec![Instruction::new(InstructionKind::SetVariable(
                 "x".to_string(),
                 Value::Call {
                     block_id: "gone".to_string(),
                     args: vec![],
+                    branches: vec![],
                     saved: Box::new(Value::number(0.0)),
                 },
             ))],
-        };
+        });
         ins.scrub_block_calls("gone");
-        match &ins {
+        match &ins.kind {
             InstructionKind::If { body, .. } => {
                 assert_eq!(
                     body[0],
@@ -2343,3 +2978,4 @@ mod tests {
         assert_eq!(InstructionKind::ContinueLoop.body_mut(0), None);
     }
 }
+

@@ -7,7 +7,7 @@
 //! macOS: downloads the latest release's `.app.zip` (produced by
 //! `scripts/build-macos-bundle.sh` + `ditto -c -k --keepParent`), extracts it
 //! with the system `ditto` (which restores the symlinks/resource forks inside
-//! `Chromium Embedded Framework.framework` faithfully — a pure-Rust zip
+//! the Qt frameworks faithfully - a pure-Rust zip
 //! extractor would not), swaps the new `Blockwork.app` over the running
 //! bundle, and re-opens it. The caller exits immediately after.
 
@@ -16,7 +16,7 @@ use self_update::backends::github::Update;
 use std::fs;
 use std::path::{Path, PathBuf};
 
-const REPO_OWNER: &str = "EthanRStokes";
+const REPO_OWNER: &str = "Blockworked";
 const REPO_NAME: &str = "blockwork";
 // Must match the artifact_name values produced by .github/workflows/release.yml.
 #[cfg(windows)]
@@ -51,6 +51,16 @@ fn release_arch_name(rust_arch: &str) -> &str {
     }
 }
 
+/// True when running from an MSIX package, where the Store owns updates.
+#[cfg(windows)]
+fn is_packaged() -> bool {
+    use windows_sys::Win32::Storage::Packaging::Appx::GetCurrentPackageFullName;
+    const APPMODEL_ERROR_NO_PACKAGE: u32 = 15700;
+    let mut len = 0u32;
+    // SAFETY: a null buffer with len 0 only asks for the required length
+    unsafe { GetCurrentPackageFullName(&mut len, std::ptr::null_mut()) != APPMODEL_ERROR_NO_PACKAGE }
+}
+
 fn build_updater(current_version: &str) -> Result<Update, String> {
     let mut configure = Update::configure();
     configure
@@ -66,8 +76,12 @@ fn build_updater(current_version: &str) -> Result<Update, String> {
     configure.build().map_err(|err| err.to_string())
 }
 
-/// Blocking — call via `tokio::task::spawn_blocking`. `Ok(None)` means already up to date.
+/// Blocking - call via `tokio::task::spawn_blocking`. `Ok(None)` means already up to date.
 pub fn check_for_update(current_version: &str) -> Result<Option<UpdateInfo>, String> {
+    #[cfg(windows)]
+    if is_packaged() {
+        return Ok(None);
+    }
     let updater = build_updater(current_version)?;
     let releases = updater
         .get_latest_release()
@@ -84,14 +98,18 @@ pub fn check_for_update(current_version: &str) -> Result<Option<UpdateInfo>, Str
     }))
 }
 
-/// Blocking — call via `tokio::task::spawn_blocking`. Downloads the latest release's installer
+/// Blocking - call via `tokio::task::spawn_blocking`. Downloads the latest release's installer
 /// and launches it; the caller is expected to kill the current process immediately after.
-/// Deliberately doesn't touch the running exe — every in-process replacement attempt hit
-/// "used by another process" — so it just runs the real installer, which finds nothing
+/// Deliberately doesn't touch the running exe - every in-process replacement attempt hit
+/// "used by another process" - so it just runs the real installer, which finds nothing
 /// locking the install once this process exits.
 #[cfg(windows)]
 pub fn apply_update(current_version: &str) -> Result<PathBuf, String> {
     use std::os::windows::process::CommandExt;
+
+    if is_packaged() {
+        return Err("Updates are managed by the Microsoft Store".to_string());
+    }
 
     const DETACHED_PROCESS: u32 = 0x0000_0008;
 
@@ -131,7 +149,7 @@ pub fn apply_update(current_version: &str) -> Result<PathBuf, String> {
     Ok(installer_path)
 }
 
-/// Blocking — call via `tokio::task::spawn_blocking`. Downloads the latest release's
+/// Blocking - call via `tokio::task::spawn_blocking`. Downloads the latest release's
 /// `.app.zip`, swaps the new bundle over the running one, and re-opens it; the caller
 /// is expected to exit immediately after so the old bundle isn't in use mid-swap.
 #[cfg(target_os = "macos")]
@@ -294,7 +312,7 @@ mod tests {
     fn release_arch_name_translates_aarch64_to_arm64() {
         // The actual Apple Silicon release artifact is
         // `blockwork-macos-arm64.app.zip`, while `std::env::consts::ARCH` on
-        // that machine is `aarch64` — the updater must emit the former.
+        // that machine is `aarch64` - the updater must emit the former.
         assert_eq!(release_arch_name("aarch64"), "arm64");
         assert_eq!(release_arch_name("x86_64"), "x86_64");
     }

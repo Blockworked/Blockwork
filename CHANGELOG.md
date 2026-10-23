@@ -8,6 +8,167 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Tag releases (`0.x.y`, see `.github/workflows/release.yml`) publish the matching
 section below as the GitHub release notes, followed by the downloads table.
 
+## [Unreleased]
+
+## [0.6.0] - 2026-10-21
+
+### Added
+- File blocks:
+  - Write or append to a file, read a file, check a file exists, list a folder.
+  - "When file changes" trigger.
+- Web blocks:
+  - Send GET/POST/PUT/PATCH/DELETE requests into a variable, or fetch a URL.
+  - Read values out of JSON.
+  - Webhook trigger: an opt-in local server (Settings > Integrations) that starts macros on a web request with a token, passing the request body.
+    - Its token stays hidden as dots in Settings, so it's safe on a shared screen: copy it (or a ready-made curl example) without showing it, or show it briefly.
+- Shell reporters: a command's output and whether it succeeded.
+- Notify block for desktop notifications.
+- Dialog blocks: ask for text, ask yes or no, choose from a list, show a message.
+  - They work with the editor closed.
+  - Cancelling stops the run unless a try block catches it.
+- Windows:
+  - Active window title/app reporters and a "when window is focused/unfocused" trigger (Windows, macOS, X11, Hyprland, Sway, KDE with kdotool).
+  - Focus, minimize, maximize, restore, close, move or resize a window, matched by title or app (picked from a dropdown), plus a "window exists?" reporter.
+- Window detection blocks:
+  - Detect objects in a window with a local detector service, and wait for a detection.
+  - Aim one step toward a point, or at a tracked detection.
+  - "Window x/y/width/height/center" and "detection of" reporters.
+  - Detectors must run on this computer.
+- Screen blocks, in a new Screen palette category:
+  - Color at a point, average color of a region, colors match.
+  - Text on screen (OCR): Windows/macOS built-ins, or Tesseract on Linux.
+  - Mouse position, screen size, monitor count, monitor position/size.
+- Image blocks:
+  - Find an image on screen, click on it, and wait for it to appear or disappear, with a tolerance.
+  - Capture the image from the screen or load a PNG.
+- Screen picker in the editor toolbar:
+  - A see-through overlay on every monitor: click a point or drag a region to get its coordinates and color, and add matching blocks.
+  - On Wayland, captures go through the desktop portal (KDE and GNOME may ask for permission once) or `grim` on wlroots desktops.
+- "Wait until" block that pauses until a condition is true, with a time limit.
+- Error handling:
+  - Try/on error, throw error, error message, stop macro.
+  - Retry block: runs its body again after a failure, up to N attempts.
+  - Per-macro time limit and loop limit.
+- Emergency stop hotkey (Ctrl+Alt+Shift+Esc) that stops every run and pauses triggers until resumed.
+- Run feedback:
+  - The block each running strand is on is outlined live on the canvas.
+  - Blocks that failed in the last run get a red marker; click a logged error to jump to its block.
+  - Activity strip under the canvas shows the latest run event; click it to open the run log.
+  - Tray menu "Recent activity" lists the latest runs, triggers and errors.
+- Debugger:
+  - Right-click a block to toggle a breakpoint.
+  - Pause, resume, step one block at a time (F8/F10) or stop from the bar above the canvas, which shows the paused strand's variables and lists.
+- Macros calling macros:
+  - Run macro (and continue, or wait for it to finish), stop macro by name, "macro is running?" reporter.
+  - Signals: "send signal (and wait)" starts this macro's "when I receive" strands, sharing the run's variables.
+  - "With lock" block: only one strand, across every macro, runs inside a lock of the same name at a time.
+- Global variables:
+  - Set/change global blocks and a "global" reporter, shared by every macro and kept across restarts.
+  - Listed in Settings, where they can be deleted.
+- Secrets:
+  - Named passwords and API keys in Settings > Integrations, kept in the system keyring (Secret Service, Credential Manager, Keychain) and read with the "secret" block.
+  - Values are masked in the run log, previews and saved or exported macro files.
+  - The import review warns about macros that read them.
+- Text and data blocks:
+  - Contains / starts with / ends with / matches regex.
+  - Replace, regex replace and find; split into a list or take one part; letters from/to; trim.
+  - Number formatting, and timestamps with date formatting, parsing and parts.
+- Text expansion:
+  - A "when I type" trigger that fires on an abbreviation like `;addr` typed anywhere, optionally erasing it.
+  - A paste block that pastes through the clipboard and puts the old clipboard back.
+  - The Text snippet template uses them.
+- More triggers and reporters:
+  - App starts or exits, after N minutes idle, screen locks or unlocks.
+  - Network connects or disconnects, USB device plugged in or unplugged.
+  - Mouse button pressed or released (optionally with modifier keys).
+  - Reporters: "app is running?", "seconds idle", "screen is locked?", "online?", "USB device plugged in?".
+- Schedules:
+  - "On schedule" trigger with cron expressions (`*/15 9-17 * * mon-fri`, `@hourly`); a broken expression is reported in the run log.
+  - "Once at" trigger for a single date and time.
+  - Per-macro "catch up on missed schedules" setting that runs schedules missed while Blockwork was closed or the computer slept.
+- Per-macro conditions in Macro settings: triggers and hotkeys only start the macro while a given window is focused, on AC or battery power, between two times, or on chosen weekdays.
+- Macro library:
+  - The macro picker is now a searchable list with folders.
+  - Open, duplicate, move to a folder, export or delete a macro from it.
+  - Import and export use the system file dialog.
+- Importing and sharing macros:
+  - The import review shows what a macro can do (commands, web, files, input, clipboard, windows, triggers) before it's added.
+  - Bundles: export a library folder or a macro (with the macros it runs) as a `.blockwork` file and import it with the same review.
+  - Permissions: imported macros ask before running commands, going online, writing files, reading secrets or reading the screen, with "allow this time" and "always allow".
+  - Choose what to allow in the import review or in Macro settings > Permissions; grants are kept outside the macro file.
+- Block library:
+  - My Blocks > Browse lists shared block packs from library indexes set in Settings > Editor; the built-in one is https://community.blockworked.com.
+  - The built-in library can't be removed, and comes back for anyone who removed it in an earlier build.
+  - Packs are checked against the SHA-256 their index pins, reviewed before they're added, and replace their older versions in place.
+  - Packs published by the Blockworked team show a blue verified badge next to their publisher in Browse library. Only the built-in library can mark packs this way.
+  - Right-click a custom block to share it, and the blocks it uses, as a `.blockpack` file.
+  - After saving a pack, "Submit to community library..." opens the library site, where you sign in with GitHub or Google and upload it for review.
+- Translatable UI:
+  - Every editor and dialog string goes through Qt's translation system, with a language setting in Settings > General.
+  - Ships with English and pirate-speak English; every built-in language shows up in the setting by itself.
+  - Translation happens on Weblate.
+- Command line: `blockwork list`, `blockwork run <name> [--wait]` and `blockwork stop <name>` drive macros through the daemon without a window.
+- Starter templates (auto clicker, text snippet, break reminder, website watcher) in the welcome screen and the macro menu's "New from template".
+- UI animations: menus and drop-downs fade and grow open, dialogs ease in over a fading backdrop, and buttons, switches, check boxes and list rows ease between hover and pressed states. Panels like the sidebar and run log slide open and shut, and pages and Settings tabs fade in.
+- Smooth scrolling: a mouse wheel notch glides to its spot instead of jumping, in the editor canvas, the block palette, Settings and the other scrolling lists. Jumping to a block from the run log glides there too.
+- Settings > General > Animation speed, a slider from Instant to Slow. Instant turns every animation off.
+- Pinch on a touchpad to zoom the canvas.
+- Time and schedule pickers:
+  - Click the time on a "when every day at" block to pick it from a popup (tap an hour and a minute, or nudge them), instead of typing it. The time slot also takes a variable or reporter that gives a time like 09:30.
+  - "On schedule" reads in words ("weekdays at 09:00", "every 15 minutes") and opens a schedule picker: repeat every few minutes or hours, run at a time on chosen days, or once a month, with the next few runs shown. Cron text still works under Custom, and the slot still takes a reporter.
+  - Click the date on a "once at" block to pick the day from a calendar, with the time beside it. It's still saved as 2026-12-24 18:00, and the slot still takes a reporter.
+  - Settings > General > Time format: 12-hour (with AM/PM), 24-hour, or the system's default, for times in blocks and the pickers.
+- Recording settings > Countdown: how long Record waits before it starts, from off to 10 seconds (3 by default).
+- "Run command and wait" block: runs a shell command and waits for it to finish before moving on.
+
+### Changed
+- "Run command" starts its command and moves straight on down the strand instead of waiting for it to finish. Run command blocks in saved macros and block packs become "run command and wait" blocks when loaded, so they keep waiting (the original file is kept as a backup).
+- Macro files now carry a format version and are upgraded step by step when
+  loaded. Blocks a version can't run become notes on the canvas instead of
+  making the whole macro fail to load, and an upgraded file's original is
+  kept next to it as `.v0.bak`.
+- Macros saved by a newer Blockwork are reported in the run log instead of
+  being skipped silently.
+- Blocks that fail at run time are reported in the run log instead of only
+  the console.
+- Click-to-preview won't run shell or web blocks.
+- While recording, the canvas shows a card with a live timer, what's being recorded, where the blocks will go, the stop shortcut and a Stop button, instead of a bare "Recording..." message. The countdown shows on the canvas too, which stays locked during it.
+- Block text no longer ends labels with a colon, so blocks read as plain sentences ("Run command [cmd]" instead of "Run command: [cmd]").
+
+### Fixed
+- On Linux, evdev waits for held keys and mouse buttons to be released before
+  grabbing an input device, preventing stuck input when Blockwork starts.
+- A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
+- Ctrl+scroll zooms the canvas around the mouse pointer instead of pushing the view right and down, and mouse wheel zoom, the zoom buttons and reset now ease in (follows the animation speed setting).
+- The "when every day at" block saves its day, weekday, month and time again.
+- Dragging the canvas with the mouse stops where you let go instead of gliding on, and two-finger touchpad panning is smoothed slightly.
+- Every event block label now uses the same bold caption style; newer event blocks (when run, when file changes, when idle and others) were drawn in plain text while the older ones were bold.
+- Clicking Record during the countdown cancels the recording instead of starting the countdown over, and the Record button's label no longer gets cut off or overlaps its neighbours.
+- Images taken with the screen picker no longer catch the picker's own close animation (such as KDE's shattering windows) as stray lines and shapes.
+
+## [0.5.4] - 2026-09-20
+
+### Added
+- Flatpak packaging for Flathub.
+- Open App and Close App work in the Flatpak.
+
+### Changed
+- Split into a background daemon and the editor window; closing the window
+  frees its memory.
+- The linux backend now uses libei for absolute mouse positions.
+
+### Fixed
+- Freeze when closing to tray on Wayland.
+- Missing maximize button on KDE.
+- Crash when closing the window on Wayland.
+- White flash when opening and closing the window.
+
+## [0.5.3] - 2026-09-14
+
+### Changed
+- Project transferred to the Blockworked GitHub organization.
+- App ID changed to com.blockworked.Blockwork
+
 ## [0.5.2] - 2026-09-14
 
 ### Added
@@ -120,13 +281,16 @@ Initial release.
 - Global shortcuts (navigation, loop mode) on Linux; global keybinds on Windows.
 - App icons, updater and confirm dialogs, Wayland support.
 
-[Unreleased]: https://github.com/EthanRStokes/Blockwork/compare/0.5.2...HEAD
-[0.5.2]: https://github.com/EthanRStokes/Blockwork/compare/0.5.1...0.5.2
-[0.5.1]: https://github.com/EthanRStokes/Blockwork/compare/0.5.0...0.5.1
-[0.5.0]: https://github.com/EthanRStokes/Blockwork/compare/0.4.0...0.5.0
-[0.4.0]: https://github.com/EthanRStokes/Blockwork/compare/0.3.1...0.4.0
-[0.3.1]: https://github.com/EthanRStokes/Blockwork/compare/0.3.0...0.3.1
-[0.3.0]: https://github.com/EthanRStokes/Blockwork/compare/0.2.1...0.3.0
-[0.2.1]: https://github.com/EthanRStokes/Blockwork/compare/0.2.0...0.2.1
-[0.2.0]: https://github.com/EthanRStokes/Blockwork/compare/0.1.0...0.2.0
-[0.1.0]: https://github.com/EthanRStokes/Blockwork/releases/tag/0.1.0
+[Unreleased]: https://github.com/Blockworked/Blockwork/compare/0.6.0...HEAD
+[0.6.0]: https://github.com/Blockworked/Blockwork/compare/0.5.4...0.6.0
+[0.5.4]: https://github.com/Blockworked/Blockwork/compare/0.5.3...0.5.4
+[0.5.3]: https://github.com/Blockworked/Blockwork/compare/0.5.2...0.5.3
+[0.5.2]: https://github.com/Blockworked/Blockwork/compare/0.5.1...0.5.2
+[0.5.1]: https://github.com/Blockworked/Blockwork/compare/0.5.0...0.5.1
+[0.5.0]: https://github.com/Blockworked/Blockwork/compare/0.4.0...0.5.0
+[0.4.0]: https://github.com/Blockworked/Blockwork/compare/0.3.1...0.4.0
+[0.3.1]: https://github.com/Blockworked/Blockwork/compare/0.3.0...0.3.1
+[0.3.0]: https://github.com/Blockworked/Blockwork/compare/0.2.1...0.3.0
+[0.2.1]: https://github.com/Blockworked/Blockwork/compare/0.2.0...0.2.1
+[0.2.0]: https://github.com/Blockworked/Blockwork/compare/0.1.0...0.2.0
+[0.1.0]: https://github.com/Blockworked/Blockwork/releases/tag/0.1.0

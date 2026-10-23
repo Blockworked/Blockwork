@@ -61,9 +61,10 @@ fn rdev_key_name_to_display(name: &str) -> String {
 pub enum HotkeyAction {
     RunMacro,
     StopLoop,
+    /// Kill switch: stops every run and pauses triggers until resumed.
+    EmergencyStop,
     NextMacro,
     PrevMacro,
-    ToggleLoop,
     RunSpecificMacro(String),
     StartRecordingImmediate,
     StopRecording,

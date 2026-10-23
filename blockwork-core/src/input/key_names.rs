@@ -138,3 +138,72 @@ pub fn key_to_string(key: &MacroKey) -> Result<&'static str, &'static str> {
         _ => Err("Unknown key"),
     }
 }
+
+/// Display/storage name for any key, including ones `key_to_string` can't name.
+pub fn key_name(key: &MacroKey) -> String {
+    match key {
+        MacroKey::Other(n) => format!("Other:{n}"),
+        _ => key_to_string(key).unwrap_or("Unknown").to_string(),
+    }
+}
+
+/// Parses one combo part, accepting everything `key_name` produces.
+pub fn parse_key_name(name: &str) -> Option<MacroKey> {
+    if let Some(n) = name.strip_prefix("Other:") {
+        return n.parse().ok().map(MacroKey::Other);
+    }
+    string_to_key(name.trim()).ok()
+}
+
+/// Joins keys into a combo string such as `Control+Alt+O`.
+pub fn format_key_combo(keys: &[MacroKey]) -> String {
+    keys.iter().map(key_name).collect::<Vec<_>>().join("+")
+}
+
+/// Splits a combo string on `+`. A `+` with nothing before it is the key
+/// itself, so `Control++` is Control and the plus key. Unknown parts are dropped.
+pub fn parse_key_combo(text: &str) -> Vec<MacroKey> {
+    let mut parts: Vec<String> = Vec::new();
+    let mut current = String::new();
+    for c in text.chars() {
+        if c == '+' && !current.is_empty() {
+            parts.push(std::mem::take(&mut current));
+        } else {
+            current.push(c);
+        }
+    }
+    if !current.is_empty() {
+        parts.push(current);
+    }
+    parts.iter().filter_map(|p| parse_key_name(p)).collect()
+}
+
+/// Folds left/right and case variants together so a physical key event
+/// compares equal to a key named in a combo.
+pub fn match_key(key: &MacroKey) -> MacroKey {
+    match key {
+        MacroKey::LShift | MacroKey::RShift => MacroKey::Shift,
+        MacroKey::LControl | MacroKey::RControl => MacroKey::Control,
+        MacroKey::AltGr | MacroKey::Option | MacroKey::LMenu => MacroKey::Alt,
+        MacroKey::Unicode(c) => MacroKey::Unicode(c.to_ascii_lowercase()),
+        other => other.clone(),
+    }
+}
+
+#[cfg(test)]
+mod combo_tests {
+    use super::*;
+
+    #[test]
+    fn combo_round_trips() {
+        let keys = parse_key_combo("Control+Alt+o+s");
+        assert_eq!(keys, vec![MacroKey::Control, MacroKey::Alt, MacroKey::Unicode('o'), MacroKey::Unicode('s')]);
+        assert_eq!(format_key_combo(&keys), "Control+Alt+o+s");
+    }
+
+    #[test]
+    fn plus_key_is_literal() {
+        assert_eq!(parse_key_combo("+"), vec![MacroKey::Unicode('+')]);
+        assert_eq!(parse_key_combo("Control++"), vec![MacroKey::Control, MacroKey::Unicode('+')]);
+    }
+}

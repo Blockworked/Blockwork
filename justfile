@@ -1,111 +1,139 @@
 name := "blockwork"
-appid := "dev.ethanstokes.Blockwork"
+appid := "com.blockworked.Blockwork"
 
-# Variables
-TARGET := "target/release/blockwork"
-CEF_DIR := "target/release"
+set shell := ["sh", "-cu"]
+set windows-shell := ["cmd.exe", "/Q", "/C"]
+
+TARGET := if os() == "windows" { 'target\release\blockwork.exe' } else { "target/release/blockwork" }
+DAEMON := if os() == "windows" { 'target\release\blockwork-daemon.exe' } else { "target/release/blockwork-daemon" }
+
 LIBDIR := "/usr/lib/blockwork"
 
-# Default target
+mkdir-cargo := if os() == "windows" { 'if not exist .cargo mkdir .cargo' } else { 'mkdir -p .cargo' }
+rm-cargo-cfg := if os() == "windows" { 'if exist .cargo\config.toml (del /F /Q .cargo\config.toml)' } else { 'rm -f .cargo/config.toml' }
+
 default: build
 
-# Build the project
+# Build everything. The UI starts `blockwork-daemon` from beside itself,
+# so the whole workspace has to be built, not just the default members.
+# blockwork-linux-bridge is Linux-only and ships separately (see packaging).
 build *args:
-    cargo build --release {{args}}
+    cargo build --release --workspace --exclude blockwork-linux-bridge {{args}}
 
-# Run the project
+[unix]
 run: build
-    {{TARGET}}
+    "{{TARGET}}"
 
-# Clean the project
+# Stage the Qt DLLs and QML plugins beside both executables before launching.
+[windows]
+run: build
+    pwsh -NoProfile -File scripts/deploy-qt-windows.ps1 -ReleaseDirectory target/release -Destination dist/windows-local
+    dist\windows-local\blockwork.exe
+
+test:
+    cargo test --workspace --exclude blockwork-linux-bridge
+
+# Run a command (default: the live screen tests) on a headless desktop with
+# a stand-in game window. See docs/mock-desktop.md.
+[linux]
+mock-desktop desktop="x11" *cmd="":
+    scripts/mock-desktop.sh run {{desktop}} {{cmd}}
+
 clean:
     cargo clean
 
-# Point ui/'s blockstitch dependency at a local checkout via a pnpm `link:`
-# dependency, and hide the resulting package.json/pnpm-lock.yaml changes from
-# git (skip-worktree) so this machine-local switch never shows up as a diff or
-# gets committed. `cargo build`/`cargo run` always run `pnpm install` (see
-# src-tauri/build.rs) before compiling, in debug *and* release, so this takes
-# effect immediately with no separate release-mode step.
-#
-# Note: `just flatpak-sources`/`flatpak-build` consume the *committed*
-# ui/pnpm-lock.yaml to build fully offline -- run `just blockstitch-published`
-# first if you're packaging a release while local-link mode is active.
-blockstitch-local path="../../blockstitch":
-    cd ui && npm pkg set dependencies.blockstitch="link:{{path}}" && pnpm install
-    git update-index --skip-worktree ui/package.json ui/pnpm-lock.yaml
+# Refresh blockwork-qt/i18n/*.ts from the QML (this repo's and blockstitch's)
+# and compile them to the .qm files the build embeds. Needs Qt's linguist tools.
+translations blockstitch="../blockstitch":
+    #!/bin/sh
+    set -eu
+    bin=$(qtpaths6 --query QT_HOST_BINS 2>/dev/null || qtpaths --query QT_HOST_BINS 2>/dev/null || echo /usr/lib/qt6/bin)
+    "$bin/lupdate" -silent blockwork-qt/qml "{{blockstitch}}/qml/Blockstitch" -extensions qml -no-obsolete -ts $(ls blockwork-qt/i18n/qml_*.ts | grep -v qml_en.ts)
+    "$bin/lupdate" -silent -pluralonly blockwork-qt/qml "{{blockstitch}}/qml/Blockstitch" -extensions qml -no-obsolete -ts blockwork-qt/i18n/qml_en.ts
+    "$bin/lrelease" -silent blockwork-qt/i18n/qml_*.ts
 
-# Switch back to the published, pinned blockstitch dependency: un-hide
-# package.json/pnpm-lock.yaml from git, restore their committed content, and
-# reinstall from the pinned GitHub commit. Optionally pass a new commit hash
-# (`just blockstitch-published <sha>`) to pin blockstitch to that commit
-# instead of the currently committed one.
+# Work on blockstitch locally: point cargo's QML and core crates at the same
+# checkout, without touching the committed lockfile.
+blockstitch-local path="../blockstitch":
+    {{mkdir-cargo}}
+    {{ if os() == "windows" { 'echo paths = ["' + replace(clean(justfile_directory() / path), "\\", "/") + '", "' + replace(clean(justfile_directory() / path), "\\", "/") + '/crates/blockstitch-core"] > .cargo\config.toml' } else { "printf 'paths = [\"%s\", \"%s/crates/blockstitch-core\"]\\n' \"$(realpath " + path + ")\" \"$(realpath " + path + ")\" > .cargo/config.toml" } }}
+
 blockstitch-published commit="":
-    git update-index --no-skip-worktree ui/package.json ui/pnpm-lock.yaml
-    git checkout -- ui/package.json ui/pnpm-lock.yaml
-    if [ -n "{{commit}}" ]; then cd ui && npm pkg set dependencies.blockstitch="github:EthanRStokes/blockstitch#{{commit}}"; fi
-    cd ui && pnpm install
+    {{rm-cargo-cfg}}
+    {{ if os() == "windows" { 'if not "' + commit + '"=="" (node scripts/set-blockstitch-rev.js ' + commit + ')' } else { 'if [ -n "' + commit + '" ]; then node scripts/set-blockstitch-rev.js ' + commit + '; fi' } }}
+    cargo fetch
 
-# Install the project
-install:
-    # Binary's RUNPATH is `$ORIGIN`, so the CEF runtime payload (libcef.so,
-    # GL/Vulkan shims, *.pak, icudtl.dat, locales/, ...) has to live alongside
-    # it in a private libdir, not /usr/bin.
+[linux]
+install: build
     sudo install -Dm0755 {{TARGET}} {{LIBDIR}}/blockwork
-    sudo install -Dm0755 {{CEF_DIR}}/libcef.so {{LIBDIR}}/libcef.so
-    sudo install -Dm0755 {{CEF_DIR}}/libEGL.so {{LIBDIR}}/libEGL.so
-    sudo install -Dm0755 {{CEF_DIR}}/libGLESv2.so {{LIBDIR}}/libGLESv2.so
-    sudo install -Dm0755 {{CEF_DIR}}/libvk_swiftshader.so {{LIBDIR}}/libvk_swiftshader.so
-    sudo install -Dm0755 {{CEF_DIR}}/libvulkan.so.1 {{LIBDIR}}/libvulkan.so.1
-    sudo install -Dm0755 {{CEF_DIR}}/chrome-sandbox {{LIBDIR}}/chrome-sandbox
-    sudo install -Dm0644 {{CEF_DIR}}/vk_swiftshader_icd.json {{LIBDIR}}/vk_swiftshader_icd.json
-    sudo install -Dm0644 {{CEF_DIR}}/icudtl.dat {{LIBDIR}}/icudtl.dat
-    sudo install -Dm0644 {{CEF_DIR}}/v8_context_snapshot.bin {{LIBDIR}}/v8_context_snapshot.bin
-    sudo install -Dm0644 {{CEF_DIR}}/chrome_100_percent.pak {{LIBDIR}}/chrome_100_percent.pak
-    sudo install -Dm0644 {{CEF_DIR}}/chrome_200_percent.pak {{LIBDIR}}/chrome_200_percent.pak
-    sudo install -Dm0644 {{CEF_DIR}}/resources.pak {{LIBDIR}}/resources.pak
-    sudo rm -rf {{LIBDIR}}/locales
-    sudo cp -r {{CEF_DIR}}/locales {{LIBDIR}}/locales
+    sudo install -Dm0755 {{DAEMON}} {{LIBDIR}}/blockwork-daemon
     sudo ln -sf {{LIBDIR}}/blockwork /usr/bin/blockwork
     sudo install -Dm0644 res/blockwork.desktop /usr/share/applications/blockwork.desktop
     sudo install -Dm0644 res/icons/blockwork.png /usr/share/icons/hicolor/256x256/apps/blockwork.png
 
-# Uninstall the project
+[linux]
 uninstall:
     sudo rm -rf {{LIBDIR}}
     sudo rm -f /usr/bin/blockwork /usr/share/applications/blockwork.desktop /usr/share/icons/hicolor/256x256/apps/blockwork.png
 
+[windows]
+install: msix-install
+
+[windows]
+uninstall:
+    @echo "Windows uninstalls remove the MSIX package under Settings - Apps."
+
+[macos]
+install: macos-install
+
+[macos]
+uninstall:
+    sudo rm -rf "/Applications/Blockwork.app"
+
+# Rebuild and reinstall the editor and daemon.
 replace: build uninstall install
 
-# Regenerate packaging/flatpak/{cargo,node}-sources.json from the current
-# lockfiles (needs org.flatpak.Builder installed: flatpak install flathub
-# org.flatpak.Builder). Re-run whenever Cargo.lock or ui/pnpm-lock.yaml changes.
+# Reinstall over the current install without removing it first.
+[linux]
+replace-fast: build install
+
 flatpak-sources:
     flatpak run --command=flatpak-cargo-generator org.flatpak.Builder -o packaging/flatpak/cargo-sources.json Cargo.lock
-    flatpak run --command=flatpak-node-generator org.flatpak.Builder pnpm ui/pnpm-lock.yaml --pnpm-store-version v11 -o packaging/flatpak/node-sources.json
 
-# Build the Flatpak entirely from source inside the sandbox (Rust + frontend),
-# into ./flatpak-build, exporting to a local ./flatpak-repo (both gitignored).
-# Building in-sandbox -- rather than reusing a host `cargo build` -- keeps the
-# binary linked against the runtime's own glibc instead of the host's, which
-# matters on rolling-release distros with a newer glibc than the runtime ships.
-# If flatpak-builder errors with "Failed to spawn rofiles-fuse", add
-# --disable-rofiles-fuse (needed in some sandboxed/containerized dev environments
-# where FUSE isn't available).
 flatpak-build *args:
-    flatpak-builder --force-clean --user --repo=flatpak-repo flatpak-build packaging/flatpak/{{appid}}.yml {{args}}
+    #!/usr/bin/env bash
+    set -euo pipefail
+    if [[ ! -f ../blockstitch/Cargo.toml ]]; then
+        echo "error: the sibling ../blockstitch QML module is required" >&2
+        exit 1
+    fi
+    flatpak run --command=flatpak-cargo-generator org.flatpak.Builder \
+        -o packaging/flatpak/cargo-sources.json Cargo.lock
+    awk '
+      /# BEGIN app-source/ { print; print "      - type: dir"; print "        path: ../.."; print "        skip: [target, .git, .flatpak-builder, flatpak-build, flatpak-repo, packaging/flatpak]"; skip = 1; next }
+      /# END app-source/ { skip = 0; print; next }
+      /# BEGIN blockstitch-source/ { print; print "      - type: dir"; print "        path: ../../../blockstitch"; print "        dest: .flatpak-blockstitch"; print "        skip: [target, .git, node_modules, dist]"; skip = 1; next }
+      /# END blockstitch-source/ { skip = 0; print; next }
+      !skip
+    ' packaging/flatpak/{{appid}}.yml > packaging/flatpak/{{appid}}.local.yml
+    flatpak-builder --force-clean --user --disable-rofiles-fuse --repo=flatpak-repo flatpak-build packaging/flatpak/{{appid}}.local.yml {{args}}
 
-# Install the just-built Flatpak from the local repo, adding it as a remote
-# first if needed. Re-run after every flatpak-build to pick up changes.
+flatpak-lint:
+    #!/usr/bin/env bash
+    status=0
+    for check in "appstream res/{{appid}}.metainfo.xml" "manifest packaging/flatpak/{{appid}}.yml" "repo flatpak-repo"; do
+        echo "==> flatpak-builder-lint $check"
+        flatpak run --command=flatpak-builder-lint org.flatpak.Builder $check || status=1
+    done
+    exit $status
+
 flatpak-install:
     flatpak remote-add --user --if-not-exists --no-gpg-verify blockwork-local flatpak-repo
     flatpak install --user -y --reinstall blockwork-local {{appid}}
 
-# Build, install, and launch in one go -- the normal "does it still work" loop.
 flatpak-test *args: (flatpak-build args) flatpak-install
     flatpak run {{appid}}
 
-# Build dist/Blockwork.app and install it to /Applications (macOS only).
 macos-install *args:
     @if [ "$(uname)" != "Darwin" ]; then echo "error: macos-install only works on macOS" >&2; exit 1; fi
     ./scripts/build-macos-bundle.sh {{args}}
@@ -114,6 +142,34 @@ macos-install *args:
     sudo xattr -dr com.apple.quarantine "/Applications/Blockwork.app" || true
     @echo "Installed to /Applications/Blockwork.app"
 
-# Remove the local test install (leaves flatpak-repo/flatpak-build in place).
+# Windows only: build the Qt UI, deploy its runtime, and pack an unsigned MSIX.
+msix target="x86_64-pc-windows-msvc" arch="x64":
+    #!pwsh
+    $ErrorActionPreference = "Stop"
+    cargo build --release --target {{target}} --workspace --exclude blockwork-linux-bridge
+    if ($LASTEXITCODE -ne 0) { throw "cargo build failed" }
+    $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
+    ./scripts/build-msix.ps1 -Version $version -Target {{target}} -Arch {{arch}}
+
+# Windows only: build the MSIX, sign it with a test cert and install it. The
+# cert import targets the LocalMachine store, so it needs elevation; this is
+# handled automatically via Windows sudo (11 24H2+) when run un-elevated.
+msix-install: msix
+    #!pwsh
+    $ErrorActionPreference = "Stop"
+    $isAdmin = ([Security.Principal.WindowsPrincipal][Security.Principal.WindowsIdentity]::GetCurrent()).IsInRole([Security.Principal.WindowsBuiltInRole]::Administrator)
+    if (-not $isAdmin) {
+        if (-not (Get-Command sudo.exe -ErrorAction SilentlyContinue)) {
+            throw "sudo.exe not found, so elevation is unavailable; run `just msix-install` from an elevated shell instead"
+        }
+        Write-Host "Elevating via sudo to install the MSIX..."
+        sudo.exe pwsh -NoProfile -ExecutionPolicy Bypass -File $PSCommandPath
+        exit $LASTEXITCODE
+    }
+    ./scripts/sign-msix-test.ps1 -Msix dist/blockwork-windows-x86_64.msix
+    Import-Certificate -FilePath dist/blockwork-msix-test.cer -CertStoreLocation Cert:\LocalMachine\TrustedPeople | Out-Null
+    Get-AppxPackage -Name "Blockworked.Blockwork" | Remove-AppxPackage
+    Add-AppxPackage -Path dist/blockwork-windows-x86_64.msix -ForceUpdateFromAnyVersion
+
 flatpak-uninstall:
     flatpak uninstall --user -y {{appid}}

@@ -1,0 +1,4260 @@
+use crate::macros_thread;
+use crate::state::{
+    AppState, ComboCapture, EditSession, FragmentDto, HotkeyActionDto, InstructionDto, KeyCaptureTarget,
+    ListItemDto, Page, PathStep, RecordingPhase, SharedState, StateDto, UpdateCheckState,
+    ValueLocation, build_state_dto, dto_to_fragment, dto_to_hotkey_action, dto_to_instruction,
+    fragment_to_dto,
+    emit_state_updated,
+};
+use blockstitch_core::editor::{
+    Created, EditCommand, EditContext, EditError, EditOutcome, NumberSpelling, ValueDestination,
+    apply_buffer_effects, drop_strand_buffers, prune_value_buffers, retain_live_buffers,
+};
+use blockwork_core::config;
+use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
+use blockwork_core::input::types::InputToken;
+use blockwork_core::input::value::{Evaluated, Value};
+use blockwork_core::macros::runner::VariableStore;
+use blockstitch_core::graph::{ListItem, ListStore, resolve_list_reporters};
+use blockwork_core::macros::{
+    BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro,
+    SPEED_MULTIPLIER_RANGE, loop_control,
+    normalize_block_color as normalize_persisted_block_color,
+};
+#[cfg(test)]
+use blockwork_core::macros::Strand;
+use blockwork_core::recording;
+use std::collections::HashMap;
+use std::sync::atomic::Ordering;
+use std::sync::{Arc, Mutex};
+use crate::AppHandle;
+use tracing::warn;
+
+const CLEAR_CONFIRM_TIMEOUT_SECS: u64 = 3;
+
+/// Checkpoints the canvas before a structural edit, and ends the current
+/// text-edit group so the next keystroke starts a fresh step.
+pub(crate) fn push_undo(s: &mut AppState) {
+    push_undo_for(s, None);
+}
+
+/// [`push_undo`] for an edit that coalesces with the keystrokes already in
+/// progress at `session` - only the first one checkpoints.
+fn push_undo_for(s: &mut AppState, session: Option<EditSession>) {
+    let snapshot = s.current_macro.as_ref().map(|mac| (mac.graph.clone(), mac.signals.clone(), mac.settings.block_packs.clone()));
+    match (snapshot, session) {
+        (Some(snapshot), Some(session)) => {
+            s.history.push_for_session(snapshot, session);
+        }
+        (Some(snapshot), None) => s.history.push(snapshot),
+        (None, _) => s.history.end_session(),
+    }
+}
+
+/// Blockwork keeps "09" typed into an operator argument as text.
+const EDIT_CONTEXT: EditContext = EditContext {
+    numbers: NumberSpelling::KeepTypedInOperands,
+};
+
+/// Runs one typed edit on the open macro: a rejected or no-op edit costs no
+/// undo step and no save; buffers follow the outcome either way.
+fn run_edit(
+    s: &mut AppState,
+    command: EditCommand<InstructionKind>,
+) -> Result<EditOutcome, EditError> {
+    let mac = s
+        .current_macro
+        .as_ref()
+        .ok_or(EditError::Missing("No macro selected"))?;
+    let prepared = mac.prepare_edit(command, &EDIT_CONTEXT)?;
+    if prepared.changes() {
+        push_undo_for(s, prepared.coalesce().cloned());
+    }
+    let outcome = match &mut s.current_macro {
+        Some(mac) => mac.commit_edit(prepared),
+        None => EditOutcome::default(),
+    };
+    apply_buffer_effects(&mut s.invalid_field_buffers, &outcome.buffers);
+    if outcome.changed {
+        auto_save(s);
+    }
+    Ok(outcome)
+}
+
+/// Max wait for the libei permission prompt; a portal that never replies
+/// would otherwise hang the request forever.
+const LIBEI_REQUEST_TIMEOUT: std::time::Duration = std::time::Duration::from_secs(25);
+
+/// Starts the libei portal session without holding the app-state lock, which
+/// would stall the daemon while the prompt is open.
+///
+/// Runs on `spawn_blocking`: the blocking portal call wedged every other
+/// connection when run on an async worker. The emulator stays locked until
+/// it returns, so the timeout only bounds this request, not playback.
+pub(crate) async fn request_absolute_mouse_support(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let emulator = state
+        .lock()
+        .map_err(|e| e.to_string())?
+        .emulator
+        .clone()
+        .ok_or_else(|| "The input backend is unavailable.".to_string())?;
+    let task = tokio::task::spawn_blocking(move || {
+        let mut emulator = emulator.lock().map_err(|e| e.to_string())?;
+        emulator.ensure_absolute_mouse_support()
+    });
+    let result = match tokio::time::timeout(LIBEI_REQUEST_TIMEOUT, task).await {
+        Ok(joined) => joined.map_err(|e| e.to_string())?,
+        Err(_) => Err("timed out waiting for the permission dialog".to_string()),
+    };
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.absolute_mouse_position_available = result.is_ok()
+        && blockwork_core::macros::backend::absolute_mouse_position_available();
+    emit_state_updated(app, &s);
+    result
+}
+
+fn refresh_macro_list(s: &mut crate::state::AppState) {
+    let macros = config::get_macros_from_config();
+    s.macro_strs = macros.iter().map(|m| m.name.clone()).collect();
+    // Keep current_macro in sync if it was modified
+    if let Some(ref cur) = s.current_macro.clone() {
+        if let Some(updated) = macros.iter().find(|m| m.id == cur.id) {
+            s.current_macro = Some(updated.clone());
+        }
+    }
+    // Update macro_selected index (name may have changed)
+    if let Some(ref cur) = s.current_macro {
+        s.macro_selected = macros.iter().position(|m| m.id == cur.id);
+    }
+    s.macros_list = macros;
+}
+
+/// Resyncs the live variable store to `current_macro`'s declared variables -
+/// called after `current_macro` is (re)assigned, so stale entries don't linger.
+pub(crate) fn sync_variable_values(s: &mut crate::state::AppState) {
+    let values = match &s.current_macro {
+        Some(mac) => mac
+            .variables
+            .iter()
+            .map(|v| (v.name.clone(), v.value.clone()))
+            .collect(),
+        None => HashMap::new(),
+    };
+    if let Ok(mut store) = s.variable_values.lock() {
+        *store = values;
+    }
+}
+
+pub(crate) fn sync_list_values(s: &mut crate::state::AppState) {
+    let values = match &s.current_macro {
+        Some(mac) => mac
+            .lists
+            .iter()
+            .map(|list| (list.name.clone(), list.items.clone()))
+            .collect(),
+        None => HashMap::new(),
+    };
+    if let Ok(mut store) = s.list_values.lock() {
+        *store = values;
+    }
+}
+
+pub(crate) fn auto_save(s: &mut crate::state::AppState) {
+    if let Some(mac) = &mut s.current_macro {
+        mac.collect_named_signals();
+        if let Err(e) = mac.save() {
+            warn!("Failed to auto-save macro: {e}");
+        } else {
+            config::set_selected_macro_id(Some(&mac.id));
+        }
+    }
+    sync_open_macro_into_list(s);
+}
+
+/// Copies the open macro over its `macros_list` entry. Watchers and fired
+/// runs read that list, so a stale entry runs (and saves back) old blocks.
+pub(crate) fn sync_open_macro_into_list(s: &mut crate::state::AppState) {
+    let Some(mac) = &s.current_macro else { return };
+    if let Some(entry) = s.macros_list.iter_mut().find(|m| m.id == mac.id) {
+        *entry = mac.clone();
+    }
+}
+
+// ─── Read ──────────────────────────────────────────────────────────────────
+
+pub(crate) fn get_state(state: &SharedState) -> Result<StateDto, String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    Ok(build_state_dto(&s))
+}
+
+// ─── Macro library ─────────────────────────────────────────────────────────
+
+pub(crate) fn select_macro(
+    state: &SharedState,
+    app: &AppHandle,
+    index: usize,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = s.macros_list.get(index).cloned() {
+        s.macro_selected = Some(index);
+        s.current_macro = Some(mac.clone());
+        config::set_selected_macro_id(Some(&mac.id));
+    } else {
+        s.macro_selected = None;
+        s.current_macro = None;
+        config::set_selected_macro_id(None);
+    }
+    s.history.clear();
+    s.invalid_field_buffers.clear();
+    sync_variable_values(&mut s);
+    sync_list_values(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn new_macro(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    add_and_select(state, app, Macro::new("New Macro".into(), "".into(), vec![]))
+}
+
+/// Adds a starter macro from `templates` and opens it.
+pub(crate) fn new_macro_from_template(state: &SharedState, app: &AppHandle, template: &str) -> Result<(), String> {
+    add_and_select(state, app, crate::templates::build(template)?)
+}
+
+fn add_and_select(state: &SharedState, app: &AppHandle, new_macro: Macro) -> Result<(), String> {
+    let new_id = new_macro.id.clone();
+    if let Err(e) = new_macro.add() {
+        return Err(format!("Failed to create macro: {e}"));
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    refresh_macro_list(&mut s);
+    // Select the newly created macro
+    if let Some((idx, mac)) = s
+        .macros_list
+        .iter()
+        .enumerate()
+        .find(|(_, m)| m.id == new_id)
+        .map(|(i, m)| (i, m.clone()))
+    {
+        s.macro_selected = Some(idx);
+        s.current_macro = Some(mac);
+        config::set_selected_macro_id(Some(&new_id));
+    }
+    s.invalid_field_buffers.clear();
+    sync_variable_values(&mut s);
+    sync_list_values(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Opens the macro with id `id`.
+pub(crate) fn select_macro_by_id(state: &SharedState, app: &AppHandle, id: &str) -> Result<(), String> {
+    let index = {
+        let s = state.lock().map_err(|e| e.to_string())?;
+        s.macros_list.iter().position(|m| m.id == id).ok_or("Macro not found")?
+    };
+    select_macro(state, app, index)
+}
+
+/// The freshest copy of macro `id`: the open one holds unsaved edits.
+fn find_macro(s: &crate::state::AppState, id: &str) -> Result<Macro, String> {
+    s.current_macro
+        .as_ref()
+        .filter(|m| m.id == id)
+        .or_else(|| s.macros_list.iter().find(|m| m.id == id))
+        .cloned()
+        .ok_or_else(|| "Macro not found".to_string())
+}
+
+/// Saves a copy of macro `id` next to it and opens the copy.
+pub(crate) fn duplicate_macro(state: &SharedState, app: &AppHandle, id: &str) -> Result<(), String> {
+    let mut copy = {
+        let s = state.lock().map_err(|e| e.to_string())?;
+        find_macro(&s, id)?
+    };
+    copy.id = uuid::Uuid::new_v4().simple().to_string();
+    copy.name = format!("{} copy", copy.name);
+    blockwork_core::permissions::copy(id, &copy.id);
+    add_and_select(state, app, copy)
+}
+
+/// Moves macro `id` into `folder` (empty for the top level).
+pub(crate) fn set_macro_folder(state: &SharedState, app: &AppHandle, id: &str, folder: &str) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mut mac = find_macro(&s, id)?;
+    mac.settings.folder = folder.trim().trim_matches('/').trim().to_string();
+    mac.save()?;
+    if let Some(open) = s.current_macro.as_mut().filter(|m| m.id == id) {
+        open.settings.folder = mac.settings.folder.clone();
+    }
+    refresh_macro_list(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Deletes macro `id`, closing it if it's open. The UI confirms first.
+pub(crate) fn delete_macro(state: &SharedState, app: &AppHandle, id: &str) -> Result<(), String> {
+    let is_open = state.lock().map_err(|e| e.to_string())?.current_macro.as_ref().is_some_and(|m| m.id == id);
+    if is_open {
+        return remove_macro(state, app);
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mac = find_macro(&s, id)?;
+    blockwork_core::macros::debug::clear_breakpoints(id);
+    mac.remove()?;
+    refresh_macro_list(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Deletes the current macro. The frontend confirms with the user via a
+/// confirmation dialog before ever calling this, so it deletes
+/// unconditionally.
+pub(crate) fn remove_macro(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = s.current_macro.take() {
+        if let Err(e) = mac.remove() {
+            warn!("Failed to remove macro: {e}");
+        }
+    }
+    s.macro_selected = None;
+    s.invalid_field_buffers.clear();
+    refresh_macro_list(&mut s);
+    config::set_selected_macro_id(None);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_title(
+    state: &SharedState,
+    app: &AppHandle,
+    title: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        mac.name = title;
+        auto_save(&mut s);
+        // Rebuild list so dropdown reflects the new name
+        let macros = config::get_macros_from_config();
+        s.macro_strs = macros.iter().map(|m| m.name.clone()).collect();
+        s.macros_list = macros;
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_macro_speed_multiplier(
+    state: &SharedState,
+    app: &AppHandle,
+    multiplier: f64,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        mac.speed_multiplier = multiplier.clamp(
+            *SPEED_MULTIPLIER_RANGE.start(),
+            *SPEED_MULTIPLIER_RANGE.end(),
+        );
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Sets the current macro's "always listen for events even when a different
+/// macro is selected" setting - see `MacroSettings::always_listen`. Edited
+/// from the "Macro Settings" popup next to the macro dropdown.
+pub(crate) fn set_macro_always_listen(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        mac.settings.always_listen = enabled;
+        auto_save(&mut s);
+        refresh_macro_list(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Sets whether the open macro runs schedules it missed - see
+/// `MacroSettings::catch_up_missed`.
+pub(crate) fn set_macro_catch_up(state: &SharedState, app: &AppHandle, enabled: bool) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        mac.settings.catch_up_missed = enabled;
+        auto_save(&mut s);
+        refresh_macro_list(&mut s);
+    }
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Makes the open macro ask before risky abilities, or trusts it fully.
+pub(crate) fn set_macro_restricted(state: &SharedState, app: &AppHandle, restricted: bool) -> Result<(), String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    let id = s.current_macro.as_ref().map(|m| m.id.clone()).ok_or("No macro selected")?;
+    if restricted {
+        if blockwork_core::permissions::grants(&id).is_none() {
+            blockwork_core::permissions::restrict(&id, Vec::new());
+        }
+    } else {
+        blockwork_core::permissions::trust(&id);
+    }
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Lets the open, restricted macro use `kind` without asking, or not.
+pub(crate) fn set_macro_permission(state: &SharedState, app: &AppHandle, kind: &str, allowed: bool) -> Result<(), String> {
+    if !blockwork_core::permissions::GUARDED.iter().any(|(k, _)| *k == kind) {
+        return Err(format!("unknown permission {kind}"));
+    }
+    let s = state.lock().map_err(|e| e.to_string())?;
+    let id = s.current_macro.as_ref().map(|m| m.id.clone()).ok_or("No macro selected")?;
+    blockwork_core::permissions::set_allowed(&id, kind, allowed);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Sets when triggers and hotkeys may start the selected macro. Empty
+/// times mean all day; one empty time is an error.
+pub(crate) fn set_macro_conditions(
+    state: &SharedState,
+    app: &AppHandle,
+    only_in_window: String,
+    power: blockwork_core::macros::conditions::PowerCondition,
+    active_from: &str,
+    active_until: &str,
+    active_days: u8,
+) -> Result<(), String> {
+    use blockwork_core::macros::conditions::parse_clock;
+    let active_hours = match (active_from.trim(), active_until.trim()) {
+        ("", "") => None,
+        ("", _) | (_, "") => return Err("set both a start and an end time, or neither".into()),
+        (from, until) => Some((parse_clock(from)?, parse_clock(until)?)),
+    };
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        mac.settings.only_in_window = only_in_window.trim().to_string();
+        mac.settings.power = power;
+        mac.settings.active_hours = active_hours;
+        mac.settings.active_days = active_days & 0x7f;
+        auto_save(&mut s);
+        refresh_macro_list(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Sets how long a run of the selected macro may last; 0 means no limit.
+pub(crate) fn set_macro_max_run_secs(
+    state: &SharedState,
+    app: &AppHandle,
+    seconds: u32,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        mac.settings.max_run_secs = seconds;
+        auto_save(&mut s);
+        refresh_macro_list(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Creates an empty global for every macro's name picker.
+pub(crate) fn create_global(state: &SharedState, app: &AppHandle, name: &str) -> Result<(), String> {
+    blockwork_core::globals::create(name)?;
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn delete_global(state: &SharedState, app: &AppHandle, name: &str) -> Result<(), String> {
+    blockwork_core::globals::remove(name);
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Sets how many iterations any one loop of the selected macro may run; 0
+/// means no limit.
+pub(crate) fn set_macro_max_loop_iterations(
+    state: &SharedState,
+    app: &AppHandle,
+    iterations: u32,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        mac.settings.max_loop_iterations = iterations;
+        auto_save(&mut s);
+        refresh_macro_list(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Kill switch: stops every run, including trigger-fired ones, and pauses
+/// the trigger watchers until `resume_triggers`.
+pub(crate) fn emergency_stop(state: &SharedState, app: &AppHandle) {
+    let cleared = blockwork_core::macros::run_registry::stop_all();
+    tracing::info!(cleared, "Emergency stop");
+    blockwork_core::run_log::error(
+        &blockwork_core::run_log::Source::app("Blockwork"),
+        format!("Emergency stop: stopped {cleared} run(s) and paused triggers"),
+    );
+    if let Ok(mut s) = state.lock() {
+        s.triggers_paused = true;
+        if let Ok(mut lk) = s.is_looping.lock() {
+            *lk = false;
+        }
+        emit_state_updated(app, &s);
+    }
+}
+
+/// Re-arms the trigger watchers after an emergency stop.
+pub(crate) fn resume_triggers(state: &SharedState, app: &AppHandle) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.triggers_paused = false;
+    blockwork_core::run_log::info(&blockwork_core::run_log::Source::app("Blockwork"), "Triggers resumed");
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn clear_run_log(state: &SharedState, app: &AppHandle) -> Result<(), String> {
+    blockwork_core::run_log::clear();
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Declares a new macro-wide variable, starting at `0`. No `push_undo` -
+/// a naming/creation action, not an undoable structural edit.
+pub(crate) fn create_variable(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
+    let trimmed = mac.create_variable(&name)?;
+    if let Ok(mut store) = s.variable_values.lock() {
+        store.insert(trimmed, Evaluated::Number(0.0));
+    }
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Renames a declared variable and every reference to it.
+pub(crate) fn rename_variable(
+    state: &SharedState,
+    app: &AppHandle,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    // Rename on a copy first, so a rejected or no-op rename doesn't add a
+    // useless undo entry.
+    let mut graph = s
+        .current_macro
+        .as_ref()
+        .map(|mac| mac.graph.clone())
+        .ok_or("No macro selected")?;
+    let trimmed = graph.rename_variable(&old_name, &new_name)?;
+    if trimmed == old_name {
+        return Ok(());
+    }
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.graph = graph;
+    }
+    if let Ok(mut store) = s.variable_values.lock() {
+        if let Some(v) = store.remove(&old_name) {
+            store.insert(trimmed, v);
+        }
+    }
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Deletes a declared variable. No `push_undo` - same precedent as
+/// `create_variable`.
+pub(crate) fn delete_variable(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
+    mac.remove_variable(&name);
+    if let Ok(mut store) = s.variable_values.lock() {
+        store.remove(&name);
+    }
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn create_signal(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let name = s
+        .current_macro
+        .as_ref()
+        .ok_or("No macro selected")?
+        .validate_signal_name(&name, None)?;
+    push_undo(&mut s);
+    s.current_macro.as_mut().unwrap().signals.push(name);
+    auto_save(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn rename_signal(
+    state: &SharedState,
+    app: &AppHandle,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+    let name = mac.validate_signal_name(&new_name, Some(&old_name))?;
+    if !mac.signals.contains(&old_name) {
+        return Err("Signal not found".into());
+    }
+    if name == old_name {
+        return Ok(());
+    }
+    push_undo(&mut s);
+    s.current_macro
+        .as_mut()
+        .unwrap()
+        .rename_signal(&old_name, &name)?;
+    auto_save(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn delete_signal(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+    if !mac.signals.contains(&name) {
+        return Err("Signal not found".into());
+    }
+    let mut used = false;
+    mac.graph.walk_instructions(&mut |ins| {
+        if let InstructionKind::WhenSignal(target)
+        | InstructionKind::SendSignal { name: target, .. } = &ins.kind
+            && !target.expression
+            && let Value::Text { value } = &target.value
+        {
+            used |= value.trim().eq_ignore_ascii_case(&name);
+        }
+    });
+    if used {
+        return Err("This signal is still used by a named signal block. Change or remove those blocks first.".into());
+    }
+    push_undo(&mut s);
+    s.current_macro
+        .as_mut()
+        .unwrap()
+        .signals
+        .retain(|s| s != &name);
+    auto_save(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+fn create_list_in(mac: &mut Macro, name: &str) -> Result<String, String> {
+    let trimmed = mac.graph.create_list(name)?;
+    if let Some(list) = mac.graph.lists.iter_mut().find(|list| list.name == trimmed) {
+        list.editor_x = 36;
+        list.editor_y = 36;
+    }
+    Ok(trimmed)
+}
+
+pub(crate) fn create_list(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    // Validate before checkpointing so a rejected name never creates a dead
+    // undo entry.
+    {
+        let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Err("List name can't be empty".to_string());
+        }
+        if mac.lists.iter().any(|list| list.name == trimmed) {
+            return Err(format!("A list named \"{trimmed}\" already exists"));
+        }
+    }
+    push_undo(&mut s);
+    create_list_in(s.current_macro.as_mut().ok_or("No macro selected")?, &name)?;
+    sync_list_values(&mut s);
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn rename_list(
+    state: &SharedState,
+    app: &AppHandle,
+    old_name: String,
+    new_name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let trimmed = new_name.trim().to_string();
+    {
+        let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+        if trimmed.is_empty() {
+            return Err("List name can't be empty".to_string());
+        }
+        if trimmed != old_name && mac.lists.iter().any(|list| list.name == trimmed) {
+            return Err(format!("A list named \"{trimmed}\" already exists"));
+        }
+        if !mac.lists.iter().any(|list| list.name == old_name) {
+            return Err("List not found".to_string());
+        }
+    }
+    if trimmed == old_name {
+        return Ok(());
+    }
+
+    push_undo(&mut s);
+    s.current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .graph
+        .rename_list(&old_name, &trimmed)?;
+    sync_list_values(&mut s);
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn delete_list(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let exists = s
+        .current_macro
+        .as_ref()
+        .ok_or("No macro selected")?
+        .lists
+        .iter()
+        .any(|list| list.name == name);
+    if exists {
+        push_undo(&mut s);
+        s.current_macro
+            .as_mut()
+            .expect("checked above")
+            .graph
+            .remove_list(&name);
+    }
+    sync_list_values(&mut s);
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Replaces a list's visible-editor contents. `ListItemDto` intentionally has
+/// no boolean/expression case, which enforces the literal-only list contract.
+pub(crate) fn set_list_items(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+    items: Vec<ListItemDto>,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let items: Vec<ListItem> = items.iter().map(crate::state::dto_to_list_item).collect();
+    s.current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .graph
+        .set_list_items(&name, items)?;
+    sync_list_values(&mut s);
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Saves whether a list's editable canvas monitor is open and where it sits.
+/// This is a presentation preference rather than an undoable macro edit.
+pub(crate) fn set_list_editor_state(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+    visible: bool,
+    x: i32,
+    y: i32,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .graph
+        .set_list_editor_state(&name, visible, x, y)?;
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+// ─── Custom blocks ("My Blocks") ────────────────────────────────────────────
+
+/// Colors are stored as six-digit CSS hex values. Restricting the persisted
+/// value keeps imported/user-created macros from injecting arbitrary CSS when
+/// the frontend uses it as a custom property on a block row.
+fn normalize_block_color(color: &str) -> Result<String, String> {
+    normalize_persisted_block_color(color).ok_or_else(|| "Choose a valid block color".to_string())
+}
+
+/// Defines a new custom block, creating its (initially empty) header strand
+/// next to the macro's other strands. Pushes undo, since it has real canvas
+/// footprint.
+pub(crate) fn create_block(
+    state: &SharedState,
+    app: &AppHandle,
+    pieces: Vec<BlockPiece>,
+    shape: BlockShape,
+    color: String,
+    icon: String,
+    identifier: String,
+    description: String,
+) -> Result<String, String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    BlockDef::validate_pieces(&pieces)?;
+    let color = normalize_block_color(&color)?;
+    push_undo(&mut s);
+    let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
+    let (x, y) = mac.next_editor_position();
+    let id = mac.create_block(pieces, shape, color, x, y);
+    mac.set_block_details(&id, &identifier, &description, &icon)?;
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(id)
+}
+
+/// Updates a block's prototype/return-type, reconciling every call site's
+/// `args` to the new input list and renaming body params that kept their
+/// identity but changed name. Pushes undo.
+pub(crate) fn edit_block(
+    state: &SharedState,
+    app: &AppHandle,
+    block_id: String,
+    pieces: Vec<BlockPiece>,
+    shape: BlockShape,
+    color: String,
+    icon: String,
+    identifier: String,
+    description: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    blockwork_core::block_packs::check_editable(
+        s.current_macro.as_ref().ok_or("No macro selected")?, &block_id,
+    )?;
+    // `update_block` re-checks both; doing it first keeps a rejected edit
+    // from leaving a useless undo step.
+    BlockDef::validate_pieces(&pieces)?;
+    normalize_block_color(&color)?;
+    push_undo(&mut s);
+    let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
+    if let Some(def) = mac.block_defs.iter().find(|b| b.id == block_id) {
+        let old_pieces = def.pieces.clone();
+        let renames: Vec<(String, String)> = pieces
+            .iter()
+            .filter_map(|new_piece| {
+                let BlockPiece::Branch { id, name: new_name } = new_piece else {
+                    return None;
+                };
+                let old_name = old_pieces.iter().find_map(|p| match p {
+                    BlockPiece::Branch { id: old_id, name } if old_id == id => Some(name),
+                    _ => None,
+                })?;
+                (old_name != new_name).then(|| (old_name.clone(), new_name.clone()))
+            })
+            .collect();
+        for (old_name, new_name) in &renames {
+            mac.rename_block_branch_body(&block_id, old_name, new_name);
+        }
+    }
+    s.current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .update_block(&block_id, pieces, shape, &color)?;
+    s.current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .set_block_details(&block_id, &identifier, &description, &icon)?;
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Deletes a custom block entirely (see `Macro::remove_block`). Pushes
+/// undo, same reasoning as `create_block`.
+pub(crate) fn delete_block(
+    state: &SharedState,
+    app: &AppHandle,
+    block_id: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    blockwork_core::block_packs::check_editable(
+        s.current_macro.as_ref().ok_or("No macro selected")?, &block_id,
+    )?;
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.remove_block(&block_id);
+        let surviving: Vec<String> = mac.strands.iter().map(|st| st.id.clone()).collect();
+        retain_live_buffers(&mut s.invalid_field_buffers, &surviving);
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn save_macro(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &s.current_macro {
+        if let Err(e) = mac.save() {
+            return Err(format!("Failed to save macro: {e}"));
+        }
+    }
+    refresh_macro_list(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Strips characters illegal in filenames on common platforms, so a macro's
+/// freeform name can double as a sane default export filename.
+fn sanitize_filename(name: &str) -> String {
+    let cleaned: String = name
+        .chars()
+        .map(|c| {
+            if matches!(c, '/' | '\\' | ':' | '*' | '?' | '"' | '<' | '>' | '|') {
+                '_'
+            } else {
+                c
+            }
+        })
+        .collect();
+    let trimmed = cleaned.trim();
+    if trimmed.is_empty() {
+        "macro".to_string()
+    } else {
+        trimmed.to_string()
+    }
+}
+
+/// Default file name offered by the UI's save dialog when exporting a macro.
+pub(crate) fn export_macro_file_name(macro_id: String) -> Result<String, String> {
+    let mac = config::get_macros_from_config()
+        .into_iter()
+        .find(|m| m.id == macro_id)
+        .ok_or("Macro not found")?;
+    Ok(format!("{}.macro", sanitize_filename(&mac.name)))
+}
+
+/// Exports a single macro to a `.macro` file the user picked in the UI (same
+/// JSON shape as the app's own on-disk storage, just under a different
+/// extension so it reads as a portable macro file rather than an app-internal
+/// one).
+pub(crate) fn export_macro(macro_id: String, path: String) -> Result<(), String> {
+    let macros = config::get_macros_from_config();
+    let mac = macros
+        .into_iter()
+        .find(|m| m.id == macro_id)
+        .ok_or("Macro not found")?;
+    config::write_macro_file(std::path::Path::new(&path), &mac)
+}
+
+/// What an imported macro can do, shown before it's added: (kind, label,
+/// whether it deserves a warning). Listed in display order.
+const CAPABILITIES: [(&str, &str, bool); 12] = [
+    ("commands", "Runs commands and opens or closes apps", true),
+    ("secrets", "Reads your saved secrets", true),
+    ("network", "Goes online", true),
+    ("files_write", "Writes to files", true),
+    ("files_read", "Reads files and folders", false),
+    ("input", "Presses keys, clicks and moves the mouse", false),
+    ("clipboard", "Reads or changes the clipboard", false),
+    ("windows", "Reads or controls other apps and windows", false),
+    ("triggers", "Starts on its own (schedules, keys, typing, apps, idle, windows, files and more)", false),
+    ("screen", "Reads the screen (colors, images and text)", false),
+    ("macros", "Runs or stops your other macros", false),
+    ("globals", "Reads or changes global variables", false),
+];
+
+/// The capability a reporter needs, by operator name.
+fn operator_capability(op: &str) -> Option<&'static str> {
+    Some(match op {
+        "ShellOutput" | "ShellSucceeded" => "commands",
+        "HttpGet" => "network",
+        "ReadFile" | "FileExists" | "ListDirectory" => "files_read",
+        "ClipboardText" | "ClipboardHasImage" | "ClipboardHasFiles" => "clipboard",
+        "ActiveWindowTitle" | "ActiveWindowApp" | "WindowExists" | "WindowInfo" | "AppRunning" => "windows",
+        "MacroRunning" => "macros",
+        "PixelColor" | "AverageColor" | "ScreenText" => "screen",
+        "GlobalVariable" => "globals",
+        "Secret" => "secrets",
+        _ => return None,
+    })
+}
+
+fn value_capabilities(value: &Value, found: &mut std::collections::HashSet<&'static str>) {
+    match value {
+        Value::Op { op, args, .. } => {
+            found.extend(operator_capability(op.name()));
+            args.iter().for_each(|a| value_capabilities(a, found));
+        }
+        Value::Call { args, .. } => args.iter().for_each(|a| value_capabilities(a, found)),
+        _ => {}
+    }
+}
+
+/// Everything `mac` can do anywhere, nested blocks included, for the import
+/// review. `OpenApp`'s command can be any shell string in a hand-edited
+/// file, so it counts as running commands.
+pub(crate) fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
+    use blockwork_core::macros::BlockKind;
+    let mut found = std::collections::HashSet::new();
+    mac.graph.walk_instructions(&mut |ins| {
+        let kind = match &ins.kind {
+            InstructionKind::Command(_)
+            | InstructionKind::CommandWait(_)
+            | InstructionKind::OpenApp { .. }
+            | InstructionKind::CloseApp { .. } => Some("commands"),
+            InstructionKind::HttpRequest { .. } => Some("network"),
+            InstructionKind::WriteFile { .. } => Some("files_write"),
+            InstructionKind::Token(_) => Some("input"),
+            InstructionKind::SetClipboard(_) | InstructionKind::WhenClipboardChanged => Some("clipboard"),
+            InstructionKind::WindowAction { .. }
+            | InstructionKind::MoveWindow { .. }
+            | InstructionKind::WhenWindow { .. }
+            | InstructionKind::WhenApp { .. } => Some("windows"),
+            InstructionKind::WhenTyped { .. } => Some("input"),
+            InstructionKind::WhenFileChanged(_) => Some("files_read"),
+            InstructionKind::RunMacro { .. } | InstructionKind::StopMacroNamed(_) => Some("macros"),
+            InstructionKind::FindImage { .. } | InstructionKind::WaitForImage { .. } => Some("screen"),
+            InstructionKind::DetectObjectsInWindow { .. } | InstructionKind::WaitForDetection { .. } => Some("screen"),
+            InstructionKind::ClickImage { .. } | InstructionKind::AimStep { .. } | InstructionKind::AimAtDetection { .. } => Some("input"),
+            InstructionKind::SetGlobal { .. } | InstructionKind::ChangeGlobal { .. } => Some("globals"),
+            _ => None,
+        };
+        found.extend(kind);
+        if matches!(ins.kind, InstructionKind::ClickImage { .. } | InstructionKind::AimAtDetection { .. }) {
+            found.insert("screen");
+        }
+        if matches!(ins.kind, InstructionKind::PasteText(_)) {
+            found.extend(["input", "clipboard"]);
+        }
+        if ins.kind.is_header() && !matches!(ins.kind, InstructionKind::WhenRan | InstructionKind::BlockHeader(_)) {
+            found.insert("triggers");
+        }
+        let mut kind = ins.kind.clone();
+        kind.visit_values_mut(&mut |value, _| value_capabilities(value, &mut found));
+    });
+    CAPABILITIES
+        .iter()
+        .filter(|(kind, ..)| found.contains(kind))
+        .map(|(kind, label, risky)| crate::state::CapabilityDto {
+            kind: kind.to_string(),
+            label: label.to_string(),
+            risky: *risky,
+            guarded: blockwork_core::permissions::GUARDED.iter().any(|(k, _)| k == kind),
+        })
+        .collect()
+}
+
+/// One (key, label, getter, setter) entry per `MacroSettings` field - the
+/// single place a new setting needs registering to participate in the
+/// "review custom settings on import" flow below. `key` is the wire
+/// identifier the frontend's toggle list and `confirm_import_macro`'s
+/// `keep_settings` map address it by; `label` is the human-readable text.
+type SettingAccessor = (
+    &'static str,
+    &'static str,
+    fn(&blockwork_core::macros::MacroSettings) -> bool,
+    fn(&mut blockwork_core::macros::MacroSettings, bool),
+);
+
+const SETTING_ACCESSORS: &[SettingAccessor] = &[
+    (
+        "always_listen",
+        "Always listen for events, even when a different macro is selected",
+        |s| s.always_listen,
+        |s, v| s.always_listen = v,
+    ),
+    (
+        "catch_up_missed",
+        "Run schedules it missed while Blockwork was closed or the computer slept",
+        |s| s.catch_up_missed,
+        |s, v| s.catch_up_missed = v,
+    ),
+];
+
+/// Every `MacroSettings` field on `settings` that differs from its default -
+/// shown to the user by `import_macro` for confirmation, since non-default
+/// behavior deserves a second look before it's silently applied.
+fn non_default_macro_settings(
+    settings: &blockwork_core::macros::MacroSettings,
+) -> Vec<crate::state::CustomMacroSettingDto> {
+    let default = blockwork_core::macros::MacroSettings::default();
+    SETTING_ACCESSORS
+        .iter()
+        .filter_map(|(key, label, get, _)| {
+            let value = get(settings);
+            (value != get(&default)).then(|| crate::state::CustomMacroSettingDto {
+                key: key.to_string(),
+                label: label.to_string(),
+                enabled: value,
+            })
+        })
+        .collect()
+}
+
+/// Resets every setting the user unchecked in the import review popup (i.e.
+/// present in `keep` as `false`) back to its default; anything not mentioned
+/// in `keep` is left as imported.
+fn apply_setting_overrides(
+    settings: &mut blockwork_core::macros::MacroSettings,
+    keep: &HashMap<String, bool>,
+) {
+    let default = blockwork_core::macros::MacroSettings::default();
+    for (key, _, get, set) in SETTING_ACCESSORS {
+        if !keep.get(*key).copied().unwrap_or(true) {
+            set(settings, get(&default));
+        }
+    }
+}
+
+/// Saves imported macros under fresh ids (so importing never overwrites
+/// anything), restricted to the abilities in `allow`, and opens the first.
+fn commit_imported_macros(
+    macros: Vec<Macro>,
+    allow: &[String],
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut first = None;
+    for mut mac in macros {
+        mac.id = uuid::Uuid::new_v4().simple().to_string();
+        blockwork_core::permissions::restrict(&mac.id, allow.to_vec());
+        first.get_or_insert_with(|| mac.id.clone());
+        mac.add()?;
+    }
+
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    refresh_macro_list(&mut s);
+    if let Some((idx, found)) = s
+        .macros_list
+        .iter()
+        .enumerate()
+        .find(|(_, m)| Some(&m.id) == first.as_ref())
+        .map(|(i, m)| (i, m.clone()))
+    {
+        config::set_selected_macro_id(Some(&found.id));
+        s.macro_selected = Some(idx);
+        s.current_macro = Some(found);
+    }
+    s.invalid_field_buffers.clear();
+    sync_variable_values(&mut s);
+    sync_list_values(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Reads the macro or `.blockwork` bundle the user picked and stages it in
+/// `pending_import` with a review of what it can do (see
+/// `macro_capabilities`), any non-default settings and upgrade notes. The
+/// review shows through `StateDto::import_review`; the frontend resolves it
+/// via `confirm_import_macro`/`cancel_import_macro`.
+pub(crate) fn import_macro(
+    state: &SharedState,
+    app: &AppHandle,
+    path: String,
+) -> Result<(), String> {
+    let file = config::persistence::read_import_file(std::path::Path::new(&path))?;
+    let mut capabilities: Vec<crate::state::CapabilityDto> = Vec::new();
+    let mut custom_settings: Vec<crate::state::CustomMacroSettingDto> = Vec::new();
+    for mac in &file.macros {
+        for cap in macro_capabilities(mac) {
+            if !capabilities.iter().any(|c| c.kind == cap.kind) {
+                capabilities.push(cap);
+            }
+        }
+        for setting in non_default_macro_settings(&mac.settings) {
+            if !custom_settings.iter().any(|c| c.key == setting.key) {
+                custom_settings.push(setting);
+            }
+        }
+    }
+    capabilities.sort_by_key(|c| CAPABILITIES.iter().position(|(kind, ..)| *kind == c.kind));
+    let review = crate::state::ImportReviewDto {
+        name: file.name,
+        macros: file.macros.iter().map(|m| m.name.clone()).collect(),
+        notes: file.notes,
+        capabilities,
+        custom_settings,
+    };
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.pending_import = Some((file.macros, review));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Finishes an import staged by `import_macro` after the user resolves its
+/// review. `keep_settings` maps each `ImportReviewDto::custom_settings`
+/// entry's `key` to whether the user kept its imported value (`true`) or
+/// reset it to default (`false`); a key the popup never showed is absent,
+/// which `apply_setting_overrides` treats as "keep". `allow` lists the
+/// guarded abilities the user ticked; the rest ask when first used.
+pub(crate) async fn confirm_import_macro(
+    state: &SharedState,
+    app: &AppHandle,
+    keep_settings: HashMap<String, bool>,
+    allow: Vec<String>,
+) -> Result<(), String> {
+    let pending = {
+        state
+            .lock()
+            .map_err(|e| e.to_string())?
+            .pending_import
+            .take()
+    };
+    let Some((mut macros, _)) = pending else {
+        return Ok(());
+    };
+    for mac in &mut macros {
+        apply_setting_overrides(&mut mac.settings, &keep_settings);
+    }
+    let allow: Vec<String> = allow
+        .into_iter()
+        .filter(|kind| blockwork_core::permissions::GUARDED.iter().any(|(k, _)| k == kind))
+        .collect();
+    commit_imported_macros(macros, &allow, state, app)
+}
+
+/// Exports macros as one `.blockwork` bundle, adding any macros they run
+/// by name so it works on its own. Returns how many it wrote.
+pub(crate) fn export_bundle(macro_ids: Vec<String>, name: String, path: String) -> Result<usize, String> {
+    let all = config::get_macros_from_config();
+    let mut picked: Vec<Macro> = macro_ids.iter().filter_map(|id| all.iter().find(|m| &m.id == id).cloned()).collect();
+    if picked.is_empty() {
+        return Err("No macros to export".into());
+    }
+    let mut i = 0;
+    while i < picked.len() {
+        let mut targets = Vec::new();
+        picked[i].graph.walk_instructions(&mut |ins| {
+            if let InstructionKind::RunMacro { target: Value::Text { value }, .. } | InstructionKind::StopMacroNamed(Value::Text { value }) = &ins.kind {
+                targets.push(value.trim().to_string());
+            }
+        });
+        for target in targets {
+            let found = all.iter().find(|m| m.name == target).or_else(|| all.iter().find(|m| m.name.eq_ignore_ascii_case(&target)));
+            if let Some(found) = found
+                && !picked.iter().any(|m| m.id == found.id)
+            {
+                picked.push(found.clone());
+            }
+        }
+        i += 1;
+    }
+    config::persistence::write_bundle(std::path::Path::new(&path), name.trim(), &picked)?;
+    Ok(picked.len())
+}
+
+/// Discards an import staged by `import_macro` after the user declines its review.
+pub(crate) fn cancel_import_macro(state: &SharedState, app: &AppHandle) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.pending_import = None;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+// ─── Debugger ──────────────────────────────────────────────────────────────
+
+fn open_macro_id(state: &SharedState) -> Result<String, String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    s.current_macro.as_ref().map(|m| m.id.clone()).ok_or_else(|| "No macro selected".to_string())
+}
+
+/// Turns the breakpoint on block `block_id` of the open macro on or off.
+pub(crate) fn toggle_breakpoint(state: &SharedState, block_id: &str) -> Result<(), String> {
+    use blockwork_core::macros::debug;
+    let id = open_macro_id(state)?;
+    let on = !debug::breakpoints(&id).iter().any(|b| b == block_id);
+    debug::set_breakpoint(&id, block_id, on);
+    Ok(())
+}
+
+pub(crate) fn clear_breakpoints(state: &SharedState) -> Result<(), String> {
+    blockwork_core::macros::debug::clear_breakpoints(&open_macro_id(state)?);
+    Ok(())
+}
+
+/// `pause`, `resume`, `step` or `stop` for the open macro's runs.
+pub(crate) fn debug_action(state: &SharedState, action: &str) -> Result<(), String> {
+    use blockwork_core::macros::{debug, run_registry};
+    let id = open_macro_id(state)?;
+    match action {
+        "pause" => debug::pause(&id),
+        "resume" => debug::resume(&id),
+        "step" => debug::step(&id),
+        "stop" => {
+            run_registry::stop_macro(&id);
+            debug::resume(&id);
+        }
+        other => return Err(format!("unknown debugger action {other}")),
+    }
+    Ok(())
+}
+
+// ─── Secrets ───────────────────────────────────────────────────────────────
+
+/// Saves a secret to the keyring. Blocking: the keyring may show an unlock prompt.
+pub(crate) fn set_secret(state: &SharedState, app: &AppHandle, name: &str, value: &str) -> Result<(), String> {
+    blockwork_core::secrets::set(name, value)?;
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn delete_secret(state: &SharedState, app: &AppHandle, name: &str) -> Result<(), String> {
+    blockwork_core::secrets::delete(name)?;
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+// ─── Instructions ──────────────────────────────────────────────────────────
+
+pub(crate) async fn add_instruction(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    path: Vec<PathStep>,
+    instruction: InstructionDto,
+) -> Result<(), String> {
+    let ins = dto_to_instruction(&instruction).ok_or("Unknown instruction type")?;
+    if matches!(
+        &ins.kind,
+        InstructionKind::Token(InputToken::MoveMouse(_, _, blockwork_core::input::types::Coordinate::Abs))
+    ) {
+        request_absolute_mouse_support(state, app).await?;
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    // Checked before checkpointing, so a rejected drop costs no undo step.
+    if let Some(mac) = &s.current_macro {
+        mac.check_header_placement(&strand_id, &path, &ins)?;
+        if let Some(strand) = mac.strand(&strand_id) {
+            blockwork_core::macros::placement::check_return(mac, strand, &ins)?;
+            blockwork_core::macros::placement::check_loop_control(strand, &path, &ins)?;
+        }
+    }
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro
+        && mac.insert_instruction(&strand_id, &path, ins)?
+    {
+        s.invalid_field_buffers.clear();
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) async fn edit_instruction(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    path: Vec<PathStep>,
+    instruction: InstructionDto,
+) -> Result<(), String> {
+    let ins = dto_to_instruction(&instruction).ok_or("Unknown instruction type")?;
+    if matches!(
+        &ins.kind,
+        InstructionKind::Token(InputToken::MoveMouse(_, _, blockwork_core::input::types::Coordinate::Abs))
+    ) {
+        request_absolute_mouse_support(state, app).await?;
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    // Freeform text fields coalesce keystrokes into one undo group, like
+    // `edit_value_field`; every other kind gets its own undo step.
+    let session = matches!(
+        &ins.kind,
+        InstructionKind::Command(_) | InstructionKind::CommandWait(_) | InstructionKind::Comment(_)
+    )
+    .then(|| EditSession::Instruction {
+        strand_id: strand_id.clone(),
+        index: path.clone(),
+    });
+    push_undo_for(&mut s, session);
+    if let Some(mac) = &mut s.current_macro
+        && mac.replace_instruction(&strand_id, &path, ins)
+    {
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn edit_value_field(
+    state: &SharedState,
+    app: &AppHandle,
+    location: ValueLocation,
+    text: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    // A run of keystrokes into one field coalesces into one undo step; a
+    // location that no longer resolves is quietly ignored, as before.
+    let _ = run_edit(&mut s, EditCommand::EditFieldText { location, text });
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_value_kind(
+    state: &SharedState,
+    app: &AppHandle,
+    location: ValueLocation,
+    kind: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    push_undo(&mut s);
+    let env: HashMap<String, Evaluated> = s
+        .variable_values
+        .lock()
+        .map(|g| g.clone())
+        .unwrap_or_default();
+    let result = match &mut s.current_macro {
+        Some(mac) => mac.set_value_kind(&location, &kind, &env),
+        None => Ok(()),
+    };
+    prune_value_buffers(&mut s.invalid_field_buffers, &location);
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    result
+}
+
+/// Removes the value at `location` and returns it, leaving a `Field`
+/// location holding whatever it was shadowing (or its typed blank value); a
+/// root `Floating` location is deleted entirely. Pairs with `put_value`/
+/// `create_floating_value` on the frontend side of a drag.
+pub(crate) fn take_value(
+    state: &SharedState,
+    app: &AppHandle,
+    location: ValueLocation,
+) -> Result<Value, String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    push_undo(&mut s);
+    let taken = s
+        .current_macro
+        .as_mut()
+        .and_then(|mac| mac.take_value(&location));
+    prune_value_buffers(&mut s.invalid_field_buffers, &location);
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    taken.ok_or_else(|| "Nothing to take at that location".to_string())
+}
+
+/// Overwrites the node at `location` with `value` - the "put" half of
+/// moving a block into a field/subfield slot. An incoming operator's
+/// shadowed value is overwritten with the destination's prior content.
+pub(crate) fn put_value(
+    state: &SharedState,
+    app: &AppHandle,
+    location: ValueLocation,
+    value: Value,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.put_value(&location, value);
+    }
+    prune_value_buffers(&mut s.invalid_field_buffers, &location);
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Moves a value block in one edit: into the slot `to`, or parked on open
+/// canvas at `x`/`y` when `to` is none. One undo step and one state update.
+pub(crate) fn move_value(
+    state: &SharedState,
+    app: &AppHandle,
+    from: ValueLocation,
+    to: Option<ValueLocation>,
+    x: i32,
+    y: i32,
+    origin_block_id: Option<String>,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let to = match to {
+        Some(to) => ValueDestination::Slot(to),
+        None => ValueDestination::Canvas {
+            x,
+            y,
+            origin_block_id,
+        },
+    };
+    let result = run_edit(&mut s, EditCommand::MoveValue { from, to });
+    emit_state_updated(&app, &s);
+    result.map(|_| ()).map_err(String::from)
+}
+
+/// One-shot sample evaluation of a value tree, for the click-to-preview
+/// tooltip on operator blocks - stateless. Uses `eval_text` so text-only
+/// ops (`Join`/`NewLine`/`Tab`) preview without erroring as "not a number".
+pub(crate) fn preview_value(state: &SharedState, value: Value) -> Result<String, String> {
+    // A click shouldn't run a command or hit the network.
+    if blockwork_core::input::value::has_side_effect_operator(&value) {
+        return Err("Preview is off for blocks that run commands or go online".into());
+    }
+    let (env, lists) = {
+        let s = state.lock().map_err(|e| e.to_string())?;
+        let env: HashMap<String, Evaluated> = s
+            .variable_values
+            .lock()
+            .map(|g| g.clone())
+            .unwrap_or_default();
+        let lists = s.list_values.lock().map(|g| g.clone()).unwrap_or_default();
+        (env, lists)
+    };
+    // Evaluated unlocked: a file or window read may be slow.
+    preview_value_with_env_and_lists(&value, &env, &lists).map(|text| blockwork_core::secrets::redact(&text))
+}
+
+/// The actual evaluation logic behind `preview_value`, factored out so it's
+/// testable without backend state locking.
+#[cfg(test)]
+fn preview_value_with_env(
+    value: &Value,
+    env: &HashMap<String, Evaluated>,
+) -> Result<String, String> {
+    preview_value_with_env_and_lists(value, env, &HashMap::new())
+}
+
+fn preview_value_with_env_and_lists(
+    value: &Value,
+    env: &HashMap<String, Evaluated>,
+    lists: &HashMap<String, Vec<ListItem>>,
+) -> Result<String, String> {
+    resolve_list_reporters(&value.resolve_vars(env), lists)?.eval_text()
+}
+
+/// Creates a new value block parked on open canvas - for a sidebar drop, or
+/// the "create" half of dragging an existing block out onto canvas.
+/// `origin_block_id` is set only when `value` is a `Param` reporter dragged
+/// straight out of its declaring block's header (see blockstitchSetup.ts's
+/// `createFloatingValue`) - lets a floating param render with its real
+/// declared shape instead of a guess.
+pub(crate) fn create_floating_value(
+    state: &SharedState,
+    app: &AppHandle,
+    x: i32,
+    y: i32,
+    value: Value,
+    origin_block_id: Option<String>,
+) -> Result<String, String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    push_undo(&mut s);
+    let id = s
+        .current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .add_floating_value(x, y, value, origin_block_id);
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(id)
+}
+
+/// Repositions a floating value block dropped on open canvas. No
+/// `push_undo` - pure repositioning, same as `move_strand`.
+pub(crate) fn move_floating_value(
+    state: &SharedState,
+    app: &AppHandle,
+    floating_id: String,
+    x: i32,
+    y: i32,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro
+        && mac.move_floating_value(&floating_id, x, y)
+    {
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Deletes a floating value block outright (dropped on the sidebar trash) -
+/// mirrors `remove_strand`.
+pub(crate) fn remove_floating_value(
+    state: &SharedState,
+    app: &AppHandle,
+    floating_id: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.remove_floating_value(&floating_id);
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Creates a freestanding note parked on open canvas - the "Add Comment"
+/// canvas-context-menu item. Mirrors `create_floating_value`.
+pub(crate) fn create_comment(
+    state: &SharedState,
+    app: &AppHandle,
+    x: i32,
+    y: i32,
+    text: String,
+) -> Result<String, String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    push_undo(&mut s);
+    let id = s
+        .current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .add_comment(x, y, text, None);
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(id)
+}
+
+/// Creates a note pinned to `instruction_id` - the "Add Comment" block/header
+/// context-menu item. `dx`/`dy` are an offset from that instruction's
+/// on-screen position, not an absolute canvas coordinate (see `Comment`'s
+/// doc comment); the frontend picks a default that clears the block.
+pub(crate) fn create_attached_comment(
+    state: &SharedState,
+    app: &AppHandle,
+    instruction_id: String,
+    dx: i32,
+    dy: i32,
+    text: String,
+) -> Result<String, String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    push_undo(&mut s);
+    let id = s
+        .current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .add_comment(dx, dy, text, Some(instruction_id));
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(id)
+}
+
+/// Repositions a note - `x`/`y` are the same value the frontend already
+/// tracks for it (an absolute canvas position if freestanding, an offset
+/// from its attached instruction if not), plus the pointer's drag delta; see
+/// `Comment`'s doc comment. No `push_undo` - pure repositioning, same as
+/// `move_floating_value`.
+pub(crate) fn move_comment(
+    state: &SharedState,
+    app: &AppHandle,
+    comment_id: String,
+    x: i32,
+    y: i32,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro
+        && mac.move_comment(&comment_id, x, y)
+    {
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Deletes a note outright (its own "×" button) - mirrors `remove_floating_value`.
+pub(crate) fn remove_comment(
+    state: &SharedState,
+    app: &AppHandle,
+    comment_id: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.remove_comment(&comment_id);
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Edits a note's text - coalesces keystrokes into one undo group, same as
+/// `edit_instruction`'s freeform-text instructions.
+pub(crate) fn edit_comment_text(
+    state: &SharedState,
+    app: &AppHandle,
+    comment_id: String,
+    text: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    push_undo_for(
+        &mut s,
+        Some(EditSession::Comment {
+            comment_id: comment_id.clone(),
+        }),
+    );
+    if let Some(mac) = &mut s.current_macro
+        && mac.set_comment_text(&comment_id, text)
+    {
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Toggles a note's collapsed state - view state, not content, so no
+/// `push_undo` (same reasoning as `move_comment`).
+pub(crate) fn set_comment_collapsed(
+    state: &SharedState,
+    app: &AppHandle,
+    comment_id: String,
+    collapsed: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro
+        && mac.set_comment_collapsed(&comment_id, collapsed)
+    {
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn remove_instruction(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    path: Vec<PathStep>,
+    count: usize,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    // `count` removes a whole tail as one edit. A path addressing nothing
+    // costs no undo step and isn't an error.
+    let _ = run_edit(
+        &mut s,
+        EditCommand::RemoveInstructions {
+            strand_id,
+            path,
+            count,
+        },
+    );
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Deletes the instruction at `path`, splitting anything below it (in the
+/// same body list) off into a new top-level strand at `(x, y)` - atomic
+/// with the removal, so it's one undo step. Returns the new strand's id, or
+/// `None` if nothing was split off.
+pub(crate) fn delete_instruction(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    path: Vec<PathStep>,
+    x: i32,
+    y: i32,
+) -> Result<Option<String>, String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mut graph = match &s.current_macro {
+        Some(mac) => mac.graph.clone(),
+        None => {
+            emit_state_updated(&app, &s);
+            return Ok(None);
+        }
+    };
+    // Out of range isn't worth an error: the block just isn't there.
+    let Ok(new_id) = graph.delete_instruction(&strand_id, &path, x, y) else {
+        emit_state_updated(&app, &s);
+        return Ok(None);
+    };
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.graph = graph;
+    }
+    s.invalid_field_buffers.clear();
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(new_id)
+}
+
+pub(crate) fn reorder_instruction(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    path: Vec<PathStep>,
+    direction: i32,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    // Reordering can legitimately do nothing (either end of the list, or a
+    // swap past a header), so only checkpoint if it moved.
+    let mut graph = match &s.current_macro {
+        Some(mac) => mac.graph.clone(),
+        None => {
+            emit_state_updated(&app, &s);
+            return Ok(());
+        }
+    };
+    if graph.reorder_instruction(&strand_id, &path, direction) {
+        push_undo(&mut s);
+        if let Some(mac) = &mut s.current_macro {
+            mac.graph = graph;
+        }
+        s.invalid_field_buffers.clear();
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn clear_instructions(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if !s.confirm_clear_instructions {
+        s.confirm_clear_instructions = true;
+        s.clear_confirm_remaining_secs = CLEAR_CONFIRM_TIMEOUT_SECS as u8;
+        s.clear_confirm_generation = s.clear_confirm_generation.wrapping_add(1);
+        let timeout_gen = s.clear_confirm_generation;
+        emit_state_updated(&app, &s);
+        drop(s);
+
+        let state_clone = Arc::clone(&*state);
+        let app_clone = app.clone();
+        crate::async_runtime::spawn(async move {
+            for remaining in (1..=CLEAR_CONFIRM_TIMEOUT_SECS).rev() {
+                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+                if let Ok(mut s) = state_clone.lock() {
+                    if s.clear_confirm_generation != timeout_gen {
+                        break;
+                    }
+                    s.clear_confirm_remaining_secs = remaining as u8 - 1;
+                    if remaining == 1 {
+                        s.confirm_clear_instructions = false;
+                    }
+                    emit_state_updated(&app_clone, &s);
+                }
+            }
+        });
+    } else {
+        push_undo(&mut s);
+        if let Some(mac) = &mut s.current_macro {
+            mac.clear_editor();
+            s.invalid_field_buffers.clear();
+            auto_save(&mut s);
+            s.confirm_clear_instructions = false;
+            s.clear_confirm_remaining_secs = 0;
+        }
+        emit_state_updated(&app, &s);
+    }
+    Ok(())
+}
+
+/// Swaps the canvas for the neighbouring history entry; `step` is
+/// [`History::undo`] or [`History::redo`], which are otherwise identical.
+fn apply_history_step(
+    state: &SharedState,
+    app: &AppHandle,
+    step: fn(
+        &mut crate::state::History<crate::state::EditorSnapshot>,
+        crate::state::EditorSnapshot,
+    ) -> Option<crate::state::EditorSnapshot>,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(current) = s
+        .current_macro
+        .as_ref()
+        .map(|mac| (mac.graph.clone(), mac.signals.clone(), mac.settings.block_packs.clone()))
+        && let Some(restored_graph) = step(&mut s.history, current)
+    {
+        if let Some(mac) = &mut s.current_macro {
+            (mac.graph, mac.signals, mac.settings.block_packs) = restored_graph;
+            mac.ensure_id();
+        }
+        sync_variable_values(&mut s);
+        sync_list_values(&mut s);
+        s.invalid_field_buffers.clear();
+        auto_save(&mut s);
+    }
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn undo(state: &SharedState, app: &AppHandle) -> Result<(), String> {
+    apply_history_step(state, app, crate::state::History::undo)
+}
+
+pub(crate) fn redo(state: &SharedState, app: &AppHandle) -> Result<(), String> {
+    apply_history_step(state, app, crate::state::History::redo)
+}
+
+// ─── Strands (canvas) ──────────────────────────────────────────────────────
+
+/// Creates a new detached strand. `x`/`y` default to an auto-picked spot
+/// next to the farthest-right strand; an explicit position and initial
+/// `instruction` are passed for a palette-block drop, as one atomic call.
+pub(crate) fn add_strand(
+    state: &SharedState,
+    app: &AppHandle,
+    x: Option<i32>,
+    y: Option<i32>,
+    instruction: Option<InstructionDto>,
+) -> Result<String, String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let ins = match instruction {
+        Some(dto) => vec![dto_to_instruction(&dto).ok_or("Unknown instruction type")?],
+        None => vec![],
+    };
+    push_undo(&mut s);
+    let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
+    let (default_x, default_y) = mac.next_editor_position();
+    let new_id = mac.add_strand(x.unwrap_or(default_x), y.unwrap_or(default_y), ins);
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(new_id)
+}
+
+pub(crate) fn remove_strand(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.remove_strand(&strand_id);
+        drop_strand_buffers(&mut s.invalid_field_buffers, &strand_id);
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Repositions a strand on the canvas - used while dragging a stack that
+/// ends up dropped on empty space rather than snapped onto another strand.
+pub(crate) fn move_strand(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    x: i32,
+    y: i32,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro
+        && mac.move_strand(&strand_id, x, y)
+    {
+        auto_save(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Detaches the instructions at and after `path` (within the same body list)
+/// into a new top-level strand at `(x, y)`, returning its id. This is how
+/// the frontend "picks up" a block: split first, then drop as a stray strand
+/// or re-merge elsewhere.
+pub(crate) fn split_strand(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    path: Vec<PathStep>,
+    x: i32,
+    y: i32,
+) -> Result<String, String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    push_undo(&mut s);
+    let new_id = s
+        .current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .split_strand(&strand_id, &path, x, y)?;
+    s.invalid_field_buffers.clear();
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(new_id)
+}
+
+/// Splices `dragged_id`'s instructions into `target_id` at `path` and
+/// deletes the (now empty) dragged strand - how two stacks snap together.
+/// A "When Ran" strand can only be a merge target, never the dragged side.
+pub(crate) fn merge_strand(
+    state: &SharedState,
+    app: &AppHandle,
+    dragged_id: String,
+    target_id: String,
+    path: Vec<PathStep>,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    // Merge validates before it moves anything, so a rejected drop leaves
+    // both strands and the undo stack untouched.
+    let mut graph = s
+        .current_macro
+        .as_ref()
+        .map(|mac| mac.graph.clone())
+        .ok_or("No macro selected")?;
+    graph.merge_strand(&dragged_id, &target_id, &path)?;
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.graph = graph;
+    }
+    drop_strand_buffers(&mut s.invalid_field_buffers, &dragged_id);
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Moves the tail at and after `path` in `strand_id` into `target_id` at
+/// `target_path` atomically - the Qt canvas's attach-on-drop for a partial
+/// stack drag, without a split-then-merge round trip (the Qt bridge drops
+/// backend replies, so it can't chain the new split id into a merge).
+pub(crate) fn merge_tail(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    path: Vec<PathStep>,
+    target_id: String,
+    target_path: Vec<PathStep>,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mut graph = s
+        .current_macro
+        .as_ref()
+        .map(|mac| mac.graph.clone())
+        .ok_or("No macro selected")?;
+    graph.merge_tail(&strand_id, &path, &target_id, &target_path)?;
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.graph = graph;
+    }
+    s.invalid_field_buffers.clear();
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Creates a new detached strand at `(x, y)` holding `instructions`
+/// verbatim - how "Paste" drops previously-copied blocks onto the canvas.
+/// `count` blocks from `path` (the rest of that list when absent), with
+/// their bodies and the notes pinned to them, for the editor's copy buffer.
+pub(crate) fn copy_instructions(
+    state: &SharedState,
+    strand_id: String,
+    path: Vec<PathStep>,
+    count: Option<usize>,
+) -> Result<FragmentDto, String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+    Ok(fragment_to_dto(&mac.copy_fragment(&strand_id, &path, count)?))
+}
+
+/// Drops a copied fragment at `(x, y)` as a new strand, with fresh ids and
+/// its notes, as one step. Returns that strand's id.
+pub(crate) fn paste_fragment(
+    state: &SharedState,
+    app: &AppHandle,
+    x: i32,
+    y: i32,
+    fragment: FragmentDto,
+) -> Result<String, String> {
+    let fragment = dto_to_fragment(&fragment).ok_or("Unknown instruction type")?;
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let outcome = run_edit(&mut s, EditCommand::PasteFragment { fragment, x, y });
+    emit_state_updated(&app, &s);
+    outcome?
+        .created
+        .into_iter()
+        .find_map(|created| match created {
+            Created::Strand(id) => Some(id),
+            _ => None,
+        })
+        .ok_or_else(|| "Nothing was pasted".to_string())
+}
+
+/// [`paste_fragment`] for bare instructions, without notes.
+pub(crate) fn paste_instructions(
+    state: &SharedState,
+    app: &AppHandle,
+    x: i32,
+    y: i32,
+    instructions: Vec<InstructionDto>,
+) -> Result<String, String> {
+    let fragment = FragmentDto {
+        instructions,
+        comments: Vec::new(),
+    };
+    paste_fragment(state, app, x, y, fragment)
+}
+
+/// Copies the block at `path` (bodies and notes included) in right after
+/// it, as one step.
+pub(crate) fn duplicate_instruction(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    path: Vec<PathStep>,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let outcome = run_edit(
+        &mut s,
+        EditCommand::DuplicateInstruction { strand_id, path },
+    );
+    emit_state_updated(&app, &s);
+    outcome.map(|_| ()).map_err(String::from)
+}
+
+/// Sets the strand that freshly-recorded input is appended to. Not part of
+/// the undo/redo stacks, so it survives undo/redo untouched; no-ops if
+/// `strand_id` doesn't exist.
+pub(crate) fn set_recording_target(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(mac) = &mut s.current_macro {
+        if mac.strand(&strand_id).is_some() {
+            mac.recording_target = Some(strand_id);
+            auto_save(&mut s);
+        }
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+// ─── Key capture ───────────────────────────────────────────────────────────
+
+pub(crate) fn start_key_capture(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    path: Vec<PathStep>,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.key_capture = Some(KeyCaptureTarget::Strand(strand_id, path));
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Same capture flow, but for a key field with no backing strand/instruction
+/// (the sidebar's Key prefab) - the result lands in `pending_standalone_key`
+/// instead of being written into a strand.
+pub(crate) fn start_standalone_key_capture(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.key_capture = Some(KeyCaptureTarget::Standalone);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// `keys` are the `(code, key)` pairs held when a key was released, in
+/// press order; they become one combo such as `Control+Alt+o`.
+pub(crate) fn key_capture_event(
+    state: &SharedState,
+    app: &AppHandle,
+    keys: Vec<(String, String)>,
+) -> Result<(), String> {
+    use blockwork_core::input::key_names::{format_key_combo, match_key};
+    let mut combo: Vec<blockwork_core::input::types::MacroKey> = Vec::new();
+    for (code, key) in &keys {
+        let parsed = blockwork_core::key_mapping::web_code_to_macro_key(code)
+            .or_else(|| blockwork_core::key_mapping::web_key_to_macro_key(key));
+        if let Some(mk) = parsed {
+            if !combo.iter().any(|k| match_key(k) == match_key(&mk)) {
+                combo.push(mk);
+            }
+        }
+    }
+    if combo.is_empty() {
+        return Ok(());
+    }
+    let text = format_key_combo(&combo);
+
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let Some(target) = s.key_capture.take() else {
+        return Ok(());
+    };
+    match target {
+        KeyCaptureTarget::Strand(strand_id, path) => {
+            let captured = s.current_macro.as_mut().is_some_and(|mac| {
+                match mac.instruction_at_mut(&strand_id, &path) {
+                    Some(Instruction {
+                        kind:
+                            InstructionKind::Token(InputToken::Key(value, _))
+                            | InstructionKind::WhenKey(value, _),
+                        ..
+                    }) => {
+                        *value = Value::Text { value: text };
+                        true
+                    }
+                    _ => false,
+                }
+            });
+            if captured {
+                auto_save(&mut s);
+            }
+        }
+        KeyCaptureTarget::Standalone => s.pending_standalone_key = Some(text),
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Consumes `pending_standalone_key` once the frontend has copied it, so a
+/// stale value can't leak into the next capture.
+pub(crate) fn clear_standalone_key_capture(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.pending_standalone_key = None;
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+// ─── Execution ─────────────────────────────────────────────────────────────
+
+pub(crate) fn run_macro(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let (mac, emulator, is_looping, speed_multiplier, variables, lists) = {
+        let s = state.lock().map_err(|e| e.to_string())?;
+        let mac = s.current_macro.clone();
+        let emulator = s.emulator.as_ref().map(Arc::clone);
+        let is_looping = Arc::clone(&s.is_looping);
+        let speed_multiplier =
+            mac.as_ref().map_or(1.0, |m| m.speed_multiplier) * s.global_speed_multiplier;
+        let variables = Arc::clone(&s.variable_values);
+        let lists = Arc::clone(&s.list_values);
+        (
+            mac,
+            emulator,
+            is_looping,
+            speed_multiplier,
+            variables,
+            lists,
+        )
+    };
+
+    if let (Some(mac), Some(emulator)) = (mac, emulator) {
+        let _ = loop_control::set_loop_state(&is_looping, true);
+        let mac_name = mac.name.clone();
+        let single_run_task = macros_thread::into_single_run_task(
+            mac,
+            Arc::clone(&emulator),
+            Arc::clone(&is_looping),
+            speed_multiplier,
+            variables,
+            lists,
+            Arc::clone(&*state),
+            app.clone(),
+        );
+        let mut s = state.lock().map_err(|e| e.to_string())?;
+        if let Err(e) = macros_thread::spawn_macro_thread(
+            &mut s.thread_pool,
+            format!("run_{}", mac_name),
+            single_run_task,
+        ) {
+            warn!("Failed to spawn run thread: {e}");
+            let _ = loop_control::stop_loop(&is_looping);
+        }
+    }
+
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_global_speed_multiplier(
+    state: &SharedState,
+    app: &AppHandle,
+    multiplier: f64,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let clamped = multiplier.clamp(
+        *SPEED_MULTIPLIER_RANGE.start(),
+        *SPEED_MULTIPLIER_RANGE.end(),
+    );
+    s.global_speed_multiplier = clamped;
+    config::update_settings(|settings| settings.global_speed_multiplier = Some(clamped));
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+// ─── Recording ─────────────────────────────────────────────────────────────
+
+/// Seeds the recorder's tracked cursor position from the real, current
+/// cursor position so the first captured move has a baseline - needed for
+/// absolute-move recording, which adds each relative delta the backend
+/// reports onto a known starting point. Best-effort: if the backend can't
+/// report a position, absolute recording waits for a later seed.
+fn seed_recording_mouse_pos(s: &crate::state::AppState) {
+    let Some(emulator) = s.emulator.as_ref() else {
+        return;
+    };
+    let Ok(mut emulator) = emulator.lock() else {
+        return;
+    };
+    // Absolute recording needs an exact origin, which on Wayland means placing
+    // the cursor rather than asking where it is.
+    let pos = if s.record_mouse_relative || !s.record_mouse_movement {
+        emulator.cursor_pos()
+    } else {
+        emulator.anchor_cursor()
+    };
+    if let Some((x, y)) = pos {
+        recording::set_last_mouse_pos(x as f64, y as f64);
+    }
+}
+
+pub(crate) fn start_recording(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    // A second start while counting down or recording must not restart the
+    // countdown; the UI cancels with stop_recording instead.
+    if s.current_macro.is_none() || s.recording_phase != RecordingPhase::Idle {
+        return Ok(());
+    }
+    s.recording_countdown_generation = s.recording_countdown_generation.wrapping_add(1);
+    let countdown_gen = s.recording_countdown_generation;
+    let secs = crate::recording_countdown_secs();
+    if secs == 0 {
+        begin_recording(&mut s);
+        emit_state_updated(&app, &s);
+        return Ok(());
+    }
+    s.recording_phase = RecordingPhase::Countdown(secs);
+    emit_state_updated(&app, &s);
+    drop(s);
+
+    let state_clone = Arc::clone(&*state);
+    let app_clone = app.clone();
+    crate::async_runtime::spawn(async move {
+        for n in (0..secs).rev() {
+            tokio::time::sleep(std::time::Duration::from_secs(1)).await;
+            let mut s = match state_clone.lock() {
+                Ok(g) => g,
+                Err(_) => return,
+            };
+            if s.recording_countdown_generation != countdown_gen {
+                return;
+            }
+            if n == 0 {
+                begin_recording(&mut s);
+                emit_state_updated(&app_clone, &s);
+                return;
+            }
+            s.recording_phase = RecordingPhase::Countdown(n);
+            emit_state_updated(&app_clone, &s);
+        }
+    });
+    Ok(())
+}
+
+fn begin_recording(s: &mut crate::state::AppState) {
+    s.recording_phase = RecordingPhase::Active;
+    recording::reset_timing();
+    seed_recording_mouse_pos(s);
+    recording::RECORDING_ACTIVE.store(true, Ordering::Relaxed);
+}
+
+/// Seconds the Record button counts down for, 0 to [`crate::MAX_RECORDING_COUNTDOWN`].
+pub(crate) fn set_recording_countdown(state: &SharedState, app: &AppHandle, seconds: u8) -> Result<(), String> {
+    if seconds > crate::MAX_RECORDING_COUNTDOWN {
+        return Err(format!("Countdown out of range: {seconds}"));
+    }
+    config::update_settings(|settings| settings.recording_countdown_secs = Some(seconds));
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn stop_recording(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    stop_recording_impl(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+/// Returns the macro to auto-save (an owned clone), if recorded instructions
+/// actually got appended - saving itself happens after the state lock is
+/// released, see `stop_recording_internal`.
+fn stop_recording_impl(s: &mut crate::state::AppState) -> Option<Macro> {
+    recording::RECORDING_ACTIVE.store(false, Ordering::Relaxed);
+    s.recording_phase = RecordingPhase::Idle;
+    // Cancel any in-progress countdown
+    s.recording_countdown_generation = s.recording_countdown_generation.wrapping_add(1);
+
+    let instructions: Vec<Instruction> = recording::get_recording_queue()
+        .lock()
+        .unwrap()
+        .drain(..)
+        .collect();
+    if instructions.is_empty() {
+        return None;
+    }
+    push_undo(s);
+    let mac = s.current_macro.as_mut()?;
+    mac.recording_target_mut().instructions.extend(instructions);
+    Some(mac.clone())
+}
+
+/// Called from the QueueSignal background task when the OS-level hook signals stop.
+pub(crate) fn stop_recording_internal(state: &SharedState, app: &AppHandle) {
+    let (to_save, dto) = {
+        let Ok(mut s) = state.lock() else { return };
+        let to_save = stop_recording_impl(&mut s);
+        sync_open_macro_into_list(&mut s);
+        (to_save, build_state_dto(&s))
+    };
+    // The disk write (and the emit below) run after the state lock is
+    // released. IPC commands go through this same lock (`StartRecordingImmediate`
+    // needs it for `reset_timing()`), so holding it across a save made a
+    // closely-following next attempt's start signal land inconsistently.
+    if let Some(mac) = to_save {
+        if let Err(e) = mac.save() {
+            warn!("Failed to auto-save macro: {e}");
+        } else {
+            config::set_selected_macro_id(Some(&mac.id));
+        }
+    }
+    app.emit_state(&dto);
+}
+
+pub(crate) async fn toggle_record_mouse_relative(
+    state: &SharedState,
+    app: &AppHandle,
+    relative: bool,
+) -> Result<(), String> {
+    if !relative && !blockwork_core::macros::backend::absolute_mouse_position_source_available() {
+        return Err("Absolute mouse recording isn't available in this session.".to_string());
+    }
+    if !relative && !blockwork_core::macros::backend::absolute_mouse_position_available() {
+        request_absolute_mouse_support(state, app).await?;
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.record_mouse_relative = relative;
+    recording::RECORD_MOUSE_RELATIVE.store(relative, Ordering::Relaxed);
+    config::update_settings(|settings| settings.record_mouse_relative = Some(relative));
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn toggle_record_mouse_movement(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.record_mouse_movement = enabled;
+    recording::RECORD_MOUSE_MOVEMENT.store(enabled, Ordering::Relaxed);
+    config::update_settings(|settings| settings.record_mouse_movement = Some(enabled));
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+// ─── Navigation ────────────────────────────────────────────────────────────
+
+pub(crate) fn open_settings(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.page = Page::Settings;
+    s.hotkey_bindings = config::load_hotkey_bindings();
+    s.combo_capture = None;
+    s.pending_macro_hotkey = None;
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn close_settings(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.page = Page::Main;
+    s.combo_capture = None;
+    s.pending_macro_hotkey = None;
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+
+// ─── Hotkey bindings ───────────────────────────────────────────────────────
+
+pub(crate) fn start_combo_capture(
+    state: &SharedState,
+    app: &AppHandle,
+    action: HotkeyActionDto,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.combo_capture = Some(ComboCapture::Named(dto_to_hotkey_action(&action)));
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn start_binding_combo_capture(
+    state: &SharedState,
+    app: &AppHandle,
+    index: usize,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if index < s.hotkey_bindings.len() {
+        s.combo_capture = Some(ComboCapture::Binding(index));
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn start_pending_combo_capture(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.combo_capture = Some(ComboCapture::Pending);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn combo_capture_event(
+    state: &SharedState,
+    app: &AppHandle,
+    code: String,
+    modifiers: u8,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let key_name = match blockwork_core::key_mapping::web_code_to_rdev_name(&code) {
+        Some(n) => n,
+        None => return Ok(()),
+    };
+    let combo = KeyCombo {
+        modifiers,
+        key: key_name,
+    };
+
+    match s.combo_capture.take() {
+        Some(ComboCapture::Named(action)) => {
+            // StopRecording must never require a combo: modifier keys held
+            // while it fires would themselves have already been captured as
+            // macro steps before the trigger key arrives.
+            let combo = if matches!(action, HotkeyAction::StopRecording) {
+                KeyCombo {
+                    modifiers: 0,
+                    ..combo
+                }
+            } else {
+                combo
+            };
+            if let Some(existing) = s.hotkey_bindings.iter_mut().find(|b| b.action == action) {
+                existing.combo = combo;
+            } else {
+                s.hotkey_bindings.push(HotkeyBinding { action, combo });
+            }
+            save_hotkey_bindings_impl(&mut s);
+        }
+        Some(ComboCapture::Binding(index)) => {
+            if let Some(existing) = s.hotkey_bindings.get_mut(index) {
+                existing.combo = combo;
+                save_hotkey_bindings_impl(&mut s);
+            }
+        }
+        Some(ComboCapture::Pending) => {
+            let entry = s.pending_macro_hotkey.get_or_insert((None, None));
+            entry.1 = Some(combo);
+        }
+        None => {}
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn cancel_combo_capture(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.combo_capture = None;
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_pending_macro_idx(
+    state: &SharedState,
+    app: &AppHandle,
+    index: Option<usize>,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let entry = s.pending_macro_hotkey.get_or_insert((None, None));
+    entry.0 = index;
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn add_macro_hotkey(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some((Some(idx), Some(combo))) = s.pending_macro_hotkey.take() {
+        let macros = config::get_macros_from_config();
+        if let Some(mac) = macros.get(idx) {
+            let binding = HotkeyBinding {
+                action: HotkeyAction::RunSpecificMacro(mac.id.clone()),
+                combo,
+            };
+            s.hotkey_bindings.push(binding);
+            save_hotkey_bindings_impl(&mut s);
+        }
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn remove_hotkey_binding(
+    state: &SharedState,
+    app: &AppHandle,
+    index: usize,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if index < s.hotkey_bindings.len() {
+        s.hotkey_bindings.remove(index);
+        save_hotkey_bindings_impl(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn clear_named_hotkey(
+    state: &SharedState,
+    app: &AppHandle,
+    action: HotkeyActionDto,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let action = dto_to_hotkey_action(&action);
+    s.hotkey_bindings.retain(|b| b.action != action);
+    save_hotkey_bindings_impl(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn reset_hotkey_to_default(
+    state: &SharedState,
+    app: &AppHandle,
+    action: HotkeyActionDto,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let action = dto_to_hotkey_action(&action);
+    if let Some(default_combo) = config::default_combo_for_action(&action) {
+        if let Some(existing) = s.hotkey_bindings.iter_mut().find(|b| b.action == action) {
+            existing.combo = default_combo;
+        } else {
+            s.hotkey_bindings.push(HotkeyBinding {
+                action,
+                combo: default_combo,
+            });
+        }
+        save_hotkey_bindings_impl(&mut s);
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+fn save_hotkey_bindings_impl(s: &mut crate::state::AppState) {
+    config::save_hotkey_bindings(&s.hotkey_bindings);
+    recording::update_hotkey_table(s.hotkey_bindings.clone());
+}
+
+// ─── IPC server ────────────────────────────────────────────────────────────
+
+pub(crate) fn set_ipc_port_text(
+    state: &SharedState,
+    app: &AppHandle,
+    text: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    match text.trim().parse::<u16>() {
+        Ok(port) => {
+            s.ipc_port_invalid = false;
+            config::update_settings(|settings| settings.ipc_port = Some(port));
+        }
+        Err(_) => {
+            s.ipc_port_invalid = true;
+        }
+    }
+    s.ipc_port_text = text;
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) async fn start_ipc_server(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if s.ipc_server.is_none() {
+        if let Ok(port) = s.ipc_port_text.trim().parse::<u16>() {
+            let (tx, rx) = tokio::sync::watch::channel(false);
+            s.ipc_server = Some(crate::async_runtime::spawn(
+                blockwork_core::ipc::run_server(port, rx),
+            ));
+            s.ipc_shutdown_tx = Some(tx);
+            s.ipc_active_port = Some(port);
+        }
+    }
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn stop_ipc_server(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(tx) = s.ipc_shutdown_tx.take() {
+        let _ = tx.send(true);
+    }
+    if let Some(handle) = s.ipc_server.take() {
+        handle.abort();
+    }
+    s.ipc_active_port = None;
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_ipc_auto_start(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.ipc_auto_start = enabled;
+    config::update_settings(|settings| settings.ipc_auto_start = Some(enabled));
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
+// ─── System tray ────────────────────────────────────────────────────────────
+
+pub(crate) fn set_close_to_tray(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.close_to_tray = enabled;
+    config::update_settings(|settings| settings.close_to_tray = Some(enabled));
+    app.send(crate::Event::CloseToTray(enabled));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+const PALETTE_LAYOUTS: [&str; 5] = ["rail", "chips", "accordion", "flyout", "tiles"];
+
+pub(crate) fn set_palette_layout(
+    state: &SharedState,
+    app: &AppHandle,
+    layout: String,
+) -> Result<(), String> {
+    if !PALETTE_LAYOUTS.contains(&layout.as_str()) {
+        return Err(format!("Unknown palette layout: {layout}"));
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.palette_layout = layout.clone();
+    config::update_settings(|settings| settings.palette_layout = Some(layout));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// The UI language, like "de"; empty follows the system.
+pub(crate) fn set_language(state: &SharedState, app: &AppHandle, language: String) -> Result<(), String> {
+    let language = language.trim().to_string();
+    if !language.is_empty() && !language.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+        return Err(format!("Unknown language: {language}"));
+    }
+    config::update_settings(|settings| settings.language = (!language.is_empty()).then_some(language));
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// How times show: "12h", "24h", or empty to follow the system locale.
+pub(crate) fn set_clock_format(state: &SharedState, app: &AppHandle, format: String) -> Result<(), String> {
+    if !matches!(format.as_str(), "" | "12h" | "24h") {
+        return Err(format!("Unknown clock format: {format}"));
+    }
+    config::update_settings(|settings| settings.clock_format = (!format.is_empty()).then_some(format));
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Empty follows the system appearance.
+pub(crate) fn set_color_scheme(state: &SharedState, app: &AppHandle, scheme: String) -> Result<(), String> {
+    if !matches!(scheme.as_str(), "" | "light" | "dark") {
+        return Err(format!("Unknown color scheme: {scheme}"));
+    }
+    config::update_settings(|settings| settings.color_scheme = (!scheme.is_empty()).then_some(scheme));
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// How long UI animations take, as a duration multiplier: 0 is instant, 1 normal.
+pub(crate) fn set_animation_speed(state: &SharedState, app: &AppHandle, speed: f64) -> Result<(), String> {
+    if !speed.is_finite() || !(0.0..=crate::MAX_ANIMATION_SPEED).contains(&speed) {
+        return Err(format!("Animation speed out of range: {speed}"));
+    }
+    config::update_settings(|settings| settings.animation_speed = Some(speed));
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_start_at_startup(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    crate::autostart::set_enabled(enabled)?;
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.start_at_startup = enabled;
+    config::update_settings(|settings| settings.start_at_startup = Some(enabled));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_onboarding_done(
+    state: &SharedState,
+    app: &AppHandle,
+    done: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.onboarding_done = done;
+    if !done {
+        s.page = Page::Main;
+    }
+    config::update_settings(|settings| settings.onboarding_done = Some(done));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+// ─── Updates (Windows/macOS) ───────────────────────────────────────────────
+
+pub(crate) fn check_for_updates(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    {
+        let mut s = state.lock().map_err(|e| e.to_string())?;
+        s.update_check_state = UpdateCheckState::Checking;
+        emit_state_updated(&app, &s);
+    }
+    let state_clone = Arc::clone(&*state);
+    let app_clone = app.clone();
+    crate::async_runtime::spawn(async move {
+        check_for_updates_internal(&state_clone, &app_clone).await;
+    });
+    Ok(())
+}
+
+pub(crate) async fn check_for_updates_internal(
+    state: &SharedState,
+    app: &AppHandle,
+) {
+    #[cfg(any(windows, target_os = "macos"))]
+    {
+        let version = env!("CARGO_PKG_VERSION").to_string();
+        let result = tokio::task::spawn_blocking(move || {
+            blockwork_core::updater::check_for_update(&version)
+        })
+        .await
+        .unwrap_or_else(|e| Err(e.to_string()));
+        if let Ok(mut s) = state.lock() {
+            s.update_check_state = match result {
+                Ok(Some(info)) => UpdateCheckState::UpdateAvailable(info.version),
+                Ok(None) => UpdateCheckState::UpToDate,
+                Err(e) => UpdateCheckState::Error(e),
+            };
+            emit_state_updated(app, &s);
+        }
+    }
+    #[cfg(not(any(windows, target_os = "macos")))]
+    if let Ok(mut s) = state.lock() {
+        s.update_check_state =
+            UpdateCheckState::Error("Updates are only supported on Windows and macOS".to_string());
+        emit_state_updated(app, &s);
+    }
+}
+
+pub(crate) fn apply_update(
+    state: &SharedState,
+    app: &AppHandle,
+) -> Result<(), String> {
+    {
+        let mut s = state.lock().map_err(|e| e.to_string())?;
+        s.update_check_state = UpdateCheckState::Applying;
+        emit_state_updated(&app, &s);
+    }
+    #[cfg(any(windows, target_os = "macos"))]
+    {
+        let state_clone = Arc::clone(&*state);
+        let app_clone = app.clone();
+        crate::async_runtime::spawn(async move {
+            let version = env!("CARGO_PKG_VERSION").to_string();
+            let result = tokio::task::spawn_blocking(move || {
+                blockwork_core::updater::apply_update(&version)
+            })
+            .await
+            .unwrap_or_else(|e| Err(e.to_string()));
+            match result {
+                Ok(_) => app_clone.send(crate::Event::Quit),
+                Err(e) => {
+                    if let Ok(mut s) = state_clone.lock() {
+                        s.update_check_state = UpdateCheckState::Error(e);
+                        emit_state_updated(&app_clone, &s);
+                    }
+                }
+            }
+        });
+    }
+    Ok(())
+}
+
+// ─── Hotkey action handler (called from QueueSignal task) ──────────────────
+
+pub(crate) fn handle_hotkey_action(
+    state: &SharedState,
+    app: &AppHandle,
+    action: HotkeyAction,
+) {
+    match &action {
+        HotkeyAction::RunMacro | HotkeyAction::RunSpecificMacro(_) => {
+            let s = match state.lock() {
+                Ok(g) => g,
+                Err(_) => return,
+            };
+            if let Some(emulator) = s.emulator.as_ref() {
+                let emulator = Arc::clone(emulator);
+                let is_looping = Arc::clone(&s.is_looping);
+                let global_speed_multiplier = s.global_speed_multiplier;
+                let shared_state = Arc::clone(state);
+                let mac = match &action {
+                    HotkeyAction::RunMacro => s.current_macro.clone(),
+                    HotkeyAction::RunSpecificMacro(id) => {
+                        let macs = s.macros_list.clone();
+                        macs.iter().find(|m| &m.id == id).cloned()
+                    }
+                    _ => None,
+                };
+                drop(s);
+                if let Some(mac) = mac {
+                    if let Some(reason) = mac.settings.blocked_by() {
+                        let source = blockwork_core::run_log::Source::for_macro(&mac.id, &mac.name);
+                        blockwork_core::run_log::info(&source, format!("Hotkey ignored: {reason}"));
+                        return;
+                    }
+                    let speed_multiplier = mac.speed_multiplier * global_speed_multiplier;
+                    // Seeded from this macro's own persisted values, not
+                    // `AppState::variable_values` (tracks the *selected* macro).
+                    let variables: VariableStore = Arc::new(Mutex::new(
+                        mac.variables
+                            .iter()
+                            .map(|v| (v.name.clone(), v.value.clone()))
+                            .collect(),
+                    ));
+                    let lists: ListStore = Arc::new(Mutex::new(
+                        mac.lists
+                            .iter()
+                            .map(|list| (list.name.clone(), list.items.clone()))
+                            .collect(),
+                    ));
+                    run_macro_task(
+                        mac,
+                        emulator,
+                        is_looping,
+                        speed_multiplier,
+                        variables,
+                        lists,
+                        shared_state,
+                        app.clone(),
+                    );
+                }
+            }
+        }
+        HotkeyAction::EmergencyStop => emergency_stop(state, app),
+        HotkeyAction::StopLoop => {
+            // Clears every in-flight run's stop flag, not just loop mode's -
+            // a single run has its own stop flag that `is_looping` doesn't reach.
+            let cleared = blockwork_core::macros::run_registry::stop_all();
+            tracing::info!(cleared, "StopLoop hotkey handled");
+            if let Ok(s) = state.lock() {
+                if let Ok(mut lk) = s.is_looping.lock() {
+                    *lk = false;
+                }
+                emit_state_updated(app, &s);
+            }
+        }
+        HotkeyAction::NextMacro => {
+            let macros = config::get_macros_from_config();
+            if !macros.is_empty() {
+                if let Ok(mut s) = state.lock() {
+                    let current_id = config::get_selected_macro_id();
+                    let current_idx = current_id
+                        .and_then(|id| macros.iter().position(|m| m.id == id))
+                        .unwrap_or(0);
+                    let next = (current_idx + 1) % macros.len();
+                    s.macro_selected = Some(next);
+                    s.current_macro = macros.get(next).cloned();
+                    if let Some(mac) = &s.current_macro {
+                        config::set_selected_macro_id(Some(&mac.id));
+                    }
+                    sync_variable_values(&mut s);
+                    sync_list_values(&mut s);
+                    emit_state_updated(app, &s);
+                }
+            }
+        }
+        HotkeyAction::PrevMacro => {
+            let macros = config::get_macros_from_config();
+            if !macros.is_empty() {
+                if let Ok(mut s) = state.lock() {
+                    let current_id = config::get_selected_macro_id();
+                    let current_idx = current_id
+                        .and_then(|id| macros.iter().position(|m| m.id == id))
+                        .unwrap_or(0);
+                    let prev = if current_idx == 0 {
+                        macros.len() - 1
+                    } else {
+                        current_idx - 1
+                    };
+                    s.macro_selected = Some(prev);
+                    s.current_macro = macros.get(prev).cloned();
+                    if let Some(mac) = &s.current_macro {
+                        config::set_selected_macro_id(Some(&mac.id));
+                    }
+                    sync_variable_values(&mut s);
+                    sync_list_values(&mut s);
+                    emit_state_updated(app, &s);
+                }
+            }
+        }
+        HotkeyAction::StartRecordingImmediate => {
+            if let Ok(mut s) = state.lock() {
+                if s.current_macro.is_some() {
+                    s.recording_countdown_generation =
+                        s.recording_countdown_generation.wrapping_add(1);
+                    begin_recording(&mut s);
+                    emit_state_updated(app, &s);
+                }
+            }
+        }
+        HotkeyAction::StopRecording => {
+            // Handled directly in recording::start_grab_thread while active;
+            // reached here only if pressed while idle - no-op.
+        }
+        HotkeyAction::Undo => {
+            let _ = undo(state, app);
+        }
+        HotkeyAction::Redo => {
+            let _ = redo(state, app);
+        }
+    }
+}
+
+fn run_macro_task(
+    mac: Macro,
+    emulator: Arc<std::sync::Mutex<dyn blockwork_core::macros::backend::InputBackend>>,
+    is_looping: Arc<std::sync::Mutex<bool>>,
+    speed_multiplier: f64,
+    variables: VariableStore,
+    lists: ListStore,
+    state: SharedState,
+    app: AppHandle,
+) {
+    // Kept alive past the move into the task so the pre-run focus/modifier
+    // cleanup can play its releases through the very backend the run will use.
+    #[cfg(windows)]
+    let prep_backend = Arc::clone(&emulator);
+
+    if let Ok(mut st) = is_looping.lock() {
+        *st = true;
+    }
+    let stop_flag = Arc::clone(&is_looping);
+    let task = macros_thread::into_single_run_task(
+        mac,
+        emulator,
+        stop_flag,
+        speed_multiplier,
+        variables,
+        lists,
+        state,
+        app,
+    );
+    tokio::task::spawn_blocking(move || {
+        // Same pre-registration as the loop branch above.
+        let playback_guard = blockwork_core::macros::run_registry::begin_run();
+        #[cfg(windows)]
+        blockwork_core::macros::backend::windows::prepare_for_macro_execution(&prep_backend);
+        #[cfg(not(windows))]
+        blockwork_core::macros::backend::release_held_modifiers();
+        task();
+        blockwork_core::macros::run_registry::end_run(&playback_guard);
+    });
+}
+
+// ─── Open App picker ────────────────────────────────────────────────────────
+
+/// Lists installed applications for the "Open App" instruction's picker
+/// popup - see `installed_apps`. `async` so scanning `.desktop`/icon-theme
+/// files (Linux) or walking the Start Menu (Windows) doesn't block the main
+/// thread; stateless, so unlike almost every other command here it doesn't
+/// take `State<SharedState>` at all.
+pub(crate) async fn list_installed_apps() -> Vec<crate::state::AppEntryDto> {
+    crate::installed_apps::list_apps()
+        .into_iter()
+        .map(|a| crate::state::AppEntryDto {
+            name: a.name,
+            command: a.command,
+            icon: a.icon,
+        })
+        .collect()
+}
+
+#[cfg(test)]
+mod value_location_tests {
+    use super::*;
+    use blockstitch_core::editor::apply_value_kind;
+    use blockwork_core::input::types::Coordinate;
+    use blockwork_core::input::value::Op;
+    use blockwork_core::macros::{
+        BlockShape, FieldId, FloatingValue, InputValueType, MacroGraph, VariableDef,
+    };
+
+    /// A flat, non-nested `InstrPath` - the shape every location was
+    /// addressed by before nested `If`/`IfElse` bodies existed.
+    fn top(index: usize) -> Vec<PathStep> {
+        vec![PathStep { index, slot: None }]
+    }
+
+    fn test_macro() -> Macro {
+        Macro {
+            id: "m".into(),
+            name: "Test".into(),
+            description: "".into(),
+            graph: MacroGraph {
+                strands: vec![Strand {
+                    id: "s1".into(),
+                    x: 0,
+                    y: 0,
+                    instructions: vec![
+                        Instruction::new(InstructionKind::WhenRan),
+                        Instruction::new(InstructionKind::Wait(Value::number(1000.0))),
+                    ],
+                }],
+                floating_values: vec![FloatingValue {
+                    id: "f1".into(),
+                    x: 10,
+                    y: 20,
+                    value: Value::number(5.0),
+                    origin_block_id: None,
+                }],
+                ..MacroGraph::new()
+            },
+            signals: Vec::new(),
+            recording_target: None,
+            speed_multiplier: 1.0,
+            settings: blockwork_core::macros::MacroSettings::default(),
+        }
+    }
+
+    #[test]
+    fn resolves_field_location() {
+        let mut mac = test_macro();
+        let loc = ValueLocation::Field {
+            strand_id: "s1".into(),
+            index: top(1),
+            field_id: FieldId::WaitDuration.to_string(),
+            path: vec![],
+        };
+        assert_eq!(
+            mac.value_at_mut(&loc),
+            Some(&mut Value::number(1000.0))
+        );
+    }
+
+    #[test]
+    fn resolves_floating_location() {
+        let mut mac = test_macro();
+        let loc = ValueLocation::Floating {
+            floating_id: "f1".into(),
+            path: vec![],
+        };
+        assert_eq!(
+            mac.value_at_mut(&loc),
+            Some(&mut Value::number(5.0))
+        );
+    }
+
+    #[test]
+    fn missing_location_resolves_to_none() {
+        let mut mac = test_macro();
+        let bad_field = ValueLocation::Field {
+            strand_id: "nope".into(),
+            index: top(0),
+            field_id: FieldId::WaitDuration.to_string(),
+            path: vec![],
+        };
+        assert_eq!(mac.value_at_mut(&bad_field), None);
+        let bad_floating = ValueLocation::Floating {
+            floating_id: "nope".into(),
+            path: vec![],
+        };
+        assert_eq!(mac.value_at_mut(&bad_floating), None);
+    }
+
+    #[test]
+    fn apply_value_kind_tucks_leaf_away_as_saved() {
+        let mut node = Value::number(5.0);
+        apply_value_kind(&mut node, "Add", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Add,
+                args: vec![Value::number(0.0), Value::number(0.0)],
+                saved: Box::new(Value::number(5.0))
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_collapses_operator_to_number_best_effort() {
+        let mut node = Value::Op {
+            op: Op::Add,
+            args: vec![Value::number(2.0), Value::number(3.0)],
+            saved: Box::new(Value::number(0.0)),
+        };
+        apply_value_kind(&mut node, "Number", &HashMap::new()).unwrap();
+        assert_eq!(node, Value::number(5.0));
+    }
+
+    #[test]
+    fn apply_value_kind_random_tucks_leaf_away_as_saved() {
+        let mut node = Value::number(5.0);
+        apply_value_kind(&mut node, "Random", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Random,
+                args: vec![Value::number(0.0), Value::number(0.0)],
+                saved: Box::new(Value::number(5.0))
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_rejects_unknown_kind() {
+        let mut node = Value::number(0.0);
+        assert!(apply_value_kind(&mut node, "Bogus", &HashMap::new()).is_err());
+    }
+
+    #[test]
+    fn apply_value_kind_var_becomes_a_plain_leaf() {
+        let mut node = Value::number(5.0);
+        apply_value_kind(&mut node, "Var:x", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Var {
+                name: "x".to_string()
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_number_best_effort_carries_over_variable_value() {
+        let mut node = Value::Var {
+            name: "x".to_string(),
+        };
+        let env = HashMap::from([("x".to_string(), Evaluated::Number(7.0))]);
+        apply_value_kind(&mut node, "Number", &env).unwrap();
+        assert_eq!(node, Value::number(7.0));
+    }
+
+    #[test]
+    fn apply_value_kind_join_tucks_leaf_away_as_saved() {
+        let mut node = Value::number(5.0);
+        apply_value_kind(&mut node, "Join", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Join,
+                args: vec![
+                    Value::Text {
+                        value: String::new()
+                    },
+                    Value::Text {
+                        value: String::new()
+                    }
+                ],
+                saved: Box::new(Value::number(5.0)),
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_join3_grows_existing_join_args() {
+        let mut node = Value::Op {
+            op: Op::Join,
+            args: vec![
+                Value::Text { value: "a".into() },
+                Value::Text { value: "b".into() },
+            ],
+            saved: Box::new(Value::number(9.0)),
+        };
+        apply_value_kind(&mut node, "Join3", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Join,
+                args: vec![
+                    Value::Text { value: "a".into() },
+                    Value::Text { value: "b".into() },
+                    Value::Text {
+                        value: String::new()
+                    },
+                ],
+                saved: Box::new(Value::number(9.0)),
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_join_shrinks_existing_join3_args() {
+        let mut node = Value::Op {
+            op: Op::Join,
+            args: vec![
+                Value::Text { value: "a".into() },
+                Value::Text { value: "b".into() },
+                Value::Text { value: "c".into() },
+            ],
+            saved: Box::new(Value::number(0.0)),
+        };
+        apply_value_kind(&mut node, "Join", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Join,
+                args: vec![
+                    Value::Text { value: "a".into() },
+                    Value::Text { value: "b".into() }
+                ],
+                saved: Box::new(Value::number(0.0)),
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_new_line_tucks_leaf_away_as_saved_with_no_args() {
+        let mut node = Value::number(5.0);
+        apply_value_kind(&mut node, "NewLine", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::NewLine,
+                args: vec![],
+                saved: Box::new(Value::number(5.0))
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_tab_tucks_leaf_away_as_saved_with_no_args() {
+        let mut node = Value::number(5.0);
+        apply_value_kind(&mut node, "Tab", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Tab,
+                args: vec![],
+                saved: Box::new(Value::number(5.0))
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_swapping_join_to_new_line_drops_args() {
+        let mut node = Value::Op {
+            op: Op::Join,
+            args: vec![
+                Value::Text { value: "a".into() },
+                Value::Text { value: "b".into() },
+            ],
+            saved: Box::new(Value::number(9.0)),
+        };
+        apply_value_kind(&mut node, "NewLine", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::NewLine,
+                args: vec![],
+                saved: Box::new(Value::number(9.0))
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_round_tucks_leaf_away_as_saved_with_one_arg() {
+        let mut node = Value::number(5.0);
+        apply_value_kind(&mut node, "Round", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Round,
+                args: vec![Value::number(0.0)],
+                saved: Box::new(Value::number(5.0))
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_math_tucks_leaf_away_with_abs_selector() {
+        let mut node = Value::number(5.0);
+        apply_value_kind(&mut node, "Math", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Math,
+                args: vec![
+                    Value::Text {
+                        value: "Abs".into()
+                    },
+                    Value::number(0.0)
+                ],
+                saved: Box::new(Value::number(5.0)),
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_case_defaults_second_arg_to_upper() {
+        let mut node = Value::number(5.0);
+        apply_value_kind(&mut node, "Case", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::Case,
+                args: vec![
+                    Value::Text {
+                        value: String::new()
+                    },
+                    Value::Text {
+                        value: "Upper".into()
+                    }
+                ],
+                saved: Box::new(Value::number(5.0)),
+            }
+        );
+    }
+
+    #[test]
+    fn apply_value_kind_letter_of_grows_from_round_with_mixed_type_default() {
+        // Round (arity 1) -> LetterOf (arity 2): the surviving first arg
+        // keeps its value untouched, and the newly-added second slot gets
+        // LetterOf's own default type (text), not Round's (number).
+        let mut node = Value::Op {
+            op: Op::Round,
+            args: vec![Value::number(7.0)],
+            saved: Box::new(Value::number(0.0)),
+        };
+        apply_value_kind(&mut node, "LetterOf", &HashMap::new()).unwrap();
+        assert_eq!(
+            node,
+            Value::Op {
+                op: Op::LetterOf,
+                args: vec![
+                    Value::number(7.0),
+                    Value::Text {
+                        value: String::new()
+                    }
+                ],
+                saved: Box::new(Value::number(0.0)),
+            }
+        );
+    }
+
+    #[test]
+    fn prune_value_buffers_drops_only_descendants_of_changed_path() {
+        let mut buffers: HashMap<ValueLocation, String> = HashMap::new();
+        let field = |path: Vec<u8>| ValueLocation::Field {
+            strand_id: "s1".into(),
+            index: top(1),
+            field_id: FieldId::WaitDuration.to_string(),
+            path,
+        };
+        buffers.insert(field(vec![0]), "kept-sibling-subtree-root".into());
+        buffers.insert(field(vec![1]), "dropped-descendant".into());
+        buffers.insert(field(vec![1, 0]), "dropped-nested-descendant".into());
+        buffers.insert(
+            ValueLocation::Field {
+                strand_id: "s2".into(),
+                index: top(1),
+                field_id: FieldId::WaitDuration.to_string(),
+                path: vec![1],
+            },
+            "kept-different-strand".into(),
+        );
+
+        prune_value_buffers(&mut buffers, &field(vec![1]));
+
+        assert_eq!(buffers.len(), 2);
+        assert!(buffers.contains_key(&field(vec![0])));
+        assert!(buffers.contains_key(&ValueLocation::Field {
+            strand_id: "s2".into(),
+            index: top(1),
+            field_id: FieldId::WaitDuration.to_string(),
+            path: vec![1]
+        }));
+    }
+
+    #[test]
+    fn location_requires_integer_only_for_pixel_fields() {
+        assert!(FieldId::MoveMouseX.requires_integer());
+        assert!(FieldId::MoveMouseY.requires_integer());
+        assert!(FieldId::ScrollAmount.requires_integer());
+        assert!(!FieldId::WaitDuration.requires_integer());
+        // And the graph looks it up through the instruction a location addresses.
+        let mac = test_macro();
+        assert!(!mac.location_requires_integer(&ValueLocation::Field {
+            strand_id: "s1".into(),
+            index: top(1),
+            field_id: FieldId::WaitDuration.to_string(),
+            path: vec![],
+        }));
+        assert!(!mac.location_requires_integer(&ValueLocation::Floating {
+            floating_id: "f1".into(),
+            path: vec![]
+        }));
+    }
+
+    #[test]
+    fn floating_values_round_trip_through_json() {
+        let mac = test_macro();
+        let json = serde_json::to_string(&mac).unwrap();
+        let back: Macro = serde_json::from_str(&json).unwrap();
+        assert_eq!(back.floating_values, mac.floating_values);
+    }
+
+    #[test]
+    fn macro_without_floating_values_key_loads_with_empty_vec() {
+        let json = r#"{"id":"m1","name":"Old","description":"","strands":[
+            {"id":"s1","x":0,"y":0,"instructions":["WhenRan"]}
+        ]}"#;
+        let mac: Macro = serde_json::from_str(json).unwrap();
+        assert!(mac.floating_values.is_empty());
+    }
+
+    #[test]
+    fn legacy_bare_number_floating_value_migrates() {
+        let json = r#"{"id":"f1","x":10,"y":20,"value":5.0}"#;
+        let fv: FloatingValue = serde_json::from_str(json).unwrap();
+        assert_eq!(fv.value, Value::number(5.0));
+    }
+
+    #[test]
+    fn move_mouse_field_still_resolves_after_rework() {
+        let mut mac = Macro {
+            id: "m".into(),
+            name: "T".into(),
+            description: "".into(),
+            graph: MacroGraph {
+                strands: vec![Strand {
+                    id: "s1".into(),
+                    x: 0,
+                    y: 0,
+                    instructions: vec![Instruction::new(InstructionKind::Token(
+                        blockwork_core::input::types::InputToken::MoveMouse(
+                            Value::number(1.0),
+                            Value::number(2.0),
+                            Coordinate::Rel,
+                        ),
+                    ))],
+                }],
+                ..MacroGraph::new()
+            },
+            signals: Vec::new(),
+            recording_target: None,
+            speed_multiplier: 1.0,
+            settings: blockwork_core::macros::MacroSettings::default(),
+        };
+        let loc = ValueLocation::Field {
+            strand_id: "s1".into(),
+            index: top(0),
+            field_id: FieldId::MoveMouseY.to_string(),
+            path: vec![],
+        };
+        assert_eq!(
+            mac.value_at_mut(&loc),
+            Some(&mut Value::number(2.0))
+        );
+    }
+
+    #[test]
+    fn preview_value_stringifies_numeric_result() {
+        let dto = Value::Op {
+            op: Op::Add,
+            args: vec![
+                Value::Number { value: 2.0 },
+                Value::Number { value: 3.0 },
+            ],
+            saved: Box::new(Value::Number { value: 0.0 }),
+        };
+        assert_eq!(
+            preview_value_with_env(&dto, &HashMap::new()),
+            Ok("5".to_string())
+        );
+    }
+
+    #[test]
+    fn preview_value_joins_text_args() {
+        let dto = Value::Op {
+            op: Op::Join,
+            args: vec![
+                Value::Text {
+                    value: "foo".into(),
+                },
+                Value::Text {
+                    value: "bar".into(),
+                },
+            ],
+            saved: Box::new(Value::Number { value: 0.0 }),
+        };
+        assert_eq!(
+            preview_value_with_env(&dto, &HashMap::new()),
+            Ok("foobar".to_string())
+        );
+    }
+
+    #[test]
+    fn preview_value_surfaces_eval_errors() {
+        let dto = Value::Op {
+            op: Op::Div,
+            args: vec![
+                Value::Number { value: 1.0 },
+                Value::Number { value: 0.0 },
+            ],
+            saved: Box::new(Value::Number { value: 0.0 }),
+        };
+        assert!(preview_value_with_env(&dto, &HashMap::new()).is_err());
+    }
+
+    #[test]
+    fn create_variable_adds_variable_starting_at_zero() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        let name = mac.create_variable("score").unwrap();
+        assert_eq!(name, "score");
+        assert_eq!(
+            mac.variables,
+            vec![VariableDef {
+                name: "score".into(),
+                value: Evaluated::Number(0.0)
+            }]
+        );
+    }
+
+    #[test]
+    fn create_variable_trims_whitespace() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        let name = mac.create_variable("  score  ").unwrap();
+        assert_eq!(name, "score");
+    }
+
+    #[test]
+    fn create_variable_rejects_empty_name() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        assert!(mac.create_variable("   ").is_err());
+    }
+
+    #[test]
+    fn create_variable_rejects_duplicate_name() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        mac.create_variable("score").unwrap();
+        assert!(mac.create_variable("score").is_err());
+        assert_eq!(mac.variables.len(), 1);
+    }
+
+    #[test]
+    fn rename_variable_renames_and_updates_references() {
+        let mut mac = Macro::new(
+            "Test".into(),
+            "".into(),
+            vec![Instruction::new(InstructionKind::SetVariable(
+                "score".to_string(),
+                Value::number(1.0),
+            ))],
+        );
+        mac.create_variable("score").unwrap();
+        let name = mac.rename_variable("score", "points").unwrap();
+        assert_eq!(name, "points");
+        assert_eq!(mac.variables[0].name, "points");
+        assert_eq!(
+            mac.strands[0].instructions[1],
+            Instruction::new(InstructionKind::SetVariable(
+                "points".to_string(),
+                Value::number(1.0)
+            ))
+        );
+    }
+
+    #[test]
+    fn rename_variable_trims_whitespace() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        mac.create_variable("score").unwrap();
+        let name = mac.rename_variable("score", "  points  ").unwrap();
+        assert_eq!(name, "points");
+    }
+
+    #[test]
+    fn rename_variable_rejects_empty_name() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        mac.create_variable("score").unwrap();
+        assert!(mac.rename_variable("score", "   ").is_err());
+    }
+
+    #[test]
+    fn rename_variable_rejects_duplicate_name() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        mac.create_variable("score").unwrap();
+        mac.create_variable("points").unwrap();
+        assert!(mac.rename_variable("score", "points").is_err());
+    }
+
+    #[test]
+    fn rename_variable_allows_renaming_to_its_own_current_name() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        mac.create_variable("score").unwrap();
+        assert_eq!(
+            mac.rename_variable("score", "score").unwrap(),
+            "score"
+        );
+        assert_eq!(mac.variables.len(), 1);
+    }
+
+    #[test]
+    fn remove_variable_removes_declaration_but_leaves_references() {
+        let mut mac = Macro::new(
+            "Test".into(),
+            "".into(),
+            vec![Instruction::new(InstructionKind::Token(InputToken::Text(
+                Value::Var {
+                    name: "score".to_string(),
+                },
+            )))],
+        );
+        mac.create_variable("score").unwrap();
+        mac.remove_variable("score");
+        assert!(mac.variables.is_empty());
+        assert_eq!(
+            mac.strands[0].instructions[1],
+            Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var {
+                name: "score".to_string()
+            })))
+        );
+    }
+
+    // ─── Custom blocks ("My Blocks") ────────────────────────────────────────
+
+    fn label(text: &str) -> BlockPiece {
+        BlockPiece::Label {
+            id: format!("id-{text}"),
+            text: text.to_string(),
+        }
+    }
+    fn input(id: &str, name: &str) -> BlockPiece {
+        BlockPiece::Input {
+            id: id.to_string(),
+            name: name.to_string(),
+            value_type: Default::default(),
+            default_value: None,
+        }
+    }
+
+    #[test]
+    fn validate_pieces_accepts_a_well_formed_prototype() {
+        assert!(BlockDef::validate_pieces(&[label("double"), input("i1", "n")]).is_ok());
+    }
+
+    #[test]
+    fn validate_pieces_rejects_all_blank_labels() {
+        assert!(BlockDef::validate_pieces(&[label("  "), input("i1", "n")]).is_err());
+    }
+
+    #[test]
+    fn validate_pieces_rejects_blank_input_name() {
+        assert!(BlockDef::validate_pieces(&[label("double"), input("i1", "  ")]).is_err());
+    }
+
+    #[test]
+    fn validate_pieces_rejects_duplicate_input_names() {
+        assert!(
+            BlockDef::validate_pieces(&[label("add"), input("i1", "n"), input("i2", "n")]).is_err()
+        );
+    }
+
+    #[test]
+    fn create_block_appends_def_and_empty_header_strand() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        let id = mac.create_block(
+            vec![label("double"), input("i1", "n")],
+            BlockShape::ReturnsValue,
+            "#4C97FF".into(),
+            100,
+            0,
+        );
+        assert_eq!(mac.block_defs.len(), 1);
+        assert_eq!(mac.block_defs[0].id, id);
+        assert_eq!(mac.block_defs[0].shape, BlockShape::ReturnsValue);
+        let header_strand = mac.strands.iter().find(|s| {
+            s.instructions == vec![Instruction::new(InstructionKind::BlockHeader(id.clone()))]
+        });
+        assert!(header_strand.is_some());
+    }
+
+    #[test]
+    fn reordering_branches_keeps_each_call_body_with_its_branch() {
+        let branch = |id: &str, name: &str| BlockPiece::Branch { id: id.into(), name: name.into() };
+        let say = |text: &str| Instruction::new(InstructionKind::Log(Value::text(text)));
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        let id = mac.create_block(
+            vec![label("either"), branch("b1", "yes"), branch("b2", "no")],
+            BlockShape::Normal,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
+        mac.strands.push(Strand {
+            id: "caller".into(),
+            x: 0,
+            y: 0,
+            instructions: vec![Instruction::new(InstructionKind::CallBlock {
+                block_id: id.clone(),
+                args: vec![],
+                branches: vec![vec![say("yes")], vec![say("no")]],
+            })],
+        });
+        mac.update_block(&id, vec![label("either"), branch("b2", "no"), branch("b1", "yes")], BlockShape::Normal, "#4C97FF")
+            .unwrap();
+        let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
+        let InstructionKind::CallBlock { branches, .. } = &caller.instructions[0].kind else {
+            panic!("expected CallBlock")
+        };
+        assert_eq!(branches, &vec![vec![say("no")], vec![say("yes")]]);
+    }
+
+    #[test]
+    fn reconcile_block_call_args_preserves_value_across_rename_by_id() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        let id = mac.create_block(
+            vec![input("i1", "a")],
+            BlockShape::Normal,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
+        // A CallBlock call site with one arg bound to the "a" slot.
+        mac.strands.push(Strand {
+            id: "caller".into(),
+            x: 0,
+            y: 0,
+            instructions: vec![Instruction::new(InstructionKind::CallBlock {
+                block_id: id.clone(),
+                args: vec![Value::number(5.0)],
+                branches: vec![],
+            })],
+        });
+        let old_pieces = mac.block_defs[0].pieces.clone();
+        let new_pieces = vec![input("i1", "b")]; // same id, renamed
+        mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);
+        let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
+        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else {
+            panic!("expected CallBlock")
+        };
+        assert_eq!(args, &vec![Value::number(5.0)]);
+    }
+
+    #[test]
+    fn reconcile_block_call_args_drops_removed_input_and_keeps_survivor() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        let id = mac.create_block(
+            vec![input("i1", "a"), input("i2", "b")],
+            BlockShape::Normal,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
+        mac.strands.push(Strand {
+            id: "caller".into(),
+            x: 0,
+            y: 0,
+            instructions: vec![Instruction::new(InstructionKind::CallBlock {
+                block_id: id.clone(),
+                args: vec![Value::number(1.0), Value::number(2.0)],
+                branches: vec![],
+            })],
+        });
+        let old_pieces = mac.block_defs[0].pieces.clone();
+        let new_pieces = vec![input("i2", "b")]; // "a" (i1) removed
+        mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);
+        let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
+        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else {
+            panic!("expected CallBlock")
+        };
+        assert_eq!(args, &vec![Value::number(2.0)]);
+    }
+
+    #[test]
+    fn reconcile_block_call_args_defaults_a_newly_added_input_to_zero() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        let id = mac.create_block(
+            vec![input("i1", "a")],
+            BlockShape::Normal,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
+        mac.strands.push(Strand {
+            id: "caller".into(),
+            x: 0,
+            y: 0,
+            instructions: vec![Instruction::new(InstructionKind::CallBlock {
+                block_id: id.clone(),
+                args: vec![Value::number(5.0)],
+                branches: vec![],
+            })],
+        });
+        let old_pieces = mac.block_defs[0].pieces.clone();
+        let new_pieces = vec![input("i1", "a"), input("i2", "b")]; // "b" newly added
+        mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);
+        let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
+        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else {
+            panic!("expected CallBlock")
+        };
+        assert_eq!(args, &vec![Value::number(5.0), Value::number(0.0)]);
+    }
+
+    #[test]
+    fn reconcile_block_call_args_defaults_a_newly_added_bool_input_to_blank_bool() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        let id = mac.create_block(
+            vec![input("i1", "a")],
+            BlockShape::Normal,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
+        mac.strands.push(Strand {
+            id: "caller".into(),
+            x: 0,
+            y: 0,
+            instructions: vec![Instruction::new(InstructionKind::CallBlock {
+                block_id: id.clone(),
+                args: vec![Value::number(5.0)],
+                branches: vec![],
+            })],
+        });
+        let old_pieces = mac.block_defs[0].pieces.clone();
+        let new_pieces = vec![
+            input("i1", "a"),
+            BlockPiece::Input {
+                id: "i2".into(),
+                name: "b".into(),
+                value_type: InputValueType::Bool,
+                default_value: None,
+            },
+        ];
+        mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);
+        let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
+        let InstructionKind::CallBlock { args, .. } = &caller.instructions[0].kind else {
+            panic!("expected CallBlock")
+        };
+        assert_eq!(args, &vec![Value::number(5.0), Value::Bool]);
+    }
+
+    #[test]
+    fn remove_block_scrubs_call_block_and_call_references() {
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        let id = mac.create_block(
+            vec![input("i1", "n")],
+            BlockShape::ReturnsValue,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
+        mac.strands.push(Strand {
+            id: "caller".into(),
+            x: 0,
+            y: 0,
+            instructions: vec![Instruction::new(InstructionKind::SetVariable(
+                "x".to_string(),
+                Value::Call {
+                    block_id: id.clone(),
+                    args: vec![],
+                    branches: vec![],
+                    saved: Box::new(Value::number(0.0)),
+                },
+            ))],
+        });
+        mac.remove_block(&id);
+        assert!(mac.block_defs.is_empty());
+        assert!(!mac.strands.iter().any(|s| matches!(
+            s.instructions.first().map(|i| &i.kind),
+            Some(InstructionKind::BlockHeader(_))
+        )));
+        let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
+        assert_eq!(
+            caller.instructions[0],
+            Instruction::new(InstructionKind::SetVariable(
+                "x".to_string(),
+                Value::number(0.0)
+            ))
+        );
+    }
+
+    /// An unresolved `Call` node must degrade to an ordinary `Err`, never panic.
+    #[test]
+    fn preview_value_with_env_errors_on_unresolved_call() {
+        let dto = Value::Call {
+            block_id: "missing".into(),
+            args: vec![],
+            branches: vec![],
+            saved: Box::new(Value::Number { value: 0.0 }),
+        };
+        assert!(preview_value_with_env(&dto, &HashMap::new()).is_err());
+    }
+
+    #[test]
+    fn apply_value_kind_number_best_effort_defaults_to_zero_for_unresolved_call() {
+        let mut node = Value::Call {
+            block_id: "missing".into(),
+            args: vec![],
+            branches: vec![],
+            saved: Box::new(Value::number(0.0)),
+        };
+        apply_value_kind(&mut node, "Number", &HashMap::new()).unwrap();
+        assert_eq!(node, Value::number(0.0));
+    }
+
+    fn wait_field(path: Vec<u8>) -> ValueLocation {
+        ValueLocation::Field {
+            strand_id: "s1".into(),
+            index: top(1),
+            field_id: FieldId::WaitDuration.to_string(),
+            path,
+        }
+    }
+
+    #[test]
+    fn typed_spelling_survives_in_an_operand_through_the_shared_edit() {
+        let mut mac = test_macro();
+        mac.put_value(&wait_field(vec![]), Value::Op {
+            op: Op::Add,
+            args: vec![Value::number(1.0), Value::number(2.0)],
+            saved: Box::new(Value::number(0.0)),
+        });
+        for (path, text, stored) in [
+            (vec![0], "09", Value::text("09")),
+            (vec![1], "1.50", Value::text("1.50")),
+        ] {
+            let outcome = mac
+                .apply_edit(
+                    EditCommand::EditFieldText { location: wait_field(path.clone()), text: text.into() },
+                    &EDIT_CONTEXT,
+                )
+                .unwrap();
+            assert!(outcome.changed);
+            assert_eq!(mac.value_at(&wait_field(path)), Some(stored));
+        }
+    }
+
+    #[test]
+    fn a_shared_move_matches_the_old_take_then_put() {
+        let floating = ValueLocation::Floating { floating_id: "f1".into(), path: vec![] };
+        let mut old = test_macro();
+        let mut new = old.clone();
+        let value = old.take_value(&floating).unwrap();
+        old.put_value(&wait_field(vec![]), value);
+
+        new.apply_edit(
+            EditCommand::MoveValue { from: floating, to: ValueDestination::Slot(wait_field(vec![])) },
+            &EDIT_CONTEXT,
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(&new.graph).unwrap(),
+            serde_json::to_value(&old.graph).unwrap()
+        );
+    }
+
+    #[test]
+    fn a_rejected_move_leaves_the_macro_alone() {
+        let mut mac = test_macro();
+        let before = serde_json::to_value(&mac.graph).unwrap();
+        let missing = ValueLocation::Floating { floating_id: "nope".into(), path: vec![] };
+        let result = mac.apply_edit(
+            EditCommand::MoveValue { from: missing, to: ValueDestination::Slot(wait_field(vec![])) },
+            &EDIT_CONTEXT,
+        );
+        assert_eq!(String::from(result.unwrap_err()), "Nothing to take at that location");
+        assert_eq!(serde_json::to_value(&mac.graph).unwrap(), before);
+    }
+
+    #[test]
+    fn delete_tail_is_one_edit() {
+        let mut mac = test_macro();
+        let outcome = mac
+            .apply_edit(
+                EditCommand::RemoveInstructions { strand_id: "s1".into(), path: top(0), count: 2 },
+                &EDIT_CONTEXT,
+            )
+            .unwrap();
+        assert!(outcome.changed);
+        assert!(mac.strand("s1").unwrap().instructions.is_empty());
+    }
+
+    /// The old frontend walker skipped `catch_body`; the shared clone walks
+    /// every body the kind declares.
+    #[test]
+    fn duplicating_a_try_renames_its_on_error_part_and_copies_notes() {
+        let mut mac = test_macro();
+        let caught = Instruction::new(InstructionKind::Wait(Value::number(1.0)));
+        let caught_id = caught.id.clone();
+        let try_block = Instruction::new(InstructionKind::TryCatch {
+            body: vec![Instruction::new(InstructionKind::Wait(Value::number(2.0)))],
+            catch_body: vec![caught],
+        });
+        mac.insert_instruction("s1", &top(2), try_block).unwrap();
+        mac.comments.push(blockwork_core::macros::Comment::new(4, 4, "n".into(), Some(caught_id.clone())));
+        let outcome = mac
+            .apply_edit(EditCommand::DuplicateInstruction { strand_id: "s1".into(), path: top(2) }, &EDIT_CONTEXT)
+            .unwrap();
+        let list = &mac.strand("s1").unwrap().instructions;
+        assert_eq!(list.len(), 4);
+        let InstructionKind::TryCatch { catch_body, .. } = &list[3].kind else { panic!() };
+        assert_ne!(catch_body[0].id, caught_id);
+        assert_eq!(outcome.ids[&caught_id], catch_body[0].id);
+        assert_eq!(mac.instruction_ids().len(), 2 + 3 + 3);
+        assert_eq!(mac.comments.last().unwrap().attached_to.as_ref(), Some(&catch_body[0].id));
+    }
+
+    #[test]
+    fn a_fragment_round_trips_through_the_frontend_dto() {
+        let mut mac = test_macro();
+        let wait_id = mac.strand("s1").unwrap().instructions[1].id.clone();
+        mac.comments.push(blockwork_core::macros::Comment::new(1, 2, "n".into(), Some(wait_id.clone())));
+        let fragment = mac.copy_fragment("s1", &top(1), None).unwrap();
+        let dto: crate::state::FragmentDto =
+            serde_json::from_value(serde_json::to_value(fragment_to_dto(&fragment)).unwrap()).unwrap();
+        let back = dto_to_fragment(&dto).unwrap();
+        assert_eq!(back, fragment);
+        assert_eq!(back.instructions[0].id, wait_id);
+        let outcome = mac
+            .apply_edit(EditCommand::PasteFragment { fragment: back, x: 5, y: 6 }, &EDIT_CONTEXT)
+            .unwrap();
+        assert!(outcome.changed);
+        assert_ne!(outcome.ids[&wait_id], wait_id);
+        assert_eq!(mac.comments.len(), 2);
+    }
+}
+
+#[cfg(test)]
+mod import_review_tests {
+    use super::*;
+    use blockwork_core::input::value::Op;
+    use blockwork_core::macros::MacroGraph;
+
+    #[test]
+    fn lists_what_a_macro_can_do_including_nested_blocks_and_reporters() {
+        blockwork_core::init();
+        let nested = Instruction::new(InstructionKind::If {
+            condition: Value::Bool,
+            body: vec![Instruction::new(InstructionKind::Log(Value::op(
+                Op::from_name("ShellOutput"),
+                vec![Value::text("ls")],
+            )))],
+        });
+        let mac = Macro {
+            id: "m".into(),
+            name: "Test".into(),
+            description: "".into(),
+            graph: MacroGraph {
+                strands: vec![Strand {
+                    id: "s1".into(),
+                    x: 0,
+                    y: 0,
+                    instructions: vec![
+                        Instruction::new(InstructionKind::WhenFileChanged(Value::text("~/a"))),
+                        nested,
+                        Instruction::new(InstructionKind::Token(InputToken::Text(Value::text("hi")))),
+                    ],
+                }],
+                ..MacroGraph::new()
+            },
+            signals: Vec::new(),
+            recording_target: None,
+            speed_multiplier: 1.0,
+            settings: blockwork_core::macros::MacroSettings::default(),
+        };
+        let kinds: Vec<_> = macro_capabilities(&mac).into_iter().map(|c| (c.kind, c.risky)).collect();
+        assert_eq!(
+            kinds,
+            vec![
+                ("commands".to_string(), true),
+                ("files_read".to_string(), false),
+                ("input".to_string(), false),
+                ("triggers".to_string(), false),
+            ]
+        );
+    }
+}

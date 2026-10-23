@@ -41,26 +41,50 @@ static CALLBACK: OnceLock<Mutex<Box<dyn FnMut(CaptureEvent, CaptureTimestamp) ->
 /// guard against.
 ///
 /// (`HOTKEY_FOREGROUND_HWND` below stays an atomic because a different
-/// thread — macro playback — does read it.)
+/// thread - macro playback - does read it.)
 struct HookThreadState {
     /// VK codes currently held down, indexed directly (0..256) rather than
     /// hashed. Needed because `KBDLLHOOKSTRUCT` carries no repeat flag of its
-    /// own — that's only synthesized later, downstream of where this hook runs.
+    /// own - that's only synthesized later, downstream of where this hook runs.
     key_held: [bool; 256],
     /// VK codes whose key-down was swallowed, so the matching key-up is
     /// swallowed too rather than reaching the focused window unpaired.
     key_suppressed: [bool; 256],
     /// Last absolute cursor position, used to turn `WM_MOUSEMOVE`'s absolute
     /// coords into relative deltas. `None` until the first move, rather than
-    /// a sentinel — a magic `i32::MIN` here previously caused an overflow
+    /// a sentinel - a magic `i32::MIN` here previously caused an overflow
     /// panic on startup.
     last_cursor: Option<(i32, i32)>,
+    /// Wheel movement not yet reported, (horizontal, vertical), in
+    /// `WHEEL_DELTA` (120) units per notch. Touchpads and free-spinning
+    /// wheels send fractions of a notch, which add up here.
+    wheel_rest: (i32, i32),
 }
 
 impl Default for HookThreadState {
     fn default() -> Self {
-        Self { key_held: [false; 256], key_suppressed: [false; 256], last_cursor: None }
+        Self { key_held: [false; 256], key_suppressed: [false; 256], last_cursor: None, wheel_rest: (0, 0) }
     }
+}
+
+/// Pixel `offset` of `size` as SendInput's 0-65535 absolute units. Windows
+/// turns them back into pixels by truncating `units * size / 65536`, so
+/// round up to land on the pixel itself.
+fn normalize(offset: i32, size: i32) -> i32 {
+    let offset = offset.clamp(0, size - 1) as i64;
+    ((offset * 65536 + size as i64 - 1) / size as i64).min(65535) as i32
+}
+
+/// Whole notches in `rest + delta`, keeping the remainder in `rest`.
+fn wheel_notches(rest: &mut i32, delta: i16) -> i32 {
+    // A reversal drops what was left over the other way.
+    if (*rest > 0 && delta < 0) || (*rest < 0 && delta > 0) {
+        *rest = 0;
+    }
+    *rest += delta as i32;
+    let notches = *rest / 120;
+    *rest -= notches * 120;
+    notches
 }
 
 thread_local! {
@@ -231,10 +255,47 @@ impl InputBackend for WinApiBackend {
             .map_err(|e| e.to_string())
     }
 
+    /// enigo maps absolute moves onto the primary monitor, which rounds
+    /// points on monitors left of or above it off by a pixel. This maps them
+    /// onto the whole virtual desktop instead.
     fn move_mouse_abs(&mut self, x: i32, y: i32) -> Result<(), String> {
-        self.enigo
-            .move_mouse(x, y, enigo::Coordinate::Abs)
-            .map_err(|e| e.to_string())
+        use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+            INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_MOVE, MOUSEEVENTF_VIRTUALDESK, MOUSEINPUT,
+            SendInput,
+        };
+        use windows_sys::Win32::UI::WindowsAndMessaging::{
+            GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+        };
+        // SAFETY: plain metrics queries.
+        let (vx, vy, vw, vh) = unsafe {
+            (
+                GetSystemMetrics(SM_XVIRTUALSCREEN),
+                GetSystemMetrics(SM_YVIRTUALSCREEN),
+                GetSystemMetrics(SM_CXVIRTUALSCREEN),
+                GetSystemMetrics(SM_CYVIRTUALSCREEN),
+            )
+        };
+        if vw < 2 || vh < 2 {
+            return self.enigo.move_mouse(x, y, enigo::Coordinate::Abs).map_err(|e| e.to_string());
+        }
+        let input = INPUT {
+            r#type: INPUT_MOUSE,
+            Anonymous: INPUT_0 {
+                mi: MOUSEINPUT {
+                    dx: normalize(x - vx, vw),
+                    dy: normalize(y - vy, vh),
+                    mouseData: 0,
+                    dwFlags: MOUSEEVENTF_MOVE | MOUSEEVENTF_ABSOLUTE | MOUSEEVENTF_VIRTUALDESK,
+                    time: 0,
+                    dwExtraInfo: 0,
+                },
+            },
+        };
+        // SAFETY: one INPUT, its size passed alongside.
+        if unsafe { SendInput(1, &input, std::mem::size_of::<INPUT>() as i32) } != 1 {
+            return Err("Windows blocked the mouse move (is a program running as administrator focused?)".into());
+        }
+        Ok(())
     }
 
     fn scroll(&mut self, amount: i32, axis: Axis) -> Result<(), String> {
@@ -294,10 +355,9 @@ pub(super) fn start_capture_thread(
                     WINEVENT_OUTOFCONTEXT,
                 );
 
-                // CEF re-executes this binary for helper processes; a helper
-                // that reached this code would install a competing hook
-                // nobody's queue drains. Exactly one of these lines should
-                // ever appear.
+                // Only the long-lived daemon should install these hooks. A
+                // second owner would install a competing hook whose queue is
+                // never drained. Exactly one of these lines should appear.
                 if kb_hook.is_null() || ms_hook.is_null() || ds_hook.is_null() {
                     warn!(
                         pid = std::process::id(),
@@ -311,10 +371,10 @@ pub(super) fn start_capture_thread(
                 }
                 // Surfaced in the UI like a failed evdev grab (Linux) or
                 // refused event tap (macOS). Keyed on the two hooks that
-                // carry input — without them there's no recording or hotkeys.
+                // carry input - without them there's no recording or hotkeys.
                 crate::recording::set_grab_failed(kb_hook.is_null() || ms_hook.is_null());
 
-                // This loop only pumps the queue — hooks deliver via
+                // This loop only pumps the queue - hooks deliver via
                 // callbacks from inside GetMessageW, and hotkeys are matched
                 // in `keyboard_proc`, not dispatched as messages.
                 let mut msg: MSG = std::mem::zeroed();
@@ -328,7 +388,7 @@ pub(super) fn start_capture_thread(
 }
 
 /// Windows silently uninstalls a low-level hook whose procedure exceeds
-/// `LowLevelHooksTimeout` (~300ms default) — no error, just hotkeys and
+/// `LowLevelHooksTimeout` (~300ms default) - no error, just hotkeys and
 /// recording quietly dying. Every hook routes through here so approaching
 /// that budget (set to a third of it, as a warning margin) shows up in the
 /// log; if it ever fires, move the callback onto a dispatch thread the way
@@ -355,54 +415,9 @@ fn dispatch(event: CaptureEvent) -> CaptureDecision {
     decision
 }
 
-/// Repeat-tracking for `dispatch_from_focused_window`, kept separate from
-/// `HOOK_STATE` since this path runs on CEF's UI thread, not `winapi-hook`.
-/// Timestamp-based rather than held/released flags: CEF doesn't reliably
-/// deliver a matching `KEYUP` once a key-down was reported handled, so a flag
-/// could get stuck "held" forever and silently swallow every later press. An
-/// elapsed-time check can't get stuck the same way.
-static FOCUSED_KEY_LAST_PRESS: Mutex<[Option<std::time::Instant>; 256]> = Mutex::new([None; 256]);
-
-/// Auto-repeat delivers the next `RAWKEYDOWN` well under this apart (Windows'
-/// fastest repeat rate is ~33ms); a deliberate second press is comfortably
-/// slower.
-const FOCUSED_KEY_REPEAT_WINDOW: std::time::Duration = std::time::Duration::from_millis(60);
-
-/// Feeds a key event from the app's own webview into the same hotkey
-/// pipeline the global hook uses — needed because Chromium grabs raw
-/// keyboard input for its focused window, starving `WH_KEYBOARD_LL` while
-/// our window has focus. Returns whether to suppress the key.
-pub(crate) fn dispatch_from_focused_window(vk: u16, pressed: bool) -> bool {
-    if vk as usize >= 256 {
-        return false;
-    }
-    if pressed {
-        let now = std::time::Instant::now();
-        let is_repeat = FOCUSED_KEY_LAST_PRESS
-            .lock()
-            .map(|mut last| {
-                let prev = last[vk as usize].replace(now);
-                prev.is_some_and(|p| now.duration_since(p) < FOCUSED_KEY_REPEAT_WINDOW)
-            })
-            .unwrap_or(false);
-        if is_repeat {
-            return false;
-        }
-    }
-    let Some(macro_key) = vk_to_macro_key(vk) else {
-        return false;
-    };
-    let event = if pressed {
-        CaptureEvent::KeyPress(macro_key)
-    } else {
-        CaptureEvent::KeyRelease(macro_key)
-    };
-    matches!(dispatch(event), CaptureDecision::Suppress)
-}
-
 /// A key held across a desktop switch (UAC prompt, Ctrl+Alt+Del, lock
 /// screen) has its key-up delivered to the secure desktop, invisible to our
-/// hook — so every tracker is cleared here to avoid wedging on the missed
+/// hook - so every tracker is cleared here to avoid wedging on the missed
 /// key-up. Safe: the user isn't mid-combo across a switch, and anything
 /// still held re-registers on its next press.
 unsafe extern "system" fn desktop_switch_event_proc(
@@ -479,7 +494,7 @@ unsafe extern "system" fn keyboard_proc(
                     cb_suppress
                 } else {
                     // A key-up whose key-down was swallowed is swallowed too,
-                    // regardless of the callback's answer — otherwise the
+                    // regardless of the callback's answer - otherwise the
                     // focused window sees an unpaired release.
                     std::mem::replace(&mut s.key_suppressed[vk], false) || cb_suppress
                 }
@@ -516,7 +531,7 @@ unsafe extern "system" fn mouse_proc(
         let high_word = (ms.mouseData >> 16) as i16;
         let capture_ev: Option<CaptureEvent> = match w_param as u32 {
             // `None` means no position has been seen yet, so this event only
-            // establishes the origin — there's no delta to report.
+            // establishes the origin - there's no delta to report.
             WM_MOUSEMOVE => last.and_then(|(lx, ly)| {
                 let (dx, dy) = (ms.pt.x - lx, ms.pt.y - ly);
                 (dx != 0 || dy != 0).then_some(CaptureEvent::MouseMoveRel(dx, dy))
@@ -529,8 +544,14 @@ unsafe extern "system" fn mouse_proc(
             WM_MBUTTONUP => Some(CaptureEvent::ButtonRelease(MacroButton::Middle)),
             WM_XBUTTONDOWN => xbutton(high_word).map(CaptureEvent::ButtonPress),
             WM_XBUTTONUP => xbutton(high_word).map(CaptureEvent::ButtonRelease),
-            WM_MOUSEWHEEL => Some(CaptureEvent::Scroll(0, high_word as i32 / 120)),
-            WM_MOUSEHWHEEL => Some(CaptureEvent::Scroll(high_word as i32 / 120, 0)),
+            WM_MOUSEWHEEL => {
+                let notches = HOOK_STATE.with_borrow_mut(|s| wheel_notches(&mut s.wheel_rest.1, high_word));
+                (notches != 0).then_some(CaptureEvent::Scroll(0, notches))
+            }
+            WM_MOUSEHWHEEL => {
+                let notches = HOOK_STATE.with_borrow_mut(|s| wheel_notches(&mut s.wheel_rest.0, high_word));
+                (notches != 0).then_some(CaptureEvent::Scroll(notches, 0))
+            }
             _ => None,
         };
 
@@ -579,7 +600,7 @@ pub(crate) fn vk_to_macro_key(vk: VIRTUAL_KEY) -> Option<MacroKey> {
         VK_LWIN => MacroKey::Meta,
         VK_RWIN => MacroKey::Meta,
         // Low-level hooks report the side-specific VK, so these generic ones
-        // are rare — but they're mapped anyway since the hotkey matcher
+        // are rare - but they're mapped anyway since the hotkey matcher
         // derives held modifiers from `MacroKey::modifier_bit`, and
         // `Other(vk)` has no modifier bit.
         VK_SHIFT => MacroKey::Shift,
@@ -624,8 +645,8 @@ pub(crate) fn vk_to_macro_key(vk: VIRTUAL_KEY) -> Option<MacroKey> {
 // ── Pre-macro focus + modifier cleanup ───────────────────────────────────────
 
 /// True for a window that can actually be brought to the foreground right
-/// now. Our own windows count too — a hotkey pressed while Macros itself is
-/// focused should still type back into whichever of our windows had it.
+/// now. Our own windows count too - a hotkey pressed while Blockwork itself
+/// is focused should still type back into whichever of our windows had it.
 fn is_usable_target(hwnd: HWND) -> bool {
     if hwnd.is_null() {
         return false;
@@ -634,7 +655,7 @@ fn is_usable_target(hwnd: HWND) -> bool {
 }
 
 /// The window a hotkey-triggered macro should type into: whatever was
-/// foreground when the hotkey fired. `None` means leave focus alone — e.g.
+/// foreground when the hotkey fired. `None` means leave focus alone - e.g.
 /// that window has since closed or been minimized.
 fn macro_target_window() -> Option<HWND> {
     let stored: HWND = HOTKEY_FOREGROUND_HWND.load(Ordering::Relaxed) as HWND;
@@ -670,5 +691,34 @@ pub fn prepare_for_macro_execution(backend: &Arc<Mutex<dyn InputBackend>>) {
         if unsafe { GetAsyncKeyState(vk as i32) } < 0 {
             let _ = backend.raw_keycode(vk, Direction::Release);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::{normalize, wheel_notches};
+
+    #[test]
+    fn wheel_fractions_add_up_to_notches() {
+        let mut rest = 0;
+        assert_eq!(wheel_notches(&mut rest, 240), 2);
+        assert_eq!([30, 30, 30, 30].map(|d| wheel_notches(&mut rest, d)), [0, 0, 0, 1]);
+        assert_eq!(wheel_notches(&mut rest, 90), 0);
+        // Turning back starts over instead of cancelling the 90 first.
+        assert_eq!(wheel_notches(&mut rest, -120), -1);
+        assert_eq!(rest, 0);
+    }
+
+    #[test]
+    fn absolute_moves_land_on_the_pixel() {
+        // What Windows does with the units: truncate back to a pixel.
+        let back = |units: i32, size: i32| (units as i64 * size as i64 / 65536) as i32;
+        for size in [2, 1080, 1707, 6400] {
+            for offset in 0..size {
+                assert_eq!(back(normalize(offset, size), size), offset, "{offset} of {size}");
+            }
+        }
+        assert_eq!(normalize(-5, 100), 0);
+        assert_eq!(normalize(500, 100), normalize(99, 100));
     }
 }

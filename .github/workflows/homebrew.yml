@@ -1,0 +1,77 @@
+name: Homebrew
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      push:
+        description: "Only set by release.yml; manual runs never push"
+        type: boolean
+        default: true
+    secrets:
+      HOMEBREW_TAP_TOKEN:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to render the cask for (e.g. 0.5.4)"
+        required: true
+        type: string
+
+jobs:
+  homebrew:
+    name: Render and publish cask
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+      TAP_TOKEN: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Download macOS bundle from release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$TAG" --repo "${{ github.repository }}" --pattern "blockwork-macos-arm64.app.zip" --dir dl
+
+      - name: Render cask
+        run: |
+          VERSION="${TAG#v}"
+          SHA=$(sha256sum dl/blockwork-macos-arm64.app.zip | cut -d' ' -f1)
+          mkdir -p out
+          sed -e "s/__VERSION__/$VERSION/g" -e "s/__TAG__/$TAG/g" -e "s/__CHECKSUM__/$SHA/g" \
+            packaging/homebrew/blockwork.rb > out/blockwork.rb
+          cat out/blockwork.rb
+
+      - name: Upload cask
+        uses: actions/upload-artifact@v4
+        with:
+          name: blockwork.rb
+          path: out/blockwork.rb
+
+      - name: Checkout tap
+        if: inputs.push && env.TAP_TOKEN != ''
+        uses: actions/checkout@v4
+        with:
+          repository: Blockworked/homebrew-tap
+          token: ${{ secrets.HOMEBREW_TAP_TOKEN }}
+          path: tap
+
+      - name: Push to tap
+        if: inputs.push && env.TAP_TOKEN != ''
+        working-directory: tap
+        run: |
+          mkdir -p Casks
+          cp ../out/blockwork.rb Casks/blockwork.rb
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add Casks/blockwork.rb
+          if git diff --cached --quiet; then
+            echo "Cask unchanged"
+          else
+            git commit -m "blockwork ${TAG#v}"
+            git push
+          fi

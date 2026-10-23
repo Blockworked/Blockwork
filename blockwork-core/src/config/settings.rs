@@ -17,11 +17,21 @@ fn settings_cache() -> &'static Mutex<Option<(SystemTime, AppSettings)>> {
     SETTINGS_CACHE.get_or_init(|| Mutex::new(None))
 }
 
+/// Drops bindings that no longer parse (e.g. the retired `ToggleLoop`) instead
+/// of failing the whole settings file.
+fn lenient_bindings<'de, D>(d: D) -> Result<Option<Vec<HotkeyBinding>>, D::Error>
+where
+    D: serde::Deserializer<'de>,
+{
+    let raw: Option<Vec<serde_json::Value>> = Option::deserialize(d)?;
+    Ok(raw.map(|v| v.into_iter().filter_map(|b| serde_json::from_value(b).ok()).collect()))
+}
+
 #[derive(Serialize, Deserialize, Default, Clone)]
 pub struct AppSettings {
-    pub loop_mode_enabled: Option<bool>,
     pub ipc_port: Option<u16>,
     pub ipc_auto_start: Option<bool>,
+    #[serde(default, deserialize_with = "lenient_bindings")]
     pub global_hotkeys: Option<Vec<HotkeyBinding>>,
     pub selected_macro_id: Option<String>,
     /// Runtime-only playback speed override applied on top of each macro's
@@ -31,12 +41,49 @@ pub struct AppSettings {
     /// When true, closing the main window hides it to the system tray
     /// instead of exiting the app.
     pub close_to_tray: Option<bool>,
+    /// Launch the daemon in the background at login.
+    pub start_at_startup: Option<bool>,
+    /// False while the first-run welcome screen is still pending.
+    pub onboarding_done: Option<bool>,
+    /// Block palette layout: rail, chips, accordion, flyout or tiles.
+    pub palette_layout: Option<String>,
     /// When true, recorded mouse movement is captured as relative deltas;
     /// when false, as absolute positions. Only relevant when
     /// `record_mouse_movement` is also true.
     pub record_mouse_relative: Option<bool>,
     /// Whether mouse movement is captured into recordings at all.
     pub record_mouse_movement: Option<bool>,
+    /// Set once the emergency stop default was added to saved bindings.
+    pub emergency_stop_seeded: Option<bool>,
+    /// The local webhook server for `WhenWebhook` triggers; off by default.
+    #[serde(default)]
+    pub webhook_enabled: Option<bool>,
+    #[serde(default)]
+    pub webhook_port: Option<u16>,
+    /// Requests must carry this, so other programs can't fire macros blindly.
+    #[serde(default)]
+    pub webhook_token: Option<String>,
+    /// Block library index addresses. The built-in one is always used, saved or not.
+    #[serde(default)]
+    pub block_library_sources: Option<Vec<String>>,
+    /// UI language code like "de"; `None` or empty follows the system.
+    #[serde(default)]
+    pub language: Option<String>,
+    /// Multiplies every UI animation's duration: 0 turns animations off,
+    /// 1 (the default) is normal, higher is slower.
+    #[serde(default)]
+    pub animation_speed: Option<f64>,
+    /// Seconds the Record button counts down before recording starts; 0
+    /// starts at once. `None` means the default of 3.
+    #[serde(default)]
+    pub recording_countdown_secs: Option<u8>,
+    /// How times show: "12h" (with AM/PM), "24h", or `None`/empty to follow
+    /// the system locale. Saved times are always 24-hour.
+    #[serde(default)]
+    pub clock_format: Option<String>,
+    /// "light", "dark", or None to follow the system appearance.
+    #[serde(default)]
+    pub color_scheme: Option<String>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {
@@ -79,7 +126,7 @@ pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
         .map_err(|e| format!("Failed to write settings: {e}"))?;
     std::fs::rename(&tmp, &path)
         .map_err(|e| format!("Failed to finalize settings: {e}"))?;
-    // Same belt-and-suspenders as `Macro::save` — avoids a stale read if a
+    // Same belt-and-suspenders as `Macro::save` - avoids a stale read if a
     // save and reload land within the same mtime tick.
     *settings_cache().lock().unwrap() = None;
     Ok(())

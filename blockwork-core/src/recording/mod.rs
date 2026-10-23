@@ -1,17 +1,17 @@
 use crate::hotkey_types::{HotkeyAction, HotkeyBinding};
-use crate::input::types::{Axis, Coordinate, Direction, InputToken, MacroKey};
+use crate::input::types::{Axis, Coordinate, Direction, InputToken, MacroButton, MacroKey};
 use crate::input::value::Value;
 use crate::macros::backend::{self, CaptureDecision, CaptureEvent, CaptureTimestamp};
 use crate::macros::{Instruction, InstructionKind};
 use std::collections::VecDeque;
-use std::sync::atomic::{AtomicBool, AtomicU8, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU64, AtomicU8, Ordering};
 use std::sync::{Mutex, OnceLock, RwLock};
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 pub static RECORDING_ACTIVE: AtomicBool = AtomicBool::new(false);
 /// Whether mouse movement is captured into the recording at all. Off by
-/// default — most recordings care about clicks/keys, and movement floods
+/// default - most recordings care about clicks/keys, and movement floods
 /// the instruction list with a token per pixel of travel.
 pub static RECORD_MOUSE_MOVEMENT: AtomicBool = AtomicBool::new(false);
 pub static RECORD_MOUSE_RELATIVE: AtomicBool = AtomicBool::new(false);
@@ -53,15 +53,115 @@ static RECORDING_QUEUE: OnceLock<Mutex<VecDeque<Instruction>>> = OnceLock::new()
 static BASELINE_NOW: OnceLock<Mutex<Option<Instant>>> = OnceLock::new();
 static BASELINE_HW: OnceLock<Mutex<Option<SystemTime>>> = OnceLock::new();
 static LAST_ELAPSED: OnceLock<Mutex<Option<Duration>>> = OnceLock::new();
+// Movement is sampled to retain a smooth path without replaying every raw
+// pointer event.
+static LAST_RECORDED_MOUSE_MOVE: OnceLock<Mutex<Option<Duration>>> = OnceLock::new();
 static LAST_MOUSE_POS: OnceLock<Mutex<Option<(f64, f64)>>> = OnceLock::new();
+// libei pauses after each pointer update while it services the portal. Do not
+// duplicate that time in a recorded wait.
+#[cfg(target_os = "linux")]
+const MOUSE_PLAYBACK_OVERHEAD: Duration = Duration::from_millis(10);
+#[cfg(not(target_os = "linux"))]
+const MOUSE_PLAYBACK_OVERHEAD: Duration = Duration::ZERO;
 // Offset added to hardware-timestamped elapsed so the first event reflects
 // the gap since recording-start, instead of collapsing to zero.
 static HW_ELAPSED_OFFSET: OnceLock<Mutex<Duration>> = OnceLock::new();
 
+/// Set while the UI is capturing a new combo, so existing bindings don't fire.
+static HOTKEYS_SUSPENDED: AtomicBool = AtomicBool::new(false);
+
+/// A physical key press or release, as seen by the capture callback.
+#[derive(Debug, Clone)]
+pub struct KeyEvent {
+    pub key: MacroKey,
+    pub pressed: bool,
+}
+
+static KEY_SUBSCRIBERS: OnceLock<Mutex<Vec<std::sync::mpsc::Sender<KeyEvent>>>> = OnceLock::new();
+
+/// Receives every key event the capture callback sees, for `WhenKey` watching.
+pub fn subscribe_key_events() -> std::sync::mpsc::Receiver<KeyEvent> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    if let Ok(mut subs) = KEY_SUBSCRIBERS.get_or_init(|| Mutex::new(Vec::new())).lock() {
+        subs.push(tx);
+    }
+    rx
+}
+
+fn broadcast_key_event(key: &MacroKey, pressed: bool) {
+    let Some(subs) = KEY_SUBSCRIBERS.get() else { return };
+    if let Ok(mut subs) = subs.lock() {
+        subs.retain(|tx| tx.send(KeyEvent { key: key.clone(), pressed }).is_ok());
+    }
+}
+
+/// A physical mouse button press or release (scrolls arrive as presses of
+/// the scroll "buttons"), with the modifier bits held at the time.
+#[derive(Debug, Clone)]
+pub struct ButtonEvent {
+    pub button: MacroButton,
+    pub pressed: bool,
+    pub modifiers: u8,
+}
+
+static BUTTON_SUBSCRIBERS: OnceLock<Mutex<Vec<std::sync::mpsc::Sender<ButtonEvent>>>> = OnceLock::new();
+
+/// Receives every mouse button event the capture callback sees, for `WhenMouseButton`.
+pub fn subscribe_button_events() -> std::sync::mpsc::Receiver<ButtonEvent> {
+    let (tx, rx) = std::sync::mpsc::channel();
+    if let Ok(mut subs) = BUTTON_SUBSCRIBERS.get_or_init(|| Mutex::new(Vec::new())).lock() {
+        subs.push(tx);
+    }
+    rx
+}
+
+fn broadcast_button_event(event: &CaptureEvent) {
+    let Some(subs) = BUTTON_SUBSCRIBERS.get() else { return };
+    let (button, pressed) = match event {
+        CaptureEvent::ButtonPress(b) => (b.clone(), true),
+        CaptureEvent::ButtonRelease(b) => (b.clone(), false),
+        CaptureEvent::Scroll(_, v) if *v != 0 => (if *v > 0 { MacroButton::ScrollUp } else { MacroButton::ScrollDown }, true),
+        CaptureEvent::Scroll(h, _) if *h != 0 => (if *h > 0 { MacroButton::ScrollRight } else { MacroButton::ScrollLeft }, true),
+        _ => return,
+    };
+    let modifiers = HELD_MODS.load(Ordering::Relaxed);
+    if let Ok(mut subs) = subs.lock() {
+        subs.retain(|tx| tx.send(ButtonEvent { button: button.clone(), pressed, modifiers }).is_ok());
+    }
+}
+
+// When the capture started, and the last input since then in ms after it.
+static CAPTURE_EPOCH: OnceLock<Instant> = OnceLock::new();
+static LAST_INPUT_MS: AtomicU64 = AtomicU64::new(0);
+static CLICKS: AtomicU64 = AtomicU64::new(0);
+
+fn note_input(event: &CaptureEvent) {
+    let epoch = CAPTURE_EPOCH.get_or_init(Instant::now);
+    LAST_INPUT_MS.store(epoch.elapsed().as_millis() as u64, Ordering::Relaxed);
+    if matches!(event, CaptureEvent::ButtonPress(_)) {
+        CLICKS.fetch_add(1, Ordering::Relaxed);
+    }
+}
+
+/// Time since the last physical key or mouse input, or `None` when the
+/// capture can't see input.
+pub fn time_since_input() -> Option<Duration> {
+    let epoch = CAPTURE_EPOCH.get()?;
+    if grab_failed() {
+        return None;
+    }
+    Some(epoch.elapsed().saturating_sub(Duration::from_millis(LAST_INPUT_MS.load(Ordering::Relaxed))))
+}
+
+/// Counts physical mouse clicks, so text tracking can tell the caret moved.
+pub fn click_count() -> u64 {
+    CLICKS.load(Ordering::Relaxed)
+}
+
 static HOTKEY_TABLE: OnceLock<RwLock<Vec<HotkeyBinding>>> = OnceLock::new();
 
 /// Armed when a `StartRecordingImmediate` combo is pressed, so recording waits
-/// until every key in the combo releases — otherwise those key-ups get recorded.
+/// until every key in the combo releases - otherwise those key-ups get recorded.
 struct PendingRecordStart {
     mods_mask: u8,
     trigger_key: MacroKey,
@@ -131,6 +231,10 @@ pub fn get_recording_queue() -> &'static Mutex<VecDeque<Instruction>> {
     RECORDING_QUEUE.get_or_init(|| Mutex::new(VecDeque::new()))
 }
 
+pub fn set_hotkeys_suspended(suspended: bool) {
+    HOTKEYS_SUSPENDED.store(suspended, Ordering::Relaxed);
+}
+
 pub fn update_hotkey_table(bindings: Vec<HotkeyBinding>) {
     // Matching happens in start_grab_thread's capture callback rather than via
     // OS-level hotkey registration, since StopRecording must only fire while recording.
@@ -141,7 +245,7 @@ pub fn update_hotkey_table(bindings: Vec<HotkeyBinding>) {
 }
 
 /// Anchors both clocks to the moment recording actually starts, rather than
-/// lazily to the first event — so the gap before the first captured input
+/// lazily to the first event - so the gap before the first captured input
 /// becomes a leading `Wait` instead of being dropped.
 pub fn reset_timing() {
     if let Ok(mut t) = BASELINE_NOW.get_or_init(|| Mutex::new(None)).lock() {
@@ -155,6 +259,9 @@ pub fn reset_timing() {
     }
     if let Ok(mut t) = LAST_ELAPSED.get_or_init(|| Mutex::new(None)).lock() {
         *t = Some(Duration::ZERO);
+    }
+    if let Ok(mut t) = LAST_RECORDED_MOUSE_MOVE.get_or_init(|| Mutex::new(None)).lock() {
+        *t = None;
     }
     if let Ok(mut p) = LAST_MOUSE_POS.get_or_init(|| Mutex::new(None)).lock() {
         *p = None;
@@ -208,6 +315,9 @@ fn elapsed_since_session_start(ts: CaptureTimestamp) -> Duration {
 }
 
 fn check_hotkey(mods: u8, key_name: &str) -> Option<HotkeyAction> {
+    if HOTKEYS_SUSPENDED.load(Ordering::Relaxed) {
+        return None;
+    }
     let table = HOTKEY_TABLE.get_or_init(|| RwLock::new(vec![]));
     if let Ok(bindings) = table.try_read() {
         for binding in bindings.iter() {
@@ -228,6 +338,9 @@ fn check_hotkey(mods: u8, key_name: &str) -> Option<HotkeyAction> {
 /// Looks up the configured `StopRecording` binding's key name, if any. It's
 /// always combo-less (enforced at capture time), so matching only compares the key.
 fn stop_recording_key() -> Option<String> {
+    if HOTKEYS_SUSPENDED.load(Ordering::Relaxed) {
+        return None;
+    }
     let table = HOTKEY_TABLE.get_or_init(|| RwLock::new(vec![]));
     table.try_read().ok().and_then(|bindings| {
         bindings
@@ -242,18 +355,23 @@ fn stop_recording_key() -> Option<String> {
 /// instead (e.g. the Wine bridge, which gets real input from a native
 /// Linux helper process rather than from `WH_KEYBOARD_LL`/`WH_MOUSE_LL`,
 /// which don't see real host input under Wine). Identical recording-queue
-/// bookkeeping and cursor tracking either way — this is the one place that
+/// bookkeeping and cursor tracking either way - this is the one place that
 /// logic lives.
 pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp) -> CaptureDecision + Send + 'static> {
+    CAPTURE_EPOCH.get_or_init(Instant::now);
     Box::new(move |event: CaptureEvent, ts: CaptureTimestamp| {
+            note_input(&event);
+            broadcast_button_event(&event);
             match &event {
                 CaptureEvent::KeyPress(key) => {
+                    broadcast_key_event(key, true);
                     let bit = key.modifier_bit();
                     if bit != 0 {
                         HELD_MODS.fetch_or(bit, Ordering::Relaxed);
                     }
                 }
                 CaptureEvent::KeyRelease(key) => {
+                    broadcast_key_event(key, false);
                     let bit = key.modifier_bit();
                     if bit != 0 {
                         HELD_MODS.fetch_and(!bit, Ordering::Relaxed);
@@ -263,13 +381,23 @@ pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp)
                 _ => {}
             }
 
-            // Track real cursor position, regardless of recording state, so
-            // absolute-move recording (and relative-move playback) always
-            // has an up-to-date baseline to work from.
+            // Always track the cursor so absolute recording and relative playback
+            // have a baseline. A real position source wins; integrating deltas is
+            // the fallback for platforms that report none.
             let prev_pos = get_last_mouse_pos();
+            let absolute_pos = if RECORDING_ACTIVE.load(Ordering::Relaxed)
+                && !RECORD_MOUSE_RELATIVE.load(Ordering::Relaxed)
+                && matches!(event, CaptureEvent::MouseMoveRel(_, _))
+            {
+                backend::absolute_mouse_position()
+            } else {
+                None
+            };
             match &event {
                 CaptureEvent::MouseMoveRel(dx, dy) => {
-                    if let Some((lx, ly)) = prev_pos {
+                    if let Some((x, y)) = absolute_pos {
+                        set_last_mouse_pos(x as f64, y as f64);
+                    } else if let Some((lx, ly)) = prev_pos {
                         set_last_mouse_pos(lx + *dx as f64, ly + *dy as f64);
                     }
                 }
@@ -281,7 +409,7 @@ pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp)
 
             if RECORDING_ACTIVE.load(Ordering::Relaxed) {
                 // The configured (combo-less) StopRecording key stops recording.
-                // Escape has no special status — it's just the shipped default binding.
+                // Escape has no special status - it's just the shipped default binding.
                 if let CaptureEvent::KeyPress(key) = &event {
                     let is_stop_key = key
                         .hotkey_name()
@@ -294,20 +422,71 @@ pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp)
                 }
 
                 let elapsed = elapsed_since_session_start(ts);
-                let instr = capture_event_to_instruction(&event, prev_pos);
+                let absolute_event =
+                    absolute_pos.map(|(x, y)| CaptureEvent::MouseMoveAbs(x as f64, y as f64));
+                let event_for_instruction = absolute_event.as_ref().unwrap_or(&event);
+                let instr = capture_event_to_instruction(event_for_instruction, prev_pos);
                 if let Some(instr) = instr {
                     let last_elapsed = LAST_ELAPSED.get_or_init(|| Mutex::new(None));
                     if let Ok(mut last) = last_elapsed.lock() {
                         let prev = *last;
                         *last = Some(elapsed);
                         if let Ok(mut q) = get_recording_queue().lock() {
-                            if let Some(prev_elapsed) = prev {
-                                let elapsed_ms = elapsed.saturating_sub(prev_elapsed).as_secs_f64() * 1000.0;
-                                if elapsed_ms > 0.0 {
-                                    q.push_back(Instruction::new(InstructionKind::Wait(Value::number(elapsed_ms))));
+                            let is_mouse_move = matches!(event_for_instruction, CaptureEvent::MouseMoveRel(_, _) | CaptureEvent::MouseMoveAbs(_, _));
+                            if is_mouse_move {
+                                const MOUSE_SAMPLE_INTERVAL: Duration = Duration::from_millis(16);
+                                let last_mouse_move = LAST_RECORDED_MOUSE_MOVE.get_or_init(|| Mutex::new(None));
+                                let elapsed_since_last = last_mouse_move
+                                    .lock()
+                                    .ok()
+                                    .and_then(|last| last.map(|last| elapsed.saturating_sub(last)));
+                                let append = elapsed_since_last
+                                    .map_or(true, |delta| delta >= MOUSE_SAMPLE_INTERVAL)
+                                    || !matches!(
+                                        q.back(),
+                                        Some(last)
+                                            if matches!(last.kind, InstructionKind::Token(InputToken::MoveMouse(_, _, _)))
+                                    );
+                                if append {
+                                    let previous_was_mouse = matches!(
+                                        q.back(),
+                                        Some(last)
+                                            if matches!(last.kind, InstructionKind::Token(InputToken::MoveMouse(_, _, _)))
+                                    );
+                                    let wait = if previous_was_mouse {
+                                        elapsed_since_last
+                                    } else {
+                                        prev.map(|last| elapsed.saturating_sub(last))
+                                    };
+                                    if let Some(wait) = wait {
+                                        let wait = wait.saturating_sub(MOUSE_PLAYBACK_OVERHEAD);
+                                        if !wait.is_zero() {
+                                            q.push_back(Instruction::new(InstructionKind::Wait(Value::number(
+                                                wait.as_secs_f64() * 1000.0,
+                                            ))));
+                                        }
+                                    }
+                                    q.push_back(instr);
+                                    if let Ok(mut last) = last_mouse_move.lock() {
+                                        *last = Some(elapsed);
+                                    }
+                                } else if let Some(last) = q.back_mut().filter(|last| {
+                                    matches!(
+                                        last.kind,
+                                        InstructionKind::Token(InputToken::MoveMouse(_, _, _))
+                                    )
+                                }) {
+                                    *last = instr;
                                 }
+                            } else {
+                                if let Some(prev_elapsed) = prev {
+                                    let elapsed_ms = elapsed.saturating_sub(prev_elapsed).as_secs_f64() * 1000.0;
+                                    if elapsed_ms > 0.0 {
+                                        q.push_back(Instruction::new(InstructionKind::Wait(Value::number(elapsed_ms))));
+                                    }
+                                }
+                                q.push_back(instr);
                             }
-                            q.push_back(instr);
                         }
                     }
                 }
@@ -316,7 +495,7 @@ pub fn build_capture_callback() -> Box<dyn FnMut(CaptureEvent, CaptureTimestamp)
             }
 
             // Hotkey detection (only when not recording), against the physical
-            // keys the backend reports — no OS-level hotkey registration involved.
+            // keys the backend reports - no OS-level hotkey registration involved.
             if let CaptureEvent::KeyPress(key) = &event {
                 if !key.is_modifier() {
                     if let Some(name) = key.hotkey_name() {
@@ -348,17 +527,21 @@ pub fn start_grab_thread() {
 }
 
 /// `prev_pos` is the tracked absolute cursor position from just before this
-/// event was applied (see `build_capture_callback`) — used to convert
+/// event was applied (see `build_capture_callback`) - used to convert
 /// between relative deltas and absolute coordinates, whichever the event
 /// itself isn't already expressed in, based on `RECORD_MOUSE_RELATIVE`.
 /// Mouse movement is dropped entirely unless `RECORD_MOUSE_MOVEMENT` is set.
+fn key_value(key: &MacroKey) -> Value {
+    Value::Text { value: crate::input::key_names::key_name(key) }
+}
+
 fn capture_event_to_instruction(event: &CaptureEvent, prev_pos: Option<(f64, f64)>) -> Option<Instruction> {
     Some(Instruction::new(match event {
         CaptureEvent::KeyPress(key) => {
-            InstructionKind::Token(InputToken::Key(key.clone(), Direction::Press))
+            InstructionKind::Token(InputToken::Key(key_value(key), Direction::Press))
         }
         CaptureEvent::KeyRelease(key) => {
-            InstructionKind::Token(InputToken::Key(key.clone(), Direction::Release))
+            InstructionKind::Token(InputToken::Key(key_value(key), Direction::Release))
         }
         CaptureEvent::ButtonPress(btn) => {
             InstructionKind::Token(InputToken::Button(btn.clone(), Direction::Press))
@@ -389,7 +572,7 @@ fn capture_event_to_instruction(event: &CaptureEvent, prev_pos: Option<(f64, f64
                 // `CaptureEvent` doc comment), so absolute recording is built
                 // by walking this delta against the tracked cursor position.
                 // Without a seeded baseline yet, there's nothing to add the
-                // delta onto — drop rather than record a bogus position.
+                // delta onto - drop rather than record a bogus position.
                 let (x, y) = prev_pos?;
                 InstructionKind::Token(InputToken::MoveMouse(Value::number(x + *dx as f64), Value::number(y + *dy as f64), Coordinate::Abs))
             }

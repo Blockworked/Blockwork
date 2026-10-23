@@ -1,0 +1,340 @@
+{
+  "author": "Blockworked",
+  "blocks": {
+    "block_defs": [
+      {
+        "color": "#59C059",
+        "description": "Returns true if the text is empty after trimming leading and trailing whitespace.",
+        "icon": "type",
+        "id": "fc92a8c773974daeac539a2ed4075bcb",
+        "identifier": "Blockworked_TextIsEmpty",
+        "pieces": [
+          {
+            "id": "61b9aa3101e04fa8b468d75995c21301",
+            "kind": "Input",
+            "name": "text",
+            "value_type": "Any"
+          },
+          {
+            "id": "7b80465153fb4aa29dac5284521451ea",
+            "kind": "Label",
+            "text": "is empty?"
+          }
+        ],
+        "shape": "ReturnsBool"
+      },
+      {
+        "color": "#59C059",
+        "description": "Returns the text with its first letter uppercased and the remaining text unchanged. Empty text stays empty.",
+        "icon": "type",
+        "id": "6b2223f7eeff4728844daf2067bd1432",
+        "identifier": "Blockworked_CapitalizeText",
+        "pieces": [
+          {
+            "id": "95727258d68840709f81f53150b37481",
+            "kind": "Label",
+            "text": "capitalize"
+          },
+          {
+            "id": "347bfd1c1bd2487e9fb7b3f4b8bff656",
+            "kind": "Input",
+            "name": "text",
+            "value_type": "Any"
+          }
+        ],
+        "shape": "ReturnsValue"
+      },
+      {
+        "color": "#59C059",
+        "description": "Returns the last letter of the text, or empty text when the input is empty.",
+        "icon": "type",
+        "id": "da5e037bb4c44340be34f94bff25ad6d",
+        "identifier": "Blockworked_LastLetter",
+        "pieces": [
+          {
+            "id": "a4fbc620961543e29166bff5e281c0bd",
+            "kind": "Label",
+            "text": "last letter of"
+          },
+          {
+            "id": "71eacb45a5264f9e843f5bee43ff4ea9",
+            "kind": "Input",
+            "name": "text",
+            "value_type": "Any"
+          }
+        ],
+        "shape": "ReturnsValue"
+      }
+    ],
+    "comments": [],
+    "description": "Check for empty text, capitalize the first letter and get the last letter.",
+    "dicts": [],
+    "floating_values": [],
+    "format_version": 1,
+    "id": "",
+    "lists": [],
+    "name": "Text helpers",
+    "recording_target": null,
+    "settings": {
+      "active_days": 0,
+      "active_hours": null,
+      "always_listen": false,
+      "catch_up_missed": false,
+      "max_loop_iterations": 0,
+      "max_run_secs": 0,
+      "only_in_window": "",
+      "power": "Any"
+    },
+    "speed_multiplier": 1.0,
+    "strands": [
+      {
+        "id": "046bb36044144ad68320ae8031ee8c30",
+        "instructions": [
+          {
+            "id": "17b25ad78f9e407fb6d9c97ac1251b9d",
+            "kind": {
+              "BlockHeader": "fc92a8c773974daeac539a2ed4075bcb"
+            }
+          },
+          {
+            "id": "77576f5a397d4ff38e693da2c0c442f3",
+            "kind": {
+              "Return": {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "args": [
+                          {
+                            "kind": "Param",
+                            "name": "text"
+                          }
+                        ],
+                        "kind": "Op",
+                        "op": "Trim",
+                        "saved": {
+                          "kind": "Number",
+                          "value": 0.0
+                        }
+                      }
+                    ],
+                    "kind": "Op",
+                    "op": "Length",
+                    "saved": {
+                      "kind": "Number",
+                      "value": 0.0
+                    }
+                  },
+                  {
+                    "kind": "Number",
+                    "value": 0.0
+                  }
+                ],
+                "kind": "Op",
+                "op": "Eq",
+                "saved": {
+                  "kind": "Number",
+                  "value": 0.0
+                }
+              }
+            }
+          }
+        ],
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": "e4c2bb2020ef4053b1ec3b472a7cc776",
+        "instructions": [
+          {
+            "id": "6ae6571025c14b8f946dde342d089665",
+            "kind": {
+              "BlockHeader": "6b2223f7eeff4728844daf2067bd1432"
+            }
+          },
+          {
+            "id": "6b3c31e12bd54e309885b4cec71985a6",
+            "kind": {
+              "IfElse": {
+                "condition": {
+                  "args": [
+                    {
+                      "args": [
+                        {
+                          "kind": "Param",
+                          "name": "text"
+                        }
+                      ],
+                      "kind": "Op",
+                      "op": "Length",
+                      "saved": {
+                        "kind": "Number",
+                        "value": 0.0
+                      }
+                    },
+                    {
+                      "kind": "Number",
+                      "value": 0.0
+                    }
+                  ],
+                  "kind": "Op",
+                  "op": "Eq",
+                  "saved": {
+                    "kind": "Number",
+                    "value": 0.0
+                  }
+                },
+                "else_body": [
+                  {
+                    "id": "142fe59429314bd48d64e38bb32d31ee",
+                    "kind": {
+                      "Return": {
+                        "args": [
+                          {
+                            "args": [
+                              {
+                                "args": [
+                                  {
+                                    "kind": "Number",
+                                    "value": 1.0
+                                  },
+                                  {
+                                    "kind": "Param",
+                                    "name": "text"
+                                  }
+                                ],
+                                "kind": "Op",
+                                "op": "LetterOf",
+                                "saved": {
+                                  "kind": "Number",
+                                  "value": 0.0
+                                }
+                              },
+                              {
+                                "kind": "Text",
+                                "value": "Upper"
+                              }
+                            ],
+                            "kind": "Op",
+                            "op": "Case",
+                            "saved": {
+                              "kind": "Number",
+                              "value": 0.0
+                            }
+                          },
+                          {
+                            "args": [
+                              {
+                                "kind": "Number",
+                                "value": 2.0
+                              },
+                              {
+                                "args": [
+                                  {
+                                    "kind": "Param",
+                                    "name": "text"
+                                  }
+                                ],
+                                "kind": "Op",
+                                "op": "Length",
+                                "saved": {
+                                  "kind": "Number",
+                                  "value": 0.0
+                                }
+                              },
+                              {
+                                "kind": "Param",
+                                "name": "text"
+                              }
+                            ],
+                            "kind": "Op",
+                            "op": "Substring",
+                            "saved": {
+                              "kind": "Number",
+                              "value": 0.0
+                            }
+                          }
+                        ],
+                        "kind": "Op",
+                        "op": "Join",
+                        "saved": {
+                          "kind": "Number",
+                          "value": 0.0
+                        }
+                      }
+                    }
+                  }
+                ],
+                "then_body": [
+                  {
+                    "id": "628c95c4cfd14625b57ff8b50054ed9d",
+                    "kind": {
+                      "Return": {
+                        "kind": "Text",
+                        "value": ""
+                      }
+                    }
+                  }
+                ]
+              }
+            }
+          }
+        ],
+        "x": 0,
+        "y": 0
+      },
+      {
+        "id": "8d3afdbbc8cd47db953cf201e06c0190",
+        "instructions": [
+          {
+            "id": "82c2f27edf874b11bd1af46abfbdef5e",
+            "kind": {
+              "BlockHeader": "da5e037bb4c44340be34f94bff25ad6d"
+            }
+          },
+          {
+            "id": "09818ea5984646bab09abcd5979e2499",
+            "kind": {
+              "Return": {
+                "args": [
+                  {
+                    "args": [
+                      {
+                        "kind": "Param",
+                        "name": "text"
+                      }
+                    ],
+                    "kind": "Op",
+                    "op": "Length",
+                    "saved": {
+                      "kind": "Number",
+                      "value": 0.0
+                    }
+                  },
+                  {
+                    "kind": "Param",
+                    "name": "text"
+                  }
+                ],
+                "kind": "Op",
+                "op": "LetterOf",
+                "saved": {
+                  "kind": "Number",
+                  "value": 0.0
+                }
+              }
+            }
+          }
+        ],
+        "x": 0,
+        "y": 0
+      }
+    ],
+    "variables": []
+  },
+  "blockwork_block_pack": 1,
+  "description": "Check for empty text, capitalize the first letter and get the last letter.",
+  "id": "text-helpers",
+  "name": "Text helpers",
+  "version": "1.0.2"
+}

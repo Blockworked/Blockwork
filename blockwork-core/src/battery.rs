@@ -20,7 +20,7 @@ pub fn percentage() -> Result<f64, String> {
     Ok(battery.state_of_charge().get::<percent>() as f64)
 }
 
-/// Whether the system is currently receiving external power — plugged into
+/// Whether the system is currently receiving external power - plugged into
 /// AC/USB, or (unlike `percentage`) simply has no battery or UPS at all,
 /// since a desktop with no battery is always "plugged in". `Discharging` is
 /// the only battery state that counts as unplugged; every other state

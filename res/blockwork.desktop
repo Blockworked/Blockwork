@@ -7,3 +7,4 @@ Type=Application
 Icon=blockwork
 Categories=Utility;
 Keywords=Macro;Manager;
+StartupWMClass=com.blockworked.Blockwork

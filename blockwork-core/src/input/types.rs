@@ -189,7 +189,9 @@ pub enum MacroButton {
 
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub enum InputToken {
-    Key(MacroKey, Direction),
+    /// The key slot holds a combo string such as `Control+Alt+O`, so a
+    /// variable or operator can supply it.
+    Key(#[serde(deserialize_with = "deserialize_key_value")] Value, Direction),
     Button(MacroButton, Direction),
     MoveMouse(Value, Value, Coordinate),
     Scroll(Value, Axis),
@@ -197,70 +199,63 @@ pub enum InputToken {
     Raw(u16, Direction),
 }
 
+/// Saves from before the key became a value stored a bare `MacroKey`.
+fn deserialize_key_value<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Value, D::Error> {
+    #[derive(Deserialize)]
+    #[serde(untagged)]
+    enum KeyDe {
+        Legacy(MacroKey),
+        Current(Value),
+    }
+    Ok(match KeyDe::deserialize(d)? {
+        KeyDe::Legacy(key) => Value::Text { value: crate::input::key_names::key_name(&key) },
+        KeyDe::Current(value) => value,
+    })
+}
+
 impl InputToken {
-    /// See `Value::rename_var` — walks every embedded `Value` tree.
-    pub fn rename_var(&mut self, old: &str, new: &str) {
+    /// Every `Value` this token owns, for `InstructionKind`'s
+    /// `BlockKind::visit_values_mut`. None of them are boolean-typed.
+    pub fn visit_values_mut(
+        &mut self,
+        f: &mut dyn FnMut(&mut Value, blockstitch_core::graph::InputValueType),
+    ) {
+        use blockstitch_core::graph::InputValueType::Any;
         match self {
             InputToken::MoveMouse(x, y, _) => {
-                x.rename_var(old, new);
-                y.rename_var(old, new);
+                f(x, Any);
+                f(y, Any);
             }
-            InputToken::Scroll(amount, _) => amount.rename_var(old, new),
-            InputToken::Text(value) => value.rename_var(old, new),
-            InputToken::Key(..) | InputToken::Button(..) | InputToken::Raw(..) => {}
+            InputToken::Scroll(amount, _) => f(amount, Any),
+            InputToken::Text(value) => f(value, Any),
+            InputToken::Key(key, _) => f(key, Any),
+            InputToken::Button(..) | InputToken::Raw(..) => {}
         }
     }
 
-    /// See `Value::rename_param` — walks every embedded `Value` tree.
-    pub fn rename_param(&mut self, old: &str, new: &str) {
-        match self {
-            InputToken::MoveMouse(x, y, _) => {
-                x.rename_param(old, new);
-                y.rename_param(old, new);
-            }
-            InputToken::Scroll(amount, _) => amount.rename_param(old, new),
-            InputToken::Text(value) => value.rename_param(old, new),
-            InputToken::Key(..) | InputToken::Button(..) | InputToken::Raw(..) => {}
-        }
+    /// Renames a list inside every embedded `Value` tree - see
+    /// `blockstitch_core::graph::rename_list_in_value`.
+    pub fn rename_list(&mut self, old: &str, new: &str) {
+        self.visit_values_mut(&mut |v, _| blockstitch_core::graph::rename_list_in_value(v, old, new));
+    }
+}
+
+#[cfg(test)]
+mod key_token_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_key_token_loads_as_text_value() {
+        let token: InputToken = serde_json::from_str(r#"{"Key":["Return","Press"]}"#).unwrap();
+        assert_eq!(token, InputToken::Key(Value::Text { value: "Enter".into() }, Direction::Press));
+        let token: InputToken = serde_json::from_str(r#"{"Key":[{"Unicode":"a"},"Click"]}"#).unwrap();
+        assert_eq!(token, InputToken::Key(Value::Text { value: "a".into() }, Direction::Click));
     }
 
-    /// See `Value::for_each_call_args_mut` — walks every embedded `Value` tree.
-    pub fn for_each_call_args_mut(&mut self, block_id: &str, f: &mut dyn FnMut(&mut Vec<Value>)) {
-        match self {
-            InputToken::MoveMouse(x, y, _) => {
-                x.for_each_call_args_mut(block_id, f);
-                y.for_each_call_args_mut(block_id, f);
-            }
-            InputToken::Scroll(amount, _) => amount.for_each_call_args_mut(block_id, f),
-            InputToken::Text(value) => value.for_each_call_args_mut(block_id, f),
-            InputToken::Key(..) | InputToken::Button(..) | InputToken::Raw(..) => {}
-        }
-    }
-
-    /// See `Value::scrub_block_calls` — walks every embedded `Value` tree.
-    pub fn scrub_block_calls(&mut self, block_id: &str) {
-        match self {
-            InputToken::MoveMouse(x, y, _) => {
-                x.scrub_block_calls(block_id);
-                y.scrub_block_calls(block_id);
-            }
-            InputToken::Scroll(amount, _) => amount.scrub_block_calls(block_id),
-            InputToken::Text(value) => value.scrub_block_calls(block_id),
-            InputToken::Key(..) | InputToken::Button(..) | InputToken::Raw(..) => {}
-        }
-    }
-
-    /// See `Value::migrate_bool_slots` — walks every embedded `Value` tree.
-    /// None of these fields are boolean-typed themselves.
-    pub fn migrate_bool_slots(&mut self) {
-        match self {
-            InputToken::MoveMouse(x, y, _) => {
-                x.migrate_bool_slots(false);
-                y.migrate_bool_slots(false);
-            }
-            InputToken::Scroll(amount, _) => amount.migrate_bool_slots(false),
-            InputToken::Text(value) => value.migrate_bool_slots(false),
-            InputToken::Key(..) | InputToken::Button(..) | InputToken::Raw(..) => {}
-        }
+    #[test]
+    fn current_key_token_round_trips() {
+        let token = InputToken::Key(Value::Text { value: "Control+s".into() }, Direction::Click);
+        let json = serde_json::to_string(&token).unwrap();
+        assert_eq!(serde_json::from_str::<InputToken>(&json).unwrap(), token);
     }
 }

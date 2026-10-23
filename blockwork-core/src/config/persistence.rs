@@ -1,3 +1,4 @@
+use crate::macros::migrate::{self, Upgrade};
 use crate::macros::Macro;
 use std::collections::HashMap;
 use std::fs;
@@ -11,7 +12,7 @@ const MACRO_FILE_EXTENSION: &str = "json";
 
 /// Per-id cache of the last parse, keyed off the file's mtime at parse time.
 /// Exists so a long-lived, stateless reader (the Linux Wine bridge process,
-/// which re-resolves the active macro on every single `RunMacro` dispatch —
+/// which re-resolves the active macro on every single `RunMacro` dispatch -
 /// i.e. every level attempt) doesn't re-read-and-reparse the same JSON file
 /// from disk on every attempt. A `stat()` to check mtime still happens every
 /// call (cheap, low-variance) so an external edit (the desktop app saving a
@@ -41,16 +42,59 @@ fn macro_file_path(id: &str) -> Result<PathBuf, String> {
 }
 
 pub fn read_macro_file(path: &Path) -> Result<Macro, String> {
+    read_macro_file_upgrading(path).map(|(mac, _)| mac)
+}
+
+/// [`read_macro_file`] plus what upgrading it from an older version changed.
+pub fn read_macro_file_upgrading(path: &Path) -> Result<(Macro, Upgrade), String> {
     let contents = fs::read_to_string(path)
         .map_err(|err| format!("Failed to read macro file '{}': {}", path.display(), err))?;
-    let mut mac: Macro = serde_json::from_str(&contents)
-        .map_err(|err| format!("Failed to parse macro file '{}': {}", path.display(), err))?;
+    let (mut mac, upgrade) = migrate::parse(&contents)
+        .map_err(|err| format!("Failed to load macro file '{}': {}", path.display(), err))?;
     mac.ensure_id();
+    Ok((mac, upgrade))
+}
+
+/// Loads one of the app's own macro files, rewriting it in the current
+/// format. When blocks changed, the original is kept as `<file>.v<N>.bak`.
+fn load_own_macro_file(path: &Path) -> Result<Macro, String> {
+    let (mac, upgrade) = read_macro_file_upgrading(path)?;
+    if upgrade.changed() {
+        if !upgrade.notes.is_empty() {
+            // A fresh backup every time: a file can be salvaged more than
+            // once (opened in an older build, edited in a newer one, opened
+            // in the older one again), and each time loses different blocks.
+            let backup = unused_backup_path(path, upgrade.from);
+            if let Err(e) = fs::copy(path, &backup) {
+                warn!("Failed to back up '{}' before upgrading it: {e}", path.display());
+                return Ok(mac);
+            }
+            let source = crate::run_log::Source::for_macro(&mac.id, &mac.name);
+            for note in &upgrade.notes {
+                crate::run_log::info(&source, format!("{note} (the old file is kept as {})", backup.display()));
+            }
+        }
+        if let Err(e) = write_macro_file(path, &mac) {
+            warn!("Failed to save upgraded macro: {e}");
+        }
+    }
     Ok(mac)
 }
 
+/// `<file>.v<N>.bak`, or `<file>.v<N>.<k>.bak` for the first `k` not taken.
+fn unused_backup_path(path: &Path, from: u64) -> PathBuf {
+    let first = path.with_extension(format!("{MACRO_FILE_EXTENSION}.v{from}.bak"));
+    if !first.exists() {
+        return first;
+    }
+    (2..)
+        .map(|k| path.with_extension(format!("{MACRO_FILE_EXTENSION}.v{from}.{k}.bak")))
+        .find(|p| !p.exists())
+        .expect("an unused backup name")
+}
+
 /// Reads and parses the single macro file for `id` directly, without
-/// scanning or parsing every other macro in the directory — `get_macro_by_id`
+/// scanning or parsing every other macro in the directory - `get_macro_by_id`
 /// used to go through `get_macros_from_config()`, which does exactly that
 /// fan-out for what's ultimately a single lookup. Backed by `MACRO_CACHE`:
 /// skips the read+parse entirely when the file's mtime matches what's
@@ -69,19 +113,50 @@ pub fn read_macro_by_id(id: &str) -> Option<Macro> {
         }
     }
 
-    let mac = match read_macro_file(&path) {
+    let mac = match load_own_macro_file(&path) {
         Ok(mac) => mac,
         Err(err) => {
             warn!("{}", err);
             return None;
         }
     };
+    // The upgrade may have rewritten the file.
+    let mtime = fs::metadata(&path).and_then(|m| m.modified()).unwrap_or(mtime);
     macro_cache().lock().unwrap().insert(id.to_string(), (mtime, mac.clone()));
     Some(mac)
 }
 
+/// A copy of `mac` with secret values masked in its saved variables and
+/// lists, or `None` when it holds none.
+fn without_secrets(mac: &Macro) -> Option<Macro> {
+    use crate::input::value::Evaluated;
+    use blockstitch_core::graph::ListItem;
+    let secret_var = |v: &Evaluated| matches!(v, Evaluated::Text(t) if crate::secrets::contains_secret(t));
+    let secret_item = |i: &ListItem| matches!(i, ListItem::Text(t) if crate::secrets::contains_secret(t));
+    if !mac.variables.iter().any(|v| secret_var(&v.value)) && !mac.lists.iter().any(|l| l.items.iter().any(secret_item)) {
+        return None;
+    }
+    let mut clean = mac.clone();
+    for var in &mut clean.graph.variables {
+        if let Evaluated::Text(t) = &mut var.value {
+            *t = crate::secrets::redact(t);
+        }
+    }
+    for list in &mut clean.graph.lists {
+        for item in &mut list.items {
+            if let ListItem::Text(t) = item {
+                *t = crate::secrets::redact(t);
+            }
+        }
+    }
+    Some(clean)
+}
+
 pub fn write_macro_file(path: &Path, mac: &Macro) -> Result<(), String> {
-    let serialized = serde_json::to_string_pretty(mac)
+    let clean = without_secrets(mac);
+    let mac = clean.as_ref().unwrap_or(mac);
+    let serialized = migrate::to_value(mac)
+        .and_then(|value| serde_json::to_string_pretty(&value).map_err(|e| e.to_string()))
         .map_err(|err| format!("Failed to serialize macro '{}': {}", mac.name, err))?;
 
     let mut temp_path = path.to_path_buf();
@@ -137,6 +212,7 @@ impl Macro {
                 .map_err(|err| format!("Failed to remove macro file '{}': {}", path.display(), err))?;
         }
         macro_cache().lock().unwrap().remove(&self.id);
+        crate::permissions::trust(&self.id);
         Ok(())
     }
 }
@@ -152,9 +228,19 @@ pub fn get_macros_from_config() -> Vec<Macro> {
     };
 
     for path in paths {
-        match read_macro_file(&path) {
+        match load_own_macro_file(&path) {
             Ok(mac) => macros.push(mac),
-            Err(err) => warn!("{}", err),
+            Err(err) => {
+                warn!("{}", err);
+                // Listing runs often; report each broken file once.
+                static REPORTED: Mutex<Vec<String>> = Mutex::new(Vec::new());
+                if let Ok(mut reported) = REPORTED.lock()
+                    && !reported.contains(&err)
+                {
+                    reported.push(err.clone());
+                    crate::run_log::error(&crate::run_log::Source::app("Blockwork"), err);
+                }
+            }
         }
     }
 
@@ -168,4 +254,109 @@ pub fn get_macros_from_config() -> Vec<Macro> {
     });
 
     macros
+}
+
+/// Top-level key marking a `.blockwork` bundle: several macros in one file.
+const BUNDLE_KEY: &str = "blockwork_bundle";
+
+/// What an import file holds, upgraded to the current format.
+pub struct ImportFile {
+    /// The bundle's name, or the macro's for a single macro file.
+    pub name: String,
+    pub macros: Vec<Macro>,
+    /// What upgrading older macros changed.
+    pub notes: Vec<String>,
+}
+
+/// Reads a single macro file or a bundle.
+pub fn read_import_file(path: &Path) -> Result<ImportFile, String> {
+    let text = fs::read_to_string(path).map_err(|e| format!("Couldn't read '{}': {e}", path.display()))?;
+    let value: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("'{}' isn't a macro file: {e}", path.display()))?;
+    let Some(version) = value.get(BUNDLE_KEY) else {
+        let (mut mac, upgrade) = migrate::from_value(value).map_err(|e| format!("Couldn't import '{}': {e}", path.display()))?;
+        mac.ensure_id();
+        return Ok(ImportFile { name: mac.name.clone(), macros: vec![mac], notes: upgrade.notes });
+    };
+    if version.as_u64().is_none_or(|v| v > 1) {
+        return Err("This bundle was made by a newer version of Blockwork. Update Blockwork to import it".into());
+    }
+    let mut out = ImportFile {
+        name: value.get("name").and_then(|n| n.as_str()).unwrap_or("Bundle").to_string(),
+        macros: Vec::new(),
+        notes: Vec::new(),
+    };
+    for entry in value.get("macros").and_then(|m| m.as_array()).into_iter().flatten() {
+        let (mut mac, upgrade) = migrate::from_value(entry.clone()).map_err(|e| format!("Couldn't import a macro in the bundle: {e}"))?;
+        mac.ensure_id();
+        out.notes.extend(upgrade.notes.into_iter().map(|n| format!("{}: {n}", mac.name)));
+        out.macros.push(mac);
+    }
+    if out.macros.is_empty() {
+        return Err("The bundle has no macros in it".into());
+    }
+    Ok(out)
+}
+
+/// Writes `macros` to one `.blockwork` bundle, secrets masked like a single export.
+pub fn write_bundle(path: &Path, name: &str, macros: &[Macro]) -> Result<(), String> {
+    let entries = macros
+        .iter()
+        .map(|mac| migrate::to_value(without_secrets(mac).as_ref().unwrap_or(mac)))
+        .collect::<Result<Vec<_>, _>>()?;
+    let bundle = serde_json::json!({ BUNDLE_KEY: 1, "name": name, "macros": entries });
+    let text = serde_json::to_string_pretty(&bundle).map_err(|e| e.to_string())?;
+    fs::write(path, text).map_err(|e| format!("Couldn't write '{}': {e}", path.display()))
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn bundles_round_trip_and_single_files_import_too() {
+        let dir = std::env::temp_dir().join(format!("bw-bundle-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let a = Macro::new("A".into(), String::new(), Vec::new());
+        let b = Macro::new("B".into(), String::new(), Vec::new());
+
+        let bundle = dir.join("pack.blockwork");
+        write_bundle(&bundle, "Pack", &[a.clone(), b.clone()]).unwrap();
+        let read = read_import_file(&bundle).unwrap();
+        assert_eq!(read.name, "Pack");
+        assert_eq!(read.macros, vec![a.clone(), b]);
+
+        let single = dir.join("a.macro");
+        write_macro_file(&single, &a).unwrap();
+        let read = read_import_file(&single).unwrap();
+        assert_eq!((read.name.as_str(), read.macros.len()), ("A", 1));
+        let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn every_salvage_keeps_its_own_backup() {
+        let dir = std::env::temp_dir().join(format!("bw-salvage-{}", std::process::id()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("m.json");
+        let with_unknown = |text: &str| {
+            let mut value = serde_json::to_value(Macro::new("M".into(), String::new(), Vec::new())).unwrap();
+            value["strands"] = serde_json::json!([{ "id": "s", "x": 0, "y": 0, "instructions": [
+                { "id": "a", "kind": "WhenRan" },
+                { "id": "b", "kind": { "BlockFromTheFuture": text } },
+            ] }]);
+            fs::write(&path, value.to_string()).unwrap();
+        };
+        with_unknown("first");
+        load_own_macro_file(&path).unwrap();
+        with_unknown("second");
+        load_own_macro_file(&path).unwrap();
+        let backups: Vec<String> = fs::read_dir(&dir)
+            .unwrap()
+            .filter_map(|e| e.ok()?.file_name().into_string().ok())
+            .filter(|n| n.ends_with(".bak"))
+            .map(|n| fs::read_to_string(dir.join(n)).unwrap())
+            .collect();
+        assert_eq!(backups.len(), 2);
+        assert!(backups.iter().any(|b| b.contains("first")) && backups.iter().any(|b| b.contains("second")));
+        let _ = fs::remove_dir_all(&dir);
+    }
 }

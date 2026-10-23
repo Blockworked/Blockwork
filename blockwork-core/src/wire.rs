@@ -1,12 +1,5 @@
-//! Wire format for the shared-memory bridge between the embedded engine
-//! (running inside GD, under Wine on Proton) and `blockwork-linux-bridge` (a
-//! native Linux process that does real input capture/emission, since
-//! Windows' `WH_KEYBOARD_LL`/`WH_MOUSE_LL` hooks don't see real host input
-//! under Wine, and `SendInput`-based emission is unreliable there too).
-//!
-//! Always compiled (no platform gate) — both `blockwork-ffi` (Windows target)
-//! and `blockwork-linux-bridge` (Linux target) depend on this module directly,
-//! so the two ends can never disagree about the encoding.
+//! Shared-memory wire format between the Wine-hosted embedder and
+//! `blockwork-linux-bridge`.
 
 use crate::input::types::{MacroButton, MacroKey};
 use serde::{Deserialize, Serialize};
@@ -27,7 +20,7 @@ pub enum WireCaptureEvent {
 }
 
 /// A `CaptureTimestamp::Hardware` value can't cross the wire directly
-/// (`SystemTime` isn't `#[repr(C)]`-portable) — split into seconds+nanos
+/// (`SystemTime` isn't `#[repr(C)]`-portable) - split into seconds+nanos
 /// since `UNIX_EPOCH` and reconstructed on the other side.
 #[derive(Debug, Clone, Copy, Serialize, Deserialize)]
 pub struct WireTimestamp {
@@ -67,57 +60,24 @@ impl From<WireCaptureEvent> for crate::macros::backend::CaptureEvent {
     }
 }
 
-/// Control-plane commands, sent Windows (Wine-hosted mod) → Linux
-/// (`blockwork-linux-bridge`). Playback used to be paced entirely on the
-/// Windows side: one `WireEmitCommand` shipped across per input event, the
-/// instant `runner::run()`'s Wait-based deadline loop decided to fire it.
-/// But that loop ran inside the Wine-hosted GD process, where Wine's
-/// `SetThreadPriority` emulation is much weaker than real `SCHED_FIFO` —
-/// under load, the deadline loop could get preempted for unpredictable
-/// stretches, throwing macro timing off just enough to land inputs at the
-/// wrong moment (confirmed: random deaths at different points in the same
-/// macro run, never reproduced running the same macro through the old
-/// standalone native-Linux desktop app talking to GD over a plain TCP
-/// socket instead of this bridge).
-///
-/// Now the whole timed run happens natively on the Linux side instead —
-/// only these two control commands cross the wire, never per-event
-/// emission. `blockwork-linux-bridge` loads the macro itself (straight from
-/// the OS-default config dir — the same file the Windows side's
-/// `macros-dir` override setting reaches via its `Z:` mapping, so no macro
-/// data needs to cross the wire either) and runs `blockwork_core::macros::
-/// Macro::run` exactly as the old desktop app did, including its own
-/// `raise_current_thread_priority()` call — on Linux that's the `#[cfg(unix)]`
-/// branch, real `SCHED_FIFO`, not Wine's emulation of it.
+/// Control commands, Windows -> Linux. Runs happen on the Linux side.
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub enum WireControlCommand {
-    /// Run the macro with this id — fire-and-forget, mirroring
-    /// `macros_run_macro`'s own "starts a background run, returns
-    /// immediately" contract. The `f64` is `elapsed_overshoot_ms` from that
-    /// same call: how much real time had already passed, before this
-    /// command was even sent, since the moment playback was actually
-    /// supposed to start (blockwork-gd's attempt-start trigger only fires once
-    /// per game frame, so it always overshoots its own 200ms grace-period
-    /// target by that frame's `dt`). `blockwork-linux-bridge` feeds it into
-    /// `Macro::run_with_offset` so the run's first `Wait` deadline anchors
-    /// to the *intended* start instant instead of whenever this command
-    /// happens to get noticed and dispatched.
+    /// Run the macro with this id - fire-and-forget, same contract as
+    /// `blockwork_run_macro`. The `f64` is `elapsed_overshoot_ms`: real time
+    /// already elapsed before this command was sent, since playback was
+    /// supposed to start. Fed into `Macro::run_with_offset` so the first
+    /// `Wait` deadline anchors to the intended start instant, not whenever
+    /// this command gets dispatched.
     RunMacro(String, f64),
     /// Stops every in-flight run started via `RunMacro`, mirroring
-    /// `macros_stop_loop`.
+    /// `blockwork_stop_loop`.
     StopLoop,
 }
 
-/// Generous relative to a bincode-encoded `WireCapture`/`WireControlCommand`
-/// (small enums over primitives/short strings, `RunMacro`'s id being the
-/// biggest at one UUID-simple string) — actual encoded size checked in
-/// tests below; this is deliberately far above it.
+/// Max encoded message size.
 pub const SLOT_SIZE: usize = 128;
-/// 512 turned out not to be enough headroom in practice — a real recording
-/// session filled it (and started dropping events) within ~14 seconds
-/// against a real mouse/keyboard, confirmed against an actual Proton/GD
-/// session. 16384 costs ~2MB per ring (trivial) and gives roughly 30x the
-/// margin at the same observed event rate.
+/// Ring capacity.
 pub const RING_CAPACITY: usize = 16384;
 
 #[repr(C)]
@@ -130,16 +90,7 @@ pub struct RingSlot {
 pub struct RingBuffer {
     pub head: AtomicU32,
     pub tail: AtomicU32,
-    /// Cross-process spinlock guarding `try_push` — needed because
-    /// `blockwork-linux-bridge` spawns one reader thread *per input device*
-    /// and every one of them pushes into the same capture ring directly.
-    /// Without this, two threads can read the same `head`, write into the
-    /// same slot, and only one push ends up counted — a real race
-    /// confirmed against an actual Proton/GD session (recording worked
-    /// inconsistently depending on whether multiple devices happened to
-    /// produce events in the same narrow window). `try_pop` stays
-    /// single-consumer-only (true on both ends: one capture-forwarder
-    /// thread, one emit-loop thread), so it needs no such lock.
+    /// Lock for multi-producer pushes.
     push_lock: AtomicU32,
     pub slots: [RingSlot; RING_CAPACITY],
 }
@@ -194,7 +145,7 @@ impl RingBuffer {
 #[repr(C)]
 pub struct SharedRegion {
     /// Bumped by blockwork-ffi; blockwork-linux-bridge exits if this goes stale,
-    /// so it never orphans itself if GD is killed/crashes.
+    /// so it never orphans itself if the host is killed/crashes.
     pub windows_heartbeat: AtomicU32,
     /// Bumped by blockwork-linux-bridge; lets blockwork-ffi notice the bridge
     /// process died (best-effort, not load-bearing in v1).
@@ -202,9 +153,8 @@ pub struct SharedRegion {
     /// Linux (producer) → Windows (consumer).
     pub capture: RingBuffer,
     /// Windows (producer) → Linux (consumer). Carries `WireControlCommand`s
-    /// — was per-input-event `WireEmitCommand`s before playback timing
-    /// moved to the Linux side; renamed along with that so the field name
-    /// still describes what actually flows through it.
+    /// (was per-event `WireEmitCommand`s before playback timing moved to
+    /// the Linux side).
     pub control: RingBuffer,
 }
 
@@ -248,7 +198,7 @@ mod tests {
 
     #[test]
     fn control_roundtrips_and_fits_slot() {
-        // A real macro id (uuid::Uuid::new_v4().simple()) is 32 hex chars —
+        // A real macro id (uuid::Uuid::new_v4().simple()) is 32 hex chars -
         // exercises the actual worst-case length rather than a short literal.
         let id = "0123456789abcdef0123456789abcdef".to_string();
         let msg = WireControlCommand::RunMacro(id.clone(), 37.5);
@@ -276,18 +226,13 @@ mod tests {
         assert!(ring.try_pop(&mut buf).is_none());
     }
 
-    /// Regression test for the multi-producer race: blockwork-linux-bridge
-    /// spawns one reader thread per input device, and every one of them
-    /// pushes into the same capture ring concurrently. A single-producer
-    /// test can't catch this — it needs actual concurrent pushers to
-    /// exercise the `push_lock`. Every pushed value must be popped exactly
-    /// once, with its content intact (no torn/overwritten slots, no lost
-    /// count in `head`).
+    /// Regression test for the multi-producer race (see `push_lock`): needs
+    /// actual concurrent pushers to exercise the lock. Every pushed value
+    /// must be popped exactly once, intact, with no lost count in `head`.
     #[test]
     fn ring_buffer_survives_concurrent_producers() {
-        // Boxed for the same reason as the test above (too large for the
-        // stack); `thread::scope` can borrow it directly without needing
-        // `'static`, unlike plain `thread::spawn`.
+        // Boxed for the same reason as above; `thread::scope` can borrow it
+        // directly, no `'static` needed unlike `thread::spawn`.
         let ring: Box<RingBuffer> = unsafe {
             let layout = std::alloc::Layout::new::<RingBuffer>();
             let ptr = std::alloc::alloc_zeroed(layout) as *mut RingBuffer;

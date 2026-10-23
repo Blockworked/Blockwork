@@ -1,0 +1,75 @@
+import QtQuick
+import QtQuick.Controls
+import QtQuick.Layouts
+import com.blockworked.Blockstitch 1.0
+import com.blockworked.Blockwork 1.0
+
+Item {
+    id: root
+    required property var appState
+    required property var invoke
+
+    readonly property var preferences: [
+        { title: qsTr("Start at system startup"), detail: qsTr("Hotkeys work as soon as you log in."), on: appState.start_at_startup === true, command: "set_start_at_startup" },
+        { title: qsTr("Close to tray"), detail: qsTr("Keep hotkeys active after closing the editor."), on: appState.close_to_tray === true, command: "set_close_to_tray" },
+        { title: qsTr("Record mouse movement"), detail: qsTr("Include cursor paths in recordings."), on: appState.record_mouse_movement === true, command: "toggle_record_mouse_movement" }
+    ]
+
+    ColumnLayout {
+        anchors.fill: parent; spacing: 0
+        Rectangle {
+            Layout.fillWidth: true; Layout.preferredHeight: 52; color: Theme.field; border.color: Theme.borderSoft
+            TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
+            RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
+                Image {
+                    visible: Qt.platform.os !== "osx"
+                    source: "qrc:/icons/blockwork.png"; sourceSize: Qt.size(40, 40)
+                    Layout.preferredWidth: 20; Layout.preferredHeight: 20
+                    fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
+                }
+                Text { text: qsTr("Welcome to Blockwork"); color: Theme.text; font.pixelSize: 15; font.weight: Font.Bold }
+                Item { Layout.fillWidth: true }
+                WindowControls { visible: Qt.platform.os !== "osx" }
+            }
+        }
+
+        Item {
+            Layout.fillWidth: true; Layout.fillHeight: true
+            ColumnLayout {
+                anchors.centerIn: parent; width: Math.min(560, parent.width - 48); spacing: 14
+                Text { Layout.alignment: Qt.AlignHCenter; text: qsTr("Make it yours"); color: Theme.text; font.pixelSize: 24; font.weight: Font.DemiBold }
+                Text { Layout.alignment: Qt.AlignHCenter; Layout.bottomMargin: 6; text: qsTr("You can change these any time in Settings."); color: Theme.textDim; font.pixelSize: 14 }
+                SectionCard {
+                    Layout.fillWidth: true; title: qsTr("Preferences"); iconName: "settings"
+                    Repeater {
+                        model: root.preferences
+                        delegate: RowLayout {
+                            required property var modelData
+                            Layout.fillWidth: true; spacing: 12
+                            ColumnLayout { Layout.fillWidth: true
+                                Text { Layout.fillWidth: true; text: modelData.title; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
+                                Text { Layout.fillWidth: true; text: modelData.detail; color: Theme.textDim; font.pixelSize: 12 }
+                            }
+                            BwSwitch {
+                                checked: modelData.on
+                                onToggled: checked => root.invoke(modelData.command, { enabled: checked })
+                            }
+                        }
+                    }
+                }
+                SectionCard {
+                    Layout.fillWidth: true; title: qsTr("Start from a template"); iconName: "sparkles"
+                    TemplateList {
+                        Layout.fillWidth: true; templates: appState.templates || []
+                        onPicked: id => { root.invoke("new_macro_from_template", { template: id }); root.invoke("set_onboarding_done", { done: true }); }
+                    }
+                }
+                BwButton {
+                    Layout.alignment: Qt.AlignHCenter; Layout.topMargin: 10
+                    text: qsTr("Get started"); primary: true
+                    onClicked: root.invoke("set_onboarding_done", { done: true })
+                }
+            }
+        }
+    }
+}

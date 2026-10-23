@@ -1,0 +1,98 @@
+app-id: com.blockworked.Blockwork
+runtime: org.kde.Platform
+runtime-version: '6.10'
+sdk: org.kde.Sdk
+command: blockwork
+sdk-extensions:
+  - org.freedesktop.Sdk.Extension.rust-stable
+
+# Upstream ships res/blockwork.desktop with Icon=blockwork; these rename both
+# to the app id at export.
+rename-desktop-file: blockwork.desktop
+rename-icon: blockwork
+
+finish-args:
+  - --share=ipc
+  - --socket=wayland
+  - --socket=fallback-x11
+  # /dev/uinput (synthetic input) + /dev/input/event* (hotkeys, recording).
+  - --device=all
+  - --device=dri
+  # Open App/Close App launch and kill host apps via flatpak-spawn --host.
+  - --talk-name=org.freedesktop.Flatpak
+  # "Close to tray" icon (StatusNotifierItem).
+  - --talk-name=org.kde.StatusNotifierWatcher
+  # Web request/fetch blocks.
+  - --share=network
+  # Notify block.
+  - --talk-name=org.freedesktop.Notifications
+  # Screen lock trigger and reporter.
+  - --talk-name=org.freedesktop.ScreenSaver
+  - --talk-name=org.gnome.ScreenSaver
+  - --system-talk-name=org.freedesktop.login1
+  # Secrets live in the system keyring (Secret Service).
+  - --talk-name=org.freedesktop.secrets
+  # KDE: fast window captures (ScreenShot2) and window client geometry (scripts).
+  - --talk-name=org.kde.KWin
+  # File blocks and the file-change trigger work on the user's files.
+  - --filesystem=home
+
+build-options:
+  append-path: /usr/lib/sdk/rust-stable/bin
+  libdir: /app/lib
+  env:
+    CARGO_HOME: /run/build/blockwork/cargo
+    CARGO_NET_OFFLINE: 'true'
+    CARGO_BUILD_JOBS: '6'
+
+modules:
+  # The daemon's tray icon uses AppIndicator; the UI itself is Qt Quick.
+  - shared-modules/libayatana-appindicator/libayatana-appindicator-gtk3.json
+
+  - name: blockwork
+    buildsystem: simple
+    build-commands:
+      # blockwork-qt intentionally consumes the QML module from the sibling
+      # Blockstitch repository. Its source is placed beside this build
+      # directory to preserve the same ../../blockstitch path used by local
+      # development. One command, since each gets a fresh /run/build.
+      - |
+        set -e
+        cp -a .flatpak-blockstitch ../blockstitch
+        # The SDK's Qt; without QMAKE, CXX-Qt only takes exact x.y.0 versions and tries to download one.
+        export QMAKE="$(command -v qmake6 || command -v qmake)"
+        test -n "$QMAKE"
+        cargo --offline build --release --workspace --exclude blockwork-linux-bridge
+      - install -Dm755 target/release/blockwork /app/lib/blockwork/blockwork
+      - install -Dm755 target/release/blockwork-daemon /app/lib/blockwork/blockwork-daemon
+      - mkdir -p /app/bin
+      - |
+        cat > /app/bin/blockwork <<'EOF'
+        #!/bin/sh
+        # The daemon relaunches the UI from its tray icon through this wrapper.
+        export BLOCKWORK_UI_EXE=/app/bin/blockwork
+        exec /app/lib/blockwork/blockwork "$@"
+        EOF
+        chmod +x /app/bin/blockwork
+      - install -Dm644 res/blockwork.desktop /app/share/applications/blockwork.desktop
+      - install -Dm644 res/icons/blockwork.png /app/share/icons/hicolor/512x512/apps/blockwork.png
+      - install -Dm644 res/com.blockworked.Blockwork.metainfo.xml /app/share/metainfo/com.blockworked.Blockwork.metainfo.xml
+    sources:
+      # BEGIN app-source
+      # Point at the release tag (and its commit) when submitting to Flathub.
+      - type: git
+        url: https://github.com/Blockworked/Blockwork.git
+        branch: master
+      # END app-source
+
+      # CI replaces this with the checked-out sibling so coordinated branches
+      # can be tested before both repositories are merged.
+      # BEGIN blockstitch-source
+      # Keep in step with the blockstitch rev pinned in Cargo.toml.
+      - type: git
+        url: https://github.com/Blockworked/blockstitch.git
+        commit: cd155bdbef5278a585f479862e0afb8b3e996d44
+        dest: .flatpak-blockstitch
+      # END blockstitch-source
+
+      - cargo-sources.json

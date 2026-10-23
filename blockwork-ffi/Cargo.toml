@@ -3,7 +3,7 @@ name = "blockwork-ffi"
 version.workspace = true
 # Pinned to 2021 (not `edition.workspace = true`) rather than 2024: cbindgen
 # 0.27's parser doesn't recognize edition 2024's `#[unsafe(no_mangle)]` form
-# and silently emits an empty header — plain `#[no_mangle]` (legal, just
+# and silently emits an empty header - plain `#[no_mangle]` (legal, just
 # non-default, on 2021) sidesteps that instead of chasing cbindgen versions.
 edition = "2021"
 
