@@ -238,6 +238,248 @@
     </message>
 </context>
 <context>
+    <name>BlockDefinitionEditor</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="115"/>
+        <source>Search icons</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="166"/>
+        <source>No icons match</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="418"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="434"/>
+        <source>block name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="667"/>
+        <source>Every input and branch needs a name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="671"/>
+        <source>Input and branch names must be unique</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="677"/>
+        <source>Give the block a name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="486"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="764"/>
+        <source>value</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="192"/>
+        <source>Identifier</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="197"/>
+        <source>AUTHOR_BLOCKNAME</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="199"/>
+        <source>Description</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="222"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1220"/>
+        <source>Default parameters</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="225"/>
+        <source>Starting values for new blocks added from the sidebar. Existing blocks keep their values.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="240"/>
+        <source>Add an input to the block to set its default value.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="267"/>
+        <source>Number</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="267"/>
+        <source>Text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="281"/>
+        <source>True</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="281"/>
+        <source>False</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="306"/>
+        <source>Enter a finite number</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="486"/>
+        <source>label</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="652"/>
+        <source>Enter a finite number for each numeric default</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="764"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1113"/>
+        <source>Add label</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="815"/>
+        <source>Move left</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="820"/>
+        <source>Remove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="825"/>
+        <source>Move right</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1071"/>
+        <source>Move branch up</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1072"/>
+        <source>Remove branch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1073"/>
+        <source>Move branch down</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1191"/>
+        <source>Icon</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1197"/>
+        <source>Default</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1209"/>
+        <source>Reset</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="203"/>
+        <source>Description for Details (optional)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="205"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="315"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1364"/>
+        <source>Done</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1380"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1387"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1394"/>
+        <source>Add an input</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1381"/>
+        <source>number or text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1388"/>
+        <source>boolean</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="486"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1395"/>
+        <source>branch</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1401"/>
+        <source>Add a label</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1474"/>
+        <source>Return Text or Number</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1474"/>
+        <source>Normal block</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1480"/>
+        <source>Return a Boolean</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1480"/>
+        <source>Ending block</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1487"/>
+        <source>Returns a value</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1508"/>
+        <source>Cancel</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1512"/>
+        <source>OK</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1"/>
+        <source>Details</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1"/>
+        <source>A public identifier and a description for this block.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>BlockLibrary</name>
     <message>
         <location filename="../qml/BlockLibrary.qml" line="59"/>
@@ -4699,43 +4941,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="115"/>
-        <source>Search icons</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="166"/>
-        <source>No icons match</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="418"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="434"/>
-        <source>block name</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="667"/>
-        <source>Every input and branch needs a name</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="671"/>
-        <source>Input and branch names must be unique</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="677"/>
-        <source>Give the block a name</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="486"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="764"/>
-        <source>value</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../qml/MakeBlockDialog.qml" line="185"/>
         <location filename="../qml/MakeBlockDialog.qml" line="1230"/>
         <source>Publishing</source>
@@ -4744,198 +4949,6 @@
     <message>
         <location filename="../qml/MakeBlockDialog.qml" line="188"/>
         <source>Details shown when sharing this block in a community pack.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="192"/>
-        <source>Identifier</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="197"/>
-        <source>AUTHOR_BLOCKNAME</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="199"/>
-        <source>Description</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="222"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="1220"/>
-        <source>Default parameters</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="225"/>
-        <source>Starting values for new blocks added from the sidebar. Existing blocks keep their values.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="240"/>
-        <source>Add an input to the block to set its default value.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="267"/>
-        <source>Number</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="267"/>
-        <source>Text</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="281"/>
-        <source>True</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="281"/>
-        <source>False</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="306"/>
-        <source>Enter a finite number</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="486"/>
-        <source>label</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="652"/>
-        <source>Enter a finite number for each numeric default</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="764"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="1113"/>
-        <source>Add label</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="815"/>
-        <source>Move left</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="820"/>
-        <source>Remove</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="825"/>
-        <source>Move right</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1071"/>
-        <source>Move branch up</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1072"/>
-        <source>Remove branch</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1073"/>
-        <source>Move branch down</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1191"/>
-        <source>Icon</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1197"/>
-        <source>Default</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1209"/>
-        <source>Reset</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="203"/>
-        <source>Description for Details (optional)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="205"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="315"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="1364"/>
-        <source>Done</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1380"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="1387"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="1394"/>
-        <source>Add an input</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1381"/>
-        <source>number or text</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1388"/>
-        <source>boolean</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="486"/>
-        <location filename="../qml/MakeBlockDialog.qml" line="1395"/>
-        <source>branch</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1401"/>
-        <source>Add a label</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1474"/>
-        <source>Return Text or Number</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1474"/>
-        <source>Normal block</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1480"/>
-        <source>Return a Boolean</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1480"/>
-        <source>Ending block</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1487"/>
-        <source>Returns a value</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1508"/>
-        <source>Cancel</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/MakeBlockDialog.qml" line="1512"/>
-        <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

@@ -3996,6 +3996,37 @@ mod value_location_tests {
     }
 
     #[test]
+    fn reordering_branches_keeps_each_call_body_with_its_branch() {
+        let branch = |id: &str, name: &str| BlockPiece::Branch { id: id.into(), name: name.into() };
+        let say = |text: &str| Instruction::new(InstructionKind::Log(Value::text(text)));
+        let mut mac = Macro::new("Test".into(), "".into(), vec![]);
+        let id = mac.create_block(
+            vec![label("either"), branch("b1", "yes"), branch("b2", "no")],
+            BlockShape::Normal,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
+        mac.strands.push(Strand {
+            id: "caller".into(),
+            x: 0,
+            y: 0,
+            instructions: vec![Instruction::new(InstructionKind::CallBlock {
+                block_id: id.clone(),
+                args: vec![],
+                branches: vec![vec![say("yes")], vec![say("no")]],
+            })],
+        });
+        mac.update_block(&id, vec![label("either"), branch("b2", "no"), branch("b1", "yes")], BlockShape::Normal, "#4C97FF")
+            .unwrap();
+        let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
+        let InstructionKind::CallBlock { branches, .. } = &caller.instructions[0].kind else {
+            panic!("expected CallBlock")
+        };
+        assert_eq!(branches, &vec![vec![say("no")], vec![say("yes")]]);
+    }
+
+    #[test]
     fn reconcile_block_call_args_preserves_value_across_rename_by_id() {
         let mut mac = Macro::new("Test".into(), "".into(), vec![]);
         let id = mac.create_block(

@@ -329,6 +329,13 @@ impl BlockKind for InstructionKind {
         }
     }
 
+    fn call_branches_mut(&mut self, block_id: &str) -> Option<&mut Vec<Vec<Instruction>>> {
+        match self {
+            InstructionKind::CallBlock { block_id: id, branches, .. } if id == block_id => Some(branches),
+            _ => None,
+        }
+    }
+
     fn block_header_id(&self) -> Option<&str> {
         match self {
             InstructionKind::BlockHeader(id) => Some(id),
