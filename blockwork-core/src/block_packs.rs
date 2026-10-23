@@ -272,7 +272,9 @@ pub fn slug(text: &str) -> String {
     out.trim_end_matches('-').to_string()
 }
 
-/// The pack file's text; secret values are masked like an export.
+/// The pack file's text; secret values are masked like an export. Needs the
+/// keyring, so it isn't in the headless build.
+#[cfg(feature = "system")]
 pub fn write_pack(pack: &BlockPack) -> Result<String, String> {
     let mut content = pack.content.clone();
     apply_details(&mut content, &pack.info);
@@ -505,6 +507,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "system")]
     fn input_defaults_survive_pack_updates_without_resetting_calls() {
         use crate::input::value::Evaluated;
         let mut author = Macro::new("author".into(), String::new(), vec![]);
@@ -539,6 +542,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "system")]
     fn packs_take_dependencies_and_update_in_place() {
         let mut author = Macro::new("Author".into(), String::new(), Vec::new());
         let inner = make_block(&mut author, "inner", vec![InstructionKind::Log(Value::text("hi"))]);
@@ -649,6 +653,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "system")]
     fn pack_details_survive_export_install_and_save() {
         let mut author = Macro::new("Author".into(), String::new(), Vec::new());
         let id = make_block(&mut author, "wait seconds", Vec::new());
@@ -703,6 +708,7 @@ mod tests {
     }
 
     #[test]
+    #[cfg(feature = "system")]
     fn details_ids_use_author_and_block_name_without_changing_internal_ids() {
         assert_eq!(details_identifier("Example Author", "WaitSeconds"), "ExampleAuthor_WaitSeconds");
         assert_eq!(details_identifier("ExampleAuthor", "ExampleAuthor_WaitSeconds"), "ExampleAuthor_WaitSeconds");

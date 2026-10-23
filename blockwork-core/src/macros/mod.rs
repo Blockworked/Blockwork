@@ -9,20 +9,33 @@ use serde::{Deserialize, Serialize};
 use std::ops::{Deref, DerefMut};
 use uuid::Uuid;
 
+#[cfg(feature = "system")]
 pub mod backend;
+#[cfg(feature = "system")]
 pub mod calls;
 pub mod conditions;
+#[cfg(feature = "system")]
 pub mod debug;
 pub mod fields;
+#[cfg(feature = "system")]
 pub mod locks;
 pub mod migrate;
+pub mod placement;
+#[cfg(feature = "system")]
 pub mod loop_control;
+#[cfg(feature = "system")]
 pub mod priority;
+#[cfg(feature = "system")]
 pub mod gdr_import;
+#[cfg(feature = "system")]
 pub mod host_clock;
+#[cfg(feature = "system")]
 pub mod run_registry;
+#[cfg(feature = "system")]
 pub mod runner;
+#[cfg(feature = "system")]
 pub mod thread_pool;
+#[cfg(feature = "system")]
 pub mod trace;
 
 pub use blockstitch_core::graph::{

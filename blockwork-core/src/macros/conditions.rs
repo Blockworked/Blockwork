@@ -1,6 +1,7 @@
 //! Per-macro conditions: when triggers and hotkeys may start a macro.
 
 use super::MacroSettings;
+#[cfg(feature = "system")]
 use chrono::{DateTime, Datelike, Local, Timelike};
 use serde::{Deserialize, Serialize};
 
@@ -18,6 +19,7 @@ impl MacroSettings {
     }
 
     /// Why a trigger or hotkey can't start the macro right now, or `None` if it can.
+    #[cfg(feature = "system")]
     pub fn blocked_by(&self) -> Option<String> {
         if !self.has_conditions() {
             return None;
@@ -25,6 +27,7 @@ impl MacroSettings {
         self.check(&Local::now(), crate::battery::is_plugged_in, crate::window::active)
     }
 
+    #[cfg(feature = "system")]
     fn check(
         &self,
         now: &DateTime<Local>,
@@ -85,19 +88,22 @@ pub fn parse_clock(text: &str) -> Result<u16, String> {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use crate::window::ActiveWindow;
-    use chrono::TimeZone;
+    #[cfg(feature = "system")]
+    use {crate::window::ActiveWindow, chrono::TimeZone};
 
+    #[cfg(feature = "system")]
     fn at(d: u32, h: u32, mi: u32) -> DateTime<Local> {
         // 2026-10-15 is a Thursday.
         Local.with_ymd_and_hms(2026, 10, d, h, mi, 0).unwrap()
     }
 
+    #[cfg(feature = "system")]
     fn window(app: &str) -> Result<ActiveWindow, String> {
         Ok(ActiveWindow { title: String::new(), app: app.into() })
     }
 
     #[test]
+    #[cfg(feature = "system")]
     fn each_condition_can_block() {
         let mut s = MacroSettings::default();
         assert!(!s.has_conditions());

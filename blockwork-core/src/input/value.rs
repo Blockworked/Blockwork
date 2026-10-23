@@ -7,6 +7,7 @@ pub use blockstitch_core::value::*;
 /// live system state, so none takes operands - see [`crate::battery`] and
 /// [`crate::clipboard`]. The wire names are what they serialized as before,
 /// so saves keep loading.
+#[cfg(feature = "system")]
 static OPERATORS: &[ExtOperator] = &[
     ExtOperator {
         kind: "BatteryPercentage",
@@ -420,10 +421,12 @@ static OPERATORS: &[ExtOperator] = &[
     },
 ];
 
+#[cfg(feature = "system")]
 fn numbers(values: &[f64]) -> Vec<Value> {
     values.iter().map(|&v| Value::number(v)).collect()
 }
 
+#[cfg(feature = "system")]
 fn one_text() -> Vec<Value> {
     vec![Value::text("")]
 }
@@ -446,11 +449,12 @@ pub fn has_side_effect_operator(value: &Value) -> bool {
 
 /// Teaches `blockstitch` about [`OPERATORS`]. Idempotent; called from
 /// [`crate::init`], which every entry point runs before touching a macro.
+#[cfg(feature = "system")]
 pub fn register_blockwork_operators() {
     register_operators(OPERATORS);
 }
 
-#[cfg(test)]
+#[cfg(all(test, feature = "system"))]
 mod tests {
     use super::*;
 
