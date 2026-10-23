@@ -176,9 +176,11 @@ Item {
             compare(ghost.refColor, Qt.color("#51b84b"));
             mouseMove(scene, 1000, 700, 20);
             mouseRelease(scene, 1000, 700);
-            const created = scene.calls.filter(c => c.command === "create_floating_value");
-            compare(created.length, 1);
-            compare(created[0].args.originBlockId, "custom");
+            // Out of a field it's one move, which keeps the parameter's block.
+            const moved = scene.calls.filter(c => c.command === "move_value");
+            compare(moved.length, 1);
+            compare(moved[0].args.to, null);
+            compare(moved[0].args.originBlockId, "custom");
         }
         function test_cancel() {
             const page = editor();
