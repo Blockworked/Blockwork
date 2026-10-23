@@ -67,12 +67,9 @@ Item {
         return i;
     }
     function firstListName() { return root.macro && root.macro.lists && root.macro.lists.length ? root.macro.lists[0].name : ""; }
-    function addBlock(type, x, y) { root.invoke("add_strand", { x: x, y: y, instruction: defaultInstruction(type) }); }
-    function addCustomBlock(definition, x, y) {
-        const instruction = palette.customInstruction(definition);
-        instruction.id = uuid();
-        root.invoke("add_strand", { x: x, y: y, instruction: instruction });
-    }
+    function customEntry(definition) { return { kind: "custom", definition: definition, instruction: palette.customInstruction(definition) }; }
+    // The palette drag controller, for tests.
+    property alias paletteDrags: dragController
     function recordingLabel() {
         const phase = appState.recording_phase || { phase: "Idle" };
         if (phase.phase === "Countdown") return qsTr("Cancel (%1)").arg(phase.countdown);
@@ -391,113 +388,33 @@ Item {
         updated.icon = root.resolvePickedIcon(app);
         root.invoke("edit_instruction", { strandId: req.strandId, path: req.path, instruction: updated });
     }
-    // ---- dragging a palette entry onto the canvas ----
-    property var paletteDrag: null   // { spec, offsetX, offsetY }
-    function beginPaletteDrag(spec, ox, oy, sx, sy) {
-        ghostHeld = false;
-        paletteDrag = { spec: spec, offsetX: ox, offsetY: oy };
-        ghost.spec = spec;
-        movePaletteDrag(sx, sy);
-        ghost.visible = true;
+    // ---- palette drops: the shared controller's edits as daemon commands ----
+    // A plain palette block drops with Blockwork's own defaults; branch and custom calls come ready-made.
+    function paletteInstruction(spec) { return spec.kind === "instruction" && spec.type ? defaultInstruction(spec.type) : null; }
+    function headerStrand(strandId) {
+        const strand = (root.macro ? root.macro.strands : []).find(s => s.id === strandId);
+        const first = strand ? strand.instructions[0] : null;
+        return first && first.type === "BlockHeader" ? first : null;
     }
-    function movePaletteDrag(sx, sy) {
-        if (!paletteDrag) return;
-        const p = ghostLayer.mapFromItem(null, sx, sy);
-        ghost.x = p.x - paletteDrag.offsetX; ghost.y = p.y - paletteDrag.offsetY;
-        // Live attach preview, just like canvas drags: the canvas opens the
-        // hovered gap and shows where the new block will land.
-        const spec = paletteDrag.spec;
-        if (spec && spec.kind === "value") {
-            canvas.clearSnap();
-            // Pass the dragged ghost's scene footprint so the canvas targets
-            // the nearest slot to the block (proximity), not the bare cursor.
-            // The ghost loader may not have built yet on the first move;
-            // then the size is 0 and the canvas falls back to the pointer.
-            const g1 = ghostLayer.mapToItem(null, ghost.x, ghost.y);
-            const g2 = ghostLayer.mapToItem(null, ghost.x + ghost.width, ghost.y + ghost.height);
-            canvas.updatePaletteValueTargetRect(g1.x, g1.y, g2.x, g2.y, sx, sy);
-            return;
-        }
-        canvas.updatePaletteValueTarget(null, null);
-        if (spec && spec.kind !== "value" && spec.instruction) {
-            const at = canvas.workspacePoint(sx, sy);
-            if (at) canvas.updatePaletteSnap(at.x - paletteDrag.offsetX / canvas.zoom, at.y - paletteDrag.offsetY / canvas.zoom, spec.instruction, ghost.width, ghost.height);
-            else canvas.clearSnap();
-        } else if (spec && (spec.kind === "custom" || spec.type)) {
-            const at = canvas.workspacePoint(sx, sy);
-            if (at) {
-                const ins = spec.kind === "custom"
-                    ? { id: "palette-new", type: ((spec.definition.pieces || []).filter(piece => piece.kind === "Branch").length ? "BranchCallBlock" : "CallBlock"), branches: (spec.definition.pieces || []).filter(piece => piece.kind === "Branch").map(() => []) }
-                    : { id: "palette-new", type: spec.type, body: [], then_body: [], else_body: [], branches: [] };
-                canvas.updatePaletteSnap(at.x - paletteDrag.offsetX / canvas.zoom, at.y - paletteDrag.offsetY / canvas.zoom, ins, ghost.width, ghost.height);
-            } else canvas.clearSnap();
-        } else canvas.clearSnap();
+    function submitEdit(edit, reply) {
+        const call = (command, args) => root.daemonCall(command, args, (result, error) => {
+            if (error) root.appBridge.lastError = error;
+            reply(!error, error);
+        });
+        if (edit.kind === "insert_instruction") call("add_instruction", { strandId: edit.strandId, path: edit.path, instruction: edit.instruction });
+        else if (edit.kind === "add_strand") call("add_strand", { x: edit.x, y: edit.y, instruction: edit.instruction });
+        else if (edit.kind === "put_value") call("put_value", { location: edit.location, value: edit.value });
+        else if (edit.kind === "create_floating_value") call("create_floating_value", { x: edit.x, y: edit.y, value: edit.value, originBlockId: edit.originBlockId || null });
+        else if (edit.kind === "remove_instructions") call("remove_instruction", { strandId: edit.strandId, path: edit.path, count: edit.count });
+        else if (edit.kind === "remove_strand") {
+            // A custom block's header row takes its whole definition with it.
+            const header = headerStrand(edit.strandId);
+            if (header) call("delete_block", { blockId: header.block_id });
+            else call("remove_strand", { strandId: edit.strandId });
+        } else if (edit.kind === "take_value") call("take_value", { location: edit.location });
+        else if (edit.kind === "remove_floating_value") call("remove_floating_value", { floatingId: edit.floatingId });
+        else reply(false, "Unknown edit " + edit.kind);
     }
-    function endPaletteDrag(sx, sy) {
-        const drag = paletteDrag;
-        const snapValid = canvas.paletteSnapValid;
-        const snapTargetId = canvas.paletteSnapTargetId;
-        const snapPath = JSON.parse(JSON.stringify(canvas.paletteSnapPath || []));
-        const valueTarget = canvas.paletteValueTarget ? JSON.parse(JSON.stringify(canvas.paletteValueTarget)) : null;
-        const landing = canvas.paletteDropScenePoint();
-        if (!drag || recordingBusy) { cancelPaletteDrag(); return; }
-        paletteDrag = null;
-        canvas.updatePaletteValueTarget(null, null);
-        const spec = drag.spec;
-        // A fresh operator dropped straight onto a value slot fills it.
-        if (spec.kind === "value" && valueTarget) {
-            canvas.clearSnap(); holdGhost(landing);
-            root.invoke("put_value", { location: valueTarget, value: spec.value });
-            return;
-        }
-        const at = canvas.workspacePoint(sx, sy);
-        if (!at) { cancelPaletteDrag(); return; }
-        const x = Math.round(at.x - drag.offsetX / canvas.zoom), y = Math.round(at.y - drag.offsetY / canvas.zoom);
-        if (spec.kind === "value") {
-            canvas.clearSnap(); holdGhost(null);
-            root.invoke("create_floating_value", { x: x, y: y, value: spec.value, originBlockId: spec.originBlockId || null });
-            return;
-        }
-        // Attach into the previewed gap when one is showing, else park as a
-        // new detached strand - mirrors the webapp palette drop.
-        if (snapValid && snapTargetId) {
-            canvas.settlePaletteDrop(); holdGhost(landing);
-            if (spec.kind === "branch") {
-                root.invoke("add_instruction", { strandId: snapTargetId, path: snapPath, instruction: { id: uuid(), type: "RunBranch", name: spec.instruction.name } });
-            } else if (spec.kind === "custom") {
-                const instruction = palette.customInstruction(spec.definition);
-                instruction.id = uuid();
-                root.invoke("add_instruction", { strandId: snapTargetId, path: snapPath, instruction: instruction });
-            } else {
-                root.invoke("add_instruction", { strandId: snapTargetId, path: snapPath, instruction: defaultInstruction(spec.type) });
-            }
-            return;
-        }
-        canvas.clearSnap(); holdGhost(null);
-        if (spec.kind === "branch") root.invoke("add_strand", { x: x, y: y, instruction: { id: uuid(), type: "RunBranch", name: spec.instruction.name } });
-        else if (spec.kind === "custom") root.addCustomBlock(spec.definition, x, y);
-        else root.addBlock(spec.type, x, y);
-    }
-    // Keeps the dropped ghost on screen (moved to `scenePoint` if given)
-    // until the new state shows the real block, so it never blinks out.
-    property bool ghostHeld: false
-    function holdGhost(scenePoint) {
-        if (scenePoint) { const p = ghostLayer.mapFromItem(null, scenePoint.x, scenePoint.y); ghost.x = p.x; ghost.y = p.y; }
-        ghostHeld = true;
-        ghostHeldDoc = macroDocKey();
-        ghostHoldTimer.restart();
-    }
-    // Strands + floating values; unrelated state pushes leave this unchanged.
-    property string ghostHeldDoc: ""
-    function macroDocKey() { return root.macro ? JSON.stringify([root.macro.strands, root.macro.floating_values]) : ""; }
-    function releaseGhost() {
-        if (!ghostHeld) return;
-        ghostHeld = false; ghost.visible = false; ghost.spec = null;
-    }
-    Timer { id: ghostHoldTimer; interval: 1500; onTriggered: root.releaseGhost() }
-    onMacroChanged: if (ghostHeld && macroDocKey() !== ghostHeldDoc) releaseGhost()
-    function cancelPaletteDrag() { paletteDrag = null; ghostHeld = false; ghost.visible = false; ghost.spec = null; canvas.clearSnap(); canvas.updatePaletteValueTarget(null, null); }
-    // A canvas block dropped on the sidebar deletes it and everything below it in its stack.
     function blockDefById(id) {
         const defs = root.macro ? root.macro.block_defs : [];
         for (let i = 0; i < defs.length; ++i) if (defs[i].id === id) return defs[i];
@@ -509,39 +426,9 @@ Item {
     }
     // A custom block's header row takes its whole definition with it.
     function removeInstruction(strandId, path) {
-        const strands = root.macro ? root.macro.strands : [];
-        for (let i = 0; i < strands.length; ++i) {
-            if (strands[i].id !== strandId) continue;
-            const first = strands[i].instructions[0];
-            if (path.length === 1 && path[0].index === 0 && first && first.type === "BlockHeader") {
-                root.invoke("delete_block", { blockId: first.block_id });
-                return;
-            }
-        }
-        root.invoke("remove_instruction", { strandId: strandId, path: path });
-    }
-    function trashDraggedBlocks(strandId, path, tailCount, sx, sy) {
-        if (root.sidebarCollapsed || !palette.contains(palette.mapFromItem(null, sx, sy))) return;
-        canvas.settleTrashed();
-        if (path.length === 1 && path[0].index === 0) {
-            const strands = root.macro ? root.macro.strands : [];
-            for (let i = 0; i < strands.length; ++i) {
-                if (strands[i].id !== strandId) continue;
-                const first = strands[i].instructions[0];
-                if (first && first.type === "BlockHeader") { root.invoke("delete_block", { blockId: first.block_id }); return; }
-            }
-            root.invoke("remove_strand", { strandId: strandId });
-            return;
-        }
-        root.invoke("remove_instruction", { strandId: strandId, path: path, count: tailCount });
-    }
-    // An existing value dropped on the sidebar resets its slot (fields) or
-    // deletes it (whole floating blocks) - mirrors the webapp trash.
-    function trashDraggedValue(location, value, sx, sy) {
-        if (root.sidebarCollapsed || !palette.contains(palette.mapFromItem(null, sx, sy))) return;
-        canvas.settleTrashed();
-        if (location.kind === "Floating" && !(location.path && location.path.length)) root.invoke("remove_floating_value", { floatingId: location.floating_id });
-        else root.invoke("take_value", { location: location });
+        const header = path.length === 1 && path[0].index === 0 ? headerStrand(strandId) : null;
+        if (header) root.invoke("delete_block", { blockId: header.block_id });
+        else root.invoke("remove_instruction", { strandId: strandId, path: path });
     }
     onAppStateChanged: {
         if (appState.standalone_key !== null && appState.standalone_key !== undefined) {
@@ -784,10 +671,10 @@ Item {
                     trashActive: canvas.dragging
                     trashArmed: canvas.dragging && palette.contains(palette.mapFromItem(null, canvas.dragSceneX, canvas.dragSceneY))
                     onResizeRequested: width => root.sidebarWidth = Math.max(root.minSidebarWidth, Math.min(root.maxSidebarWidth, width))
-                    onDragStarted: (spec, sx, sy, ox, oy) => root.beginPaletteDrag(spec, ox, oy, sx, sy)
-                    onDragMoved: (sx, sy) => root.movePaletteDrag(sx, sy)
-                    onDragEnded: (sx, sy) => root.endPaletteDrag(sx, sy)
-                    onDragCanceled: root.cancelPaletteDrag()
+                    onDragStarted: (spec, sx, sy, ox, oy) => dragController.begin(spec, sx, sy, ox, oy)
+                    onDragMoved: (sx, sy) => dragController.move(sx, sy)
+                    onDragEnded: (sx, sy) => dragController.end(sx, sy)
+                    onDragCanceled: dragController.cancel()
                     instructionTypes: root.instructionTypes
                     listInstructionTypes: root.listInstructionTypes
                     extraOperators: root.extraOperators
@@ -798,8 +685,8 @@ Item {
                     blockDefinitions: root.macro ? root.macro.block_defs : []
                     keyCapture: appState.key_capture
                     standaloneKey: root.sidebarKey
-                    onBlockActivated: type => root.addBlock(type, 120, 120)
-                    onCustomBlockActivated: definition => root.addCustomBlock(definition, 120, 120)
+                    onBlockActivated: type => dragController.addAt({ kind: "instruction", type: type }, 120, 120)
+                    onCustomBlockActivated: definition => dragController.addAt(root.customEntry(definition), 120, 120)
                     onMakeVariableRequested: variableDialog.openForCreate()
                     onRenameVariableRequested: name => variableDialog.openForRename(name)
                     onDeleteVariableRequested: name => root.invoke("delete_variable", { name: name })
@@ -816,7 +703,7 @@ Item {
                     onStandaloneKeyCaptureRequested: root.invoke("start_standalone_key_capture")
                     onAppPickerRequested: instruction => root.openPaletteAppPicker(instruction)
                     onDetailsRequested:(name,identifier,explainer)=>root.blockDefById(identifier)||name===identifier?root.showDetails(identifier,explainer):detailsDialog.show(name,identifier,explainer)
-                    onValueActivated: value => root.invoke("create_floating_value", { x: 160, y: 140, value: value, originBlockId: null })
+                    onValueActivated: value => dragController.addAt({ kind: "value", value: value }, 160, 140)
                 }
                 }
                 BlockCanvas {
@@ -835,7 +722,6 @@ Item {
                     onInstructionSplit: (strandId, path, x, y) => root.invoke("split_strand", { strandId: strandId, path: path, x: x, y: y })
                     onStrandsMerged: (draggedId, targetId, path) => root.invoke("merge_strand", { draggedId: draggedId, targetId: targetId, path: path })
                     onTailMerged: (strandId, path, targetId, targetPath) => root.invoke("merge_tail", { strandId: strandId, path: path, targetId: targetId, targetPath: targetPath })
-                    onBlockDragOutside: (strandId, path, tailCount, sx, sy) => root.trashDraggedBlocks(strandId, path, tailCount, sx, sy)
                     onInstructionRemoved: (strandId, path) => root.removeInstruction(strandId, path)
                     canPaste: root.clipboard.length > 0
                     clearIcon: appState.confirm_clear_instructions ? "triangle-alert" : "trash"
@@ -856,16 +742,11 @@ Item {
                     onInstructionDuplicated: (strandId, path, instruction) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: root.refreshIds(instruction) })
                     onInstructionEdited: (strandId, path, instruction) => root.invoke("edit_instruction", { strandId: strandId, path: path, instruction: instruction })
                     onRunBranchRequested: (strandId, path, name) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: { id: root.uuid(), type: "RunBranch", name: name } })
-                    onPaletteDragStarted: (spec, sx, sy, ox, oy) => root.beginPaletteDrag(spec, ox, oy, sx, sy)
-                    onPaletteDragMoved: (sx, sy) => root.movePaletteDrag(sx, sy)
-                    onPaletteDragEnded: (sx, sy) => root.endPaletteDrag(sx, sy)
-                    onPaletteDragCanceled: root.cancelPaletteDrag()
                     onValueEdited: (location, text) => root.invoke("edit_value_field", { location: location, text: text })
                     onValueTakeRequested: location => root.invoke("take_value", { location: location })
                     onValuePutRequested: (location, value) => root.invoke("put_value", { location: location, value: value })
                     onValueCreateRequested: (x, y, value, originBlockId) => root.invoke("create_floating_value", { x: x, y: y, value: value, originBlockId: originBlockId || null })
                     onValueMoveRequested: (from, to, x, y, originBlockId) => root.invoke("move_value", { from: from, to: to, x: x, y: y, originBlockId: originBlockId || null })
-                    onValueDragOutside: (location, value, sx, sy) => root.trashDraggedValue(location, value, sx, sy)
                     onCommentForInstructionRequested: instruction => {
                         const existing = (root.macro && root.macro.comments || []).find(c => c.attached_to === instruction.id);
                         if (existing) { if (existing.collapsed) root.invoke("set_comment_collapsed", { commentId: existing.id, collapsed: false }); }
@@ -1955,74 +1836,19 @@ Item {
         onSelected: app => root.applyPickedApp(app)
     }
 
-    MouseArea {
-        objectName: "dragCursor"
-        anchors.fill: parent; z: 501
-        visible: root.paletteDrag !== null || canvas.dragging
-        acceptedButtons: Qt.NoButton
-        cursorShape: Qt.ClosedHandCursor
-    }
-    // Follows the pointer while a palette entry is dragged.
-    Item {
-        id: ghostLayer
-        anchors.fill: parent; z: 500; enabled: false
-        // Canvas drags are clipped by the canvas, so redraw them here while over the sidebar.
-        Item {
-            id: canvasGhost
-            readonly property bool overSidebar: canvas.dragging && !root.sidebarCollapsed
-                && palette.contains(palette.mapFromItem(null, canvas.dragSceneX, canvas.dragSceneY))
-            visible: overSidebar
-            property point pos: overSidebar ? ghostLayer.mapFromItem(null, canvas.dragGhostX, canvas.dragGhostY) : Qt.point(0, 0)
-            x: pos.x; y: pos.y; opacity: 0.92
-            Column {
-                visible: !canvas.dragIsValue
-                spacing: -8; scale: canvas.zoom; transformOrigin: Item.TopLeft
-                Repeater {
-                    model: canvasGhost.overSidebar && !canvas.dragIsValue ? canvas.dragInstructions : []
-                    delegate: InstructionBlock {
-                        required property var modelData
-                        instruction: modelData; paletteMode: true; locked: true
-                        variables: root.macro ? root.macro.variables : []; lists: root.macro && root.macro.lists ? root.macro.lists : []
-                        blockDefinitions: root.macro ? root.macro.block_defs : []
-                    }
-                }
-            }
-            Loader {
-                active: canvasGhost.overSidebar && canvas.dragIsValue
-                scale: canvas.zoom; transformOrigin: Item.TopLeft
-                sourceComponent: ValueChip {
-                    valueData: canvas.dragValue; boxed: true; editable: false
-                    originBlockId: canvas.dragValueOrigin; dragPreview: true
-                    blockDefinitions: root.macro ? root.macro.block_defs : []
-                }
-            }
-        }
-        Item {
-            id: ghost
-            property var spec: null
-            visible: false; opacity: 0.92
-            width: ghostBlock.active ? ghostBlock.item.width : (ghostValue.active ? ghostValue.item.width : 0)
-            height: ghostBlock.active ? ghostBlock.item.height : (ghostValue.active ? ghostValue.item.height : 0)
-            Loader {
-                id: ghostBlock
-                active: ghost.visible && !!ghost.spec && ghost.spec.kind !== "value"
-                sourceComponent: InstructionBlock {
-                    instruction: ghost.spec.instruction; paletteMode: true; locked: true
-                    blockColor: ghost.spec.color || Theme.block
-                    variables: root.macro ? root.macro.variables : []; lists: root.macro && root.macro.lists ? root.macro.lists : []
-                    blockDefinitions: root.macro ? root.macro.block_defs : []
-                }
-            }
-            Loader {
-                id: ghostValue
-                active: ghost.visible && !!ghost.spec && ghost.spec.kind === "value"
-                sourceComponent: ValueChip {
-                    valueData: ghost.spec.value; boxed: true; editable: false; dragPreview: true
-                    referenceColor: ghost.spec.color || Theme.accent
-                    forceBoolean: !!ghost.spec.forceBoolean; callDisplayLabel: ghost.spec.label || qsTr("custom block")
-                    blockDefinitions: root.macro ? root.macro.block_defs : []
-                }
-            }
-        }
+    PaletteDragController {
+        id: dragController
+        anchors.fill: parent
+        canvas: canvas
+        variables: root.macro ? root.macro.variables : []
+        lists: root.macro && root.macro.lists ? root.macro.lists : []
+        blockDefinitions: root.macro ? root.macro.block_defs : []
+        // Counting down or recording: nothing lands on the canvas.
+        locked: root.recordingBusy
+        documentId: root.macro ? root.macro.id : ""
+        document: root.macro ? [root.macro.strands, root.macro.floating_values] : null
+        trashContains: (sx, sy) => !root.sidebarCollapsed && palette.contains(palette.mapFromItem(null, sx, sy))
+        instructionFor: spec => root.paletteInstruction(spec)
+        submit: (edit, reply) => root.submitEdit(edit, reply)
     }
 }
