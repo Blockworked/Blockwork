@@ -31,12 +31,12 @@ Item {
         Layout.fillWidth: true
         implicitHeight: Math.max(textCol.implicitHeight, ctl.implicitHeight) + 26
         data: [
-            Rectangle { anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: "#3a3b3f"; visible: !row.first },
+            Rectangle { anchors.top: parent.top; anchors.left: parent.left; anchors.right: parent.right; height: 1; color: Theme.borderSoft; visible: !row.first },
             Column {
                 id: textCol
                 anchors.left: parent.left; anchors.right: ctl.left; anchors.rightMargin: 16; anchors.verticalCenter: parent.verticalCenter; spacing: 2
-                Text { width: parent.width; text: row.title; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight }
-                Text { width: parent.width; visible: row.detail !== ""; text: row.detail; textFormat: Text.PlainText; color: "#9fa0a6"; font.pixelSize: 12; wrapMode: Text.WordWrap }
+                Text { width: parent.width; text: row.title; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                Text { width: parent.width; visible: row.detail !== ""; text: row.detail; textFormat: Text.PlainText; color: Theme.textDim; font.pixelSize: 12; wrapMode: Text.WordWrap }
             },
             Row { id: ctl; anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter; spacing: 8 }
         ]
@@ -44,13 +44,13 @@ Item {
 
     component SubHeading: Text {
         Layout.topMargin: 6; Layout.bottomMargin: 2
-        color: "#a7a8ae"; font.pixelSize: 12; font.weight: Font.Bold; font.letterSpacing: 1.2
+        color: Theme.textDim; font.pixelSize: 12; font.weight: Font.Bold; font.letterSpacing: 1.2
     }
 
     ColumnLayout {
         anchors.fill: parent; spacing: 0
         Rectangle {
-            Layout.fillWidth: true; Layout.preferredHeight: 52; color: "#292a2d"; border.color: "#38393d"
+            Layout.fillWidth: true; Layout.preferredHeight: 52; color: Theme.field; border.color: Theme.borderSoft
             TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
             RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
                 Image {
@@ -60,7 +60,7 @@ Item {
                     fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
                 }
                 BwButton { iconName: "arrow-left"; text: qsTr("Back"); implicitHeight: 34; onClicked: root.invoke("close_settings") }
-                Text { text: qsTr("Settings"); color: "#e7e7e8"; font.pixelSize: 17; font.weight: Font.Bold }
+                Text { text: qsTr("Settings"); color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold }
                 Item { Layout.fillWidth: true }
                 WindowControls { visible: Qt.platform.os !== "osx" }
             }
@@ -71,8 +71,8 @@ Item {
 
             Rectangle {
                 Layout.preferredWidth: 190; Layout.fillHeight: true
-                color: "#252629"
-                Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: "#3a3b3f" }
+                color: Theme.panel
+                Rectangle { anchors.right: parent.right; width: 1; height: parent.height; color: Theme.borderSoft }
                 Column {
                     anchors.fill: parent; anchors.margins: 10; spacing: 2
                     Repeater {
@@ -82,14 +82,14 @@ Item {
                             required property var modelData
                             required property int index
                             width: parent.width; height: 38; radius: 8
-                            color: root.tab === index ? "#2f3b4d" : (navMouse.containsMouse ? "#2e2f33" : "transparent")
+                            color: root.tab === index ? Theme.selection : (navMouse.containsMouse ? Theme.hover : "transparent")
                             Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                             Row { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 10
                                 LucideIcon { name: navItem.modelData.icon; width: 16; height: 16; anchors.verticalCenter: parent.verticalCenter
-                                    color: root.tab === navItem.index ? "#6cb2ff" : "#9da0a8" }
+                                    color: root.tab === navItem.index ? Theme.accent : Theme.textDim }
                                 Text { text: navItem.modelData.name; font.pixelSize: 14; anchors.verticalCenter: parent.verticalCenter
                                     font.weight: root.tab === navItem.index ? Font.DemiBold : Font.Normal
-                                    color: root.tab === navItem.index ? "#6cb2ff" : "#c4c5ca" }
+                                    color: root.tab === navItem.index ? Theme.accent : Theme.text }
                             }
                             MouseArea { id: navMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.tab = navItem.index }
                         }
@@ -111,8 +111,16 @@ Item {
 
                         // General
                         ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 0
-                            Text { text: qsTr("General"); color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
-                            SettingsRow { first: true; title: qsTr("Close to tray"); detail: qsTr("Keep hotkeys and schedules active after closing the editor.")
+                            Text { text: qsTr("General"); color: Theme.text; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            SettingsRow { first: true; title: qsTr("Appearance"); detail: qsTr("Choose a light or dark theme, or follow your system setting.")
+                                BwComboBox {
+                                    readonly property var schemes: [{ id: "", text: qsTr("System default") }, { id: "light", text: qsTr("Light") }, { id: "dark", text: qsTr("Dark") }]
+                                    model: schemes; textRole: "text"; implicitWidth: 210
+                                    currentIndex: Math.max(0, schemes.findIndex(s => s.id === (appState.color_scheme || "")))
+                                    onActivated: index => root.invoke("set_color_scheme", { scheme: schemes[index].id })
+                                }
+                            }
+                            SettingsRow { title: qsTr("Close to tray"); detail: qsTr("Keep hotkeys and schedules active after closing the editor.")
                                 BwSwitch { checked: appState.close_to_tray; onToggled: checked => root.invoke("set_close_to_tray", { enabled: checked }) }
                             }
                             SettingsRow { title: qsTr("Start at system startup"); detail: qsTr("Launch Blockwork in the background when you log in so hotkeys work right away.")
@@ -137,7 +145,7 @@ Item {
                                         width: ListView.view.width; implicitHeight: 32; highlighted: languageBox.highlightedIndex === index
                                         HoverHandler { cursorShape: Qt.PointingHandCursor }
                                         contentItem: Text { text: modelData.text; color: Theme.text; font: languageBox.font; verticalAlignment: Text.AlignVCenter; horizontalAlignment: Text.AlignLeft }
-                                        background: Rectangle { radius: 4; color: parent.highlighted ? "#424348" : "transparent"; Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } } }
+                                        background: Rectangle { radius: 4; color: parent.highlighted ? Theme.hover : "transparent"; Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } } }
                                     }
                                 }
                             }
@@ -168,9 +176,9 @@ Item {
                                     }
                                     Item {
                                         width: animationSlider.width; height: 16
-                                        Text { x: 0; text: qsTr("Instant", "animation speed"); color: "#9fa0a6"; font.pixelSize: 11 }
-                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("Normal", "animation speed"); color: "#9fa0a6"; font.pixelSize: 11 }
-                                        Text { anchors.right: parent.right; text: qsTr("Slow", "animation speed"); color: "#9fa0a6"; font.pixelSize: 11 }
+                                        Text { x: 0; text: qsTr("Instant", "animation speed"); color: Theme.textDim; font.pixelSize: 11 }
+                                        Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("Normal", "animation speed"); color: Theme.textDim; font.pixelSize: 11 }
+                                        Text { anchors.right: parent.right; text: qsTr("Slow", "animation speed"); color: Theme.textDim; font.pixelSize: 11 }
                                     }
                                 }
                             }
@@ -190,12 +198,12 @@ Item {
                                 delegate: RowLayout {
                                     required property var modelData
                                     Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 6; spacing: 10
-                                    Text { text: modelData.name; color: "#e7e7e8"; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.maximumWidth: 220 }
-                                    Text { text: modelData.value; color: "#9fa0a6"; font.pixelSize: 13; elide: Text.ElideRight; Layout.fillWidth: true }
+                                    Text { text: modelData.name; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.maximumWidth: 220 }
+                                    Text { text: modelData.value; color: Theme.textDim; font.pixelSize: 13; elide: Text.ElideRight; Layout.fillWidth: true }
                                     BwButton { iconName: "trash-2"; text: qsTr("Delete"); onClicked: root.invoke("delete_global", { name: modelData.name }) }
                                 }
                             }
-                            Rectangle { Layout.fillWidth: true; Layout.topMargin: 8; height: 1; color: "#3a3b3f" }
+                            Rectangle { Layout.fillWidth: true; Layout.topMargin: 8; height: 1; color: Theme.borderSoft }
                             RowLayout { Layout.fillWidth: true; Layout.topMargin: 16; spacing: 8
                                 BwButton { iconName: "play"; text: qsTr("Replay welcome tour"); onClicked: root.invoke("set_onboarding_done", { done: false }) }
                                 Item { Layout.fillWidth: true }
@@ -204,7 +212,7 @@ Item {
 
                         // Hotkeys
                         ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 1
-                            Text { text: qsTr("Hotkeys"); color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            Text { text: qsTr("Hotkeys"); color: Theme.text; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
                             SubHeading { text: qsTr("GLOBAL") }
                             Repeater {
                                 model: appState.named_hotkey_defaults || []
@@ -253,7 +261,7 @@ Item {
                                 }
                             }
                             RowLayout { Layout.fillWidth: true; Layout.topMargin: 14; spacing: 8
-                                Text { text: qsTr("Add hotkey"); color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold }
+                                Text { text: qsTr("Add hotkey"); color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold }
                                 Item { Layout.fillWidth: true }
                                 BwComboBox { id: macroBox; model: appState.macro_names || []; implicitWidth: 210; onActivated: index => root.invoke("set_pending_macro_idx", { index: index }) }
                                 BwButton { text: appState.combo_capture&&appState.combo_capture.kind==="Pending"?qsTr("Press shortcut..."):qsTr("Set combo"); primary:appState.combo_capture&&appState.combo_capture.kind==="Pending"; onClicked: root.invoke("start_pending_combo_capture") }
@@ -263,7 +271,7 @@ Item {
 
                         // Editor
                         ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 2
-                            Text { text: qsTr("Editor"); color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            Text { text: qsTr("Editor"); color: Theme.text; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
                             SettingsRow { first: true; title: qsTr("Block palette layout"); detail: qsTr("How the block sidebar is organized in the editor.")
                                 BwComboBox {
                                     id: paletteLayoutBox
@@ -284,15 +292,15 @@ Item {
                                 delegate: RowLayout {
                                     required property var modelData
                                     Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 6; spacing: 10
-                                    LucideIcon { name: modelData.error ? "triangle-alert" : "book-open"; width: 14; height: 14; color: modelData.error ? Theme.warning : "#9fa0a6" }
+                                    LucideIcon { name: modelData.error ? "triangle-alert" : "book-open"; width: 14; height: 14; color: modelData.error ? Theme.warning : Theme.textDim }
                                     ColumnLayout { Layout.fillWidth: true; spacing: 1
-                                        Text { Layout.fillWidth: true; text: modelData.name || modelData.url; color: "#e7e7e8"; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight }
+                                        Text { Layout.fillWidth: true; text: modelData.name || modelData.url; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight }
                                         Text {
-                                            Layout.fillWidth: true; color: modelData.error ? Theme.warning : "#9fa0a6"; font.pixelSize: 11; elide: Text.ElideMiddle
+                                            Layout.fillWidth: true; color: modelData.error ? Theme.warning : Theme.textDim; font.pixelSize: 11; elide: Text.ElideMiddle
                                             text: modelData.error ? modelData.error : modelData.name ? qsTr("%n pack(s)", "", modelData.packs) + " - " + modelData.url : modelData.url
                                         }
                                     }
-                                    Text { visible: modelData.builtin; text: qsTr("Built-in"); color: "#9fa0a6"; font.pixelSize: 12; Layout.rightMargin: 4 }
+                                    Text { visible: modelData.builtin; text: qsTr("Built-in"); color: Theme.textDim; font.pixelSize: 12; Layout.rightMargin: 4 }
                                     BwButton { visible: !modelData.builtin; iconName: "trash-2"; text: qsTr("Remove"); onClicked: root.invoke("remove_block_library_source", { url: modelData.url }) }
                                 }
                             }
@@ -308,7 +316,7 @@ Item {
 
                         // Integrations
                         ColumnLayout { Layout.fillWidth: true; spacing: 0; visible: root.tab === 3
-                            Text { text: qsTr("Integrations"); color: "#e7e7e8"; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
+                            Text { text: qsTr("Integrations"); color: Theme.text; font.pixelSize: 20; font.weight: Font.Bold; Layout.bottomMargin: 10 }
                             SettingsRow { first: true
                                 title: appState.ipc_active_port === null ? qsTr("TCP server stopped") : qsTr("TCP server listening on port %1").arg(appState.ipc_active_port)
                                 detail: qsTr("Allow local integrations to run Blockwork macros.")
@@ -326,8 +334,8 @@ Item {
                                 delegate: RowLayout {
                                     required property string modelData
                                     Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 6; spacing: 10
-                                    LucideIcon { name: "lock"; width: 14; height: 14; color: "#9fa0a6" }
-                                    Text { text: modelData; color: "#e7e7e8"; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
+                                    LucideIcon { name: "lock"; width: 14; height: 14; color: Theme.textDim }
+                                    Text { text: modelData; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
                                     BwButton { iconName: "pencil"; text: qsTr("Change"); onClicked: secretDialog.openFor(modelData) }
                                     BwButton { iconName: "trash-2"; text: qsTr("Delete"); onClicked: root.invoke("delete_secret", { name: modelData }) }
                                 }
@@ -343,7 +351,7 @@ Item {
                                 detail: hook.error || qsTr("Lets other programs start macros with a web request to a \"when webhook is called\" block. Only reachable from this computer.")
                                 Row {
                                     anchors.verticalCenter: parent.verticalCenter; spacing: 6
-                                    readonly property color tint: !hookRow.hook.enabled ? "#9fa0a6" : hookRow.hook.error ? Theme.warning : Theme.running
+                                    readonly property color tint: !hookRow.hook.enabled ? Theme.textDim : hookRow.hook.error ? Theme.warning : Theme.running
                                     Rectangle { width: 8; height: 8; radius: 4; color: parent.tint; anchors.verticalCenter: parent.verticalCenter }
                                     Text {
                                         anchors.verticalCenter: parent.verticalCenter; color: parent.tint; font.pixelSize: 13
@@ -386,12 +394,12 @@ Item {
                                 }
                                 Connections { target: root; function onTabChanged() { hookInfo.hide() } }
                                 RowLayout { Layout.fillWidth: true; spacing: 8
-                                    LucideIcon { name: "lock"; width: 14; height: 14; color: "#9fa0a6" }
-                                    Text { text: qsTr("Token"); color: "#e7e7e8"; font.pixelSize: 13; font.weight: Font.DemiBold }
+                                    LucideIcon { name: "lock"; width: 14; height: 14; color: Theme.textDim }
+                                    Text { text: qsTr("Token"); color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold }
                                     Text {
                                         Layout.fillWidth: true; Layout.leftMargin: 4; elide: Text.ElideRight
                                         text: hookInfo.revealed ? hookInfo.token : "\u2022".repeat(24)
-                                        color: hookInfo.revealed ? "#e7e7e8" : "#9fa0a6"; font.family: "monospace"; font.pixelSize: 12
+                                        color: hookInfo.revealed ? Theme.text : Theme.textDim; font.family: "monospace"; font.pixelSize: 12
                                         Accessible.name: hookInfo.revealed ? hookInfo.token : qsTr("Hidden token")
                                     }
                                     BwButton {
@@ -407,22 +415,22 @@ Item {
                                 Item {
                                     implicitWidth: expander.implicitWidth; implicitHeight: expander.implicitHeight
                                     Row { id: expander; spacing: 6
-                                        LucideIcon { name: hookInfo.showExample ? "chevron-down" : "chevron-right"; width: 14; height: 14; color: "#9fa0a6"; anchors.verticalCenter: parent.verticalCenter }
-                                        Text { text: qsTr("How to call it"); color: "#9fa0a6"; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+                                        LucideIcon { name: hookInfo.showExample ? "chevron-down" : "chevron-right"; width: 14; height: 14; color: Theme.textDim; anchors.verticalCenter: parent.verticalCenter }
+                                        Text { text: qsTr("How to call it"); color: Theme.textDim; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
                                     }
                                     MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: hookInfo.showExample = !hookInfo.showExample }
                                 }
                                 ColumnLayout {
                                     visible: hookInfo.showExample; Layout.fillWidth: true; spacing: 8
                                     Text {
-                                        Layout.fillWidth: true; wrapMode: Text.WordWrap; color: "#9fa0a6"; font.pixelSize: 12
+                                        Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
                                         text: qsTr("Send the token in an X-Blockwork-Token header (or ?token= in the address). For a block listening on \"hello\":")
                                     }
                                     RowLayout { Layout.fillWidth: true; spacing: 8
                                         Rectangle {
                                             Layout.fillWidth: true; implicitHeight: exampleText.implicitHeight + 16; radius: 6; color: Theme.field; border.color: Theme.borderSoft
                                             Text {
-                                                id: exampleText; anchors.fill: parent; anchors.margins: 8; wrapMode: Text.WrapAnywhere; color: "#e7e7e8"; font.family: "monospace"; font.pixelSize: 12
+                                                id: exampleText; anchors.fill: parent; anchors.margins: 8; wrapMode: Text.WrapAnywhere; color: Theme.text; font.family: "monospace"; font.pixelSize: 12
                                                 text: hookInfo.example(hookInfo.revealed ? hookInfo.token : "<token>")
                                             }
                                         }
@@ -503,9 +511,9 @@ Item {
             if (name) secretValue.forceActiveFocus(); else secretName.forceActiveFocus();
         }
         Column { width: 380; spacing: 8
-            Text { text: qsTr("Name"); color: "#e7e7e8" }
+            Text { text: qsTr("Name"); color: Theme.text }
             BwTextField { id: secretName; width: parent.width; readOnly: !!secretDialog.editing; placeholderText: qsTr("api token") }
-            Text { text: qsTr("Value"); color: "#e7e7e8" }
+            Text { text: qsTr("Value"); color: Theme.text }
             BwTextField { id: secretValue; width: parent.width; echoMode: TextInput.Password; placeholderText: qsTr("Paste it here"); onAccepted: secretDialog.accept() }
         }
         onAccepted: {

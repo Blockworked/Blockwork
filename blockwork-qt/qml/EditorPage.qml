@@ -556,7 +556,7 @@ Item {
             id: toolbar
             // Collapse stages: 1 Record icon-only, 2 Run icon-only, 3 undo/redo/save in a menu.
             readonly property int tier: width < 700 ? 3 : (width < 780 ? 2 : (width < 860 ? 1 : 0))
-            Layout.fillWidth: true; Layout.preferredHeight: 52; color: "#292a2d"; border.color: "#38393d"
+            Layout.fillWidth: true; Layout.preferredHeight: 52; color: Theme.field; border.color: Theme.borderSoft
             TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
@@ -574,7 +574,7 @@ Item {
                 Rectangle {
                     id: libraryButton
                     Layout.preferredWidth: Math.max(110, Math.min(240, toolbar.width * 0.2)); Layout.preferredHeight: 34
-                    radius: Theme.radius; color: libraryHover.hovered ? "#3b3c40" : Theme.panelRaised; border.color: library.visible ? Theme.accent : Theme.border
+                    radius: Theme.radius; color: libraryHover.hovered ? Theme.hover : Theme.panelRaised; border.color: library.visible ? Theme.accent : Theme.border
                     Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                     Behavior on border.color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                     Accessible.role: Accessible.Button; Accessible.name: qsTr("Macro library")
@@ -691,7 +691,7 @@ Item {
         }
         Rectangle {
             visible: !!appState.triggers_paused
-            Layout.fillWidth: true; Layout.preferredHeight: 40; color: "#3a2a12"; border.color: "#5a4220"
+            Layout.fillWidth: true; Layout.preferredHeight: 40; color: Theme.warningBackground; border.color: Theme.warningBorder
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 10; spacing: 10
                 LucideIcon { name: "pause"; color: Theme.warning; width: 16; height: 16 }
@@ -708,7 +708,7 @@ Item {
             function act(action) { root.invoke("debug_action", { action: action }); }
             visible: !!root.macro && (root.runningIds.length > 0 || isPaused || paused.length > 0)
             Layout.fillWidth: true; Layout.preferredHeight: debugColumn.implicitHeight + 14
-            color: isPaused ? "#33291a" : "#1c2a21"; border.color: isPaused ? "#5a4220" : "#2b4a35"
+            color: isPaused ? Theme.warningBackground : Theme.successBackground; border.color: isPaused ? Theme.warningBorder : Theme.successBorder
             ColumnLayout {
                 id: debugColumn
                 anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top
@@ -743,7 +743,7 @@ Item {
                         delegate: Rectangle {
                             required property string modelData
                             width: Math.min(chipText.implicitWidth + 16, 320); height: 24; radius: 12
-                            color: "#2a2b2e"; border.color: "#45464b"
+                            color: Theme.field; border.color: Theme.border
                             Text {
                                 id: chipText
                                 anchors.fill: parent; anchors.leftMargin: 8; anchors.rightMargin: 8
@@ -910,9 +910,9 @@ Item {
             visible: !root.macro
             Layout.fillWidth: true; Layout.fillHeight: true
             Column { anchors.centerIn: parent; spacing: 8
-                LucideIcon { anchors.horizontalCenter: parent.horizontalCenter; name: "blocks"; color: "#777980"; width: 48; height: 48 }
-                Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("No macro selected"); color: "#e7e7e8"; font.pixelSize: 16; font.weight: Font.DemiBold }
-                Text { text: qsTr("Choose a macro above or create a new one."); color: "#9fa0a6"; font.pixelSize: 13 }
+                LucideIcon { anchors.horizontalCenter: parent.horizontalCenter; name: "blocks"; color: Theme.textDim; width: 48; height: 48 }
+                Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("No macro selected"); color: Theme.text; font.pixelSize: 16; font.weight: Font.DemiBold }
+                Text { text: qsTr("Choose a macro above or create a new one."); color: Theme.textDim; font.pixelSize: 13 }
             }
         }
     }
@@ -921,12 +921,12 @@ Item {
         id: deleteMacroDialog; title: qsTr("Delete macro?"); standardButtons: Dialog.Yes | Dialog.Cancel
         property string macroId: ""
         property string macroName: ""
-        Text { text: qsTr("This removes \"%1\" from Blockwork.").arg(deleteMacroDialog.macroName); color: "#e7e7e8" }
+        Text { text: qsTr("This removes \"%1\" from Blockwork.").arg(deleteMacroDialog.macroName); color: Theme.text }
         onAccepted: root.invoke("delete_macro", { id: macroId })
     }
     AppDialog {
         id: removeDialog; title: qsTr("Delete macro?"); standardButtons: Dialog.Yes | Dialog.Cancel
-        Text { text: qsTr("This removes the selected macro from Blockwork."); color: "#e7e7e8" }
+        Text { text: qsTr("This removes the selected macro from Blockwork."); color: Theme.text }
         onAccepted: root.invoke("remove_macro")
     }
     AppDialog {
@@ -943,23 +943,23 @@ Item {
         contentHeight: settingsColumn.implicitHeight; clip: true; boundsBehavior: Flickable.StopAtBounds
         ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
         Column { id: settingsColumn; spacing: 14; width: 360
-            Text { text: qsTr("Controls behavior specific to this macro."); color: "#a5a6ab" }
-            Text { text: qsTr("Title"); color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Controls behavior specific to this macro."); color: Theme.textDim }
+            Text { text: qsTr("Title"); color: Theme.textDim; font.pixelSize: 13 }
             BwTextField { width: parent.width; text: root.macro ? root.macro.name : ""; onEditingFinished: root.invoke("set_title", { title: text }) }
-            Text { text: qsTr("Speed"); color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Speed"); color: Theme.textDim; font.pixelSize: 13 }
             RowLayout { width: parent.width; spacing: 10
                 Slider {
                     id: speed; from: .1; to: 10; value: root.macro ? root.macro.speed_multiplier : 1; Layout.fillWidth: true; implicitHeight: 30
                     onMoved: root.invoke("set_macro_speed_multiplier", { multiplier: value })
                     HoverHandler { cursorShape: Qt.PointingHandCursor }
-                    background: Rectangle { x: speed.leftPadding; y: speed.topPadding + speed.availableHeight / 2 - height / 2; width: speed.availableWidth; height: 5; radius: 3; color: "#45474d"; Rectangle { width: speed.visualPosition * parent.width; height: parent.height; radius: 3; color: Theme.accent } }
+                    background: Rectangle { x: speed.leftPadding; y: speed.topPadding + speed.availableHeight / 2 - height / 2; width: speed.availableWidth; height: 5; radius: 3; color: Theme.border; Rectangle { width: speed.visualPosition * parent.width; height: parent.height; radius: 3; color: Theme.accent } }
                     handle: Rectangle { x: speed.leftPadding + speed.visualPosition * (speed.availableWidth - width); y: speed.topPadding + speed.availableHeight / 2 - height / 2; width: 16; height: 16; radius: 8; color: "white"; border.width: 2; border.color: Theme.accent }
                 }
                 BwTextField { text: Number(speed.value).toFixed(2); Layout.preferredWidth: 62; horizontalAlignment: Text.AlignRight; onEditingFinished: root.invoke("set_macro_speed_multiplier", { multiplier: Number(text) }) }
-                Text { text: "×"; color: "#a1a2a7" }
+                Text { text: "×"; color: Theme.textDim }
             }
             BwSwitch { Accessible.name: qsTr("Listen for triggers while Blockwork is open"); checked: root.macro && root.macro.settings ? root.macro.settings.always_listen : false; onToggled: checked => root.invoke("set_macro_always_listen", { enabled: checked }) }
-            Text { text: qsTr("Time limit"); color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Time limit"); color: Theme.textDim; font.pixelSize: 13 }
             RowLayout { width: parent.width; spacing: 10
                 Text { text: qsTr("Stop a run after"); color: Theme.text; font.pixelSize: 13 }
                 BwTextField {
@@ -968,9 +968,9 @@ Item {
                     text: root.macro && root.macro.settings ? String(root.macro.settings.max_run_secs) : "0"
                     onEditingFinished: root.invoke("set_macro_max_run_secs", { seconds: Number(text) || 0 })
                 }
-                Text { Layout.fillWidth: true; text: qsTr("seconds (0 = no limit)"); color: "#a1a2a7"; font.pixelSize: 13 }
+                Text { Layout.fillWidth: true; text: qsTr("seconds (0 = no limit)"); color: Theme.textDim; font.pixelSize: 13 }
             }
-            Text { text: qsTr("Loop limit"); color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Loop limit"); color: Theme.textDim; font.pixelSize: 13 }
             RowLayout { width: parent.width; spacing: 10
                 Text { text: qsTr("Stop a loop after"); color: Theme.text; font.pixelSize: 13 }
                 BwTextField {
@@ -979,9 +979,9 @@ Item {
                     text: root.macro && root.macro.settings ? String(root.macro.settings.max_loop_iterations || 0) : "0"
                     onEditingFinished: root.invoke("set_macro_max_loop_iterations", { iterations: Number(text) || 0 })
                 }
-                Text { Layout.fillWidth: true; text: qsTr("repeats (0 = no limit)"); color: "#a1a2a7"; font.pixelSize: 13 }
+                Text { Layout.fillWidth: true; text: qsTr("repeats (0 = no limit)"); color: Theme.textDim; font.pixelSize: 13 }
             }
-            Text { text: qsTr("Conditions"); color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Conditions"); color: Theme.textDim; font.pixelSize: 13 }
             Text {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
                 text: qsTr("Triggers and hotkeys only start this macro when all of these hold. The Run button ignores them.")
@@ -1045,7 +1045,7 @@ Item {
                     }
                 }
             }
-            Text { text: qsTr("Schedules"); color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Schedules"); color: Theme.textDim; font.pixelSize: 13 }
             BwSwitch {
                 Accessible.name: qsTr("Catch up on missed schedules")
                 checked: !!macroSettings.settings.catch_up_missed
@@ -1055,7 +1055,7 @@ Item {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
                 text: qsTr("Runs a schedule or \"once at\" trigger once if its time passed while Blockwork was closed or the computer was asleep (up to a week back).")
             }
-            Text { text: qsTr("Permissions"); color: "#a1a2a7"; font.pixelSize: 13 }
+            Text { text: qsTr("Permissions"); color: Theme.textDim; font.pixelSize: 13 }
             BwSwitch {
                 Accessible.name: qsTr("Ask before risky actions")
                 checked: root.permissions !== null
@@ -1376,11 +1376,11 @@ Item {
         Column { spacing: 14; width: 390
             BwSwitch { Accessible.name: qsTr("Record mouse movement"); checked: appState.record_mouse_movement; onToggled: checked => root.invoke("toggle_record_mouse_movement", { enabled: checked }) }
             BwSwitch { Accessible.name: qsTr("Use relative mouse movement"); checked: appState.record_mouse_relative; onToggled: checked => root.invoke("toggle_record_mouse_relative", { relative: checked }) }
-            Text { width: parent.width; wrapMode: Text.WordWrap; text: appState.absolute_mouse_position_available ? qsTr("Absolute positioning is available on this system.") : qsTr("Absolute positioning is unavailable; relative movement will be used."); color: "#9fa0a6"; font.pixelSize: 12 }
+            Text { width: parent.width; wrapMode: Text.WordWrap; text: appState.absolute_mouse_position_available ? qsTr("Absolute positioning is available on this system.") : qsTr("Absolute positioning is unavailable; relative movement will be used."); color: Theme.textDim; font.pixelSize: 12 }
             Rectangle { width: parent.width; height: 1; color: Theme.borderSoft }
             Column { width: parent.width; spacing: 6
                 Text { text: qsTr("Countdown"); color: Theme.text; font.pixelSize: 14 }
-                Text { width: parent.width; wrapMode: Text.WordWrap; text: qsTr("How long Record waits before it starts, so you can switch to the app you want to record."); color: "#9fa0a6"; font.pixelSize: 12 }
+                Text { width: parent.width; wrapMode: Text.WordWrap; text: qsTr("How long Record waits before it starts, so you can switch to the app you want to record."); color: Theme.textDim; font.pixelSize: 12 }
                 Row { spacing: 12
                     BwSlider {
                         id: countdownSlider
@@ -1408,7 +1408,7 @@ Item {
         function openForCreate() { renameTarget = ""; variableName.text = ""; open(); variableName.forceActiveFocus(); }
         function openForRename(name) { renameTarget = name; variableName.text = name; open(); variableName.forceActiveFocus(); variableName.selectAll(); }
         Column { width: 340; spacing: 8
-            Text { text: qsTr("Variable name"); color: "#e7e7e8" }
+            Text { text: qsTr("Variable name"); color: Theme.text }
             BwTextField { id: variableName; width: parent.width; placeholderText: qsTr("score"); onAccepted: variableDialog.accept() }
         }
         onAccepted: {
@@ -1497,7 +1497,7 @@ Item {
         function openForCreate() { renameTarget = ""; listName.text = ""; open(); listName.forceActiveFocus(); }
         function openForRename(name) { renameTarget = name; listName.text = name; open(); listName.forceActiveFocus(); listName.selectAll(); }
         Column { width: 340; spacing: 8
-            Text { text: qsTr("List name"); color: "#e7e7e8" }
+            Text { text: qsTr("List name"); color: Theme.text }
             BwTextField { id: listName; width: parent.width; placeholderText: qsTr("items") }
         }
         onAccepted: {
@@ -1512,7 +1512,7 @@ Item {
         id: deleteListDialog
         title: qsTr("Delete list?"); standardButtons: Dialog.Yes | Dialog.Cancel
         property string listName: ""
-        Text { text: qsTr("Delete \"%1\" and its saved items?").arg(deleteListDialog.listName); color: "#e7e7e8" }
+        Text { text: qsTr("Delete \"%1\" and its saved items?").arg(deleteListDialog.listName); color: Theme.text }
         onAccepted: root.invoke("delete_list", { name: listName })
     }
     AppDialog {

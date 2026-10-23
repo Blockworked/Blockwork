@@ -97,7 +97,7 @@ Popup {
                 HoverHandler { id: rowHover }
                 Rectangle {
                     anchors.fill: parent; anchors.leftMargin: 6; anchors.rightMargin: 6; radius: 6
-                    color: row.current ? "#1d3a55" : rowHover.hovered ? Theme.panelRaised : "transparent"
+                    color: row.current ? Theme.selection : rowHover.hovered ? Theme.panelRaised : "transparent"
                     Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                 }
                 RowLayout {

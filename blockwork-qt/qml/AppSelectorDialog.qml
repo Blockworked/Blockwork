@@ -145,7 +145,7 @@ AppDialog {
                         width: appGrid.tileWidth
                         height: 104
                         radius: Theme.radius
-                        color: hover.hovered ? "#3b3c40" : Theme.panelRaised
+                        color: hover.hovered ? Theme.hover : Theme.panelRaised
                         border.color: hover.hovered ? Theme.accent : Theme.border
                         Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                         Behavior on border.color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }

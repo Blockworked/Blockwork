@@ -3016,6 +3016,17 @@ pub(crate) fn set_clock_format(state: &SharedState, app: &AppHandle, format: Str
     Ok(())
 }
 
+/// Empty follows the system appearance.
+pub(crate) fn set_color_scheme(state: &SharedState, app: &AppHandle, scheme: String) -> Result<(), String> {
+    if !matches!(scheme.as_str(), "" | "light" | "dark") {
+        return Err(format!("Unknown color scheme: {scheme}"));
+    }
+    config::update_settings(|settings| settings.color_scheme = (!scheme.is_empty()).then_some(scheme));
+    let s = state.lock().map_err(|e| e.to_string())?;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
 /// How long UI animations take, as a duration multiplier: 0 is instant, 1 normal.
 pub(crate) fn set_animation_speed(state: &SharedState, app: &AppHandle, speed: f64) -> Result<(), String> {
     if !speed.is_finite() || !(0.0..=crate::MAX_ANIMATION_SPEED).contains(&speed) {

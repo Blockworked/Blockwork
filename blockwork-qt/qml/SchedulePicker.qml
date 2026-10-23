@@ -129,7 +129,7 @@ AppDialog {
                     required property var modelData
                     readonly property bool on: root.mode === modelData.id
                     width: (470 - 3 * 8) / root.modes.length; height: 38; radius: 8
-                    color: on ? Theme.accent : modeMouse.containsMouse ? "#3b3c40" : Theme.panelRaised
+                    color: on ? Theme.accent : modeMouse.containsMouse ? Theme.hover : Theme.panelRaised
                     border.color: on ? Theme.accentHover : modeMouse.containsMouse ? Theme.accent : Theme.border
                     Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                     Behavior on border.color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
@@ -215,7 +215,7 @@ AppDialog {
                                 required property int modelData
                                 readonly property bool on: root.days[modelData]
                                 width: 52; height: 34; radius: 17
-                                color: on ? Theme.accent : dayMouse.containsMouse ? "#3b3c40" : Theme.field
+                                color: on ? Theme.accent : dayMouse.containsMouse ? Theme.hover : Theme.field
                                 border.color: on ? Theme.accentHover : Theme.border
                                 Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                                 Text { anchors.centerIn: parent; text: Schedules.weekdayShort(modelData); color: on ? "white" : Theme.text; font.pixelSize: 12; font.weight: on ? Font.DemiBold : Font.Normal }
