@@ -2,8 +2,8 @@
     {
         "type": "git",
         "url": "https://github.com/blockworked/blockstitch",
-        "commit": "fe7bb7ad196387089ea348519ca635768c340844",
-        "dest": "flatpak-cargo/git/blockstitch-fe7bb7a"
+        "commit": "9dbb8e0b0fff05799c1ea87cf9bd44a55c73eea3",
+        "dest": "flatpak-cargo/git/blockstitch-9dbb8e0"
     },
     {
         "type": "git",
@@ -605,7 +605,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-fe7bb7a/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-9dbb8e0/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
         ]
     },
     {
@@ -623,7 +623,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-fe7bb7a/.\" \"cargo/vendor/blockstitch-qml\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-9dbb8e0/.\" \"cargo/vendor/blockstitch-qml\""
         ]
     },
     {
@@ -8008,7 +8008,7 @@
     },
     {
         "type": "inline",
-        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/blockworked/blockstitch\"]\ngit = \"https://github.com/blockworked/blockstitch\"\nreplace-with = \"vendored-sources\"\nrev = \"fe7bb7ad196387089ea348519ca635768c340844\"\n\n[source.\"https://github.com/enigo-rs/enigo\"]\ngit = \"https://github.com/enigo-rs/enigo\"\nreplace-with = \"vendored-sources\"\nrev = \"a88d9b7\"\n\n[source.\"https://github.com/blockworked/lucide-qt\"]\ngit = \"https://github.com/blockworked/lucide-qt\"\nreplace-with = \"vendored-sources\"\ntag = \"v0.1.0\"\n",
+        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/blockworked/blockstitch\"]\ngit = \"https://github.com/blockworked/blockstitch\"\nreplace-with = \"vendored-sources\"\nrev = \"9dbb8e0b0fff05799c1ea87cf9bd44a55c73eea3\"\n\n[source.\"https://github.com/enigo-rs/enigo\"]\ngit = \"https://github.com/enigo-rs/enigo\"\nreplace-with = \"vendored-sources\"\nrev = \"a88d9b7\"\n\n[source.\"https://github.com/blockworked/lucide-qt\"]\ngit = \"https://github.com/blockworked/lucide-qt\"\nreplace-with = \"vendored-sources\"\ntag = \"v0.1.0\"\n",
         "dest": "cargo",
         "dest-filename": "config"
     }
