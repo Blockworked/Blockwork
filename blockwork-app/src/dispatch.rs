@@ -4,7 +4,7 @@
 
 use crate::Backend;
 use crate::commands;
-use crate::state::{BlockPiece, HotkeyActionDto, InstructionDto, PathStep, ValueLocation};
+use crate::state::{BlockPiece, FragmentDto, HotkeyActionDto, InstructionDto, PathStep, ValueLocation};
 use blockwork_core::input::value::Value as BlockValue;
 use blockwork_core::macros::BlockShape;
 use serde::de::DeserializeOwned;
@@ -654,6 +654,23 @@ impl Backend {
                     y,
                     instructions,
                 )?)
+            }
+            "copy_instructions" => {
+                let strand_id: String = arg(&args, "strandId")?;
+                let path: Vec<PathStep> = arg(&args, "path")?;
+                let count: Option<usize> = arg(&args, "count")?;
+                to_json(commands::copy_instructions(&self.state, strand_id, path, count)?)
+            }
+            "paste_fragment" => {
+                let x: i32 = arg(&args, "x")?;
+                let y: i32 = arg(&args, "y")?;
+                let fragment: FragmentDto = arg(&args, "fragment")?;
+                to_json(commands::paste_fragment(&self.state, &self.app, x, y, fragment)?)
+            }
+            "duplicate_instruction" => {
+                let strand_id: String = arg(&args, "strandId")?;
+                let path: Vec<PathStep> = arg(&args, "path")?;
+                to_json(commands::duplicate_instruction(&self.state, &self.app, strand_id, path)?)
             }
             "set_recording_target" => {
                 let strand_id: String = arg(&args, "strandId")?;

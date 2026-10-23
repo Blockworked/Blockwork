@@ -15,7 +15,7 @@ pub(crate) use blockwork_core::macros::{
     BlockDef, BlockPiece, Comment, FloatingValue, Instruction, InstructionKind,
     Macro, MacroSettings, Strand,
 };
-pub(crate) use blockstitch_core::graph::{ListDef, ListItem};
+pub(crate) use blockstitch_core::graph::{Fragment, ListDef, ListItem};
 use serde::{Deserialize, Serialize};
 use std::collections::{HashMap, HashSet};
 use crate::AppHandle;
@@ -366,6 +366,33 @@ pub(crate) struct KeyCaptureDto {
     pub(crate) kind: String,
     pub(crate) strand_id: Option<String>,
     pub(crate) index: Option<InstrPath>,
+}
+
+/// Copied blocks and the notes pinned to them, as the editor's copy buffer
+/// holds them.
+#[derive(Serialize, Deserialize, Clone, Debug)]
+pub(crate) struct FragmentDto {
+    pub(crate) instructions: Vec<InstructionDto>,
+    #[serde(default)]
+    pub(crate) comments: Vec<Comment>,
+}
+
+pub(crate) fn fragment_to_dto(fragment: &Fragment<InstructionKind>) -> FragmentDto {
+    FragmentDto {
+        instructions: fragment.instructions.iter().map(instruction_to_dto).collect(),
+        comments: fragment.comments.clone(),
+    }
+}
+
+pub(crate) fn dto_to_fragment(dto: &FragmentDto) -> Option<Fragment<InstructionKind>> {
+    Some(Fragment {
+        instructions: dto
+            .instructions
+            .iter()
+            .map(dto_to_instruction)
+            .collect::<Option<_>>()?,
+        comments: dto.comments.clone(),
+    })
 }
 
 #[derive(Serialize, Deserialize, Clone, Debug)]

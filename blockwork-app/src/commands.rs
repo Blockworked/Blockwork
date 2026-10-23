@@ -1,12 +1,13 @@
 use crate::macros_thread;
 use crate::state::{
-    AppState, ComboCapture, EditSession, HotkeyActionDto, InstructionDto, KeyCaptureTarget,
+    AppState, ComboCapture, EditSession, FragmentDto, HotkeyActionDto, InstructionDto, KeyCaptureTarget,
     ListItemDto, Page, PathStep, RecordingPhase, SharedState, StateDto, UpdateCheckState,
-    ValueLocation, build_state_dto, dto_to_hotkey_action, dto_to_instruction,
+    ValueLocation, build_state_dto, dto_to_fragment, dto_to_hotkey_action, dto_to_instruction,
+    fragment_to_dto,
     emit_state_updated,
 };
 use blockstitch_core::editor::{
-    EditCommand, EditContext, EditError, EditOutcome, NumberSpelling, ValueDestination,
+    Created, EditCommand, EditContext, EditError, EditOutcome, NumberSpelling, ValueDestination,
     apply_buffer_effects, drop_strand_buffers, prune_value_buffers, retain_live_buffers,
 };
 use blockwork_core::config;
@@ -2258,6 +2259,43 @@ pub(crate) fn merge_tail(
 
 /// Creates a new detached strand at `(x, y)` holding `instructions`
 /// verbatim - how "Paste" drops previously-copied blocks onto the canvas.
+/// `count` blocks from `path` (the rest of that list when absent), with
+/// their bodies and the notes pinned to them, for the editor's copy buffer.
+pub(crate) fn copy_instructions(
+    state: &SharedState,
+    strand_id: String,
+    path: Vec<PathStep>,
+    count: Option<usize>,
+) -> Result<FragmentDto, String> {
+    let s = state.lock().map_err(|e| e.to_string())?;
+    let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+    Ok(fragment_to_dto(&mac.copy_fragment(&strand_id, &path, count)?))
+}
+
+/// Drops a copied fragment at `(x, y)` as a new strand, with fresh ids and
+/// its notes, as one step. Returns that strand's id.
+pub(crate) fn paste_fragment(
+    state: &SharedState,
+    app: &AppHandle,
+    x: i32,
+    y: i32,
+    fragment: FragmentDto,
+) -> Result<String, String> {
+    let fragment = dto_to_fragment(&fragment).ok_or("Unknown instruction type")?;
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let outcome = run_edit(&mut s, EditCommand::PasteFragment { fragment, x, y });
+    emit_state_updated(&app, &s);
+    outcome?
+        .created
+        .into_iter()
+        .find_map(|created| match created {
+            Created::Strand(id) => Some(id),
+            _ => None,
+        })
+        .ok_or_else(|| "Nothing was pasted".to_string())
+}
+
+/// [`paste_fragment`] for bare instructions, without notes.
 pub(crate) fn paste_instructions(
     state: &SharedState,
     app: &AppHandle,
@@ -2265,21 +2303,28 @@ pub(crate) fn paste_instructions(
     y: i32,
     instructions: Vec<InstructionDto>,
 ) -> Result<String, String> {
+    let fragment = FragmentDto {
+        instructions,
+        comments: Vec::new(),
+    };
+    paste_fragment(state, app, x, y, fragment)
+}
+
+/// Copies the block at `path` (bodies and notes included) in right after
+/// it, as one step.
+pub(crate) fn duplicate_instruction(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+    path: Vec<PathStep>,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let ins: Vec<Instruction> = instructions
-        .iter()
-        .map(dto_to_instruction)
-        .collect::<Option<Vec<_>>>()
-        .ok_or("Unknown instruction type")?;
-    push_undo(&mut s);
-    let new_id = s
-        .current_macro
-        .as_mut()
-        .ok_or("No macro selected")?
-        .add_strand(x, y, ins);
-    auto_save(&mut s);
+    let outcome = run_edit(
+        &mut s,
+        EditCommand::DuplicateInstruction { strand_id, path },
+    );
     emit_state_updated(&app, &s);
-    Ok(new_id)
+    outcome.map(|_| ()).map_err(String::from)
 }
 
 /// Sets the strand that freshly-recorded input is appended to. Not part of
@@ -4263,6 +4308,50 @@ mod value_location_tests {
             .unwrap();
         assert!(outcome.changed);
         assert!(mac.strand("s1").unwrap().instructions.is_empty());
+    }
+
+    /// The old frontend walker skipped `catch_body`; the shared clone walks
+    /// every body the kind declares.
+    #[test]
+    fn duplicating_a_try_renames_its_on_error_part_and_copies_notes() {
+        let mut mac = test_macro();
+        let caught = Instruction::new(InstructionKind::Wait(Value::number(1.0)));
+        let caught_id = caught.id.clone();
+        let try_block = Instruction::new(InstructionKind::TryCatch {
+            body: vec![Instruction::new(InstructionKind::Wait(Value::number(2.0)))],
+            catch_body: vec![caught],
+        });
+        mac.insert_instruction("s1", &top(2), try_block).unwrap();
+        mac.comments.push(blockwork_core::macros::Comment::new(4, 4, "n".into(), Some(caught_id.clone())));
+        let outcome = mac
+            .apply_edit(EditCommand::DuplicateInstruction { strand_id: "s1".into(), path: top(2) }, &EDIT_CONTEXT)
+            .unwrap();
+        let list = &mac.strand("s1").unwrap().instructions;
+        assert_eq!(list.len(), 4);
+        let InstructionKind::TryCatch { catch_body, .. } = &list[3].kind else { panic!() };
+        assert_ne!(catch_body[0].id, caught_id);
+        assert_eq!(outcome.ids[&caught_id], catch_body[0].id);
+        assert_eq!(mac.instruction_ids().len(), 2 + 3 + 3);
+        assert_eq!(mac.comments.last().unwrap().attached_to.as_ref(), Some(&catch_body[0].id));
+    }
+
+    #[test]
+    fn a_fragment_round_trips_through_the_frontend_dto() {
+        let mut mac = test_macro();
+        let wait_id = mac.strand("s1").unwrap().instructions[1].id.clone();
+        mac.comments.push(blockwork_core::macros::Comment::new(1, 2, "n".into(), Some(wait_id.clone())));
+        let fragment = mac.copy_fragment("s1", &top(1), None).unwrap();
+        let dto: crate::state::FragmentDto =
+            serde_json::from_value(serde_json::to_value(fragment_to_dto(&fragment)).unwrap()).unwrap();
+        let back = dto_to_fragment(&dto).unwrap();
+        assert_eq!(back, fragment);
+        assert_eq!(back.instructions[0].id, wait_id);
+        let outcome = mac
+            .apply_edit(EditCommand::PasteFragment { fragment: back, x: 5, y: 6 }, &EDIT_CONTEXT)
+            .unwrap();
+        assert!(outcome.changed);
+        assert_ne!(outcome.ids[&wait_id], wait_id);
+        assert_eq!(mac.comments.len(), 2);
     }
 }
 

@@ -322,6 +322,13 @@ impl BlockKind for InstructionKind {
         matches!(self, InstructionKind::CallBlock { block_id: id, .. } if id == block_id)
     }
 
+    fn called_block(&self) -> Option<&str> {
+        match self {
+            InstructionKind::CallBlock { block_id, .. } => Some(block_id),
+            _ => None,
+        }
+    }
+
     fn call_args_mut(&mut self, block_id: &str) -> Option<&mut Vec<Value>> {
         match self {
             InstructionKind::CallBlock { block_id: id, args, .. } if id == block_id => Some(args),

@@ -89,14 +89,16 @@ Item {
         const b = (appState.hotkey_bindings || []).find(b => b.action && b.action.type === "StopRecording");
         return b ? b.combo_display : "";
     }
-    function refreshIds(instruction) {
-        const copy = JSON.parse(JSON.stringify(instruction)); copy.id = uuid();
-        ["body","then_body","else_body"].forEach(k => { if (copy[k]) copy[k] = copy[k].map(refreshIds); });
-        if (copy.branches) copy.branches = copy.branches.map(branch => branch.map(refreshIds));
-        return copy;
+    // In-memory copy/paste buffer (not the OS clipboard): a fragment from
+    // copy_instructions, the blocks plus the notes on them.
+    property var clipboard: null
+    function copyBlocks(strandId, path, count, then) {
+        root.daemonCall("copy_instructions", { strandId: strandId, path: path, count: count }, fragment => {
+            if (!fragment) return;
+            root.clipboard = fragment;
+            if (then) then();
+        });
     }
-    // In-memory copy/paste buffer (not the OS clipboard).
-    property var clipboard: []
     function totalBlocks() { return (root.macro ? root.macro.strands : []).reduce((n, st) => n + st.instructions.length, 0); }
     function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
     function instructionExplainer(type) {
@@ -837,23 +839,20 @@ Item {
                     onTailMerged: (strandId, path, targetId, targetPath) => root.invoke("merge_tail", { strandId: strandId, path: path, targetId: targetId, targetPath: targetPath })
                     onBlockDragOutside: (strandId, path, tailCount, sx, sy) => root.trashDraggedBlocks(strandId, path, tailCount, sx, sy)
                     onInstructionRemoved: (strandId, path) => root.removeInstruction(strandId, path)
-                    canPaste: root.clipboard.length > 0
+                    canPaste: !!root.clipboard && root.clipboard.instructions.length > 0
                     clearIcon: appState.confirm_clear_instructions ? "triangle-alert" : "trash"
                     clearText: appState.confirm_clear_instructions ? qsTr("Confirm delete (%1s)?").arg(appState.confirm_clear_instructions_remaining_secs) : qsTr("Delete %n block(s)", "", root.totalBlocks())
                     onCanvasMenuAction: (action, x, y) => {
-                        if (action === "paste" && root.clipboard.length) root.invoke("paste_instructions", { x: x, y: y, instructions: root.clipboard.map(root.refreshIds) });
+                        if (action === "paste" && root.clipboard) root.invoke("paste_fragment", { x: x, y: y, fragment: root.clipboard });
                     }
                     onBlockMenuAction: (action, strandId, path, instruction) => {
                         if (action === "edit_block") root.editBlockById(instruction.block_id);
                         else if (action === "breakpoint") root.invoke("toggle_breakpoint", { blockId: instruction.id });
-                        else if (action === "copy") root.clipboard = [instruction];
-                        else if (action === "copy_all") {
-                            const strand = canvas.strandById(strandId);
-                            const list = strand ? canvas.listFor(strand, path.slice(0, path.length - 1)) : null;
-                            if (list) root.clipboard = list.slice(path[path.length - 1].index);
-                        } else if (action === "cut") { root.clipboard = [instruction]; root.removeInstruction(strandId, path); }
+                        else if (action === "copy") root.copyBlocks(strandId, path, 1);
+                        else if (action === "copy_all") root.copyBlocks(strandId, path, null);
+                        else if (action === "cut") root.copyBlocks(strandId, path, 1, () => root.removeInstruction(strandId, path));
                     }
-                    onInstructionDuplicated: (strandId, path, instruction) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: root.refreshIds(instruction) })
+                    onInstructionDuplicated: (strandId, path) => root.invoke("duplicate_instruction", { strandId: strandId, path: path })
                     onInstructionEdited: (strandId, path, instruction) => root.invoke("edit_instruction", { strandId: strandId, path: path, instruction: instruction })
                     onRunBranchRequested: (strandId, path, name) => root.invoke("add_instruction", { strandId: strandId, path: root.nextPath(path), instruction: { id: root.uuid(), type: "RunBranch", name: name } })
                     onPaletteDragStarted: (spec, sx, sy, ox, oy) => root.beginPaletteDrag(spec, ox, oy, sx, sy)
