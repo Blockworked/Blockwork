@@ -2,8 +2,8 @@
     {
         "type": "git",
         "url": "https://github.com/blockworked/blockstitch",
-        "commit": "448b329ad5ac96dfcc7aaa57e3756e0adac4c96b",
-        "dest": "flatpak-cargo/git/blockstitch-448b329"
+        "commit": "9ef493d6cbf30a6eca1796988e704b409cc213d0",
+        "dest": "flatpak-cargo/git/blockstitch-9ef493d"
     },
     {
         "type": "git",
@@ -605,7 +605,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-448b329/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-9ef493d/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
         ]
     },
     {
@@ -623,12 +623,12 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-448b329/.\" \"cargo/vendor/blockstitch-qml\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-9ef493d/.\" \"cargo/vendor/blockstitch-qml\""
         ]
     },
     {
         "type": "inline",
-        "contents": "[package]\nname = \"blockstitch-qml\"\nversion = \"0.1.0\"\nedition = \"2024\"\ndescription = \"Qt 6/QML frontend components for Blockstitch's block canvas\"\nlicense = \"GPL-3.0-or-later\"\nbuild = \"build.rs\"\n\n[lib]\npath = \"rust/lib.rs\"\n\n[dependencies]\ncxx-qt = \"0.10\"\n\n[build-dependencies.cxx-qt-build]\nversion = \"0.10\"\nfeatures = [\"link_qt_object_files\"]\n\n[build-dependencies.qt-build-utils]\nversion = \"0.10\"\nfeatures = [\"qt_minimal\"]\n\n[build-dependencies.qt-version]\nversion = \"0.1\"\nfeatures = [\"qt_version_at_least_6_10\"]\n",
+        "contents": "[package]\nname = \"blockstitch-qml\"\nversion = \"0.1.0\"\nedition = \"2024\"\ndescription = \"Qt 6/QML frontend components for Blockstitch's block canvas\"\nlicense = \"GPL-3.0-or-later\"\nbuild = \"build.rs\"\n\n[lib]\npath = \"rust/lib.rs\"\n\n[dependencies]\ncxx-qt = \"0.10\"\n\n[build-dependencies]\nserde_json = \"1\"\n\n[build-dependencies.cxx-qt-build]\nversion = \"0.10\"\nfeatures = [\"link_qt_object_files\"]\n\n[build-dependencies.qt-build-utils]\nversion = \"0.10\"\nfeatures = [\"qt_minimal\"]\n\n[build-dependencies.qt-version]\nversion = \"0.1\"\nfeatures = [\"qt_version_at_least_6_10\"]\n",
         "dest": "cargo/vendor/blockstitch-qml",
         "dest-filename": "Cargo.toml"
     },
@@ -8008,7 +8008,7 @@
     },
     {
         "type": "inline",
-        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/blockworked/blockstitch\"]\ngit = \"https://github.com/blockworked/blockstitch\"\nreplace-with = \"vendored-sources\"\nrev = \"448b329ad5ac96dfcc7aaa57e3756e0adac4c96b\"\n\n[source.\"https://github.com/enigo-rs/enigo\"]\ngit = \"https://github.com/enigo-rs/enigo\"\nreplace-with = \"vendored-sources\"\nrev = \"a88d9b7\"\n\n[source.\"https://github.com/blockworked/lucide-qt\"]\ngit = \"https://github.com/blockworked/lucide-qt\"\nreplace-with = \"vendored-sources\"\ntag = \"v0.1.0\"\n",
+        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/blockworked/blockstitch\"]\ngit = \"https://github.com/blockworked/blockstitch\"\nreplace-with = \"vendored-sources\"\nrev = \"9ef493d6cbf30a6eca1796988e704b409cc213d0\"\n\n[source.\"https://github.com/enigo-rs/enigo\"]\ngit = \"https://github.com/enigo-rs/enigo\"\nreplace-with = \"vendored-sources\"\nrev = \"a88d9b7\"\n\n[source.\"https://github.com/blockworked/lucide-qt\"]\ngit = \"https://github.com/blockworked/lucide-qt\"\nreplace-with = \"vendored-sources\"\ntag = \"v0.1.0\"\n",
         "dest": "cargo",
         "dest-filename": "config"
     }
