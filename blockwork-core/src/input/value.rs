@@ -50,7 +50,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "ReadFile",
         op: "ReadFile",
         arity: 1,
-        default_args: one_text,
+        default_args: || vec![Value::text("~/notes.txt")],
         eval: |args| {
             crate::permissions::require("files_read")?;
             Ok(Evaluated::Text(crate::files::read_text(&args[0].as_text())?))
@@ -60,14 +60,14 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "FileExists",
         op: "FileExists",
         arity: 1,
-        default_args: one_text,
+        default_args: || vec![Value::text("~/notes.txt")],
         eval: |args| Ok(Evaluated::Bool(crate::files::exists(&args[0].as_text()))),
     },
     ExtOperator {
         kind: "ListDirectory",
         op: "ListDirectory",
         arity: 1,
-        default_args: one_text,
+        default_args: || vec![Value::text("~")],
         eval: |args| {
             crate::permissions::require("files_read")?;
             Ok(Evaluated::Text(crate::files::list_dir(&args[0].as_text())?))
@@ -77,7 +77,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "HttpGet",
         op: "HttpGet",
         arity: 1,
-        default_args: one_text,
+        default_args: || vec![Value::text("https://example.com")],
         eval: |args| {
             crate::permissions::require("network")?;
             Ok(Evaluated::Text(crate::http::get(&args[0].as_text())?))
@@ -87,7 +87,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "JsonGet",
         op: "JsonGet",
         arity: 2,
-        default_args: two_texts,
+        default_args: || vec![Value::text("name"), Value::text(r#"{"name": "Blockwork"}"#)],
         eval: |args| {
             Ok(Evaluated::Text(crate::http::json_get(&args[1].as_text(), &args[0].as_text())?))
         },
@@ -96,7 +96,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "ShellOutput",
         op: "ShellOutput",
         arity: 1,
-        default_args: one_text,
+        default_args: || vec![Value::text("echo hello")],
         eval: |args| {
             crate::permissions::require("commands")?;
             Ok(Evaluated::Text(crate::shell::run(&args[0].as_text())?.stdout))
@@ -106,7 +106,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "ShellSucceeded",
         op: "ShellSucceeded",
         arity: 1,
-        default_args: one_text,
+        default_args: || vec![Value::text("true")],
         eval: |args| {
             crate::permissions::require("commands")?;
             Ok(Evaluated::Bool(crate::shell::run(&args[0].as_text())?.success))
@@ -130,7 +130,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "WindowExists",
         op: "WindowExists",
         arity: 1,
-        default_args: one_text,
+        default_args: || vec![Value::text("Firefox")],
         eval: |args| Ok(Evaluated::Bool(crate::window::exists(&args[0].as_text())?)),
     },
     ExtOperator {
@@ -270,7 +270,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "AppRunning",
         op: "AppRunning",
         arity: 1,
-        default_args: one_text,
+        default_args: || vec![Value::text("firefox")],
         eval: |args| Ok(Evaluated::Bool(crate::system::app_running(&args[0].as_text())?)),
     },
     ExtOperator {
@@ -308,7 +308,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "Secret",
         op: "Secret",
         arity: 1,
-        default_args: one_text,
+        default_args: || vec![Value::text("api token")],
         eval: |args| {
             crate::permissions::require("secrets")?;
             Ok(Evaluated::Text(crate::secrets::get(&args[0].as_text())?))
@@ -426,10 +426,6 @@ fn numbers(values: &[f64]) -> Vec<Value> {
 
 fn one_text() -> Vec<Value> {
     vec![Value::text("")]
-}
-
-fn two_texts() -> Vec<Value> {
-    vec![Value::text(""), Value::text("")]
 }
 
 /// Operators that run commands or go online, so evaluating one has side

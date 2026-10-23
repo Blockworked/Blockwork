@@ -1531,36 +1531,80 @@ Item {
         onEditRequested:(blockId,pieces,shape,color,icon,identifier,description)=>root.invoke("edit_block",{blockId:blockId,pieces:pieces,shape:shape,color:color,icon:icon,identifier:identifier,description:description})
     }
 
-    // Blockwork's automation blocks, declared for blockstitch's generic rows.
+    // Blockwork's reporters as blockstitch-core describes them (arity, slot
+    // types, defaults), for BlockRegistry.freshValue.
+    // BEGIN GENERATED operator descriptors (blockwork-core tests/operator_descriptors.rs; BLESS=1 rewrites)
+    readonly property var hostDescriptors: [
+        {"kind":"BatteryPercentage","op":"BatteryPercentage","arity":0,"args":[],"host":true},
+        {"kind":"PluggedIn","op":"PluggedIn","arity":0,"args":[],"host":true},
+        {"kind":"ClipboardText","op":"ClipboardText","arity":0,"args":[],"host":true},
+        {"kind":"ClipboardHasImage","op":"ClipboardHasImage","arity":0,"args":[],"host":true},
+        {"kind":"ClipboardHasFiles","op":"ClipboardHasFiles","arity":0,"args":[],"host":true},
+        {"kind":"ReadFile","op":"ReadFile","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"~/notes.txt"}}],"host":true},
+        {"kind":"FileExists","op":"FileExists","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"~/notes.txt"}}],"host":true},
+        {"kind":"ListDirectory","op":"ListDirectory","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"~"}}],"host":true},
+        {"kind":"HttpGet","op":"HttpGet","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"https://example.com"}}],"host":true},
+        {"kind":"JsonGet","op":"JsonGet","arity":2,"args":[{"type":"text","default":{"kind":"Text","value":"name"}},{"type":"text","default":{"kind":"Text","value":"{\"name\": \"Blockwork\"}"}}],"host":true},
+        {"kind":"ShellOutput","op":"ShellOutput","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"echo hello"}}],"host":true},
+        {"kind":"ShellSucceeded","op":"ShellSucceeded","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"true"}}],"host":true},
+        {"kind":"ActiveWindowTitle","op":"ActiveWindowTitle","arity":0,"args":[],"host":true},
+        {"kind":"ActiveWindowApp","op":"ActiveWindowApp","arity":0,"args":[],"host":true},
+        {"kind":"WindowExists","op":"WindowExists","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"Firefox"}}],"host":true},
+        {"kind":"WindowInfo","op":"WindowInfo","arity":2,"args":[{"type":"text","default":{"kind":"Text","value":"Firefox"}},{"type":"text","default":{"kind":"Text","value":"center x"}}],"host":true},
+        {"kind":"Detection","op":"Detection","arity":2,"args":[{"type":"text","default":{"kind":"Text","value":"center x"}},{"type":"text","default":{"kind":"Op","op":"ListItem","args":[{"kind":"Number","value":1.0},{"kind":"Text","value":"detections"}],"saved":{"kind":"Number","value":0.0}}}],"host":true},
+        {"kind":"MacroRunning","op":"MacroRunning","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":""}}],"host":true},
+        {"kind":"GlobalVariable","op":"GlobalVariable","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":""}}],"host":true},
+        {"kind":"PixelColor","op":"PixelColor","arity":2,"args":[{"type":"number","default":{"kind":"Number","value":100.0}},{"type":"number","default":{"kind":"Number","value":100.0}}],"host":true},
+        {"kind":"AverageColor","op":"AverageColor","arity":4,"args":[{"type":"number","default":{"kind":"Number","value":0.0}},{"type":"number","default":{"kind":"Number","value":0.0}},{"type":"number","default":{"kind":"Number","value":100.0}},{"type":"number","default":{"kind":"Number","value":100.0}}],"host":true},
+        {"kind":"ColorsMatch","op":"ColorsMatch","arity":3,"args":[{"type":"text","default":{"kind":"Text","value":"#ffffff"}},{"type":"text","default":{"kind":"Text","value":"#fafafa"}},{"type":"number","default":{"kind":"Number","value":10.0}}],"host":true},
+        {"kind":"ScreenText","op":"ScreenText","arity":4,"args":[{"type":"number","default":{"kind":"Number","value":0.0}},{"type":"number","default":{"kind":"Number","value":0.0}},{"type":"number","default":{"kind":"Number","value":400.0}},{"type":"number","default":{"kind":"Number","value":100.0}}],"host":true},
+        {"kind":"MousePosition","op":"MousePosition","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"x"}}],"host":true},
+        {"kind":"ScreenSize","op":"ScreenSize","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"width"}}],"host":true},
+        {"kind":"MonitorCount","op":"MonitorCount","arity":0,"args":[],"host":true},
+        {"kind":"MonitorInfo","op":"MonitorInfo","arity":2,"args":[{"type":"number","default":{"kind":"Number","value":1.0}},{"type":"text","default":{"kind":"Text","value":"width"}}],"host":true},
+        {"kind":"AppRunning","op":"AppRunning","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"firefox"}}],"host":true},
+        {"kind":"IdleSeconds","op":"IdleSeconds","arity":0,"args":[],"host":true},
+        {"kind":"ScreenLocked","op":"ScreenLocked","arity":0,"args":[],"host":true},
+        {"kind":"NetworkConnected","op":"NetworkConnected","arity":0,"args":[],"host":true},
+        {"kind":"UsbConnected","op":"UsbConnected","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":""}}],"host":true},
+        {"kind":"Secret","op":"Secret","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"api token"}}],"host":true},
+        {"kind":"TextCheck","op":"TextCheck","arity":3,"args":[{"type":"text","default":{"kind":"Text","value":"hello world"}},{"type":"text","default":{"kind":"Text","value":"contains"}},{"type":"text","default":{"kind":"Text","value":"world"}}],"host":true},
+        {"kind":"TextReplace","op":"TextReplace","arity":3,"args":[{"type":"text","default":{"kind":"Text","value":"world"}},{"type":"text","default":{"kind":"Text","value":"hello world"}},{"type":"text","default":{"kind":"Text","value":"there"}}],"host":true},
+        {"kind":"RegexReplace","op":"RegexReplace","arity":3,"args":[{"type":"text","default":{"kind":"Text","value":"[0-9]+"}},{"type":"text","default":{"kind":"Text","value":"order 1234"}},{"type":"text","default":{"kind":"Text","value":"#"}}],"host":true},
+        {"kind":"RegexFind","op":"RegexFind","arity":2,"args":[{"type":"text","default":{"kind":"Text","value":"[0-9]+"}},{"type":"text","default":{"kind":"Text","value":"order 1234"}}],"host":true},
+        {"kind":"SplitPart","op":"SplitPart","arity":3,"args":[{"type":"number","default":{"kind":"Number","value":1.0}},{"type":"text","default":{"kind":"Text","value":"a,b,c"}},{"type":"text","default":{"kind":"Text","value":","}}],"host":true},
+        {"kind":"SplitCount","op":"SplitCount","arity":2,"args":[{"type":"text","default":{"kind":"Text","value":"a,b,c"}},{"type":"text","default":{"kind":"Text","value":","}}],"host":true},
+        {"kind":"Substring","op":"Substring","arity":3,"args":[{"type":"number","default":{"kind":"Number","value":1.0}},{"type":"number","default":{"kind":"Number","value":3.0}},{"type":"text","default":{"kind":"Text","value":"hello"}}],"host":true},
+        {"kind":"Trim","op":"Trim","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"  hello  "}}],"host":true},
+        {"kind":"FormatNumber","op":"FormatNumber","arity":2,"args":[{"type":"number","default":{"kind":"Number","value":12.3456}},{"type":"number","default":{"kind":"Number","value":2.0}}],"host":true},
+        {"kind":"Timestamp","op":"Timestamp","arity":0,"args":[],"host":true},
+        {"kind":"FormatDate","op":"FormatDate","arity":2,"args":[{"type":"text","default":{"kind":"Op","op":"Timestamp","args":[],"saved":{"kind":"Number","value":0.0}}},{"type":"text","default":{"kind":"Text","value":"%Y-%m-%d %H:%M"}}],"host":true},
+        {"kind":"ParseDate","op":"ParseDate","arity":2,"args":[{"type":"text","default":{"kind":"Text","value":"2026-01-31 09:00"}},{"type":"text","default":{"kind":"Text","value":""}}],"host":true},
+        {"kind":"DatePart","op":"DatePart","arity":2,"args":[{"type":"text","default":{"kind":"Text","value":"day"}},{"type":"text","default":{"kind":"Op","op":"Timestamp","args":[],"saved":{"kind":"Number","value":0.0}}}],"host":true},
+        {"kind":"LastError","op":"LastError","arity":0,"args":[],"host":true}
+    ]
+    // END GENERATED operator descriptors
+    // Blockwork's reporters for the palette: [op, result, arity, args?]. A
+    // fresh one takes hostDescriptors' defaults unless it gives its own args.
     readonly property var extraOperators: [
-        ["ReadFile", "text", 1, [textValue("~/notes.txt")]], ["FileExists", "bool", 1, [textValue("~/notes.txt")]],
-        ["ListDirectory", "text", 1, [textValue("~")]], ["HttpGet", "text", 1, [textValue("https://example.com")]],
-        ["JsonGet", "text", 2, [textValue("name"), textValue('{"name": "Blockwork"}')]],
-        ["ShellOutput", "text", 1, [textValue("echo hello")]], ["ShellSucceeded", "bool", 1, [textValue("true")]],
-        ["ActiveWindowTitle", "text", 0], ["ActiveWindowApp", "text", 0], ["WindowExists", "bool", 1, [textValue("Firefox")]],
-        ["LastError", "text", 0], ["MacroRunning", "bool", 1, [textValue("")]], ["GlobalVariable", "text", 1, [textValue(firstGlobalName())]],
-        ["PixelColor", "text", 2, [numberValue(100), numberValue(100)]], ["AverageColor", "text", 4, [numberValue(0), numberValue(0), numberValue(100), numberValue(100)]],
-        ["ColorsMatch", "bool", 3, [textValue("#ffffff"), textValue("#fafafa"), numberValue(10)]],
-        ["ScreenText", "text", 4, [numberValue(0), numberValue(0), numberValue(400), numberValue(100)]],
-        ["MousePosition", "number", 1, [textValue("x")]], ["ScreenSize", "number", 1, [textValue("width")]],
-        ["MonitorCount", "number", 0], ["MonitorInfo", "number", 2, [numberValue(1), textValue("width")]],
-        ["WindowInfo", "number", 2, [textValue("Firefox"), textValue("center x")]],
-        ["Detection", "text", 2, [textValue("center x"), { kind: "Op", op: "ListItem", args: [numberValue(1), textValue("detections")], saved: numberValue(0) }]],
-        ["AppRunning", "bool", 1, [textValue("firefox")]], ["IdleSeconds", "number", 0], ["ScreenLocked", "bool", 0],
-        ["NetworkConnected", "bool", 0], ["UsbConnected", "bool", 1, [textValue("")]], ["Secret", "text", 1, [textValue("api token")]],
-        ["TextCheck", "bool", 3, [textValue("hello world"), textValue("contains"), textValue("world")]],
-        ["TextReplace", "text", 3, [textValue("world"), textValue("hello world"), textValue("there")]],
-        ["RegexReplace", "text", 3, [textValue("[0-9]+"), textValue("order 1234"), textValue("#")]],
-        ["RegexFind", "text", 2, [textValue("[0-9]+"), textValue("order 1234")]],
-        ["SplitPart", "text", 3, [numberValue(1), textValue("a,b,c"), textValue(",")]],
-        ["SplitCount", "number", 2, [textValue("a,b,c"), textValue(",")]],
-        ["Substring", "text", 3, [numberValue(1), numberValue(3), textValue("hello")]],
-        ["Trim", "text", 1, [textValue("  hello  ")]], ["FormatNumber", "text", 2, [numberValue(12.3456), numberValue(2)]],
-        ["Timestamp", "number", 0], ["FormatDate", "text", 2, [{ kind: "Op", op: "Timestamp", args: [], saved: numberValue(0) }, textValue("%Y-%m-%d %H:%M")]],
-        ["ParseDate", "number", 2, [textValue("2026-01-31 09:00"), textValue("")]],
-        ["DatePart", "number", 2, [textValue("day"), { kind: "Op", op: "Timestamp", args: [], saved: numberValue(0) }]]
+        ["PluggedIn", "bool", 0], ["BatteryPercentage", "number", 0],
+        ["ClipboardText", "text", 0], ["ClipboardHasImage", "bool", 0], ["ClipboardHasFiles", "bool", 0],
+        ["ReadFile", "text", 1], ["FileExists", "bool", 1], ["ListDirectory", "text", 1], ["HttpGet", "text", 1], ["JsonGet", "text", 2],
+        ["ShellOutput", "text", 1], ["ShellSucceeded", "bool", 1],
+        ["ActiveWindowTitle", "text", 0], ["ActiveWindowApp", "text", 0], ["WindowExists", "bool", 1],
+        ["LastError", "text", 0], ["MacroRunning", "bool", 1], ["GlobalVariable", "text", 1, [textValue(firstGlobalName())]],
+        ["PixelColor", "text", 2], ["AverageColor", "text", 4], ["ColorsMatch", "bool", 3], ["ScreenText", "text", 4],
+        ["MousePosition", "number", 1], ["ScreenSize", "number", 1], ["MonitorCount", "number", 0], ["MonitorInfo", "number", 2],
+        ["WindowInfo", "number", 2], ["Detection", "text", 2],
+        ["AppRunning", "bool", 1], ["IdleSeconds", "number", 0], ["ScreenLocked", "bool", 0],
+        ["NetworkConnected", "bool", 0], ["UsbConnected", "bool", 1], ["Secret", "text", 1],
+        ["TextCheck", "bool", 3], ["TextReplace", "text", 3], ["RegexReplace", "text", 3], ["RegexFind", "text", 2],
+        ["SplitPart", "text", 3], ["SplitCount", "number", 2], ["Substring", "text", 3],
+        ["Trim", "text", 1], ["FormatNumber", "text", 2],
+        ["Timestamp", "number", 0], ["FormatDate", "text", 2], ["ParseDate", "number", 2], ["DatePart", "number", 2]
     ]
     readonly property var extraCategories: ({
+        PluggedIn: "system", BatteryPercentage: "system", ClipboardText: "system", ClipboardHasImage: "system", ClipboardHasFiles: "system",
         CommandWait: "system", WriteFile: "system", HttpRequest: "system", Notify: "system", Log: "system",
         AskText: "system", AskYesNo: "system", AskChoice: "system", ShowMessage: "system", SendSignal: "control",
         TryCatch: "control", Retry: "control", ThrowError: "control", WithLock: "control", PasteText: "input",
@@ -1615,7 +1659,19 @@ Item {
             { kind: "button", action: "pickRegion", icon: "square-dashed", text: i => i && i.region ? qsTr("region %1").arg(i.region) : qsTr("whole window") },
             { kind: "button", action: "clearRegion", icon: "x", when: i => !!i && !!i.region }
         ];
+        // Blockwork's own features and vocabulary; a neutral blockstitch host has none of these.
+        BlockRegistry.recordingTargets = true;
+        BlockRegistry.registerDescriptors(hostDescriptors);
+        BlockRegistry.registerIcons({
+            WhenRan: "play", WhenBatteryDischargedTo: "battery-warning", WhenBatteryChargedTo: "battery-charging", WhenTime: "clock",
+            WhenPowerPluggedIn: "plug-zap", WhenPowerUnplugged: "unplug", WhenClipboardChanged: "clipboard-check", WhenKey: "keyboard",
+            Text: "text-cursor", Key: "keyboard", Button: "mouse-pointer-click", MoveMouse: "move", Scroll: "mouse", Command: "terminal",
+            OpenApp: "app-window", CloseApp: "square-x", SetClipboard: "clipboard"
+        });
         BlockRegistry.registerOperators({
+            BatteryPercentage: { prefix: qsTr("battery percentage"), result: "number" }, PluggedIn: { prefix: qsTr("plugged in?"), result: "bool" },
+            ClipboardText: { prefix: qsTr("clipboard text"), result: "text" }, ClipboardHasImage: { prefix: qsTr("clipboard has image"), result: "bool" },
+            ClipboardHasFiles: { prefix: qsTr("clipboard has files"), result: "bool" },
             ReadFile: { prefix: qsTr("contents of file"), result: "text" }, FileExists: { prefix: qsTr("file"), suffix: qsTr("exists?"), result: "bool" },
             ListDirectory: { prefix: qsTr("files in folder"), result: "text" }, HttpGet: { prefix: qsTr("fetch"), result: "text" },
             JsonGet: { prefix: qsTr("get"), infix: qsTr("from JSON"), result: "text" },

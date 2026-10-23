@@ -917,6 +917,21 @@
 <context>
     <name>EditorPage</name>
     <message>
+        <location filename="../qml/EditorPage.qml" line="1"/>
+        <source>battery percentage</source>
+        <translation>powder left in the battery</translation>
+    </message>
+    <message>
+        <location filename="../qml/EditorPage.qml" line="1"/>
+        <source>clipboard has image</source>
+        <translation>clipboard has a picture</translation>
+    </message>
+    <message>
+        <location filename="../qml/EditorPage.qml" line="1"/>
+        <source>clipboard has files</source>
+        <translation>clipboard has scrolls</translation>
+    </message>
+    <message>
         <location filename="../qml/EditorPage.qml" line="84"/>
         <source>Stop recording</source>
         <translation>Stop recordin&apos;</translation>
