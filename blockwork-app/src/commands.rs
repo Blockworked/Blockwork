@@ -1029,9 +1029,10 @@ pub(crate) fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto
     let mut found = std::collections::HashSet::new();
     mac.graph.walk_instructions(&mut |ins| {
         let kind = match &ins.kind {
-            InstructionKind::Command(_) | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. } => {
-                Some("commands")
-            }
+            InstructionKind::Command(_)
+            | InstructionKind::CommandWait(_)
+            | InstructionKind::OpenApp { .. }
+            | InstructionKind::CloseApp { .. } => Some("commands"),
             InstructionKind::HttpRequest { .. } => Some("network"),
             InstructionKind::WriteFile { .. } => Some("files_write"),
             InstructionKind::Token(_) => Some("input"),
@@ -1582,7 +1583,7 @@ pub(crate) async fn edit_instruction(
     // `edit_value_field`; every other kind gets its own undo step.
     let session = matches!(
         &ins.kind,
-        InstructionKind::Command(_) | InstructionKind::Comment(_)
+        InstructionKind::Command(_) | InstructionKind::CommandWait(_) | InstructionKind::Comment(_)
     )
     .then(|| EditSession::Instruction {
         strand_id: strand_id.clone(),

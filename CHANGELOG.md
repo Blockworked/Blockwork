@@ -119,8 +119,10 @@ section below as the GitHub release notes, followed by the downloads table.
   - Click the date on a "once at" block to pick the day from a calendar, with the time beside it. It's still saved as 2026-12-24 18:00, and the slot still takes a reporter.
   - Settings > General > Time format: 12-hour (with AM/PM), 24-hour, or the system's default, for times in blocks and the pickers.
 - Recording settings > Countdown: how long Record waits before it starts, from off to 10 seconds (3 by default).
+- "Run command and wait" block: runs a shell command and waits for it to finish before moving on.
 
 ### Changed
+- "Run command" starts its command and moves straight on down the strand instead of waiting for it to finish. Run command blocks in saved macros and block packs become "run command and wait" blocks when loaded, so they keep waiting (the original file is kept as a backup).
 - Macro files now carry a format version and are upgraded step by step when
   loaded. Blocks a version can't run become notes on the canvas instead of
   making the whole macro fail to load, and an upgraded file's original is

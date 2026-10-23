@@ -409,6 +409,10 @@ pub(crate) enum InstructionDto {
         id: String,
         command: String,
     },
+    CommandWait {
+        id: String,
+        command: String,
+    },
     Comment {
         id: String,
         comment: String,
@@ -915,6 +919,10 @@ pub(crate) fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             id,
             command: cmd.clone(),
         },
+        InstructionKind::CommandWait(cmd) => InstructionDto::CommandWait {
+            id,
+            command: cmd.clone(),
+        },
         InstructionKind::Comment(c) => InstructionDto::Comment {
             id,
             comment: c.clone(),
@@ -1339,6 +1347,7 @@ pub(crate) fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
             InstructionKind::Token(InputToken::Scroll(amount.clone(), str_to_axis(axis))),
         ),
         InstructionDto::Command { id, command } => (id, InstructionKind::Command(command.clone())),
+        InstructionDto::CommandWait { id, command } => (id, InstructionKind::CommandWait(command.clone())),
         InstructionDto::Comment { id, comment } => (id, InstructionKind::Comment(comment.clone())),
         InstructionDto::WhenRan { id } => (id, InstructionKind::WhenRan),
         InstructionDto::WhenBatteryDischargedTo { id, threshold } => (

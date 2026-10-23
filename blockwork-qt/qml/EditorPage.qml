@@ -26,7 +26,7 @@ Item {
     property bool sidebarToggling: false
     readonly property real minSidebarWidth: 180
     readonly property real maxSidebarWidth: 600
-    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "WhenTyped", "WhenApp", "WhenIdle", "WhenScreenLock", "WhenCron", "WhenNetwork", "WhenUsb", "WhenMouseButton", "WhenAt", "WhenSignal", "WhenWebhook", "Wait", "Text", "PasteText", "Key", "Button", "MoveMouse", "Scroll", "Command", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile", "HttpRequest", "Notify", "AskText", "AskYesNo", "AskChoice", "ShowMessage", "Log", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry", "ThrowError", "StopMacro", "WithLock", "SendSignal", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal", "WaitUntil", "FindImage", "ClickImage", "WaitForImage", "DetectObjectsInWindow", "WaitForDetection", "AimStep", "AimAtDetection"]
+    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "WhenTyped", "WhenApp", "WhenIdle", "WhenScreenLock", "WhenCron", "WhenNetwork", "WhenUsb", "WhenMouseButton", "WhenAt", "WhenSignal", "WhenWebhook", "Wait", "Text", "PasteText", "Key", "Button", "MoveMouse", "Scroll", "Command", "CommandWait", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile", "HttpRequest", "Notify", "AskText", "AskYesNo", "AskChoice", "ShowMessage", "Log", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry", "ThrowError", "StopMacro", "WithLock", "SendSignal", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal", "WaitUntil", "FindImage", "ClickImage", "WaitForImage", "DetectObjectsInWindow", "WaitForDetection", "AimStep", "AimAtDetection"]
     readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList", "SplitIntoList"]
 
     function uuid() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }); }
@@ -47,7 +47,7 @@ Item {
         else if (type === "Button") { i.button = "Left"; i.direction = "Click"; }
         else if (type === "MoveMouse") { i.x = numberValue(0); i.y = numberValue(0); i.coordinate = "Relative"; }
         else if (type === "Scroll") { i.amount = numberValue(4); i.axis = "Vertical"; }
-        else if (type === "Command") i.command = "";
+        else if (type === "Command" || type === "CommandWait") i.command = "";
         else if (type === "OpenApp" || type === "CloseApp") { i.command = ""; i.name = ""; i.icon = null; }
         else if (type === "SetClipboard") i.value = textValue("text");
         else if (type === "AddToList") { i.name = firstListName(); i.value = textValue("thing"); }
@@ -114,7 +114,8 @@ Item {
             Button:qsTr("Presses, releases or clicks a mouse button where the pointer is now. Pair it with a move mouse block to click somewhere specific."),
             MoveMouse:qsTr("Moves the mouse pointer. Absolute goes to that screen position; relative moves it by that many pixels from where it is. Use the screen picker to find coordinates."),
             Scroll:qsTr("Turns the mouse wheel by this many notches. Positive scrolls up (or right), negative down (or left)."),
-            Command:qsTr("Runs a shell command (bash) and waits for it to finish. Its output is thrown away; use the shell output reporter to read what it prints."),
+            Command:qsTr("Starts a shell command (bash) and moves on straight away, while the command keeps running. Use 'run command and wait' to wait for it to finish."),
+            CommandWait:qsTr("Runs a shell command (bash) and waits for it to finish before moving on. Its output is thrown away; use the shell output reporter to read what it prints."),
             OpenApp:qsTr("Launches an installed app. Click it to choose the app."),
             CloseApp:qsTr("Closes a running app. Click it to choose the app."),
             SetVariable:qsTr("Sets a variable to a value, replacing what it held. Variables belong to this run of the macro and start at 0."),
@@ -1561,7 +1562,7 @@ Item {
         ["DatePart", "number", 2, [textValue("day"), { kind: "Op", op: "Timestamp", args: [], saved: numberValue(0) }]]
     ]
     readonly property var extraCategories: ({
-        WriteFile: "system", HttpRequest: "system", Notify: "system", Log: "system",
+        CommandWait: "system", WriteFile: "system", HttpRequest: "system", Notify: "system", Log: "system",
         AskText: "system", AskYesNo: "system", AskChoice: "system", ShowMessage: "system", SendSignal: "control",
         TryCatch: "control", Retry: "control", ThrowError: "control", WithLock: "control", PasteText: "input",
         AppRunning: "system", IdleSeconds: "system", ScreenLocked: "system", NetworkConnected: "system", UsbConnected: "system", Secret: "data",
@@ -1739,6 +1740,7 @@ Item {
             SplitIntoList: { icon: "scissors", head: [label(qsTr("split")), value("SplitText", "text"), label(qsTr("by")), value("SplitSeparator", "separator"),
                 label(qsTr("into")), { kind: "dropdown", key: "name", options: "lists" }] },
             PasteText: { icon: "clipboard-paste", head: [label(qsTr("paste")), value("PasteValue", "text")] },
+            CommandWait: { icon: "terminal", head: [label(qsTr("Run command")), { kind: "text", key: "command", placeholder: qsTr("command") }, label(qsTr("and wait"))] },
             WithLock: { icon: "lock", mouths: ["body"], head: [label(qsTr("with lock")), value("LockName", "name")] },
             WriteFile: { icon: "file-text", head: [
                 { kind: "dropdown", key: "append", options: [{ value: "write", label: qsTr("write") }, { value: "append", label: qsTr("append") }],

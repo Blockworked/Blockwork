@@ -354,10 +354,22 @@ fn signal_bodies(ctx: &mut ExecCtx, name: &str, depth: u32) -> Vec<Vec<Instructi
         .collect()
 }
 
+/// `bash -c command`, for the run command blocks.
+fn shell_process(command: &str) -> Command {
+    let mut process = Command::new("bash");
+    #[cfg(windows)]
+    process.creation_flags(CREATE_NO_WINDOW);
+    process.args(["-c", command]);
+    process
+}
+
 /// The abilities a block needs permission for.
 fn guarded_abilities(kind: &InstructionKind) -> &'static [&'static str] {
     match kind {
-        InstructionKind::Command(_) | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. } => &["commands"],
+        InstructionKind::Command(_)
+        | InstructionKind::CommandWait(_)
+        | InstructionKind::OpenApp { .. }
+        | InstructionKind::CloseApp { .. } => &["commands"],
         InstructionKind::HttpRequest { .. } => &["network"],
         InstructionKind::WriteFile { .. } => &["files_write"],
         InstructionKind::FindImage { .. } | InstructionKind::WaitForImage { .. } => &["screen"],
@@ -1754,11 +1766,18 @@ fn run_block(
                 }
             }
             InstructionKind::Command(command) => {
+                println!("Starting command: {command}");
+                match shell_process(command).spawn() {
+                    // Reap it when it exits so it doesn't linger as a zombie.
+                    Ok(mut child) => {
+                        std::thread::spawn(move || child.wait());
+                    }
+                    Err(e) => soft_fail(ctx, &ins.id, "Command", e)?,
+                }
+            }
+            InstructionKind::CommandWait(command) => {
                 println!("Running command: {command}");
-                let mut process = Command::new("bash");
-                #[cfg(windows)]
-                process.creation_flags(CREATE_NO_WINDOW);
-                if let Err(e) = process.args(["-c", command]).status() {
+                if let Err(e) = shell_process(command).status() {
                     soft_fail(ctx, &ins.id, "Command", e)?;
                 }
             }
@@ -3492,6 +3511,27 @@ mod tests {
         crate::globals::remove(name);
     }
 
+    #[cfg(unix)]
+    #[test]
+    fn run_command_moves_on_and_run_command_and_wait_waits() {
+        let dir = std::env::temp_dir().join(format!("bw-command-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let run = |kind: InstructionKind| {
+            Macro::new("Commands".into(), String::new(), vec![Instruction::new(kind)]).run(noop_emulator(), None, 1.0, empty_vars());
+        };
+        let (started, waited) = (dir.join("started"), dir.join("waited"));
+        run(InstructionKind::Command(format!("sleep 1; touch '{}'", started.display())));
+        assert!(!started.exists(), "run command didn't wait");
+        run(InstructionKind::CommandWait(format!("sleep 1; touch '{}'", waited.display())));
+        assert!(waited.exists(), "run command and wait waited");
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !started.exists() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(50));
+        }
+        assert!(started.exists(), "the started command still ran");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
     #[test]
     fn restricted_macros_skip_blocks_they_may_not_run() {
         install_test_dialogs();
@@ -3500,7 +3540,7 @@ mod tests {
             "Restricted".into(),
             String::new(),
             vec![
-                Instruction::new(InstructionKind::Command(format!("touch '{}'", marker.display()))),
+                Instruction::new(InstructionKind::CommandWait(format!("touch '{}'", marker.display()))),
                 set("after", Value::number(1.0)),
             ],
         );

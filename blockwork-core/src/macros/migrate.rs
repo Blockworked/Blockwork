@@ -5,11 +5,12 @@
 use crate::macros::{Instruction, Macro};
 use serde_json::{json, Map, Value};
 
-/// The version this build writes; 1 is the format 0.6.0 shipped. Bump it
+/// The version this build writes; 1 is the format 0.6.0 first had, 2 split
+/// run command into one that waits and one that doesn't. Bump it
 /// with a new step in [`STEPS`] (a no-op one when old files load as they are)
 /// whenever a release adds block kinds or changes their fields, so an older
 /// Blockwork says the file is too new instead of turning blocks into notes.
-pub const FORMAT_VERSION: u64 = 1;
+pub const FORMAT_VERSION: u64 = 2;
 const VERSION_KEY: &str = "format_version";
 
 /// What loading had to change.
@@ -31,7 +32,7 @@ impl Upgrade {
 type Step = fn(&mut Value, &mut Vec<String>);
 
 /// `STEPS[n]` upgrades version `n` to `n + 1`.
-const STEPS: [Step; FORMAT_VERSION as usize] = [v0_old_window_blocks];
+const STEPS: [Step; FORMAT_VERSION as usize] = [v0_old_window_blocks, v1_run_command_waits];
 
 pub fn parse(text: &str) -> Result<(Macro, Upgrade), String> {
     from_value(serde_json::from_str(text).map_err(|e| format!("not a macro file: {e}"))?)
@@ -200,6 +201,24 @@ fn v0_old_window_blocks(value: &mut Value, notes: &mut Vec<String>) {
     }
 }
 
+/// Run command always waited for its command; now it starts it and moves on,
+/// and "run command and wait" waits. Old blocks keep waiting.
+fn v1_run_command_waits(value: &mut Value, notes: &mut Vec<String>) {
+    let mut converted = 0;
+    walk_objects(value, &mut |obj| {
+        if obj.len() == 1 && obj.get("Command").is_some_and(Value::is_string) {
+            if let Some(command) = obj.remove("Command") {
+                obj.insert("CommandWait".into(), command);
+                converted += 1;
+            }
+        }
+    });
+    if converted > 0 {
+        let blocks = if converted == 1 { "run command block is now a \"run command and wait\" block" } else { "run command blocks are now \"run command and wait\" blocks" };
+        notes.push(format!("{converted} {blocks}, so they still wait for their command to finish"));
+    }
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -244,6 +263,31 @@ mod tests {
         assert!(matches!(&kinds[2], InstructionKind::MoveWindow { by, resize: false, pattern, .. }
             if by == "Title" && pattern.eval_text().unwrap() == "Notes"));
         assert!(matches!(&kinds[3], InstructionKind::WaitUntil { .. }));
+    }
+
+    #[test]
+    fn old_run_commands_keep_waiting() {
+        let (mac, upgrade) = parse(
+            r#"{"format_version":1,"id":"m","name":"Old","description":"","strands":[{"id":"s","x":0,"y":0,"instructions":[
+                {"id":"a","kind":"WhenRan"},
+                {"id":"b","kind":{"Command":"make"}},
+                {"id":"c","kind":{"Repeat":{"count":{"kind":"Number","value":2.0},"body":[{"id":"d","kind":{"Command":"sleep 1"}}]}}}
+            ]}]}"#,
+        )
+        .unwrap();
+        assert_eq!(upgrade.notes.len(), 1, "{:?}", upgrade.notes);
+        assert!(upgrade.notes[0].starts_with("2 run command blocks"));
+        let kinds = first_strand(&mac);
+        assert_eq!(kinds[1], InstructionKind::CommandWait("make".into()));
+        let InstructionKind::Repeat { body, .. } = &kinds[2] else { panic!("{kinds:?}") };
+        assert_eq!(body[0].kind, InstructionKind::CommandWait("sleep 1".into()));
+        // Current files keep both kinds as they are.
+        let (back, upgrade) = from_value(to_value(&mac).unwrap()).unwrap();
+        assert_eq!(back, mac);
+        assert!(!upgrade.changed());
+        let mac = Macro::new("New".into(), String::new(), vec![Instruction::new(InstructionKind::Command("make".into()))]);
+        let (back, _) = from_value(to_value(&mac).unwrap()).unwrap();
+        assert_eq!(back, mac);
     }
 
     #[test]

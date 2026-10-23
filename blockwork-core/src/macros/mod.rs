@@ -181,6 +181,7 @@ impl BlockKind for InstructionKind {
                 f(value, InputValueType::Any);
             }
             InstructionKind::Command(_)
+            | InstructionKind::CommandWait(_)
             | InstructionKind::Comment(_)
             | InstructionKind::WhenRan
             | InstructionKind::BlockHeader(_)
@@ -375,7 +376,11 @@ impl From<Value> for SignalName {
 pub enum InstructionKind {
     Token(InputToken),
     Wait(Value),
+    /// Starts a shell command and moves on without waiting for it. Files
+    /// before format version 2 meant `CommandWait` by it (see `migrate`).
     Command(String),
+    /// Runs a shell command and waits for it to finish.
+    CommandWait(String),
     Comment(String),
     /// Marks a strand as an entry point (always at index 0): it runs as its
     /// own concurrent thread when the macro runs. A macro can have several.
@@ -810,6 +815,10 @@ impl std::hash::Hash for InstructionKind {
                 2u8.hash(state);
                 s.hash(state);
             }
+            Self::CommandWait(s) => {
+                77u8.hash(state);
+                s.hash(state);
+            }
             Self::Comment(s) => {
                 3u8.hash(state);
                 s.hash(state);
@@ -1211,6 +1220,7 @@ enum InstructionKindDe {
     Token(InputToken),
     Wait(WaitDe),
     Command(String),
+    CommandWait(String),
     Comment(String),
     WhenRan,
     WhenBatteryDischargedTo(Value),
@@ -1537,6 +1547,7 @@ impl From<InstructionKindDe> for InstructionKind {
             }
             InstructionKindDe::Wait(WaitDe::Current(d)) => InstructionKind::Wait(d),
             InstructionKindDe::Command(s) => InstructionKind::Command(s),
+            InstructionKindDe::CommandWait(s) => InstructionKind::CommandWait(s),
             InstructionKindDe::Comment(s) => InstructionKind::Comment(s),
             InstructionKindDe::WhenRan => InstructionKind::WhenRan,
             InstructionKindDe::WhenBatteryDischargedTo(v) => {
