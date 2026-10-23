@@ -11,7 +11,6 @@ use blockstitch_core::editor::{
     prune_value_buffers, retain_live_buffers,
 };
 use blockstitch_core::graph::{BlockKind, ListItem, resolve_list_reporters};
-use blockstitch_core::value::ext_operator;
 use blockwork_core::block_packs::{self, PackRecord};
 use blockwork_core::frontend::{
     FragmentDto, InstructionDto, InvalidFieldDto, KeyCaptureDto, ListItemDto, dto_to_fragment,
@@ -19,7 +18,7 @@ use blockwork_core::frontend::{
 };
 use blockwork_core::input::key_names::{format_key_combo, match_key};
 use blockwork_core::input::types::{InputToken, MacroKey};
-use blockwork_core::input::value::{Evaluated, Op, Value, has_side_effect_operator};
+use blockwork_core::input::value::{Evaluated, Op, Value, has_side_effect_operator, is_pure_operator};
 use blockwork_core::key_mapping::{web_code_to_macro_key, web_key_to_macro_key};
 use blockwork_core::macros::conditions::{PowerCondition, parse_clock};
 use blockwork_core::macros::{
@@ -754,7 +753,9 @@ fn rename_branch_bodies(mac: &mut Macro, block_id: &str, pieces: &[BlockPiece]) 
 fn needs_app(value: &Value) -> bool {
     match value {
         Value::Op { op, args, .. } => {
-            matches!(op, Op::Ext(name) if ext_operator(name).is_none()) || args.iter().any(needs_app)
+            // Not the registry: a native build with `system` unified in has
+            // the machine's reporters registered too.
+            matches!(op, Op::Ext(name) if !is_pure_operator(name)) || args.iter().any(needs_app)
         }
         Value::Call { args, .. } => args.iter().any(needs_app),
         _ => false,

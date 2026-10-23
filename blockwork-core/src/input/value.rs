@@ -455,6 +455,13 @@ pub fn has_side_effect_operator(value: &Value) -> bool {
     }
 }
 
+/// Whether `name` is one of the pure reporters every build registers, so a
+/// page without the app can evaluate it. True of nothing that reads the
+/// machine, whatever features this build has.
+pub fn is_pure_operator(name: &str) -> bool {
+    TEXT_OPERATORS.iter().any(|o| o.op == name)
+}
+
 /// Teaches `blockstitch` about Blockwork's operators, in palette order.
 /// Idempotent; called from [`crate::init`], which every entry point runs
 /// before touching a macro. Without `system` only the pure ones exist.
