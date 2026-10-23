@@ -37,6 +37,10 @@ impl Tracker {
     /// The strand is now running `block_id`.
     pub(crate) fn at(&self, block_id: &str) {
         let Ok(mut active) = ACTIVE.lock() else { return };
+        self.at_locked(&mut active, block_id);
+    }
+
+    fn at_locked(&self, active: &mut [(u64, ActiveBlock)], block_id: &str) {
         if let Some((_, block)) = active.iter_mut().find(|(k, _)| *k == self.key)
             && block.block_id != block_id
         {
@@ -86,10 +90,19 @@ mod tests {
     fn tracks_blocks_until_the_strand_ends() {
         let tracker = Tracker::new("trace-test").unwrap();
         tracker.at("b1");
-        let before = revision();
-        tracker.at("b1");
-        assert_eq!(revision(), before, "staying on a block isn't a change");
-        tracker.at("b2");
+        {
+            // Other runner tests also bump the revision, so hold the trace lock.
+            let mut active = ACTIVE.lock().unwrap();
+            let before = revision();
+            tracker.at_locked(&mut active, "b1");
+            assert_eq!(revision(), before, "staying on a block isn't a change");
+            tracker.at_locked(&mut active, "b2");
+            assert_eq!(
+                revision(),
+                before.wrapping_add(1),
+                "moving to another block is a change"
+            );
+        }
         let mine = |s: Vec<ActiveBlock>| s.into_iter().filter(|b| b.macro_id == "trace-test").collect::<Vec<_>>();
         assert_eq!(mine(snapshot()), vec![ActiveBlock { macro_id: "trace-test".into(), block_id: "b2".into() }]);
         drop(tracker);

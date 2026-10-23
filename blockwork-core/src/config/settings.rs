@@ -81,6 +81,9 @@ pub struct AppSettings {
     /// the system locale. Saved times are always 24-hour.
     #[serde(default)]
     pub clock_format: Option<String>,
+    /// "light", "dark", or None to follow the system appearance.
+    #[serde(default)]
+    pub color_scheme: Option<String>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {

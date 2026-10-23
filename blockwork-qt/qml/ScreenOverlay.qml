@@ -139,7 +139,7 @@ Item {
                     x: Math.min(parent.width - width - 8, area.mouseX + 18)
                     y: Math.min(parent.height - height - 8, area.mouseY + 18)
                     width: coords.implicitWidth + 14; height: coords.implicitHeight + 8; radius: 5
-                    color: "#e6202124"; border.color: Theme.border
+                    color: Qt.alpha(Theme.window, 0.9); border.color: Theme.border
                     Text {
                         id: coords
                         anchors.centerIn: parent
@@ -154,7 +154,7 @@ Item {
                 Rectangle {
                     anchors.top: parent.top; anchors.topMargin: 16; anchors.horizontalCenter: parent.horizontalCenter
                     width: bar.implicitWidth + 24; height: 46; radius: 10
-                    color: "#f0242527"; border.color: Theme.border
+                    color: Qt.alpha(Theme.panel, 0.94); border.color: Theme.border
                     Row {
                         id: bar
                         anchors.centerIn: parent; spacing: 10

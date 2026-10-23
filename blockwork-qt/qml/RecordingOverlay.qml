@@ -43,7 +43,7 @@ Item {
         width: Math.min(parent.width - 48, 420)
         height: content.implicitHeight + 48
         radius: 12; color: Theme.panel
-        border.color: root.recording ? "#5c2a2c" : Theme.borderSoft
+        border.color: root.recording ? Theme.dangerBorder : Theme.borderSoft
         Behavior on border.color { enabled: Motion.enabled; ColorAnimation { duration: Motion.normal } }
         scale: root.active ? 1 : 0.96
         Behavior on scale { enabled: Motion.enabled; NumberAnimation { duration: Motion.normal; easing.type: Easing.OutCubic } }

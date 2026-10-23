@@ -39,7 +39,8 @@ fn main() {
     // Title-bar, taskbar and dock fallback icon (see src/app_icon.cpp).
     app_icon::apply();
     let mut engine = QQmlApplicationEngine::new();
-    if let Some(engine) = engine.as_mut() {
+    if let Some(mut engine) = engine.as_mut() {
+        application::init_appearance(engine.as_mut().upcast_pin());
         translations::set_engine(engine.upcast_pin());
     }
     translations::set_language(&if prompt { prompt_bridge::language() } else { translations::saved_language() });

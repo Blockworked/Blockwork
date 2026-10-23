@@ -19,8 +19,8 @@ GridLayout {
             Layout.fillWidth: true
             Layout.minimumWidth: 0; Layout.preferredWidth: 1
             Layout.preferredHeight: Math.max(92, cardContent.implicitHeight + 24)
-            radius: 10; color: cardMouse.containsMouse ? "#30343b" : "#2a2b2f"
-            border.color: cardMouse.containsMouse ? Theme.accent : "#3a3b3f"
+            radius: 10; color: cardMouse.containsMouse ? Theme.hover : Theme.field
+            border.color: cardMouse.containsMouse ? Theme.accent : Theme.borderSoft
             Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
             Behavior on border.color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
             RowLayout {
@@ -32,8 +32,8 @@ GridLayout {
                     Layout.preferredHeight: 22; Layout.alignment: Qt.AlignTop
                 }
                 ColumnLayout { Layout.fillWidth: true; Layout.minimumWidth: 0; spacing: 3
-                    Text { Layout.fillWidth: true; Layout.minimumWidth: 0; text: card.modelData.name; color: "#e7e7e8"; font.pixelSize: 14; font.weight: Font.DemiBold; wrapMode: Text.WordWrap }
-                    Text { Layout.fillWidth: true; Layout.minimumWidth: 0; text: card.modelData.description; color: "#9fa0a6"; font.pixelSize: 12; wrapMode: Text.WordWrap }
+                    Text { Layout.fillWidth: true; Layout.minimumWidth: 0; text: card.modelData.name; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold; wrapMode: Text.WordWrap }
+                    Text { Layout.fillWidth: true; Layout.minimumWidth: 0; text: card.modelData.description; color: Theme.textDim; font.pixelSize: 12; wrapMode: Text.WordWrap }
                 }
             }
             MouseArea { id: cardMouse; anchors.fill: parent; hoverEnabled: true; cursorShape: Qt.PointingHandCursor; onClicked: root.picked(card.modelData.id) }

@@ -837,6 +837,10 @@ impl Backend {
                 let language: String = arg(&args, "language")?;
                 to_json(commands::set_language(&self.state, &self.app, language)?)
             }
+            "set_color_scheme" => {
+                let scheme: String = arg(&args, "scheme")?;
+                to_json(commands::set_color_scheme(&self.state, &self.app, scheme)?)
+            }
             "set_clock_format" => {
                 let format: String = arg(&args, "format")?;
                 to_json(commands::set_clock_format(&self.state, &self.app, format)?)

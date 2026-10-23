@@ -24,7 +24,7 @@ Rectangle {
     }
     // The log stays shown while the panel slides shut.
     readonly property bool open: expanded || height > stripHeight + 0.5
-    color: "#242527"; border.color: "#38393d"
+    color: Theme.panel; border.color: Theme.borderSoft
     clip: true
 
     readonly property var mine: entries.filter(e => e.macro_id === macroId)
@@ -107,7 +107,7 @@ Rectangle {
                 anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 8
                 Rectangle {
                     width: 8; height: 8; radius: 4
-                    color: root.running ? Theme.accent : root.latest && root.latest.level === "Error" ? Theme.danger : "#5d5e63"
+                    color: root.running ? Theme.accent : root.latest && root.latest.level === "Error" ? Theme.danger : Theme.textDim
                     SequentialAnimation on opacity {
                         running: root.running && Motion.enabled; loops: Animation.Infinite
                         onRunningChanged: if (!running) parent.opacity = 1
@@ -145,7 +145,7 @@ Rectangle {
                 }
             }
         }
-        Rectangle { visible: root.open; Layout.fillWidth: true; Layout.preferredHeight: 1; color: "#38393d" }
+        Rectangle { visible: root.open; Layout.fillWidth: true; Layout.preferredHeight: 1; color: Theme.borderSoft }
         Item {
             visible: root.open
             Layout.fillWidth: true; Layout.fillHeight: true

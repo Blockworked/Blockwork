@@ -182,6 +182,8 @@ pub(crate) struct StateDto {
     pub(crate) animation_speed: f64,
     /// "12h", "24h", or empty to follow the system locale.
     pub(crate) clock_format: String,
+    /// "light", "dark", or empty to follow the system appearance.
+    pub(crate) color_scheme: String,
 }
 
 /// One macro as the library lists it.
@@ -553,6 +555,7 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         language: crate::ui_language(),
         animation_speed: crate::animation_speed(),
         clock_format: blockwork_core::config::load_settings().clock_format.unwrap_or_default(),
+        color_scheme: blockwork_core::config::load_settings().color_scheme.unwrap_or_default(),
     }
 }
 

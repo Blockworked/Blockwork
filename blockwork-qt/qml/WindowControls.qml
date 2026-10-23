@@ -16,7 +16,7 @@ Row {
         property string label
         signal activated()
         width: 34; height: 34; radius: 8
-        color: hover.hovered ? (close ? "#e5484d" : "#3b3c40") : "transparent"
+        color: hover.hovered ? (close ? "#e5484d" : Theme.hover) : "transparent"
         Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
         HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
         TapHandler { onTapped: control.activated() }

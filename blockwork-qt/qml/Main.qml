@@ -22,7 +22,7 @@ ApplicationWindow {
     readonly property real cornerRadius: customChrome && visibility === Window.Windowed ? 10 : 0
     flags: customChrome ? (Qt.Window | Qt.FramelessWindowHint
         | (Qt.platform.os === "windows" ? Qt.WindowMinMaxButtonsHint | Qt.WindowSystemMenuHint : 0)) : Qt.Window
-    color: customChrome ? "transparent" : "#202124"
+    color: customChrome ? "transparent" : Theme.window
     property real sidebarWidth: 348
     // True while the window is being resized: the rounded-corner mask layer is
     // skipped then, since rendering the whole UI offscreen every frame is slow.
@@ -41,6 +41,7 @@ ApplicationWindow {
     }
 
     property var appState: ({
+        color_scheme: blockworkAppearance,
         macro_names: [], macro_selected: null, current_macro: null, macros_data: [],
         global_speed_multiplier: 1, is_looping: false,
         recording_phase: { phase: "Idle", countdown: null }, recording_countdown_secs: 3, page: "Main",
@@ -59,6 +60,7 @@ ApplicationWindow {
 
     // Every animation's duration scales with the Animation speed setting; 0 turns them off.
     Binding { target: Motion; property: "durationScale"; value: root.appState.animation_speed ?? 1 }
+    Binding { target: Theme; property: "mode"; value: root.appState.color_scheme || "" }
     Binding { target: Schedules; property: "clockFormat"; value: root.appState.clock_format || "" }
 
     function invoke(command, args) {
@@ -152,7 +154,7 @@ ApplicationWindow {
         layer.enabled: root.cornerRadius > 0 && !root.liveResizing
         layer.smooth: true
         layer.effect: MultiEffect { maskEnabled: true; maskSource: frameMask; maskThresholdMin: 0.5; maskSpreadAtMin: 1.0 }
-        Rectangle { anchors.fill: parent; color: "#202124" }
+        Rectangle { anchors.fill: parent; color: Theme.window }
     Item {
         id:contentRoot;anchors.fill:parent;focus:true
         Keys.priority:Keys.BeforeItem
@@ -179,20 +181,20 @@ ApplicationWindow {
     Rectangle {
         visible: !bridge.connected
         anchors.fill: parent
-        color: "#dd202124"
+        color: Qt.alpha(Theme.window, 0.87)
         z: 100
         Column {
             anchors.centerIn: parent; spacing: 12
             BusyIndicator { anchors.horizontalCenter: parent.horizontalCenter; running: bridge.lastError.length === 0 }
-            Text { text: bridge.lastError.length ? bridge.lastError : qsTr("Connecting to Blockwork..."); color: bridge.lastError.length ? "#ff7373" : "#e7e7e8"; font.pixelSize: 16 }
+            Text { text: bridge.lastError.length ? bridge.lastError : qsTr("Connecting to Blockwork..."); color: bridge.lastError.length ? Theme.danger : Theme.text; font.pixelSize: 16 }
         }
     }
 
     Rectangle {
         visible: bridge.lastError.length > 0 && bridge.connected
         anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom
-        height: 38; color: "#4b2225"; z: 110
-        Text { anchors.centerIn: parent; text: bridge.lastError; color: "#ffb5b5"; font.pixelSize: 13 }
+        height: 38; color: Theme.dangerBackground; z: 110
+        Text { anchors.centerIn: parent; text: bridge.lastError; color: Theme.danger; font.pixelSize: 13 }
     }
     }
     Item {
@@ -221,7 +223,7 @@ ApplicationWindow {
     Rectangle {
         visible: root.customChrome && root.visibility !== Window.Maximized
         anchors.fill: parent; anchors.margins: root.shadowMargin
-        color: "transparent"; radius: root.cornerRadius; border.color: "#45474d"; z: 150
+        color: "transparent"; radius: root.cornerRadius; border.color: Theme.border; z: 150
     }
     Repeater {
         model: root.customChrome && root.visibility === Window.Windowed ? [
