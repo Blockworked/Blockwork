@@ -18,9 +18,9 @@ Item {
     ColumnLayout {
         anchors.fill: parent; spacing: 0
         Rectangle {
-            Layout.fillWidth: true; Layout.preferredHeight: 56; color: "#292a2d"; border.color: "#3a3b3f"
+            Layout.fillWidth: true; Layout.preferredHeight: 52; color: "#292a2d"; border.color: "#3a3b3f"
             TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
-            RowLayout { anchors.fill: parent; anchors.margins: 14
+            RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12
                 Image {
                     visible: Qt.platform.os !== "osx"
                     source: "qrc:/icons/blockwork.png"; sourceSize: Qt.size(40, 40)
