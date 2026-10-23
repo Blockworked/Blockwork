@@ -1,0 +1,38 @@
+{
+  "uri": "com.blockworked.Blockwork",
+  "version": "1.0",
+  "qt_modules": ["Qml", "Quick", "QuickControls2", "QuickDialogs2"],
+  "singletons": ["Schedules.qml"],
+  "editor": [
+    "EditorPage.qml",
+    "WheelPan.qml",
+    "MakeBlockDialog.qml",
+    "AppSelectorDialog.qml",
+    "ActivityPanel.qml",
+    "RecordingOverlay.qml",
+    "TemplateList.qml",
+    "LibraryPanel.qml",
+    "AppDialog.qml",
+    "GlobalPicker.qml",
+    "NamePicker.qml",
+    "SchedulePicker.qml",
+    "Schedules.qml"
+  ],
+  "host_provided": ["TitleBarDrag.qml", "WindowControls.qml", "ScreenOverlay.qml"],
+  "desktop": [
+    "Main.qml",
+    "SettingsPage.qml",
+    "OnboardingPage.qml",
+    "SectionCard.qml",
+    "MacroFiles.qml",
+    "PromptWindow.qml",
+    "BlockLibrary.qml"
+  ],
+  "style_modules": {
+    "BlockworkStyle": ["qmldir", "TextField.qml", "TextArea.qml", "TextEditingMenu.qml"]
+  },
+  "editor_resources": {
+    "/icons": ["../../res/icons/blockwork.png"]
+  },
+  "lucide": { "files": ["Icons.qml", "LucideIcon.qml"], "singletons": ["Icons.qml"] }
+}
