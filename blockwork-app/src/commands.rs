@@ -6,7 +6,8 @@ use crate::state::{
     emit_state_updated,
 };
 use blockstitch_core::editor::{
-    ValueEdit, drop_strand_buffers, prune_value_buffers, retain_live_buffers,
+    EditCommand, EditContext, EditError, EditOutcome, NumberSpelling, ValueDestination,
+    apply_buffer_effects, drop_strand_buffers, prune_value_buffers, retain_live_buffers,
 };
 use blockwork_core::config;
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
@@ -45,6 +46,36 @@ fn push_undo_for(s: &mut AppState, session: Option<EditSession>) {
         (Some(snapshot), None) => s.history.push(snapshot),
         (None, _) => s.history.end_session(),
     }
+}
+
+/// Blockwork keeps "09" typed into an operator argument as text.
+const EDIT_CONTEXT: EditContext = EditContext {
+    numbers: NumberSpelling::KeepTypedInOperands,
+};
+
+/// Runs one typed edit on the open macro: a rejected or no-op edit costs no
+/// undo step and no save; buffers follow the outcome either way.
+fn run_edit(
+    s: &mut AppState,
+    command: EditCommand<InstructionKind>,
+) -> Result<EditOutcome, EditError> {
+    let mac = s
+        .current_macro
+        .as_ref()
+        .ok_or(EditError::Missing("No macro selected"))?;
+    let prepared = mac.prepare_edit(command, &EDIT_CONTEXT)?;
+    if prepared.changes() {
+        push_undo_for(s, prepared.coalesce().cloned());
+    }
+    let outcome = match &mut s.current_macro {
+        Some(mac) => mac.commit_edit(prepared),
+        None => EditOutcome::default(),
+    };
+    apply_buffer_effects(&mut s.invalid_field_buffers, &outcome.buffers);
+    if outcome.changed {
+        auto_save(s);
+    }
+    Ok(outcome)
 }
 
 /// Max wait for the libei permission prompt; a portal that never replies
@@ -827,11 +858,7 @@ pub(crate) fn create_block(
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let (x, y) = mac.next_editor_position();
     let id = mac.create_block(pieces, shape, color, x, y);
-    mac.set_block_icon(&id, &icon)?;
-    if let Some(def) = mac.graph.block_def_mut(&id) {
-        def.identifier = identifier.trim().to_string();
-        def.description = description.trim().to_string();
-    }
+    mac.set_block_details(&id, &identifier, &description, &icon)?;
     auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(id)
@@ -887,11 +914,7 @@ pub(crate) fn edit_block(
     s.current_macro
         .as_mut()
         .ok_or("No macro selected")?
-        .set_block_icon(&block_id, &icon)?;
-    if let Some(def) = s.current_macro.as_mut().and_then(|mac| mac.graph.block_def_mut(&block_id)) {
-        def.identifier = identifier.trim().to_string();
-        def.description = description.trim().to_string();
-    }
+        .set_block_details(&block_id, &identifier, &description, &icon)?;
     auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
@@ -1606,34 +1629,9 @@ pub(crate) fn edit_value_field(
     text: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    // Coalesce a run of keystrokes into this field into a single undo step.
-    push_undo_for(&mut s, Some(EditSession::Value(location.clone())));
-    if let Some(mac) = &mut s.current_macro {
-        match mac.edit_value_text(&location, text.clone()) {
-            // Text leaves are always valid - no invalid-buffer bookkeeping needed.
-            ValueEdit::Text => auto_save(&mut s),
-            // A numeric field keeps the raw text either way, so a
-            // half-written number doesn't snap back mid-edit.
-            ValueEdit::Number { parsed } => {
-                // Keep what was typed ("09", "1.50") in an operator argument
-                // as text; a numeric leaf would reformat it. Text still
-                // coerces to a number when evaluated.
-                if parsed && !location.path().is_empty() {
-                    let typed = text.trim();
-                    if let Some(node) = mac.value_at_mut(&location)
-                        && matches!(node, Value::Number { value } if value.to_string() != typed)
-                    {
-                        *node = Value::text(typed);
-                    }
-                }
-                s.invalid_field_buffers.insert(location, text);
-                if parsed {
-                    auto_save(&mut s);
-                }
-            }
-            ValueEdit::Missing => {}
-        }
-    }
+    // A run of keystrokes into one field coalesces into one undo step; a
+    // location that no longer resolves is quietly ignored, as before.
+    let _ = run_edit(&mut s, EditCommand::EditFieldText { location, text });
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -1714,33 +1712,17 @@ pub(crate) fn move_value(
     origin_block_id: Option<String>,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let Some(mut graph) = s.current_macro.as_ref().map(|mac| mac.graph.clone()) else {
-        emit_state_updated(&app, &s);
-        return Err("No macro selected".into());
+    let to = match to {
+        Some(to) => ValueDestination::Slot(to),
+        None => ValueDestination::Canvas {
+            x,
+            y,
+            origin_block_id,
+        },
     };
-    let Some(value) = graph.take_value(&from) else {
-        emit_state_updated(&app, &s);
-        return Err("Nothing to take at that location".into());
-    };
-    match &to {
-        Some(to) => {
-            graph.put_value(to, value);
-        }
-        None => {
-            graph.add_floating_value(x, y, value, origin_block_id);
-        }
-    }
-    push_undo(&mut s);
-    if let Some(mac) = &mut s.current_macro {
-        mac.graph = graph;
-    }
-    prune_value_buffers(&mut s.invalid_field_buffers, &from);
-    if let Some(to) = &to {
-        prune_value_buffers(&mut s.invalid_field_buffers, to);
-    }
-    auto_save(&mut s);
+    let result = run_edit(&mut s, EditCommand::MoveValue { from, to });
     emit_state_updated(&app, &s);
-    Ok(())
+    result.map(|_| ()).map_err(String::from)
 }
 
 /// One-shot sample evaluation of a value tree, for the click-to-preview
@@ -1978,30 +1960,16 @@ pub(crate) fn remove_instruction(
     count: usize,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    // Work on a copy: a path addressing nothing costs no undo step.
-    let mut graph = match &s.current_macro {
-        Some(mac) => mac.graph.clone(),
-        None => {
-            emit_state_updated(&app, &s);
-            return Ok(());
-        }
-    };
-    // `count` removes a whole tail as one edit (one undo step, one state update).
-    let mut removed = false;
-    for _ in 0..count.max(1) {
-        if !graph.remove_instruction(&strand_id, &path) {
-            break;
-        }
-        removed = true;
-    }
-    if removed {
-        push_undo(&mut s);
-        if let Some(mac) = &mut s.current_macro {
-            mac.graph = graph;
-        }
-        s.invalid_field_buffers.clear();
-        auto_save(&mut s);
-    }
+    // `count` removes a whole tail as one edit. A path addressing nothing
+    // costs no undo step and isn't an error.
+    let _ = run_edit(
+        &mut s,
+        EditCommand::RemoveInstructions {
+            strand_id,
+            path,
+            count,
+        },
+    );
     emit_state_updated(&app, &s);
     Ok(())
 }
@@ -4226,6 +4194,83 @@ mod value_location_tests {
         };
         apply_value_kind(&mut node, "Number", &HashMap::new()).unwrap();
         assert_eq!(node, Value::number(0.0));
+    }
+
+    fn wait_field(path: Vec<u8>) -> ValueLocation {
+        ValueLocation::Field {
+            strand_id: "s1".into(),
+            index: top(1),
+            field_id: FieldId::WaitDuration.to_string(),
+            path,
+        }
+    }
+
+    #[test]
+    fn typed_spelling_survives_in_an_operand_through_the_shared_edit() {
+        let mut mac = test_macro();
+        mac.put_value(&wait_field(vec![]), Value::Op {
+            op: Op::Add,
+            args: vec![Value::number(1.0), Value::number(2.0)],
+            saved: Box::new(Value::number(0.0)),
+        });
+        for (path, text, stored) in [
+            (vec![0], "09", Value::text("09")),
+            (vec![1], "1.50", Value::text("1.50")),
+        ] {
+            let outcome = mac
+                .apply_edit(
+                    EditCommand::EditFieldText { location: wait_field(path.clone()), text: text.into() },
+                    &EDIT_CONTEXT,
+                )
+                .unwrap();
+            assert!(outcome.changed);
+            assert_eq!(mac.value_at(&wait_field(path)), Some(stored));
+        }
+    }
+
+    #[test]
+    fn a_shared_move_matches_the_old_take_then_put() {
+        let floating = ValueLocation::Floating { floating_id: "f1".into(), path: vec![] };
+        let mut old = test_macro();
+        let mut new = old.clone();
+        let value = old.take_value(&floating).unwrap();
+        old.put_value(&wait_field(vec![]), value);
+
+        new.apply_edit(
+            EditCommand::MoveValue { from: floating, to: ValueDestination::Slot(wait_field(vec![])) },
+            &EDIT_CONTEXT,
+        )
+        .unwrap();
+        assert_eq!(
+            serde_json::to_value(&new.graph).unwrap(),
+            serde_json::to_value(&old.graph).unwrap()
+        );
+    }
+
+    #[test]
+    fn a_rejected_move_leaves_the_macro_alone() {
+        let mut mac = test_macro();
+        let before = serde_json::to_value(&mac.graph).unwrap();
+        let missing = ValueLocation::Floating { floating_id: "nope".into(), path: vec![] };
+        let result = mac.apply_edit(
+            EditCommand::MoveValue { from: missing, to: ValueDestination::Slot(wait_field(vec![])) },
+            &EDIT_CONTEXT,
+        );
+        assert_eq!(String::from(result.unwrap_err()), "Nothing to take at that location");
+        assert_eq!(serde_json::to_value(&mac.graph).unwrap(), before);
+    }
+
+    #[test]
+    fn delete_tail_is_one_edit() {
+        let mut mac = test_macro();
+        let outcome = mac
+            .apply_edit(
+                EditCommand::RemoveInstructions { strand_id: "s1".into(), path: top(0), count: 2 },
+                &EDIT_CONTEXT,
+            )
+            .unwrap();
+        assert!(outcome.changed);
+        assert!(mac.strand("s1").unwrap().instructions.is_empty());
     }
 }
 
