@@ -18,9 +18,11 @@ use blockwork_core::macros::runner::VariableStore;
 use blockstitch_core::graph::{ListItem, ListStore, resolve_list_reporters};
 use blockwork_core::macros::{
     BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro,
-    SPEED_MULTIPLIER_RANGE, Strand, loop_control,
+    SPEED_MULTIPLIER_RANGE, loop_control,
     normalize_block_color as normalize_persisted_block_color,
 };
+#[cfg(test)]
+use blockwork_core::macros::Strand;
 use blockwork_core::recording;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;

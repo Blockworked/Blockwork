@@ -15,7 +15,7 @@ default = ["system", "ipc", "updater", "onnx", "gpu"]
 # which is what the website's in-browser editor (blockwork-web) links.
 system = [
     "dep:dirs", "dep:tokio", "dep:spin_sleep", "dep:bincode", "dep:starship-battery", "dep:arboard",
-    "dep:ureq", "dep:png", "dep:base64", "dep:regex", "dep:libc",
+    "dep:ureq", "dep:png", "dep:base64", "dep:libc",
     "dep:evdev", "dep:x11rb", "dep:enigo", "dep:wayland-client", "dep:wayland-protocols", "dep:zbus",
     "dep:windows-sys", "dep:core-graphics", "dep:core-foundation", "dep:foreign-types", "dep:security-framework",
 ]
@@ -52,7 +52,7 @@ ureq = { workspace = true, optional = true }
 png = { version = "0.18", optional = true }
 base64 = { workspace = true, optional = true }
 # Regex text operators.
-regex = { workspace = true, optional = true }
+regex.workspace = true
 tract-onnx = { version = "0.23.9", optional = true }
 # Pins downloaded model files.
 sha2 = "0.10.9"

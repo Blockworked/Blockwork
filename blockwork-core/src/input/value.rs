@@ -315,6 +315,11 @@ static OPERATORS: &[ExtOperator] = &[
             Ok(Evaluated::Text(crate::secrets::get(&args[0].as_text())?))
         },
     },
+];
+
+/// Pure text and date reporters: no machine state, so the website's
+/// editor (built without `system`) registers them too.
+static TEXT_OPERATORS: &[ExtOperator] = &[
     ExtOperator {
         kind: "TextCheck",
         op: "TextCheck",
@@ -412,6 +417,10 @@ static OPERATORS: &[ExtOperator] = &[
         default_args: || vec![Value::text("day"), Value::op(Op::from_name("Timestamp"), vec![])],
         eval: |args| Ok(Evaluated::Number(crate::text::date_part(args[1].as_number()?, &args[0].as_text())?)),
     },
+];
+
+#[cfg(feature = "system")]
+static LATE_OPERATORS: &[ExtOperator] = &[
     ExtOperator {
         kind: "LastError",
         op: "LastError",
@@ -421,7 +430,6 @@ static OPERATORS: &[ExtOperator] = &[
     },
 ];
 
-#[cfg(feature = "system")]
 fn numbers(values: &[f64]) -> Vec<Value> {
     values.iter().map(|&v| Value::number(v)).collect()
 }
@@ -447,14 +455,18 @@ pub fn has_side_effect_operator(value: &Value) -> bool {
     }
 }
 
-/// Teaches `blockstitch` about [`OPERATORS`]. Idempotent; called from
-/// [`crate::init`], which every entry point runs before touching a macro.
-#[cfg(feature = "system")]
+/// Teaches `blockstitch` about Blockwork's operators, in palette order.
+/// Idempotent; called from [`crate::init`], which every entry point runs
+/// before touching a macro. Without `system` only the pure ones exist.
 pub fn register_blockwork_operators() {
+    #[cfg(feature = "system")]
     register_operators(OPERATORS);
+    register_operators(TEXT_OPERATORS);
+    #[cfg(feature = "system")]
+    register_operators(LATE_OPERATORS);
 }
 
-#[cfg(all(test, feature = "system"))]
+#[cfg(test)]
 mod tests {
     use super::*;
 
@@ -472,6 +484,7 @@ mod tests {
         assert!(matches!(year, Ok(Evaluated::Number(y)) if y >= 2026.0));
     }
 
+    #[cfg(feature = "system")]
     #[test]
     fn detection_reporter_reads_list_items() {
         register_blockwork_operators();
@@ -482,6 +495,7 @@ mod tests {
         assert!(op("x", "").is_err(), "an empty item (list index out of range) is an error");
     }
 
+    #[cfg(feature = "system")]
     #[test]
     fn battery_operators_evaluate_once_registered() {
         register_blockwork_operators();

@@ -1,0 +1,19 @@
+[package]
+name = "blockwork-web"
+version.workspace = true
+edition.workspace = true
+
+# The website's in-browser editor: the headless vocabulary behind the shared
+# C ABI. Built for wasm32-unknown-emscripten with `--profile web` and linked
+# into the Qt for WebAssembly page as a static library.
+[lib]
+name = "blockwork_web"
+crate-type = ["staticlib", "rlib"]
+
+[dependencies]
+blockwork-core = { path = "../blockwork-core", default-features = false }
+blockstitch-core.workspace = true
+blockstitch-ffi.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+uuid.workspace = true

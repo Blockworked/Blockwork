@@ -7,6 +7,7 @@ members = [
     "blockwork-ffi",
     "blockwork-linux-bridge",
     "blockwork-protocol",
+    "blockwork-web",
 ]
 resolver = "2"
 
@@ -21,6 +22,7 @@ edition = "2024"
 
 [workspace.dependencies]
 blockstitch-qml = { git = "https://github.com/Blockworked/blockstitch", rev = "1ef88917faf9d3163c3df21844be1325ac4e2996" }
+blockstitch-ffi = { git = "https://github.com/Blockworked/blockstitch", rev = "1ef88917faf9d3163c3df21844be1325ac4e2996" }
 blockstitch-core = {
     git = "https://github.com/Blockworked/blockstitch",
     rev = "1ef88917faf9d3163c3df21844be1325ac4e2996",
@@ -81,3 +83,12 @@ ureq = { version = "3.4", default-features = false, features = ["rustls", "gzip"
 regex = "1.13"
 security-framework = { version = "3.7", default-features = false }
 zbus = { version = "5.19", default-features = false, features = ["blocking-api", "async-io"] }
+
+# The website's wasm editor (blockwork-web). Qt for WebAssembly uses JS
+# exceptions and Rust's emscripten std uses wasm ones, so it can't unwind.
+[profile.web]
+inherits = "release"
+panic = "abort"
+opt-level = "z"
+lto = true
+codegen-units = 1

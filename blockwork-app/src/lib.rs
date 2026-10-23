@@ -25,6 +25,8 @@ pub(crate) mod block_library;
 pub(crate) mod templates;
 pub(crate) mod time_watch;
 pub(crate) mod webhook;
+#[cfg(test)]
+mod web_parity;
 
 /// For the daemon, which draws macro dialogs.
 pub use blockwork_core::prompt;
@@ -132,6 +134,68 @@ pub struct Backend {
     app: AppHandle,
 }
 
+/// The editor's state before any macro loads, from saved settings. The
+/// emulator and session facts come in so tests can build one without a
+/// desktop.
+fn initial_state(
+    settings: &config::AppSettings,
+    emulator: Option<Arc<Mutex<dyn blockwork_core::macros::backend::InputBackend>>>,
+    absolute_mouse_position_available: bool,
+    wayland_session: bool,
+) -> AppState {
+    AppState {
+        macro_selected: None,
+        current_macro: None,
+        macros_list: vec![],
+        macro_strs: vec![],
+        emulator,
+        variable_values: Arc::new(Mutex::new(HashMap::new())),
+        list_values: Arc::new(Mutex::new(HashMap::new())),
+        thread_pool: ThreadPool::new(),
+        is_looping: Arc::new(Mutex::new(false)),
+        global_speed_multiplier: settings.global_speed_multiplier.unwrap_or(1.0),
+        ipc_server: None,
+        ipc_shutdown_tx: None,
+        ipc_active_port: None,
+        ipc_auto_start: settings.ipc_auto_start.unwrap_or(false),
+        close_to_tray: settings.close_to_tray.unwrap_or(false),
+        start_at_startup: settings.start_at_startup.unwrap_or(false),
+        onboarding_done: settings.onboarding_done.unwrap_or(true),
+        palette_layout: settings.palette_layout.clone().unwrap_or_else(|| "rail".into()),
+        confirm_clear_instructions: false,
+        clear_confirm_remaining_secs: 0,
+        clear_confirm_generation: 0,
+        key_capture: None,
+        pending_standalone_key: None,
+        history: History::new(UNDO_STACK_LIMIT),
+        recording_phase: RecordingPhase::Idle,
+        recording_countdown_generation: 0,
+        // Linux absolute recording needs libei, both to replay absolute
+        // moves and to place the cursor while recording.
+        // Keep a saved absolute preference for a future supported session,
+        // but force this one to record relative movement instead.
+        record_mouse_relative: if absolute_mouse_position_available {
+            settings.record_mouse_relative.unwrap_or(true)
+        } else {
+            true
+        },
+        record_mouse_movement: settings.record_mouse_movement.unwrap_or(false),
+        absolute_mouse_position_available,
+        wayland_session,
+        page: Page::Main,
+        combo_capture: None,
+        hotkey_bindings: vec![],
+        pending_macro_hotkey: None,
+        invalid_field_buffers: HashMap::new(),
+        ipc_port_text: settings.ipc_port.unwrap_or(47821).to_string(),
+        ipc_port_invalid: false,
+        update_check_state: UpdateCheckState::Idle,
+        pending_import: None,
+        pending_pack: None,
+        triggers_paused: false,
+    }
+}
+
 impl Backend {
     /// Loads settings and macros and starts every background service
     /// (input grab, hotkeys, IPC auto-start, battery/time watchers, update
@@ -152,57 +216,12 @@ impl Backend {
         let emulator = Some(make_backend_or_unavailable());
         let absolute_mouse_position_available =
             blockwork_core::macros::backend::absolute_mouse_position_available();
-        let initial_state = AppState {
-            macro_selected: None,
-            current_macro: None,
-            macros_list: vec![],
-            macro_strs: vec![],
+        let initial_state = initial_state(
+            &settings,
             emulator,
-            variable_values: Arc::new(Mutex::new(HashMap::new())),
-            list_values: Arc::new(Mutex::new(HashMap::new())),
-            thread_pool: ThreadPool::new(),
-            is_looping: Arc::new(Mutex::new(false)),
-            global_speed_multiplier: settings.global_speed_multiplier.unwrap_or(1.0),
-            ipc_server: None,
-            ipc_shutdown_tx: None,
-            ipc_active_port: None,
-            ipc_auto_start: settings.ipc_auto_start.unwrap_or(false),
-            close_to_tray: settings.close_to_tray.unwrap_or(false),
-            start_at_startup: settings.start_at_startup.unwrap_or(false),
-            onboarding_done: settings.onboarding_done.unwrap_or(true),
-            palette_layout: settings.palette_layout.clone().unwrap_or_else(|| "rail".into()),
-            confirm_clear_instructions: false,
-            clear_confirm_remaining_secs: 0,
-            clear_confirm_generation: 0,
-            key_capture: None,
-            pending_standalone_key: None,
-            history: History::new(UNDO_STACK_LIMIT),
-            recording_phase: RecordingPhase::Idle,
-            recording_countdown_generation: 0,
-            // Linux absolute recording needs libei, both to replay absolute
-            // moves and to place the cursor while recording.
-            // Keep a saved absolute preference for a future supported session,
-            // but force this one to record relative movement instead.
-            record_mouse_relative: if absolute_mouse_position_available {
-                settings.record_mouse_relative.unwrap_or(true)
-            } else {
-                true
-            },
-            record_mouse_movement: settings.record_mouse_movement.unwrap_or(false),
             absolute_mouse_position_available,
-            wayland_session: blockwork_core::macros::backend::is_wayland_session(),
-            page: Page::Main,
-            combo_capture: None,
-            hotkey_bindings: vec![],
-            pending_macro_hotkey: None,
-            invalid_field_buffers: HashMap::new(),
-            ipc_port_text: settings.ipc_port.unwrap_or(47821).to_string(),
-            ipc_port_invalid: false,
-            update_check_state: UpdateCheckState::Idle,
-            pending_import: None,
-            pending_pack: None,
-            triggers_paused: false,
-        };
+            blockwork_core::macros::backend::is_wayland_session(),
+        );
 
         let shared: SharedState = Arc::new(Mutex::new(initial_state));
 

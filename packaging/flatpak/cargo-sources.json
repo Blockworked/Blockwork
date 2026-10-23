@@ -623,6 +623,24 @@
     {
         "type": "shell",
         "commands": [
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-1ef8891/crates/blockstitch-ffi\" \"cargo/vendor/blockstitch-ffi\""
+        ]
+    },
+    {
+        "type": "inline",
+        "contents": "[package]\nname = \"blockstitch-ffi\"\nversion = \"0.1.0\"\nedition = \"2024\"\ndescription = \"C ABI over blockstitch-core: handle-based sessions speaking JSON, for hosts that can't link Rust directly (Qt for WebAssembly).\"\nlicense = \"MIT\"\n\n[lib]\nname = \"blockstitch_ffi\"\n\n[dependencies]\nserde_json = \"1.0.151\"\n\n[dependencies.blockstitch-core]\nversion = \"0.1.0\"\n\n[dependencies.serde]\nversion = \"1.0.229\"\nfeatures = [\"derive\"]\n\n[workspace]\n",
+        "dest": "cargo/vendor/blockstitch-ffi",
+        "dest-filename": "Cargo.toml"
+    },
+    {
+        "type": "inline",
+        "contents": "{\"package\": null, \"files\": {}}",
+        "dest": "cargo/vendor/blockstitch-ffi",
+        "dest-filename": ".cargo-checksum.json"
+    },
+    {
+        "type": "shell",
+        "commands": [
             "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-1ef8891/.\" \"cargo/vendor/blockstitch-qml\""
         ]
     },

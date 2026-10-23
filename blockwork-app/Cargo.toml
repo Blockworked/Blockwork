@@ -19,3 +19,8 @@ dirs.workspace = true
 # "Open App" picker (see src/installed_apps.rs) - Linux-only, since the
 # Windows/Mac listings there don't resolve icons at all yet.
 base64.workspace = true
+
+[dev-dependencies]
+# The website's editor, replayed against this crate's commands.
+blockwork-web = { path = "../blockwork-web" }
+blockstitch-ffi.workspace = true

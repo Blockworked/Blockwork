@@ -22,7 +22,6 @@ pub mod http;
 pub mod input;
 #[cfg(feature = "ipc")]
 pub mod ipc;
-#[cfg(feature = "system")]
 pub mod key_mapping;
 #[cfg(all(feature = "system", target_os = "linux"))]
 pub mod dbus;
@@ -47,7 +46,6 @@ pub mod secrets;
 pub mod shell;
 #[cfg(feature = "system")]
 pub mod system;
-#[cfg(feature = "system")]
 pub mod text;
 #[cfg(all(feature = "updater", any(windows, target_os = "macos")))]
 pub mod updater;
@@ -59,6 +57,5 @@ pub mod wire;
 /// Registers Blockwork's own value operators with blockstitch, so a saved
 /// macro using them evaluates. Every entry point calls it; twice is fine.
 pub fn init() {
-    #[cfg(feature = "system")]
     input::value::register_blockwork_operators();
 }
