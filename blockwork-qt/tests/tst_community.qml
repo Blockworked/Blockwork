@@ -55,8 +55,8 @@ Item {
                 {kind:"Input",id:"number",name:"count",value_type:"Any",default_value:{kind:"Number",value:1}}
             ]};
             dialog.pendingDef = definition;
-            dialog.loadDef(definition);
-            const pieces = dialog.resultPieces();
+            dialog.editor.load(definition);
+            const pieces = dialog.editor.resultPieces();
             compare(pieces[1].default_value.kind, "Text");
             compare(pieces[1].default_value.value, "");
             compare(pieces[2].default_value.value, 1);
@@ -74,9 +74,9 @@ Item {
                 {kind:"Input",id:"flag",name:"enabled",value_type:"Bool",default_value:{kind:"Bool",value:true}}
             ]});
             tryCompare(dialog, "opened", true);
-            compare(dialog.resultPieces().length, 4);
+            compare(dialog.editor.resultPieces().length, 4);
             const defaults = named(dialog, "defaultParametersPopup");
-            const publishing = named(dialog, "publishingPopup");
+            const publishing = named(dialog, "detailsPopup");
             verify(!defaults.visible);
             verify(!publishing.visible);
             mouseClick(named(dialog, "defaultParametersButton"));
@@ -93,27 +93,27 @@ Item {
             number.forceActiveFocus();
             number.selectAll();
             keyClick(Qt.Key_9);
-            compare(dialog.resultPieces()[1].default_value.value, 9);
+            compare(dialog.editor.resultPieces()[1].default_value.value, 9);
             const textRow = rows.find(o => o.pieceName === "text");
             const text = named(textRow, "defaultTextValue");
             text.forceActiveFocus();
             keyClick(Qt.Key_A);
-            compare(dialog.resultPieces()[2].default_value.value, "a");
+            compare(dialog.editor.resultPieces()[2].default_value.value, "a");
             mouseClick(named(rows.find(o => o.pieceName === "enabled"), "defaultBooleanValue"));
-            compare(dialog.resultPieces()[3].default_value.value, false);
-            dialog.setInputDefault(1, "Number", "bad");
-            verify(!dialog.defaultsValid());
-            dialog.setInputDefault(1, "Number", "-2.5");
-            verify(dialog.defaultsValid());
-            dialog.selectedPiece = 1;
-            dialog.moveSelected(1);
-            compare(dialog.resultPieces()[2].id, "count");
-            compare(dialog.resultPieces()[2].default_value.value, -2.5);
+            compare(dialog.editor.resultPieces()[3].default_value.value, false);
+            dialog.editor.setInputDefault(1, "Number", "bad");
+            verify(!dialog.editor.defaultsValid());
+            dialog.editor.setInputDefault(1, "Number", "-2.5");
+            verify(dialog.editor.defaultsValid());
+            dialog.editor.selectedPiece = 1;
+            dialog.editor.moveSelected(1);
+            compare(dialog.editor.resultPieces()[2].id, "count");
+            compare(dialog.editor.resultPieces()[2].default_value.value, -2.5);
             defaults.close();
-            mouseClick(named(dialog, "publishingButton"));
+            mouseClick(named(dialog, "detailsButton"));
             tryCompare(publishing, "visible", true);
             verify(!defaults.visible);
-            const identifier = named(publishing, "publishingIdentifier");
+            const identifier = named(publishing, "detailsIdentifier");
             identifier.forceActiveFocus();
             keyClick(Qt.Key_X);
             compare(identifier.text, "x");
@@ -128,12 +128,52 @@ Item {
             dialog.openForCreate();
             tryCompare(dialog, "opened", true);
             compare(identifier.text, "");
-            dialog.addPiece("Input", "Any");
-            dialog.commitPiece();
-            dialog.setInputDefault(1, "Text", "");
-            compare(dialog.resultPieces()[1].default_value.kind, "Text");
-            compare(dialog.resultPieces()[1].default_value.value, "");
+            dialog.editor.addPiece("Input", "Any");
+            dialog.editor.commitPiece();
+            dialog.editor.setInputDefault(1, "Text", "");
+            compare(dialog.editor.resultPieces()[1].default_value.kind, "Text");
+            compare(dialog.editor.resultPieces()[1].default_value.value, "");
             dialog.close();
+        }
+        function test_details_round_trip_and_unknown_keys_survive() {
+            const dialog = createTemporaryObject(blockDialogComponent, scene);
+            const definition = {id:"kept",shape:"ReturnsBool",color:"#FF6680",icon:"rocket",identifier:"Alice_Kept",description:"Keeps things",pieces:[
+                {kind:"Label",id:"l",text:"kept",future:"label data"},
+                {kind:"Input",id:"x",name:"x",value_type:"Any",default_value:{kind:"Number",value:2},future:{a:1}},
+                {kind:"Branch",id:"b",name:"body"}
+            ]};
+            dialog.openForEdit(definition);
+            tryCompare(dialog, "opened", true);
+            compare(named(dialog, "detailsIdentifier").text, "Alice_Kept");
+            let saved = null;
+            dialog.editRequested.connect((id, pieces, shape, color, icon, identifier, description) => {
+                saved = {id: id, pieces: pieces, shape: shape, color: color, icon: icon, identifier: identifier, description: description};
+            });
+            dialog.submit();
+            verify(!!saved);
+            compare(saved.id, "kept");
+            compare(saved.shape, "ReturnsBool");
+            compare(saved.color, "#FF6680");
+            compare(saved.icon, "rocket");
+            compare(saved.identifier, "Alice_Kept");
+            compare(saved.description, "Keeps things");
+            compare(saved.pieces.map(p => p.id).join(","), "l,x,b");
+            compare(saved.pieces[0].future, "label data");
+            compare(saved.pieces[1].future.a, 1);
+            compare(saved.pieces[1].default_value.value, 2);
+            compare(saved.pieces[2].kind, "Branch");
+        }
+        function test_cancel_sends_nothing() {
+            const dialog = createTemporaryObject(blockDialogComponent, scene);
+            let sent = 0;
+            dialog.createRequested.connect(() => sent++);
+            dialog.editRequested.connect(() => sent++);
+            dialog.openForEdit({id:"c",shape:"Normal",pieces:[{kind:"Label",id:"l",text:"c"}]});
+            tryCompare(dialog, "opened", true);
+            dialog.editor.addPiece("Input", "Any");
+            mouseClick(named(dialog, "cancelButton"));
+            tryCompare(dialog, "visible", false);
+            compare(sent, 0);
         }
         function test_pack_input_defaults() {
             const definition = {id:"defaults",shape:"Normal",pieces:[
