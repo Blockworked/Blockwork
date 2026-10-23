@@ -1,0 +1,361 @@
+{
+  "block_defs": [
+    {
+      "color": "#4C97FF",
+      "description": "",
+      "icon": "",
+      "id": "double",
+      "identifier": "",
+      "pieces": [
+        {
+          "id": "l",
+          "kind": "Label",
+          "text": "double"
+        },
+        {
+          "id": "n",
+          "kind": "Input",
+          "name": "n",
+          "value_type": "Any"
+        }
+      ],
+      "shape": "ReturnsValue"
+    }
+  ],
+  "comments": [
+    {
+      "attached_to": null,
+      "collapsed": false,
+      "id": "note",
+      "text": "loose note",
+      "x": 420,
+      "y": 300
+    },
+    {
+      "attached_to": "loop",
+      "collapsed": true,
+      "id": "pinned",
+      "text": "attached to the loop",
+      "x": 0,
+      "y": 0
+    }
+  ],
+  "description": "Nested bodies, a custom reporter, comments, collections and two-output blocks.",
+  "dicts": [],
+  "floating_values": [
+    {
+      "id": "loose",
+      "origin_block_id": null,
+      "value": {
+        "args": [
+          {
+            "kind": "Var",
+            "name": "hit x"
+          },
+          {
+            "kind": "Var",
+            "name": "hit y"
+          }
+        ],
+        "kind": "Op",
+        "op": "Add",
+        "saved": {
+          "kind": "Number",
+          "value": 0.0
+        }
+      },
+      "x": 420,
+      "y": 200
+    }
+  ],
+  "format_version": 2,
+  "id": "baseline-macro",
+  "lists": [
+    {
+      "editor_visible": false,
+      "editor_x": 0,
+      "editor_y": 0,
+      "items": [
+        {
+          "kind": "Text",
+          "value": "first"
+        },
+        {
+          "kind": "Number",
+          "value": 2.0
+        }
+      ],
+      "name": "log"
+    }
+  ],
+  "name": "Editor baseline",
+  "recording_target": null,
+  "settings": {
+    "active_days": 0,
+    "active_hours": null,
+    "always_listen": false,
+    "catch_up_missed": false,
+    "max_loop_iterations": 0,
+    "max_run_secs": 0,
+    "only_in_window": "",
+    "power": "Any"
+  },
+  "signals": [],
+  "speed_multiplier": 1.0,
+  "strands": [
+    {
+      "id": "main",
+      "instructions": [
+        {
+          "id": "start",
+          "kind": "WhenRan"
+        },
+        {
+          "id": "loop",
+          "kind": {
+            "Repeat": {
+              "body": [
+                {
+                  "id": "check",
+                  "kind": {
+                    "If": {
+                      "body": [
+                        {
+                          "id": "bump",
+                          "kind": {
+                            "ChangeVariable": [
+                              "score",
+                              {
+                                "kind": "Number",
+                                "value": 1.0
+                              }
+                            ]
+                          }
+                        }
+                      ],
+                      "condition": {
+                        "args": [
+                          {
+                            "kind": "Var",
+                            "name": "score"
+                          },
+                          {
+                            "kind": "Number",
+                            "value": 5.0
+                          }
+                        ],
+                        "kind": "Op",
+                        "op": "Gt",
+                        "saved": {
+                          "kind": "Bool"
+                        }
+                      }
+                    }
+                  }
+                },
+                {
+                  "id": "pause",
+                  "kind": {
+                    "Wait": {
+                      "kind": "Text",
+                      "value": "09"
+                    }
+                  }
+                }
+              ],
+              "count": {
+                "kind": "Number",
+                "value": 3.0
+              }
+            }
+          }
+        },
+        {
+          "id": "branch",
+          "kind": {
+            "IfElse": {
+              "condition": {
+                "kind": "Bool"
+              },
+              "else_body": [
+                {
+                  "id": "reset",
+                  "kind": {
+                    "SetVariable": [
+                      "score",
+                      {
+                        "kind": "Number",
+                        "value": 0.0
+                      }
+                    ]
+                  }
+                }
+              ],
+              "then_body": [
+                {
+                  "id": "say",
+                  "kind": {
+                    "Log": {
+                      "args": [
+                        {
+                          "kind": "Text",
+                          "value": "score "
+                        },
+                        {
+                          "kind": "Var",
+                          "name": "score"
+                        }
+                      ],
+                      "kind": "Op",
+                      "op": "Join",
+                      "saved": {
+                        "kind": "Text",
+                        "value": ""
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "guard",
+          "kind": {
+            "TryCatch": {
+              "body": [
+                {
+                  "id": "find",
+                  "kind": {
+                    "FindImage": {
+                      "image": "",
+                      "tolerance": {
+                        "kind": "Number",
+                        "value": 10.0
+                      },
+                      "x_variable": "hit x",
+                      "y_variable": "hit y"
+                    }
+                  }
+                }
+              ],
+              "catch_body": [
+                {
+                  "id": "caught",
+                  "kind": {
+                    "AddToList": {
+                      "name": "log",
+                      "value": {
+                        "kind": "Text",
+                        "value": "missed"
+                      }
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        },
+        {
+          "id": "doubled",
+          "kind": {
+            "SetVariable": [
+              "score",
+              {
+                "args": [
+                  {
+                    "kind": "Var",
+                    "name": "score"
+                  }
+                ],
+                "block_id": "double",
+                "branches": [],
+                "kind": "Call",
+                "saved": {
+                  "kind": "Number",
+                  "value": 0.0
+                }
+              }
+            ]
+          }
+        },
+        {
+          "id": "call",
+          "kind": {
+            "CallBlock": {
+              "args": [
+                {
+                  "kind": "Number",
+                  "value": 2.0
+                }
+              ],
+              "block_id": "double",
+              "branches": []
+            }
+          }
+        }
+      ],
+      "x": 0,
+      "y": 0
+    },
+    {
+      "id": "def",
+      "instructions": [
+        {
+          "id": "header",
+          "kind": {
+            "BlockHeader": "double"
+          }
+        },
+        {
+          "id": "ret",
+          "kind": {
+            "Return": {
+              "args": [
+                {
+                  "kind": "Param",
+                  "name": "n"
+                },
+                {
+                  "kind": "Number",
+                  "value": 2.0
+                }
+              ],
+              "kind": "Op",
+              "op": "Mul",
+              "saved": {
+                "kind": "Number",
+                "value": 0.0
+              }
+            }
+          }
+        }
+      ],
+      "x": 420,
+      "y": 0
+    }
+  ],
+  "variables": [
+    {
+      "name": "score",
+      "value": {
+        "kind": "Number",
+        "value": 0.0
+      }
+    },
+    {
+      "name": "hit x",
+      "value": {
+        "kind": "Number",
+        "value": 0.0
+      }
+    },
+    {
+      "name": "hit y",
+      "value": {
+        "kind": "Number",
+        "value": 0.0
+      }
+    }
+  ]
+}
