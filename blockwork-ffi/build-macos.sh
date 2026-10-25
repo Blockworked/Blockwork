@@ -10,16 +10,27 @@
 set -euo pipefail
 
 cd "$(dirname "${BASH_SOURCE[0]}")"
+REPO_ROOT="$(cd .. && pwd)"
+export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-11.0}"
+# Cargo can reuse pure-Rust objects produced for a different deployment floor.
+# Keep this embedder build separate from the Qt app's macOS 13+ cache.
+BUILD_TARGET_DIR="${CARGO_TARGET_DIR:-$REPO_ROOT/target/macos-ffi-$MACOSX_DEPLOYMENT_TARGET}"
+case "$BUILD_TARGET_DIR" in
+    /*) ;;
+    *) BUILD_TARGET_DIR="$REPO_ROOT/$BUILD_TARGET_DIR" ;;
+esac
+mkdir -p "$BUILD_TARGET_DIR"
+export CARGO_TARGET_DIR="$BUILD_TARGET_DIR"
 
 for target in x86_64-apple-darwin aarch64-apple-darwin; do
     rustup target add "$target" >/dev/null
-    cargo build -p blockwork-ffi --release --target "$target"
+    cargo build -p blockwork-ffi --release --locked --target "$target"
 done
 
 mkdir -p ../target/universal-macos
 lipo -create -output ../target/universal-macos/libblockwork_ffi.a \
-    ../target/x86_64-apple-darwin/release/libblockwork_ffi.a \
-    ../target/aarch64-apple-darwin/release/libblockwork_ffi.a
+    "$BUILD_TARGET_DIR/x86_64-apple-darwin/release/libblockwork_ffi.a" \
+    "$BUILD_TARGET_DIR/aarch64-apple-darwin/release/libblockwork_ffi.a"
 
 echo
 echo "Built: blockwork-ffi/../target/universal-macos/libblockwork_ffi.a"
@@ -29,9 +40,8 @@ echo "Pass to the host's CMake configure, e.g.:"
 echo "  -DBLOCKWORK_FFI_LIB=$(cd .. && pwd)/target/universal-macos/libblockwork_ffi.a"
 echo "  -DBLOCKWORK_FFI_INCLUDE_DIR=$(pwd)/include"
 echo
-echo "If the link step reports missing symbols, blockwork-core's macOS backend"
-echo "(backend/macos.rs) may need another framework linked beyond"
-echo "CoreFoundation/ApplicationServices - Security"
-echo "is the most likely candidate (core-foundation/core-graphics sometimes"
-echo "pull it in transitively). Verify against the actual linker error rather"
-echo "than adding it speculatively."
+echo "Deployment target: $MACOSX_DEPLOYMENT_TARGET"
+echo "Native frameworks: AppKit, Foundation, CoreGraphics, ApplicationServices,"
+echo "CoreFoundation, Security and IOKit (plus the standard system/Objective-C libraries)."
+echo "To inspect requirements after dependency changes, run cargo rustc for"
+echo "blockwork-ffi with -- --print native-static-libs."
