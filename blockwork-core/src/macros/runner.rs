@@ -2464,10 +2464,12 @@ mod tests {
     }
 
     /// `run_with_offset` should backdate the first `Wait`'s deadline anchor
-    /// by `initial_offset` - a macro whose only strand waits 200ms should
-    /// return in roughly (200ms - offset) wall-clock time, proving the
+    /// by `initial_offset` - a macro whose only strand waits 2000ms should
+    /// return in roughly (2000ms - offset) wall-clock time, proving the
     /// anchor is `Instant::now() - initial_offset`, not just `Instant::now()`
     /// with the offset silently ignored.
+    // A 1500ms separation distinguishes an ignored offset while allowing
+    // scheduler jitter on shared CI runners; the expected wait is 500ms.
     #[test]
     fn run_with_offset_backdates_the_first_wait_deadline() {
         let mac = Macro {
@@ -2475,7 +2477,7 @@ mod tests {
             name: "Offset".into(),
             description: "".into(),
             graph: MacroGraph {
-                strands: vec![when_ran_strand("a", 200.0)],
+                strands: vec![when_ran_strand("a", 2000.0)],
                 floating_values: vec![],
                 comments: vec![],
                 variables: vec![],
@@ -2494,15 +2496,15 @@ mod tests {
             None,
             1.0,
             empty_vars(),
-            Duration::from_millis(80),
+            Duration::from_millis(1500),
         );
         let elapsed = start.elapsed();
         assert!(
-            elapsed < Duration::from_millis(170),
+            elapsed < Duration::from_millis(1200),
             "offset didn't shorten the wait as expected: {elapsed:?}"
         );
         assert!(
-            elapsed >= Duration::from_millis(90),
+            elapsed >= Duration::from_millis(250),
             "returned suspiciously fast, offset may have overshot: {elapsed:?}"
         );
     }
