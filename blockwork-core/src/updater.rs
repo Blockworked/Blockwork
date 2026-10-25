@@ -375,6 +375,81 @@ fn find_blockwork_app(extract_dir: &Path) -> Option<PathBuf> {
 mod tests {
     use super::*;
 
+    /// Opt-in integration gate using an actual released archive and a rebuilt app.
+    /// All replacement operations stay inside a disposable install directory.
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "requires BLOCKWORK_TEST_RELEASE_ZIP and BLOCKWORK_TEST_UPDATE_APP"]
+    fn macos_released_bundle_upgrades_to_rebuilt_app() {
+        use std::process::Command;
+        let archive = PathBuf::from(std::env::var_os("BLOCKWORK_TEST_RELEASE_ZIP").unwrap());
+        let rebuilt = PathBuf::from(std::env::var_os("BLOCKWORK_TEST_UPDATE_APP").unwrap());
+        let root = std::env::temp_dir().join(format!(
+            "blockwork-release-upgrade-{}",
+            uuid::Uuid::new_v4()
+        ));
+        let extracted = root.join("download");
+        fs::create_dir_all(&extracted).unwrap();
+        let extraction = Command::new("/usr/bin/ditto")
+            .args(["-x", "-k"])
+            .arg(&archive)
+            .arg(&extracted)
+            .output()
+            .unwrap();
+        assert!(extraction.status.success(), "{:?}", extraction);
+        let released = find_blockwork_app(&extracted).expect("release contains an app");
+        let installed = root.join("installed/Blockwork.app");
+        fs::create_dir_all(installed.parent().unwrap()).unwrap();
+        assert!(
+            Command::new("/usr/bin/ditto")
+                .arg(&released)
+                .arg(&installed)
+                .status()
+                .unwrap()
+                .success()
+        );
+        let previous_plist = fs::read(installed.join("Contents/Info.plist")).unwrap();
+        let previous_binary = fs::read(installed.join("Contents/MacOS/Blockwork")).unwrap();
+        replace_macos_bundle(&rebuilt, &installed).unwrap();
+        assert_eq!(
+            fs::read(backup_path(&installed).join("Contents/Info.plist")).unwrap(),
+            previous_plist
+        );
+        assert_eq!(
+            fs::read(backup_path(&installed).join("Contents/MacOS/Blockwork")).unwrap(),
+            previous_binary
+        );
+        for binary in ["Blockwork", "blockwork-daemon"] {
+            let relative = Path::new("Contents/MacOS").join(binary);
+            assert_eq!(
+                fs::read(installed.join(&relative)).unwrap(),
+                fs::read(rebuilt.join(&relative)).unwrap()
+            );
+        }
+        let verifier = Path::new(env!("CARGO_MANIFEST_DIR")).join("../scripts/macos/verify-bundle.py");
+        let validation = Command::new("python3")
+            .arg(verifier)
+            .arg(&installed)
+            .output()
+            .unwrap();
+        assert!(validation.status.success(), "{:?}", validation);
+        let launch = Command::new(installed.join("Contents/MacOS/Blockwork"))
+            .arg("--help")
+            .output()
+            .unwrap();
+        assert!(launch.status.success(), "{:?}", launch);
+        assert!(String::from_utf8_lossy(&launch.stdout).contains("Usage:"));
+        assert_eq!(
+            fs::read_dir(installed.parent().unwrap()).unwrap().count(),
+            2,
+            "no leftover staging bundle"
+        );
+        eprintln!(
+            "Released archive extracted; rebuilt bundle installed, validated and started; previous release preserved in backup."
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
     #[cfg(target_os = "macos")]
     #[test]
     fn macos_relaunch_waits_for_the_old_daemon_and_preserves_literal_paths() {

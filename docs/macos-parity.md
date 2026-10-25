@@ -76,3 +76,14 @@ The final installed Apple Silicon bundle passed Unicode delivery, window geometr
 The post-authorship workspace suite also passed (`/tmp/blockwork-post-authorship-workspace-tests.log`). Checks at `30f92a46f19ebab1cd7bff7f6b8e9c984c17e51a` passed Linux workspace tests/Clippy and both native Mac core/FFI jobs: https://github.com/Blockworked/Blockwork/actions/runs/40231358858.
 
 The app artifact and release matrices now include native Intel Macs, alongside Apple Silicon. Both Mac app jobs are required rather than experimental. Each builds and validates the complete bundle, starts its packaged executable with `--help`, and runs the application QML tests with the installed Qt runtime. This adds Intel application coverage; it does not establish permission-dependent desktop input/capture on that runner. The new jobs must pass before counting this gate as verified. Multi-display hardware and a real installed-release update remain unexecuted coverage gates.
+
+The real-archive updater fixture passed with the published 0.5.4 Apple Silicon archive (180,394,802 bytes; SHA-256 `12d70042ea7282a269606d6c9592d234a88f1c5fb00e4d3e30f6ba0f6701694a`). It extracts the archive using ditto, creates a disposable installed copy, calls the production replacement function with the rebuilt app, verifies the previous release's plist and executable bytes in the backup, validates the promoted bundle's signatures/dependencies, and starts its packaged CLI. The test removes its disposable install afterward. The live user installation is not replaced. This narrows the updater coverage gap; live GUI relaunch and the updater's network selection/download path are not established by this fixture. Evidence: `target/macos-parity-evidence/update-fixture/source.json` and `test.log`.
+
+To repeat this opt-in integration gate after downloading a release archive and building the new bundle:
+
+```sh
+BLOCKWORK_TEST_RELEASE_ZIP=/absolute/path/blockwork-macos-arm64.app.zip \
+BLOCKWORK_TEST_UPDATE_APP=/absolute/path/Blockwork.app \
+cargo test -p blockwork-core --no-default-features --features updater \
+  macos_released_bundle_upgrades_to_rebuilt_app -- --ignored --nocapture
+```
