@@ -17,6 +17,8 @@ jobs:
           - name: windows-x86_64
             runner: windows-latest
             target: x86_64-pc-windows-msvc
+            qt_host: windows
+            qt_arch: win64_msvc2022_64
             artifact_name: blockwork-windows-x86_64.zip
             installer_arch: x64compatible
             qt_host: windows
