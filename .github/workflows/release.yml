@@ -512,3 +512,45 @@ jobs:
           release-tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
           installers-regex: '-setup\.exe$'
           token: ${{ secrets.WINGET_TOKEN }}
+
+  msstore:
+    name: Submit to Microsoft Store
+    runs-on: windows-latest
+    needs: [release]
+    env:
+      MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
+      MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
+      MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
+      MSSTORE_APP_ID: ${{ vars.MSSTORE_APP_ID }}
+
+    steps:
+      # Skipped until the Partner Center credentials are set, like winget
+      - name: Check Store credentials
+        id: creds
+        shell: pwsh
+        run: |
+          $missing = @("MSSTORE_TENANT_ID", "MSSTORE_CLIENT_ID", "MSSTORE_CLIENT_SECRET", "MSSTORE_APP_ID") |
+            Where-Object { -not [Environment]::GetEnvironmentVariable($_) }
+          if ($missing) {
+            Write-Host "Skipping Store submission, not set: $($missing -join ', ')"
+            echo "ready=false" >> $env:GITHUB_OUTPUT
+          } else {
+            echo "ready=true" >> $env:GITHUB_OUTPUT
+          }
+
+      - name: Checkout
+        if: steps.creds.outputs.ready == 'true'
+        uses: actions/checkout@v4
+
+      - name: Download MSIX
+        if: steps.creds.outputs.ready == 'true'
+        uses: actions/download-artifact@v4
+        with:
+          name: blockwork-windows-x86_64.msix
+          path: dist
+
+      # The Store signs the package and runs certification after this
+      - name: Submit to Partner Center
+        if: steps.creds.outputs.ready == 'true'
+        shell: pwsh
+        run: ./scripts/submit-msstore.ps1 -Msix dist/blockwork-windows-x86_64.msix
