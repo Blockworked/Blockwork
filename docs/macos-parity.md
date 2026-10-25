@@ -1,6 +1,6 @@
 # macOS parity verification
 
-Work in progress. Passing tests establish the behavior below, not complete application parity.
+Verification record for the macOS implementation, with exercised behavior and coverage limits recorded below. Minecraft verification is excluded at the user's request.
 
 Blockwork is the first gate. The later blockwork-gd gate requires fresh imports of `~/Downloads/ChesszDC-Bloodbath-Infinity-zBot.gdr` against the local level named approximately **Bloodbath Infinity 2**, accurate completion at normal speed, and reliable repeated completion at QOL Mod 10x. The game gate completed normal-speed fresh imports, 20/20 direct 10x attempts, 20/20 queued 10x attempts, and a final 3/3 universal-package 10x batch. Current game evidence and remaining checks are documented in the sibling `blockwork-gd/docs/macos-parity.md`.
 
@@ -11,8 +11,8 @@ Blockwork is the first gate. The later blockwork-gd gate requires fresh imports 
 | Keyboard | Native Unicode/surrogate pairs, extended keys, side-specific modifier ordering, explicit Fn/keypad cleanup, event-synthesis permission preflight; packaged text delivered exactly `Mac parity: café 中 🦀` | More keyboard layouts and physical devices |
 | Recording/hotkeys | Hardware timestamps, modifier suppression, playback filtering, disabled-tap recovery; packaged recording/replay preserved a/Shift+b/c, original waits, and Escape stop | Long-duration recording |
 | Mouse | Extra buttons, absolute event coordinates, drag deltas, fractional two-axis scrolling; queued-target tracking prevents stale live coordinates after asynchronous posting | Additional mouse hardware |
-| Screen | Native/nominal clipped capture, explicit sRGB/RGBA, permission preflight; packaged colors, image search/click, OCR and HTTP detection all succeeded | Multiple displays, Retina scaling configurations |
-| Detection | Local HTTP detector positive fixture; real shipped ONNX model Metal/CPU comparison on three deterministic inputs, maximum absolute difference 0.000519 | Positive trained Minecraft image and broader models |
+| Screen | Native/nominal clipped capture, explicit sRGB/RGBA, permission preflight; packaged colors, image search/click, OCR and HTTP detection all succeeded | Mixed 1x/2x virtual-display test passed; physical monitor hot-plug not exercised |
+| Detection | Local HTTP detector positive fixture; real shipped ONNX model Metal/CPU comparison on three deterministic inputs, maximum absolute difference 0.000519 | Minecraft verification skipped at user request; broader models not claimed |
 | Windows | CoreGraphics + bounded Accessibility operations; focus, consecutive geometry operations, minimize/restore, fullscreen, close; geometry tolerates redacted CG titles | More third-party application window types |
 | Application lifecycle | Native NSWorkspace close by canonical bundle path; fixture close/open/close passed without AppleEvents; reopening the packaged app recreated the editor from its background daemon | More application types |
 | Picker | System/Cryptex/Utilities/user roots; symlink-loop and helper filtering; accessible search/select; native macOS icons displayed | Broader application catalog |
@@ -87,3 +87,11 @@ BLOCKWORK_TEST_UPDATE_APP=/absolute/path/Blockwork.app \
 cargo test -p blockwork-core --no-default-features --features updater \
   macos_released_bundle_upgrades_to_rebuilt_app -- --ignored --nocapture
 ```
+
+## Final platform checkpoints
+
+Checks at `41d4511` passed Linux workspace tests/Clippy and native Apple Silicon + Intel core/FFI tests: https://github.com/Blockworked/Blockwork/actions/runs/40232665736. All eight artifact jobs passed at the same revision, including both Windows architectures, both Linux AppImage/Flatpak architectures, and both Mac architectures: https://github.com/Blockworked/Blockwork/actions/runs/40232665698. Each Mac bundle validates 97 Mach-O images and passes packaged CLI startup plus all 45 application QML tests. These are native Intel app build/QML checks; Intel game execution is not claimed.
+
+A disposable 800×600 logical virtual display with 1600×1200 pixels at x=-800 was tested alongside the physical 1x display. The installed bundle read the known pixel and region colors, picked a 40×40 logical crop into an 80×80 PNG, and found its asymmetric blue marker at exactly (-670,90). This verifies Retina scaling and negative coordinates together. The virtual display, daemon and temporary macro were removed; the physical display layout and original user macros were verified afterward. Evidence: `target/macos-parity-evidence/virtual-retina-screen-result.json`, `virtual-display-cleanup.txt`, and the preserved fixture sources in that directory. A synthetic exact-red search was correctly rejected when compositing changed one channel by one level; the actual picker template matched exactly without relaxing tolerance.
+
+The latest rebuilt GD package also passed separate step-recording probes at normal speed and QOL 10x, another 3/3 fresh-import full-level 10x batch, and a final normal/10x trace pair with all 724 inputs identical. Full trace positions match through step 26,841, beyond the final input at 26,741. The latest successful fresh replay is selected and linked to the local level, and all original user macros remain byte-identical. The sibling GD verification report records the complete acceptance and CI evidence.
