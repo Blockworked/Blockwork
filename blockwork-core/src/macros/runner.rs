@@ -4109,25 +4109,41 @@ mod tests {
         assert_eq!(vars.lock().unwrap().get("ran"), Some(&Evaluated::Number(1.0)));
         assert!(!crate::macros::locks::is_held("runner-free"));
 
-        // Held elsewhere: the strand waits until it's stopped, skipping the body.
-        let held = std::thread::spawn(|| {
-            let guard = crate::macros::locks::acquire("runner-busy", Duration::from_millis(5), || false);
-            std::thread::sleep(Duration::from_millis(400));
-            drop(guard);
-        });
-        std::thread::sleep(Duration::from_millis(50));
+        // Keep the lock held until the stopped strand has returned. Sleeping
+        // for a fixed holder lifetime made cancellation depend on CI scheduling.
+        let held = crate::macros::locks::acquire("runner-busy", Duration::from_millis(5), || false).unwrap();
         let stop = Arc::new(Mutex::new(true));
-        let stopper = Arc::clone(&stop);
-        std::thread::spawn(move || {
-            std::thread::sleep(Duration::from_millis(100));
-            *stopper.lock().unwrap() = false;
-        });
+        let worker_stop = Arc::clone(&stop);
         let vars = empty_vars();
-        let started = Instant::now();
-        run_instructions(vec![lock("runner-busy", vec![set("ran", Value::number(1.0))])], noop_emulator(), Some(stop), 1.0, Arc::clone(&vars));
-        assert!(started.elapsed() < Duration::from_millis(300));
+        let worker_vars = Arc::clone(&vars);
+        let instruction = lock("runner-busy", vec![set("ran", Value::number(1.0))]);
+        let block_id = instruction.id.clone();
+        let (finished, completion) = std::sync::mpsc::channel();
+        let worker = std::thread::spawn(move || {
+            run_fired_strand(
+                crate::run_log::Source::for_macro("runner-lock-cancellation", "Lock cancellation"),
+                vec![instruction], noop_emulator(), Some(worker_stop), 1.0,
+                worker_vars, Arc::new(Mutex::new(HashMap::new())), Arc::new(HashMap::new()), 0,
+            );
+            let _ = finished.send(());
+        });
+        let deadline = Instant::now() + Duration::from_secs(5);
+        let reached_lock = loop {
+            if crate::macros::trace::snapshot().iter().any(|active| {
+                active.macro_id == "runner-lock-cancellation" && active.block_id == block_id
+            }) {
+                break true;
+            }
+            if Instant::now() >= deadline { break false; }
+            std::thread::sleep(Duration::from_millis(1));
+        };
+        *stop.lock().unwrap() = false;
+        let cancelled_while_held = completion.recv_timeout(Duration::from_secs(2)).is_ok();
+        drop(held);
+        worker.join().unwrap();
+        assert!(reached_lock, "the strand never reached the held lock");
+        assert!(cancelled_while_held, "the strand needed the lock released before it could stop");
         assert_eq!(vars.lock().unwrap().get("ran"), None);
-        held.join().unwrap();
     }
 
     #[test]
