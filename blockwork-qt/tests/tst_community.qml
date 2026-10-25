@@ -80,7 +80,9 @@ Item {
             verify(!defaults.visible);
             verify(!publishing.visible);
             mouseClick(named(dialog, "defaultParametersButton"));
-            tryCompare(defaults, "visible", true);
+            // visible becomes true before the popup's enter transition ends.
+            // Wait for stable hit targets before clicking its controls.
+            tryCompare(defaults, "opened", true);
             verify(!publishing.visible);
             const repeater = named(defaults, "defaultParameterRows");
             verify(!!repeater);
@@ -99,6 +101,8 @@ Item {
             text.forceActiveFocus();
             keyClick(Qt.Key_A);
             compare(dialog.editor.resultPieces()[2].default_value.value, "a");
+            // Text edits can schedule a layout pass that moves the next row.
+            verify(waitForRendering(defaults.contentItem));
             mouseClick(named(rows.find(o => o.pieceName === "enabled"), "defaultBooleanValue"));
             compare(dialog.editor.resultPieces()[3].default_value.value, false);
             dialog.editor.setInputDefault(1, "Number", "bad");

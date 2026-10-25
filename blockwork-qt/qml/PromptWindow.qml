@@ -25,7 +25,7 @@ ApplicationWindow {
         placeholderText: Theme.textDim; mid: Theme.border; dark: Theme.borderSoft; light: Theme.panelRaised
     }
 
-    PromptBridge { id: bridge }
+    PromptBridge { id: bridge; objectName: "promptBridge" }
 
     property bool answered: false
     function answer(button, text) {
@@ -34,8 +34,13 @@ ApplicationWindow {
         bridge.finish(button, text || "");
     }
     onClosing: answer(kind === "message" ? "ok" : "cancel", "")
+    function focusInput() {
+        if (kind === "text") field.forceActiveFocus();
+        else if (kind === "choice") choices.forceActiveFocus();
+    }
+    onKindChanged: Qt.callLater(focusInput)
     Component.onCompleted: {
-        raise(); requestActivate(); if (kind === "text") field.forceActiveFocus();
+        raise(); requestActivate(); focusInput();
     }
     // The daemon starts dialogs in the background, where some systems
     // (Windows) won't let them take focus by asking; keep pulling until it's ours.
@@ -45,6 +50,11 @@ ApplicationWindow {
         repeat: true
         running: !root.active && tries < 20
         onTriggered: { tries++; bridge.bringToFront(); }
+    }
+    // A daemon exit must not leave an orphaned question on the desktop.
+    Timer {
+        interval: 250; repeat: true; running: !root.answered
+        onTriggered: { if (!bridge.parentAlive()) root.answer("cancel", ""); }
     }
     // Permission questions are worded here so they follow the UI language.
     readonly property string message: {
@@ -102,6 +112,8 @@ ApplicationWindow {
         }
         BwTextField {
             id: field
+            objectName: "promptText"
+            Accessible.name: root.message
             visible: root.kind === "text"
             Layout.fillWidth: true
             text: root.request.default || ""
@@ -109,6 +121,9 @@ ApplicationWindow {
         }
         ListView {
             id: choices
+            objectName: "promptChoices"
+            Accessible.role: Accessible.List
+            Accessible.name: root.message
             visible: root.kind === "choice"
             Layout.fillWidth: true
             Layout.preferredHeight: Math.min(240, contentHeight)
@@ -119,6 +134,11 @@ ApplicationWindow {
             delegate: Rectangle {
                 required property string modelData
                 required property int index
+                objectName: "promptChoice_" + index
+                Accessible.role: Accessible.ListItem
+                Accessible.name: modelData
+                Accessible.selected: ListView.isCurrentItem
+                Accessible.onPressAction: choices.currentIndex = index
                 width: choices.width; height: 34; radius: 6
                 color: ListView.isCurrentItem ? Theme.selection : hover.hovered ? Theme.panelRaised : "transparent"
                 Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
@@ -137,6 +157,7 @@ ApplicationWindow {
                 model: root.buttons
                 delegate: BwButton {
                     required property var modelData
+                    objectName: "promptButton_" + modelData[1]
                     text: modelData[0]; primary: modelData[2]
                     onClicked: modelData[1] === "ok" ? root.accept() : root.answer(modelData[1], "")
                 }

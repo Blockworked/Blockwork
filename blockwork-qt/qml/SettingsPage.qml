@@ -186,13 +186,19 @@ Item {
                                             readonly property var speeds: [0, 0.25, 0.5, 1, 1.5, 2, 3]
                                             width: 230; from: 0; to: speeds.length - 1; stepSize: 1; ticks: true
                                             Accessible.name: qsTr("Animation speed")
-                                            value: {
+                                            readonly property int savedIndex: {
                                                 const s = appState.animation_speed ?? 1;
                                                 let best = 0;
                                                 speeds.forEach((v, i) => { if (Math.abs(v - s) < Math.abs(speeds[best] - s)) best = i; });
                                                 return best;
                                             }
-                                            onMoved: root.invoke("set_animation_speed", { speed: speeds[Math.round(value)] })
+                                            property bool readyForEdits: false
+                                            Component.onCompleted: readyForEdits = true
+                                            value: savedIndex
+                                            onValueChanged: {
+                                                if (readyForEdits && value !== savedIndex)
+                                                    root.invoke("set_animation_speed", { speed: speeds[Math.round(value)] });
+                                            }
                                         }
                                         Item {
                                             width: animationSlider.width; height: 16

@@ -27,16 +27,26 @@ pub mod qobject {
         #[qinvokable]
         #[cxx_name = "bringToFront"]
         fn bring_to_front(self: &PromptBridge);
+
+        #[qinvokable]
+        #[cxx_name = "parentAlive"]
+        fn parent_alive(self: &PromptBridge) -> bool;
     }
 }
 
 static REQUEST: OnceLock<String> = OnceLock::new();
+#[cfg(unix)]
+static PARENT: OnceLock<libc::pid_t> = OnceLock::new();
 
 /// Whether this launch is a prompt; reads the request if so. Call before Qt starts.
 pub fn requested() -> bool {
     if std::env::args().nth(1).as_deref() != Some("--prompt") {
         return false;
     }
+    #[cfg(unix)]
+    PARENT.get_or_init(|| std::env::var("BLOCKWORK_PROMPT_PARENT_PID")
+        .ok().and_then(|value| value.parse().ok())
+        .unwrap_or_else(|| unsafe { libc::getppid() }));
     let mut text = String::new();
     let _ = std::io::stdin().read_to_string(&mut text);
     let _ = REQUEST.set(text);
@@ -69,6 +79,16 @@ impl qobject::PromptBridge {
         let _ = writeln!(out, "{reply}");
         let _ = out.flush();
         std::process::exit(0);
+    }
+
+    fn parent_alive(&self) -> bool {
+        #[cfg(unix)]
+        if let Some(parent) = PARENT.get() {
+            // Reparenting also covers a parent that died before this dialog
+            // finished launching, without relying on PID liveness/reuse.
+            return unsafe { libc::getppid() } == *parent;
+        }
+        true
     }
 
     fn bring_to_front(&self) {

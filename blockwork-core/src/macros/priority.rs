@@ -11,20 +11,58 @@ use tracing::{info, warn};
 /// process launched through several layers of Steam/Proton/Wine) is exactly
 /// the kind of thing that silently reproduces the imprecision this call
 /// exists to prevent.
-#[cfg(unix)]
+#[cfg(all(unix, not(target_os = "macos")))]
 pub fn raise_current_thread_priority() {
     let param = unsafe {
         let mut p = std::mem::MaybeUninit::<libc::sched_param>::zeroed().assume_init();
         p.sched_priority = 10;
         p
     };
-    let ok = unsafe {
-        libc::pthread_setschedparam(libc::pthread_self(), libc::SCHED_FIFO, &param)
-    } == 0;
+    let ok =
+        unsafe { libc::pthread_setschedparam(libc::pthread_self(), libc::SCHED_FIFO, &param) } == 0;
     if ok {
         info!("Raised thread priority to SCHED_FIFO:10");
     } else {
         warn!("Failed to raise thread priority (SCHED_FIFO); continuing at default priority");
+    }
+}
+
+#[cfg(target_os = "macos")]
+pub fn raise_current_thread_priority() {
+    // Darwin schedules latency-sensitive work through QoS. A POSIX FIFO
+    // priority does not select this class and can clear an inherited QoS.
+    let result = unsafe {
+        libc::pthread_set_qos_class_self_np(libc::qos_class_t::QOS_CLASS_USER_INTERACTIVE, 0)
+    };
+    if result == 0 {
+        info!("Raised thread priority to QOS_CLASS_USER_INTERACTIVE");
+    } else {
+        warn!("Failed to set macOS interactive QoS ({result}); continuing at default priority");
+    }
+}
+
+#[cfg(all(test, target_os = "macos"))]
+mod tests {
+    #[test]
+    fn playback_threads_request_interactive_qos() {
+        std::thread::spawn(|| {
+            super::raise_current_thread_priority();
+            let mut class = libc::qos_class_t::QOS_CLASS_UNSPECIFIED;
+            let mut relative = 0;
+            assert_eq!(
+                unsafe {
+                    libc::pthread_get_qos_class_np(libc::pthread_self(), &mut class, &mut relative)
+                },
+                0
+            );
+            assert_eq!(
+                class as u32,
+                libc::qos_class_t::QOS_CLASS_USER_INTERACTIVE as u32
+            );
+            assert_eq!(relative, 0);
+        })
+        .join()
+        .unwrap();
     }
 }
 

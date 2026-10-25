@@ -11,9 +11,14 @@ pub fn app_icon(command: &str, size: i32) -> String {
     imp::app_icon(command, size)
 }
 
-/// Non-Windows builds have no native source wired up yet (Linux listings
-/// already carry theme icons from the backend); the UI keeps its placeholder.
-#[cfg(not(windows))]
+/// QFileIconProvider uses the macOS application's native bundle icon.
+#[cfg(target_os = "macos")]
+pub fn app_icon(command: &str, size: i32) -> String {
+    crate::app_icon::native_app_icon(command, size)
+}
+
+/// Linux listings already carry theme icons from the backend.
+#[cfg(not(any(windows, target_os = "macos")))]
 pub fn app_icon(_command: &str, _size: i32) -> String {
     String::new()
 }

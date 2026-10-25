@@ -17,7 +17,7 @@ system = [
     "dep:dirs", "dep:tokio", "dep:spin_sleep", "dep:bincode", "dep:starship-battery", "dep:arboard",
     "dep:ureq", "dep:png", "dep:base64", "dep:libc",
     "dep:evdev", "dep:x11rb", "dep:enigo", "dep:wayland-client", "dep:wayland-protocols", "dep:zbus",
-    "dep:windows-sys", "dep:core-graphics", "dep:core-foundation", "dep:foreign-types", "dep:security-framework",
+    "dep:windows-sys", "dep:core-graphics", "dep:core-foundation", "dep:foreign-types", "dep:security-framework", "dep:objc2", "dep:objc2-app-kit",
 ]
 # Loopback TCP control server; not needed by an embedder (e.g. via
 # blockwork-ffi) that calls into this crate directly and in-process.
@@ -28,9 +28,9 @@ updater = ["system", "dep:self_update", "dep:http"]
 # Built-in object detection models (see src/detect/onnx.rs). Pure Rust, so
 # offline and Flatpak builds need no native runtime.
 onnx = ["system", "dep:tract-onnx"]
-# Runs those models on an NVIDIA GPU when CUDA is installed. CUDA is loaded
-# at runtime, so builds don't need it and machines without it use the CPU.
-gpu = ["onnx", "dep:tract-cuda"]
+# Runs models on Apple Metal on macOS, or CUDA on Linux/Windows. Machines
+# without a usable GPU/runtime fall back to the CPU.
+gpu = ["onnx", "dep:tract-cuda", "dep:tract-metal"]
 
 [dependencies]
 blockstitch-core.workspace = true
@@ -84,6 +84,9 @@ self_update = { workspace = true, optional = true }
 http = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
+objc2 = { version = "0.6", optional = true }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSWorkspace", "NSRunningApplication", "NSEvent", "NSGraphicsContext", "objc2-core-graphics"], optional = true }
+tract-metal = { version = "=0.23.9", optional = true }
 core-graphics = { workspace = true, optional = true }
 core-foundation = { workspace = true, optional = true }
 foreign-types = { workspace = true, optional = true }

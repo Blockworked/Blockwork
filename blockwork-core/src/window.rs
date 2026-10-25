@@ -968,130 +968,8 @@ mod windows {
 }
 
 #[cfg(target_os = "macos")]
-mod macos {
-    use super::{Action, ActiveWindow, MatchBy, Rect};
-
-    // Finds the window by app or title, then does `verb` to it. Arguments
-    // travel as argv so a pattern can't break out of the script.
-    const SCRIPT: &str = r#"on run argv
-    set pat to item 1 of argv
-    set mode to item 2 of argv
-    set verb to item 3 of argv
-    set targetProc to missing value
-    set targetWin to missing value
-    tell application "System Events"
-        if pat is "" then
-            set targetProc to first application process whose frontmost is true
-            if (count of windows of targetProc) > 0 then set targetWin to front window of targetProc
-        else
-            repeat with p in (application processes whose background only is false)
-                repeat with w in windows of p
-                    set wn to ""
-                    try
-                        set wn to name of w
-                    end try
-                    if (mode is not "Title" and name of p contains pat) or (mode is not "App" and wn contains pat) then
-                        set targetProc to p
-                        set targetWin to w
-                        exit repeat
-                    end if
-                end repeat
-                if targetWin is not missing value then exit repeat
-            end repeat
-        end if
-        if verb is "Exists" then return (targetWin is not missing value) as text
-        if verb is "Active" then
-            set t to ""
-            if targetWin is not missing value then set t to name of targetWin
-            return (name of targetProc) & linefeed & t
-        end if
-        if targetWin is missing value then error "no window matches '" & pat & "'"
-        if verb is "Bounds" then
-            set {px, py} to position of targetWin
-            set {sx, sy} to size of targetWin
-            return (px as text) & "," & (py as text) & "," & (sx as text) & "," & (sy as text)
-        end if
-        if verb is "Focus" then
-            set value of attribute "AXMinimized" of targetWin to false
-            set frontmost of targetProc to true
-            perform action "AXRaise" of targetWin
-        else if verb is "Minimize" then
-            set value of attribute "AXMinimized" of targetWin to true
-        else if verb is "Maximize" then
-            set value of attribute "AXFullScreen" of targetWin to true
-        else if verb is "Restore" then
-            set value of attribute "AXMinimized" of targetWin to false
-            set value of attribute "AXFullScreen" of targetWin to false
-        else if verb is "Close" then
-            click (first button of targetWin whose subrole is "AXCloseButton")
-        else if verb is "Move" then
-            set position of targetWin to {(item 4 of argv) as integer, (item 5 of argv) as integer}
-        else if verb is "Resize" then
-            set size of targetWin to {(item 4 of argv) as integer, (item 5 of argv) as integer}
-        end if
-    end tell
-    return ""
-end run"#;
-
-    fn run(args: &[&str]) -> Result<String, String> {
-        let output = std::process::Command::new("osascript")
-            .args(["-e", SCRIPT])
-            .args(args)
-            .output()
-            .map_err(|e| format!("couldn't ask System Events about windows: {e}"))?;
-        if !output.status.success() {
-            let err = String::from_utf8_lossy(&output.stderr);
-            return Err(if err.contains("matches") {
-                err.trim().to_string()
-            } else {
-                "couldn't control windows (Blockwork needs Accessibility access)".into()
-            });
-        }
-        Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
-    }
-
-    pub fn active() -> Result<ActiveWindow, String> {
-        let text = run(&["", "Any", "Active"])?;
-        let mut lines = text.splitn(2, '\n');
-        Ok(ActiveWindow {
-            app: lines.next().unwrap_or_default().to_string(),
-            title: lines.next().unwrap_or_default().to_string(),
-        })
-    }
-
-    fn mode(by: MatchBy) -> &'static str {
-        match by {
-            MatchBy::Any => "Any",
-            MatchBy::Title => "Title",
-            MatchBy::App => "App",
-        }
-    }
-
-    pub fn act(action: Action, pattern: &str, by: MatchBy) -> Result<(), String> {
-        let verb = super::ACTIONS[action as usize];
-        run(&[pattern.trim(), mode(by), verb]).map(drop)
-    }
-
-    pub fn place(pattern: &str, by: MatchBy, resize: bool, a: i32, b: i32) -> Result<(), String> {
-        let (a, b) = (a.to_string(), b.to_string());
-        run(&[pattern.trim(), mode(by), if resize { "Resize" } else { "Move" }, &a, &b]).map(drop)
-    }
-
-    /// The whole window frame; System Events has no separate content area.
-    pub fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
-        let text = run(&[pattern.trim(), mode(by), "Bounds"])?;
-        let n: Vec<f64> = text.split(',').filter_map(|v| v.trim().parse().ok()).collect();
-        match n[..] {
-            [x, y, width, height] if width >= 1.0 && height >= 1.0 => Ok(Rect { x, y, width, height }),
-            [_, _, _, _] => Err("the window is minimized or hidden".into()),
-            _ => Err(format!("unexpected window bounds '{text}'")),
-        }
-    }
-
-    pub fn exists(pattern: &str) -> Result<bool, String> {
-        Ok(pattern.trim().is_empty() || run(&[pattern.trim(), "Any", "Exists"])? == "true")
-    }
-}
+#[path = "window/macos.rs"]
+mod macos;
 
 #[cfg(test)]
 mod tests {
@@ -1102,15 +980,33 @@ mod tests {
     fn sway_restore_brings_minimized_windows_back() {
         let hidden = serde_json::json!({ "workspace": "__i3_scratch" });
         let tiled = serde_json::json!({ "workspace": "1", "scratchpad_state": "none" });
-        assert_eq!(linux::sway::act_command(Action::Restore, &serde_json::json!({ "scratchpad_state": "fresh" })), "scratchpad show, floating disable");
-        assert_eq!(linux::sway::act_command(Action::Minimize, &tiled), "move scratchpad");
-        assert_eq!(linux::sway::act_command(Action::Restore, &hidden), "scratchpad show, floating disable");
-        assert_eq!(linux::sway::act_command(Action::Restore, &tiled), "fullscreen disable");
+        assert_eq!(
+            linux::sway::act_command(
+                Action::Restore,
+                &serde_json::json!({ "scratchpad_state": "fresh" })
+            ),
+            "scratchpad show, floating disable"
+        );
+        assert_eq!(
+            linux::sway::act_command(Action::Minimize, &tiled),
+            "move scratchpad"
+        );
+        assert_eq!(
+            linux::sway::act_command(Action::Restore, &hidden),
+            "scratchpad show, floating disable"
+        );
+        assert_eq!(
+            linux::sway::act_command(Action::Restore, &tiled),
+            "fullscreen disable"
+        );
     }
 
     #[test]
     fn matches_title_or_app_ignoring_case() {
-        let w = ActiveWindow { title: "Inbox - Mail".into(), app: "Thunderbird".into() };
+        let w = ActiveWindow {
+            title: "Inbox - Mail".into(),
+            app: "Thunderbird".into(),
+        };
         assert!(w.matches("", MatchBy::Title));
         assert!(w.matches("inbox", MatchBy::Any));
         assert!(w.matches("THUNDER", MatchBy::Any));
@@ -1123,11 +1019,30 @@ mod tests {
     #[test]
     fn kdotool_geometry_parses() {
         let out = "Window {5f1e}\n  Position: 120,-40\n  Geometry: 800x600\n";
-        assert_eq!(linux::kde::parse_geometry(out), Ok(Rect { x: 120.0, y: -40.0, width: 800.0, height: 600.0 }));
+        assert_eq!(
+            linux::kde::parse_geometry(out),
+            Ok(Rect {
+                x: 120.0,
+                y: -40.0,
+                width: 800.0,
+                height: 600.0
+            })
+        );
         assert!(linux::kde::parse_geometry("Position: 1,2\n  Geometry: 0x0").is_err());
         assert!(linux::kde::parse_geometry("nonsense").is_err());
-        assert_eq!(linux::kde::parse_rect("2427,374,480,360"), Ok(Rect { x: 2427.0, y: 374.0, width: 480.0, height: 360.0 }));
-        assert_eq!(linux::kde::parse_rect("0,13,1707.5,1067").map(|r| r.width), Ok(1707.5));
+        assert_eq!(
+            linux::kde::parse_rect("2427,374,480,360"),
+            Ok(Rect {
+                x: 2427.0,
+                y: 374.0,
+                width: 480.0,
+                height: 360.0
+            })
+        );
+        assert_eq!(
+            linux::kde::parse_rect("0,13,1707.5,1067").map(|r| r.width),
+            Ok(1707.5)
+        );
         assert!(linux::kde::parse_rect("").is_err());
         assert!(linux::kde::parse_rect("1,2,0,0").is_err());
     }

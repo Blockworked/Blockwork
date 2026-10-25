@@ -899,8 +899,15 @@ Item {
             Text { text: qsTr("Speed"); color: Theme.textDim; font.pixelSize: 13 }
             RowLayout { width: parent.width; spacing: 10
                 Slider {
-                    id: speed; from: .1; to: 10; value: root.macro ? root.macro.speed_multiplier : 1; Layout.fillWidth: true; implicitHeight: 30
-                    onMoved: root.invoke("set_macro_speed_multiplier", { multiplier: value })
+                    id: speed; from: .1; to: 10; value: savedSpeed; Layout.fillWidth: true; implicitHeight: 30
+                    Accessible.name: qsTr("Playback speed")
+                    readonly property real savedSpeed: Math.max(from, Math.min(to, root.macro ? (root.macro.speed_multiplier ?? 1) : 1))
+                    property bool readyForEdits: false
+                    Component.onCompleted: readyForEdits = true
+                    onValueChanged: {
+                        if (readyForEdits && root.macro && value !== savedSpeed)
+                            root.invoke("set_macro_speed_multiplier", { multiplier: value });
+                    }
                     HoverHandler { cursorShape: Qt.PointingHandCursor }
                     background: Rectangle { x: speed.leftPadding; y: speed.topPadding + speed.availableHeight / 2 - height / 2; width: speed.availableWidth; height: 5; radius: 3; color: Theme.border; Rectangle { width: speed.visualPosition * parent.width; height: parent.height; radius: 3; color: Theme.accent } }
                     handle: Rectangle { x: speed.leftPadding + speed.visualPosition * (speed.availableWidth - width); y: speed.topPadding + speed.availableHeight / 2 - height / 2; width: 16; height: 16; radius: 8; color: "white"; border.width: 2; border.color: Theme.accent }
@@ -1413,8 +1420,14 @@ Item {
                         width: 280; from: 0; to: 10; stepSize: 1; ticks: true
                         anchors.verticalCenter: parent.verticalCenter
                         Accessible.name: qsTr("Countdown")
-                        value: appState.recording_countdown_secs ?? 3
-                        onMoved: root.invoke("set_recording_countdown", { seconds: Math.round(value) })
+                        readonly property int savedSeconds: Math.max(from, Math.min(to, appState.recording_countdown_secs ?? 3))
+                        property bool readyForEdits: false
+                        Component.onCompleted: readyForEdits = true
+                        value: savedSeconds
+                        onValueChanged: {
+                            if (readyForEdits && value !== savedSeconds)
+                                root.invoke("set_recording_countdown", { seconds: Math.round(value) });
+                        }
                     }
                     Text {
                         anchors.verticalCenter: parent.verticalCenter
