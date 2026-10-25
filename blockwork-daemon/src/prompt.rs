@@ -15,6 +15,7 @@ fn show(request: &Request, stopped: &dyn Fn() -> bool) -> Result<Reply, String> 
     let program = crate::server::ui_program().ok_or("can't find the Blockwork window program")?;
     let mut child = Command::new(&program)
         .arg("--prompt")
+        .env("BLOCKWORK_PROMPT_PARENT_PID", std::process::id().to_string())
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())

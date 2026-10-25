@@ -196,6 +196,18 @@ fn initial_state(
     }
 }
 
+/// Restore the selected document and the live stores used by both execution
+/// and reporter previews. Lists must be restored alongside variables, even
+/// when a background/CLI run happens before the editor ever opens.
+fn restore_loaded_macros(s: &mut AppState, macros: Vec<blockwork_core::macros::Macro>, selected: Option<&str>) {
+    s.macro_strs = macros.iter().map(|mac| mac.name.clone()).collect();
+    s.macro_selected = selected.and_then(|id| macros.iter().position(|mac| mac.id == id));
+    s.current_macro = s.macro_selected.map(|index| macros[index].clone());
+    s.macros_list = macros;
+    commands::sync_variable_values(s);
+    commands::sync_list_values(s);
+}
+
 impl Backend {
     /// Loads settings and macros and starts every background service
     /// (input grab, hotkeys, IPC auto-start, battery/time watchers, update
@@ -239,34 +251,7 @@ impl Backend {
                 let _ = blockwork_core::macros::Macro::new("New Macro".into(), "".into(), vec![]).add();
             }
             let macros = config::get_macros_from_config();
-            s.macro_strs = macros.iter().map(|m| m.name.clone()).collect();
-
-            // Restore selection
-            if let Some(ref id) = settings.selected_macro_id {
-                if let Some((idx, mac)) = macros.iter().enumerate().find(|(_, m)| &m.id == id) {
-                    s.macro_selected = Some(idx);
-                    s.current_macro = Some(mac.clone());
-                }
-            }
-            s.macros_list = macros;
-
-            // The selected macro's live variable store backs reporter
-            // previews and execution. Populate it at startup too, not
-            // just on UI selection, or persisted variables preview as
-            // empty until a reselect.
-            let variables = s
-                .current_macro
-                .as_ref()
-                .map(|mac| {
-                    mac.variables
-                        .iter()
-                        .map(|variable| (variable.name.clone(), variable.value.clone()))
-                        .collect()
-                })
-                .unwrap_or_default();
-            if let Ok(mut store) = s.variable_values.lock() {
-                *store = variables;
-            }
+            restore_loaded_macros(&mut s, macros, settings.selected_macro_id.as_deref());
 
             // macOS accessibility
             #[cfg(target_os = "macos")]
@@ -425,5 +410,29 @@ impl Backend {
     /// Asks every subscriber to shut down (publishes [`Event::Quit`]).
     pub fn request_quit(&self) {
         self.app.send(Event::Quit);
+    }
+}
+
+#[cfg(test)]
+mod startup_tests {
+    use super::*;
+    use blockwork_core::input::value::Evaluated;
+    use blockwork_core::macros::{ListDef, ListItem, Macro, VariableDef};
+
+    #[test]
+    fn restored_selection_has_saved_lists_and_variables_before_any_ui_selection() {
+        let mut mac = Macro::new("Saved choices".into(), "".into(), vec![]);
+        let id = mac.id.clone();
+        mac.variables.push(VariableDef { name: "answer".into(), value: Evaluated::Text("saved".into()) });
+        mac.lists.push(ListDef { name: "choices".into(), items: vec![ListItem::Text("First".into()), ListItem::Text("Second".into())], editor_visible: false, editor_x: 0, editor_y: 0 });
+        let mut state = initial_state(&config::AppSettings::default(), None, false, false);
+        restore_loaded_macros(&mut state, vec![mac], Some(&id));
+        assert_eq!(state.variable_values.lock().unwrap().get("answer"), Some(&Evaluated::Text("saved".into())));
+        assert_eq!(state.list_values.lock().unwrap().get("choices"), Some(&vec![ListItem::Text("First".into()), ListItem::Text("Second".into())]));
+        // A missing selection must not retain the old document's live data.
+        restore_loaded_macros(&mut state, vec![], Some("missing"));
+        assert!(state.current_macro.is_none());
+        assert!(state.variable_values.lock().unwrap().is_empty());
+        assert!(state.list_values.lock().unwrap().is_empty());
     }
 }

@@ -71,28 +71,51 @@ pub struct Shot {
 impl Shot {
     /// The image pixel under screen point (`x`, `y`).
     pub fn to_image(&self, x: f64, y: f64) -> (i64, i64) {
-        (((x - self.origin.0) * self.scale).floor() as i64, ((y - self.origin.1) * self.scale).floor() as i64)
+        (
+            ((x - self.origin.0) * self.scale).floor() as i64,
+            ((y - self.origin.1) * self.scale).floor() as i64,
+        )
     }
 
     /// The screen point at the middle of image pixel (`px`, `py`).
     pub fn to_screen(&self, px: f64, py: f64) -> (f64, f64) {
-        (self.origin.0 + px / self.scale, self.origin.1 + py / self.scale)
+        (
+            self.origin.0 + px / self.scale,
+            self.origin.1 + py / self.scale,
+        )
     }
 
     /// The part of the image under a screen rectangle, clipped to the image.
     pub fn region(&self, x: f64, y: f64, width: f64, height: f64) -> Result<Image, String> {
-        self.crop(Rect { x, y, width, height }).map(|shot| shot.image)
+        self.crop(Rect {
+            x,
+            y,
+            width,
+            height,
+        })
+        .map(|shot| shot.image)
     }
 
     /// The part of this shot under a screen rectangle, clipped to the image,
     /// keeping the mapping back to screen coordinates.
     pub fn crop(&self, rect: Rect) -> Result<Shot, String> {
-        let Rect { x, y, width, height } = rect;
+        let Rect {
+            x,
+            y,
+            width,
+            height,
+        } = rect;
         let (x0, y0) = self.to_image(x, y);
         let (x1, y1) = self.to_image(x + width, y + height);
         let clip = |v: i64, max: u32| v.clamp(0, max as i64) as u32;
-        let (x0, x1) = (clip(x0, self.image.width), clip(x1.max(x0 + 1), self.image.width));
-        let (y0, y1) = (clip(y0, self.image.height), clip(y1.max(y0 + 1), self.image.height));
+        let (x0, x1) = (
+            clip(x0, self.image.width),
+            clip(x1.max(x0 + 1), self.image.width),
+        );
+        let (y0, y1) = (
+            clip(y0, self.image.height),
+            clip(y1.max(y0 + 1), self.image.height),
+        );
         if x1 <= x0 || y1 <= y0 {
             return Err(format!("the region {x},{y} {width}x{height} is off screen"));
         }
@@ -105,7 +128,10 @@ impl Shot {
 
     /// The screen point at the middle of the image.
     pub fn center(&self) -> (f64, f64) {
-        self.to_screen(self.image.width as f64 / 2.0, self.image.height as f64 / 2.0)
+        self.to_screen(
+            self.image.width as f64 / 2.0,
+            self.image.height as f64 / 2.0,
+        )
     }
 }
 
@@ -148,7 +174,13 @@ fn area(rect: Rect) -> Result<Shot, String> {
 
 /// The color at screen point (`x`, `y`) as `#rrggbb`.
 pub fn pixel_color(x: f64, y: f64) -> Result<String, String> {
-    let shot = area(Rect { x, y, width: 1.0, height: 1.0 }).map_err(|_| format!("{x},{y} is off screen"))?;
+    let shot = area(Rect {
+        x,
+        y,
+        width: 1.0,
+        height: 1.0,
+    })
+    .map_err(|_| format!("{x},{y} is off screen"))?;
     let (px, py) = shot.to_image(x, y);
     if px < 0 || py < 0 || px >= shot.image.width as i64 || py >= shot.image.height as i64 {
         return Err(format!("{x},{y} is off screen"));
@@ -158,7 +190,13 @@ pub fn pixel_color(x: f64, y: f64) -> Result<String, String> {
 
 /// The average color of a screen rectangle as `#rrggbb`.
 pub fn average_color(x: f64, y: f64, width: f64, height: f64) -> Result<String, String> {
-    let region = area(Rect { x, y, width: width.max(1.0), height: height.max(1.0) })?.image;
+    let region = area(Rect {
+        x,
+        y,
+        width: width.max(1.0),
+        height: height.max(1.0),
+    })?
+    .image;
     let mut sum = [0u64; 3];
     for px in region.rgba.chunks_exact(4) {
         for c in 0..3 {
@@ -166,12 +204,26 @@ pub fn average_color(x: f64, y: f64, width: f64, height: f64) -> Result<String, 
         }
     }
     let n = (region.width as u64 * region.height as u64).max(1);
-    Ok(hex([(sum[0] / n) as u8, (sum[1] / n) as u8, (sum[2] / n) as u8]))
+    Ok(hex([
+        (sum[0] / n) as u8,
+        (sum[1] / n) as u8,
+        (sum[2] / n) as u8,
+    ]))
 }
 
 /// Text read from a screen rectangle; an empty rectangle reads the whole screen.
 pub fn read_text(x: f64, y: f64, width: f64, height: f64) -> Result<String, String> {
-    let image = if width <= 0.0 || height <= 0.0 { capture()?.image.clone() } else { area(Rect { x, y, width, height })?.image };
+    let image = if width <= 0.0 || height <= 0.0 {
+        capture()?.image.clone()
+    } else {
+        area(Rect {
+            x,
+            y,
+            width,
+            height,
+        })?
+        .image
+    };
     ocr::read(&image)
 }
 
@@ -180,7 +232,10 @@ pub fn read_text(x: f64, y: f64, width: f64, height: f64) -> Result<String, Stri
 pub fn find_image(needle: &Image, tolerance: f64) -> Result<Option<(f64, f64)>, String> {
     let shot = capture()?;
     Ok(find(&shot.image, needle, tolerance).map(|(px, py)| {
-        shot.to_screen(px as f64 + needle.width as f64 / 2.0, py as f64 + needle.height as f64 / 2.0)
+        shot.to_screen(
+            px as f64 + needle.width as f64 / 2.0,
+            py as f64 + needle.height as f64 / 2.0,
+        )
     }))
 }
 
@@ -202,7 +257,9 @@ fn window_shot(pattern: &str, by: crate::window::MatchBy, native: bool) -> Resul
     if let Some(shot) = platform::capture_area(bounds, native) {
         return Ok(shot);
     }
-    capture()?.crop(bounds).map_err(|_| "the window is off screen".to_string())
+    capture()?
+        .crop(bounds)
+        .map_err(|_| "the window is off screen".to_string())
 }
 
 /// How long a window lookup is reused: aiming captures the same window many
@@ -234,14 +291,24 @@ pub fn monitors() -> Vec<Rect> {
 pub fn desktop() -> Result<Rect, String> {
     let monitors = monitors();
     let first = monitors.first().ok_or("couldn't find any monitors")?;
-    let (mut x0, mut y0, mut x1, mut y1) = (first.x, first.y, first.x + first.width, first.y + first.height);
+    let (mut x0, mut y0, mut x1, mut y1) = (
+        first.x,
+        first.y,
+        first.x + first.width,
+        first.y + first.height,
+    );
     for m in &monitors[1..] {
         x0 = x0.min(m.x);
         y0 = y0.min(m.y);
         x1 = x1.max(m.x + m.width);
         y1 = y1.max(m.y + m.height);
     }
-    Ok(Rect { x: x0, y: y0, width: x1 - x0, height: y1 - y0 })
+    Ok(Rect {
+        x: x0,
+        y: y0,
+        width: x1 - x0,
+        height: y1 - y0,
+    })
 }
 
 /// The mouse cursor's screen position.
@@ -258,13 +325,21 @@ pub fn parse_color(text: &str) -> Result<[u8; 3], String> {
     let text = text.trim();
     let bad = || format!("'{text}' isn't a color (use #rrggbb)");
     if text.contains(',') {
-        let parts: Vec<u8> = text.split(',').map(|p| p.trim().parse::<u8>()).collect::<Result<_, _>>().map_err(|_| bad())?;
+        let parts: Vec<u8> = text
+            .split(',')
+            .map(|p| p.trim().parse::<u8>())
+            .collect::<Result<_, _>>()
+            .map_err(|_| bad())?;
         return <[u8; 3]>::try_from(parts).map_err(|_| bad());
     }
     let digits = text.trim_start_matches('#');
     let channel = |s: &str| u8::from_str_radix(s, 16).map_err(|_| bad());
     match digits.len() {
-        6 => Ok([channel(&digits[0..2])?, channel(&digits[2..4])?, channel(&digits[4..6])?]),
+        6 => Ok([
+            channel(&digits[0..2])?,
+            channel(&digits[2..4])?,
+            channel(&digits[4..6])?,
+        ]),
         3 => {
             let one = |i: usize| channel(&digits[i..i + 1]).map(|v| v * 17);
             Ok([one(0)?, one(1)?, one(2)?])
@@ -296,7 +371,11 @@ mod tests {
 
     #[test]
     fn shots_map_between_screen_and_image_pixels() {
-        let shot = Shot { image: Image::new(300, 150), origin: (-100.0, 0.0), scale: 1.5 };
+        let shot = Shot {
+            image: Image::new(300, 150),
+            origin: (-100.0, 0.0),
+            scale: 1.5,
+        };
         assert_eq!(shot.to_image(-100.0, 0.0), (0, 0));
         assert_eq!(shot.to_image(0.0, 10.0), (150, 15));
         assert_eq!(shot.to_screen(150.0, 15.0), (0.0, 10.0));
@@ -304,7 +383,14 @@ mod tests {
         assert_eq!((region.width, region.height), (30, 15));
         assert!(shot.region(500.0, 500.0, 10.0, 10.0).is_err());
         // A crop hanging off the left edge starts at the image edge.
-        let crop = shot.crop(Rect { x: -120.0, y: 10.0, width: 40.0, height: 20.0 }).unwrap();
+        let crop = shot
+            .crop(Rect {
+                x: -120.0,
+                y: 10.0,
+                width: 40.0,
+                height: 20.0,
+            })
+            .unwrap();
         assert_eq!(crop.origin, (-100.0, 10.0));
         assert_eq!((crop.image.width, crop.image.height), (30, 30));
         assert_eq!(crop.center(), (-90.0, 20.0));
@@ -319,15 +405,33 @@ mod live {
     fn reads_the_real_screen() {
         let started = std::time::Instant::now();
         let shot = super::capture().unwrap();
-        eprintln!("capture {}x{} scale {} origin {:?} in {:?}", shot.image.width, shot.image.height, shot.scale, shot.origin, started.elapsed());
+        eprintln!(
+            "capture {}x{} scale {} origin {:?} in {:?}",
+            shot.image.width,
+            shot.image.height,
+            shot.scale,
+            shot.origin,
+            started.elapsed()
+        );
         eprintln!("monitors {:?}", super::monitors());
         eprintln!("cursor {:?}", super::cursor());
         eprintln!("pixel {:?}", super::pixel_color(10.0, 10.0));
+        if let Ok(path) = std::env::var("BLOCKWORK_TEST_OCR_CROP") {
+            std::fs::write(path, shot.region(0.0, 0.0, 600.0, 120.0).unwrap().to_png().unwrap()).unwrap();
+        }
         let needle = shot.region(20.0, 4.0, 90.0, 24.0).unwrap();
         let started = std::time::Instant::now();
-        eprintln!("find {:?} in {:?}", super::find_image(&needle, 5.0), started.elapsed());
+        eprintln!(
+            "find {:?} in {:?}",
+            super::find_image(&needle, 5.0),
+            started.elapsed()
+        );
         let started = std::time::Instant::now();
-        eprintln!("text {:?} in {:?}", super::read_text(0.0, 0.0, 600.0, 120.0), started.elapsed());
+        eprintln!(
+            "text {:?} in {:?}",
+            super::read_text(0.0, 0.0, 600.0, 120.0),
+            started.elapsed()
+        );
     }
 }
 
@@ -341,11 +445,68 @@ mod live_window {
         std::env::var("BW_LIVE_WINDOW").expect("set BW_LIVE_WINDOW to a test window's title")
     }
 
+    /// Deterministic colors and text from scripts/macos/test-window.swift.
+    #[cfg(target_os = "macos")]
+    #[test]
+    #[ignore = "requires the native fixture and the example color detector"]
+    fn fixture_screen_blocks_and_detection_agree_on_coordinates() {
+        use crate::detect::Detector;
+        let title = title();
+        let shot = super::capture_window_small(&title, MatchBy::Title).unwrap();
+        let center = (
+            shot.origin.0 + 320.0,
+            shot.origin.1 + shot.image.height as f64 / shot.scale - 220.0,
+        );
+        assert_eq!(super::pixel_color(center.0, center.1).unwrap(), "#ff0000");
+        assert_eq!(
+            super::average_color(center.0 - 10.0, center.1 - 10.0, 20.0, 20.0).unwrap(),
+            "#ff0000"
+        );
+        let mut needle = super::Image::new(16, 16);
+        for pixel in needle.rgba.chunks_exact_mut(4) {
+            pixel.copy_from_slice(&[255, 0, 0, 255]);
+        }
+        let at = super::find(&shot.image, &needle, 0.0).expect("red marker must be searchable");
+        let at = shot.to_screen(at.0 as f64, at.1 as f64);
+        assert!(
+            (at.0 - (center.0 - 40.0)).abs() <= 1.0,
+            "{at:?}, {center:?}"
+        );
+        assert!(
+            (at.1 - (center.1 - 40.0)).abs() <= 1.0,
+            "{at:?}, {center:?}"
+        );
+        let text = super::read_text(shot.origin.0, shot.origin.1, 640.0, 150.0).unwrap();
+        assert!(
+            text.contains("BLOCKWORK MACOS 12345"),
+            "Vision returned {text:?}"
+        );
+        let url = std::env::var("BLOCKWORK_TEST_DETECTOR").expect("set BLOCKWORK_TEST_DETECTOR");
+        let found = crate::detect::http::HttpDetector::new(&url)
+            .unwrap()
+            .detect(&shot.image)
+            .unwrap();
+        assert!(
+            found.iter().filter(|d| d.label == "player").any(|d| {
+                let detected = shot.to_screen(d.center().0, d.center().1);
+                (detected.0 - center.0).abs() <= 1.0
+                    && (detected.1 - center.1).abs() <= 1.0
+                    && (d.w / shot.scale - 80.0).abs() <= 1.0
+                    && (d.h / shot.scale - 80.0).abs() <= 1.0
+            }),
+            "detections {found:?} must include the 80x80 marker centered at {center:?}"
+        );
+    }
+
     #[test]
     #[ignore]
     fn window_bounds() {
         let started = std::time::Instant::now();
-        eprintln!("bounds {:?} in {:?}", crate::window::bounds(&title(), MatchBy::Title), started.elapsed());
+        eprintln!(
+            "bounds {:?} in {:?}",
+            crate::window::bounds(&title(), MatchBy::Title),
+            started.elapsed()
+        );
     }
 
     #[test]
@@ -355,17 +516,33 @@ mod live_window {
         for _ in 0..10 {
             let started = std::time::Instant::now();
             let shot = super::capture_window(&title, MatchBy::Title).unwrap();
-            eprintln!("capture_window {}x{} origin {:?} scale {} in {:?}", shot.image.width, shot.image.height, shot.origin, shot.scale, started.elapsed());
+            eprintln!(
+                "capture_window {}x{} origin {:?} scale {} in {:?}",
+                shot.image.width,
+                shot.image.height,
+                shot.origin,
+                shot.scale,
+                started.elapsed()
+            );
         }
         // Where pure red sits, to check the crop against a centered red marker.
         let shot = super::capture_window(&title, MatchBy::Title).unwrap();
         let (w, h) = (shot.image.width, shot.image.height);
-        let red: Vec<(u32, u32)> = (0..h).flat_map(|y| (0..w).map(move |x| (x, y))).filter(|&(x, y)| shot.image.pixel(x, y) == [255, 0, 0]).collect();
-        if let (Some(x0), Some(x1), Some(y0), Some(y1)) =
-            (red.iter().map(|p| p.0).min(), red.iter().map(|p| p.0).max(), red.iter().map(|p| p.1).min(), red.iter().map(|p| p.1).max())
-        {
+        let red: Vec<(u32, u32)> = (0..h)
+            .flat_map(|y| (0..w).map(move |x| (x, y)))
+            .filter(|&(x, y)| shot.image.pixel(x, y) == [255, 0, 0])
+            .collect();
+        if let (Some(x0), Some(x1), Some(y0), Some(y1)) = (
+            red.iter().map(|p| p.0).min(),
+            red.iter().map(|p| p.0).max(),
+            red.iter().map(|p| p.1).min(),
+            red.iter().map(|p| p.1).max(),
+        ) {
             let marker = shot.to_screen((x0 + x1 + 1) as f64 / 2.0, (y0 + y1 + 1) as f64 / 2.0);
-            eprintln!("red marker center {marker:?}, window center {:?}", shot.center());
+            eprintln!(
+                "red marker center {marker:?}, window center {:?}",
+                shot.center()
+            );
         }
     }
 }

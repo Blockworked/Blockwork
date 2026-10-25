@@ -58,7 +58,9 @@ fn is_packaged() -> bool {
     const APPMODEL_ERROR_NO_PACKAGE: u32 = 15700;
     let mut len = 0u32;
     // SAFETY: a null buffer with len 0 only asks for the required length
-    unsafe { GetCurrentPackageFullName(&mut len, std::ptr::null_mut()) != APPMODEL_ERROR_NO_PACKAGE }
+    unsafe {
+        GetCurrentPackageFullName(&mut len, std::ptr::null_mut()) != APPMODEL_ERROR_NO_PACKAGE
+    }
 }
 
 fn build_updater(current_version: &str) -> Result<Update, String> {
@@ -205,16 +207,7 @@ pub fn apply_update(current_version: &str) -> Result<PathBuf, String> {
         .ok_or_else(|| "update archive did not contain a Blockwork.app bundle".to_string())?;
     let current_bundle = current_app_bundle()?;
 
-    let backup_bundle = backup_path(&current_bundle);
-    if backup_bundle.exists() {
-        fs::remove_dir_all(&backup_bundle).map_err(|err| err.to_string())?;
-    }
-    fs::rename(&current_bundle, &backup_bundle).map_err(|err| err.to_string())?;
-    if let Err(err) = fs::rename(&new_app, &current_bundle) {
-        // Best-effort rollback so the user isn't left without an app bundle.
-        let _ = fs::rename(&backup_bundle, &current_bundle);
-        return Err(err.to_string());
-    }
+    replace_macos_bundle(&new_app, &current_bundle)?;
 
     // A bundle moved in from a download carries a quarantine flag that makes
     // Gatekeeper refuse (or nag about) the fresh copy; the replaced bundle is
@@ -225,13 +218,101 @@ pub fn apply_update(current_version: &str) -> Result<PathBuf, String> {
         .arg(&current_bundle)
         .status();
 
-    std::process::Command::new("open")
-        .args(["-n"])
-        .arg(&current_bundle)
-        .spawn()
-        .map_err(|err| format!("update installed but failed to relaunch: {err}"))?;
+    // The caller is now the daemon. Starting the UI before it exits lets the
+    // new UI connect to the old socket and receive the imminent Quit message.
+    // A separate helper survives that exit and relaunches only afterward.
+    relaunch_after_exit(
+        std::process::id(),
+        &current_bundle,
+        Path::new("/usr/bin/open"),
+    )
+    .map_err(|err| format!("update installed but failed to schedule relaunch: {err}"))?;
 
     Ok(current_bundle)
+}
+
+/// Copy to the install volume before renaming. A temp directory and an app
+/// installed on an external volume need not share a filesystem. `ditto` keeps
+/// framework symlinks and macOS metadata intact during that copy.
+#[cfg(target_os = "macos")]
+fn replace_macos_bundle(source: &Path, current: &Path) -> Result<(), String> {
+    replace_macos_bundle_with_rename(source, current, &mut |from, to| fs::rename(from, to))
+}
+
+#[cfg(target_os = "macos")]
+fn replace_macos_bundle_with_rename(
+    source: &Path,
+    current: &Path,
+    rename: &mut impl FnMut(&Path, &Path) -> std::io::Result<()>,
+) -> Result<(), String> {
+    for required in [
+        "Contents/Info.plist",
+        "Contents/MacOS/Blockwork",
+        "Contents/MacOS/blockwork-daemon",
+    ] {
+        if !source.join(required).is_file() {
+            return Err(format!("update bundle is missing {required}"));
+        }
+    }
+    struct Stage(PathBuf);
+    impl Drop for Stage {
+        fn drop(&mut self) {
+            let _ = fs::remove_dir_all(&self.0);
+        }
+    }
+    let stage =
+        Stage(current.with_file_name(format!(".Blockwork.update-{}.app", uuid::Uuid::new_v4())));
+    let copy = std::process::Command::new("/usr/bin/ditto")
+        .arg(source)
+        .arg(&stage.0)
+        .output()
+        .map_err(|err| format!("failed to stage update beside the installed app: {err}"))?;
+    if !copy.status.success() {
+        return Err(format!(
+            "failed to stage update beside the installed app: {}",
+            String::from_utf8_lossy(&copy.stderr).trim()
+        ));
+    }
+    let backup = backup_path(current);
+    if backup.exists() {
+        fs::remove_dir_all(&backup)
+            .map_err(|err| format!("couldn't remove the previous update backup: {err}"))?;
+    }
+    rename(current, &backup).map_err(|err| format!("couldn't back up the installed app: {err}"))?;
+    if let Err(install_error) = rename(&stage.0, current) {
+        return match rename(&backup, current) {
+            Ok(()) => Err(format!(
+                "couldn't install update; the previous app was restored: {install_error}"
+            )),
+            Err(rollback_error) => Err(format!(
+                "couldn't install update ({install_error}) or restore the previous app ({rollback_error}); its backup is at {}",
+                backup.display()
+            )),
+        };
+    }
+    Ok(())
+}
+
+#[cfg(target_os = "macos")]
+fn relaunch_after_exit(
+    parent: u32,
+    bundle: &Path,
+    opener: &Path,
+) -> std::io::Result<std::process::Child> {
+    // Paths are separate positional arguments, never interpolated shell code.
+    std::process::Command::new("/bin/sh")
+        .args([
+            "-c",
+            "while kill -0 \"$1\" 2>/dev/null; do sleep 0.1; done; exec \"$2\" -n \"$3\"",
+            "blockwork-update-relaunch",
+        ])
+        .arg(parent.to_string())
+        .arg(opener)
+        .arg(bundle)
+        .stdin(std::process::Stdio::null())
+        .stdout(std::process::Stdio::null())
+        .stderr(std::process::Stdio::null())
+        .spawn()
 }
 
 /// The running `Blockwork.app` bundle, derived from the current executable's
@@ -293,6 +374,133 @@ fn find_blockwork_app(extract_dir: &Path) -> Option<PathBuf> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_relaunch_waits_for_the_old_daemon_and_preserves_literal_paths() {
+        use std::os::unix::fs::PermissionsExt;
+        let root =
+            std::env::temp_dir().join(format!("blockwork-relaunch-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&root).unwrap();
+        let opener = root.join("test opener");
+        fs::write(
+            &opener,
+            "#!/bin/sh\nprintf '%s\\n' \"$@\" > \"${0%/*}/launched\"\n",
+        )
+        .unwrap();
+        fs::set_permissions(&opener, fs::Permissions::from_mode(0o700)).unwrap();
+        let bundle = root.join("Blockwork ' $(literal).app");
+        let mut parent = std::process::Command::new("/bin/cat")
+            .stdin(std::process::Stdio::piped())
+            .spawn()
+            .unwrap();
+        let mut helper = relaunch_after_exit(parent.id(), &bundle, &opener).unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(150));
+        assert!(parent.try_wait().unwrap().is_none());
+        assert!(
+            !root.join("launched").exists(),
+            "must not relaunch against the old daemon's socket"
+        );
+        drop(parent.stdin.take());
+        parent.wait().unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        loop {
+            if let Some(status) = helper.try_wait().unwrap() {
+                assert!(status.success());
+                break;
+            }
+            if std::time::Instant::now() >= deadline {
+                let _ = helper.kill();
+                let _ = helper.wait();
+                panic!("relaunch helper did not finish after the old daemon exited");
+            }
+            std::thread::sleep(std::time::Duration::from_millis(10));
+        }
+        assert_eq!(
+            fs::read_to_string(root.join("launched")).unwrap(),
+            format!("-n\n{}\n", bundle.display())
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn macos_bundle_replacement_stages_copy_preserves_symlinks_and_keeps_backup() {
+        use std::os::unix::fs::symlink;
+        let root = std::env::temp_dir().join(format!("blockwork-install-{}", uuid::Uuid::new_v4()));
+        let source = root.join("download/Blockwork.app");
+        let current = root.join("installed/Blockwork ' $(literal).app");
+        for (app, marker) in [(&source, "new"), (&current, "old")] {
+            fs::create_dir_all(app.join("Contents/MacOS")).unwrap();
+            fs::write(app.join("Contents/Info.plist"), marker).unwrap();
+            fs::write(app.join("Contents/MacOS/Blockwork"), marker).unwrap();
+            fs::write(app.join("Contents/MacOS/blockwork-daemon"), marker).unwrap();
+        }
+        let versions = source.join("Contents/Frameworks/Example.framework/Versions");
+        fs::create_dir_all(versions.join("A")).unwrap();
+        fs::write(versions.join("A/Example"), "framework").unwrap();
+        symlink("A", versions.join("Current")).unwrap();
+        // Simulate a failed promotion after the old app has been moved aside.
+        let mut renames = 0;
+        let error = replace_macos_bundle_with_rename(&source, &current, &mut |from, to| {
+            renames += 1;
+            if renames == 2 {
+                Err(std::io::Error::new(
+                    std::io::ErrorKind::PermissionDenied,
+                    "simulated failed promotion",
+                ))
+            } else {
+                fs::rename(from, to)
+            }
+        })
+        .unwrap_err();
+        assert!(error.contains("previous app was restored"), "{error}");
+        assert_eq!(
+            fs::read_to_string(current.join("Contents/MacOS/Blockwork")).unwrap(),
+            "old"
+        );
+        assert!(!backup_path(&current).exists());
+        assert_eq!(fs::read_dir(current.parent().unwrap()).unwrap().count(), 1);
+        replace_macos_bundle(&source, &current).unwrap();
+        assert_eq!(
+            fs::read_to_string(current.join("Contents/MacOS/Blockwork")).unwrap(),
+            "new"
+        );
+        assert_eq!(
+            fs::read_to_string(backup_path(&current).join("Contents/MacOS/Blockwork")).unwrap(),
+            "old"
+        );
+        assert_eq!(
+            fs::read_link(current.join("Contents/Frameworks/Example.framework/Versions/Current"))
+                .unwrap(),
+            Path::new("A")
+        );
+        assert!(
+            source.join("Contents/MacOS/Blockwork").is_file(),
+            "copy must work across volumes rather than moving the download"
+        );
+        assert_eq!(
+            fs::read_dir(current.parent().unwrap()).unwrap().count(),
+            2,
+            "no staging bundles should remain"
+        );
+        // A partial archive must leave both the app and its rollback intact.
+        fs::remove_file(source.join("Contents/MacOS/blockwork-daemon")).unwrap();
+        assert!(
+            replace_macos_bundle(&source, &current)
+                .unwrap_err()
+                .contains("blockwork-daemon")
+        );
+        assert_eq!(
+            fs::read_to_string(current.join("Contents/MacOS/Blockwork")).unwrap(),
+            "new"
+        );
+        assert_eq!(
+            fs::read_to_string(backup_path(&current).join("Contents/MacOS/Blockwork")).unwrap(),
+            "old"
+        );
+        fs::remove_dir_all(root).unwrap();
+    }
 
     #[test]
     fn macos_asset_name_matches_release_artifact() {

@@ -19,6 +19,11 @@ esac
 REPO_ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 cd "$REPO_ROOT"
 
+# Qt 6.10 calls __yield without including its declaration on Apple Clang 21.
+export CXXFLAGS_aarch64_apple_darwin="${CXXFLAGS_aarch64_apple_darwin:-} -include arm_acle.h"
+# The official Qt 6.10 frameworks require macOS 13, matching release CI.
+export MACOSX_DEPLOYMENT_TARGET="${MACOSX_DEPLOYMENT_TARGET:-13.0}"
+
 VERSION="$(sed -n 's/^version = "\(.*\)"/\1/p' Cargo.toml | head -1)"
 APP_NAME="Blockwork"
 
@@ -64,7 +69,16 @@ if [[ ! -x "$MACDEPLOYQT" ]]; then
   echo "error: macdeployqt not found next to $QMAKE_BIN" >&2
   exit 1
 fi
-"$MACDEPLOYQT" "$DIST" -qmldir="$REPO_ROOT/blockwork-qt/qml" -always-overwrite
+# ODBC/PostgreSQL plugins are unused and reference optional host database
+# installations. Skip those plugins, and sign every framework/plugin after
+# macdeployqt rewrites its load commands (signing only the outer app is not enough).
+"$MACDEPLOYQT" "$DIST" -qmldir="$REPO_ROOT/blockwork-qt/qml" -always-overwrite -appstore-compliant -codesign=-
+
+# Qt can also copy optional Mimer/MySQL/etc. drivers whose client libraries
+# aren't part of the app. Blockwork only needs SQLite (Qt's local storage).
+if [[ -d "$CONTENTS/PlugIns/sqldrivers" ]]; then
+  find "$CONTENTS/PlugIns/sqldrivers" -type f ! -name 'libqsqlite.dylib' -delete
+fi
 
 # Ad-hoc signing isn't optional on Apple Silicon. It has nothing to do with
 # Gatekeeper or notarization:
@@ -76,5 +90,6 @@ fi
 # `xattr -dr com.apple.quarantine dist/Blockwork.app` after downloading);
 # that's expected without a paid Developer ID for notarization.
 codesign --force --sign - "$DIST"
+python3 scripts/macos/verify-bundle.py "$DIST"
 
 echo "Built $DIST"

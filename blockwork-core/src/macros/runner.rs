@@ -2135,7 +2135,7 @@ fn open_app(command: &str) -> std::io::Result<()> {
 
 #[cfg(target_os = "macos")]
 fn open_app(command: &str) -> std::io::Result<()> {
-    Command::new("open").arg(command).spawn().map(|_| ())
+    crate::system::open_application(command)
 }
 
 #[cfg(target_os = "linux")]
@@ -2159,8 +2159,7 @@ fn open_app(_command: &str) -> std::io::Result<()> {
 /// "close this launch string" API exists, so each platform derives a
 /// best-effort process matcher from whatever `OpenApp`'s picker captured:
 /// the executable basename from a Linux `Exec=` line or a Windows `.lnk`
-/// path, or (macOS) the app's display name, since Launch Services addresses
-/// running apps by name.
+/// path, or the exact macOS bundle path with a legacy display-name fallback.
 #[cfg(target_os = "linux")]
 fn close_app(command: &str, _name: &str) -> std::io::Result<()> {
     let proc_name = command
@@ -2193,19 +2192,8 @@ fn close_app(command: &str, _name: &str) -> std::io::Result<()> {
 }
 
 #[cfg(target_os = "macos")]
-fn close_app(_command: &str, name: &str) -> std::io::Result<()> {
-    if name.is_empty() {
-        return Ok(());
-    }
-    // AppleScript string literal - strip quotes/backslashes rather than
-    // escaping them, since `name` only ever comes from the picker's own app
-    // list (never freeform user text) and doesn't need real escaping support.
-    let sanitized: String = name.chars().filter(|c| *c != '"' && *c != '\\').collect();
-    let script = format!("tell application \"{sanitized}\" to quit");
-    Command::new("osascript")
-        .args(["-e", &script])
-        .spawn()
-        .map(|_| ())
+fn close_app(command: &str, name: &str) -> std::io::Result<()> {
+    crate::system::close_application(command, name)
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]

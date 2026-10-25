@@ -81,6 +81,50 @@ fn process_names() -> Result<Vec<String>, String> {
     Ok(names)
 }
 
+/// Launch an app through LaunchServices, reporting a failed launcher rather
+/// than merely accepting that an `open` child process was created.
+#[cfg(target_os = "macos")]
+pub fn open_application(command: &str) -> std::io::Result<()> {
+    let output = std::process::Command::new("/usr/bin/open").arg(command).output()?;
+    if output.status.success() {
+        Ok(())
+    } else {
+        Err(std::io::Error::other(format!("couldn't open the application: {}", String::from_utf8_lossy(&output.stderr).trim())))
+    }
+}
+
+#[cfg(target_os = "macos")]
+fn app_target_matches(command: &str, name: &str, bundle: Option<&str>, running_name: &str) -> bool {
+    let command = command.trim();
+    let command = command.strip_prefix('"').and_then(|value| value.strip_suffix('"')).unwrap_or(command);
+    let target = std::path::Path::new(command);
+    if target.extension().is_some_and(|ext| ext == "app") {
+        // Two installed copies can share both their name and bundle id.
+        let Some(bundle) = bundle else { return false };
+        let canonical = |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        return canonical(target) == canonical(std::path::Path::new(bundle));
+    }
+    !name.trim().is_empty() && name.trim().eq_ignore_ascii_case(running_name)
+}
+
+/// Ask the selected application to quit normally. NSRunningApplication is
+/// thread-safe and does not send Apple Events or need an Automation grant.
+#[cfg(target_os = "macos")]
+pub fn close_application(command: &str, name: &str) -> std::io::Result<()> {
+    use objc2_app_kit::NSWorkspace;
+    objc2::rc::autoreleasepool(|_| {
+        for app in NSWorkspace::sharedWorkspace().runningApplications().iter() {
+            let path = app.bundleURL().and_then(|url| url.path()).map(|path| path.to_string());
+            let running_name = app.localizedName().map(|name| name.to_string()).unwrap_or_default();
+            if app_target_matches(command, name, path.as_deref(), &running_name)
+                && !app.terminate() && !app.isTerminated() {
+                return Err(std::io::Error::other(format!("couldn't request that {running_name} quit")));
+            }
+        }
+        Ok(())
+    })
+}
+
 #[cfg(windows)]
 fn process_names() -> Result<Vec<String>, String> {
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
@@ -468,6 +512,17 @@ fn parse_ioreg(text: &str) -> Vec<UsbDevice> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[cfg(target_os = "macos")]
+    #[test]
+    fn close_app_prefers_the_selected_bundle_over_another_copy_with_the_same_name() {
+        assert!(app_target_matches("/Applications/Example.app", "Example", Some("/Applications/Example.app"), "Example"));
+        assert!(!app_target_matches("/Applications/Example.app", "Example", Some("/Users/test/Example.app"), "Example"));
+        assert!(app_target_matches("\"/Applications/Example.app\"", "Example", Some("/Applications/Example.app"), "Example"));
+        assert!(!app_target_matches("/Applications/Example.app", "Example", None, "Example"));
+        assert!(app_target_matches("", "Example", None, "example"));
+        assert!(!app_target_matches("", "", None, "Example"));
+    }
 
     #[test]
     fn matches_program_names_loosely() {

@@ -4,6 +4,11 @@ appid := "com.blockworked.Blockwork"
 set shell := ["sh", "-cu"]
 set windows-shell := ["cmd.exe", "/Q", "/C"]
 
+# Qt 6.10 needs the ARM intrinsic declaration with Apple Clang 21.
+# cc-rs applies this only to C++ targeting Apple Silicon macOS.
+export CXXFLAGS_aarch64_apple_darwin := env_var_or_default("CXXFLAGS_aarch64_apple_darwin", "") + " -include arm_acle.h"
+export MACOSX_DEPLOYMENT_TARGET := env_var_or_default("MACOSX_DEPLOYMENT_TARGET", "13.0")
+
 TARGET := if os() == "windows" { 'target\release\blockwork.exe' } else { "target/release/blockwork" }
 DAEMON := if os() == "windows" { 'target\release\blockwork-daemon.exe' } else { "target/release/blockwork-daemon" }
 

@@ -7,6 +7,23 @@ on:
   workflow_dispatch:
 
 jobs:
+  macos-core:
+    name: macOS core and standalone FFI (${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: macos-core-${{ matrix.runner }}
+      # Deliberately no Qt/app dependency to supply core features by unification:
+      # the Geode embedder must also compile on its own.
+      - run: cargo test -p blockwork-core -p blockwork-ffi
+
   test:
     name: Tests and clippy
     runs-on: ubuntu-latest

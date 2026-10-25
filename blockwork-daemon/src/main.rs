@@ -102,6 +102,14 @@ fn main() {
     event_loop.run(move |event, _, control_flow| {
         *control_flow = ControlFlow::Wait;
         let _ = &runtime;
+        // LaunchServices can route opening the app to its existing background
+        // daemon. Reopening must still show the editor after close-to-tray.
+        #[cfg(target_os = "macos")]
+        if matches!(&event, tao::event::Event::Reopen { .. }) {
+            if !clients.focus_ui() {
+                server::spawn_ui();
+            }
+        }
         if let tao::event::Event::UserEvent(event) = event {
             match event {
                 MainThreadEvent::SetTrayVisible(visible) => {

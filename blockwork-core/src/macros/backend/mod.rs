@@ -70,7 +70,9 @@ impl UnavailableBackend {
         } else {
             "input emulation isn't available on this system, so Blockwork can't press keys or move the mouse"
         };
-        UnavailableBackend { reason: reason.to_string() }
+        UnavailableBackend {
+            reason: reason.to_string(),
+        }
     }
 }
 
@@ -179,7 +181,12 @@ pub fn absolute_mouse_position() -> Option<(i32, i32)> {
         return cursor_track::current();
     }
 
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(target_os = "macos")]
+    {
+        crate::screen::cursor().ok()
+    }
+
+    #[cfg(not(any(target_os = "linux", target_os = "macos")))]
     {
         None
     }
@@ -249,9 +256,16 @@ pub fn create_backend() -> Option<Arc<Mutex<dyn InputBackend>>> {
 
     #[cfg(target_os = "macos")]
     {
-        let b = macos::MacosBackend::new();
-        let arc: Arc<Mutex<dyn InputBackend>> = Arc::new(Mutex::new(b));
-        return Some(arc);
+        match macos::MacosBackend::new() {
+            Ok(b) => {
+                let arc: Arc<Mutex<dyn InputBackend>> = Arc::new(Mutex::new(b));
+                return Some(arc);
+            }
+            Err(e) => {
+                tracing::warn!("Failed to create macOS input backend: {e}");
+                return None;
+            }
+        }
     }
 
     #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
@@ -262,15 +276,15 @@ pub fn create_backend() -> Option<Arc<Mutex<dyn InputBackend>>> {
 }
 
 #[cfg(target_os = "linux")]
-pub mod evdev_mapping;
+pub(crate) mod cursor_track;
 #[cfg(target_os = "linux")]
 pub mod evdev;
 #[cfg(target_os = "linux")]
-pub(crate) mod cursor_track;
-#[cfg(target_os = "linux")]
-pub(crate) mod x11_cursor;
+pub mod evdev_mapping;
 #[cfg(target_os = "linux")]
 pub(crate) mod wayland_display;
+#[cfg(target_os = "linux")]
+pub(crate) mod x11_cursor;
 
 #[cfg(windows)]
 pub mod windows;

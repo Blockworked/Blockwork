@@ -73,7 +73,9 @@ AppDialog {
             id: searchField
             Layout.fillWidth: true
             placeholderText: qsTr("Search apps...")
-            onTextEdited: root.searchText = text
+            // Accessibility clients can replace the field's value directly;
+            // those user edits emit textChanged rather than textEdited.
+            onTextChanged: root.searchText = text
             Component.onCompleted: forceActiveFocus()
         }
 
@@ -204,6 +206,7 @@ AppDialog {
                         }
                         Accessible.name: modelData.name || "app"
                         Accessible.role: Accessible.Button
+                        Accessible.onPressAction: root.choose(modelData)
                     }
                 }
             }

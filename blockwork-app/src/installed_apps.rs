@@ -50,7 +50,9 @@ mod linux {
     fn application_dirs() -> Vec<PathBuf> {
         let mut dirs = Vec::new();
         match std::env::var("XDG_DATA_DIRS") {
-            Ok(v) if !v.is_empty() => dirs.extend(v.split(':').map(|d| PathBuf::from(d).join("applications"))),
+            Ok(v) if !v.is_empty() => {
+                dirs.extend(v.split(':').map(|d| PathBuf::from(d).join("applications")))
+            }
             _ => {
                 dirs.push(PathBuf::from("/usr/local/share/applications"));
                 dirs.push(PathBuf::from("/usr/share/applications"));
@@ -71,7 +73,11 @@ mod linux {
     }
 
     pub(crate) fn list_apps() -> Vec<AppEntry> {
-        let mut apps = if blockwork_core::flatpak::is_flatpak() { host::list_apps() } else { list_local_apps() };
+        let mut apps = if blockwork_core::flatpak::is_flatpak() {
+            host::list_apps()
+        } else {
+            list_local_apps()
+        };
         apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
         apps
     }
@@ -80,17 +86,30 @@ mod linux {
         let mut seen_ids = HashSet::new();
         let mut apps = Vec::new();
         for dir in application_dirs() {
-            let Ok(entries) = fs::read_dir(&dir) else { continue };
+            let Ok(entries) = fs::read_dir(&dir) else {
+                continue;
+            };
             for entry in entries.flatten() {
                 let path = entry.path();
                 if path.extension().and_then(|e| e.to_str()) != Some("desktop") {
                     continue;
                 }
-                let Some(id) = path.file_name().and_then(|n| n.to_str()).map(str::to_string) else { continue };
+                let Some(id) = path
+                    .file_name()
+                    .and_then(|n| n.to_str())
+                    .map(str::to_string)
+                else {
+                    continue;
+                };
                 if !seen_ids.insert(id) {
                     continue;
                 }
-                let Some(entry) = fs::read_to_string(&path).ok().and_then(|c| parse_desktop_entry(&c)) else { continue };
+                let Some(entry) = fs::read_to_string(&path)
+                    .ok()
+                    .and_then(|c| parse_desktop_entry(&c))
+                else {
+                    continue;
+                };
                 apps.push(AppEntry {
                     name: entry.name,
                     command: entry.command,
@@ -147,7 +166,11 @@ mod linux {
         if command.is_empty() {
             return None;
         }
-        Some(DesktopEntry { name, command, icon })
+        Some(DesktopEntry {
+            name,
+            command,
+            icon,
+        })
     }
 
     /// Strips freedesktop field codes (`%f`/`%F`/`%u`/`%U`/etc.) from an
@@ -163,7 +186,10 @@ mod linux {
             }
             match chars.next() {
                 Some('%') => result.push('%'),
-                Some('f' | 'F' | 'u' | 'U' | 'd' | 'D' | 'n' | 'N' | 'i' | 'c' | 'k' | 'v' | 'm') | None => {}
+                Some(
+                    'f' | 'F' | 'u' | 'U' | 'd' | 'D' | 'n' | 'N' | 'i' | 'c' | 'k' | 'v' | 'm',
+                )
+                | None => {}
                 Some(other) => {
                     result.push('%');
                     result.push(other);
@@ -177,7 +203,11 @@ mod linux {
     /// or an icon-theme lookup key) to a `data:` URI, if a usable file was
     /// found for it.
     fn resolve_icon(icon_name: &str) -> Option<String> {
-        let path = if Path::new(icon_name).is_absolute() { PathBuf::from(icon_name) } else { find_icon_file(icon_name)? };
+        let path = if Path::new(icon_name).is_absolute() {
+            PathBuf::from(icon_name)
+        } else {
+            find_icon_file(icon_name)?
+        };
         icon_file_to_data_uri(&path)
     }
 
@@ -196,14 +226,20 @@ mod linux {
         base_dirs.push(PathBuf::from("/usr/local/share/icons"));
 
         const THEMES: &[&str] = &["hicolor", "Adwaita", "gnome", "breeze", "Papirus"];
-        const SIZES: &[&str] = &["scalable", "256x256", "128x128", "96x96", "64x64", "48x48", "32x32"];
+        const SIZES: &[&str] = &[
+            "scalable", "256x256", "128x128", "96x96", "64x64", "48x48", "32x32",
+        ];
         const EXTS: &[&str] = &["svg", "png"];
 
         for base in &base_dirs {
             for theme in THEMES {
                 for size in SIZES {
                     for ext in EXTS {
-                        let candidate = base.join(theme).join(size).join("apps").join(format!("{name}.{ext}"));
+                        let candidate = base
+                            .join(theme)
+                            .join(size)
+                            .join("apps")
+                            .join(format!("{name}.{ext}"));
                         if candidate.is_file() {
                             return Some(candidate);
                         }
@@ -226,7 +262,10 @@ mod linux {
         let mime = icon_mime(path.extension().and_then(|e| e.to_str())?)?;
         let bytes = fs::read(path).ok()?;
         use base64::Engine;
-        Some(format!("data:{mime};base64,{}", base64::engine::general_purpose::STANDARD.encode(bytes)))
+        Some(format!(
+            "data:{mime};base64,{}",
+            base64::engine::general_purpose::STANDARD.encode(bytes)
+        ))
     }
 
     fn icon_mime(extension: &str) -> Option<&'static str> {
@@ -318,12 +357,16 @@ done
 "#;
 
         pub(super) fn list_apps() -> Vec<AppEntry> {
-            let Some(output) = run_host_script(LIST_DESKTOP_FILES, &[]) else { return Vec::new() };
+            let Some(output) = run_host_script(LIST_DESKTOP_FILES, &[]) else {
+                return Vec::new();
+            };
 
             let mut seen_ids = HashSet::new();
             let mut entries = Vec::new();
             for record in output.split(RECORD).skip(1) {
-                let Some((id, content)) = record.split_once('\n') else { continue };
+                let Some((id, content)) = record.split_once('\n') else {
+                    continue;
+                };
                 if !seen_ids.insert(id) {
                     continue;
                 }
@@ -356,10 +399,16 @@ done
             if names.is_empty() {
                 return icons;
             }
-            let Some(output) = run_host_script(READ_ICONS, names) else { return icons };
+            let Some(output) = run_host_script(READ_ICONS, names) else {
+                return icons;
+            };
             for record in output.split(RECORD).skip(1) {
                 let mut lines = record.splitn(3, '\n');
-                let (Some(name), Some(ext), Some(data)) = (lines.next(), lines.next(), lines.next()) else { continue };
+                let (Some(name), Some(ext), Some(data)) =
+                    (lines.next(), lines.next(), lines.next())
+                else {
+                    continue;
+                };
                 if let Some(mime) = icon_mime(ext) {
                     icons.insert(name.to_string(), format!("data:{mime};base64,{data}"));
                 }
@@ -412,24 +461,37 @@ mod windows {
     }
 
     fn walk(dir: &Path, out: &mut Vec<AppEntry>) {
-        let Ok(entries) = std::fs::read_dir(dir) else { return };
+        let Ok(entries) = std::fs::read_dir(dir) else {
+            return;
+        };
         for entry in entries.flatten() {
             let path = entry.path();
             if path.is_dir() {
                 walk(&path, out);
                 continue;
             }
-            if path.extension().and_then(|e| e.to_str()).map(|e| e.eq_ignore_ascii_case("lnk")) != Some(true) {
+            if path
+                .extension()
+                .and_then(|e| e.to_str())
+                .map(|e| e.eq_ignore_ascii_case("lnk"))
+                != Some(true)
+            {
                 continue;
             }
-            let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else { continue };
+            let Some(stem) = path.file_stem().and_then(|s| s.to_str()) else {
+                continue;
+            };
             // Skip the noisy "Uninstall X"/"X Website" shortcuts most
             // installers also drop into the Start Menu next to the real app.
             let lower = stem.to_lowercase();
             if lower.starts_with("uninstall") || lower.contains("website") {
                 continue;
             }
-            out.push(AppEntry { name: stem.to_string(), command: path.to_string_lossy().to_string(), icon: None });
+            out.push(AppEntry {
+                name: stem.to_string(),
+                command: path.to_string_lossy().to_string(),
+                icon: None,
+            });
         }
     }
 }
@@ -439,28 +501,105 @@ mod macos {
     use super::AppEntry;
     use std::path::Path;
 
-    /// Top-level `.app` bundles in `/Applications` and `~/Applications` - no
-    /// icon (see module doc comment); `command` is the bundle path itself,
-    /// which `runner::open_app`'s `open <path>` launches directly.
+    /// macOS splits applications between user, system and Cryptex locations.
+    /// Walk category folders such as Utilities, but never enter an app bundle
+    /// (which would expose its helper apps as independent launch targets).
     pub(crate) fn list_apps() -> Vec<AppEntry> {
-        let mut dirs = vec![Path::new("/Applications").to_path_buf()];
+        let mut roots = vec![
+            Path::new("/Applications").to_path_buf(),
+            Path::new("/System/Applications").to_path_buf(),
+            Path::new("/System/Library/CoreServices/Applications").to_path_buf(),
+            Path::new("/System/Volumes/Preboot/Cryptexes/App/System/Applications").to_path_buf(),
+            Path::new("/System/Library/CoreServices/Finder.app").to_path_buf(),
+        ];
         if let Some(home) = dirs::home_dir() {
-            dirs.push(home.join("Applications"));
+            roots.push(home.join("Applications"));
         }
+        list_in(&roots)
+    }
 
+    fn list_in(roots: &[std::path::PathBuf]) -> Vec<AppEntry> {
+        let mut seen = std::collections::HashSet::new();
+        let mut pending = roots.to_vec();
         let mut apps = Vec::new();
-        for dir in dirs {
-            let Ok(entries) = std::fs::read_dir(&dir) else { continue };
-            for entry in entries.flatten() {
-                let path = entry.path();
-                if path.extension().and_then(|e| e.to_str()) != Some("app") {
+        while let Some(path) = pending.pop() {
+            if !path.is_dir() {
+                continue;
+            }
+            let Ok(canonical) = path.canonicalize() else {
+                continue;
+            };
+            if !seen.insert(canonical) {
+                continue;
+            }
+            if path
+                .extension()
+                .is_some_and(|ext| ext.eq_ignore_ascii_case("app"))
+            {
+                let Some(name) = path.file_stem().and_then(|s| s.to_str()) else {
                     continue;
+                };
+                apps.push(AppEntry {
+                    name: name.into(),
+                    command: path.to_string_lossy().into_owned(),
+                    icon: None,
+                });
+                continue;
+            }
+            // Renamed bundles (for example Editor.app.backup) still contain
+            // helpers. They aren't category folders or independent apps.
+            if path.join("Contents/Info.plist").is_file() || path.join("Contents/MacOS").is_dir() {
+                continue;
+            }
+            let Ok(entries) = std::fs::read_dir(&path) else {
+                continue;
+            };
+            for entry in entries.flatten() {
+                if !entry.file_name().to_string_lossy().starts_with('.') {
+                    pending.push(entry.path());
                 }
-                let Some(name) = path.file_stem().and_then(|s| s.to_str()) else { continue };
-                apps.push(AppEntry { name: name.to_string(), command: path.to_string_lossy().to_string(), icon: None });
             }
         }
-        apps.sort_by(|a, b| a.name.to_lowercase().cmp(&b.name.to_lowercase()));
+        apps.sort_by(|a, b| {
+            a.name
+                .to_lowercase()
+                .cmp(&b.name.to_lowercase())
+                .then(a.command.cmp(&b.command))
+        });
         apps
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        #[test]
+        fn includes_system_and_utility_apps_without_helpers_or_symlink_duplicates() {
+            let root =
+                std::env::temp_dir().join(format!("blockwork-app-picker-{}", uuid::Uuid::new_v4()));
+            let user = root.join("Applications");
+            let system = root.join("System/Applications");
+            for path in [
+                user.join("Editor.app/Contents/Helpers/Helper.app"),
+                user.join("Editor.app.backup/Contents/Helpers/Old Helper.app"),
+                system.join("Notes.app"),
+                system.join("Utilities/Terminal.app"),
+            ] {
+                std::fs::create_dir_all(path).unwrap();
+            }
+            std::fs::write(
+                user.join("Editor.app.backup/Contents/Info.plist"),
+                "<plist/>",
+            )
+            .unwrap();
+            std::os::unix::fs::symlink(&user, root.join("Alias")).unwrap();
+            std::os::unix::fs::symlink(&root, user.join("Loop")).unwrap();
+            let apps = list_in(&[user, system, root.join("Alias")]);
+            assert_eq!(
+                apps.iter().map(|a| a.name.as_str()).collect::<Vec<_>>(),
+                ["Editor", "Notes", "Terminal"]
+            );
+            assert!(apps.iter().all(|a| Path::new(&a.command).is_dir()));
+            std::fs::remove_dir_all(root).unwrap();
+        }
     }
 }
