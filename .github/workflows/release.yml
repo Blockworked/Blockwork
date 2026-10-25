@@ -47,7 +47,9 @@ jobs:
              "artifact_name": "blockwork-windows-arm64.zip", "installer_arch": "arm64", "msix_arch": "arm64",
              "qt_host": "windows_arm64", "qt_arch": "win64_msvc2022_arm64", "experimental": true},
             {"name": "macos-arm64", "runner": "macos-latest", "target": "aarch64-apple-darwin",
-             "artifact_name": "blockwork-macos-arm64", "qt_host": "mac", "qt_arch": "clang_64", "experimental": true}
+             "artifact_name": "blockwork-macos-arm64", "qt_host": "mac", "qt_arch": "clang_64", "experimental": false},
+            {"name": "macos-x86_64", "runner": "macos-15-intel", "target": "x86_64-apple-darwin",
+             "artifact_name": "blockwork-macos-x86_64", "qt_host": "mac", "qt_arch": "clang_64", "experimental": false}
           ]'
           if [ -n "$FLIGHT" ]; then
             matrix=$(jq -c 'map(select(.msix_arch))' <<< "$matrix")
@@ -136,6 +138,16 @@ jobs:
           # Newer Xcode clang lists __yield as a builtin but needs arm_acle.h to declare it (Qt's qyieldcpu.h).
           CXXFLAGS_aarch64_apple_darwin: -include arm_acle.h
         run: ./scripts/build-macos-bundle.sh ${{ matrix.target }}
+
+      - name: Verify packaged executable starts
+        if: runner.os == 'macOS'
+        run: dist/Blockwork.app/Contents/MacOS/Blockwork --help
+
+      - name: Run application QML tests
+        if: runner.os == 'macOS'
+        run: |
+          export PATH="$(dirname "$QMAKE"):$PATH"
+          python3 blockwork-qt/tests/run.py ../blockstitch
 
       - name: Zip macOS app bundle
         if: runner.os == 'macOS'

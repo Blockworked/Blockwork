@@ -2,7 +2,7 @@
 
 Work in progress. Passing tests establish the behavior below, not complete application parity.
 
-Blockwork is the first gate. The later blockwork-gd gate requires fresh imports of `~/Downloads/ChesszDC-Bloodbath-Infinity-zBot.gdr` against the local level named approximately **Bloodbath Infinity 2**, accurate completion at normal speed, and reliable repeated completion at QOL Mod 10x. The separately ordered game gate has now started; normal-speed and initial 10x fresh-import runs completed successfully. Current game evidence and remaining checks are documented in the sibling `blockwork-gd/docs/macos-parity.md`.
+Blockwork is the first gate. The later blockwork-gd gate requires fresh imports of `~/Downloads/ChesszDC-Bloodbath-Infinity-zBot.gdr` against the local level named approximately **Bloodbath Infinity 2**, accurate completion at normal speed, and reliable repeated completion at QOL Mod 10x. The game gate completed normal-speed fresh imports, 20/20 direct 10x attempts, 20/20 queued 10x attempts, and a final 3/3 universal-package 10x batch. Current game evidence and remaining checks are documented in the sibling `blockwork-gd/docs/macos-parity.md`.
 
 ## Implemented and exercised
 
@@ -68,3 +68,11 @@ The validator checks nested signatures, architectures, escaping symlinks, host-s
 The final release is built and the bundle validates all 97 Mach-O images. The existing grants survived this rebuild: packaged Unicode input and the complete screen/window/detection/OCR workflow passed. An unnecessary refresh prompted for authentication; it was cancelled without changing the grants. Evidence: `/tmp/blockwork-final-packaged-input-result.json` and `/tmp/blockwork-final-packaged-screen-result.json`. No authentication remains pending. The reviewed macOS platform branches and exercised packaged workflows have no remaining known functional blocker. Actual Intel runtime, multi-display hardware and a real installed-release update remain coverage limits; these are not claimed as executed. Proceed to the separately ordered fresh-import GD work; do not reuse the user's existing replay as the acceptance fixture.
 
 The universal embedder build isolates Cargo objects by deployment target. Reusing the Qt app’s cache had linked macOS 13 objects into an 11.0-targeted Geode library; a separate cache prevents that mismatch. Translation catalogs were refreshed with the repository workflow, and all 31 catalogs (37,275 messages) pass structural checks.
+
+## Final coverage audit
+
+The final installed Apple Silicon bundle passed Unicode delivery, window geometry, pixel/average colors, image search/click, HTTP detection and Vision OCR again after the dependency pins were updated. Durable local evidence is in `target/macos-parity-evidence/final-input-result.json` and `final-screen-result.json`. The original user macros are byte-identical, temporary test macros are archived, and the verified fresh Bloodbath replay remains selected and linked to the local level.
+
+The post-authorship workspace suite also passed (`/tmp/blockwork-post-authorship-workspace-tests.log`). Checks at `30f92a46f19ebab1cd7bff7f6b8e9c984c17e51a` passed Linux workspace tests/Clippy and both native Mac core/FFI jobs: https://github.com/Blockworked/Blockwork/actions/runs/40231358858.
+
+The app artifact and release matrices now include native Intel Macs, alongside Apple Silicon. Both Mac app jobs are required rather than experimental. Each builds and validates the complete bundle, starts its packaged executable with `--help`, and runs the application QML tests with the installed Qt runtime. This adds Intel application coverage; it does not establish permission-dependent desktop input/capture on that runner. The new jobs must pass before counting this gate as verified. Multi-display hardware and a real installed-release update remain unexecuted coverage gates.
