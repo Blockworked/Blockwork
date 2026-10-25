@@ -73,12 +73,10 @@ jobs:
       - name: Checkout Blockstitch QML module
         shell: bash
         run: |
-          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          if git ls-remote --exit-code --heads https://github.com/Blockworked/blockstitch.git "$ref" >/dev/null; then
-            git clone --depth 1 --branch "$ref" https://github.com/Blockworked/blockstitch.git ../blockstitch
-          else
-            git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
-          fi
+          # Match the Rust dependency used by the executable and its QML tests.
+          git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
+          git -C ../blockstitch fetch --depth 1 origin 250bf3620dc276eca96bb849ef765459b7dfe3c8
+          git -C ../blockstitch checkout --detach FETCH_HEAD
 
       # Official Qt builds where CXX-Qt's Qt download is missing or broken.
       - name: Set up Python
@@ -242,12 +240,10 @@ jobs:
       - name: Checkout Blockstitch QML module
         shell: bash
         run: |
-          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          if git ls-remote --exit-code --heads https://github.com/Blockworked/blockstitch.git "$ref" >/dev/null; then
-            git clone --depth 1 --branch "$ref" https://github.com/Blockworked/blockstitch.git ../blockstitch
-          else
-            git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
-          fi
+          # Match the Rust dependency used by the executable and its QML tests.
+          git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
+          git -C ../blockstitch fetch --depth 1 origin 250bf3620dc276eca96bb849ef765459b7dfe3c8
+          git -C ../blockstitch checkout --detach FETCH_HEAD
 
       # Official Qt builds where CXX-Qt's Qt download is missing or broken.
       - name: Set up Python
@@ -370,12 +366,10 @@ jobs:
       - name: Checkout Blockstitch QML module
         shell: bash
         run: |
-          ref="${GITHUB_HEAD_REF:-$GITHUB_REF_NAME}"
-          if git ls-remote --exit-code --heads https://github.com/Blockworked/blockstitch.git "$ref" >/dev/null; then
-            git clone --depth 1 --branch "$ref" https://github.com/Blockworked/blockstitch.git ../blockstitch
-          else
-            git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
-          fi
+          # Match the Rust dependency used by the executable and its QML tests.
+          git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
+          git -C ../blockstitch fetch --depth 1 origin 250bf3620dc276eca96bb849ef765459b7dfe3c8
+          git -C ../blockstitch checkout --detach FETCH_HEAD
 
       - name: Install Flatpak tooling
         run: |
