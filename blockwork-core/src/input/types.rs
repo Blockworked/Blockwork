@@ -96,6 +96,7 @@ pub enum MacroKey {
     VolumeDown,
     VolumeMute,
     VolumeUp,
+    /// Legacy name for the left Alt modifier.
     LMenu,
     Select,
     Unicode(char),
@@ -107,7 +108,7 @@ impl MacroKey {
         match self {
             MacroKey::Control | MacroKey::LControl | MacroKey::RControl => MOD_CTRL,
             MacroKey::Shift | MacroKey::LShift | MacroKey::RShift => MOD_SHIFT,
-            MacroKey::Alt | MacroKey::AltGr | MacroKey::Option => MOD_ALT,
+            MacroKey::Alt | MacroKey::AltGr | MacroKey::Option | MacroKey::LMenu => MOD_ALT,
             MacroKey::Meta => MOD_META,
             _ => 0,
         }

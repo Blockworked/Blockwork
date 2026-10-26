@@ -202,6 +202,15 @@ mod combo_tests {
     }
 
     #[test]
+    fn menu_alias_matches_the_alt_modifier_emitted_by_backends() {
+        let keys = parse_key_combo("LMenu+a");
+        assert_eq!(match_key(&keys[0]), MacroKey::Alt);
+        assert_eq!(keys[0].modifier_bit(), crate::hotkey_types::MOD_ALT);
+        assert!(keys[0].is_modifier());
+        assert_ne!(match_key(&keys[0]), match_key(&MacroKey::Meta));
+    }
+
+    #[test]
     fn plus_key_is_literal() {
         assert_eq!(parse_key_combo("+"), vec![MacroKey::Unicode('+')]);
         assert_eq!(parse_key_combo("Control++"), vec![MacroKey::Control, MacroKey::Unicode('+')]);

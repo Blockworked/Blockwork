@@ -41,7 +41,7 @@ fn macro_key_to_cgkeycode(key: &MacroKey) -> Option<(u16, bool)> {
         MacroKey::RShift => (60, false),
         MacroKey::Control | MacroKey::LControl => (59, false),
         MacroKey::RControl => (62, false),
-        MacroKey::Alt | MacroKey::Option => (58, false),
+        MacroKey::Alt | MacroKey::Option | MacroKey::LMenu => (58, false),
         MacroKey::AltGr => (61, false),
         MacroKey::Meta => (55, false),
         MacroKey::CapsLock => (57, false),
@@ -81,7 +81,6 @@ fn macro_key_to_cgkeycode(key: &MacroKey) -> Option<(u16, bool)> {
         MacroKey::Divide => (75, false),
         MacroKey::Decimal => (65, false),
         MacroKey::NumLock => (71, false),
-        MacroKey::LMenu => (110, false),
         MacroKey::VolumeUp => (72, false),
         MacroKey::VolumeDown => (73, false),
         MacroKey::VolumeMute => (74, false),
@@ -1035,7 +1034,6 @@ fn cg_keycode_to_macro_key(code: u16) -> Option<MacroKey> {
         75 => MacroKey::Divide,
         65 => MacroKey::Decimal,
         71 => MacroKey::NumLock,
-        110 => MacroKey::LMenu,
         72 => MacroKey::VolumeUp,
         73 => MacroKey::VolumeDown,
         74 => MacroKey::VolumeMute,
@@ -1179,7 +1177,7 @@ mod tests {
     fn extended_keys_round_trip_without_becoming_unknown_codes() {
         for code in [
             64, 65, 67, 69, 71, 72, 73, 74, 75, 78, 79, 80, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91,
-            92, 105, 106, 107, 110, 113, 114,
+            92, 105, 106, 107, 113, 114,
         ] {
             let key = cg_keycode_to_macro_key(code).unwrap();
             assert!(!matches!(key, MacroKey::Other(_)), "code {code}");
@@ -1258,6 +1256,35 @@ mod tests {
         assert!(
             keyboard_flags(79, CGEventFlags::empty(), false)
                 .contains(CGEventFlags::CGEventFlagSecondaryFn)
+        );
+    }
+
+    #[test]
+    fn menu_alias_holds_option_for_the_following_combo_key() {
+        let mut backend = MacosBackend::new().unwrap();
+        let keys = crate::input::key_names::parse_key_combo("LMenu+a");
+        let (modifier, _) = macro_key_to_cgkeycode(&keys[0]).unwrap();
+        backend.keyboard_event(modifier, true).unwrap();
+        let (letter, _) = macro_key_to_cgkeycode(&keys[1]).unwrap();
+        let press = backend.keyboard_event(letter, true).unwrap();
+        assert!(
+            press
+                .get_flags()
+                .contains(CGEventFlags::CGEventFlagAlternate)
+        );
+        backend.keyboard_event(modifier, false).unwrap();
+        assert!(
+            !backend
+                .keyboard_event(letter, false)
+                .unwrap()
+                .get_flags()
+                .contains(CGEventFlags::CGEventFlagAlternate)
+        );
+        // The distinct physical application-menu key must retain its raw code.
+        assert_eq!(cg_keycode_to_macro_key(110), Some(MacroKey::Other(110)));
+        assert_eq!(
+            macro_key_to_cgkeycode(&MacroKey::Other(110)),
+            Some((110, false))
         );
     }
 
@@ -1647,6 +1674,42 @@ mod tests {
                 assert_eq!(typed, "ABcé中🦀");
                 break;
             }
+            std::thread::sleep(std::time::Duration::from_millis(20));
+        }
+        let offset = std::fs::read(&path).unwrap().len();
+        backend.key(MacroKey::LMenu, Direction::Press).unwrap();
+        backend
+            .key(MacroKey::Unicode('x'), Direction::Click)
+            .unwrap();
+        backend.key(MacroKey::LMenu, Direction::Release).unwrap();
+        let deadline = std::time::Instant::now() + std::time::Duration::from_secs(3);
+        loop {
+            let log = std::fs::read_to_string(&path).unwrap();
+            let rows: Vec<serde_json::Value> = log[offset..]
+                .lines()
+                .filter_map(|line| serde_json::from_str(line).ok())
+                .collect();
+            if let Some(press) = rows
+                .iter()
+                .find(|row| row["type"] == 10 && row["keyCode"] == 7)
+            {
+                assert_ne!(
+                    press["flags"].as_u64().unwrap() & CGEventFlags::CGEventFlagAlternate.bits(),
+                    0
+                );
+                if rows.iter().any(|row| {
+                    row["type"] == 12
+                        && row["flags"].as_u64().unwrap()
+                            & CGEventFlags::CGEventFlagAlternate.bits()
+                            == 0
+                }) {
+                    break;
+                }
+            }
+            assert!(
+                std::time::Instant::now() < deadline,
+                "LMenu option combo/release did not reach the fixture: {rows:?}"
+            );
             std::thread::sleep(std::time::Duration::from_millis(20));
         }
     }
