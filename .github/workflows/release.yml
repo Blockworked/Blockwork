@@ -521,7 +521,7 @@ jobs:
       MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
       MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
       MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
-      MSSTORE_APP_ID: ${{ vars.MSSTORE_APP_ID }}
+      MSSTORE_APP_ID: ${{ vars.MSSTORE_APP_ID || secrets.MSSTORE_APP_ID }}
 
     steps:
       # Skipped until the Partner Center credentials are set, like winget
