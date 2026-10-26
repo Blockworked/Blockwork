@@ -585,7 +585,7 @@ mod tests {
         author.create_list("boxes").unwrap();
         let find = InstructionKind::FindImage {
             image: String::new(),
-            tolerance: Value::number(0.0),
+            tolerance: Some(Value::number(0.0)),
             x_variable: "hit x".into(),
             y_variable: "hit y".into(),
             pick: None,

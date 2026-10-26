@@ -92,6 +92,72 @@ Item {
             compare(calls[0].args.path[0].index, 1);
             compare(calls[0].args.instruction.duration.value, 1000, "EditorPage.defaultInstruction, not the palette prefab");
         }
+        function test_edited_components_survive_insertion_data() {
+            const rows = [];
+            for (const type of ["BrowserClick", "BrowserType", "ClickImage"])
+                for (const target of ["canvas", "gap", "activation"])
+                    rows.push({tag: type + "_" + target, type: type, target: target});
+            return rows;
+        }
+        function test_edited_components_survive_insertion(data) {
+            const page = editor();
+            const source = paletteBlock(page, data.type);
+            verify(!!source);
+            const row = all(source).find(o => o.paletteMode === true);
+            const component = row.rowSpec.components[0];
+            row.addComponent(component);
+            verify(component.key in source.instruction);
+            if (data.type.indexOf("Browser") === 0) {
+                const edited = JSON.parse(JSON.stringify(source.instruction));
+                edited.nth = {kind: "Number", value: 3};
+                edited.selector = {kind: "Text", value: "button.save"};
+                row.instructionEdited("", [], edited);
+            }
+            const expected = JSON.parse(JSON.stringify(source.instruction));
+            if (data.target === "activation") source.activated();
+            else if (data.target === "gap") {
+                const wait = canvasBlock(page, "wait");
+                const below = wait.mapToItem(scene, 20, wait.height + 6);
+                dragFromPalette(page, data.type, below.x, below.y);
+            } else dragFromPalette(page, data.type, 900, 650);
+            const command = data.target === "gap" ? "add_instruction" : "add_strand";
+            const calls = scene.calls.filter(c => c.command === command);
+            compare(calls.length, 1);
+            const inserted = JSON.parse(JSON.stringify(calls[0].args.instruction));
+            verify(inserted.id !== expected.id, "the inserted block gets its own id");
+            delete inserted.id;
+            delete expected.id;
+            compare(inserted, expected, "all edited palette fields survive insertion");
+            compare(source.instruction.id, "palette-" + data.type);
+        }
+        function test_optional_wait_and_tolerance_components_data() {
+            return [
+                {tag: "condition", type: "WaitUntil", keys: ["timeout", "error_timeout"]},
+                {tag: "image", type: "WaitForImage", keys: ["timeout", "error_timeout", "tolerance"]},
+                {tag: "find", type: "FindImage", keys: ["tolerance"]},
+                {tag: "click", type: "ClickImage", keys: ["tolerance"]},
+                {tag: "mouse_keys", type: "WhenMouseButton", keys: ["modifiers"]}
+            ];
+        }
+        function test_optional_wait_and_tolerance_components(data) {
+            const page = editor();
+            const source = paletteBlock(page, data.type);
+            verify(!!source);
+            const row = all(source).find(o => o.paletteMode === true);
+            for (const key of data.keys) {
+                verify(!(key in source.instruction), key + " is absent by default");
+                const component = row.rowSpec.components.find(c => c.key === key);
+                verify(!!component, key);
+                row.addComponent(component);
+                compare(source.instruction[key], key === "modifiers" ? {kind: "Text", value: "Control"} : {kind: "Number", value: key === "tolerance" ? 10 : 10000});
+                const edited = JSON.parse(JSON.stringify(source.instruction));
+                edited[key] = {kind: "Number", value: 42};
+                row.instructionEdited("", [], edited);
+                compare(source.instruction[key].value, 42);
+                row.removeComponent(component);
+                verify(!(key in source.instruction), key + " is removed");
+            }
+        }
         function test_sidebar_pickup_matches_canvas_zoom() {
             const page = editor();
             page.paletteDrags.canvas.setZoom(1.5);

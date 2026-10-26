@@ -29,6 +29,7 @@ use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 pub(crate) enum MainThreadEvent {
     SetTrayVisible(bool),
     OpenUi,
+    ToggleUi,
     Quit,
 }
 
@@ -109,6 +110,11 @@ fn main() {
                 }
                 MainThreadEvent::OpenUi => {
                     if !clients.focus_ui() {
+                        server::spawn_ui();
+                    }
+                }
+                MainThreadEvent::ToggleUi => {
+                    if !clients.close_ui() {
                         server::spawn_ui();
                     }
                 }

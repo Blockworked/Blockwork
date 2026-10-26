@@ -31,6 +31,16 @@ ApplicationWindow {
     onHeightChanged: { liveResizing = true; resizeIdle.restart(); }
     Timer { id: resizeIdle; interval: 140; onTriggered: root.liveResizing = false }
     property bool sidebarCollapsed: false
+    property bool initialStateReceived: false
+    readonly property bool uiReady: bridge.connected && initialStateReceived
+    property bool startupNoticeVisible: false
+    property bool startupComplete: false
+
+    Timer {
+        interval: 500
+        running: !root.uiReady
+        onTriggered: root.startupNoticeVisible = true
+    }
 
     // Keep every control on the app theme instead of the system light/dark palette.
     palette {
@@ -126,7 +136,10 @@ ApplicationWindow {
     AppBridge {
         id: bridge
         onStateJsonChanged: {
-            try { root.appState = JSON.parse(stateJson); }
+            try {
+                root.appState = JSON.parse(stateJson);
+                root.initialStateReceived = true;
+            }
             catch (error) { console.warn("Invalid Blockwork state", error); }
             if (root.appState.key_capture === null || root.appState.key_capture === undefined) root.heldCaptureKeys = [];
             if (root.appState.key_capture !== null || root.appState.combo_capture !== null) contentRoot.forceActiveFocus();
@@ -157,6 +170,7 @@ ApplicationWindow {
         Rectangle { anchors.fill: parent; color: Theme.window }
     Item {
         id:contentRoot;anchors.fill:parent;focus:true
+        enabled: root.startupComplete
         Keys.priority:Keys.BeforeItem
         Keys.onPressed:event=>root.captureKey(event)
         Keys.onReleased:event=>{
@@ -171,23 +185,52 @@ ApplicationWindow {
         Loader {
             id: pageLoader
             anchors.fill: parent
+            active: root.uiReady
             sourceComponent: root.appState.onboarding_done === false ? onboardingComponent
                 : root.appState.page === "Settings" ? settingsComponent : editorComponent
-            // A new page fades in instead of snapping over the old one.
-            onLoaded: if (Motion.enabled) pageFade.restart()
+            // Reveal the first page under the startup cover; fade later page changes.
+            onLoaded: {
+                if (!root.startupComplete) startupReveal.restart();
+                else if (Motion.enabled) pageFade.restart();
+            }
             NumberAnimation { id: pageFade; target: pageLoader.item; property: "opacity"; from: 0; to: 1; duration: Motion.normal; easing.type: Easing.OutCubic }
         }
     }
     Rectangle {
-        visible: !bridge.connected
+        id: startupCover
+        visible: !root.startupComplete
         anchors.fill: parent
-        color: Qt.alpha(Theme.window, 0.87)
+        color: Theme.window
         z: 100
         Column {
+            id: startupMessage
+            visible: root.startupNoticeVisible || bridge.lastError.length > 0
             anchors.centerIn: parent; spacing: 12
+            width: Math.min(400, parent.width - 48)
             BusyIndicator { anchors.horizontalCenter: parent.horizontalCenter; running: bridge.lastError.length === 0 }
-            Text { text: bridge.lastError.length ? bridge.lastError : qsTr("Connecting to Blockwork..."); color: bridge.lastError.length ? Theme.danger : Theme.text; font.pixelSize: 16 }
+            Text {
+                width: parent.width
+                text: bridge.lastError.length ? bridge.lastError : qsTr("Starting Blockwork...")
+                color: bridge.lastError.length ? Theme.danger : Theme.text
+                font.pixelSize: 16
+                horizontalAlignment: Text.AlignHCenter
+                wrapMode: Text.Wrap
+            }
         }
+    }
+    SequentialAnimation {
+        id: startupReveal
+        NumberAnimation {
+            target: startupMessage; property: "opacity"; to: 0
+            duration: startupMessage.visible ? Motion.quick : 0
+            easing.type: Easing.OutCubic
+        }
+        NumberAnimation {
+            target: startupCover; property: "opacity"; to: 0
+            duration: Motion.slow
+            easing.type: Easing.InOutCubic
+        }
+        ScriptAction { script: root.startupComplete = true }
     }
 
     Rectangle {

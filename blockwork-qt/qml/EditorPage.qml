@@ -99,7 +99,7 @@ Item {
     function totalBlocks() { return (root.macro ? root.macro.strands : []).reduce((n, st) => n + st.instructions.length, 0); }
     function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
     function instructionExplainer(type) {
-        const x={BrowserOpen:qsTr("Opens a web address in the browser's current tab, or a new one, and waits for it to load. Needs the Blockwork browser extension, paired in Settings > Integrations."),BrowserClick:qsTr("Clicks an element on the page in the browser you used last, waiting up to 5 seconds for it to appear. It clicks the first match; add 'which match' with the + to pick another when several fit: 1 is the first, -1 the last. A selector says which element: CSS like button.save, text=Save for what it reads (or its label), focused for the field with the cursor; join parts with >> to search inside the one before, and add >> near=button for the closest button, or >> nth=2 for the second match. The extension's picker makes one for you."),BrowserType:qsTr("Puts text into a field on the page, replacing what was there, the way typing would. It uses the first match; add 'which match' with the + to pick another. Works on text boxes, rich text editors and lists (pick an option by its text). A selector says which element: CSS like button.save, text=Save for what it reads (or its label), focused for the field with the cursor; join parts with >> to search inside the one before, and add >> near=button for the closest button, or >> nth=2 for the second match. The extension's picker makes one for you."),BrowserWaitFor:qsTr("Pauses until an element appears on the page (or goes away). If that hasn't happened within the time limit it's an error; 0 waits forever. A selector says which element: CSS like button.save, text=Save for what it reads (or its label), focused for the field with the cursor; join parts with >> to search inside the one before, and add >> near=button for the closest button, or >> nth=2 for the second match. The extension's picker makes one for you."),BrowserScript:qsTr("Runs JavaScript in the page and puts its result in the variable. Give an expression like document.title, or statements with a return. Some sites' security settings block it."),BrowserConnected:qsTr("Whether a browser with the Blockwork extension is connected."),PageUrl:qsTr("The web address of the tab you're on in the browser."),PageTitle:qsTr("The title of the tab you're on in the browser."),ElementText:qsTr("The text of the first element the selector matches, or what's typed in it for a field. An error if nothing matches. Add >> nth=2 for the second match."),ElementExists:qsTr("Whether the selector matches anything on the page right now."),ElementCount:qsTr("How many elements the selector matches on the page. Handy for checking a selector picks only one."),WhenAt:qsTr("Runs once, at a date and time like 2026-12-24 18:00 (local time). Click it to pick the day from a calendar, or drop a reporter that gives one. Turn on 'catch up on missed schedules' in Macro settings to still run it if Blockwork was closed or the computer was asleep at that moment."),WhenSignal:qsTr("Runs when a 'send signal' block in this macro sends the same name. It shares that run's variables, so one strand can hand work to others."),SendSignal:qsTr("Starts this macro's 'when I receive' strands with the same name. With 'and wait' this strand pauses until they've all finished: a way to wait for other strands."),WhenWebhook:qsTr("Runs when a web request reaches Blockwork's webhook server at this path. Turn the server on in Settings > Integrations, where its address and token are. The request body goes into the variable."),AskText:qsTr("Shows a dialog asking for text and puts the answer in the variable. Cancel stops the run, unless it's inside a try block, where it's an error you can catch."),AskYesNo:qsTr("Shows a yes/no question and puts true or false in the variable."),AskChoice:qsTr("Shows the items of a list and puts the one you pick in the variable. Cancel stops the run, unless it's inside a try block."),ShowMessage:qsTr("Shows a message in a dialog and waits until you close it."),WhenNetwork:qsTr("Runs when the computer goes online or offline: when a network route to the internet appears or goes away. Checked once a second."),WhenUsb:qsTr("Runs when a USB device is plugged in or unplugged. The text matches the device's name or its vendor:product id (like 046d:c52b); leave it empty for any device. Hubs don't count."),WhenMouseButton:qsTr("Runs when a mouse button is pressed or released, or the wheel scrolls. Put modifier keys in the box (like Control+Shift) to only run while exactly those are held; leave it empty to ignore modifiers. The click still goes through to the app. On Windows, clicks in programs running as administrator are only seen when Blockwork runs as administrator too."),SplitIntoList:qsTr("Cuts the text at every separator and puts the pieces in the list, replacing what was there. An empty separator splits it into letters."),Secret:qsTr("The value of a secret saved in Settings > Secrets. It comes from your system keyring, isn't stored in the macro file, and shows as dots in the run log."),NetworkConnected:qsTr("Whether the computer has a network route to the internet."),UsbConnected:qsTr("Whether a USB device whose name or vendor:product id contains the text is plugged in. Empty matches any device."),TextCheck:qsTr("Checks text: contains, starts with, ends with, or matches a regular expression. Case matters."),TextReplace:qsTr("Replaces every copy of the first text inside the second with the third."),RegexReplace:qsTr("Replaces every match of a regular expression. Use $1, $2 in the replacement for groups."),RegexFind:qsTr("The first match of a regular expression, or its first group if it has one. Empty when nothing matches."),SplitPart:qsTr("Cuts the text at every separator and gives one piece, counting from 1. Negative numbers count from the end."),SplitCount:qsTr("How many pieces the text has when cut at every separator."),Substring:qsTr("The letters between two positions, counting from 1, both included."),Trim:qsTr("The text without spaces or line breaks at its start and end."),FormatNumber:qsTr("The number as text with exactly this many digits after the point."),Timestamp:qsTr("The current time as a Unix timestamp: seconds since 1970. Add 86400 for a day later."),FormatDate:qsTr("Writes a timestamp as a date in local time. Codes: %Y year, %m month, %d day, %H hour, %M minute, %S second, %A weekday name, %B month name."),ParseDate:qsTr("The timestamp of a date written as text, in local time. Leave the format empty for dates like 2026-01-31 09:00, or use codes like %d.%m.%Y."),DatePart:qsTr("One part of a timestamp in local time. Weekday is 1 for Sunday to 7 for Saturday."),WhenTyped:qsTr("Text expansion: runs when you type the text anywhere, like ;addr. With 'erase it' the typed text is deleted first, so a paste block can replace it. Uses a US keyboard layout for symbols."),PasteText:qsTr("Pastes text with Ctrl+V (Cmd+V on macOS), then puts back the text that was on the clipboard. Faster and more reliable than typing for long text. Terminals that paste with Ctrl+Shift+V need a Key block instead."),WhenApp:qsTr("Runs when a program whose name contains the text starts or exits. Checked once a second."),WhenIdle:qsTr("Runs once you haven't touched the keyboard or mouse for this many minutes. Fires again after the next idle stretch."),WhenScreenLock:qsTr("Runs when the screen locks or unlocks."),WhenCron:qsTr("Runs on a schedule, like every 15 minutes on weekdays or 9:00 on the 1st of each month. Click the schedule to choose it. Underneath it's cron (minute hour day month weekday, like '0 9 * * mon-fri'), so you can also type one under Custom or drop a reporter that gives one."),WithLock:qsTr("Runs its body while holding a named lock. Only one strand, in any macro, can be inside a lock with the same name at a time; others wait their turn. Use it so two macros don't type over each other."),AppRunning:qsTr("Whether a program whose name contains the text is running."),IdleSeconds:qsTr("How many seconds since the last keyboard or mouse input."),ScreenLocked:qsTr("Whether the screen is locked."),WaitUntil:qsTr("Pauses until the condition is true, checking about 10 times a second. If it's still false after the time limit it's an error; 0 waits forever."),FindImage:qsTr("Looks for the picture on screen and puts the screen position of its middle in the two variables, or -1 if it isn't there. Click the picture area to capture one. It uses the best match. When the picture is on screen more than once, add 'which match' with the + to choose a match number (counting left to right, top to bottom; -1 is the last), the one nearest the mouse, or the one nearest a point, like the x and y of another find block. Add 'search region' to only search part of the screen, and 'count matches' to get how many there are. Tolerance is how different the pixels may be, in percent. On Windows, games in exclusive fullscreen capture as black: switch them to borderless windowed."),ClickImage:qsTr("Finds the picture on screen and clicks its middle. It's an error if the picture isn't there. Click the picture area to capture one. It uses the best match. When the picture is on screen more than once, add 'which match' with the + to choose a match number (counting left to right, top to bottom; -1 is the last), the one nearest the mouse, or the one nearest a point. Add 'search region' to only search part of the screen."),WaitForImage:qsTr("Pauses until the picture appears on screen (or goes away). Add 'search region' with the + to only watch part of the screen. If that hasn't happened within the time limit it's an error; 0 waits forever."),DetectObjectsInWindow:qsTr("Captures the window and finds the objects in it, with a built-in model (the name of a .onnx file in Blockwork's models folder, or a path to one) or a detector running on this computer (a local http:// address). Each one becomes a list item, ordered best, closest to the window's center, or largest first; read them with 'detection of'. Objects keep their id from one run of this block to the next. Click the region button to search only part of the window; the aim still uses the window's center. On Windows, games in exclusive fullscreen capture as black: switch them to borderless windowed. Only use it where automation is allowed, never against other players."),WaitForDetection:qsTr("Pauses until the detector sees the label in the window (or stops seeing it). If that hasn't happened within the time limit it's an error; 0 waits forever. Only use it where automation is allowed, never against other players."),AimStep:qsTr("Asks once per session before it moves the mouse. Moves the mouse one small step from the window's center toward a screen point. Games that lock the pointer turn the view instead, so repeat it with a fresh detection each time. Gain is mouse movement per pixel off target in a 1000 pixel tall window (it's scaled to the window's height): tune it to your sensitivity; about 0.5 suits Minecraft's default. Only use it where automation is allowed, never against other players."),AimAtDetection:qsTr("Asks once per session before it moves the mouse. Follows one item of a detections list: detects again and again while gliding the mouse toward it like a hand would, until it's held at the window's center for the hold time. Gain works as in the aim step block. Puts hit, timeout or lost in the variable. Fill the list with a detect block first. Only use it where automation is allowed, never against other players."),WindowInfo:qsTr("The position or size of a window, or its center (where games draw the crosshair), in screen coordinates."),Detection:qsTr("One part of a detection from a detect block's list: its box, center, score (0-100), label or tracking id. An item that isn't a detection is an error."),PixelColor:qsTr("The color of the screen at a point, as #rrggbb. Use the screen picker in the toolbar to find coordinates."),AverageColor:qsTr("The average color of a screen region, as #rrggbb."),ColorsMatch:qsTr("Whether two colors are within the given percentage of each other (0 = identical, 100 = black vs white)."),ScreenText:qsTr("Reads the text in a screen region (OCR). Uses Windows or macOS text recognition, or Tesseract on Linux. Windows reads the languages added in its Language settings."),MousePosition:qsTr("Where the mouse pointer is, in screen coordinates."),ScreenSize:qsTr("The size of the whole desktop, across all monitors."),MonitorInfo:qsTr("The position or size of a monitor, counting from 1."),MonitorCount:qsTr("How many monitors are connected."),RunMacro:qsTr("Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too."),StopMacroNamed:qsTr("Stops every run of the named macro."),SetGlobal:qsTr("Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts."),ChangeGlobal:qsTr("Adds a number to a global variable. A global that was never set counts as 0."),Retry:qsTr("Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other."),WindowAction:qsTr("Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window. On Windows it can only control programs running as administrator when Blockwork runs as administrator too."),MoveWindow:qsTr("Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating. On Windows it can only move programs running as administrator when Blockwork runs as administrator too."),WhenWindow:qsTr("Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window."),WhenFileChanged:qsTr("Runs when the file is created, changed or deleted. Checked once a second."),WriteFile:qsTr("Writes text to a file, replacing it, or appends to the end. ~ means your home folder."),HttpRequest:qsTr("Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error."),Notify:qsTr("Shows a desktop notification."),Log:qsTr("Adds a line to the run log."),TryCatch:qsTr("Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong."),ThrowError:qsTr("Fails with this message. Ends the strand unless a try block catches it."),StopMacro:qsTr("Stops every strand of this run."),WhenRan:qsTr("Runs this strand when the macro starts, from the Run button or the macro's hotkey. A macro can have several, and they all run side by side."),
+        const x={BrowserOpen:qsTr("Opens a web address in the browser's current tab, or a new one, and waits for it to load. Needs the Blockwork browser extension, paired in Settings > Integrations."),BrowserClick:qsTr("Clicks an element on the page in the browser you used last, waiting up to 5 seconds for it to appear. It clicks the first match; add 'which match' with the + to pick another when several fit: 1 is the first, -1 the last. A selector says which element: CSS like button.save, text=Save for what it reads (or its label), focused for the field with the cursor; join parts with >> to search inside the one before, and add >> near=button for the closest button, or >> nth=2 for the second match. The extension's picker makes one for you."),BrowserType:qsTr("Puts text into a field on the page, replacing what was there, the way typing would. It uses the first match; add 'which match' with the + to pick another. Works on text boxes, rich text editors and lists (pick an option by its text). A selector says which element: CSS like button.save, text=Save for what it reads (or its label), focused for the field with the cursor; join parts with >> to search inside the one before, and add >> near=button for the closest button, or >> nth=2 for the second match. The extension's picker makes one for you."),BrowserWaitFor:qsTr("Pauses until an element appears on the page (or goes away). If that hasn't happened within the time limit it's an error; 0 waits forever. A selector says which element: CSS like button.save, text=Save for what it reads (or its label), focused for the field with the cursor; join parts with >> to search inside the one before, and add >> near=button for the closest button, or >> nth=2 for the second match. The extension's picker makes one for you."),BrowserScript:qsTr("Runs JavaScript in the page and puts its result in the variable. Give an expression like document.title, or statements with a return. Some sites' security settings block it."),BrowserConnected:qsTr("Whether a browser with the Blockwork extension is connected."),PageUrl:qsTr("The web address of the tab you're on in the browser."),PageTitle:qsTr("The title of the tab you're on in the browser."),ElementText:qsTr("The text of the first element the selector matches, or what's typed in it for a field. An error if nothing matches. Add >> nth=2 for the second match."),ElementExists:qsTr("Whether the selector matches anything on the page right now."),ElementCount:qsTr("How many elements the selector matches on the page. Handy for checking a selector picks only one."),WhenAt:qsTr("Runs once, at a date and time like 2026-12-24 18:00 (local time). Click it to pick the day from a calendar, or drop a reporter that gives one. Turn on 'catch up on missed schedules' in Macro settings to still run it if Blockwork was closed or the computer was asleep at that moment."),WhenSignal:qsTr("Runs when a 'send signal' block in this macro sends the same name. It shares that run's variables, so one strand can hand work to others."),SendSignal:qsTr("Starts this macro's 'when I receive' strands with the same name. With 'and wait' this strand pauses until they've all finished: a way to wait for other strands."),WhenWebhook:qsTr("Runs when a web request reaches Blockwork's webhook server at this path. Turn the server on in Settings > Integrations, where its address and token are. The request body goes into the variable."),AskText:qsTr("Shows a dialog asking for text and puts the answer in the variable. Cancel stops the run, unless it's inside a try block, where it's an error you can catch."),AskYesNo:qsTr("Shows a yes/no question and puts true or false in the variable."),AskChoice:qsTr("Shows the items of a list and puts the one you pick in the variable. Cancel stops the run, unless it's inside a try block."),ShowMessage:qsTr("Shows a message in a dialog and waits until you close it."),WhenNetwork:qsTr("Runs when the computer goes online or offline: when a network route to the internet appears or goes away. Checked once a second."),WhenUsb:qsTr("Runs when a USB device is plugged in or unplugged. The text matches the device's name or its vendor:product id (like 046d:c52b); leave it empty for any device. Hubs don't count."),WhenMouseButton:qsTr("Runs when a mouse button is pressed or released, or the wheel scrolls. Put modifier keys in the box (like Control+Shift) to only run while exactly those are held; leave it empty to ignore modifiers. The click still goes through to the app. On Windows, clicks in programs running as administrator are only seen when Blockwork runs as administrator too."),SplitIntoList:qsTr("Cuts the text at every separator and puts the pieces in the list, replacing what was there. An empty separator splits it into letters."),Secret:qsTr("The value of a secret saved in Settings > Secrets. It comes from your system keyring, isn't stored in the macro file, and shows as dots in the run log."),NetworkConnected:qsTr("Whether the computer has a network route to the internet."),UsbConnected:qsTr("Whether a USB device whose name or vendor:product id contains the text is plugged in. Empty matches any device."),TextCheck:qsTr("Checks text: contains, starts with, ends with, or matches a regular expression. Case matters."),TextReplace:qsTr("Replaces every copy of the first text inside the second with the third."),RegexReplace:qsTr("Replaces every match of a regular expression. Use $1, $2 in the replacement for groups."),RegexFind:qsTr("The first match of a regular expression, or its first group if it has one. Empty when nothing matches."),SplitPart:qsTr("Cuts the text at every separator and gives one piece, counting from 1. Negative numbers count from the end."),SplitCount:qsTr("How many pieces the text has when cut at every separator."),Substring:qsTr("The letters between two positions, counting from 1, both included."),Trim:qsTr("The text without spaces or line breaks at its start and end."),FormatNumber:qsTr("The number as text with exactly this many digits after the point."),Timestamp:qsTr("The current time as a Unix timestamp: seconds since 1970. Add 86400 for a day later."),FormatDate:qsTr("Writes a timestamp as a date in local time. Codes: %Y year, %m month, %d day, %H hour, %M minute, %S second, %A weekday name, %B month name."),ParseDate:qsTr("The timestamp of a date written as text, in local time. Leave the format empty for dates like 2026-01-31 09:00, or use codes like %d.%m.%Y."),DatePart:qsTr("One part of a timestamp in local time. Weekday is 1 for Sunday to 7 for Saturday."),WhenTyped:qsTr("Text expansion: runs when you type the text anywhere, like ;addr. With 'erase it' the typed text is deleted first, so a paste block can replace it. Uses a US keyboard layout for symbols."),PasteText:qsTr("Pastes text with Ctrl+V (Cmd+V on macOS), then puts back the text that was on the clipboard. Faster and more reliable than typing for long text. Terminals that paste with Ctrl+Shift+V need a Key block instead."),WhenApp:qsTr("Runs when a program whose name contains the text starts or exits. Checked once a second."),WhenIdle:qsTr("Runs once you haven't touched the keyboard or mouse for this many minutes. Fires again after the next idle stretch."),WhenScreenLock:qsTr("Runs when the screen locks or unlocks."),WhenCron:qsTr("Runs on a schedule, like every 15 minutes on weekdays or 9:00 on the 1st of each month. Click the schedule to choose it. Underneath it's cron (minute hour day month weekday, like '0 9 * * mon-fri'), so you can also type one under Custom or drop a reporter that gives one."),WithLock:qsTr("Runs its body while holding a named lock. Only one strand, in any macro, can be inside a lock with the same name at a time; others wait their turn. Use it so two macros don't type over each other."),AppRunning:qsTr("Whether a program whose name contains the text is running."),IdleSeconds:qsTr("How many seconds since the last keyboard or mouse input."),ScreenLocked:qsTr("Whether the screen is locked."),WaitUntil:qsTr("Pauses until the condition is true, checking about 10 times a second. Add 'for up to' to continue after a time limit, or 'or error after' to end the strand with an error (catchable with try). Without a limit, or with 0, it waits forever."),FindImage:qsTr("Looks for the picture on screen and puts the screen position of its middle in the two variables, or -1 if it isn't there. Click the picture area to capture one. It uses the best match. When the picture is on screen more than once, add 'which match' with the + to choose a match number (counting left to right, top to bottom; -1 is the last), the one nearest the mouse, or the one nearest a point, like the x and y of another find block. Add 'search region' to only search part of the screen, and 'count matches' to get how many there are. Tolerance is how different the pixels may be, in percent. On Windows, games in exclusive fullscreen capture as black: switch them to borderless windowed."),ClickImage:qsTr("Finds the picture on screen and clicks its middle. It's an error if the picture isn't there. Click the picture area to capture one. It uses the best match. When the picture is on screen more than once, add 'which match' with the + to choose a match number (counting left to right, top to bottom; -1 is the last), the one nearest the mouse, or the one nearest a point. Add 'search region' to only search part of the screen."),WaitForImage:qsTr("Pauses until the picture appears on screen (or goes away). Use the + to add a search region or 'within %' tolerance (10% by default). Add 'for up to' to continue after a time limit, or 'or error after' to end the strand with an error (catchable with try). Without a limit, or with 0, it waits forever. If both limits are added, the earlier one wins; errors win a tie."),DetectObjectsInWindow:qsTr("Captures the window and finds the objects in it, with a built-in model (the name of a .onnx file in Blockwork's models folder, or a path to one) or a detector running on this computer (a local http:// address). Each one becomes a list item, ordered best, closest to the window's center, or largest first; read them with 'detection of'. Objects keep their id from one run of this block to the next. Click the region button to search only part of the window; the aim still uses the window's center. On Windows, games in exclusive fullscreen capture as black: switch them to borderless windowed. Only use it where automation is allowed, never against other players."),WaitForDetection:qsTr("Pauses until the detector sees the label in the window (or stops seeing it). If that hasn't happened within the time limit it's an error; 0 waits forever. Only use it where automation is allowed, never against other players."),AimStep:qsTr("Asks once per session before it moves the mouse. Moves the mouse one small step from the window's center toward a screen point. Games that lock the pointer turn the view instead, so repeat it with a fresh detection each time. Gain is mouse movement per pixel off target in a 1000 pixel tall window (it's scaled to the window's height): tune it to your sensitivity; about 0.5 suits Minecraft's default. Only use it where automation is allowed, never against other players."),AimAtDetection:qsTr("Asks once per session before it moves the mouse. Follows one item of a detections list: detects again and again while gliding the mouse toward it like a hand would, until it's held at the window's center for the hold time. Gain works as in the aim step block. Puts hit, timeout or lost in the variable. Fill the list with a detect block first. Only use it where automation is allowed, never against other players."),WindowInfo:qsTr("The position or size of a window, or its center (where games draw the crosshair), in screen coordinates."),Detection:qsTr("One part of a detection from a detect block's list: its box, center, score (0-100), label or tracking id. An item that isn't a detection is an error."),PixelColor:qsTr("The color of the screen at a point, as #rrggbb. Use the screen picker in the toolbar to find coordinates."),AverageColor:qsTr("The average color of a screen region, as #rrggbb."),ColorsMatch:qsTr("Whether two colors are within the given percentage of each other (0 = identical, 100 = black vs white)."),ScreenText:qsTr("Reads the text in a screen region (OCR). Uses Windows or macOS text recognition, or Tesseract on Linux. Windows reads the languages added in its Language settings."),MousePosition:qsTr("Where the mouse pointer is, in screen coordinates."),ScreenSize:qsTr("The size of the whole desktop, across all monitors."),MonitorInfo:qsTr("The position or size of a monitor, counting from 1."),MonitorCount:qsTr("How many monitors are connected."),RunMacro:qsTr("Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too."),StopMacroNamed:qsTr("Stops every run of the named macro."),SetGlobal:qsTr("Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts."),ChangeGlobal:qsTr("Adds a number to a global variable. A global that was never set counts as 0."),Retry:qsTr("Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other."),WindowAction:qsTr("Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window. On Windows it can only control programs running as administrator when Blockwork runs as administrator too."),MoveWindow:qsTr("Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating. On Windows it can only move programs running as administrator when Blockwork runs as administrator too."),WhenWindow:qsTr("Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window."),WhenFileChanged:qsTr("Runs when the file is created, changed or deleted. Checked once a second."),WriteFile:qsTr("Writes text to a file, replacing it, or appends to the end. ~ means your home folder."),HttpRequest:qsTr("Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error."),Notify:qsTr("Shows a desktop notification."),Log:qsTr("Adds a line to the run log."),TryCatch:qsTr("Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong."),ThrowError:qsTr("Fails with this message. Ends the strand unless a try block catches it."),StopMacro:qsTr("Stops every strand of this run."),WhenRan:qsTr("Runs this strand when the macro starts, from the Run button or the macro's hotkey. A macro can have several, and they all run side by side."),
             WhenBatteryDischargedTo:qsTr("Runs when the battery drops to this percentage or below. It won't run again until the battery charges back above it and drops again."),
             WhenBatteryChargedTo:qsTr("Runs when the battery charges to this percentage or above. It won't run again until the battery drops back below it and charges again."),
             WhenTime:qsTr("Runs at a time of day, every day, week, month or year (local time). Click the time to pick it, or drop a reporter there that gives a time like 09:30. A monthly day that a month doesn't have, like the 31st, skips that month."),
@@ -415,8 +415,14 @@ Item {
         root.invoke("edit_instruction", { strandId: req.strandId, path: req.path, instruction: updated });
     }
     // ---- palette drops: the shared controller's edits as daemon commands ----
-    // A plain palette block drops with Blockwork's own defaults; branch and custom calls come ready-made.
-    function paletteInstruction(spec) { return spec.kind === "instruction" && spec.type ? defaultInstruction(spec.type) : null; }
+    // Keep palette edits and give the inserted block its own id.
+    function paletteInstruction(spec) {
+        if (spec.kind !== "instruction" || !spec.type) return null;
+        if (!spec.instruction) return defaultInstruction(spec.type);
+        const instruction = JSON.parse(JSON.stringify(spec.instruction));
+        instruction.id = uuid();
+        return instruction;
+    }
     function headerStrand(strandId) {
         const strand = (root.macro ? root.macro.strands : []).find(s => s.id === strandId);
         const first = strand ? strand.instructions[0] : null;
@@ -711,7 +717,7 @@ Item {
                     blockDefinitions: root.macro ? root.macro.block_defs : []
                     keyCapture: appState.key_capture
                     standaloneKey: root.sidebarKey
-                    onBlockActivated: type => dragController.addAt({ kind: "instruction", type: type }, 120, 120)
+                    onBlockActivated: (type, instruction) => dragController.addAt({ kind: "instruction", type: type, instruction: instruction }, 120, 120)
                     onCustomBlockActivated: definition => dragController.addAt(root.customEntry(definition), 120, 120)
                     onMakeVariableRequested: variableDialog.openForCreate()
                     onRenameVariableRequested: name => variableDialog.openForRename(name)
@@ -1127,6 +1133,7 @@ Item {
     }
     GlobalPicker {
         id: globalPicker
+        objectName: "globalPicker"
         globals: root.appState.globals || []
         callCommand: (command, args, done) => root.daemonCall(command, args, done)
     }
@@ -1382,22 +1389,43 @@ Item {
     }
     AppDialog {
         id: variableDialog
+        objectName: "variableDialog"
         property string renameTarget: ""
+        property var selectCreated: null
+        property string errorText: ""
         title: renameTarget.length ? qsTr("Rename Variable") : qsTr("Make a Variable")
         standardButtons: Dialog.Ok | Dialog.Cancel
-        function openForCreate() { renameTarget = ""; variableName.text = ""; open(); variableName.forceActiveFocus(); }
-        function openForRename(name) { renameTarget = name; variableName.text = name; open(); variableName.forceActiveFocus(); variableName.selectAll(); }
+        function openForCreate(select) { renameTarget = ""; selectCreated = select || null; errorText = ""; variableName.text = ""; open(); variableName.forceActiveFocus(); }
+        function openForRename(name) { selectCreated = null; errorText = ""; renameTarget = name; variableName.text = name; open(); variableName.forceActiveFocus(); variableName.selectAll(); }
         Column { width: 340; spacing: 8
             Text { text: qsTr("Variable name"); color: Theme.text }
-            BwTextField { id: variableName; width: parent.width; placeholderText: qsTr("score"); onAccepted: variableDialog.accept() }
+            BwTextField { id: variableName; objectName: "variableName"; width: parent.width; placeholderText: qsTr("score"); onAccepted: variableDialog.accept() }
+            Text { width: parent.width; visible: text.length > 0; text: variableDialog.errorText; color: Theme.text; wrapMode: Text.WordWrap }
         }
+        onRejected: selectCreated = null
         onAccepted: {
             const name = variableName.text.trim();
-            if (name.length) {
-                if (renameTarget.length) { if (name !== renameTarget) root.invoke("rename_variable", { oldName: renameTarget, newName: name }); }
-                else root.invoke("create_variable", { name: name });
+            if (!name.length) {
+                errorText = qsTr("Enter a variable name.");
+                Qt.callLater(() => { open(); variableName.forceActiveFocus(); });
+                return;
             }
-            renameTarget = ""; variableName.clear();
+            const select = selectCreated;
+            const macroId = root.macro ? root.macro.id : "";
+            const command = renameTarget.length ? "rename_variable" : "create_variable";
+            const args = renameTarget.length ? { oldName: renameTarget, newName: name } : { name: name };
+            if (renameTarget === name) { selectCreated = null; return; }
+            root.daemonCall(command, args, (result, error) => {
+                if (!root.macro || root.macro.id !== macroId) return;
+                if (error) {
+                    errorText = error;
+                    open(); variableName.forceActiveFocus();
+                    return;
+                }
+                selectCreated = null;
+                renameTarget = ""; variableName.clear();
+                if (select) select(name);
+            });
         }
     }
     AppDialog {
@@ -1471,21 +1499,43 @@ Item {
     }
     AppDialog {
         id: listDialog
+        objectName: "listDialog"
         property string renameTarget: ""
+        property var selectCreated: null
+        property string errorText: ""
         title: renameTarget.length ? qsTr("Rename List") : qsTr("Make a List")
         standardButtons: Dialog.Ok | Dialog.Cancel
-        function openForCreate() { renameTarget = ""; listName.text = ""; open(); listName.forceActiveFocus(); }
-        function openForRename(name) { renameTarget = name; listName.text = name; open(); listName.forceActiveFocus(); listName.selectAll(); }
+        function openForCreate(select) { renameTarget = ""; selectCreated = select || null; errorText = ""; listName.text = ""; open(); listName.forceActiveFocus(); }
+        function openForRename(name) { selectCreated = null; errorText = ""; renameTarget = name; listName.text = name; open(); listName.forceActiveFocus(); listName.selectAll(); }
         Column { width: 340; spacing: 8
             Text { text: qsTr("List name"); color: Theme.text }
-            BwTextField { id: listName; width: parent.width; placeholderText: qsTr("items") }
+            BwTextField { id: listName; objectName: "listName"; width: parent.width; placeholderText: qsTr("items"); onAccepted: listDialog.accept() }
+            Text { width: parent.width; visible: text.length > 0; text: listDialog.errorText; color: Theme.text; wrapMode: Text.WordWrap }
         }
+        onRejected: selectCreated = null
         onAccepted: {
             const name = listName.text.trim();
-            if (!name.length) return;
-            if (renameTarget.length) root.invoke("rename_list", { oldName: renameTarget, newName: name });
-            else root.invoke("create_list", { name: name });
-            renameTarget = ""; listName.clear();
+            if (!name.length) {
+                errorText = qsTr("Enter a list name.");
+                Qt.callLater(() => { open(); listName.forceActiveFocus(); });
+                return;
+            }
+            const select = selectCreated;
+            const macroId = root.macro ? root.macro.id : "";
+            const command = renameTarget.length ? "rename_list" : "create_list";
+            const args = renameTarget.length ? { oldName: renameTarget, newName: name } : { name: name };
+            if (renameTarget === name) { selectCreated = null; return; }
+            root.daemonCall(command, args, (result, error) => {
+                if (!root.macro || root.macro.id !== macroId) return;
+                if (error) {
+                    errorText = error;
+                    open(); listName.forceActiveFocus();
+                    return;
+                }
+                selectCreated = null;
+                renameTarget = ""; listName.clear();
+                if (select) select(name);
+            });
         }
     }
     AppDialog {
@@ -1611,7 +1661,14 @@ Item {
     // [[value, label]] as dropdown options.
     function choices(pairs) { return pairs.map(p => ({ value: p[0], label: p[1] })); }
     function variableChoices() {
-        return [{ value: "", label: qsTr("(no variable)") }].concat((root.macro ? root.macro.variables : []).map(v => ({ value: v, label: v })));
+        return [{ value: "", label: qsTr("(no variable)") }]
+            .concat((root.macro ? root.macro.variables : []).map(v => ({ value: v, label: v })))
+            .concat([{ label: qsTr("Make a Variable…"), action: select => variableDialog.openForCreate(select) }]);
+    }
+    function globalChoices() {
+        return (root.appState.globals || []).map(g => ({ value: g.name, label: g.name }))
+            .concat([{ label: qsTr("Make a Global Variable…"), action: (select, location) => globalPicker.openForCreate(location
+                ? name => root.invoke("put_value", { location: location, value: root.textValue(name) }) : select) }]);
     }
     readonly property var mouseButtonOptions: [["Left", qsTr("left button")], ["Right", qsTr("right button")], ["Middle", qsTr("middle button")],
         ["Back", qsTr("back button")], ["Forward", qsTr("forward button")], ["ScrollUp", qsTr("wheel up")], ["ScrollDown", qsTr("wheel down")],
@@ -1653,6 +1710,15 @@ Item {
             { kind: "button", action: "pickRegion", icon: "square-dashed", text: i => i && i.region ? qsTr("region %1").arg(i.region) : qsTr("whole window") },
             { kind: "button", action: "clearRegion", icon: "x", when: i => !!i && !!i.region }
         ];
+        const timeoutComponent = { key: "timeout", label: qsTr("for up to"), icon: "timer", fresh: () => numberValue(10000), pieces: [
+            label(qsTr("for up to")), value("WaitTimeout", "timeout"), label(qsTr("ms"))
+        ] };
+        const errorTimeoutComponent = { key: "error_timeout", label: qsTr("or error after"), icon: "timer", fresh: () => numberValue(10000), pieces: [
+            label(qsTr("or error after")), value("WaitErrorTimeout", "error_timeout"), label(qsTr("ms"))
+        ] };
+        const toleranceComponent = { key: "tolerance", label: qsTr("within %"), icon: "scan", fresh: () => numberValue(10), pieces: [
+            label(qsTr("within")), value("ImageTolerance", "tolerance"), label("%")
+        ] };
         // The image blocks' optional components, added from the block's "+".
         // The search area, in screen coordinates.
         const regionComponent = { key: "region", label: qsTr("search region"), icon: "square-dashed", fresh: "", pieces: [
@@ -1696,7 +1762,7 @@ Item {
             WindowExists: { prefix: qsTr("window"), suffix: qsTr("exists?"), result: "bool" },
             LastError: { prefix: qsTr("error message"), result: "text" },
             MacroRunning: { prefix: qsTr("macro"), suffix: qsTr("is running?"), result: "bool" },
-            GlobalVariable: { prefix: qsTr("global"), result: "text", pickArg: { index: 0, action: "pickGlobal", icon: "chevron-down" } },
+            GlobalVariable: { prefix: qsTr("global"), result: "text", enumArg: { index: 0, options: () => root ? root.globalChoices() : [] } },
             PixelColor: { prefix: qsTr("color at x"), infix: [qsTr("y")], result: "text",
                 pickOp: { action: "pickScreenPoint", icon: "crosshair", tip: qsTr("Click a point on screen") } },
             AverageColor: { prefix: qsTr("average color at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text",
@@ -1779,6 +1845,12 @@ Item {
             return l.working_dir || (l.env && l.env.length) || l.new_instance ? qsTr("custom") : "";
         };
         BlockRegistry.registerRows({
+            SetVariable: { head: [label(qsTr("set")),
+                { kind: "dropdown", key: "name", options: () => root.variableChoices() },
+                label(qsTr("to")), value("SetVariableValue", "value")] },
+            ChangeVariable: { head: [label(qsTr("change")),
+                { kind: "dropdown", key: "name", options: () => root.variableChoices() },
+                label(qsTr("by")), value("ChangeVariableValue", "value")] },
             WhenRan: { shape: "header", icon: "play", head: [label(qsTr("WHEN RUN"))] },
             WhenAt: { shape: "header", icon: "clock", head: [label(qsTr("ONCE AT")),
                 Object.assign(value("AtTime", "at"), { pick: { action: "pickDateTime", icon: "calendar", display: t => Schedules.dateTimeLabel(t), tip: qsTr("Click to pick a date and time, or drop a reporter here") } })] },
@@ -1818,11 +1890,15 @@ Item {
             WhenUsb: { shape: "header", icon: "plug-zap", head: [label(qsTr("WHEN USB DEVICE")), value("UsbPattern", "pattern"), { kind: "button", action: "pickUsb", icon: "list" }, label(qsTr("IS")),
                 { kind: "dropdown", key: "connected", options: [{ value: "in", label: qsTr("plugged in") }, { value: "out", label: qsTr("unplugged") }],
                   encode: v => v === "in", decode: v => v ? "in" : "out" }] },
-            WhenMouseButton: { shape: "header", icon: "mouse", head: [label(qsTr("WHEN")),
+            WhenMouseButton: { shape: "header", icon: "mouse", components: [
+                { key: "modifiers", label: qsTr("with keys"), icon: "keyboard", fresh: () => textValue("Control"),
+                  present: i => !!i && !!i.modifiers && (i.modifiers.kind !== "Text" || i.modifiers.value.trim().length > 0), pieces: [
+                    label(qsTr("WITH KEYS")), value("MouseModifiers", "modifiers")
+                ] }
+            ], head: [label(qsTr("WHEN")),
                 { kind: "dropdown", key: "button", options: root.mouseButtonOptions },
                 { kind: "dropdown", key: "pressed", options: [{ value: "down", label: qsTr("is pressed") }, { value: "up", label: qsTr("is released") }],
-                  encode: v => v === "down", decode: v => v ? "down" : "up" },
-                label(qsTr("WITH KEYS")), value("MouseModifiers", "modifiers")] },
+                  encode: v => v === "down", decode: v => v ? "down" : "up" }] },
             SplitIntoList: { icon: "scissors", head: [label(qsTr("split")), value("SplitText", "text"), label(qsTr("by")), value("SplitSeparator", "separator"),
                 label(qsTr("into")), { kind: "dropdown", key: "name", options: "lists" }] },
             PasteText: { icon: "clipboard-paste", head: [label(qsTr("paste")), value("PasteValue", "text")] },
@@ -1866,23 +1942,21 @@ Item {
                 { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
                   encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
             StopMacroNamed: { icon: "square", head: [label(qsTr("stop macro")), value("MacroTarget", "target")] },
-            SetGlobal: { icon: "variable", head: [label(qsTr("set global")), { kind: "value", field: "GlobalName", key: "name", pickAction: "pickGlobal" }, label(qsTr("to")), value("GlobalValue", "value")] },
-            ChangeGlobal: { icon: "variable", head: [label(qsTr("change global")), { kind: "value", field: "GlobalName", key: "name", pickAction: "pickGlobal" }, label(qsTr("by")), value("GlobalValue", "by")] },
-            WaitUntil: { icon: "loader", head: [label(qsTr("wait until")), { kind: "value", field: "Condition", key: "condition", bool: true },
-                label(qsTr("for up to")), value("WaitTimeout", "timeout"), label(qsTr("ms"))] },
+            SetGlobal: { icon: "variable", head: [label(qsTr("set global")), { kind: "value", field: "GlobalName", key: "name", options: () => root ? root.globalChoices() : [], placeholder: qsTr("(no global variable)") }, label(qsTr("to")), value("GlobalValue", "value")] },
+            ChangeGlobal: { icon: "variable", head: [label(qsTr("change global")), { kind: "value", field: "GlobalName", key: "name", options: () => root ? root.globalChoices() : [], placeholder: qsTr("(no global variable)") }, label(qsTr("by")), value("GlobalValue", "by")] },
+            WaitUntil: { icon: "loader", components: [timeoutComponent, errorTimeoutComponent],
+                head: [label(qsTr("wait until")), { kind: "value", field: "Condition", key: "condition", bool: true }] },
             FindImage: { icon: "search", head: [label(qsTr("find")), ...imagePieces, label(qsTr("put x in")),
                 { kind: "dropdown", key: "x_variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") },
-                label(qsTr("y in")), { kind: "dropdown", key: "y_variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") },
-                label(qsTr("within")), value("ImageTolerance", "tolerance"), label("%")],
-                components: [pickComponent, regionComponent, countComponent] },
+                label(qsTr("y in")), { kind: "dropdown", key: "y_variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") }],
+                components: [toleranceComponent, pickComponent, regionComponent, countComponent] },
             ClickImage: { icon: "mouse-pointer-click", head: [label(qsTr("click")),
                 { kind: "dropdown", key: "button", options: [{ value: "Left", label: qsTr("left") }, { value: "Right", label: qsTr("right") }, { value: "Middle", label: qsTr("middle") }] },
-                label(qsTr("on")), ...imagePieces, label(qsTr("within")), value("ImageTolerance", "tolerance"), label("%")],
-                components: [pickComponent, regionComponent] },
-            WaitForImage: { icon: "eye", components: [regionComponent], head: [label(qsTr("wait until")), ...imagePieces,
+                label(qsTr("on")), ...imagePieces],
+                components: [toleranceComponent, pickComponent, regionComponent] },
+            WaitForImage: { icon: "eye", components: [timeoutComponent, errorTimeoutComponent, toleranceComponent, regionComponent], head: [label(qsTr("wait until")), ...imagePieces,
                 { kind: "dropdown", key: "appear", options: [{ value: "appears", label: qsTr("appears") }, { value: "gone", label: qsTr("disappears") }],
-                  encode: v => v === "appears", decode: v => v ? "appears" : "gone" },
-                label(qsTr("for up to")), value("WaitTimeout", "timeout"), label(qsTr("ms, within")), value("ImageTolerance", "tolerance"), label("%")] },
+                  encode: v => v === "appears", decode: v => v ? "appears" : "gone" }] },
             DetectObjectsInWindow: { icon: "aperture", head: [label(qsTr("detect")), value("DetectLabel", "label"), label(qsTr("in")),
                 { kind: "dropdown", key: "by", options: root.windowMatchOptions }, value("WindowPattern", "pattern"), ...regionPieces,
                 label(qsTr("with")), value("DetectorUrl", "detector"), { kind: "button", action: "pickModel", icon: "box" }, label(qsTr("at least")), value("DetectConfidence", "confidence"), label(qsTr("% into")),
@@ -1938,7 +2012,7 @@ Item {
             WhenTime: { schedule: { kind: "Daily" }, time: textValue("09:00") },
             WhenNetwork: { connected: true },
             WhenUsb: { pattern: textValue(""), connected: true },
-            WhenMouseButton: { button: "Back", pressed: true, modifiers: textValue("") },
+            WhenMouseButton: { button: "Back", pressed: true },
             SplitIntoList: () => ({ text: textValue("a,b,c"), separator: textValue(","), name: root.firstListName() }),
             PasteText: { text: textValue(qsTr("Hello!")) },
             WithLock: { name: textValue("keyboard"), body: [] },
@@ -1957,11 +2031,11 @@ Item {
             StopMacroNamed: () => ({ target: textValue(root.otherMacroName()) }),
             SetGlobal: () => ({ name: textValue(firstGlobalName()), value: numberValue(0) }),
             ChangeGlobal: () => ({ name: textValue(firstGlobalName()), by: numberValue(1) }),
-            WaitUntil: { condition: { kind: "Bool" }, timeout: numberValue(0) },
-            FindImage: () => ({ image: "", tolerance: numberValue(10), x_variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "",
+            WaitUntil: { condition: { kind: "Bool" } },
+            FindImage: () => ({ image: "", x_variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "",
                 y_variable: root.macro && root.macro.variables.length > 1 ? root.macro.variables[1] : "" }),
-            ClickImage: { image: "", tolerance: numberValue(10), button: "Left" },
-            WaitForImage: { image: "", tolerance: numberValue(10), appear: true, timeout: numberValue(10000) },
+            ClickImage: { image: "", button: "Left" },
+            WaitForImage: { image: "", appear: true },
             DetectObjectsInWindow: () => ({ pattern: textValue("Minecraft"), by: "Title", detector: textValue(root.defaultDetector),
                 label: textValue("player"), confidence: numberValue(50), sort: "Closest", results_list: root.firstListName(), region: "",
                 count_variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
@@ -1980,7 +2054,7 @@ Item {
         });
     }
     // The variable dropdowns read macro state through a function, so nudge them.
-    readonly property string variablesKey: JSON.stringify([root.macro ? root.macro.variables : [], root.macro ? root.macro.signals : [], appState.secret_names || []])
+    readonly property string variablesKey: JSON.stringify([root.macro ? root.macro.variables : [], root.macro ? root.macro.signals : [], appState.secret_names || [], appState.globals || []])
     onVariablesKeyChanged: BlockRegistry.revision++
 
     // ---- run log ----
@@ -2042,7 +2116,13 @@ Item {
     // Block labels are read once, so register them again in a new language.
     readonly property string uiLanguage: appState.language || ""
     onUiLanguageChanged: Qt.callLater(() => { BlockRegistry.resetOperators(); registerBlocks(); BlockRegistry.blockMenu = [{ id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }]; })
+    property var createListFromDropdown: (select, location) => listDialog.openForCreate(location
+        ? name => root.invoke("edit_value_field", { location: location, text: name }) : select)
+    Component.onDestruction: {
+        if (BlockRegistry.listCreationHandler === root.createListFromDropdown) BlockRegistry.listCreationHandler = null;
+    }
     Component.onCompleted: {
+        BlockRegistry.listCreationHandler = root.createListFromDropdown;
         registerBlocks();
         BlockRegistry.blockMenu = [{ id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }];
         BlockRegistry.previewHandler = (key, value) => root.appBridge.previewValue(key, JSON.stringify(value));

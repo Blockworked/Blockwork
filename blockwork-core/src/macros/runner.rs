@@ -160,17 +160,18 @@ fn resolve_calls_and_params(value: &Value, ctx: &mut ExecCtx, depth: u32) -> Res
                 saved: saved.clone(),
             })
         }
-        Value::Call { block_id, args, .. } => {
+        Value::Call { block_id, args, branches, .. } => {
             // Args evaluate in the caller's scope, fully resolved to
             // concrete values before call_block swaps in the callee's scope.
-            // Reporter calls carry no branch bodies (blockstitch's `Value`
-            // has nowhere to put them), so the branch env stays empty.
             let mut evaluated_args = Vec::with_capacity(args.len());
             for a in args {
                 let resolved = resolve_calls_and_params(a, ctx, depth)?;
                 evaluated_args.push(resolved.eval()?);
             }
-            match call_block(block_id, evaluated_args, Vec::new(), ctx, depth + 1)? {
+            let branch_values = branches.iter().map(|body| {
+                crate::frontend::reporter_branch_to_instructions(body)
+            }).collect::<Result<Vec<_>, _>>()?;
+            match call_block(block_id, evaluated_args, branch_values, ctx, depth + 1)? {
                 Some(e) => Ok(e.into_value()),
                 None => Err(format!("custom block '{block_id}' didn't return a value")),
             }
@@ -247,6 +248,33 @@ fn soft_fail(ctx: &mut ExecCtx, block_id: &str, block: &str, error: impl std::fm
     warn!("{message}");
     crate::run_log::block_error(&ctx.source, block_id, message);
     Ok(())
+}
+
+// Optional wait limits use real time, just like the existing wait blocks.
+fn optional_number(
+    ctx: &mut ExecCtx,
+    depth: u32,
+    value: Option<&Value>,
+    fallback: f64,
+) -> Result<f64, String> {
+    value.map_or(Ok(fallback), |v| ctx.resolve(v, depth)?.eval_number())
+}
+
+fn wait_limit_reached(
+    ctx: &mut ExecCtx,
+    block_id: &str,
+    started: Instant,
+    timeout: f64,
+    error_timeout: f64,
+    message: &str,
+) -> Result<bool, String> {
+    let elapsed = started.elapsed().as_secs_f64() * 1000.0;
+    // If both are present, the earlier deadline wins; errors win a tie.
+    if error_timeout > 0.0 && (timeout <= 0.0 || error_timeout <= timeout) && elapsed >= error_timeout {
+        ctx.error_block = block_id.to_string();
+        return Err(format!("{message} after {error_timeout} ms"));
+    }
+    Ok(timeout > 0.0 && elapsed >= timeout)
 }
 
 /// Counts one loop iteration. Past the macro's loop limit it reports the
@@ -434,7 +462,7 @@ fn set_variable(ctx: &ExecCtx, name: &str, value: Evaluated) {
 /// What an image block looks for and which match it wants.
 struct ImageSearch<'a> {
     image: &'a str,
-    tolerance: &'a Value,
+    tolerance: Option<&'a Value>,
     pick: Option<&'a ImageMatch>,
     region: Option<&'a str>,
 }
@@ -442,7 +470,7 @@ struct ImageSearch<'a> {
 /// The screen point of the match `search` picks, if there is one, and how
 /// many matches there are (only counted when `count` asks or the pick needs them).
 fn find_picked_image(ctx: &mut ExecCtx, depth: u32, search: &ImageSearch, count: bool) -> Result<(Option<(f64, f64)>, usize), String> {
-    let tolerance = ctx.resolve(search.tolerance, depth)?.eval_number()?;
+    let tolerance = optional_number(ctx, depth, search.tolerance, 10.0)?;
     let needle = crate::screen::image::load_cached(search.image)?;
     let region = crate::detect::parse_region(search.region.unwrap_or(""))?;
     if search.pick.is_none() && !count {
@@ -1398,9 +1426,14 @@ fn run_block(
                     soft_fail(ctx, &ins.id, if *resize { "Resize window" } else { "Move window" }, e)?;
                 }
             }
-            InstructionKind::WaitUntil { condition, timeout } => {
-                let timeout = match ctx.resolve(timeout, depth).and_then(|v| v.eval_number()) {
-                    Ok(ms) => ms.max(0.0),
+            InstructionKind::WaitUntil { condition, timeout, error_timeout } => {
+                let (timeout, error_timeout) = match (|| {
+                    Ok::<_, String>((
+                        optional_number(ctx, depth, timeout.as_ref(), 0.0)?,
+                        optional_number(ctx, depth, error_timeout.as_ref(), 0.0)?,
+                    ))
+                })() {
+                    Ok(limits) => limits,
                     Err(e) => {
                         soft_fail(ctx, &ins.id, "Wait until", e)?;
                         continue;
@@ -1416,8 +1449,7 @@ fn run_block(
                             break;
                         }
                     }
-                    if timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout {
-                        soft_fail(ctx, &ins.id, "Wait until", format!("still false after {timeout} ms"))?;
+                    if wait_limit_reached(ctx, &ins.id, started, timeout, error_timeout, "Wait until: still false")? {
                         break;
                     }
                     if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
@@ -1426,7 +1458,7 @@ fn run_block(
                 }
             }
             InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable } => {
-                let search = ImageSearch { image, tolerance, pick: pick.as_ref(), region: region.as_deref() };
+                let search = ImageSearch { image, tolerance: tolerance.as_ref(), pick: pick.as_ref(), region: region.as_deref() };
                 let count_variable = count_variable.as_deref().unwrap_or("");
                 match find_picked_image(ctx, depth, &search, !count_variable.is_empty()) {
                     Ok((at, count)) => {
@@ -1440,7 +1472,7 @@ fn run_block(
             }
             InstructionKind::ClickImage { image, tolerance, button, pick, region } => {
                 let clicked = (|| {
-                    let search = ImageSearch { image, tolerance, pick: pick.as_ref(), region: region.as_deref() };
+                    let search = ImageSearch { image, tolerance: tolerance.as_ref(), pick: pick.as_ref(), region: region.as_deref() };
                     let mode = pick.as_ref().map(|m| m.mode);
                     let (at, count) = find_picked_image(ctx, depth, &search, mode == Some(ImagePick::Nth))?;
                     let (x, y) = at.ok_or_else(|| match (mode, count) {
@@ -1457,14 +1489,15 @@ fn run_block(
                     soft_fail(ctx, &ins.id, "Click image", e)?;
                 }
             }
-            InstructionKind::WaitForImage { image, tolerance, appear, timeout, region } => {
+            InstructionKind::WaitForImage { image, tolerance, appear, timeout, region, error_timeout } => {
                 let setup = (|| {
-                    let tolerance = ctx.resolve(tolerance, depth)?.eval_number()?;
-                    let timeout = ctx.resolve(timeout, depth)?.eval_number()?.max(0.0);
+                    let tolerance = optional_number(ctx, depth, tolerance.as_ref(), 10.0)?;
+                    let timeout = optional_number(ctx, depth, timeout.as_ref(), 0.0)?;
+                    let error_timeout = optional_number(ctx, depth, error_timeout.as_ref(), 0.0)?;
                     let region = crate::detect::parse_region(region.as_deref().unwrap_or(""))?;
-                    Ok::<_, String>((crate::screen::image::load_cached(image)?, tolerance, timeout, region))
+                    Ok::<_, String>((crate::screen::image::load_cached(image)?, tolerance, timeout, region, error_timeout))
                 })();
-                let (needle, tolerance, timeout, region) = match setup {
+                let (needle, tolerance, timeout, region, error_timeout) = match setup {
                     Ok(setup) => setup,
                     Err(e) => {
                         soft_fail(ctx, &ins.id, "Wait for image", e)?;
@@ -1481,9 +1514,8 @@ fn run_block(
                             break;
                         }
                     }
-                    if timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout {
-                        let what = if *appear { "didn't appear" } else { "didn't go away" };
-                        soft_fail(ctx, &ins.id, "Wait for image", format!("the image {what} within {timeout} ms"))?;
+                    let what = if *appear { "Wait for image: the image didn't appear" } else { "Wait for image: the image didn't go away" };
+                    if wait_limit_reached(ctx, &ins.id, started, timeout, error_timeout, what)? {
                         break;
                     }
                     if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
@@ -3129,6 +3161,28 @@ mod tests {
     }
 
     #[test]
+    fn value_call_runs_its_supplied_branch() {
+        let mut mac = macro_with_double_block(vec![Instruction::new(InstructionKind::SetVariable(
+            "result".into(),
+            Value::Call {
+                block_id: "double".into(), args: vec![Value::number(21.0)],
+                branches: vec![vec![serde_json::to_value(crate::frontend::instruction_to_dto(&Instruction::new(
+                    InstructionKind::SetVariable("branch_ran".into(), Value::number(7.0)),
+                ))).unwrap()]],
+                saved: Box::new(Value::number(0.0)),
+            },
+        ))]);
+        mac.block_defs[0].pieces.push(BlockPiece::Branch { id: "callback".into(), name: "callback".into() });
+        let body = mac.strands.iter_mut().find(|s| s.instructions.first().is_some_and(|i| matches!(&i.kind, InstructionKind::BlockHeader(_)))).unwrap();
+        body.instructions.insert(1, Instruction::new(InstructionKind::RunBranch("callback".into())));
+        let vars = empty_vars();
+        mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("branch_ran"), Some(&Evaluated::Number(7.0)));
+        assert_eq!(vars.get("result"), Some(&Evaluated::Number(42.0)));
+    }
+
+    #[test]
     fn value_call_to_reporter_block_resolves_and_runs() {
         let vars = empty_vars();
         let mac = macro_with_double_block(vec![Instruction::new(InstructionKind::SetVariable(
@@ -3888,10 +3942,10 @@ mod tests {
         let gt = |a: Value, b: Value| Value::op(Op::from_name("Gt"), vec![a, b]);
         run_instructions(
             vec![
-                Instruction::new(InstructionKind::WaitUntil { condition: gt(Value::number(2.0), Value::number(1.0)), timeout: Value::number(0.0) }),
+                Instruction::new(InstructionKind::WaitUntil { condition: gt(Value::number(2.0), Value::number(1.0)), timeout: None, error_timeout: Some(Value::number(0.0)) }),
                 Instruction::new(InstructionKind::TryCatch {
                     body: vec![
-                        Instruction::new(InstructionKind::WaitUntil { condition: gt(Value::number(1.0), Value::number(2.0)), timeout: Value::number(150.0) }),
+                        Instruction::new(InstructionKind::WaitUntil { condition: gt(Value::number(1.0), Value::number(2.0)), timeout: None, error_timeout: Some(Value::number(150.0)) }),
                         set("missed", Value::number(1.0)),
                     ],
                     catch_body: vec![set("timed_out", Value::number(1.0))],
@@ -3907,6 +3961,42 @@ mod tests {
         assert_eq!(vars.get("missed"), None);
         let elapsed = started.elapsed();
         assert!(elapsed >= Duration::from_millis(150) && elapsed < Duration::from_secs(2), "{elapsed:?}");
+    }
+
+    #[test]
+    fn wait_limits_continue_or_end_the_strand_and_can_be_caught() {
+        let wait = |timeout: Option<f64>, error_timeout: Option<f64>| Instruction::new(InstructionKind::WaitUntil {
+            condition: Value::op(Op::from_name("Gt"), vec![Value::number(0.0), Value::number(1.0)]),
+            timeout: timeout.map(Value::number),
+            error_timeout: error_timeout.map(Value::number),
+        });
+        // A normal deadline continues even inside try; an error deadline stops the strand.
+        let vars = empty_vars();
+        run_instructions(vec![
+            Instruction::new(InstructionKind::TryCatch {
+                body: vec![wait(Some(1.0), None), set("continued", Value::number(1.0))],
+                catch_body: vec![set("caught", Value::number(1.0))],
+            }),
+            wait(None, Some(1.0)),
+            set("after_error", Value::number(1.0)),
+        ], noop_emulator(), None, 1.0, Arc::clone(&vars));
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("continued"), Some(&Evaluated::Number(1.0)));
+        assert_eq!(vars.get("caught"), None);
+        assert_eq!(vars.get("after_error"), None);
+        drop(vars);
+
+        // Both deadlines start together. The earlier wins, with errors winning a tie.
+        for (timeout, error_timeout, caught) in [(1.0, 1000.0, false), (1000.0, 1.0, true), (1.0, 1.0, true)] {
+            let vars = empty_vars();
+            run_instructions(vec![Instruction::new(InstructionKind::TryCatch {
+                body: vec![wait(Some(timeout), Some(error_timeout)), set("continued", Value::number(1.0))],
+                catch_body: vec![set("caught", Value::number(1.0))],
+            })], noop_emulator(), None, 1.0, Arc::clone(&vars));
+            let vars = vars.lock().unwrap();
+            assert_eq!(vars.contains_key("caught"), caught);
+            assert_eq!(vars.contains_key("continued"), !caught);
+        }
     }
 
     #[test]
@@ -4001,7 +4091,7 @@ mod tests {
                 vec![
                     search(InstructionKind::FindImage {
                         image: image.clone(),
-                        tolerance: Value::number(10.0),
+                        tolerance: Some(Value::number(10.0)),
                         x_variable: "x".into(),
                         y_variable: "y".into(),
                         pick: pick.clone(),
@@ -4010,7 +4100,7 @@ mod tests {
                     }),
                     search(InstructionKind::ClickImage {
                         image: image.clone(),
-                        tolerance: Value::number(10.0),
+                        tolerance: Some(Value::number(10.0)),
                         button: MacroButton::Left,
                         pick,
                         region: None,
@@ -4033,7 +4123,7 @@ mod tests {
             vec![
                 Instruction::new(InstructionKind::FindImage {
                     image: String::new(),
-                    tolerance: Value::number(5.0),
+                    tolerance: Some(Value::number(5.0)),
                     x_variable: "x".into(),
                     y_variable: "y".into(),
                     pick: None,

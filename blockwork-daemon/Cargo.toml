@@ -11,9 +11,11 @@ tracing-subscriber.workspace = true
 serde_json = { workspace = true, features = ["raw_value"] }
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net", "io-util", "time", "sync"] }
 dirs.workspace = true
-# Native Linux builds use libappindicator. Flatpak uses ksni directly because
-# it must avoid owning a well-known D-Bus name inside the sandbox.
-tray-icon = { version = "0.25", default-features = false, features = ["libappindicator"] }
-ksni = { version = "0.3.6", default-features = false, features = ["blocking", "tokio"] }
 tao = "0.37"
 png = "0.18"
+
+[target.'cfg(not(target_os = "linux"))'.dependencies]
+tray-icon = { version = "0.25", default-features = false }
+
+[target.'cfg(target_os = "linux")'.dependencies]
+ksni = { version = "0.3.6", default-features = false, features = ["blocking", "tokio"] }

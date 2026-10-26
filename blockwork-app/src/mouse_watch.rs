@@ -42,7 +42,7 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
                         continue;
                     }
                     // Empty means "whatever is held"; otherwise exactly these modifiers.
-                    let combo = modifiers.resolve_vars(&env).eval_text().unwrap_or_default();
+                    let combo = modifiers.as_ref().and_then(|v| v.resolve_vars(&env).eval_text().ok()).unwrap_or_default();
                     if !combo.trim().is_empty() && modifier_bits(&combo) != Some(event.modifiers) {
                         continue;
                     }

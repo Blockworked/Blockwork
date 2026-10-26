@@ -421,12 +421,16 @@ pub enum InstructionDto {
     WaitUntil {
         id: String,
         condition: Value,
-        timeout: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout: Option<Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_timeout: Option<Value>,
     },
     FindImage {
         id: String,
         image: String,
-        tolerance: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tolerance: Option<Value>,
         x_variable: String,
         y_variable: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -439,7 +443,8 @@ pub enum InstructionDto {
     ClickImage {
         id: String,
         image: String,
-        tolerance: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tolerance: Option<Value>,
         button: crate::input::types::MacroButton,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pick: Option<crate::macros::ImageMatch>,
@@ -449,11 +454,15 @@ pub enum InstructionDto {
     WaitForImage {
         id: String,
         image: String,
-        tolerance: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tolerance: Option<Value>,
         appear: bool,
-        timeout: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         region: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_timeout: Option<Value>,
     },
     WhenTyped {
         id: String,
@@ -505,7 +514,8 @@ pub enum InstructionDto {
         id: String,
         button: String,
         pressed: bool,
-        modifiers: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        modifiers: Option<Value>,
     },
     AskText {
         id: String,
@@ -922,10 +932,11 @@ pub fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             name: name.clone(),
             by: by.clone(),
         },
-        InstructionKind::WaitUntil { condition, timeout } => InstructionDto::WaitUntil {
+        InstructionKind::WaitUntil { condition, timeout, error_timeout } => InstructionDto::WaitUntil {
             id,
             condition: condition.clone(),
             timeout: timeout.clone(),
+            error_timeout: error_timeout.clone(),
         },
         InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable } => {
             InstructionDto::FindImage {
@@ -947,12 +958,13 @@ pub fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             pick: pick.clone(),
             region: region.clone(),
         },
-        InstructionKind::WaitForImage { image, tolerance, appear, timeout, region } => InstructionDto::WaitForImage {
+        InstructionKind::WaitForImage { image, tolerance, appear, timeout, region, error_timeout } => InstructionDto::WaitForImage {
             id,
             image: image.clone(),
             tolerance: tolerance.clone(),
             appear: *appear,
             timeout: timeout.clone(),
+            error_timeout: error_timeout.clone(),
             region: region.clone(),
         },
         InstructionKind::WhenTyped { text, erase } => InstructionDto::WhenTyped { id, text: text.clone(), erase: *erase },
@@ -1413,8 +1425,8 @@ pub fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         InstructionDto::ChangeGlobal { id, name, by } => {
             (id, InstructionKind::ChangeGlobal { name: name.clone(), by: by.clone() })
         }
-        InstructionDto::WaitUntil { id, condition, timeout } => {
-            (id, InstructionKind::WaitUntil { condition: condition.clone(), timeout: timeout.clone() })
+        InstructionDto::WaitUntil { id, condition, timeout, error_timeout } => {
+            (id, InstructionKind::WaitUntil { condition: condition.clone(), timeout: timeout.clone(), error_timeout: error_timeout.clone() })
         }
         InstructionDto::FindImage { id, image, tolerance, x_variable, y_variable, pick, region, count_variable } => (
             id,
@@ -1438,13 +1450,14 @@ pub fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
                 region: region.clone(),
             },
         ),
-        InstructionDto::WaitForImage { id, image, tolerance, appear, timeout, region } => (
+        InstructionDto::WaitForImage { id, image, tolerance, appear, timeout, region, error_timeout } => (
             id,
             InstructionKind::WaitForImage {
                 image: image.clone(),
                 tolerance: tolerance.clone(),
                 appear: *appear,
                 timeout: timeout.clone(),
+                error_timeout: error_timeout.clone(),
                 region: region.clone(),
             },
         ),
@@ -1620,4 +1633,14 @@ pub fn macro_to_dto(mac: &Macro) -> MacroDto {
         }).collect(),
         settings: macro_settings_to_dto(&mac.settings),
     }
+}
+
+/// Decodes reporter bodies stored as frontend instructions or older native records.
+pub fn reporter_branch_to_instructions(body: &[serde_json::Value]) -> Result<Vec<Instruction>, String> {
+    body.iter().map(|value| {
+        serde_json::from_value::<InstructionDto>(value.clone()).ok()
+            .and_then(|dto| dto_to_instruction(&dto))
+            .or_else(|| serde_json::from_value::<Instruction>(value.clone()).ok())
+            .ok_or_else(|| "Invalid instruction in a custom reporter branch".to_string())
+    }).collect()
 }

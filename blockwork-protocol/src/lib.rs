@@ -65,7 +65,7 @@ pub enum DaemonMessageKind {
     State,
     /// Bring the window to the front.
     Focus,
-    /// Close the UI; the whole app is shutting down.
+    /// Exit the UI process.
     Quit,
     /// `data` lists the blocks running strands are on, `[{macro_id, block_id}]`.
     Trace,

@@ -26,6 +26,15 @@ impl Default for Clients {
 }
 
 impl Clients {
+    /// Closes only the editor process. The daemon keeps running in the tray.
+    pub(crate) fn close_ui(&self) -> bool {
+        let ui = self.ui.lock().unwrap();
+        match ui.as_ref() {
+            Some((_, tx)) => tx.try_send(encode(&DaemonMessage::quit())).is_ok(),
+            None => false,
+        }
+    }
+
     /// Asks the connected UI to come to the front. Returns `false` if no UI is
     /// connected.
     pub(crate) fn focus_ui(&self) -> bool {
@@ -292,5 +301,29 @@ pub(crate) fn spawn_ui() {
             std::thread::spawn(move || child.wait());
         }
         Err(e) => tracing::warn!("Failed to launch the UI ({}): {e}", program.display()),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use blockwork_protocol::DaemonMessageKind;
+
+    #[test]
+    fn tray_closes_the_ui_and_open_still_focuses() {
+        let clients = Clients::default();
+        assert!(!clients.close_ui());
+        let (tx, mut rx) = mpsc::channel(32);
+        *clients.ui.lock().unwrap() = Some((1, tx));
+        assert!(clients.focus_ui());
+        let line = rx.try_recv().unwrap();
+        let message: DaemonMessage<'_> = serde_json::from_str(&line).unwrap();
+        assert_eq!(message.kind, DaemonMessageKind::Focus);
+        assert!(clients.close_ui());
+        let line = rx.try_recv().unwrap();
+        let message: DaemonMessage<'_> = serde_json::from_str(&line).unwrap();
+        assert_eq!(message.kind, DaemonMessageKind::Quit);
+        *clients.ui.lock().unwrap() = None;
+        assert!(!clients.close_ui());
     }
 }

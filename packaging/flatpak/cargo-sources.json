@@ -2,8 +2,8 @@
     {
         "type": "git",
         "url": "https://github.com/blockworked/blockstitch",
-        "commit": "3f0f8975aa11842ed8840856691ba5969b3813fc",
-        "dest": "flatpak-cargo/git/blockstitch-3f0f897"
+        "commit": "5ef480e4acf21251f6e8f2e3bea3061f4712edf3",
+        "dest": "flatpak-cargo/git/blockstitch-5ef480e"
     },
     {
         "type": "git",
@@ -605,7 +605,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-3f0f897/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-5ef480e/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
         ]
     },
     {
@@ -623,7 +623,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-3f0f897/crates/blockstitch-ffi\" \"cargo/vendor/blockstitch-ffi\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-5ef480e/crates/blockstitch-ffi\" \"cargo/vendor/blockstitch-ffi\""
         ]
     },
     {
@@ -641,7 +641,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-3f0f897/.\" \"cargo/vendor/blockstitch-qml\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-5ef480e/.\" \"cargo/vendor/blockstitch-qml\""
         ]
     },
     {
@@ -3108,32 +3108,6 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/libappindicator/libappindicator-0.9.0.crate",
-        "sha256": "03589b9607c868cc7ae54c0b2a22c8dc03dd41692d48f2d7df73615c6a95dc0a",
-        "dest": "cargo/vendor/libappindicator-0.9.0"
-    },
-    {
-        "type": "inline",
-        "contents": "{\"package\": \"03589b9607c868cc7ae54c0b2a22c8dc03dd41692d48f2d7df73615c6a95dc0a\", \"files\": {}}",
-        "dest": "cargo/vendor/libappindicator-0.9.0",
-        "dest-filename": ".cargo-checksum.json"
-    },
-    {
-        "type": "archive",
-        "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/libappindicator-sys/libappindicator-sys-0.9.0.crate",
-        "sha256": "6e9ec52138abedcc58dc17a7c6c0c00a2bdb4f3427c7f63fa97fd0d859155caf",
-        "dest": "cargo/vendor/libappindicator-sys-0.9.0"
-    },
-    {
-        "type": "inline",
-        "contents": "{\"package\": \"6e9ec52138abedcc58dc17a7c6c0c00a2bdb4f3427c7f63fa97fd0d859155caf\", \"files\": {}}",
-        "dest": "cargo/vendor/libappindicator-sys-0.9.0",
-        "dest-filename": ".cargo-checksum.json"
-    },
-    {
-        "type": "archive",
-        "archive-type": "tar-gzip",
         "url": "https://static.crates.io/crates/libc/libc-0.2.189.crate",
         "sha256": "3eaf3ede3fee6db1a4c2ee091bf8a8b4dccdc6d17f656fb07896ee72867612f2",
         "dest": "cargo/vendor/libc-0.2.189"
@@ -3155,19 +3129,6 @@
         "type": "inline",
         "contents": "{\"package\": \"328c4789d42200f1eeec05bd86c9c13c7f091d2ba9a6ea35acdf51f31bc0f043\", \"files\": {}}",
         "dest": "cargo/vendor/libdbus-sys-0.2.7",
-        "dest-filename": ".cargo-checksum.json"
-    },
-    {
-        "type": "archive",
-        "archive-type": "tar-gzip",
-        "url": "https://static.crates.io/crates/libloading/libloading-0.7.4.crate",
-        "sha256": "b67380fd3b2fbe7527a606e18729d21c6f3951633d0500574c4dc22d2d638b9f",
-        "dest": "cargo/vendor/libloading-0.7.4"
-    },
-    {
-        "type": "inline",
-        "contents": "{\"package\": \"b67380fd3b2fbe7527a606e18729d21c6f3951633d0500574c4dc22d2d638b9f\", \"files\": {}}",
-        "dest": "cargo/vendor/libloading-0.7.4",
         "dest-filename": ".cargo-checksum.json"
     },
     {
@@ -8026,7 +7987,7 @@
     },
     {
         "type": "inline",
-        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/blockworked/blockstitch\"]\ngit = \"https://github.com/blockworked/blockstitch\"\nreplace-with = \"vendored-sources\"\nrev = \"3f0f8975aa11842ed8840856691ba5969b3813fc\"\n\n[source.\"https://github.com/enigo-rs/enigo\"]\ngit = \"https://github.com/enigo-rs/enigo\"\nreplace-with = \"vendored-sources\"\nrev = \"a88d9b7\"\n\n[source.\"https://github.com/blockworked/lucide-qt\"]\ngit = \"https://github.com/blockworked/lucide-qt\"\nreplace-with = \"vendored-sources\"\ntag = \"v0.1.0\"\n",
+        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/blockworked/blockstitch\"]\ngit = \"https://github.com/blockworked/blockstitch\"\nreplace-with = \"vendored-sources\"\nrev = \"5ef480e4acf21251f6e8f2e3bea3061f4712edf3\"\n\n[source.\"https://github.com/enigo-rs/enigo\"]\ngit = \"https://github.com/enigo-rs/enigo\"\nreplace-with = \"vendored-sources\"\nrev = \"a88d9b7\"\n\n[source.\"https://github.com/blockworked/lucide-qt\"]\ngit = \"https://github.com/blockworked/lucide-qt\"\nreplace-with = \"vendored-sources\"\ntag = \"v0.1.0\"\n",
         "dest": "cargo",
         "dest-filename": "config"
     }

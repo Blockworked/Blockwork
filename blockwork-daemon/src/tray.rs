@@ -1,14 +1,18 @@
-//! The tray icon shown while "close to tray" is enabled: left click opens the
+//! The tray icon shown while "close to tray" is enabled: left click toggles the
 //! editor, right click shows the Open/Quit menu.
 
 use crate::MainThreadEvent;
 use tao::event_loop::EventLoopProxy;
+#[cfg(not(target_os = "linux"))]
 use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
+#[cfg(not(target_os = "linux"))]
 use tray_icon::{
     Icon as TrayImage, MouseButton, MouseButtonState, TrayIcon, TrayIconBuilder, TrayIconEvent,
 };
 
+#[cfg(not(target_os = "linux"))]
 const OPEN_ID: &str = "open";
+#[cfg(not(target_os = "linux"))]
 const QUIT_ID: &str = "quit";
 
 pub(crate) struct Tray {
@@ -18,34 +22,38 @@ pub(crate) struct Tray {
 
 #[allow(dead_code)]
 enum BuiltTray {
+    #[cfg(not(target_os = "linux"))]
     Native(TrayIcon),
-    #[cfg(all(unix, not(target_os = "macos")))]
-    Flatpak(FlatpakTray),
+    #[cfg(target_os = "linux")]
+    Linux(LinuxTray),
 }
 
 impl Tray {
     /// Must be created on the main thread, inside the event loop's lifetime.
     pub(crate) fn new(proxy: EventLoopProxy<MainThreadEvent>) -> Tray {
-        let menu_proxy = proxy.clone();
-        MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
-            let action = match event.id().as_ref() {
-                OPEN_ID => MainThreadEvent::OpenUi,
-                QUIT_ID => MainThreadEvent::Quit,
-                _ => return,
-            };
-            let _ = menu_proxy.send_event(action);
-        }));
-        let click_proxy = proxy.clone();
-        TrayIconEvent::set_event_handler(Some(move |event: TrayIconEvent| {
-            if let TrayIconEvent::Click {
-                button: MouseButton::Left,
-                button_state: MouseButtonState::Up,
-                ..
-            } = event
-            {
-                let _ = click_proxy.send_event(MainThreadEvent::OpenUi);
-            }
-        }));
+        #[cfg(not(target_os = "linux"))]
+        {
+            let menu_proxy = proxy.clone();
+            MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
+                let action = match event.id().as_ref() {
+                    OPEN_ID => MainThreadEvent::OpenUi,
+                    QUIT_ID => MainThreadEvent::Quit,
+                    _ => return,
+                };
+                let _ = menu_proxy.send_event(action);
+            }));
+            let click_proxy = proxy.clone();
+            TrayIconEvent::set_event_handler(Some(move |event: TrayIconEvent| {
+                if let TrayIconEvent::Click {
+                    button: MouseButton::Left,
+                    button_state: MouseButtonState::Up,
+                    ..
+                } = event
+                {
+                    let _ = click_proxy.send_event(MainThreadEvent::ToggleUi);
+                }
+            }));
+        }
         Tray { icon: None, proxy }
     }
 
@@ -62,9 +70,9 @@ impl Tray {
             Err(e) => tracing::warn!("Failed to create tray icon: {e}"),
         }
     }
-
 }
 
+#[cfg(not(target_os = "linux"))]
 fn menu() -> Result<Menu, Box<dyn std::error::Error>> {
     let menu = Menu::new();
     menu.append(&MenuItem::with_id(OPEN_ID, "Open", true, None))?;
@@ -73,12 +81,13 @@ fn menu() -> Result<Menu, Box<dyn std::error::Error>> {
     Ok(menu)
 }
 
-fn build(proxy: EventLoopProxy<MainThreadEvent>) -> Result<BuiltTray, Box<dyn std::error::Error>> {
-    #[cfg(all(unix, not(target_os = "macos")))]
-    if std::env::var_os("FLATPAK_ID").is_some() {
-        return FlatpakTray::new(proxy).map(BuiltTray::Flatpak);
+fn build(_proxy: EventLoopProxy<MainThreadEvent>) -> Result<BuiltTray, Box<dyn std::error::Error>> {
+    #[cfg(target_os = "linux")]
+    {
+        LinuxTray::new(_proxy).map(BuiltTray::Linux)
     }
 
+    #[cfg(not(target_os = "linux"))]
     Ok(BuiltTray::Native(
         TrayIconBuilder::new()
             .with_menu(Box::new(menu()?))
@@ -100,18 +109,19 @@ fn icon_rgba() -> Result<(Vec<u8>, u32, u32), Box<dyn std::error::Error>> {
     Ok((rgba, info.width, info.height))
 }
 
+#[cfg(not(target_os = "linux"))]
 fn icon() -> Result<TrayImage, Box<dyn std::error::Error>> {
     let (rgba, width, height) = icon_rgba()?;
     Ok(TrayImage::from_rgba(rgba, width, height)?)
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
-struct FlatpakTray {
-    handle: ksni::blocking::Handle<FlatpakNotifier>,
+#[cfg(target_os = "linux")]
+struct LinuxTray {
+    handle: ksni::blocking::Handle<LinuxNotifier>,
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
-impl FlatpakTray {
+#[cfg(target_os = "linux")]
+impl LinuxTray {
     fn new(proxy: EventLoopProxy<MainThreadEvent>) -> Result<Self, Box<dyn std::error::Error>> {
         use ksni::blocking::TrayMethods;
 
@@ -119,7 +129,7 @@ impl FlatpakTray {
         for pixel in data.as_chunks_mut::<4>().0 {
             pixel.rotate_right(1);
         }
-        let notifier = FlatpakNotifier {
+        let notifier = LinuxNotifier {
             proxy,
             icon: ksni::Icon {
                 width: width as i32,
@@ -127,29 +137,30 @@ impl FlatpakTray {
                 data,
             },
         };
+        let flatpak = std::env::var_os("FLATPAK_ID").is_some();
         let handle = notifier
-            .disable_dbus_name(true)
-            .assume_sni_available(true)
+            .disable_dbus_name(flatpak)
+            .assume_sni_available(flatpak)
             .spawn()?;
         Ok(Self { handle })
     }
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
-impl Drop for FlatpakTray {
+#[cfg(target_os = "linux")]
+impl Drop for LinuxTray {
     fn drop(&mut self) {
         self.handle.shutdown().wait();
     }
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
-struct FlatpakNotifier {
+#[cfg(target_os = "linux")]
+struct LinuxNotifier {
     proxy: EventLoopProxy<MainThreadEvent>,
     icon: ksni::Icon,
 }
 
-#[cfg(all(unix, not(target_os = "macos")))]
-impl ksni::Tray for FlatpakNotifier {
+#[cfg(target_os = "linux")]
+impl ksni::Tray for LinuxNotifier {
     fn id(&self) -> String {
         "blockwork".into()
     }
@@ -171,7 +182,7 @@ impl ksni::Tray for FlatpakNotifier {
     }
 
     fn activate(&mut self, _: i32, _: i32) {
-        let _ = self.proxy.send_event(MainThreadEvent::OpenUi);
+        let _ = self.proxy.send_event(MainThreadEvent::ToggleUi);
     }
 
     fn menu(&self) -> Vec<ksni::MenuItem<Self>> {

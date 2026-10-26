@@ -4265,3 +4265,31 @@ mod import_review_tests {
         );
     }
 }
+
+/// Commits a reporter body edit as one undoable document change.
+pub(crate) async fn edit_reporter_branch(
+    state: &SharedState,
+    app: &AppHandle,
+    cmd: &str,
+    args: &serde_json::Value,
+) -> Result<serde_json::Value, String> {
+    if matches!(cmd, "add_instruction" | "edit_instruction") {
+        let dto: InstructionDto = serde_json::from_value(args["instruction"].clone())
+            .map_err(|e| e.to_string())?;
+        let instruction = dto_to_instruction(&dto).ok_or("Unknown instruction type")?;
+        if matches!(instruction.kind, InstructionKind::Token(InputToken::MoveMouse(_, _, blockwork_core::input::types::Coordinate::Abs))) {
+            request_absolute_mouse_support(state, app).await?;
+        }
+    }
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mut graph = s.current_macro.as_ref().ok_or("No macro selected")?.graph.clone();
+    let result = crate::reporter_branches::edit(&mut graph, cmd, args)?;
+    if cmd != "copy_instructions" {
+        push_undo(&mut s);
+        s.current_macro.as_mut().ok_or("No macro selected")?.graph = graph;
+        s.invalid_field_buffers.clear();
+        auto_save(&mut s);
+        emit_state_updated(app, &s);
+    }
+    Ok(result)
+}

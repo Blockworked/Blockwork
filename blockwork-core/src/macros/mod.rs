@@ -143,7 +143,6 @@ impl BlockKind for InstructionKind {
             | InstructionKind::WhenCron(value)
             | InstructionKind::WithLock { name: value, .. }
             | InstructionKind::WhenUsb { pattern: value, .. }
-            | InstructionKind::WhenMouseButton { modifiers: value, .. }
             | InstructionKind::AskYesNo { prompt: value, .. }
             | InstructionKind::AskChoice { prompt: value, .. }
             | InstructionKind::ShowMessage(value)
@@ -207,21 +206,34 @@ impl BlockKind for InstructionKind {
                 f(name, InputValueType::Any);
                 f(other, InputValueType::Any);
             }
-            InstructionKind::WaitUntil { condition, timeout } => {
+            InstructionKind::WhenMouseButton { modifiers, .. } => {
+                if let Some(value) = modifiers {
+                    f(value, InputValueType::Any);
+                }
+            }
+            InstructionKind::WaitUntil { condition, timeout, error_timeout } => {
                 f(condition, InputValueType::Bool);
-                f(timeout, InputValueType::Any);
+                for v in timeout.iter_mut().chain(error_timeout.iter_mut()) {
+                    f(v, InputValueType::Any);
+                }
             }
             InstructionKind::FindImage { tolerance, pick, .. } | InstructionKind::ClickImage { tolerance, pick, .. } => {
-                f(tolerance, InputValueType::Any);
+                if let Some(v) = tolerance {
+                    f(v, InputValueType::Any);
+                }
                 if let Some(ImageMatch { index, near_x, near_y, .. }) = pick {
                     for v in [index, near_x, near_y] {
                         f(v, InputValueType::Any);
                     }
                 }
             }
-            InstructionKind::WaitForImage { tolerance, timeout, .. } => {
-                f(tolerance, InputValueType::Any);
-                f(timeout, InputValueType::Any);
+            InstructionKind::WaitForImage { tolerance, timeout, error_timeout, .. } => {
+                if let Some(v) = tolerance {
+                    f(v, InputValueType::Any);
+                }
+                for v in timeout.iter_mut().chain(error_timeout.iter_mut()) {
+                    f(v, InputValueType::Any);
+                }
             }
             InstructionKind::DetectObjectsInWindow { pattern, detector, label, confidence, .. } => {
                 for v in [pattern, detector, label, confidence] {
@@ -723,10 +735,14 @@ pub enum InstructionKind {
         name: Value,
         by: Value,
     },
-    /// Pauses until `condition` is true, failing after `timeout` ms (0 = never).
+    /// Pauses until true. `timeout` continues; `error_timeout` ends the strand.
+    /// Missing or zero limits wait forever.
     WaitUntil {
         condition: Value,
-        timeout: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout: Option<Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_timeout: Option<Value>,
     },
     /// Looks for `image` (a PNG `data:` URI or file path) on screen, or in
     /// `region` of it, and puts the screen position of the middle of the
@@ -736,7 +752,8 @@ pub enum InstructionKind {
     /// components: `None` while the user hasn't added them.
     FindImage {
         image: String,
-        tolerance: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tolerance: Option<Value>,
         x_variable: String,
         y_variable: String,
         #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -750,7 +767,8 @@ pub enum InstructionKind {
     /// error if there's none.
     ClickImage {
         image: String,
-        tolerance: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tolerance: Option<Value>,
         button: MacroButton,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         pick: Option<ImageMatch>,
@@ -758,14 +776,19 @@ pub enum InstructionKind {
         region: Option<String>,
     },
     /// Pauses until `image` appears (or with `appear` false, disappears),
-    /// failing after `timeout` ms (0 = never).
+    /// continuing after `timeout` ms or failing after `error_timeout` ms.
+    /// Missing or zero limits wait forever; missing tolerance uses 10%.
     WaitForImage {
         image: String,
-        tolerance: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tolerance: Option<Value>,
         appear: bool,
-        timeout: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout: Option<Value>,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         region: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_timeout: Option<Value>,
     },
     /// Header for a strand fired when a window whose title or app contains
     /// `pattern` gains (`focused`) or loses focus. Driven by `window_watch`
@@ -828,7 +851,8 @@ pub enum InstructionKind {
     WhenMouseButton {
         button: MacroButton,
         pressed: bool,
-        modifiers: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        modifiers: Option<Value>,
     },
     /// Asks for text in a dialog and puts the answer in variable `name`.
     /// Cancelling is an error.
@@ -1223,10 +1247,11 @@ impl std::hash::Hash for InstructionKind {
                 name.hash(state);
                 by.hash(state);
             }
-            Self::WaitUntil { condition, timeout } => {
+            Self::WaitUntil { condition, timeout, error_timeout } => {
                 50u8.hash(state);
                 condition.hash(state);
                 timeout.hash(state);
+                error_timeout.hash(state);
             }
             Self::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable } => {
                 51u8.hash(state);
@@ -1243,12 +1268,13 @@ impl std::hash::Hash for InstructionKind {
                 button.hash(state);
                 (pick, region).hash(state);
             }
-            Self::WaitForImage { image, tolerance, appear, timeout, region } => {
+            Self::WaitForImage { image, tolerance, appear, timeout, region, error_timeout } => {
                 53u8.hash(state);
                 image.hash(state);
                 tolerance.hash(state);
                 appear.hash(state);
                 timeout.hash(state);
+                error_timeout.hash(state);
                 region.hash(state);
             }
             Self::WhenTyped { text, erase } => {
@@ -1544,11 +1570,15 @@ enum InstructionKindDe {
     },
     WaitUntil {
         condition: Value,
-        timeout: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout: Option<Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_timeout: Option<Value>,
     },
     FindImage {
         image: String,
-        tolerance: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tolerance: Option<Value>,
         x_variable: String,
         y_variable: String,
         #[serde(default)]
@@ -1560,7 +1590,8 @@ enum InstructionKindDe {
     },
     ClickImage {
         image: String,
-        tolerance: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tolerance: Option<Value>,
         button: MacroButton,
         #[serde(default)]
         pick: Option<ImageMatch>,
@@ -1569,11 +1600,15 @@ enum InstructionKindDe {
     },
     WaitForImage {
         image: String,
-        tolerance: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tolerance: Option<Value>,
         appear: bool,
-        timeout: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout: Option<Value>,
         #[serde(default)]
         region: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        error_timeout: Option<Value>,
     },
     WhenTyped {
         text: Value,
@@ -1608,8 +1643,8 @@ enum InstructionKindDe {
     WhenMouseButton {
         button: MacroButton,
         pressed: bool,
-        #[serde(default = "empty_text")]
-        modifiers: Value,
+        #[serde(default)]
+        modifiers: Option<Value>,
     },
     AskText {
         prompt: Value,
@@ -1702,10 +1737,6 @@ enum InstructionKindDe {
         code: Value,
         variable: String,
     },
-}
-
-fn empty_text() -> Value {
-    Value::text("")
 }
 
 fn match_by_title() -> String {
@@ -1920,15 +1951,15 @@ impl From<InstructionKindDe> for InstructionKind {
             InstructionKindDe::StopMacroNamed(v) => InstructionKind::StopMacroNamed(v),
             InstructionKindDe::SetGlobal { name, value } => InstructionKind::SetGlobal { name, value },
             InstructionKindDe::ChangeGlobal { name, by } => InstructionKind::ChangeGlobal { name, by },
-            InstructionKindDe::WaitUntil { condition, timeout } => InstructionKind::WaitUntil { condition, timeout },
+            InstructionKindDe::WaitUntil { condition, timeout, error_timeout } => InstructionKind::WaitUntil { condition, timeout, error_timeout },
             InstructionKindDe::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable } => {
                 InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable }
             }
             InstructionKindDe::ClickImage { image, tolerance, button, pick, region } => {
                 InstructionKind::ClickImage { image, tolerance, button, pick, region }
             }
-            InstructionKindDe::WaitForImage { image, tolerance, appear, timeout, region } => {
-                InstructionKind::WaitForImage { image, tolerance, appear, timeout, region }
+            InstructionKindDe::WaitForImage { image, tolerance, appear, timeout, region, error_timeout } => {
+                InstructionKind::WaitForImage { image, tolerance, appear, timeout, region, error_timeout }
             }
             InstructionKindDe::WhenTyped { text, erase } => InstructionKind::WhenTyped { text, erase },
             InstructionKindDe::PasteText(v) => InstructionKind::PasteText(v),
@@ -2612,13 +2643,63 @@ mod tests {
     }
 
     #[test]
+    fn mouse_modifier_component_is_optional_and_preserves_saved_combos() {
+        for modifiers in [None, Some(Value::text("")), Some(Value::text("Control+Shift"))] {
+            let ins = Instruction::new(InstructionKind::WhenMouseButton {
+                button: MacroButton::Back,
+                pressed: true,
+                modifiers: modifiers.clone(),
+            });
+            let json = serde_json::to_value(&ins.kind).unwrap();
+            assert_eq!(json["WhenMouseButton"].get("modifiers").is_some(), modifiers.is_some());
+            let loaded: InstructionKind = serde_json::from_value(json).unwrap();
+            assert_eq!(loaded, ins.kind);
+            let dto = crate::frontend::instruction_to_dto(&ins);
+            let json = serde_json::to_value(&dto).unwrap();
+            assert_eq!(json.get("modifiers").is_some(), modifiers.is_some());
+            let dto = serde_json::from_value(json).unwrap();
+            let mut loaded = crate::frontend::dto_to_instruction(&dto).unwrap();
+            assert_eq!(loaded.kind, ins.kind);
+            assert_eq!(fields::value_slot_mut(&mut loaded.kind, fields::FieldId::MouseModifiers).is_some(), modifiers.is_some());
+        }
+    }
+
+    #[test]
+    fn optional_wait_and_tolerance_components_round_trip() {
+        use crate::frontend::{dto_to_instruction, instruction_to_dto, InstructionDto};
+        for json in [
+            r#"{"type":"WaitUntil","id":"wait","condition":{"kind":"Bool"}}"#,
+            r#"{"type":"WaitForImage","id":"image","image":"","appear":true}"#,
+            r#"{"type":"FindImage","id":"find","image":"","x_variable":"x","y_variable":"y"}"#,
+            r#"{"type":"ClickImage","id":"click","image":"","button":"Left"}"#,
+        ] {
+            let dto: InstructionDto = serde_json::from_str(json).unwrap();
+            let mut ins = dto_to_instruction(&dto).unwrap();
+            let plain = serde_json::to_value(instruction_to_dto(&ins)).unwrap();
+            for key in ["timeout", "error_timeout", "tolerance"] { assert!(plain.get(key).is_none()); }
+            if let InstructionKind::WaitUntil { timeout, error_timeout, .. } | InstructionKind::WaitForImage { timeout, error_timeout, .. } = &mut ins.kind {
+                *timeout = Some(Value::number(10.0));
+                *error_timeout = Some(Value::number(20.0));
+            }
+            if let InstructionKind::FindImage { tolerance, .. } | InstructionKind::ClickImage { tolerance, .. } | InstructionKind::WaitForImage { tolerance, .. } = &mut ins.kind {
+                *tolerance = Some(Value::number(0.0));
+            }
+            let loaded: InstructionKind = serde_json::from_str(&serde_json::to_string(&ins.kind).unwrap()).unwrap();
+            assert_eq!(loaded, ins.kind);
+            let dto = instruction_to_dto(&ins);
+            let loaded: InstructionDto = serde_json::from_str(&serde_json::to_string(&dto).unwrap()).unwrap();
+            assert_eq!(dto_to_instruction(&loaded).unwrap().kind, ins.kind);
+        }
+    }
+
+    #[test]
     fn image_block_components_are_saved_only_once_added() {
-        let plain = InstructionKind::ClickImage { image: String::new(), tolerance: Value::number(10.0), button: MacroButton::Left, pick: None, region: None };
+        let plain = InstructionKind::ClickImage { image: String::new(), tolerance: Some(Value::number(10.0)), button: MacroButton::Left, pick: None, region: None };
         let text = serde_json::to_string(&plain).unwrap();
         assert!(!text.contains("pick") && !text.contains("region"), "{text}");
         let added = InstructionKind::ClickImage {
             image: String::new(),
-            tolerance: Value::number(10.0),
+            tolerance: Some(Value::number(10.0)),
             button: MacroButton::Left,
             pick: Some(ImageMatch { mode: ImagePick::NearPoint, index: Value::number(1.0), near_x: Value::number(5.0), near_y: Value::number(6.0) }),
             region: Some("0,0,10,10".into()),
