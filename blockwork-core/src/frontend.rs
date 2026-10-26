@@ -427,34 +427,22 @@ pub enum InstructionDto {
         tolerance: Value,
         x_variable: String,
         y_variable: String,
-        #[serde(default)]
-        pick: crate::macros::ImagePick,
-        #[serde(default = "crate::macros::first_match")]
-        index: Value,
-        #[serde(default = "crate::macros::zero_value")]
-        near_x: Value,
-        #[serde(default = "crate::macros::zero_value")]
-        near_y: Value,
-        #[serde(default)]
-        region: String,
-        #[serde(default)]
-        count_variable: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pick: Option<crate::macros::ImageMatch>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        region: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        count_variable: Option<String>,
     },
     ClickImage {
         id: String,
         image: String,
         tolerance: Value,
         button: crate::input::types::MacroButton,
-        #[serde(default)]
-        pick: crate::macros::ImagePick,
-        #[serde(default = "crate::macros::first_match")]
-        index: Value,
-        #[serde(default = "crate::macros::zero_value")]
-        near_x: Value,
-        #[serde(default = "crate::macros::zero_value")]
-        near_y: Value,
-        #[serde(default)]
-        region: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pick: Option<crate::macros::ImageMatch>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        region: Option<String>,
     },
     WaitForImage {
         id: String,
@@ -462,8 +450,8 @@ pub enum InstructionDto {
         tolerance: Value,
         appear: bool,
         timeout: Value,
-        #[serde(default)]
-        region: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        region: Option<String>,
     },
     WhenTyped {
         id: String,
@@ -906,30 +894,24 @@ pub fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             condition: condition.clone(),
             timeout: timeout.clone(),
         },
-        InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, index, near_x, near_y, region, count_variable } => {
+        InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable } => {
             InstructionDto::FindImage {
                 id,
                 image: image.clone(),
                 tolerance: tolerance.clone(),
                 x_variable: x_variable.clone(),
                 y_variable: y_variable.clone(),
-                pick: *pick,
-                index: index.clone(),
-                near_x: near_x.clone(),
-                near_y: near_y.clone(),
+                pick: pick.clone(),
                 region: region.clone(),
                 count_variable: count_variable.clone(),
             }
         }
-        InstructionKind::ClickImage { image, tolerance, button, pick, index, near_x, near_y, region } => InstructionDto::ClickImage {
+        InstructionKind::ClickImage { image, tolerance, button, pick, region } => InstructionDto::ClickImage {
             id,
             image: image.clone(),
             tolerance: tolerance.clone(),
             button: button.clone(),
-            pick: *pick,
-            index: index.clone(),
-            near_x: near_x.clone(),
-            near_y: near_y.clone(),
+            pick: pick.clone(),
             region: region.clone(),
         },
         InstructionKind::WaitForImage { image, tolerance, appear, timeout, region } => InstructionDto::WaitForImage {
@@ -1386,31 +1368,25 @@ pub fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         InstructionDto::WaitUntil { id, condition, timeout } => {
             (id, InstructionKind::WaitUntil { condition: condition.clone(), timeout: timeout.clone() })
         }
-        InstructionDto::FindImage { id, image, tolerance, x_variable, y_variable, pick, index, near_x, near_y, region, count_variable } => (
+        InstructionDto::FindImage { id, image, tolerance, x_variable, y_variable, pick, region, count_variable } => (
             id,
             InstructionKind::FindImage {
                 image: image.clone(),
                 tolerance: tolerance.clone(),
                 x_variable: x_variable.clone(),
                 y_variable: y_variable.clone(),
-                pick: *pick,
-                index: index.clone(),
-                near_x: near_x.clone(),
-                near_y: near_y.clone(),
+                pick: pick.clone(),
                 region: region.clone(),
                 count_variable: count_variable.clone(),
             },
         ),
-        InstructionDto::ClickImage { id, image, tolerance, button, pick, index, near_x, near_y, region } => (
+        InstructionDto::ClickImage { id, image, tolerance, button, pick, region } => (
             id,
             InstructionKind::ClickImage {
                 image: image.clone(),
                 tolerance: tolerance.clone(),
                 button: button.clone(),
-                pick: *pick,
-                index: index.clone(),
-                near_x: near_x.clone(),
-                near_y: near_y.clone(),
+                pick: pick.clone(),
                 region: region.clone(),
             },
         ),

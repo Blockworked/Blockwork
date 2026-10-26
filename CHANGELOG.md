@@ -121,6 +121,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Recording settings > Countdown: how long Record waits before it starts, from off to 10 seconds (3 by default).
 - "Run command and wait" block: runs a shell command and waits for it to finish before moving on.
 - Image blocks choose which match to use when the picture is on screen more than once: the best match, a match number (left to right, top to bottom; -1 is the last), the one nearest the mouse, or the one nearest a point. They can also search just a region of the screen, and "find image" can count the matches into a variable.
+- Some blocks start short and have a "+" at the end that adds more options to them, each with an "x" to take it off again. The image blocks keep "which match", "search region" and "count matches" there.
 
 ### Changed
 - "Run command" starts its command and moves straight on down the strand instead of waiting for it to finish. Run command blocks in saved macros and block packs become "run command and wait" blocks when loaded, so they keep waiting (the original file is kept as a backup).

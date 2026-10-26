@@ -82,7 +82,9 @@ macro_rules! for_each_ref {
             InstructionKind::FindImage { x_variable, y_variable, count_variable, .. } => {
                 $f(RefKind::Variable, x_variable);
                 $f(RefKind::Variable, y_variable);
-                $f(RefKind::Variable, count_variable);
+                if let Some(count_variable) = count_variable {
+                    $f(RefKind::Variable, count_variable);
+                }
             }
             InstructionKind::AskChoice { list, name, .. } => {
                 $f(RefKind::List, list);
@@ -189,10 +191,12 @@ impl BlockKind for InstructionKind {
                 f(condition, InputValueType::Bool);
                 f(timeout, InputValueType::Any);
             }
-            InstructionKind::FindImage { tolerance, index, near_x, near_y, .. }
-            | InstructionKind::ClickImage { tolerance, index, near_x, near_y, .. } => {
-                for v in [tolerance, index, near_x, near_y] {
-                    f(v, InputValueType::Any);
+            InstructionKind::FindImage { tolerance, pick, .. } | InstructionKind::ClickImage { tolerance, pick, .. } => {
+                f(tolerance, InputValueType::Any);
+                if let Some(ImageMatch { index, near_x, near_y, .. }) = pick {
+                    for v in [index, near_x, near_y] {
+                        f(v, InputValueType::Any);
+                    }
                 }
             }
             InstructionKind::WaitForImage { tolerance, timeout, .. } => {
@@ -676,19 +680,21 @@ pub enum InstructionKind {
     },
     /// Looks for `image` (a PNG `data:` URI or file path) on screen, or in
     /// `region` of it, and puts the screen position of the middle of the
-    /// match `pick` chooses in two variables, -1 if there's none. The number
-    /// of matches goes in `count_variable`.
+    /// match `pick` chooses (the best without one) in two variables, -1 if
+    /// there's none. The number of matches goes in `count_variable`.
+    /// `pick`, `region` and `count_variable` are the block's optional
+    /// components: `None` while the user hasn't added them.
     FindImage {
         image: String,
         tolerance: Value,
         x_variable: String,
         y_variable: String,
-        pick: ImagePick,
-        index: Value,
-        near_x: Value,
-        near_y: Value,
-        region: String,
-        count_variable: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pick: Option<ImageMatch>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        region: Option<String>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        count_variable: Option<String>,
     },
     /// Clicks the middle of the match of `image` that `pick` chooses; an
     /// error if there's none.
@@ -696,11 +702,10 @@ pub enum InstructionKind {
         image: String,
         tolerance: Value,
         button: MacroButton,
-        pick: ImagePick,
-        index: Value,
-        near_x: Value,
-        near_y: Value,
-        region: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        pick: Option<ImageMatch>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        region: Option<String>,
     },
     /// Pauses until `image` appears (or with `appear` false, disappears),
     /// failing after `timeout` ms (0 = never).
@@ -709,7 +714,8 @@ pub enum InstructionKind {
         tolerance: Value,
         appear: bool,
         timeout: Value,
-        region: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        region: Option<String>,
     },
     /// Header for a strand fired when a window whose title or app contains
     /// `pattern` gains (`focused`) or loses focus. Driven by `window_watch`
@@ -1136,20 +1142,20 @@ impl std::hash::Hash for InstructionKind {
                 condition.hash(state);
                 timeout.hash(state);
             }
-            Self::FindImage { image, tolerance, x_variable, y_variable, pick, index, near_x, near_y, region, count_variable } => {
+            Self::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable } => {
                 51u8.hash(state);
                 image.hash(state);
                 tolerance.hash(state);
                 x_variable.hash(state);
                 y_variable.hash(state);
-                (pick, index, near_x, near_y, region, count_variable).hash(state);
+                (pick, region, count_variable).hash(state);
             }
-            Self::ClickImage { image, tolerance, button, pick, index, near_x, near_y, region } => {
+            Self::ClickImage { image, tolerance, button, pick, region } => {
                 52u8.hash(state);
                 image.hash(state);
                 tolerance.hash(state);
                 button.hash(state);
-                (pick, index, near_x, near_y, region).hash(state);
+                (pick, region).hash(state);
             }
             Self::WaitForImage { image, tolerance, appear, timeout, region } => {
                 53u8.hash(state);
@@ -1438,32 +1444,20 @@ enum InstructionKindDe {
         x_variable: String,
         y_variable: String,
         #[serde(default)]
-        pick: ImagePick,
-        #[serde(default = "first_match")]
-        index: Value,
-        #[serde(default = "zero_value")]
-        near_x: Value,
-        #[serde(default = "zero_value")]
-        near_y: Value,
+        pick: Option<ImageMatch>,
         #[serde(default)]
-        region: String,
+        region: Option<String>,
         #[serde(default)]
-        count_variable: String,
+        count_variable: Option<String>,
     },
     ClickImage {
         image: String,
         tolerance: Value,
         button: MacroButton,
         #[serde(default)]
-        pick: ImagePick,
-        #[serde(default = "first_match")]
-        index: Value,
-        #[serde(default = "zero_value")]
-        near_x: Value,
-        #[serde(default = "zero_value")]
-        near_y: Value,
+        pick: Option<ImageMatch>,
         #[serde(default)]
-        region: String,
+        region: Option<String>,
     },
     WaitForImage {
         image: String,
@@ -1471,7 +1465,7 @@ enum InstructionKindDe {
         appear: bool,
         timeout: Value,
         #[serde(default)]
-        region: String,
+        region: Option<String>,
     },
     WhenTyped {
         text: Value,
@@ -1594,12 +1588,22 @@ pub(crate) fn zero_value() -> Value {
     Value::number(0.0)
 }
 
-/// Which match an image block uses when the picture is on screen more than once.
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+/// Which match an image block uses when the picture is on screen more
+/// than once. A block without one takes the closest likeness, ties going to
+/// the first in reading order.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+pub struct ImageMatch {
+    pub mode: ImagePick,
+    #[serde(default = "first_match")]
+    pub index: Value,
+    #[serde(default = "zero_value")]
+    pub near_x: Value,
+    #[serde(default = "zero_value")]
+    pub near_y: Value,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum ImagePick {
-    /// The closest likeness; ties go to the first in reading order.
-    #[default]
-    Best,
     /// Match number `index` in reading order, counting from 1; negative
     /// counts from the end.
     Nth,
@@ -1783,11 +1787,11 @@ impl From<InstructionKindDe> for InstructionKind {
             InstructionKindDe::SetGlobal { name, value } => InstructionKind::SetGlobal { name, value },
             InstructionKindDe::ChangeGlobal { name, by } => InstructionKind::ChangeGlobal { name, by },
             InstructionKindDe::WaitUntil { condition, timeout } => InstructionKind::WaitUntil { condition, timeout },
-            InstructionKindDe::FindImage { image, tolerance, x_variable, y_variable, pick, index, near_x, near_y, region, count_variable } => {
-                InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, index, near_x, near_y, region, count_variable }
+            InstructionKindDe::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable } => {
+                InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable }
             }
-            InstructionKindDe::ClickImage { image, tolerance, button, pick, index, near_x, near_y, region } => {
-                InstructionKind::ClickImage { image, tolerance, button, pick, index, near_x, near_y, region }
+            InstructionKindDe::ClickImage { image, tolerance, button, pick, region } => {
+                InstructionKind::ClickImage { image, tolerance, button, pick, region }
             }
             InstructionKindDe::WaitForImage { image, tolerance, appear, timeout, region } => {
                 InstructionKind::WaitForImage { image, tolerance, appear, timeout, region }
@@ -2425,13 +2429,31 @@ mod tests {
             r#"{"FindImage":{"image":"","tolerance":{"kind":"Number","value":10.0},"x_variable":"a","y_variable":"b"}}"#,
         )
         .unwrap();
-        let InstructionKind::FindImage { pick, index, region, count_variable, .. } = kind else { panic!("{kind:?}") };
-        assert_eq!((pick, index, region, count_variable), (ImagePick::Best, Value::number(1.0), String::new(), String::new()));
+        let InstructionKind::FindImage { pick, region, count_variable, .. } = kind else { panic!("{kind:?}") };
+        assert_eq!((pick, region, count_variable), (None, None, None));
         let kind: InstructionKind = serde_json::from_str(
             r#"{"WaitForImage":{"image":"","tolerance":{"kind":"Number","value":10.0},"appear":true,"timeout":{"kind":"Number","value":0.0}}}"#,
         )
         .unwrap();
-        assert!(matches!(kind, InstructionKind::WaitForImage { region, .. } if region.is_empty()));
+        assert!(matches!(kind, InstructionKind::WaitForImage { region: None, .. }));
+    }
+
+    #[test]
+    fn image_block_components_are_saved_only_once_added() {
+        let plain = InstructionKind::ClickImage { image: String::new(), tolerance: Value::number(10.0), button: MacroButton::Left, pick: None, region: None };
+        let text = serde_json::to_string(&plain).unwrap();
+        assert!(!text.contains("pick") && !text.contains("region"), "{text}");
+        let added = InstructionKind::ClickImage {
+            image: String::new(),
+            tolerance: Value::number(10.0),
+            button: MacroButton::Left,
+            pick: Some(ImageMatch { mode: ImagePick::NearPoint, index: Value::number(1.0), near_x: Value::number(5.0), near_y: Value::number(6.0) }),
+            region: Some("0,0,10,10".into()),
+        };
+        let back: InstructionKind = serde_json::from_str(&serde_json::to_string(&added).unwrap()).unwrap();
+        assert_eq!(back, added);
+        let dto = crate::frontend::instruction_to_dto(&Instruction::new(added.clone()));
+        assert_eq!(crate::frontend::dto_to_instruction(&dto).unwrap().kind, added);
     }
 
     #[test]
