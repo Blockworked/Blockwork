@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
 """Exercise the bundle validator against real, signed native Mach-O fixtures."""
+import argparse
 import pathlib
 import plistlib
 import shutil
@@ -8,6 +9,10 @@ import sys
 import tempfile
 
 validator = pathlib.Path(__file__).with_name('verify-bundle.py')
+parser = argparse.ArgumentParser(description=__doc__)
+parser.add_argument('--arch', choices=['arm64', 'x86_64'])
+args = parser.parse_args()
+compile_flags = ['-arch', args.arch] if args.arch else []
 
 
 def run(*args):
@@ -31,18 +36,20 @@ with tempfile.TemporaryDirectory(prefix='blockwork-validator-') as temporary:
         'LSMinimumSystemVersion': '13.0'}))
     main = root / 'main.c'
     main.write_text('int main(void) { return 0; }\n')
-    run('clang', str(main), '-o', str(binaries / 'Blockwork'))
+    run('clang', *compile_flags, str(main), '-o', str(binaries / 'Blockwork'))
     shutil.copy2(binaries / 'Blockwork', binaries / 'blockwork-daemon')
     renderer = binaries / 'Blockwork Helper (Renderer)'
     shutil.copy2(binaries / 'Blockwork', renderer)
     library = frameworks / 'libprobe.dylib'
     source = root / 'library.c'
     source.write_text('int blockwork_probe(void) { return 42; }\n')
-    run('clang', '-dynamiclib', str(source), '-Wl,-headerpad_max_install_names',
+    run('clang', *compile_flags, '-dynamiclib', str(source), '-Wl,-headerpad_max_install_names',
         '-Wl,-install_name,./libprobe.dylib', '-o', str(library))
 
     def sign():
-        for image in [binaries / 'Blockwork', binaries / 'blockwork-daemon', renderer, library]:
+        # Signing the main executable may validate its enclosing bundle.
+        # Intel clang leaves nested code unsigned, so sign inside out.
+        for image in [binaries / 'blockwork-daemon', renderer, library]:
             run('codesign', '--force', '--sign', '-', str(image))
         run('codesign', '--force', '--sign', '-', str(bundle))
 
