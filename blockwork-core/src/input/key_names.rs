@@ -185,6 +185,12 @@ pub fn match_key(key: &MacroKey) -> MacroKey {
         MacroKey::LShift | MacroKey::RShift => MacroKey::Shift,
         MacroKey::LControl | MacroKey::RControl => MacroKey::Control,
         MacroKey::AltGr | MacroKey::Option | MacroKey::LMenu => MacroKey::Alt,
+        #[cfg(target_os = "macos")]
+        MacroKey::PrintScr => MacroKey::F13,
+        #[cfg(target_os = "macos")]
+        MacroKey::ScrollLock => MacroKey::F14,
+        #[cfg(target_os = "macos")]
+        MacroKey::Pause => MacroKey::F15,
         MacroKey::Unicode(c) => MacroKey::Unicode(c.to_ascii_lowercase()),
         other => other.clone(),
     }
@@ -217,6 +223,14 @@ mod combo_tests {
             let key = parse_key_name(&name).unwrap();
             assert_eq!(key.hotkey_name().as_deref(), Some(name.as_str()));
         }
+    }
+
+    #[test]
+    fn pc_key_triggers_use_native_aliases_on_mac() {
+        for (pc, native) in [(MacroKey::PrintScr, MacroKey::F13), (MacroKey::ScrollLock, MacroKey::F14), (MacroKey::Pause, MacroKey::F15)] {
+            assert_eq!(match_key(&pc) == match_key(&native), cfg!(target_os = "macos"));
+        }
+        assert_eq!(parse_key_name("PrintScreen"), Some(MacroKey::PrintScr));
     }
 
     #[test]
