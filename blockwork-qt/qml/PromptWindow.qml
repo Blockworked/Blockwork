@@ -53,6 +53,7 @@ ApplicationWindow {
         const phrases = {
             commands: qsTr("\"%1\" wants to run commands and open or close apps."),
             network: qsTr("\"%1\" wants to go online."),
+            browser: qsTr("\"%1\" wants to control your web browser."),
             files_write: qsTr("\"%1\" wants to write to files."),
             secrets: qsTr("\"%1\" wants to read your saved secrets."),
             screen: qsTr("\"%1\" wants to read the screen.")

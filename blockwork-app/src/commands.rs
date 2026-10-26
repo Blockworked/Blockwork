@@ -997,10 +997,11 @@ pub(crate) fn export_macro(macro_id: String, path: String) -> Result<(), String>
 
 /// What an imported macro can do, shown before it's added: (kind, label,
 /// whether it deserves a warning). Listed in display order.
-const CAPABILITIES: [(&str, &str, bool); 12] = [
+const CAPABILITIES: [(&str, &str, bool); 13] = [
     ("commands", "Runs commands and opens or closes apps", true),
     ("secrets", "Reads your saved secrets", true),
     ("network", "Goes online", true),
+    ("browser", "Controls your web browser (clicks, types and reads pages)", true),
     ("files_write", "Writes to files", true),
     ("files_read", "Reads files and folders", false),
     ("input", "Presses keys, clicks and moves the mouse", false),
@@ -1024,6 +1025,7 @@ fn operator_capability(op: &str) -> Option<&'static str> {
         "PixelColor" | "AverageColor" | "ScreenText" => "screen",
         "GlobalVariable" => "globals",
         "Secret" => "secrets",
+        "PageUrl" | "PageTitle" | "ElementText" | "ElementExists" | "ElementCount" => "browser",
         _ => return None,
     })
 }
@@ -1066,6 +1068,11 @@ pub(crate) fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto
             InstructionKind::DetectObjectsInWindow { .. } | InstructionKind::WaitForDetection { .. } => Some("screen"),
             InstructionKind::ClickImage { .. } | InstructionKind::AimStep { .. } | InstructionKind::AimAtDetection { .. } => Some("input"),
             InstructionKind::SetGlobal { .. } | InstructionKind::ChangeGlobal { .. } => Some("globals"),
+            InstructionKind::BrowserOpen { .. }
+            | InstructionKind::BrowserClick { .. }
+            | InstructionKind::BrowserType { .. }
+            | InstructionKind::BrowserWaitFor { .. }
+            | InstructionKind::BrowserScript { .. } => Some("browser"),
             _ => None,
         };
         found.extend(kind);

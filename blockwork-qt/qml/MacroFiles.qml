@@ -18,7 +18,7 @@ Item {
     function capabilityLabel(cap) {
         const labels = {
             commands: qsTr("Runs commands and opens or closes apps"), secrets: qsTr("Reads your saved secrets"),
-            network: qsTr("Goes online"), files_write: qsTr("Writes to files"), files_read: qsTr("Reads files and folders"),
+            network: qsTr("Goes online"), browser: qsTr("Controls your web browser (clicks, types and reads pages)"), files_write: qsTr("Writes to files"), files_read: qsTr("Reads files and folders"),
             input: qsTr("Presses keys, clicks and moves the mouse"), clipboard: qsTr("Reads or changes the clipboard"),
             windows: qsTr("Reads or controls other apps and windows"),
             triggers: qsTr("Starts on its own (schedules, keys, typing, apps, idle, windows, files and more)"),

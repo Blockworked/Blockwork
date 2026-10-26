@@ -315,7 +315,64 @@ static OPERATORS: &[ExtOperator] = &[
             Ok(Evaluated::Text(crate::secrets::get(&args[0].as_text())?))
         },
     },
+    ExtOperator {
+        kind: "BrowserConnected",
+        op: "BrowserConnected",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Bool(crate::browser::connected())),
+    },
+    ExtOperator {
+        kind: "PageUrl",
+        op: "PageUrl",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Text(crate::browser::text_field(&browser("info", serde_json::json!({}))?, "url"))),
+    },
+    ExtOperator {
+        kind: "PageTitle",
+        op: "PageTitle",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Text(crate::browser::text_field(&browser("info", serde_json::json!({}))?, "title"))),
+    },
+    ExtOperator {
+        kind: "ElementText",
+        op: "ElementText",
+        arity: 1,
+        default_args: || vec![Value::text("h1")],
+        eval: |args| {
+            let read = browser("read", serde_json::json!({ "selector": args[0].as_text(), "wait": 0 }))?;
+            Ok(Evaluated::Text(crate::browser::text_field(&read, "value")))
+        },
+    },
+    ExtOperator {
+        kind: "ElementExists",
+        op: "ElementExists",
+        arity: 1,
+        default_args: || vec![Value::text("text=Sign in")],
+        eval: |args| Ok(Evaluated::Bool(element_count(&args[0].as_text())? > 0.0)),
+    },
+    ExtOperator {
+        kind: "ElementCount",
+        op: "ElementCount",
+        arity: 1,
+        default_args: || vec![Value::text("button")],
+        eval: |args| Ok(Evaluated::Number(element_count(&args[0].as_text())?)),
+    },
 ];
+
+/// A browser reporter's request, behind the browser permission.
+#[cfg(feature = "system")]
+fn browser(cmd: &str, args: serde_json::Value) -> Result<serde_json::Value, String> {
+    crate::permissions::require("browser")?;
+    crate::browser::request(cmd, args, std::time::Duration::from_secs(10))
+}
+
+#[cfg(feature = "system")]
+fn element_count(selector: &str) -> Result<f64, String> {
+    Ok(browser("count", serde_json::json!({ "selector": selector }))?["count"].as_f64().unwrap_or(0.0))
+}
 
 /// Pure text and date reporters: no machine state, so the website's
 /// editor (built without `system`) registers them too.
