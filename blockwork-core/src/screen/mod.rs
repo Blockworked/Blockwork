@@ -18,7 +18,7 @@ mod macos;
 #[cfg(windows)]
 mod windows;
 
-pub use find::find;
+pub use find::{find, find_all, Match};
 pub use image::Image;
 
 use std::sync::{Arc, Mutex};
@@ -178,10 +178,46 @@ pub fn read_text(x: f64, y: f64, width: f64, height: f64) -> Result<String, Stri
 /// Where `needle` is on screen (the screen point at its middle), if it is.
 /// `tolerance` is 0-100: how different the pixels may be, in percent.
 pub fn find_image(needle: &Image, tolerance: f64) -> Result<Option<(f64, f64)>, String> {
-    let shot = capture()?;
-    Ok(find(&shot.image, needle, tolerance).map(|(px, py)| {
-        shot.to_screen(px as f64 + needle.width as f64 / 2.0, py as f64 + needle.height as f64 / 2.0)
-    }))
+    find_image_in(needle, tolerance, None)
+}
+
+/// [`find_image`] within a screen rectangle (`None` for the whole screen).
+pub fn find_image_in(needle: &Image, tolerance: f64, region: Option<Rect>) -> Result<Option<(f64, f64)>, String> {
+    let shot = search_area(region)?;
+    Ok(find(&shot.image, needle, tolerance).map(|(px, py)| middle(&shot, needle, px, py)))
+}
+
+/// One place an image is on screen: the screen point at its middle, and
+/// how different its pixels are (0-255 per channel, on average).
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct ScreenMatch {
+    pub x: f64,
+    pub y: f64,
+    pub diff: f64,
+}
+
+/// Every place `needle` is on screen, or in `region` of it, in reading
+/// order: rows top to bottom, each left to right.
+pub fn find_image_all(needle: &Image, tolerance: f64, region: Option<Rect>) -> Result<Vec<ScreenMatch>, String> {
+    let shot = search_area(region)?;
+    let mut matches = find_all(&shot.image, needle, tolerance);
+    find::reading_order(&mut matches, needle.height);
+    Ok(matches.into_iter().map(|m| {
+        let (x, y) = middle(&shot, needle, m.x, m.y);
+        ScreenMatch { x, y, diff: m.diff }
+    }).collect())
+}
+
+fn search_area(region: Option<Rect>) -> Result<Arc<Shot>, String> {
+    match region {
+        Some(rect) => area(rect).map(Arc::new),
+        None => capture(),
+    }
+}
+
+/// The screen point at the middle of `needle` placed at image pixel (`px`, `py`).
+fn middle(shot: &Shot, needle: &Image, px: u32, py: u32) -> (f64, f64) {
+    shot.to_screen(px as f64 + needle.width as f64 / 2.0, py as f64 + needle.height as f64 / 2.0)
 }
 
 /// What's inside a matching window right now (the active window when

@@ -3,7 +3,7 @@ use crate::input::value::{Evaluated, Op, Value};
 use crate::macros::backend::{create_backend, InputBackend};
 use crate::macros::host_clock;
 use crate::macros::priority::raise_current_thread_priority;
-use crate::macros::{BlockKind, Instruction, InstructionKind, Macro};
+use crate::macros::{BlockKind, ImagePick, Instruction, InstructionKind, Macro};
 use blockstitch_core::graph::{
     ListItem, ListStore, is_list_reporter, list_index, resolve_list_reporter,
 };
@@ -422,6 +422,70 @@ fn set_variable(ctx: &ExecCtx, name: &str, value: Evaluated) {
 
 /// A detection query from a detect block's slots.
 #[allow(clippy::too_many_arguments)]
+/// What an image block looks for and which match it wants.
+struct ImageSearch<'a> {
+    image: &'a str,
+    tolerance: &'a Value,
+    pick: ImagePick,
+    index: &'a Value,
+    near_x: &'a Value,
+    near_y: &'a Value,
+    region: &'a str,
+}
+
+/// The screen point of the match `search` picks, if there is one, and how
+/// many matches there are (only counted when `count` asks or the pick needs them).
+fn find_picked_image(ctx: &mut ExecCtx, depth: u32, search: &ImageSearch, count: bool) -> Result<(Option<(f64, f64)>, usize), String> {
+    let tolerance = ctx.resolve(search.tolerance, depth)?.eval_number()?;
+    let needle = crate::screen::image::load_cached(search.image)?;
+    let region = crate::detect::parse_region(search.region)?;
+    if search.pick == ImagePick::Best && !count {
+        let at = crate::screen::find_image_in(&needle, tolerance, region)?;
+        return Ok((at, at.map_or(0, |_| 1)));
+    }
+    let target = match search.pick {
+        ImagePick::Best => MatchTarget::Best,
+        ImagePick::Nth => MatchTarget::Nth(ctx.resolve(search.index, depth)?.eval_number()?),
+        ImagePick::NearMouse => {
+            let (x, y) = crate::screen::cursor()?;
+            MatchTarget::Near(x as f64, y as f64)
+        }
+        ImagePick::NearPoint => MatchTarget::Near(
+            ctx.resolve(search.near_x, depth)?.eval_number()?,
+            ctx.resolve(search.near_y, depth)?.eval_number()?,
+        ),
+    };
+    let matches = crate::screen::find_image_all(&needle, tolerance, region)?;
+    let picked = pick_match(&matches, target)?;
+    Ok((picked.map(|m| (m.x, m.y)), matches.len()))
+}
+
+/// Which of several matches an image block wants, with its numbers resolved.
+#[derive(Debug, Clone, Copy)]
+enum MatchTarget {
+    Best,
+    Nth(f64),
+    Near(f64, f64),
+}
+
+/// The match `target` names among `matches` (in reading order), if any.
+fn pick_match(matches: &[crate::screen::ScreenMatch], target: MatchTarget) -> Result<Option<crate::screen::ScreenMatch>, String> {
+    let distance = |m: &crate::screen::ScreenMatch, x: f64, y: f64| (m.x - x).hypot(m.y - y);
+    Ok(match target {
+        // min_by keeps the first of equals: reading order breaks ties.
+        MatchTarget::Best => matches.iter().min_by(|a, b| a.diff.total_cmp(&b.diff)).copied(),
+        MatchTarget::Nth(n) => {
+            let n = n.round();
+            if n == 0.0 || !n.is_finite() {
+                return Err("match numbers count from 1 (or from -1 at the end)".into());
+            }
+            let at = if n > 0.0 { n - 1.0 } else { matches.len() as f64 + n };
+            (at >= 0.0).then(|| matches.get(at as usize).copied()).flatten()
+        }
+        MatchTarget::Near(x, y) => matches.iter().min_by(|a, b| distance(a, x, y).total_cmp(&distance(b, x, y))).copied(),
+    })
+}
+
 fn detect_query(
     ctx: &mut ExecCtx,
     depth: u32,
@@ -1353,30 +1417,28 @@ fn run_block(
                     }
                 }
             }
-            InstructionKind::FindImage { image, tolerance, x_variable, y_variable } => {
-                let found = ctx
-                    .resolve(tolerance, depth)
-                    .and_then(|t| t.eval_number())
-                    .and_then(|t| crate::screen::find_image(&*crate::screen::image::load_cached(image)?, t));
-                match found {
-                    Ok(at) => {
+            InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, index, near_x, near_y, region, count_variable } => {
+                let search = ImageSearch { image, tolerance, pick: *pick, index, near_x, near_y, region };
+                match find_picked_image(ctx, depth, &search, !count_variable.is_empty()) {
+                    Ok((at, count)) => {
                         let (x, y) = at.map_or((-1.0, -1.0), |(x, y)| (x.round(), y.round()));
-                        if let Ok(mut vars) = ctx.variables.lock() {
-                            for (name, value) in [(x_variable, x), (y_variable, y)] {
-                                if !name.is_empty() {
-                                    vars.insert(name.clone(), Evaluated::Number(value));
-                                }
-                            }
-                        }
+                        set_variable(ctx, x_variable, Evaluated::Number(x));
+                        set_variable(ctx, y_variable, Evaluated::Number(y));
+                        set_variable(ctx, count_variable, Evaluated::Number(count as f64));
                     }
                     Err(e) => soft_fail(ctx, &ins.id, "Find image", e)?,
                 }
             }
-            InstructionKind::ClickImage { image, tolerance, button } => {
+            InstructionKind::ClickImage { image, tolerance, button, pick, index, near_x, near_y, region } => {
                 let clicked = (|| {
-                    let tolerance = ctx.resolve(tolerance, depth)?.eval_number()?;
-                    let (x, y) = crate::screen::find_image(&*crate::screen::image::load_cached(image)?, tolerance)?
-                        .ok_or("the image isn't on screen")?;
+                    let search = ImageSearch { image, tolerance, pick: *pick, index, near_x, near_y, region };
+                    let (at, count) = find_picked_image(ctx, depth, &search, *pick == ImagePick::Nth)?;
+                    let (x, y) = at.ok_or_else(|| match (*pick, count) {
+                        (_, 0) => "the image isn't on screen".to_string(),
+                        (ImagePick::Nth, 1) => "the image is on screen only once".to_string(),
+                        (ImagePick::Nth, n) => format!("the image is on screen only {n} times"),
+                        _ => "the image isn't on screen".to_string(),
+                    })?;
                     let mut em = ctx.emulator.lock().map_err(|e| e.to_string())?;
                     em.move_mouse_abs(x.round() as i32, y.round() as i32)?;
                     em.button(button.clone(), Direction::Click)
@@ -1385,13 +1447,14 @@ fn run_block(
                     soft_fail(ctx, &ins.id, "Click image", e)?;
                 }
             }
-            InstructionKind::WaitForImage { image, tolerance, appear, timeout } => {
+            InstructionKind::WaitForImage { image, tolerance, appear, timeout, region } => {
                 let setup = (|| {
                     let tolerance = ctx.resolve(tolerance, depth)?.eval_number()?;
                     let timeout = ctx.resolve(timeout, depth)?.eval_number()?.max(0.0);
-                    Ok::<_, String>((crate::screen::image::load_cached(image)?, tolerance, timeout))
+                    let region = crate::detect::parse_region(region)?;
+                    Ok::<_, String>((crate::screen::image::load_cached(image)?, tolerance, timeout, region))
                 })();
-                let (needle, tolerance, timeout) = match setup {
+                let (needle, tolerance, timeout, region) = match setup {
                     Ok(setup) => setup,
                     Err(e) => {
                         soft_fail(ctx, &ins.id, "Wait for image", e)?;
@@ -1400,7 +1463,7 @@ fn run_block(
                 };
                 let started = Instant::now();
                 loop {
-                    match crate::screen::find_image(&needle, tolerance) {
+                    match crate::screen::find_image_in(&needle, tolerance, region) {
                         Ok(at) if at.is_some() == *appear => break,
                         Ok(_) => {}
                         Err(e) => {
@@ -3638,6 +3701,99 @@ mod tests {
     }
 
     #[test]
+    fn image_matches_are_picked_by_number_or_by_nearness() {
+        use crate::screen::ScreenMatch;
+        // Reading order: two on the top row, one below; the middle one looks best.
+        let matches = [
+            ScreenMatch { x: 100.0, y: 50.0, diff: 4.0 },
+            ScreenMatch { x: 400.0, y: 50.0, diff: 1.0 },
+            ScreenMatch { x: 100.0, y: 300.0, diff: 1.0 },
+        ];
+        let x_of = |target| pick_match(&matches, target).unwrap().map(|m| (m.x, m.y));
+        assert_eq!(x_of(MatchTarget::Best), Some((400.0, 50.0)), "ties go to reading order");
+        assert_eq!(x_of(MatchTarget::Nth(1.0)), Some((100.0, 50.0)));
+        assert_eq!(x_of(MatchTarget::Nth(3.0)), Some((100.0, 300.0)));
+        assert_eq!(x_of(MatchTarget::Nth(-1.0)), Some((100.0, 300.0)), "negative counts from the end");
+        assert_eq!(x_of(MatchTarget::Nth(-3.0)), Some((100.0, 50.0)));
+        assert_eq!(x_of(MatchTarget::Nth(4.0)), None);
+        assert_eq!(x_of(MatchTarget::Nth(-4.0)), None);
+        assert!(pick_match(&matches, MatchTarget::Nth(0.0)).is_err());
+        assert_eq!(x_of(MatchTarget::Near(120.0, 260.0)), Some((100.0, 300.0)));
+        assert_eq!(x_of(MatchTarget::Near(390.0, 0.0)), Some((400.0, 50.0)));
+        assert_eq!(pick_match(&[], MatchTarget::Near(0.0, 0.0)).unwrap(), None);
+    }
+
+    /// Every image pick against the real screen, for `$BW_LIVE_IMAGE` (a PNG
+    /// on screen more than once) near `$BW_LIVE_NEAR` (`x,y`); run by hand
+    /// with `--ignored`.
+    #[test]
+    #[ignore]
+    fn live_image_picks() {
+        struct Moves(Arc<Mutex<Vec<(i32, i32)>>>);
+        impl InputBackend for Moves {
+            fn key(&mut self, _: MacroKey, _: Direction) -> Result<(), String> { Ok(()) }
+            fn raw_keycode(&mut self, _: u16, _: Direction) -> Result<(), String> { Ok(()) }
+            fn button(&mut self, _: MacroButton, _: Direction) -> Result<(), String> { Ok(()) }
+            fn move_mouse_rel(&mut self, _: i32, _: i32) -> Result<(), String> { Ok(()) }
+            fn move_mouse_abs(&mut self, x: i32, y: i32) -> Result<(), String> {
+                self.0.lock().unwrap().push((x, y));
+                Ok(())
+            }
+            fn scroll(&mut self, _: i32, _: Axis) -> Result<(), String> { Ok(()) }
+            fn text(&mut self, _: &str) -> Result<(), String> { Ok(()) }
+            fn cursor_pos(&self) -> Option<(i32, i32)> { None }
+        }
+        let image = std::env::var("BW_LIVE_IMAGE").expect("set BW_LIVE_IMAGE to a PNG");
+        let near = std::env::var("BW_LIVE_NEAR").unwrap_or_else(|_| "0,0".into());
+        let (nx, ny) = near.split_once(',').map(|(x, y)| (x.parse().unwrap(), y.parse().unwrap())).unwrap();
+        let picks = [
+            ("best", ImagePick::Best, 1.0),
+            ("match 1", ImagePick::Nth, 1.0),
+            ("match 2", ImagePick::Nth, 2.0),
+            ("match -1", ImagePick::Nth, -1.0),
+            ("nearest mouse", ImagePick::NearMouse, 1.0),
+            ("nearest point", ImagePick::NearPoint, 1.0),
+        ];
+        for (name, pick, index) in picks {
+            let vars = empty_vars();
+            let moves = Arc::new(Mutex::new(Vec::new()));
+            let search = |kind| Instruction::new(kind);
+            run_instructions(
+                vec![
+                    search(InstructionKind::FindImage {
+                        image: image.clone(),
+                        tolerance: Value::number(10.0),
+                        x_variable: "x".into(),
+                        y_variable: "y".into(),
+                        pick,
+                        index: Value::number(index),
+                        near_x: Value::number(nx),
+                        near_y: Value::number(ny),
+                        region: String::new(),
+                        count_variable: "count".into(),
+                    }),
+                    search(InstructionKind::ClickImage {
+                        image: image.clone(),
+                        tolerance: Value::number(10.0),
+                        button: MacroButton::Left,
+                        pick,
+                        index: Value::number(index),
+                        near_x: Value::number(nx),
+                        near_y: Value::number(ny),
+                        region: String::new(),
+                    }),
+                ],
+                Arc::new(Mutex::new(Moves(Arc::clone(&moves)))),
+                None,
+                1.0,
+                Arc::clone(&vars),
+            );
+            let vars = vars.lock().unwrap();
+            eprintln!("{name}: x {:?} y {:?} count {:?}, click at {:?}", vars.get("x"), vars.get("y"), vars.get("count"), moves.lock().unwrap());
+        }
+    }
+
+    #[test]
     fn image_blocks_without_an_image_fail_softly() {
         let vars = empty_vars();
         run_instructions(
@@ -3647,6 +3803,12 @@ mod tests {
                     tolerance: Value::number(5.0),
                     x_variable: "x".into(),
                     y_variable: "y".into(),
+                    pick: ImagePick::Best,
+                    index: Value::number(1.0),
+                    near_x: Value::number(0.0),
+                    near_y: Value::number(0.0),
+                    region: String::new(),
+                    count_variable: String::new(),
                 }),
                 set("after", Value::number(1.0)),
             ],

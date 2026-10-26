@@ -228,7 +228,22 @@
                   "id": "find",
                   "kind": {
                     "FindImage": {
+                      "count_variable": "",
                       "image": "",
+                      "index": {
+                        "kind": "Number",
+                        "value": 1.0
+                      },
+                      "near_x": {
+                        "kind": "Number",
+                        "value": 0.0
+                      },
+                      "near_y": {
+                        "kind": "Number",
+                        "value": 0.0
+                      },
+                      "pick": "Best",
+                      "region": "",
                       "tolerance": {
                         "kind": "Number",
                         "value": 10.0

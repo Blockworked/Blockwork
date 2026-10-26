@@ -588,6 +588,12 @@ mod tests {
             tolerance: Value::number(0.0),
             x_variable: "hit x".into(),
             y_variable: "hit y".into(),
+            pick: crate::macros::ImagePick::Best,
+            index: Value::number(1.0),
+            near_x: Value::number(0.0),
+            near_y: Value::number(0.0),
+            region: String::new(),
+            count_variable: String::new(),
         };
         let detect = InstructionKind::DetectObjectsInWindow {
             pattern: Value::text(""),

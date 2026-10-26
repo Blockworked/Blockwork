@@ -427,12 +427,34 @@ pub enum InstructionDto {
         tolerance: Value,
         x_variable: String,
         y_variable: String,
+        #[serde(default)]
+        pick: crate::macros::ImagePick,
+        #[serde(default = "crate::macros::first_match")]
+        index: Value,
+        #[serde(default = "crate::macros::zero_value")]
+        near_x: Value,
+        #[serde(default = "crate::macros::zero_value")]
+        near_y: Value,
+        #[serde(default)]
+        region: String,
+        #[serde(default)]
+        count_variable: String,
     },
     ClickImage {
         id: String,
         image: String,
         tolerance: Value,
         button: crate::input::types::MacroButton,
+        #[serde(default)]
+        pick: crate::macros::ImagePick,
+        #[serde(default = "crate::macros::first_match")]
+        index: Value,
+        #[serde(default = "crate::macros::zero_value")]
+        near_x: Value,
+        #[serde(default = "crate::macros::zero_value")]
+        near_y: Value,
+        #[serde(default)]
+        region: String,
     },
     WaitForImage {
         id: String,
@@ -440,6 +462,8 @@ pub enum InstructionDto {
         tolerance: Value,
         appear: bool,
         timeout: Value,
+        #[serde(default)]
+        region: String,
     },
     WhenTyped {
         id: String,
@@ -882,25 +906,39 @@ pub fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             condition: condition.clone(),
             timeout: timeout.clone(),
         },
-        InstructionKind::FindImage { image, tolerance, x_variable, y_variable } => InstructionDto::FindImage {
-            id,
-            image: image.clone(),
-            tolerance: tolerance.clone(),
-            x_variable: x_variable.clone(),
-            y_variable: y_variable.clone(),
-        },
-        InstructionKind::ClickImage { image, tolerance, button } => InstructionDto::ClickImage {
+        InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, index, near_x, near_y, region, count_variable } => {
+            InstructionDto::FindImage {
+                id,
+                image: image.clone(),
+                tolerance: tolerance.clone(),
+                x_variable: x_variable.clone(),
+                y_variable: y_variable.clone(),
+                pick: *pick,
+                index: index.clone(),
+                near_x: near_x.clone(),
+                near_y: near_y.clone(),
+                region: region.clone(),
+                count_variable: count_variable.clone(),
+            }
+        }
+        InstructionKind::ClickImage { image, tolerance, button, pick, index, near_x, near_y, region } => InstructionDto::ClickImage {
             id,
             image: image.clone(),
             tolerance: tolerance.clone(),
             button: button.clone(),
+            pick: *pick,
+            index: index.clone(),
+            near_x: near_x.clone(),
+            near_y: near_y.clone(),
+            region: region.clone(),
         },
-        InstructionKind::WaitForImage { image, tolerance, appear, timeout } => InstructionDto::WaitForImage {
+        InstructionKind::WaitForImage { image, tolerance, appear, timeout, region } => InstructionDto::WaitForImage {
             id,
             image: image.clone(),
             tolerance: tolerance.clone(),
             appear: *appear,
             timeout: timeout.clone(),
+            region: region.clone(),
         },
         InstructionKind::WhenTyped { text, erase } => InstructionDto::WhenTyped { id, text: text.clone(), erase: *erase },
         InstructionKind::PasteText(text) => InstructionDto::PasteText { id, text: text.clone() },
@@ -1348,26 +1386,42 @@ pub fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
         InstructionDto::WaitUntil { id, condition, timeout } => {
             (id, InstructionKind::WaitUntil { condition: condition.clone(), timeout: timeout.clone() })
         }
-        InstructionDto::FindImage { id, image, tolerance, x_variable, y_variable } => (
+        InstructionDto::FindImage { id, image, tolerance, x_variable, y_variable, pick, index, near_x, near_y, region, count_variable } => (
             id,
             InstructionKind::FindImage {
                 image: image.clone(),
                 tolerance: tolerance.clone(),
                 x_variable: x_variable.clone(),
                 y_variable: y_variable.clone(),
+                pick: *pick,
+                index: index.clone(),
+                near_x: near_x.clone(),
+                near_y: near_y.clone(),
+                region: region.clone(),
+                count_variable: count_variable.clone(),
             },
         ),
-        InstructionDto::ClickImage { id, image, tolerance, button } => (
+        InstructionDto::ClickImage { id, image, tolerance, button, pick, index, near_x, near_y, region } => (
             id,
-            InstructionKind::ClickImage { image: image.clone(), tolerance: tolerance.clone(), button: button.clone() },
+            InstructionKind::ClickImage {
+                image: image.clone(),
+                tolerance: tolerance.clone(),
+                button: button.clone(),
+                pick: *pick,
+                index: index.clone(),
+                near_x: near_x.clone(),
+                near_y: near_y.clone(),
+                region: region.clone(),
+            },
         ),
-        InstructionDto::WaitForImage { id, image, tolerance, appear, timeout } => (
+        InstructionDto::WaitForImage { id, image, tolerance, appear, timeout, region } => (
             id,
             InstructionKind::WaitForImage {
                 image: image.clone(),
                 tolerance: tolerance.clone(),
                 appear: *appear,
                 timeout: timeout.clone(),
+                region: region.clone(),
             },
         ),
         InstructionDto::WhenTyped { id, text, erase } => (id, InstructionKind::WhenTyped { text: text.clone(), erase: *erase }),
