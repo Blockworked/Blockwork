@@ -153,12 +153,16 @@ impl BlockKind for InstructionKind {
             | InstructionKind::BrowserScript { code: value, .. } => f(value, InputValueType::Any),
             InstructionKind::BrowserClick { selector, nth } => {
                 f(selector, InputValueType::Any);
-                f(nth, InputValueType::Any);
+                if let Some(nth) = nth {
+                    f(nth, InputValueType::Any);
+                }
             }
             InstructionKind::BrowserType { text, selector, nth } => {
                 f(text, InputValueType::Any);
                 f(selector, InputValueType::Any);
-                f(nth, InputValueType::Any);
+                if let Some(nth) = nth {
+                    f(nth, InputValueType::Any);
+                }
             }
             InstructionKind::BrowserWaitFor { selector, timeout, .. } => {
                 f(selector, InputValueType::Any);
@@ -922,15 +926,18 @@ pub enum InstructionKind {
     },
     /// Clicks match `nth` (from 1; negative counts from the end) of
     /// `selector` in the active tab, waiting a few seconds for it to appear.
+    /// `nth` is an optional component: `None` (the first match) until added.
     BrowserClick {
         selector: Value,
-        nth: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nth: Option<Value>,
     },
     /// Types `text` into match `nth` of `selector`, replacing what was there.
     BrowserType {
         text: Value,
         selector: Value,
-        nth: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nth: Option<Value>,
     },
     /// Pauses until `selector` matches something (or with `appear` false,
     /// nothing), failing after `timeout` ms (0 = never).
@@ -1677,12 +1684,14 @@ enum InstructionKindDe {
     },
     BrowserClick {
         selector: Value,
-        nth: Value,
+        #[serde(default)]
+        nth: Option<Value>,
     },
     BrowserType {
         text: Value,
         selector: Value,
-        nth: Value,
+        #[serde(default)]
+        nth: Option<Value>,
     },
     BrowserWaitFor {
         selector: Value,
@@ -2588,6 +2597,18 @@ mod tests {
         )
         .unwrap();
         assert!(matches!(kind, InstructionKind::WaitForImage { region: None, .. }));
+    }
+
+    #[test]
+    fn browser_match_is_saved_only_once_added() {
+        let plain = InstructionKind::BrowserClick { selector: Value::text("button"), nth: None };
+        let text = serde_json::to_string(&plain).unwrap();
+        assert!(!text.contains("nth"), "{text}");
+        let added = InstructionKind::BrowserType { text: Value::text("x"), selector: Value::text("focused"), nth: Some(Value::number(-1.0)) };
+        let back: InstructionKind = serde_json::from_str(&serde_json::to_string(&added).unwrap()).unwrap();
+        assert_eq!(back, added);
+        let dto = crate::frontend::instruction_to_dto(&Instruction::new(added.clone()));
+        assert_eq!(crate::frontend::dto_to_instruction(&dto).unwrap().kind, added);
     }
 
     #[test]

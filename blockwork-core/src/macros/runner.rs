@@ -1645,7 +1645,10 @@ fn run_block(
             InstructionKind::BrowserClick { selector, nth } => {
                 let clicked = (|| {
                     let selector = ctx.resolve(selector, depth)?.eval_text()?;
-                    let nth = ctx.resolve(nth, depth)?.eval_number()?;
+                    let nth = match nth {
+                        Some(nth) => ctx.resolve(nth, depth)?.eval_number()?,
+                        None => 1.0,
+                    };
                     crate::browser::request("click", serde_json::json!({ "selector": selector, "nth": nth }), BROWSER_LIMIT)
                 })();
                 if let Err(e) = clicked {
@@ -1656,7 +1659,10 @@ fn run_block(
                 let typed = (|| {
                     let text = ctx.resolve(text, depth)?.eval_text()?;
                     let selector = ctx.resolve(selector, depth)?.eval_text()?;
-                    let nth = ctx.resolve(nth, depth)?.eval_number()?;
+                    let nth = match nth {
+                        Some(nth) => ctx.resolve(nth, depth)?.eval_number()?,
+                        None => 1.0,
+                    };
                     crate::browser::request("type", serde_json::json!({ "selector": selector, "nth": nth, "text": text }), BROWSER_LIMIT)
                 })();
                 if let Err(e) = typed {
