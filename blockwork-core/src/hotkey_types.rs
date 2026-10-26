@@ -77,3 +77,36 @@ pub struct HotkeyBinding {
     pub action: HotkeyAction,
     pub combo: KeyCombo,
 }
+
+/// Compare stored hotkey names using the physical keyboard translation of the
+/// current OS. Mac PC keyboards report PrintScreen/ScrollLock/Pause as F13–F15.
+pub(crate) fn key_names_match(configured: &str, captured: &str) -> bool {
+    #[cfg(target_os = "macos")]
+    fn canonical(name: &str) -> &str {
+        match name {
+            "PrintScreen" | "PrintScr" => "F13",
+            "ScrollLock" => "F14",
+            "Pause" => "F15",
+            other => other,
+        }
+    }
+    #[cfg(not(target_os = "macos"))]
+    fn canonical(name: &str) -> &str { name }
+    canonical(configured) == canonical(captured)
+}
+
+#[cfg(test)]
+mod keyboard_alias_tests {
+    use super::key_names_match;
+
+    #[test]
+    fn pc_key_hotkeys_follow_the_platform_keyboard_translation() {
+        for (pc, native) in [("PrintScreen", "F13"), ("ScrollLock", "F14"), ("Pause", "F15")] {
+            assert!(key_names_match(pc, pc));
+            assert_eq!(key_names_match(pc, native), cfg!(target_os = "macos"));
+            assert_eq!(key_names_match(native, pc), cfg!(target_os = "macos"));
+        }
+        assert!(!key_names_match("F13", "F14"));
+        assert!(!key_names_match("F20", "F21"));
+    }
+}

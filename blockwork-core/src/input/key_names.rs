@@ -49,7 +49,7 @@ pub fn string_to_key(key_str: &str) -> Result<MacroKey, &'static str> {
         "NumLock" | "Numlock" => Ok(MacroKey::NumLock),
         "ScrollLock" => Ok(MacroKey::ScrollLock),
         "Pause" => Ok(MacroKey::Pause),
-        "PrintScr" => Ok(MacroKey::PrintScr),
+        "PrintScr" | "PrintScreen" => Ok(MacroKey::PrintScr),
         "LMenu" => Ok(MacroKey::LMenu),
         "RightShift" => Ok(MacroKey::RShift),
         "LeftControl" => Ok(MacroKey::LControl),
@@ -208,6 +208,15 @@ mod combo_tests {
         assert_eq!(keys[0].modifier_bit(), crate::hotkey_types::MOD_ALT);
         assert!(keys[0].is_modifier());
         assert_ne!(match_key(&keys[0]), match_key(&MacroKey::Meta));
+    }
+
+    #[test]
+    fn extended_function_keys_keep_hotkey_and_stop_recording_names() {
+        for number in 13..=24 {
+            let name = format!("F{number}");
+            let key = parse_key_name(&name).unwrap();
+            assert_eq!(key.hotkey_name().as_deref(), Some(name.as_str()));
+        }
     }
 
     #[test]

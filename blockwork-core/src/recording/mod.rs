@@ -434,7 +434,7 @@ fn check_hotkey(mods: u8, key_name: &str) -> Option<HotkeyAction> {
             if matches!(binding.action, HotkeyAction::StopRecording) {
                 continue;
             }
-            if binding.combo.modifiers == mods && binding.combo.key == key_name {
+            if binding.combo.modifiers == mods && crate::hotkey_types::key_names_match(&binding.combo.key, key_name) {
                 return Some(binding.action.clone());
             }
         }
@@ -515,7 +515,7 @@ pub fn build_capture_callback()
             if let CaptureEvent::KeyPress(key) = &event {
                 let is_stop_key = key
                     .hotkey_name()
-                    .is_some_and(|name| stop_recording_key().as_deref() == Some(name.as_str()));
+                    .is_some_and(|name| stop_recording_key().is_some_and(|configured| crate::hotkey_types::key_names_match(&configured, &name)));
                 if is_stop_key {
                     RECORDING_ACTIVE.store(false, Ordering::Relaxed);
                     push_queue_signal(QueueSignal::Stop);

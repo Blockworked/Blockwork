@@ -57,9 +57,12 @@ fn macro_key_to_cgkeycode(key: &MacroKey) -> Option<(u16, bool)> {
         MacroKey::F10 => (109, false),
         MacroKey::F11 => (103, false),
         MacroKey::F12 => (111, false),
-        MacroKey::F13 => (105, false),
-        MacroKey::F14 => (107, false),
-        MacroKey::F15 => (113, false),
+        // Apple translates these USB PC keys to the same native codes as
+        // F13/F14/F15. Capture retains the canonical Mac function-key names.
+        // IOHIDFamily/IOHIDFamily/Cosmo_USB2ADB.c, USB usages 0x46..=0x48.
+        MacroKey::F13 | MacroKey::PrintScr => (105, false),
+        MacroKey::F14 | MacroKey::ScrollLock => (107, false),
+        MacroKey::F15 | MacroKey::Pause => (113, false),
         MacroKey::F16 => (106, false),
         MacroKey::F17 => (64, false),
         MacroKey::F18 => (79, false),
@@ -518,6 +521,9 @@ impl InputBackend for MacosBackend {
     }
 
     fn key(&mut self, key: MacroKey, dir: Direction) -> Result<(), String> {
+        if matches!(key, MacroKey::F21 | MacroKey::F22 | MacroKey::F23 | MacroKey::F24 | MacroKey::Select) {
+            return Err(format!("macOS cannot synthesize {key:?}: this key has no native macOS virtual-key code; choose a supported key such as F13–F20"));
+        }
         if let Some(code) = system_keys::code(&key) {
             let virtual_code = macro_key_to_cgkeycode(&key).unwrap().0;
             for down in [true, false] {
@@ -1174,6 +1180,36 @@ mod tests {
     }
 
     #[test]
+    fn unavailable_native_keys_fail_clearly_for_every_direction() {
+        let mut backend = MacosBackend::new().unwrap();
+        for key in [MacroKey::F21, MacroKey::F22, MacroKey::F23, MacroKey::F24, MacroKey::Select] {
+            for direction in [Direction::Press, Direction::Release, Direction::Click] {
+                let error = backend.key(key.clone(), direction).unwrap_err();
+                assert!(error.contains(&format!("{key:?}")) && error.contains("no native macOS virtual-key code"));
+            }
+        }
+    }
+
+    #[test]
+    fn pc_navigation_keys_follow_apples_usb_keyboard_translation() {
+        for (key, native, canonical) in [
+            (MacroKey::PrintScr, 105, MacroKey::F13),
+            (MacroKey::ScrollLock, 107, MacroKey::F14),
+            (MacroKey::Pause, 113, MacroKey::F15),
+        ] {
+            let (code, shifted) = macro_key_to_cgkeycode(&key).expect("PC key has a native alias");
+            assert_eq!(code, native);
+            assert!(!shifted);
+            assert_eq!(cg_keycode_to_macro_key(code), Some(canonical));
+            let mut backend = MacosBackend::new().unwrap();
+            for down in [true, false] {
+                let event = backend.keyboard_event(code, down).unwrap();
+                assert!(event.get_flags().contains(CGEventFlags::CGEventFlagSecondaryFn));
+            }
+        }
+    }
+
+    #[test]
     fn extended_keys_round_trip_without_becoming_unknown_codes() {
         for code in [
             64, 65, 67, 69, 71, 72, 73, 74, 75, 78, 79, 80, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91,
@@ -1624,6 +1660,48 @@ mod tests {
                 "cursor did not resync"
             );
             std::thread::sleep(std::time::Duration::from_millis(5));
+        }
+    }
+
+    #[test]
+    #[ignore = "posts and intercepts native keyboard input; requires Accessibility"]
+    fn live_pc_key_aliases_deliver_matching_native_pairs() {
+        use std::sync::{Arc, Mutex};
+        let received = Arc::new(Mutex::new(Vec::new()));
+        let captured = Arc::clone(&received);
+        let tap = system_keys::KeyTap::new(move |kind, event| {
+            if matches!(kind, 10 | 11)
+                && event.get_integer_value_field(EventField::EVENT_SOURCE_USER_DATA) == SYNTHETIC_EVENT_TAG
+            {
+                captured.lock().unwrap().push((
+                    event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE),
+                    kind, event.get_flags().bits(),
+                ));
+                // F14/F15 are system brightness shortcuts on macOS. Observe
+                // their native pairs before the OS consumes them, and prevent
+                // this opt-in test from changing the user's brightness.
+                return CaptureDecision::Suppress;
+            }
+            CaptureDecision::Passthrough
+        }).expect("native-key test requires Accessibility access");
+        let source = tap.mach_port().create_runloop_source(0).unwrap();
+        let run_loop = CFRunLoop::get_current();
+        run_loop.add_source(&source, unsafe { kCFRunLoopDefaultMode });
+        tap.enable();
+        let mut backend = MacosBackend::new().unwrap();
+        for key in [MacroKey::PrintScr, MacroKey::ScrollLock, MacroKey::Pause] {
+            backend.key(key, Direction::Click).unwrap();
+        }
+        CFRunLoop::run_in_mode(unsafe { kCFRunLoopDefaultMode }, std::time::Duration::from_millis(500), false);
+        run_loop.remove_source(&source, unsafe { kCFRunLoopDefaultMode });
+        let received = received.lock().unwrap();
+        assert_eq!(received.len(), 6, "each alias needs one native down and up: {received:?}");
+        for (pair, code) in received.chunks_exact(2).zip([105, 107, 113]) {
+            assert_eq!((pair[0].0, pair[0].1), (code, 10));
+            assert_eq!((pair[1].0, pair[1].1), (code, 11));
+            for event in pair {
+                assert_ne!(event.2 & CGEventFlags::CGEventFlagSecondaryFn.bits(), 0);
+            }
         }
     }
 
