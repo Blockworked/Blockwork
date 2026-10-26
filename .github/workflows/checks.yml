@@ -23,6 +23,8 @@ jobs:
       # Deliberately no Qt/app dependency to supply core features by unification:
       # the Geode embedder must also compile on its own.
       - run: cargo test -p blockwork-core -p blockwork-ffi
+      - name: Test native macOS bundle validation
+        run: python3 scripts/macos/test-verify-bundle.py
 
   test:
     name: Tests and clippy

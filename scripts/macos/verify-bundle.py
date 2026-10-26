@@ -14,6 +14,20 @@ def run(*args):
     return subprocess.check_output(args, text=True, stderr=subprocess.STDOUT)
 
 
+def otool(flag, image):
+    # Apple's otool treats a filename ending in `(name)` as archive(member)
+    # syntax, even when it names an ordinary signed helper executable. A
+    # passed descriptor gives it a literal path without changing the image's
+    # loader/executable context used by the dependency resolver below.
+    with image.open('rb') as stream:
+        try:
+            return subprocess.check_output(('otool', flag, f'/dev/fd/{stream.fileno()}'),
+                                           pass_fds=(stream.fileno(),), text=True,
+                                           stderr=subprocess.STDOUT)
+        except subprocess.CalledProcessError as error:
+            raise RuntimeError(f'could not inspect {image}: {error.output.strip()}') from error
+
+
 def main():
     bundle = pathlib.Path(sys.argv[1]).resolve(strict=True)
     with (bundle / 'Contents/Info.plist').open('rb') as stream:
@@ -33,12 +47,16 @@ def main():
                 if stream.read(4) in MAGIC:
                     images.add(path.resolve())
     rpaths = {}
+    dependencies = {}
     for image in images:
         arches = set(run('lipo', '-archs', str(image)).split())
         if not required_arches.issubset(arches):
             raise RuntimeError(f'{image} lacks required architecture(s): {required_arches - arches}')
-        commands = run('otool', '-l', str(image))
+        commands = otool('-l', image)
         rpaths[image] = re.findall(r'cmd LC_RPATH\s+cmdsize \d+\s+path (.*?) \(offset', commands)
+        # LC_ID_DYLIB is the library's own install name, not a dependency.
+        dependencies[image] = re.findall(
+            r'cmd LC_(?:LOAD|LOAD_WEAK|REEXPORT|LOAD_UPWARD|LAZY_LOAD)_DYLIB\s+cmdsize \d+\s+name (.*?) \(offset', commands)
         for path in rpaths[image]:
             if path.startswith('/') and not path.startswith(('/System/Library/', '/usr/lib/')):
                 raise RuntimeError(f'{image} has a host-specific search path: {path}')
@@ -46,10 +64,7 @@ def main():
         return pathlib.Path(path.replace('@executable_path', str(executable.parent))
                             .replace('@loader_path', str(image.parent))).resolve()
     for image in images:
-        for line in run('otool', '-L', str(image)).splitlines():
-            if not line.startswith('\t'):
-                continue
-            dependency = line.strip().split(' (compatibility version', 1)[0]
+        for dependency in dependencies[image]:
             if dependency.startswith(('/System/Library/', '/usr/lib/')):
                 continue
             if dependency.startswith('@rpath/'):
