@@ -604,13 +604,15 @@ pub enum InstructionDto {
     BrowserClick {
         id: String,
         selector: Value,
-        nth: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nth: Option<Value>,
     },
     BrowserType {
         id: String,
         text: Value,
         selector: Value,
-        nth: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        nth: Option<Value>,
     },
     BrowserWaitFor {
         id: String,

@@ -364,7 +364,7 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
             | InstructionKind::BrowserWaitFor { selector, .. },
             FieldId::BrowserSelector,
         ) => Some(selector),
-        (InstructionKind::BrowserClick { nth, .. } | InstructionKind::BrowserType { nth, .. }, FieldId::BrowserNth) => Some(nth),
+        (InstructionKind::BrowserClick { nth: Some(nth), .. } | InstructionKind::BrowserType { nth: Some(nth), .. }, FieldId::BrowserNth) => Some(nth),
         (InstructionKind::BrowserType { text, .. }, FieldId::BrowserText) => Some(text),
         (InstructionKind::BrowserWaitFor { timeout, .. }, FieldId::WaitTimeout) => Some(timeout),
         (InstructionKind::BrowserScript { code, .. }, FieldId::BrowserCode) => Some(code),
