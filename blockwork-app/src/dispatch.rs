@@ -153,6 +153,12 @@ impl Backend {
                 let path: String = arg(&args, "path")?;
                 to_json(crate::block_library::export(&self.state, block_ids, info, path)?)
             }
+            "set_browser_bridge" => {
+                let (enabled, port): (bool, u16) = (arg(&args, "enabled")?, arg(&args, "port")?);
+                to_json(crate::browser_bridge::configure(&self.state, &self.app, enabled, port)?)
+            }
+            "new_browser_key" => to_json(crate::browser_bridge::new_key(&self.state, &self.app)?),
+            "browser_key" => to_json(blockwork_core::browser::key()),
             "new_webhook_token" => to_json(crate::webhook::new_token(&self.state, &self.app)?),
             "webhook_token" => to_json(crate::webhook::token()),
             "set_macro_max_run_secs" => {

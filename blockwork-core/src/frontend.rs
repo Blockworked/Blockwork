@@ -596,6 +596,33 @@ pub enum InstructionDto {
         settle_ms: Value,
         status_variable: String,
     },
+    BrowserOpen {
+        id: String,
+        url: Value,
+        new_tab: bool,
+    },
+    BrowserClick {
+        id: String,
+        selector: Value,
+        nth: Value,
+    },
+    BrowserType {
+        id: String,
+        text: Value,
+        selector: Value,
+        nth: Value,
+    },
+    BrowserWaitFor {
+        id: String,
+        selector: Value,
+        appear: bool,
+        timeout: Value,
+    },
+    BrowserScript {
+        id: String,
+        code: Value,
+        variable: String,
+    },
 }
 
 #[derive(Serialize, Clone)]
@@ -1018,6 +1045,19 @@ pub fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
                 settle_ms: settle_ms.clone(),
                 status_variable: status_variable.clone(),
             }
+        }
+        InstructionKind::BrowserOpen { url, new_tab } => InstructionDto::BrowserOpen { id, url: url.clone(), new_tab: *new_tab },
+        InstructionKind::BrowserClick { selector, nth } => {
+            InstructionDto::BrowserClick { id, selector: selector.clone(), nth: nth.clone() }
+        }
+        InstructionKind::BrowserType { text, selector, nth } => {
+            InstructionDto::BrowserType { id, text: text.clone(), selector: selector.clone(), nth: nth.clone() }
+        }
+        InstructionKind::BrowserWaitFor { selector, appear, timeout } => {
+            InstructionDto::BrowserWaitFor { id, selector: selector.clone(), appear: *appear, timeout: timeout.clone() }
+        }
+        InstructionKind::BrowserScript { code, variable } => {
+            InstructionDto::BrowserScript { id, code: code.clone(), variable: variable.clone() }
         }
         InstructionKind::Token(token) => match token {
             InputToken::Text(t) => InstructionDto::Text {
@@ -1506,6 +1546,20 @@ pub fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
                 status_variable: status_variable.clone(),
             },
         ),
+        InstructionDto::BrowserOpen { id, url, new_tab } => (id, InstructionKind::BrowserOpen { url: url.clone(), new_tab: *new_tab }),
+        InstructionDto::BrowserClick { id, selector, nth } => {
+            (id, InstructionKind::BrowserClick { selector: selector.clone(), nth: nth.clone() })
+        }
+        InstructionDto::BrowserType { id, text, selector, nth } => {
+            (id, InstructionKind::BrowserType { text: text.clone(), selector: selector.clone(), nth: nth.clone() })
+        }
+        InstructionDto::BrowserWaitFor { id, selector, appear, timeout } => (
+            id,
+            InstructionKind::BrowserWaitFor { selector: selector.clone(), appear: *appear, timeout: timeout.clone() },
+        ),
+        InstructionDto::BrowserScript { id, code, variable } => {
+            (id, InstructionKind::BrowserScript { code: code.clone(), variable: variable.clone() })
+        }
     };
     Some(Instruction {
         id: id.clone(),

@@ -10,7 +10,7 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 /// Abilities that ask first, with what the prompt says the macro wants to do.
-pub const GUARDED: [(&str, &str); 10] = [
+pub const GUARDED: [(&str, &str); 11] = [
     ("commands", "run commands and open or close apps"),
     ("network", "go online"),
     ("files_write", "write to files"),
@@ -21,6 +21,7 @@ pub const GUARDED: [(&str, &str); 10] = [
     ("clipboard", "read the clipboard"),
     ("macros", "run or stop your other macros"),
     ("globals", "read or change global variables"),
+    ("browser", "control your web browser"),
 ];
 
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]

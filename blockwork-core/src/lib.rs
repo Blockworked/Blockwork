@@ -4,6 +4,8 @@ pub mod backoff;
 pub mod battery;
 pub mod block_packs;
 #[cfg(feature = "system")]
+pub mod browser;
+#[cfg(feature = "system")]
 pub mod clipboard;
 #[cfg(feature = "system")]
 pub mod config;

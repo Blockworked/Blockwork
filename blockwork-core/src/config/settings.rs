@@ -63,6 +63,14 @@ pub struct AppSettings {
     /// Requests must carry this, so other programs can't fire macros blindly.
     #[serde(default)]
     pub webhook_token: Option<String>,
+    /// The browser bridge the Blockwork extension connects to; off by default.
+    #[serde(default)]
+    pub browser_enabled: Option<bool>,
+    #[serde(default)]
+    pub browser_port: Option<u16>,
+    /// The extension and Blockwork each prove they know this before talking.
+    #[serde(default)]
+    pub browser_key: Option<String>,
     /// Block library index addresses. The built-in one is always used, saved or not.
     #[serde(default)]
     pub block_library_sources: Option<Vec<String>>,

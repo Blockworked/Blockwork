@@ -25,6 +25,7 @@ pub(crate) mod block_library;
 pub(crate) mod templates;
 pub(crate) mod time_watch;
 pub(crate) mod webhook;
+pub(crate) mod browser_bridge;
 #[cfg(test)]
 mod web_parity;
 
@@ -317,6 +318,7 @@ impl Backend {
         system_watch::start(Arc::clone(&shared), app.clone());
         mouse_watch::start(Arc::clone(&shared), app.clone());
         webhook::start(Arc::clone(&shared), app.clone());
+        browser_bridge::start(Arc::clone(&shared), app.clone());
 
         // Pushes run log updates to the UI, at most a few times a second.
         {

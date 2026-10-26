@@ -441,6 +441,78 @@ Item {
                                     }
                                 }
                             }
+                            SettingsRow {
+                                id: browserRow
+                                readonly property var bridge: appState.browser || ({ enabled: false, port: 8788, error: "", browsers: [] })
+                                readonly property int connections: (bridge.browsers || []).length
+                                title: qsTr("Browser extension")
+                                detail: bridge.error || (connections ? qsTr("Connected: %1").arg(bridge.browsers.join(", "))
+                                    : qsTr("Lets macros click, type and read on web pages with the Browser blocks, by element instead of by picture. Install the Blockwork extension in Chrome, Edge or Firefox and paste the pairing key into it."))
+                                Row {
+                                    anchors.verticalCenter: parent.verticalCenter; spacing: 6
+                                    readonly property color tint: !browserRow.bridge.enabled ? Theme.textDim : browserRow.bridge.error ? Theme.warning
+                                        : browserRow.connections ? Theme.running : Theme.textDim
+                                    Rectangle { width: 8; height: 8; radius: 4; color: parent.tint; anchors.verticalCenter: parent.verticalCenter }
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter; color: parent.tint; font.pixelSize: 13
+                                        text: !browserRow.bridge.enabled ? qsTr("Off") : browserRow.bridge.error ? qsTr("Not running")
+                                            : browserRow.connections ? qsTr("Connected") : qsTr("Waiting for a browser")
+                                    }
+                                }
+                                BwTextField {
+                                    id: browserPort; implicitWidth: 80; Accessible.name: qsTr("Browser extension port")
+                                    text: String(browserRow.bridge.port); validator: IntValidator { bottom: 1; top: 65535 }
+                                    onEditingFinished: root.invoke("set_browser_bridge", { enabled: !!browserRow.bridge.enabled, port: Number(text) || 8788 })
+                                }
+                                Item {
+                                    anchors.verticalCenter: parent.verticalCenter; implicitWidth: 38; implicitHeight: 28; clip: true
+                                    BwSwitch {
+                                        Accessible.name: qsTr("Browser extension"); checked: !!browserRow.bridge.enabled
+                                        onToggled: checked => root.invoke("set_browser_bridge", { enabled: checked, port: Number(browserPort.text) || 8788 })
+                                    }
+                                }
+                            }
+                            // The pairing key stays hidden like the webhook token.
+                            ColumnLayout {
+                                id: browserInfo
+                                visible: !!browserRow.bridge.enabled
+                                Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 14; spacing: 8
+                                property string key: ""
+                                readonly property bool revealed: key !== ""
+                                property bool copied: false
+                                function hide() { key = ""; browserHideTimer.stop() }
+                                onVisibleChanged: if (!visible) hide()
+                                Timer { id: browserHideTimer; interval: 30000; onTriggered: browserInfo.hide() }
+                                Timer { id: browserCopiedTimer; interval: 1500; onTriggered: browserInfo.copied = false }
+                                Connections {
+                                    target: Qt.application
+                                    function onStateChanged() { if (Qt.application.state !== Qt.ApplicationActive) browserInfo.hide() }
+                                }
+                                Connections { target: root; function onTabChanged() { browserInfo.hide() } }
+                                RowLayout { Layout.fillWidth: true; spacing: 8
+                                    LucideIcon { name: "lock"; width: 14; height: 14; color: Theme.textDim }
+                                    Text { text: qsTr("Pairing key"); color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold }
+                                    Text {
+                                        Layout.fillWidth: true; Layout.leftMargin: 4; elide: Text.ElideRight
+                                        text: browserInfo.revealed ? browserInfo.key : "\u2022".repeat(24)
+                                        color: browserInfo.revealed ? Theme.text : Theme.textDim; font.family: "monospace"; font.pixelSize: 12
+                                        Accessible.name: browserInfo.revealed ? browserInfo.key : qsTr("Hidden pairing key")
+                                    }
+                                    BwButton {
+                                        iconName: browserInfo.revealed ? "lock" : "eye"; text: browserInfo.revealed ? qsTr("Hide") : qsTr("Show")
+                                        onClicked: browserInfo.revealed ? browserInfo.hide() : root.withReply("browser_key", key => { browserInfo.key = key; browserHideTimer.restart() })
+                                    }
+                                    BwButton {
+                                        iconName: browserInfo.copied ? "check" : "copy"; text: browserInfo.copied ? qsTr("Copied") : qsTr("Copy")
+                                        onClicked: root.withReply("browser_key", key => { root.copyText(key); browserInfo.copied = true; browserCopiedTimer.restart() })
+                                    }
+                                    BwButton { iconName: "refresh-cw"; text: qsTr("New key"); onClicked: { browserInfo.hide(); root.invoke("new_browser_key") } }
+                                }
+                                Text {
+                                    Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
+                                    text: qsTr("Open the extension's menu in your browser, choose Pairing and paste the key. A new key disconnects every browser until it gets the new one.")
+                                }
+                            }
                             SettingsRow { title: qsTr("Command line")
                                 detail: qsTr("Scripts and launchers can run macros by name: \"blockwork run <name>\" (add --wait to return when it ends), \"blockwork stop <name>\" and \"blockwork list\".")
                             }
@@ -463,15 +535,17 @@ Item {
     }
     function copyText(text) { clipboardHelper.text = text; clipboardHelper.selectAll(); clipboardHelper.copy(); clipboardHelper.text = ""; }
 
-    // The webhook token isn't in appState; it's fetched when it's copied or shown.
+    // The webhook token and browser pairing key aren't in appState; they're
+    // fetched when copied or shown.
     property int callSeq: 0
     property var callbacks: ({})
-    function withWebhookToken(done) {
+    function withReply(command, done) {
         if (!appBridge) return;
         const key = "settings" + (++callSeq);
         callbacks[key] = done;
-        appBridge.callCommand(key, "webhook_token", "{}");
+        appBridge.callCommand(key, command, "{}");
     }
+    function withWebhookToken(done) { withReply("webhook_token", done) }
     Connections {
         target: root.appBridge
         function onReplySerialChanged() {

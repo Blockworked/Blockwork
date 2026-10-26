@@ -294,6 +294,10 @@ fn spin_sleeper() -> &'static SpinSleeper {
 const STOP_POLL_INTERVAL: Duration = Duration::from_millis(15);
 /// How often wait-until blocks re-check (on top of the check's own time).
 const CONDITION_POLL_MS: f64 = 100.0;
+/// How long a browser block waits for the extension's answer; it waits up
+/// to 5 s itself for an element to show up.
+const BROWSER_LIMIT: Duration = Duration::from_secs(20);
+const BROWSER_LOAD_LIMIT: Duration = Duration::from_secs(40);
 /// A box this close to where the aimed-at target should be is taken to be it.
 const RELOCK_MIN_PX: f64 = 40.0;
 /// How often the aim mover sends a move: 500 Hz, like a gaming mouse.
@@ -371,6 +375,11 @@ fn guarded_abilities(kind: &InstructionKind) -> &'static [&'static str] {
         | InstructionKind::OpenApp { .. }
         | InstructionKind::CloseApp { .. } => &["commands"],
         InstructionKind::HttpRequest { .. } => &["network"],
+        InstructionKind::BrowserOpen { .. }
+        | InstructionKind::BrowserClick { .. }
+        | InstructionKind::BrowserType { .. }
+        | InstructionKind::BrowserWaitFor { .. }
+        | InstructionKind::BrowserScript { .. } => &["browser"],
         InstructionKind::WriteFile { .. } => &["files_write"],
         InstructionKind::FindImage { .. } | InstructionKind::WaitForImage { .. } => &["screen"],
         InstructionKind::DetectObjectsInWindow { .. } | InstructionKind::WaitForDetection { .. } => &["screen"],
@@ -1622,6 +1631,79 @@ fn run_block(
                 let written = path.and_then(|p| text.and_then(|t| crate::files::write_text(&p, &t, *append)));
                 if let Err(e) = written {
                     soft_fail(ctx, &ins.id, if *append { "Append to file" } else { "Write file" }, e)?;
+                }
+            }
+            InstructionKind::BrowserOpen { url, new_tab } => {
+                let opened = ctx
+                    .resolve(url, depth)
+                    .and_then(|u| u.eval_text())
+                    .and_then(|url| crate::browser::request("open", serde_json::json!({ "url": url, "newTab": new_tab }), BROWSER_LOAD_LIMIT));
+                if let Err(e) = opened {
+                    soft_fail(ctx, &ins.id, "Open in browser", e)?;
+                }
+            }
+            InstructionKind::BrowserClick { selector, nth } => {
+                let clicked = (|| {
+                    let selector = ctx.resolve(selector, depth)?.eval_text()?;
+                    let nth = ctx.resolve(nth, depth)?.eval_number()?;
+                    crate::browser::request("click", serde_json::json!({ "selector": selector, "nth": nth }), BROWSER_LIMIT)
+                })();
+                if let Err(e) = clicked {
+                    soft_fail(ctx, &ins.id, "Click in browser", e)?;
+                }
+            }
+            InstructionKind::BrowserType { text, selector, nth } => {
+                let typed = (|| {
+                    let text = ctx.resolve(text, depth)?.eval_text()?;
+                    let selector = ctx.resolve(selector, depth)?.eval_text()?;
+                    let nth = ctx.resolve(nth, depth)?.eval_number()?;
+                    crate::browser::request("type", serde_json::json!({ "selector": selector, "nth": nth, "text": text }), BROWSER_LIMIT)
+                })();
+                if let Err(e) = typed {
+                    soft_fail(ctx, &ins.id, "Type in browser", e)?;
+                }
+            }
+            InstructionKind::BrowserWaitFor { selector, appear, timeout } => {
+                let setup = (|| {
+                    let selector = ctx.resolve(selector, depth)?.eval_text()?;
+                    let timeout = ctx.resolve(timeout, depth)?.eval_number()?.max(0.0);
+                    Ok::<_, String>((selector, timeout))
+                })();
+                let (selector, timeout) = match setup {
+                    Ok(setup) => setup,
+                    Err(e) => {
+                        soft_fail(ctx, &ins.id, "Wait for element", e)?;
+                        return Ok(Flow::Normal);
+                    }
+                };
+                let started = Instant::now();
+                loop {
+                    match crate::browser::request("count", serde_json::json!({ "selector": selector }), BROWSER_LIMIT) {
+                        Ok(found) if (found["count"].as_u64().unwrap_or(0) > 0) == *appear => break,
+                        Ok(_) => {}
+                        Err(e) => {
+                            soft_fail(ctx, &ins.id, "Wait for element", e)?;
+                            break;
+                        }
+                    }
+                    if timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout {
+                        let what = if *appear { "didn't appear" } else { "didn't go away" };
+                        soft_fail(ctx, &ins.id, "Wait for element", format!("{selector} {what} within {timeout} ms"))?;
+                        break;
+                    }
+                    if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
+                        break;
+                    }
+                }
+            }
+            InstructionKind::BrowserScript { code, variable } => {
+                let ran = ctx
+                    .resolve(code, depth)
+                    .and_then(|c| c.eval_text())
+                    .and_then(|code| crate::browser::request("script", serde_json::json!({ "code": code }), BROWSER_LIMIT));
+                match ran {
+                    Ok(result) => set_variable(ctx, variable, Evaluated::Text(crate::browser::text_field(&result, "value"))),
+                    Err(e) => soft_fail(ctx, &ins.id, "Run JavaScript", e)?,
                 }
             }
             InstructionKind::HttpRequest {

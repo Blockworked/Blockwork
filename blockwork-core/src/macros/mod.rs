@@ -76,6 +76,7 @@ macro_rules! for_each_ref {
             InstructionKind::SetVariable(name, _)
             | InstructionKind::ChangeVariable(name, _)
             | InstructionKind::HttpRequest { variable: name, .. }
+            | InstructionKind::BrowserScript { variable: name, .. }
             | InstructionKind::AskText { name, .. }
             | InstructionKind::AskYesNo { name, .. }
             | InstructionKind::WhenWebhook { variable: name, .. } => $f(RefKind::Variable, name),
@@ -147,7 +148,22 @@ impl BlockKind for InstructionKind {
             | InstructionKind::AskChoice { prompt: value, .. }
             | InstructionKind::ShowMessage(value)
             | InstructionKind::WhenAt(value)
-            | InstructionKind::WhenWebhook { path: value, .. } => f(value, InputValueType::Any),
+            | InstructionKind::WhenWebhook { path: value, .. }
+            | InstructionKind::BrowserOpen { url: value, .. }
+            | InstructionKind::BrowserScript { code: value, .. } => f(value, InputValueType::Any),
+            InstructionKind::BrowserClick { selector, nth } => {
+                f(selector, InputValueType::Any);
+                f(nth, InputValueType::Any);
+            }
+            InstructionKind::BrowserType { text, selector, nth } => {
+                f(text, InputValueType::Any);
+                f(selector, InputValueType::Any);
+                f(nth, InputValueType::Any);
+            }
+            InstructionKind::BrowserWaitFor { selector, timeout, .. } => {
+                f(selector, InputValueType::Any);
+                f(timeout, InputValueType::Any);
+            }
             InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } => f(&mut name.value, InputValueType::Any),
             InstructionKind::AskText { prompt, default, .. } => {
                 f(prompt, InputValueType::Any);
@@ -897,6 +913,37 @@ pub enum InstructionKind {
         settle_ms: Value,
         status_variable: String,
     },
+    /// Opens `url` in the browser's active tab, or with `new_tab` in a new
+    /// one, and waits for it to load. The browser blocks go through the
+    /// Blockwork extension; see [`crate::browser`].
+    BrowserOpen {
+        url: Value,
+        new_tab: bool,
+    },
+    /// Clicks match `nth` (from 1; negative counts from the end) of
+    /// `selector` in the active tab, waiting a few seconds for it to appear.
+    BrowserClick {
+        selector: Value,
+        nth: Value,
+    },
+    /// Types `text` into match `nth` of `selector`, replacing what was there.
+    BrowserType {
+        text: Value,
+        selector: Value,
+        nth: Value,
+    },
+    /// Pauses until `selector` matches something (or with `appear` false,
+    /// nothing), failing after `timeout` ms (0 = never).
+    BrowserWaitFor {
+        selector: Value,
+        appear: bool,
+        timeout: Value,
+    },
+    /// Runs JavaScript in the active tab and puts its result in `variable`.
+    BrowserScript {
+        code: Value,
+        variable: String,
+    },
 }
 
 impl std::hash::Hash for InstructionKind {
@@ -1306,6 +1353,26 @@ impl std::hash::Hash for InstructionKind {
                 (results_list, index, gain, max_step, deadzone).hash(state);
                 (timeout, settle_ms, status_variable).hash(state);
             }
+            Self::BrowserOpen { url, new_tab } => {
+                77u8.hash(state);
+                (url, new_tab).hash(state);
+            }
+            Self::BrowserClick { selector, nth } => {
+                78u8.hash(state);
+                (selector, nth).hash(state);
+            }
+            Self::BrowserType { text, selector, nth } => {
+                79u8.hash(state);
+                (text, selector, nth).hash(state);
+            }
+            Self::BrowserWaitFor { selector, appear, timeout } => {
+                80u8.hash(state);
+                (selector, appear, timeout).hash(state);
+            }
+            Self::BrowserScript { code, variable } => {
+                81u8.hash(state);
+                (code, variable).hash(state);
+            }
         }
     }
 }
@@ -1604,6 +1671,28 @@ enum InstructionKindDe {
         settle_ms: Value,
         status_variable: String,
     },
+    BrowserOpen {
+        url: Value,
+        new_tab: bool,
+    },
+    BrowserClick {
+        selector: Value,
+        nth: Value,
+    },
+    BrowserType {
+        text: Value,
+        selector: Value,
+        nth: Value,
+    },
+    BrowserWaitFor {
+        selector: Value,
+        appear: bool,
+        timeout: Value,
+    },
+    BrowserScript {
+        code: Value,
+        variable: String,
+    },
 }
 
 fn empty_text() -> Value {
@@ -1865,6 +1954,13 @@ impl From<InstructionKindDe> for InstructionKind {
             InstructionKindDe::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => {
                 InstructionKind::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable }
             }
+            InstructionKindDe::BrowserOpen { url, new_tab } => InstructionKind::BrowserOpen { url, new_tab },
+            InstructionKindDe::BrowserClick { selector, nth } => InstructionKind::BrowserClick { selector, nth },
+            InstructionKindDe::BrowserType { text, selector, nth } => InstructionKind::BrowserType { text, selector, nth },
+            InstructionKindDe::BrowserWaitFor { selector, appear, timeout } => {
+                InstructionKind::BrowserWaitFor { selector, appear, timeout }
+            }
+            InstructionKindDe::BrowserScript { code, variable } => InstructionKind::BrowserScript { code, variable },
         }
     }
 }

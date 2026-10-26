@@ -27,6 +27,11 @@ section below as the GitHub release notes, followed by the downloads table.
   - Webhook trigger: an opt-in local server (Settings > Integrations) that starts macros on a web request with a token, passing the request body.
     - Its token stays hidden as dots in Settings, so it's safe on a shared screen: copy it (or a ready-made curl example) without showing it, or show it briefly.
 - Shell reporters: a command's output and whether it succeeded.
+- Browser blocks, through the new Blockwork browser extension (Chrome, Edge, Firefox):
+  - Open a page, click an element, type into an element, wait for an element, and run JavaScript into a variable.
+  - Reporters for page address and title, an element's text, whether it exists and how many match.
+  - Elements are named by selectors, including `focused`, `text=` and `near=`, so a macro can pick the button beside the box you're typing in when a page has several alike.
+  - Opt-in local bridge in Settings > Integrations, paired with a key; macros need the new "browser" permission.
 - Notify block for desktop notifications.
 - Dialog blocks: ask for text, ask yes or no, choose from a list, show a message.
   - They work with the editor closed.
