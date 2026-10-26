@@ -53,7 +53,7 @@
 <context>
     <name>EditorPage</name>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="622"/>
+        <location filename="../qml/EditorPage.qml" line="633"/>
         <source>Paused before &quot;%1&quot; (%n strand(s) waiting)</source>
         <translation>
             <numerusform>Paused before &quot;%1&quot; (%n strand waiting)</numerusform>
@@ -61,7 +61,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="741"/>
+        <location filename="../qml/EditorPage.qml" line="752"/>
         <source>Delete %n block(s)</source>
         <translation>
             <numerusform>Delete %n block</numerusform>
@@ -69,7 +69,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="1287"/>
+        <location filename="../qml/EditorPage.qml" line="1298"/>
         <source>%n second(s)</source>
         <translation>
             <numerusform>%n second</numerusform>

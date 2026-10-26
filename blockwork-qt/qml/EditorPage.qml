@@ -223,7 +223,7 @@ Item {
     }
 
     // ---- screen picker: images for image blocks, points/regions for reporters ----
-    // { kind: "image" | "region", strandId, path, instruction } or { kind: "tool" }
+    // { kind: "image" | "region", strandId, path, instruction }, { kind: "value", location, value, point } or { kind: "tool" }
     property var pickRequest: null
     property int savedVisibility: Window.Windowed
     // Gives the compositor a moment to take a window off screen.
@@ -240,8 +240,10 @@ Item {
         win.hide();
         const onScreen = request.kind === "region" && root.screenRegionTypes.indexOf((request.instruction || {}).type) >= 0;
         const hint = onScreen ? qsTr("Drag out the part of the screen to search")
+            : request.kind === "value" ? (request.point ? qsTr("Click the point to read") : qsTr("Drag out the part of the screen to read"))
             : { image: qsTr("Drag around the image to look for"), region: qsTr("Drag out the part of the window to search") }[request.kind];
-        root.afterUnmap(() => screenOverlay.begin(!!hint, hint || qsTr("Click a point or drag out a region")));
+        const regionOnly = request.kind === "value" ? !request.point : !!hint;
+        root.afterUnmap(() => screenOverlay.begin(regionOnly, hint || qsTr("Click a point or drag out a region")));
     }
     function restoreWindow() {
         const win = Window.window;
@@ -259,6 +261,7 @@ Item {
             const request = root.pickRequest;
             root.pickRequest = null;
             if (request && request.kind === "region") { root.setBlockRegion(request, x, y, width, height); return; }
+            if (request && request.kind === "value") { root.setValueRegion(request, x, y, width, height); return; }
             // Capture once the overlay itself is gone.
             root.afterUnmap(() => root.daemonCall("screen_grab", { x: x, y: y, width: width, height: height }, (result, error) => {
                 root.restoreWindow();
@@ -267,6 +270,14 @@ Item {
                 else pickResult.show(result);
             }));
         }
+    }
+    // A screen reporter's x, y (and width, height) from a pick, in screen coordinates.
+    function setValueRegion(request, x, y, width, height) {
+        root.restoreWindow();
+        const n = v => numberValue(Math.round(v));
+        const updated = JSON.parse(JSON.stringify(request.value));
+        updated.args = request.point ? [n(x), n(y)] : [n(x), n(y), n(width), n(height)];
+        root.invoke("put_value", { location: request.location, value: updated });
     }
     function setBlockDetector(request, detector) {
         const updated = JSON.parse(JSON.stringify(request.instruction || {}));
@@ -1593,10 +1604,13 @@ Item {
             LastError: { prefix: qsTr("error message"), result: "text" },
             MacroRunning: { prefix: qsTr("macro"), suffix: qsTr("is running?"), result: "bool" },
             GlobalVariable: { prefix: qsTr("global"), result: "text", pickArg: { index: 0, action: "pickGlobal", icon: "chevron-down" } },
-            PixelColor: { prefix: qsTr("color at x"), infix: [qsTr("y")], result: "text" },
-            AverageColor: { prefix: qsTr("average color at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text" },
+            PixelColor: { prefix: qsTr("color at x"), infix: [qsTr("y")], result: "text",
+                pickOp: { action: "pickScreenPoint", icon: "crosshair", tip: qsTr("Click a point on screen") } },
+            AverageColor: { prefix: qsTr("average color at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text",
+                pickOp: { action: "pickScreenRegion", icon: "square-dashed", tip: qsTr("Drag out a region on screen") } },
             ColorsMatch: { infix: [qsTr("matches"), qsTr("within")], suffix: "%", result: "bool" },
-            ScreenText: { prefix: qsTr("text on screen at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text" },
+            ScreenText: { prefix: qsTr("text on screen at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text",
+                pickOp: { action: "pickScreenRegion", icon: "square-dashed", tip: qsTr("Drag out a region on screen") } },
             MousePosition: { prefix: qsTr("mouse"), result: "number", enumArg: { index: 0, options: [{ value: "x", label: qsTr("x") }, { value: "y", label: qsTr("y") }] } },
             ScreenSize: { prefix: qsTr("screen"), result: "number", enumArg: { index: 0, options: [{ value: "width", label: qsTr("width") }, { value: "height", label: qsTr("height") }] } },
             MonitorCount: { prefix: qsTr("number of monitors"), result: "number" },
@@ -1912,6 +1926,8 @@ Item {
             else if (action === "pickTime") timePicker.openFor(location, value, anchor);
             else if (action === "pickDateTime") dateTimePicker.openFor(location, value, anchor);
             else if (action === "pickSchedule") scheduleDialog.openFor(location, value);
+            else if (action === "pickScreenRegion" || action === "pickScreenPoint")
+                root.startScreenPick({ kind: "value", location: location, value: value, point: action === "pickScreenPoint" });
         };
     }
     Connections {
