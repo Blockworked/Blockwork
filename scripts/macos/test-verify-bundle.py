@@ -11,7 +11,10 @@ validator = pathlib.Path(__file__).with_name('verify-bundle.py')
 
 
 def run(*args):
-    return subprocess.run(args, capture_output=True, text=True, check=True)
+    result = subprocess.run(args, capture_output=True, text=True)
+    if result.returncode:
+        raise RuntimeError(f'{args!r} failed ({result.returncode}):\n{result.stdout}{result.stderr}')
+    return result
 
 
 with tempfile.TemporaryDirectory(prefix='blockwork-validator-') as temporary:
@@ -23,7 +26,9 @@ with tempfile.TemporaryDirectory(prefix='blockwork-validator-') as temporary:
     frameworks.mkdir()
     (bundle / 'Contents/Info.plist').write_bytes(plistlib.dumps({
         'CFBundleExecutable': 'Blockwork', 'CFBundleIdentifier': 'com.blockworked.ValidatorFixture',
-        'CFBundlePackageType': 'APPL'}))
+        'CFBundlePackageType': 'APPL', 'CFBundleName': 'Blockwork',
+        'CFBundleVersion': '1.0', 'CFBundleShortVersionString': '1.0',
+        'LSMinimumSystemVersion': '13.0'}))
     main = root / 'main.c'
     main.write_text('int main(void) { return 0; }\n')
     run('clang', str(main), '-o', str(binaries / 'Blockwork'))
