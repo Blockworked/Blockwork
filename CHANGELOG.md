@@ -10,6 +10,11 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ## [Unreleased]
 
+### Added
+- Launch options for the Open app block: a gear on the block opens a panel
+  for arguments (like `--incognito`), a working folder, environment variables,
+  and opening a new copy on macOS.
+
 ## [0.6.0] - 2026-10-21
 
 ### Added

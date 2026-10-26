@@ -9,7 +9,7 @@ use crate::input::types::{Axis, Coordinate, Direction, InputToken};
 use crate::input::value::Value;
 use crate::input::{get_mouse_button_names, mouse_button_to_index};
 use crate::macros::{
-    BlockDef, Comment, FloatingValue, Instruction, InstructionKind, Macro, MacroSettings, Strand,
+    BlockDef, Comment, FloatingValue, Instruction, InstructionKind, LaunchOptions, Macro, MacroSettings, Strand,
 };
 use blockstitch_core::editor::{InstrPath, ValueLocation};
 use blockstitch_core::graph::{Fragment, ListDef, ListItem};
@@ -249,6 +249,8 @@ pub enum InstructionDto {
         command: String,
         name: String,
         icon: Option<String>,
+        #[serde(default)]
+        launch: LaunchOptions,
     },
     CloseApp {
         id: String,
@@ -703,11 +705,13 @@ pub fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
             command,
             name,
             icon,
+            launch,
         } => InstructionDto::OpenApp {
             id,
             command: command.clone(),
             name: name.clone(),
             icon: icon.clone(),
+            launch: launch.clone(),
         },
         InstructionKind::CloseApp {
             command,
@@ -1123,12 +1127,14 @@ pub fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
             command,
             name,
             icon,
+            launch,
         } => (
             id,
             InstructionKind::OpenApp {
                 command: command.clone(),
                 name: name.clone(),
                 icon: icon.clone(),
+                launch: launch.clone(),
             },
         ),
         InstructionDto::CloseApp {

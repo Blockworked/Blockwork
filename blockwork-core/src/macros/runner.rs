@@ -3,7 +3,7 @@ use crate::input::value::{Evaluated, Op, Value};
 use crate::macros::backend::{create_backend, InputBackend};
 use crate::macros::host_clock;
 use crate::macros::priority::raise_current_thread_priority;
-use crate::macros::{BlockKind, ImageMatch, ImagePick, Instruction, InstructionKind, Macro};
+use crate::macros::{BlockKind, ImageMatch, ImagePick, Instruction, InstructionKind, LaunchOptions, Macro};
 use blockstitch_core::graph::{
     ListItem, ListStore, is_list_reporter, list_index, resolve_list_reporter,
 };
@@ -1285,9 +1285,9 @@ fn run_block(
                     return Ok(flow);
                 }
             }
-            InstructionKind::OpenApp { command, .. } => {
+            InstructionKind::OpenApp { command, launch, .. } => {
                 println!("Opening app: {command}");
-                if let Err(e) = open_app(command) {
+                if let Err(e) = open_app(command, launch) {
                     soft_fail(ctx, &ins.id, "Open app", e)?;
                 }
             }
@@ -2183,40 +2183,151 @@ fn run_block(
 }
 
 /// Launches `command` - the already-resolved, platform-specific launch
-/// string an `InstructionKind::OpenApp` carries. Each platform needs a
-/// different launcher: Windows' `start` handles a `.lnk` path directly;
-/// macOS' `open` handles an `.app` bundle path; a plain `sh -c` covers
-/// Linux's cleaned `Exec=` line (may still carry shell syntax), run on the
-/// host when sandboxed since the app lives outside the Flatpak.
+/// string an `InstructionKind::OpenApp` carries - with its launch options.
+/// Each platform needs a different launcher: Windows' `start` handles a
+/// `.lnk` path directly; macOS' `open` handles an `.app` bundle path; a plain
+/// `sh -c` covers Linux's cleaned `Exec=` line (may still carry shell
+/// syntax), run on the host when sandboxed since the app lives outside the
+/// Flatpak.
 #[cfg(target_os = "windows")]
-fn open_app(command: &str) -> std::io::Result<()> {
-    Command::new("cmd")
-        .args(["/C", "start", "", command])
-        .creation_flags(CREATE_NO_WINDOW)
-        .spawn()
-        .map(|_| ())
+fn open_app(command: &str, launch: &LaunchOptions) -> std::io::Result<()> {
+    let mut cmd = Command::new("cmd");
+    cmd.args(["/C", "start", ""]);
+    if let Some(dir) = working_dir(launch)? {
+        cmd.arg("/D").arg(dir);
+    }
+    cmd.arg(command);
+    // Raw, so the arguments reach the app as typed, quotes and all.
+    if !launch.args.trim().is_empty() {
+        cmd.raw_arg(launch.args.trim());
+    }
+    cmd.envs(env_vars(launch)).creation_flags(CREATE_NO_WINDOW).spawn().map(|_| ())
 }
 
 #[cfg(target_os = "macos")]
-fn open_app(command: &str) -> std::io::Result<()> {
-    Command::new("open").arg(command).spawn().map(|_| ())
+fn open_app(command: &str, launch: &LaunchOptions) -> std::io::Result<()> {
+    let mut cmd = Command::new("open");
+    if launch.new_instance {
+        cmd.arg("-n");
+    }
+    for (name, value) in env_vars(launch) {
+        cmd.arg("--env").arg(format!("{name}={value}"));
+    }
+    cmd.arg(command);
+    let args = split_args(&launch.args);
+    if !args.is_empty() {
+        cmd.arg("--args").args(args);
+    }
+    cmd.spawn().map(|_| ())
 }
 
 #[cfg(target_os = "linux")]
-fn open_app(command: &str) -> std::io::Result<()> {
-    crate::flatpak::host_command("sh")
-        .arg("-c")
-        .arg(command)
-        .spawn()
-        .map(|_| ())
+fn open_app(command: &str, launch: &LaunchOptions) -> std::io::Result<()> {
+    let line = match launch.args.trim() {
+        "" => command.to_string(),
+        args => format!("{command} {args}"),
+    };
+    let dir = working_dir(launch)?;
+    let env = env_vars(launch);
+    let mut cmd = if crate::flatpak::is_flatpak() {
+        // A host process gets its folder and variables from flatpak-spawn.
+        let mut cmd = Command::new("flatpak-spawn");
+        cmd.arg("--host");
+        if let Some(dir) = &dir {
+            cmd.arg(format!("--directory={}", dir.display()));
+        }
+        for (name, value) in &env {
+            cmd.arg(format!("--env={name}={value}"));
+        }
+        cmd.arg("sh");
+        cmd
+    } else {
+        let mut cmd = Command::new("sh");
+        if let Some(dir) = &dir {
+            cmd.current_dir(dir);
+        }
+        cmd.envs(env);
+        cmd
+    };
+    cmd.arg("-c").arg(line).spawn().map(|_| ())
 }
 
 #[cfg(not(any(target_os = "windows", target_os = "macos", target_os = "linux")))]
-fn open_app(_command: &str) -> std::io::Result<()> {
+fn open_app(_command: &str, _launch: &LaunchOptions) -> std::io::Result<()> {
     Err(std::io::Error::new(
         std::io::ErrorKind::Unsupported,
         "opening apps is not supported on this platform",
     ))
+}
+
+/// The launch's working folder with `~` expanded, or `None` to keep ours.
+#[cfg(any(target_os = "windows", target_os = "linux"))]
+fn working_dir(launch: &LaunchOptions) -> std::io::Result<Option<std::path::PathBuf>> {
+    if launch.working_dir.trim().is_empty() {
+        return Ok(None);
+    }
+    let dir = crate::files::expand(&launch.working_dir);
+    // Most host folders are hidden from a Flatpak, so the host checks there.
+    let sandboxed = cfg!(target_os = "linux") && crate::flatpak::is_flatpak();
+    if !sandboxed && !dir.is_dir() {
+        return Err(std::io::Error::new(
+            std::io::ErrorKind::NotFound,
+            format!("working folder {} doesn't exist", dir.display()),
+        ));
+    }
+    Ok(Some(dir))
+}
+
+/// The launch's environment variables, skipping rows with no name.
+#[cfg(any(target_os = "windows", target_os = "macos", target_os = "linux"))]
+fn env_vars(launch: &LaunchOptions) -> Vec<(String, String)> {
+    launch
+        .env
+        .iter()
+        .filter(|v| !v.name.trim().is_empty())
+        .map(|v| (v.name.trim().to_string(), v.value.clone()))
+        .collect()
+}
+
+/// Splits a typed argument line the way a shell would: whitespace between
+/// words, single or double quotes around spaces, backslash escapes.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
+fn split_args(line: &str) -> Vec<String> {
+    let mut args = Vec::new();
+    let mut current = String::new();
+    let mut in_word = false;
+    let mut quote: Option<char> = None;
+    let mut chars = line.chars();
+    while let Some(c) = chars.next() {
+        match (quote, c) {
+            (Some(q), c) if c == q => quote = None,
+            (Some('"') | None, '\\') => {
+                if let Some(next) = chars.next() {
+                    current.push(next);
+                }
+                in_word = true;
+            }
+            (Some(_), c) => current.push(c),
+            (None, '"' | '\'') => {
+                quote = Some(c);
+                in_word = true;
+            }
+            (None, c) if c.is_whitespace() => {
+                if in_word {
+                    args.push(std::mem::take(&mut current));
+                    in_word = false;
+                }
+            }
+            (None, c) => {
+                current.push(c);
+                in_word = true;
+            }
+        }
+    }
+    if in_word {
+        args.push(current);
+    }
+    args
 }
 
 /// Terminates the app an `InstructionKind::CloseApp` names. No cross-platform
@@ -2306,6 +2417,44 @@ mod tests {
         default_block_color,
     };
     use blockstitch_core::graph::resolve_list_reporters;
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn open_app_passes_arguments_folder_and_environment() {
+        if crate::flatpak::is_flatpak() {
+            return;
+        }
+        let dir = std::env::temp_dir().join(format!("blockwork-open-app-{}", std::process::id()));
+        std::fs::create_dir_all(&dir).unwrap();
+        let out = dir.join("out.txt");
+        let launch = LaunchOptions {
+            args: "'two words' \"$GREETING\"".into(),
+            working_dir: dir.display().to_string(),
+            env: vec![crate::macros::EnvVar { name: "GREETING".into(), value: "hi".into() }],
+            new_instance: false,
+        };
+        let command = format!("sh -c 'printf \"%s|\" \"$PWD\" \"$@\" > {}' app", out.display());
+        open_app(&command, &launch).unwrap();
+        let deadline = Instant::now() + Duration::from_secs(5);
+        while !out.exists() && Instant::now() < deadline {
+            std::thread::sleep(Duration::from_millis(20));
+        }
+        std::thread::sleep(Duration::from_millis(50));
+        let text = std::fs::read_to_string(&out).unwrap();
+        assert_eq!(text, format!("{}|two words|hi|", dir.display()));
+        let missing = LaunchOptions { working_dir: dir.join("nope").display().to_string(), ..Default::default() };
+        assert!(open_app("true", &missing).is_err());
+        std::fs::remove_dir_all(&dir).ok();
+    }
+
+    #[test]
+    fn split_args_reads_quotes_and_escapes() {
+        assert_eq!(split_args(""), Vec::<String>::new());
+        assert_eq!(split_args("  --incognito  --new-window "), ["--incognito", "--new-window"]);
+        assert_eq!(split_args(r#"--name "My Profile" 'a b' c\ d"#), ["--name", "My Profile", "a b", "c d"]);
+        assert_eq!(split_args(r#"--x="" end"#), ["--x=", "end"]);
+        assert_eq!(split_args(r#""say \"hi\"""#), [r#"say "hi""#]);
+    }
 
     struct NoopBackend;
     impl InputBackend for NoopBackend {

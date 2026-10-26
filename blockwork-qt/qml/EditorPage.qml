@@ -115,7 +115,7 @@ Item {
             Scroll:qsTr("Turns the mouse wheel by this many notches. Positive scrolls up (or right), negative down (or left)."),
             Command:qsTr("Starts a shell command (bash) and moves on straight away, while the command keeps running. Use 'run command and wait' to wait for it to finish."),
             CommandWait:qsTr("Runs a shell command (bash) and waits for it to finish before moving on. Its output is thrown away; use the shell output reporter to read what it prints."),
-            OpenApp:qsTr("Launches an installed app. Click it to choose the app."),
+            OpenApp:qsTr("Launches an installed app. Click it to choose the app, and click the gear to add arguments, a working folder or environment variables."),
             CloseApp:qsTr("Closes a running app. Click it to choose the app."),
             SetVariable:qsTr("Sets a variable to a value, replacing what it held. Variables belong to this run of the macro and start at 0."),
             ChangeVariable:qsTr("Adds a number to a variable (use a negative number to subtract). A variable that isn't a number counts as 0."),
@@ -338,6 +338,8 @@ Item {
         else if (action === "loadImage") imageFileDialog.openFor(request);
         else if (action === "pickModel") modelDialog.openFor(request);
         else if (action === "pickUsb") usbDialog.openFor(request);
+        else if (action === "pickApp") root.openAppPicker(strandId, path, instruction);
+        else if (action === "launchOptions") launchDialog.openFor(request);
         else if (action === "pickRegion") root.startScreenPick(Object.assign(request, { kind: "region" }));
         else if (action === "clearRegion") {
             const updated = JSON.parse(JSON.stringify(instruction || {}));
@@ -726,6 +728,7 @@ Item {
                     onShareBlockRequested: definition => root.blockLibrary.share(definition)
                     onStandaloneKeyCaptureRequested: root.invoke("start_standalone_key_capture")
                     onAppPickerRequested: instruction => root.openPaletteAppPicker(instruction)
+                    onPieceActionRequested: (action, instruction) => { if (action === "pickApp") root.openPaletteAppPicker(instruction); }
                     onDetailsRequested:(name,identifier,explainer)=>root.blockDefById(identifier)||name===identifier?root.showDetails(identifier,explainer):detailsDialog.show(name,identifier,explainer)
                     onValueActivated: value => dragController.addAt({ kind: "value", value: value }, 160, 140)
                 }
@@ -1163,6 +1166,81 @@ Item {
         property var location: null
         function openFor(where, value) { location = where; openWith(value && value.value !== undefined ? value.value : ""); }
         onChosen: expression => root.invoke("edit_value_field", { location: location, text: expression })
+    }
+    AppDialog {
+        id: launchDialog; title: qsTr("Launch options"); standardButtons: Dialog.Ok | Dialog.Cancel; acceptText: qsTr("Save")
+        property var request: null
+        readonly property bool mac: Qt.platform.os === "osx"
+        function openFor(req) {
+            request = req;
+            const l = (req.instruction && req.instruction.launch) || {};
+            launchArgs.text = l.args || "";
+            launchDir.text = l.working_dir || "";
+            launchEnv.clear();
+            for (const v of (l.env || [])) launchEnv.append({ name: v.name || "", value: v.value || "" });
+            launchNewCopy.checked = !!l.new_instance;
+            open();
+            launchArgs.forceActiveFocus();
+        }
+        onAccepted: {
+            const req = request;
+            request = null;
+            if (!req) return;
+            const env = [];
+            for (let i = 0; i < launchEnv.count; ++i) {
+                const row = launchEnv.get(i);
+                if (row.name.trim()) env.push({ name: row.name.trim(), value: row.value });
+            }
+            const updated = JSON.parse(JSON.stringify(req.instruction || {}));
+            updated.launch = { args: launchArgs.text.trim(), working_dir: launchDir.text.trim(), env: env, new_instance: launchNewCopy.checked };
+            root.invoke("edit_instruction", { strandId: req.strandId, path: req.path, instruction: updated });
+        }
+        ListModel { id: launchEnv }
+        FolderDialog {
+            id: launchFolder; title: qsTr("Choose a working folder")
+            currentFolder: StandardPaths.writableLocation(StandardPaths.HomeLocation)
+            onAccepted: {
+                const text = decodeURIComponent(selectedFolder.toString());
+                launchDir.text = Qt.platform.os === "windows" ? text.replace(/^file:\/\/\//, "") : text.replace(/^file:\/\//, "");
+            }
+        }
+        Column { width: 440; spacing: 8
+            Text { text: qsTr("Arguments"); color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold }
+            BwTextField { id: launchArgs; width: parent.width; placeholderText: "--incognito" }
+            Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
+                text: qsTr("Added after the app's own command, the way you'd type them in a terminal. Put quotes around an argument with spaces.") }
+            Item { width: 1; height: 4 }
+            Text { text: qsTr("Working folder"); color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold }
+            RowLayout { width: parent.width; spacing: 8
+                BwTextField { id: launchDir; Layout.fillWidth: true; placeholderText: qsTr("Leave empty to use the default") }
+                BwButton { text: qsTr("Browse..."); iconName: "folder-open"; onClicked: launchFolder.open() }
+            }
+            Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
+                text: launchDialog.mac ? qsTr("macOS always starts apps in their own folder, so this is only used on Windows and Linux.")
+                                       : qsTr("The folder the app starts in. ~ means your home folder.") }
+            Item { width: 1; height: 4 }
+            Text { text: qsTr("Environment variables"); color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold }
+            Text { visible: launchEnv.count === 0; width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
+                text: qsTr("None. These are set for this app only.") }
+            Repeater {
+                model: launchEnv
+                delegate: RowLayout {
+                    required property int index
+                    required property string name
+                    required property string value
+                    width: 440; spacing: 6
+                    BwTextField { Layout.preferredWidth: 150; text: name; placeholderText: qsTr("NAME"); onTextEdited: launchEnv.setProperty(index, "name", text) }
+                    Text { text: "="; color: Theme.textDim }
+                    BwTextField { Layout.fillWidth: true; text: value; placeholderText: qsTr("value"); onTextEdited: launchEnv.setProperty(index, "value", text) }
+                    BwButton { iconName: "x"; implicitWidth: 32; onClicked: launchEnv.remove(index) }
+                }
+            }
+            BwButton { text: qsTr("Add variable"); iconName: "plus"; onClicked: launchEnv.append({ name: "", value: "" }) }
+            Item { width: 1; height: 4 }
+            BwCheckBox { id: launchNewCopy; text: qsTr("Open a new copy even if the app is already running") }
+            Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
+                text: qsTr("Only changes anything on macOS. On Windows and Linux the app decides whether a second launch opens a new window.") }
+        }
     }
     AppDialog {
         id: usbDialog; title: qsTr("Choose a USB device"); standardButtons: Dialog.Cancel
@@ -1673,6 +1751,13 @@ Item {
             label(qsTr("at")),
             Object.assign(value("ScheduleTime", "time"), { pick: { action: "pickTime", icon: "clock", display: t => Schedules.timeLabel(t), tip: qsTr("Click to pick a time, or drop a reporter here") } })
         ];
+        const launchSummary = i => {
+            const l = i && i.launch;
+            if (!l) return "";
+            const args = (l.args || "").trim();
+            if (args) return args.length > 28 ? args.slice(0, 27) + "…" : args;
+            return l.working_dir || (l.env && l.env.length) || l.new_instance ? qsTr("custom") : "";
+        };
         BlockRegistry.registerRows({
             WhenRan: { shape: "header", icon: "play", head: [label(qsTr("WHEN RUN"))] },
             WhenAt: { shape: "header", icon: "clock", head: [label(qsTr("ONCE AT")),
@@ -1721,6 +1806,11 @@ Item {
             SplitIntoList: { icon: "scissors", head: [label(qsTr("split")), value("SplitText", "text"), label(qsTr("by")), value("SplitSeparator", "separator"),
                 label(qsTr("into")), { kind: "dropdown", key: "name", options: "lists" }] },
             PasteText: { icon: "clipboard-paste", head: [label(qsTr("paste")), value("PasteValue", "text")] },
+            // The app, then a gear for its launch options, labelled with the
+            // arguments or just that something else is set.
+            OpenApp: { icon: "app-window", head: [label(qsTr("Open app")),
+                { kind: "button", action: "pickApp", palette: true, image: "icon", icon: "app-window", text: i => i && i.name ? i.name : qsTr("Choose app...") },
+                { kind: "button", action: "launchOptions", icon: "settings", text: launchSummary }] },
             CommandWait: { icon: "terminal", head: [label(qsTr("Run command")), { kind: "text", key: "command", placeholder: qsTr("command") }, label(qsTr("and wait"))] },
             WithLock: { icon: "lock", mouths: ["body"], head: [label(qsTr("with lock")), value("LockName", "name")] },
             WriteFile: { icon: "file-text", head: [

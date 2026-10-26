@@ -423,6 +423,33 @@ impl From<Value> for SignalName {
     }
 }
 
+/// Extra launch settings for an `OpenApp` block, all empty by default.
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(default)]
+pub struct LaunchOptions {
+    /// Added after the app's own command, read like a command line.
+    pub args: String,
+    /// Folder the app starts in; empty keeps Blockwork's. Unused on macOS.
+    pub working_dir: String,
+    /// Environment variables set for the app only.
+    pub env: Vec<EnvVar>,
+    /// macOS only: open another copy even if the app is already running.
+    pub new_instance: bool,
+}
+
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(default)]
+pub struct EnvVar {
+    pub name: String,
+    pub value: String,
+}
+
+impl LaunchOptions {
+    pub fn is_empty(&self) -> bool {
+        *self == Self::default()
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[serde(from = "InstructionKindDe")]
 pub enum InstructionKind {
@@ -486,10 +513,13 @@ pub enum InstructionKind {
     /// `icon` (a `data:` URI, when one was found) are cached at the same
     /// time purely for display, so the block keeps showing the right label
     /// and picture even if the app is later renamed or uninstalled.
+    /// `launch` is what the block's launch options panel adds on top.
     OpenApp {
         command: String,
         name: String,
         icon: Option<String>,
+        #[serde(default, skip_serializing_if = "LaunchOptions::is_empty")]
+        launch: LaunchOptions,
     },
     /// Same picker/payload shape as `OpenApp`, but terminates the app
     /// instead of launching it - `runner::close_app` derives a process
@@ -985,11 +1015,13 @@ impl std::hash::Hash for InstructionKind {
                 command,
                 name,
                 icon,
+                launch,
             } => {
                 22u8.hash(state);
                 command.hash(state);
                 name.hash(state);
                 icon.hash(state);
+                launch.hash(state);
             }
             Self::CloseApp {
                 command,
@@ -1306,6 +1338,8 @@ enum InstructionKindDe {
         command: String,
         name: String,
         icon: Option<String>,
+        #[serde(default)]
+        launch: LaunchOptions,
     },
     CloseApp {
         command: String,
@@ -1683,10 +1717,12 @@ impl From<InstructionKindDe> for InstructionKind {
                 command,
                 name,
                 icon,
+                launch,
             } => InstructionKind::OpenApp {
                 command,
                 name,
                 icon,
+                launch,
             },
             InstructionKindDe::CloseApp {
                 command,
@@ -2394,6 +2430,26 @@ mod tests {
         let def: BlockDef =
             serde_json::from_str(r#"{"id":"b1","pieces":[],"shape":"ReturnsBool"}"#).unwrap();
         assert_eq!(def.shape, BlockShape::ReturnsBool);
+    }
+
+    #[test]
+    fn open_app_launch_options_are_optional_and_round_trip() {
+        let old = r#"{"OpenApp":{"command":"brave","name":"Brave","icon":null}}"#;
+        let kind: InstructionKind = serde_json::from_str(old).unwrap();
+        let InstructionKind::OpenApp { launch, .. } = &kind else { panic!() };
+        assert!(launch.is_empty());
+        // Untouched blocks save the same shape as before.
+        assert_eq!(serde_json::to_string(&kind).unwrap(), old);
+
+        let launch = LaunchOptions {
+            args: "--incognito".into(),
+            working_dir: "~/Downloads".into(),
+            env: vec![EnvVar { name: "LANG".into(), value: "C".into() }],
+            new_instance: true,
+        };
+        let kind = InstructionKind::OpenApp { command: "brave".into(), name: "Brave".into(), icon: None, launch };
+        let back: InstructionKind = serde_json::from_str(&serde_json::to_string(&kind).unwrap()).unwrap();
+        assert_eq!(back, kind);
     }
 
     #[test]

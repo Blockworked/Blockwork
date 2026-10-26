@@ -53,7 +53,7 @@
 <context>
     <name>EditorPage</name>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="633"/>
+        <location filename="../qml/EditorPage.qml" line="635"/>
         <source>Paused before &quot;%1&quot; (%n strand(s) waiting)</source>
         <translation>
             <numerusform>Paused before &quot;%1&quot; (%n strand waiting)</numerusform>
@@ -61,7 +61,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="752"/>
+        <location filename="../qml/EditorPage.qml" line="755"/>
         <source>Delete %n block(s)</source>
         <translation>
             <numerusform>Delete %n block</numerusform>
@@ -69,7 +69,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="1298"/>
+        <location filename="../qml/EditorPage.qml" line="1376"/>
         <source>%n second(s)</source>
         <translation>
             <numerusform>%n second</numerusform>
@@ -99,7 +99,7 @@
 <context>
     <name>PalettePanel</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="569"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="571"/>
         <source>%n block(s)</source>
         <translation>
             <numerusform>%n block</numerusform>
