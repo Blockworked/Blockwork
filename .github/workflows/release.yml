@@ -22,38 +22,41 @@ on:
         default: ""
 
 jobs:
+  plan:
+    name: Plan builds
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.matrix.outputs.value }}
+    steps:
+      # A flight run only needs the MSIX, which the Windows x64 build makes
+      - name: Pick platforms
+        id: matrix
+        env:
+          FLIGHT: ${{ inputs.flight }}
+        run: |
+          matrix='[
+            {"name": "windows-x86_64", "runner": "windows-latest", "target": "x86_64-pc-windows-msvc",
+             "artifact_name": "blockwork-windows-x86_64.zip", "installer_arch": "x64compatible", "experimental": false},
+            {"name": "windows-arm64", "runner": "windows-11-arm", "target": "aarch64-pc-windows-msvc",
+             "artifact_name": "blockwork-windows-arm64.zip", "installer_arch": "arm64",
+             "qt_host": "windows_arm64", "qt_arch": "win64_msvc2022_arm64", "experimental": true},
+            {"name": "macos-arm64", "runner": "macos-latest", "target": "aarch64-apple-darwin",
+             "artifact_name": "blockwork-macos-arm64", "qt_host": "mac", "qt_arch": "clang_64", "experimental": true}
+          ]'
+          if [ -n "$FLIGHT" ]; then
+            matrix=$(jq -c 'map(select(.name == "windows-x86_64"))' <<< "$matrix")
+          fi
+          echo "value={\"include\": $(jq -c . <<< "$matrix")}" >> "$GITHUB_OUTPUT"
+
   build:
     name: Build (${{ matrix.name }})
+    needs: [plan]
     runs-on: ${{ matrix.runner }}
     continue-on-error: ${{ matrix.experimental == true }}
 
     strategy:
       fail-fast: false
-      matrix:
-        include:
-          - name: windows-x86_64
-            runner: windows-latest
-            target: x86_64-pc-windows-msvc
-            artifact_name: blockwork-windows-x86_64.zip
-            installer_arch: x64compatible
-            experimental: false
-
-          - name: windows-arm64
-            runner: windows-11-arm
-            target: aarch64-pc-windows-msvc
-            artifact_name: blockwork-windows-arm64.zip
-            installer_arch: arm64
-            qt_host: windows_arm64
-            qt_arch: win64_msvc2022_arm64
-            experimental: true
-
-          - name: macos-arm64
-            runner: macos-latest
-            target: aarch64-apple-darwin
-            artifact_name: blockwork-macos-arm64
-            qt_host: mac
-            qt_arch: clang_64
-            experimental: true
+      matrix: ${{ fromJSON(needs.plan.outputs.matrix) }}
 
     steps:
       - name: Checkout
