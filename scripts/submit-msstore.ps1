@@ -1,10 +1,13 @@
 # Submits an MSIX to the Microsoft Store through the Partner Center submission API.
 # Copies the last published submission, swaps in the new package and commits it for certification.
 #
-# Usage: scripts/submit-msstore.ps1 -Msix dist/blockwork-windows-x86_64.msix
+# With -Flight it goes to that package flight (its name or ID) instead of the public listing.
+#
+# Usage: scripts/submit-msstore.ps1 -Msix dist/blockwork-windows-x86_64.msix [-Flight Beta]
 # Needs MSSTORE_TENANT_ID, MSSTORE_CLIENT_ID, MSSTORE_CLIENT_SECRET and MSSTORE_APP_ID in the environment.
 param(
   [Parameter(Mandatory)][string]$Msix,
+  [string]$Flight,
   [switch]$NoCommit
 )
 
@@ -29,28 +32,44 @@ function Call($Method, $Uri, $Body) {
   Invoke-RestMethod @params
 }
 
-# Only one pending submission may exist, so drop a leftover draft first
-$app = Call Get $api
-if ($app.pendingApplicationSubmission) {
-  Write-Host "Deleting pending submission $($app.pendingApplicationSubmission.id)"
-  Call Delete "$api/submissions/$($app.pendingApplicationSubmission.id)" | Out-Null
+# A flight's submissions live under the flight and list flightPackages instead
+$base = $api
+$packagesField = "applicationPackages"
+$pendingField = "pendingApplicationSubmission"
+if ($Flight) {
+  $flights = @((Call Get "$api/listflights?top=100").value)
+  $match = $flights | Where-Object { $_.flightId -eq $Flight -or $_.friendlyName -eq $Flight } | Select-Object -First 1
+  if (-not $match) {
+    throw "No package flight named '$Flight'. Flights: $(($flights | ForEach-Object { $_.friendlyName }) -join ', ')"
+  }
+  Write-Host "Submitting to package flight '$($match.friendlyName)' ($($match.flightId))"
+  $base = "$api/flights/$($match.flightId)"
+  $packagesField = "flightPackages"
+  $pendingField = "pendingFlightSubmission"
 }
 
-$submission = Call Post "$api/submissions"
+# Only one pending submission may exist, so drop a leftover draft first
+$current = Call Get $base
+if ($current.$pendingField) {
+  Write-Host "Deleting pending submission $($current.$pendingField.id)"
+  Call Delete "$base/submissions/$($current.$pendingField.id)" | Out-Null
+}
+
+$submission = Call Post "$base/submissions"
 Write-Host "Created submission $($submission.id)"
 
 # Replace the previous packages with this one
-$packages = @($submission.applicationPackages | Where-Object { $_ })
+$packages = @($submission.$packagesField | Where-Object { $_ })
 foreach ($package in $packages) { $package.fileStatus = "PendingDelete" }
 $fileName = Split-Path $Msix -Leaf
-$submission.applicationPackages = $packages + [pscustomobject]@{
+$submission.$packagesField = $packages + [pscustomobject]@{
   fileName              = $fileName
   fileStatus            = "PendingUpload"
   minimumDirectXVersion = "None"
   minimumSystemRam      = "None"
 }
 $uploadUrl = $submission.fileUploadUrl
-Call Put "$api/submissions/$($submission.id)" $submission | Out-Null
+Call Put "$base/submissions/$($submission.id)" $submission | Out-Null
 
 # The package goes up as a zip with the file at its root
 $zip = Join-Path ([IO.Path]::GetTempPath()) "msstore-upload.zip"
@@ -64,10 +83,10 @@ if ($NoCommit) {
   exit 0
 }
 
-Call Post "$api/submissions/$($submission.id)/commit" | Out-Null
+Call Post "$base/submissions/$($submission.id)/commit" | Out-Null
 do {
   Start-Sleep -Seconds 15
-  $status = Call Get "$api/submissions/$($submission.id)/status"
+  $status = Call Get "$base/submissions/$($submission.id)/status"
   Write-Host "Status: $($status.status)"
 } while ($status.status -eq "CommitStarted")
 

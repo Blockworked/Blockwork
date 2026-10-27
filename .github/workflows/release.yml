@@ -15,6 +15,11 @@ on:
         required: false
         type: string
         default: ""
+      flight:
+        description: "Microsoft Store package flight (name or ID). When set, the build only goes to that flight"
+        required: false
+        type: string
+        default: ""
 
 jobs:
   build:
@@ -184,6 +189,7 @@ jobs:
   linux-appimage:
     name: AppImage (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
+    if: ${{ !inputs.flight }}
 
     strategy:
       fail-fast: false
@@ -317,6 +323,7 @@ jobs:
   linux-flatpak:
     name: Flatpak (${{ matrix.name }})
     runs-on: ${{ matrix.runner }}
+    if: ${{ !inputs.flight }}
 
     strategy:
       fail-fast: false
@@ -402,7 +409,8 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [build, linux-appimage, linux-flatpak]
-    if: always()
+    # A flight build goes to the Store flight only, so no GitHub release (and no Chocolatey, Homebrew or winget)
+    if: ${{ always() && !inputs.flight }}
     permissions:
       contents: write
 
@@ -516,8 +524,10 @@ jobs:
   msstore:
     name: Submit to Microsoft Store
     runs-on: windows-latest
-    needs: [release]
+    needs: [build, release]
+    if: ${{ always() && needs.build.result == 'success' && (needs.release.result == 'success' || inputs.flight) }}
     env:
+      MSSTORE_FLIGHT: ${{ inputs.flight }}
       MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
       MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
       MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
@@ -553,4 +563,4 @@ jobs:
       - name: Submit to Partner Center
         if: steps.creds.outputs.ready == 'true'
         shell: pwsh
-        run: ./scripts/submit-msstore.ps1 -Msix dist/blockwork-windows-x86_64.msix
+        run: ./scripts/submit-msstore.ps1 -Msix dist/blockwork-windows-x86_64.msix -Flight "$env:MSSTORE_FLIGHT"
