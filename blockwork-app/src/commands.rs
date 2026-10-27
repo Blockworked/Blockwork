@@ -834,8 +834,7 @@ fn normalize_block_color(color: &str) -> Result<String, String> {
 }
 
 /// Defines a new custom block, creating its (initially empty) header strand
-/// next to the macro's other strands. Pushes undo, since it has real canvas
-/// footprint.
+/// at the requested position, or beside existing strands. Pushes undo.
 pub(crate) fn create_block(
     state: &SharedState,
     app: &AppHandle,
@@ -845,13 +844,14 @@ pub(crate) fn create_block(
     icon: String,
     identifier: String,
     description: String,
+    position: Option<(i32, i32)>,
 ) -> Result<String, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     BlockDef::validate_pieces(&pieces)?;
     let color = normalize_block_color(&color)?;
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
-    let (x, y) = mac.next_editor_position();
+    let (x, y) = position.unwrap_or_else(|| mac.next_editor_position());
     let id = mac.create_block(pieces, shape, color, x, y);
     mac.set_block_details(&id, &identifier, &description, &icon)?;
     auto_save(&mut s);
@@ -1370,6 +1370,7 @@ pub(crate) async fn add_instruction(
     strand_id: String,
     path: Vec<PathStep>,
     instruction: InstructionDto,
+    target_y: Option<i32>,
 ) -> Result<(), String> {
     let ins = dto_to_instruction(&instruction).ok_or("Unknown instruction type")?;
     if matches!(
@@ -1391,6 +1392,13 @@ pub(crate) async fn add_instruction(
     if let Some(mac) = &mut s.current_macro
         && mac.insert_instruction(&strand_id, &path, ins)?
     {
+        if let Some(y) = target_y
+            && path.len() == 1
+            && path[0].index == 0
+            && let Some(strand) = mac.strand_mut(&strand_id)
+        {
+            strand.y = y;
+        }
         s.invalid_field_buffers.clear();
         auto_save(&mut s);
     }
@@ -2026,6 +2034,7 @@ pub(crate) fn merge_strand(
     dragged_id: String,
     target_id: String,
     path: Vec<PathStep>,
+    target_y: Option<i32>,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     // Merge validates before it moves anything, so a rejected drop leaves
@@ -2036,6 +2045,13 @@ pub(crate) fn merge_strand(
         .map(|mac| mac.graph.clone())
         .ok_or("No macro selected")?;
     graph.merge_strand(&dragged_id, &target_id, &path)?;
+    if let Some(y) = target_y
+        && path.len() == 1
+        && path[0].index == 0
+        && let Some(strand) = graph.strand_mut(&target_id)
+    {
+        strand.y = y;
+    }
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {
         mac.graph = graph;
@@ -2057,6 +2073,7 @@ pub(crate) fn merge_tail(
     path: Vec<PathStep>,
     target_id: String,
     target_path: Vec<PathStep>,
+    target_y: Option<i32>,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let mut graph = s
@@ -2065,6 +2082,13 @@ pub(crate) fn merge_tail(
         .map(|mac| mac.graph.clone())
         .ok_or("No macro selected")?;
     graph.merge_tail(&strand_id, &path, &target_id, &target_path)?;
+    if let Some(y) = target_y
+        && target_path.len() == 1
+        && target_path[0].index == 0
+        && let Some(strand) = graph.strand_mut(&target_id)
+    {
+        strand.y = y;
+    }
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {
         mac.graph = graph;

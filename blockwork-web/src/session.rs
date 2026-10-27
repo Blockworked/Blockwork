@@ -648,11 +648,12 @@ impl Demo {
                 let color = block_color(&arg::<String>(a, "color")?)?;
                 let (icon, identifier, description): (String, String, String) =
                     (opt(a, "icon")?, opt(a, "identifier")?, opt(a, "description")?);
+                let position = arg::<Option<i32>>(a, "x")?.zip(arg::<Option<i32>>(a, "y")?);
                 BlockDef::validate_pieces(&pieces)?;
                 self.open()?;
                 self.push_undo();
                 let mac = self.open_mut().ok_or("No macro selected")?;
-                let (x, y) = mac.next_editor_position();
+                let (x, y) = position.unwrap_or_else(|| mac.next_editor_position());
                 let id = mac.create_block(pieces, shape, color, x, y);
                 mac.set_block_details(&id, &identifier, &description, &icon)?;
                 to_json(id)

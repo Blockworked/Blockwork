@@ -1,4 +1,5 @@
 import QtQuick
+import QtQuick.Controls
 import QtTest
 import com.blockworked.Blockstitch 1.0
 import com.blockworked.Blockwork 1.0
@@ -82,6 +83,26 @@ Item {
             const dialog = findChild(page, "listDialog");
             verify(dialog.visible);
             return {page: page, block: block, dropdown: dropdown, dialog: dialog, name: findChild(page, "listName")};
+        }
+        function test_delete_list_confirmation_data() {
+            return [{tag:"confirm", button:Dialog.Yes}, {tag:"cancel", button:Dialog.Cancel}];
+        }
+        function test_delete_list_confirmation(data) {
+            scene.calls = [];
+            const page = createTemporaryObject(editorComponent, scene);
+            wait(50);
+            const palette = all(page).find(object => typeof object.deleteListRequested === "function");
+            verify(!!palette);
+            palette.deleteListRequested("existing");
+            const dialog = findChild(page, "deleteListDialog");
+            verify(!!dialog);
+            tryCompare(dialog, "opened", true);
+            mouseClick(dialog.standardButton(data.button));
+            if (data.button === Dialog.Yes) {
+                compare(scene.calls.length, 1);
+                compare(scene.calls[0].command, "delete_list");
+                compare(scene.calls[0].args.name, "existing");
+            } else compare(scene.calls.length, 0);
         }
         function test_create_and_select_data() {
             return [

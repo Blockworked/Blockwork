@@ -271,8 +271,15 @@ impl Backend {
                 let path: Vec<PathStep> = arg(&args, "path")?;
                 let instruction: InstructionDto = arg(&args, "instruction")?;
                 to_json(
-                    commands::add_instruction(&self.state, &self.app, strand_id, path, instruction)
-                        .await?,
+                    commands::add_instruction(
+                        &self.state,
+                        &self.app,
+                        strand_id,
+                        path,
+                        instruction,
+                        arg(&args, "targetY")?,
+                    )
+                    .await?,
                 )
             }
             "edit_instruction" => {
@@ -361,6 +368,7 @@ impl Backend {
                     icon,
                     arg(&args, "identifier").unwrap_or_default(),
                     arg(&args, "description").unwrap_or_default(),
+                    arg::<Option<i32>>(&args, "x")?.zip(arg::<Option<i32>>(&args, "y")?),
                 )?)
             }
             "edit_block" => {
@@ -622,6 +630,7 @@ impl Backend {
                     dragged_id,
                     target_id,
                     path,
+                    arg(&args, "targetY")?,
                 )?)
             }
             "merge_tail" => {
@@ -636,6 +645,7 @@ impl Backend {
                     path,
                     target_id,
                     target_path,
+                    arg(&args, "targetY")?,
                 )?)
             }
             "delete_instruction" => {

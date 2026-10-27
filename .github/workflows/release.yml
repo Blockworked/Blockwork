@@ -36,7 +36,8 @@ jobs:
         run: |
           matrix='[
             {"name": "windows-x86_64", "runner": "windows-latest", "target": "x86_64-pc-windows-msvc",
-             "artifact_name": "blockwork-windows-x86_64.zip", "installer_arch": "x64compatible", "msix_arch": "x64", "experimental": false},
+             "artifact_name": "blockwork-windows-x86_64.zip", "installer_arch": "x64compatible", "msix_arch": "x64",
+             "qt_host": "windows", "qt_arch": "win64_msvc2022_64", "experimental": false},
             {"name": "windows-arm64", "runner": "windows-11-arm", "target": "aarch64-pc-windows-msvc",
              "artifact_name": "blockwork-windows-arm64.zip", "installer_arch": "arm64", "msix_arch": "arm64",
              "qt_host": "windows_arm64", "qt_arch": "win64_msvc2022_arm64", "experimental": true},

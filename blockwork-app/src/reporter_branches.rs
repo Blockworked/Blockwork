@@ -302,6 +302,24 @@ pub(crate) fn edit(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, St
             ));
         }
     };
+    if matches!(cmd, "merge_strand" | "merge_tail")
+        && let Some(y) = arg::<Option<i32>>(args, "targetY")?
+    {
+        let target_path: Vec<crate::state::PathStep> = arg(
+            args,
+            if cmd == "merge_tail" {
+                "targetPath"
+            } else {
+                "path"
+            },
+        )?;
+        if target_path.len() == 1
+            && target_path[0].index == 0
+            && let Some(target) = graph.strand_mut(&arg::<String>(args, "targetId")?)
+        {
+            target.y = y;
+        }
+    }
     for branch in branches.into_iter().rev() {
         restore(graph, branch)?;
     }

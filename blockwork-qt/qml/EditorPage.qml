@@ -211,6 +211,21 @@ Item {
         callbacks[key] = done;
         root.appBridge.callCommand(key, command, JSON.stringify(args || {}));
     }
+    Component {
+        id: headerPlacementPreview
+        InstructionBlock { visible: false; locked: true }
+    }
+    function createBlock(pieces, shape, color, icon, identifier, description) {
+        const definition = {id: "placement-preview", pieces: pieces, shape: shape, color: color, icon: icon};
+        const preview = headerPlacementPreview.createObject(canvas, {
+            instruction: {id: "placement-preview-header", type: "BlockHeader", block_id: definition.id},
+            blockDefinitions: (root.macro ? root.macro.block_defs : []).concat([definition])
+        });
+        const position = canvas.findEmptyPosition(preview.implicitWidth, preview.implicitHeight);
+        preview.destroy();
+        root.invoke("create_block", {pieces: pieces, shape: shape, color: color, icon: icon,
+            identifier: identifier, description: description, x: position.x, y: position.y});
+    }
     Connections {
         target: root.appBridge
         function onReplySerialChanged() {
@@ -433,7 +448,7 @@ Item {
             if (error) root.appBridge.lastError = error;
             reply(!error, error);
         });
-        if (edit.kind === "insert_instruction") call("add_instruction", { strandId: edit.strandId, path: edit.path, instruction: edit.instruction });
+        if (edit.kind === "insert_instruction") call("add_instruction", { strandId: edit.strandId, path: edit.path, instruction: edit.instruction, targetY: edit.targetY });
         else if (edit.kind === "add_strand") call("add_strand", { x: edit.x, y: edit.y, instruction: edit.instruction });
         else if (edit.kind === "put_value") call("put_value", { location: edit.location, value: edit.value });
         else if (edit.kind === "create_floating_value") call("create_floating_value", { x: edit.x, y: edit.y, value: edit.value, originBlockId: edit.originBlockId || null });
@@ -753,8 +768,8 @@ Item {
                     locked: root.recordingBusy
                     onStrandMoved: (strandId, x, y) => root.invoke("move_strand", { strandId: strandId, x: x, y: y })
                     onInstructionSplit: (strandId, path, x, y) => root.invoke("split_strand", { strandId: strandId, path: path, x: x, y: y })
-                    onStrandsMerged: (draggedId, targetId, path) => root.invoke("merge_strand", { draggedId: draggedId, targetId: targetId, path: path })
-                    onTailMerged: (strandId, path, targetId, targetPath) => root.invoke("merge_tail", { strandId: strandId, path: path, targetId: targetId, targetPath: targetPath })
+                    onStrandsMerged: (draggedId, targetId, path, targetY) => root.invoke("merge_strand", { draggedId: draggedId, targetId: targetId, path: path, targetY: targetY })
+                    onTailMerged: (strandId, path, targetId, targetPath, targetY) => root.invoke("merge_tail", { strandId: strandId, path: path, targetId: targetId, targetPath: targetPath, targetY: targetY })
                     onInstructionRemoved: (strandId, path) => root.removeInstruction(strandId, path)
                     canPaste: !!root.clipboard && root.clipboard.instructions.length > 0
                     clearIcon: appState.confirm_clear_instructions ? "triangle-alert" : "trash"
@@ -1540,10 +1555,11 @@ Item {
     }
     AppDialog {
         id: deleteListDialog
+        objectName: "deleteListDialog"
         title: qsTr("Delete list?"); standardButtons: Dialog.Yes | Dialog.Cancel
         property string listName: ""
         Text { text: qsTr("Delete \"%1\" and its saved items?").arg(deleteListDialog.listName); color: Theme.text }
-        onAccepted: root.invoke("delete_list", { name: listName })
+        onAccepted: root.invoke("delete_list", { name: deleteListDialog.listName })
     }
     AppDialog {
         id:detailsDialog;standardButtons:Dialog.NoButton;width:430;padding:0;topPadding:0;bottomPadding:0;showClose:false
@@ -1558,7 +1574,8 @@ Item {
     }
     MakeBlockDialog {
         id:blockDialog
-        onCreateRequested:(pieces,shape,color,icon,identifier,description)=>root.invoke("create_block",{pieces:pieces,shape:shape,color:color,icon:icon,identifier:identifier,description:description})
+        objectName: "blockDialog"
+        onCreateRequested:(pieces,shape,color,icon,identifier,description)=>root.createBlock(pieces,shape,color,icon,identifier,description)
         onEditRequested:(blockId,pieces,shape,color,icon,identifier,description)=>root.invoke("edit_block",{blockId:blockId,pieces:pieces,shape:shape,color:color,icon:icon,identifier:identifier,description:description})
     }
 
@@ -1698,6 +1715,7 @@ Item {
     }
     function registerBlocks() {
         const label = text => ({ kind: "label", text: text });
+        const commandField = { kind: "text", key: "command", placeholder: qsTr("command"), minWidth: 92, maxWidth: 480 };
         // The image blocks' picture: click to capture from the screen, or load a file.
         const imagePieces = [
             { kind: "button", action: "captureImage", image: "image", icon: "crosshair", text: i => i && i.image ? "" : qsTr("capture image") },
@@ -1907,7 +1925,8 @@ Item {
             OpenApp: { icon: "app-window", head: [label(qsTr("Open app")),
                 { kind: "button", action: "pickApp", palette: true, image: "icon", icon: "app-window", text: i => i && i.name ? i.name : qsTr("Choose app...") },
                 { kind: "button", action: "launchOptions", icon: "settings", text: launchSummary }] },
-            CommandWait: { icon: "terminal", head: [label(qsTr("Run command")), { kind: "text", key: "command", placeholder: qsTr("command") }, label(qsTr("and wait"))] },
+            Command: { icon: "terminal", head: [label(qsTr("Run command")), commandField] },
+            CommandWait: { icon: "terminal", head: [label(qsTr("Run command")), commandField, label(qsTr("and wait"))] },
             WithLock: { icon: "lock", mouths: ["body"], head: [label(qsTr("with lock")), value("LockName", "name")] },
             WriteFile: { icon: "file-text", head: [
                 { kind: "dropdown", key: "append", options: [{ value: "write", label: qsTr("write") }, { value: "append", label: qsTr("append") }],
@@ -1994,6 +2013,8 @@ Item {
                 label(qsTr("to result of JavaScript")), value("BrowserCode", "code")] }
         });
         BlockRegistry.registerPrefabs({
+            Command: { command: "" },
+            CommandWait: { command: "" },
             WhenAt: () => ({ at: textValue(Qt.formatDateTime(new Date(Date.now() + 3600000), "yyyy-MM-dd HH:00")) }),
             WhenSignal: () => ({ name: textValue(root.macro && root.macro.signals.length ? root.macro.signals[0] : "go"), expression: false }),
             WhenWebhook: () => ({ path: textValue("hello"), variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),

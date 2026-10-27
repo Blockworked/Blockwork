@@ -229,3 +229,136 @@ fn web_preview_matches_the_app_for_pure_reporters() {
         web.dispatch("preview_value", &shell)
     );
 }
+
+#[test]
+fn snapping_above_keeps_target_position_and_undoes_atomically() {
+    for command in ["add_instruction", "merge_strand", "merge_tail"] {
+        let app = backend();
+        let runtime = tokio::runtime::Builder::new_current_thread()
+            .enable_all()
+            .build()
+            .unwrap();
+        let send = |cmd, args| runtime.block_on(app.dispatch(cmd, args)).unwrap();
+        send("new_macro", json!({}));
+        let wait = |id| json!({"id": id, "type": "Wait", "duration": num(1.0)});
+        let target = send(
+            "add_strand",
+            json!({"x": 40, "y": 240, "instruction": wait("lower")}),
+        );
+        let source = send(
+            "add_strand",
+            json!({"x": 400, "y": 240, "instruction": wait("upper")}),
+        );
+        if command == "merge_tail" {
+            send(
+                "add_instruction",
+                json!({"strandId": source, "path": at(1), "instruction": wait("tail")}),
+            );
+        }
+        let before = app
+            .state
+            .lock()
+            .unwrap()
+            .current_macro
+            .as_ref()
+            .unwrap()
+            .graph
+            .clone();
+        let args = match command {
+            "add_instruction" => {
+                json!({"strandId": target, "path": at(0), "instruction": wait("palette"), "targetY": 190})
+            }
+            "merge_strand" => {
+                json!({"draggedId": source, "targetId": target, "path": at(0), "targetY": 190})
+            }
+            _ => {
+                json!({"strandId": source, "path": at(1), "targetId": target, "targetPath": at(0), "targetY": 190})
+            }
+        };
+        send(command, args);
+        let after = app
+            .state
+            .lock()
+            .unwrap()
+            .current_macro
+            .as_ref()
+            .unwrap()
+            .graph
+            .clone();
+        let strand = after.strand(target.as_str().unwrap()).unwrap();
+        assert_eq!(strand.x, 40);
+        assert_eq!(
+            strand.y + 50,
+            240,
+            "{command} must preserve the lower block's y"
+        );
+        assert_eq!(strand.instructions.last().unwrap().id, "lower");
+        send("undo", json!({}));
+        assert_eq!(
+            app.state
+                .lock()
+                .unwrap()
+                .current_macro
+                .as_ref()
+                .unwrap()
+                .graph,
+            before
+        );
+        send("redo", json!({}));
+        assert_eq!(
+            app.state
+                .lock()
+                .unwrap()
+                .current_macro
+                .as_ref()
+                .unwrap()
+                .graph,
+            after
+        );
+    }
+}
+
+#[test]
+fn custom_block_position_is_preserved_and_undoable() {
+    let app = backend();
+    let mut web = Demo::default();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
+    runtime
+        .block_on(app.dispatch("new_macro", json!({})))
+        .unwrap();
+    web.dispatch("new_macro", &json!({})).unwrap();
+    let args = json!({"pieces": [{"kind": "Label", "id": "label", "text": "custom"}],
+        "shape": "Normal", "color": "#51b84b", "x": -1375, "y": 812});
+    runtime
+        .block_on(app.dispatch("create_block", args.clone()))
+        .unwrap();
+    web.dispatch("create_block", &args).unwrap();
+    let state = || serde_json::to_value(crate::commands::get_state(&app.state).unwrap()).unwrap();
+    let created = state();
+    for snapshot in [created.clone(), web.state()] {
+        let header = snapshot["current_macro"]["strands"]
+            .as_array()
+            .unwrap()
+            .iter()
+            .find(|strand| strand["instructions"][0]["type"] == "BlockHeader")
+            .unwrap();
+        assert_eq!(header["x"], -1375);
+        assert_eq!(header["y"], 812);
+    }
+    runtime.block_on(app.dispatch("undo", json!({}))).unwrap();
+    web.dispatch("undo", &json!({})).unwrap();
+    assert!(
+        state()["current_macro"]["block_defs"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
+    assert_eq!(view(&state()), view(&web.state()));
+    runtime.block_on(app.dispatch("redo", json!({}))).unwrap();
+    web.dispatch("redo", &json!({})).unwrap();
+    assert_eq!(view(&state()), view(&created));
+    assert_eq!(view(&state()), view(&web.state()));
+}

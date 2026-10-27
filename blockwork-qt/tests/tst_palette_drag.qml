@@ -92,6 +92,37 @@ Item {
             compare(calls[0].args.path[0].index, 1);
             compare(calls[0].args.instruction.duration.value, 1000, "EditorPage.defaultInstruction, not the palette prefab");
         }
+        function test_command_blocks_data() {
+            const rows = [];
+            for (const type of ["Command", "CommandWait"])
+                for (const target of ["canvas", "gap"])
+                    rows.push({tag: type + "_" + target, type: type, target: target});
+            return rows;
+        }
+        function test_command_blocks(data) {
+            const page = editor();
+            const source = paletteBlock(page, data.type);
+            verify(!!source);
+            compare(source.instruction.command, "");
+            const field = all(source).find(o => o.placeholderText === "command");
+            verify(!!field);
+            compare(field.width, 92);
+            compare(field.height, 28);
+            field.text = "printf hello";
+            field.editingFinished();
+            let destination = {x: 900, y: 650};
+            if (data.target === "gap") {
+                const block = canvasBlock(page, "wait");
+                destination = block.mapToItem(scene, 20, block.height + 6);
+            }
+            dragFromPalette(page, data.type, destination.x, destination.y);
+            const command = data.target === "gap" ? "add_instruction" : "add_strand";
+            const calls = scene.calls.filter(c => c.command === command);
+            compare(calls.length, 1);
+            compare(calls[0].args.instruction.type, data.type);
+            compare(calls[0].args.instruction.command, "printf hello");
+            verify(calls[0].args.instruction.id !== source.instruction.id);
+        }
         function test_edited_components_survive_insertion_data() {
             const rows = [];
             for (const type of ["BrowserClick", "BrowserType", "ClickImage"])

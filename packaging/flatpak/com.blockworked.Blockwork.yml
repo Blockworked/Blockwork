@@ -91,7 +91,7 @@ modules:
       # Keep in step with the blockstitch rev pinned in Cargo.toml.
       - type: git
         url: https://github.com/Blockworked/blockstitch.git
-        commit: 5ef480e4acf21251f6e8f2e3bea3061f4712edf3
+        commit: 8ac1bfa3fe61919d60d36c3aa568f77e0c7e0bc7
         dest: .flatpak-blockstitch
       # END blockstitch-source
 
