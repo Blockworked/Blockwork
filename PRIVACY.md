@@ -1,6 +1,6 @@
 # Privacy Policy
 
-Last updated: 2026-10-20
+Last updated: 2026-10-27
 
 Blockwork is an open-source desktop app for building and running keyboard and
 mouse macros. It runs entirely on your device.
@@ -31,6 +31,19 @@ of packs, and any pack you add, from community.blockworked.com and from any
 other library address you add in Settings. Blockwork also runs a local-only control connection on your own machine
 (loopback) so other programs you run can trigger macros. It is not reachable
 from other devices.
+
+## Browser extension
+
+The Blockwork browser extension (for Chrome, Edge and Firefox) lets your
+macros click, type and read on web pages. It talks only to the Blockwork app
+on your own computer, over a loopback connection (127.0.0.1) paired with a key
+you copy from Blockwork's Settings. It reads or changes a page only when one
+of your macros asks it to, or when you use its element picker, and it sends
+what it reads (an element's text, the page's address and title, a script's
+result) only to that local app. The pairing key and port are kept in the
+browser's extension storage. The extension has no servers, accounts,
+analytics or advertising, and it does not collect, sell or share your
+browsing data or any personal information.
 
 ## Community block library
 
