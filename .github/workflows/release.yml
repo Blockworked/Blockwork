@@ -16,7 +16,12 @@ on:
         type: string
         default: ""
       flight:
-        description: "Microsoft Store package flight (name or ID). When set, the build only goes to that flight"
+        description: "Microsoft Store package flight (name or ID). Missing names are created through the API; builds go only to that flight"
+        required: false
+        type: string
+        default: ""
+      flight_group_ids:
+        description: "Comma-separated tester group IDs for a newly created Store flight (existing flights keep their groups)"
         required: false
         type: string
         default: ""
@@ -536,6 +541,7 @@ jobs:
     if: ${{ always() && needs.build.result == 'success' && (needs.release.result == 'success' || inputs.flight) }}
     env:
       MSSTORE_FLIGHT: ${{ inputs.flight }}
+      MSSTORE_FLIGHT_GROUP_IDS: ${{ inputs.flight_group_ids }}
       MSSTORE_TENANT_ID: ${{ secrets.MSSTORE_TENANT_ID }}
       MSSTORE_CLIENT_ID: ${{ secrets.MSSTORE_CLIENT_ID }}
       MSSTORE_CLIENT_SECRET: ${{ secrets.MSSTORE_CLIENT_SECRET }}
@@ -577,4 +583,4 @@ jobs:
           $packages = @(Get-ChildItem dist/*.msix | ForEach-Object FullName)
           if (-not ($packages -match 'x86_64')) { throw "The x64 MSIX is missing" }
           if (-not ($packages -match 'arm64')) { Write-Host "::warning::No arm64 MSIX was built, so the Store submission is x64 only" }
-          ./scripts/submit-msstore.ps1 -Msix $packages -Flight "$env:MSSTORE_FLIGHT"
+          ./scripts/submit-msstore.ps1 -Msix $packages -Flight "$env:MSSTORE_FLIGHT" -FlightGroupIds @($env:MSSTORE_FLIGHT_GROUP_IDS)

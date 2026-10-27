@@ -15,6 +15,10 @@ jobs:
       - name: Checkout
         uses: actions/checkout@v4
 
+      - name: Store submission regression checks
+        shell: pwsh
+        run: ./.github/tests/msstore-submission.ps1
+
       - name: Set up Python
         uses: actions/setup-python@v5
         with:

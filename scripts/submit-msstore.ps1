@@ -2,16 +2,19 @@
 # Copies the last published submission, swaps in the new packages and commits it for certification.
 #
 # With -Flight it goes to that package flight (its name or ID) instead of the public listing.
+# Missing flight names are created through the API; -FlightGroupIds selects their tester groups.
 #
 # Usage: scripts/submit-msstore.ps1 -Msix dist/blockwork-windows-x86_64.msix, dist/blockwork-windows-arm64.msix [-Flight Beta]
 # Needs MSSTORE_TENANT_ID, MSSTORE_CLIENT_ID, MSSTORE_CLIENT_SECRET and MSSTORE_APP_ID in the environment.
 param(
   [Parameter(Mandatory)][string[]]$Msix,
   [string]$Flight,
+  [string[]]$FlightGroupIds = @(),
   [switch]$NoCommit
 )
 
 $ErrorActionPreference = "Stop"
+if ($Flight -and -not $Flight.Trim()) { throw "Flight must contain a name or ID, or be empty for the public listing." }
 foreach ($name in "MSSTORE_TENANT_ID", "MSSTORE_CLIENT_ID", "MSSTORE_CLIENT_SECRET", "MSSTORE_APP_ID") {
   if (-not [Environment]::GetEnvironmentVariable($name)) { throw "$name is not set" }
 }
@@ -37,10 +40,36 @@ $base = $api
 $packagesField = "applicationPackages"
 $pendingField = "pendingApplicationSubmission"
 if ($Flight) {
-  $flights = @((Call Get "$api/listflights?top=100").value)
-  $match = $flights | Where-Object { $_.flightId -eq $Flight -or $_.friendlyName -eq $Flight } | Select-Object -First 1
+  $Flight = $Flight.Trim()
+  $flights = @()
+  $next = "$api/listflights?top=100"
+  do {
+    try {
+      $page = Call Get $next
+    } catch {
+      # The API returns 404 when the app has no flights.
+      if ($next -eq "$api/listflights?top=100" -and [int]$_.Exception.Response.StatusCode -eq 404) { break }
+      throw
+    }
+    $flights += @($page.value | Where-Object { $_ })
+    $next = if ($page.'@nextLink') { "https://manage.devcenter.microsoft.com/v1.0/my/$($page.'@nextLink')" } else { $null }
+  } while ($next)
+  $matches = @($flights | Where-Object { $_.flightId -eq $Flight })
+  if (-not $matches) { $matches = @($flights | Where-Object { $_.friendlyName -eq $Flight }) }
+  if ($matches.Count -gt 1) { throw "Multiple package flights named '$Flight'. Use a flight ID instead." }
+  $match = $matches | Select-Object -First 1
   if (-not $match) {
-    throw "No package flight named '$Flight'. Flights: $(($flights | ForEach-Object { $_.friendlyName }) -join ', ')"
+    $flightGuid = [guid]::Empty
+    if ([guid]::TryParse($Flight, [ref]$flightGuid)) {
+      throw "Package flight ID '$Flight' no longer exists. Enter a flight name to create a new flight through the API."
+    }
+    $groups = @($FlightGroupIds | ForEach-Object { $_.Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    Write-Host "Creating package flight '$Flight' through the API"
+    $match = Call Post "$api/flights" @{ friendlyName = $Flight; groupIds = $groups }
+    if (-not $match.flightId) { throw "The Store did not return an ID for the new package flight." }
+    if (-not $groups) {
+      Write-Warning "The new flight has no tester groups. Assign groups in Partner Center before testers can receive it; do not edit its submission there."
+    }
   }
   Write-Host "Submitting to package flight '$($match.friendlyName)' ($($match.flightId))"
   $base = "$api/flights/$($match.flightId)"
@@ -52,7 +81,20 @@ if ($Flight) {
 $current = Call Get $base
 if ($current.$pendingField) {
   Write-Host "Deleting pending submission $($current.$pendingField.id)"
-  Call Delete "$base/submissions/$($current.$pendingField.id)" | Out-Null
+  try {
+    Call Delete "$base/submissions/$($current.$pendingField.id)" | Out-Null
+  } catch {
+    if ($_.ErrorDetails.Message -match 'submissions that are created through the API') {
+      $target = if ($Flight) { "package flight '$($match.friendlyName)'" } else { "app" }
+      $recovery = if ($Flight) {
+        "Delete only the in-progress submission in Partner Center, keeping the flight and its tester groups, then rerun this workflow. Alternatively, use a new flight name so the workflow creates it through the API."
+      } else {
+        "Delete the in-progress app submission in Partner Center, then rerun this workflow."
+      }
+      throw "Partner Center owns pending submission $($current.$pendingField.id) for this $target, so the API cannot delete or update it. $recovery Do not edit API-created submissions in Partner Center."
+    }
+    throw
+  }
 }
 
 $submission = Call Post "$base/submissions"
