@@ -127,26 +127,27 @@ jobs:
           retention-days: 14
 
       - name: Build MSIX
-        if: matrix.name == 'windows-x86_64'
+        if: runner.os == 'Windows'
         shell: pwsh
         run: |
           $version = (Select-String -Path Cargo.toml -Pattern '^version = "(.*)"').Matches[0].Groups[1].Value
-          ./scripts/build-msix.ps1 -Version $version -Target ${{ matrix.target }} -Arch x64
+          $arch = if ("${{ matrix.target }}" -like "aarch64-*") { "arm64" } else { "x64" }
+          ./scripts/build-msix.ps1 -Version $version -Target ${{ matrix.target }} -Arch $arch
 
       # An unsigned MSIX won't install locally, so sign a test copy with a throwaway cert.
       # The Store re-signs the release build.
       - name: Sign MSIX with test certificate
-        if: matrix.name == 'windows-x86_64'
+        if: runner.os == 'Windows'
         shell: pwsh
-        run: ./scripts/sign-msix-test.ps1 -Msix dist/blockwork-windows-x86_64.msix
+        run: ./scripts/sign-msix-test.ps1 -Msix dist/blockwork-${{ matrix.name }}.msix
 
       - name: Upload MSIX artifact
-        if: matrix.name == 'windows-x86_64'
+        if: runner.os == 'Windows'
         uses: actions/upload-artifact@v4
         with:
-          name: blockwork-windows-x86_64-msix-test
+          name: blockwork-${{ matrix.name }}-msix-test
           path: |
-            dist/blockwork-windows-x86_64.msix
+            dist/blockwork-${{ matrix.name }}.msix
             dist/blockwork-msix-test.cer
           if-no-files-found: error
           retention-days: 14

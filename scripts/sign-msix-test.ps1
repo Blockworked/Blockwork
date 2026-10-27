@@ -13,7 +13,7 @@ $cert = New-SelfSignedCertificate -Type Custom -Subject $subject `
   -TextExtension @("2.5.29.37={text}1.3.6.1.5.5.7.3.3", "2.5.29.19={text}")
 Export-Certificate -Cert $cert -FilePath $cerPath | Out-Null
 
-$signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe" |
+$signtool = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\signtool.exe", "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\arm64\signtool.exe" -ErrorAction SilentlyContinue |
   Sort-Object FullName -Descending | Select-Object -First 1
 if (-not $signtool) { throw "signtool.exe not found (install the Windows SDK)" }
 

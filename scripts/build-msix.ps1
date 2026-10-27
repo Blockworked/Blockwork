@@ -41,7 +41,7 @@ $icon.Dispose()
   Replace("__VERSION__", $msixVersion).
   Replace("__ARCH__", $Arch) | Set-Content (Join-Path $stage "AppxManifest.xml") -NoNewline
 
-$makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe" |
+$makeappx = Get-ChildItem "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\x64\makeappx.exe", "${env:ProgramFiles(x86)}\Windows Kits\10\bin\*\arm64\makeappx.exe" -ErrorAction SilentlyContinue |
   Sort-Object FullName -Descending | Select-Object -First 1
 if (-not $makeappx) { throw "makeappx.exe not found (install the Windows SDK)" }
 

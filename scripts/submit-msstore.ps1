@@ -1,12 +1,12 @@
-# Submits an MSIX to the Microsoft Store through the Partner Center submission API.
-# Copies the last published submission, swaps in the new package and commits it for certification.
+# Submits MSIX packages (one per architecture) to the Microsoft Store through the Partner Center submission API.
+# Copies the last published submission, swaps in the new packages and commits it for certification.
 #
 # With -Flight it goes to that package flight (its name or ID) instead of the public listing.
 #
-# Usage: scripts/submit-msstore.ps1 -Msix dist/blockwork-windows-x86_64.msix [-Flight Beta]
+# Usage: scripts/submit-msstore.ps1 -Msix dist/blockwork-windows-x86_64.msix, dist/blockwork-windows-arm64.msix [-Flight Beta]
 # Needs MSSTORE_TENANT_ID, MSSTORE_CLIENT_ID, MSSTORE_CLIENT_SECRET and MSSTORE_APP_ID in the environment.
 param(
-  [Parameter(Mandatory)][string]$Msix,
+  [Parameter(Mandatory)][string[]]$Msix,
   [string]$Flight,
   [switch]$NoCommit
 )
@@ -15,7 +15,7 @@ $ErrorActionPreference = "Stop"
 foreach ($name in "MSSTORE_TENANT_ID", "MSSTORE_CLIENT_ID", "MSSTORE_CLIENT_SECRET", "MSSTORE_APP_ID") {
   if (-not [Environment]::GetEnvironmentVariable($name)) { throw "$name is not set" }
 }
-$Msix = (Resolve-Path $Msix).Path
+$Msix = @($Msix | ForEach-Object { (Resolve-Path $_).Path })
 $api = "https://manage.devcenter.microsoft.com/v1.0/my/applications/$env:MSSTORE_APP_ID"
 
 $token = (Invoke-RestMethod -Method Post -Uri "https://login.microsoftonline.com/$env:MSSTORE_TENANT_ID/oauth2/token" -Body @{
@@ -58,24 +58,26 @@ if ($current.$pendingField) {
 $submission = Call Post "$base/submissions"
 Write-Host "Created submission $($submission.id)"
 
-# Replace the previous packages with this one
+# Replace the previous packages with these
 $packages = @($submission.$packagesField | Where-Object { $_ })
 foreach ($package in $packages) { $package.fileStatus = "PendingDelete" }
-$fileName = Split-Path $Msix -Leaf
-$submission.$packagesField = $packages + [pscustomobject]@{
-  fileName              = $fileName
-  fileStatus            = "PendingUpload"
-  minimumDirectXVersion = "None"
-  minimumSystemRam      = "None"
+foreach ($file in $Msix) {
+  $packages += [pscustomobject]@{
+    fileName              = Split-Path $file -Leaf
+    fileStatus            = "PendingUpload"
+    minimumDirectXVersion = "None"
+    minimumSystemRam      = "None"
+  }
 }
+$submission.$packagesField = $packages
 $uploadUrl = $submission.fileUploadUrl
 Call Put "$base/submissions/$($submission.id)" $submission | Out-Null
 
-# The package goes up as a zip with the file at its root
+# The packages go up as one zip with the files at its root
 $zip = Join-Path ([IO.Path]::GetTempPath()) "msstore-upload.zip"
 Remove-Item $zip -ErrorAction SilentlyContinue
 Compress-Archive -Path $Msix -DestinationPath $zip
-Write-Host "Uploading $fileName"
+Write-Host "Uploading $(($Msix | ForEach-Object { Split-Path $_ -Leaf }) -join ', ')"
 Invoke-RestMethod -Method Put -Uri $uploadUrl -InFile $zip -Headers @{ "x-ms-blob-type" = "BlockBlob" } -ContentType "application/octet-stream" | Out-Null
 
 if ($NoCommit) {

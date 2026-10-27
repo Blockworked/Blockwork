@@ -28,7 +28,7 @@ jobs:
     outputs:
       matrix: ${{ steps.matrix.outputs.value }}
     steps:
-      # A flight run only needs the MSIX, which the Windows x64 build makes
+      # A flight run only needs the MSIX packages, which the Windows builds make
       - name: Pick platforms
         id: matrix
         env:
@@ -36,15 +36,15 @@ jobs:
         run: |
           matrix='[
             {"name": "windows-x86_64", "runner": "windows-latest", "target": "x86_64-pc-windows-msvc",
-             "artifact_name": "blockwork-windows-x86_64.zip", "installer_arch": "x64compatible", "experimental": false},
+             "artifact_name": "blockwork-windows-x86_64.zip", "installer_arch": "x64compatible", "msix_arch": "x64", "experimental": false},
             {"name": "windows-arm64", "runner": "windows-11-arm", "target": "aarch64-pc-windows-msvc",
-             "artifact_name": "blockwork-windows-arm64.zip", "installer_arch": "arm64",
+             "artifact_name": "blockwork-windows-arm64.zip", "installer_arch": "arm64", "msix_arch": "arm64",
              "qt_host": "windows_arm64", "qt_arch": "win64_msvc2022_arm64", "experimental": true},
             {"name": "macos-arm64", "runner": "macos-latest", "target": "aarch64-apple-darwin",
              "artifact_name": "blockwork-macos-arm64", "qt_host": "mac", "qt_arch": "clang_64", "experimental": true}
           ]'
           if [ -n "$FLIGHT" ]; then
-            matrix=$(jq -c 'map(select(.name == "windows-x86_64"))' <<< "$matrix")
+            matrix=$(jq -c 'map(select(.msix_arch))' <<< "$matrix")
           fi
           echo "value={\"include\": $(jq -c . <<< "$matrix")}" >> "$GITHUB_OUTPUT"
 
@@ -176,16 +176,16 @@ jobs:
           retention-days: 90
 
       - name: Build MSIX (Microsoft Store)
-        if: matrix.name == 'windows-x86_64'
+        if: matrix.msix_arch
         shell: pwsh
-        run: ./scripts/build-msix.ps1 -Version "${{ steps.installer_version.outputs.value }}" -Target ${{ matrix.target }} -Arch x64
+        run: ./scripts/build-msix.ps1 -Version "${{ steps.installer_version.outputs.value }}" -Target ${{ matrix.target }} -Arch ${{ matrix.msix_arch }}
 
       - name: Upload MSIX artifact
-        if: matrix.name == 'windows-x86_64'
+        if: matrix.msix_arch
         uses: actions/upload-artifact@v4
         with:
-          name: blockwork-windows-x86_64.msix
-          path: dist/blockwork-windows-x86_64.msix
+          name: blockwork-${{ matrix.name }}.msix
+          path: dist/blockwork-${{ matrix.name }}.msix
           if-no-files-found: error
           retention-days: 90
 
@@ -460,6 +460,7 @@ jobs:
             echo "| Windows x86_64 (installer) | \`blockwork-windows-x86_64-setup.exe\` |"
             echo "| Windows x86_64 (portable Qt bundle) | \`blockwork-windows-x86_64.zip\` |"
             echo "| Windows x86_64 (MSIX, for the Microsoft Store) | \`blockwork-windows-x86_64.msix\` |"
+            echo "| Windows arm64 (MSIX, for the Microsoft Store) | \`blockwork-windows-arm64.msix\` |"
             echo "| Windows arm64 (installer) | \`blockwork-windows-arm64-setup.exe\` |"
             echo "| Windows arm64 (portable Qt bundle) | \`blockwork-windows-arm64.zip\` |"
             echo "| Linux x86_64 (AppImage) | \`blockwork-linux-x86_64.AppImage\` |"
@@ -555,15 +556,21 @@ jobs:
         if: steps.creds.outputs.ready == 'true'
         uses: actions/checkout@v4
 
-      - name: Download MSIX
+      - name: Download MSIX packages
         if: steps.creds.outputs.ready == 'true'
         uses: actions/download-artifact@v4
         with:
-          name: blockwork-windows-x86_64.msix
+          pattern: blockwork-windows-*.msix
+          merge-multiple: true
           path: dist
 
       # The Store signs the package and runs certification after this
       - name: Submit to Partner Center
         if: steps.creds.outputs.ready == 'true'
         shell: pwsh
-        run: ./scripts/submit-msstore.ps1 -Msix dist/blockwork-windows-x86_64.msix -Flight "$env:MSSTORE_FLIGHT"
+        run: |
+          # arm64 is allowed to fail, so submit whichever packages were built
+          $packages = @(Get-ChildItem dist/*.msix | ForEach-Object FullName)
+          if (-not ($packages -match 'x86_64')) { throw "The x64 MSIX is missing" }
+          if (-not ($packages -match 'arm64')) { Write-Host "::warning::No arm64 MSIX was built, so the Store submission is x64 only" }
+          ./scripts/submit-msstore.ps1 -Msix $packages -Flight "$env:MSSTORE_FLIGHT"
