@@ -70,6 +70,48 @@ Item {
         }
         function canvasBlock(page, id) { return all(page).find(o => o.instruction && o.instruction.id === id && o.paletteMode === false && o.width > 0); }
         function ghost(page) { return all(page).find(o => o.objectName === "paletteGhost"); }
+        function test_sidebar_keeps_workspace_stationary_data() {
+            const rows = [];
+            for (const layout of ["rail", "chips", "accordion", "flyout", "tiles"])
+                for (const zoom of [0.5, 1, 1.8])
+                    rows.push({tag: layout + "_" + zoom, layout: layout, zoom: zoom});
+            return rows;
+        }
+        function test_sidebar_keeps_workspace_stationary(data) {
+            const page = editor();
+            page.appState = Object.assign({}, page.appState, {palette_layout: data.layout});
+            wait(30);
+            const canvas = all(page).find(o => typeof o.workspacePoint === "function");
+            verify(!!canvas);
+            canvas.setZoom(data.zoom);
+            const block = canvasBlock(page, "wait");
+            verify(!!block);
+            const before = block.mapToItem(scene, 0, 0);
+            const at = scene.mapToItem(null, 900, 400);
+            const world = canvas.workspacePoint(at.x, at.y);
+            verify(!!world);
+            function checkView() {
+                const after = block.mapToItem(scene, 0, 0);
+                fuzzyCompare(after.x, before.x, 0.1, "block stays fixed horizontally");
+                fuzzyCompare(after.y, before.y, 0.1, "block stays fixed vertically");
+                const point = canvas.workspacePoint(at.x, at.y);
+                fuzzyCompare(point.x, world.x, 0.1, "world x stays fixed");
+                fuzzyCompare(point.y, world.y, 0.1, "world y stays fixed");
+            }
+            for (const width of [180, 600, 348]) {
+                page.sidebarWidth = width;
+                wait(30);
+                checkView();
+            }
+            for (const collapsed of [true, false]) {
+                page.sidebarToggling = true;
+                page.sidebarCollapsed = collapsed;
+                for (let frame = 0; frame < 20; ++frame) {
+                    wait(16);
+                    checkView();
+                }
+            }
+        }
         function dragFromPalette(page, type, x, y) {
             const source = paletteBlock(page, type);
             verify(!!source, type);
@@ -263,6 +305,37 @@ Item {
             mouseRelease(scene, 900, 650);
             compare(scene.calls.length, 0);
         }
+        function openClearDialog(page) {
+            const canvas = all(page).find(o => typeof o.clearRequested === "function");
+            verify(!!canvas);
+            canvas.clearRequested();
+            const dialog = findChild(page, "clearInstructionsDialog");
+            verify(!!dialog);
+            tryCompare(dialog, "opened", true);
+            compare(scene.calls.length, 0);
+            return dialog;
+        }
+        function test_clear_blocks_requires_popup_confirmation() {
+            const dialog = openClearDialog(editor());
+            const button = all(dialog.footer).find(o => o.text === "Delete");
+            verify(!!button);
+            mouseClick(button);
+            compare(scene.calls.map(c => c.command), ["clear_instructions"]);
+        }
+        function test_clear_blocks_cancel_keeps_canvas() {
+            const dialog = openClearDialog(editor());
+            const button = all(dialog.footer).find(o => o.text === "Cancel");
+            verify(!!button);
+            mouseClick(button);
+            compare(scene.calls.length, 0);
+        }
+        function test_clear_blocks_does_not_delete_another_macro() {
+            const page = editor();
+            const dialog = openClearDialog(page);
+            page.appState = scene.state(scene.macro("other", scene.strands));
+            dialog.accept();
+            compare(scene.calls.length, 0);
+        }
         function test_trashing_a_definition_deletes_the_block() {
             const page = editor();
             const sidebar = all(page).find(o => typeof o.customInstruction === "function");
@@ -273,6 +346,47 @@ Item {
             compare(scene.calls.map(c => c.command), ["delete_block", "remove_strand", "remove_instruction"]);
             compare(scene.calls[0].args.blockId, "custom");
             compare(scene.calls[2].args.count, 3);
+        }
+        function test_canvas_release_over_sidebar_deletes_data() {
+            const rows = [];
+            for (const layout of ["rail", "chips", "accordion", "flyout", "tiles"])
+                for (const kind of ["strand", "definition", "value"])
+                    rows.push({tag: layout + "_" + kind, layout: layout, kind: kind});
+            return rows;
+        }
+        function test_canvas_release_over_sidebar_deletes(data) {
+            const page = editor();
+            page.appState = Object.assign({}, page.appState, {palette_layout: data.layout});
+            wait(30);
+            const canvas = page.paletteDrags.canvas;
+            const sidebar = all(page).find(o => typeof o.customInstruction === "function");
+            const at = sidebar.mapToItem(null, 20, 300);
+            compare(canvas.workspacePoint(at.x, at.y), null, "sidebar is outside the drop area");
+            const start = canvas.mapToItem(null, 800, 300);
+            if (data.kind === "value") {
+                const location = {kind: "Instruction", strand_id: "main", path: [{index: 0}], field: "duration", value_path: []};
+                canvas.beginValueDrag(location, {kind: "Number", value: 100}, start.x, start.y, 0, 0, 60, 30);
+                canvas.endValueDrag(at.x, at.y);
+                compare(scene.calls.map(c => c.command), ["take_value"]);
+            } else {
+                const id = data.kind === "definition" ? "definition" : "main";
+                canvas.beginDrag(id, [{index: 0}], 1, start.x, start.y, 0, 0, 150, 60);
+                canvas.endDrag(at.x, at.y);
+                compare(scene.calls.map(c => c.command), [data.kind === "definition" ? "delete_block" : "remove_strand"]);
+            }
+            page.sidebarCollapsed = true;
+            wait(30);
+            verify(!!canvas.workspacePoint(at.x, at.y), "collapsed sidebar reveals the drop area");
+        }
+        function test_mouse_drag_to_sidebar_deletes() {
+            const page = editor();
+            const source = canvasBlock(page, "wait");
+            const start = source.mapToItem(scene, 12, source.height / 2);
+            mousePress(scene, start.x, start.y);
+            mouseMove(scene, start.x + 40, start.y + 10, 20);
+            mouseMove(scene, 20, 400, 20);
+            mouseRelease(scene, 20, 400);
+            compare(scene.calls.map(c => c.command), ["remove_strand"]);
         }
         function test_double_click_adds_at_the_old_spot() {
             const page = editor();

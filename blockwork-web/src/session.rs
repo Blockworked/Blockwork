@@ -295,8 +295,6 @@ impl Demo {
                 self.buffers.clear();
                 Ok(Json::Null)
             }
-            // The app asks twice, three seconds apart; the page has no timer
-            // to undo the first press, so it clears at once (one undo step).
             "clear_instructions" => {
                 self.push_undo();
                 if let Some(mac) = self.open_mut() {
@@ -932,8 +930,6 @@ impl Demo {
             "page": "Main",
             "onboarding_done": true,
             "palette_layout": self.palette_layout,
-            "confirm_clear_instructions": false,
-            "confirm_clear_instructions_remaining_secs": 0,
             "key_capture": key_capture,
             "standalone_key": self.standalone_key,
             "combo_capture": null,

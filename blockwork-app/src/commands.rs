@@ -30,8 +30,6 @@ use std::sync::{Arc, Mutex};
 use crate::AppHandle;
 use tracing::warn;
 
-const CLEAR_CONFIRM_TIMEOUT_SECS: u64 = 3;
-
 /// Checkpoints the canvas before a structural edit, and ends the current
 /// text-edit group so the next keystroke starts a fresh step.
 pub(crate) fn push_undo(s: &mut AppState) {
@@ -1862,42 +1860,13 @@ pub(crate) fn clear_instructions(
     app: &AppHandle,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    if !s.confirm_clear_instructions {
-        s.confirm_clear_instructions = true;
-        s.clear_confirm_remaining_secs = CLEAR_CONFIRM_TIMEOUT_SECS as u8;
-        s.clear_confirm_generation = s.clear_confirm_generation.wrapping_add(1);
-        let timeout_gen = s.clear_confirm_generation;
-        emit_state_updated(&app, &s);
-        drop(s);
-
-        let state_clone = Arc::clone(&*state);
-        let app_clone = app.clone();
-        crate::async_runtime::spawn(async move {
-            for remaining in (1..=CLEAR_CONFIRM_TIMEOUT_SECS).rev() {
-                tokio::time::sleep(std::time::Duration::from_secs(1)).await;
-                if let Ok(mut s) = state_clone.lock() {
-                    if s.clear_confirm_generation != timeout_gen {
-                        break;
-                    }
-                    s.clear_confirm_remaining_secs = remaining as u8 - 1;
-                    if remaining == 1 {
-                        s.confirm_clear_instructions = false;
-                    }
-                    emit_state_updated(&app_clone, &s);
-                }
-            }
-        });
-    } else {
-        push_undo(&mut s);
-        if let Some(mac) = &mut s.current_macro {
-            mac.clear_editor();
-            s.invalid_field_buffers.clear();
-            auto_save(&mut s);
-            s.confirm_clear_instructions = false;
-            s.clear_confirm_remaining_secs = 0;
-        }
-        emit_state_updated(&app, &s);
+    push_undo(&mut s);
+    if let Some(mac) = &mut s.current_macro {
+        mac.clear_editor();
+        s.invalid_field_buffers.clear();
+        auto_save(&mut s);
     }
+    emit_state_updated(&app, &s);
     Ok(())
 }
 

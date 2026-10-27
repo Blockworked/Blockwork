@@ -62,7 +62,7 @@ Item {
             const canvas = all(page).find(o => o.isBlockCanvas);
             canvas.setZoom(data.zoom);
             if (data.edge) all(canvas).find(o => o.contentX !== undefined && o.contentWidth !== undefined).contentX = 0;
-            const point = canvas.mapToItem(null, 30, 100);
+            const point = canvas.mapToItem(null, canvas.width - 30, 100);
             const before = canvas.workspacePoint(point.x, point.y);
             const pieces = [{kind:"Label",text:data.wide ? "A much longer custom block header with several words" : "custom"}];
             if (data.branch) pieces.push({kind:"Branch",name:"body"});
@@ -98,12 +98,12 @@ Item {
             const page = createTemporaryObject(editorComponent, scene);
             wait(30);
             const canvas = all(page).find(o => o.isBlockCanvas);
-            const point = canvas.mapToItem(null, 0, 0);
+            const point = canvas.mapToItem(null, canvas.width - 30, 100);
             const before = canvas.workspacePoint(point.x, point.y);
             const updated = JSON.parse(JSON.stringify(page.appState));
             for (let x = 0; x < canvas.width; x += 220)
                 for (let y = 0; y < canvas.height; y += 113)
-                    updated.current_macro.comments.push({id:x+":"+y,x:before.x+x,y:before.y+y,text:"",collapsed:false});
+                    updated.current_macro.comments.push({id:x+":"+y,x:before.x-(canvas.width-30)/canvas.zoom+x,y:before.y-100/canvas.zoom+y,text:"",collapsed:false});
             page.appState = updated;
             wait(40);
             const args = create(page, [{kind:"Label",text:"custom"}]);

@@ -364,7 +364,8 @@ Item {
     }
     // Canvas coordinates near the top-left of what's on screen, for blocks added from a dialog.
     function visibleCanvasPoint() {
-        const scene = canvas.mapToItem(null, 60, 60);
+        const sidebarEdge = root.sidebarCollapsed ? 0 : palette.width;
+        const scene = canvas.mapToItem(null, Math.min(canvas.width - 60, sidebarEdge + 60), 60);
         const at = canvas.workspacePoint(scene.x, scene.y);
         return at ? { x: Math.round(at.x), y: Math.round(at.y) } : { x: 120, y: 120 };
     }
@@ -696,17 +697,25 @@ Item {
         Item {
             visible: !!root.macro
             Layout.fillWidth: true; Layout.fillHeight: true
-            RowLayout { anchors.fill: parent; spacing: 0
+            Item { anchors.fill: parent
                 Item {
                     id: sidebarHost
-                    // The flyout layout keeps only its icon rail in the layout and floats the list over the canvas.
-                    Layout.preferredWidth: root.sidebarCollapsed ? 0 : (palette.layout === "flyout" ? palette.railWidth : root.sidebarWidth); Layout.fillHeight: true
+                    // Overlay the sidebar so resizing it never moves the workspace.
+                    width: root.sidebarCollapsed ? 0 : (palette.layout === "flyout" ? palette.railWidth : root.sidebarWidth)
+                    anchors.top: parent.top; anchors.bottom: parent.bottom
                     clip: palette.layout !== "flyout"
-                    z: palette.layout === "flyout" ? 5 : 0
+                    z: 5
                     // Animate only the collapse toggle, not drag-resizing.
-                    Behavior on Layout.preferredWidth {
+                    Behavior on width {
                         enabled: root.sidebarToggling
                         NumberAnimation { duration: Motion.normal; easing.type: Easing.OutCubic; onRunningChanged: if (!running) root.sidebarToggling = false }
+                    }
+                    // Empty palette space must not pan or click the covered canvas.
+                    MouseArea {
+                        width: palette.width; height: parent.height
+                        visible: palette.visible
+                        acceptedButtons: Qt.AllButtons
+                        onWheel: wheel => wheel.accepted = true
                     }
                 PalettePanel {
                     id: palette
@@ -756,7 +765,16 @@ Item {
                 }
                 BlockCanvas {
                     id: canvas
-                    Layout.fillWidth: true; Layout.fillHeight: true
+                    // Covered space belongs to the sidebar, including for drag releases.
+                    containmentMask: QtObject {
+                        function contains(point: point): bool {
+                            if (point.x < 0 || point.y < 0 || point.x >= canvas.width || point.y >= canvas.height) return false;
+                            const scene = canvas.mapToItem(null, point.x, point.y);
+                            return !dragController.inTrash(scene.x, scene.y);
+                        }
+                    }
+                    textMenu: Component { Editing.TextEditingMenu {} }
+                    anchors.fill: parent
                     strands: root.macro ? root.macro.strands : []
                     recordingTargetId: root.macro && root.macro.recording_target_strand_id ? root.macro.recording_target_strand_id : ""
                     comments: root.macro ? root.macro.comments : []
@@ -772,8 +790,8 @@ Item {
                     onTailMerged: (strandId, path, targetId, targetPath, targetY) => root.invoke("merge_tail", { strandId: strandId, path: path, targetId: targetId, targetPath: targetPath, targetY: targetY })
                     onInstructionRemoved: (strandId, path) => root.removeInstruction(strandId, path)
                     canPaste: !!root.clipboard && root.clipboard.instructions.length > 0
-                    clearIcon: appState.confirm_clear_instructions ? "triangle-alert" : "trash"
-                    clearText: appState.confirm_clear_instructions ? qsTr("Confirm delete (%1s)?").arg(appState.confirm_clear_instructions_remaining_secs) : qsTr("Delete %n block(s)", "", root.totalBlocks())
+                    clearIcon: "trash"
+                    clearText: qsTr("Delete %n block(s)", "", root.totalBlocks())
                     onCanvasMenuAction: (action, x, y) => {
                         if (action === "paste" && root.clipboard) root.invoke("paste_fragment", { x: x, y: y, fragment: root.clipboard });
                     }
@@ -803,7 +821,7 @@ Item {
                     onPieceActionRequested:(action,strandId,path,instruction)=>root.onPieceAction(action,strandId,path,instruction)
                     onDetailsRequested:type=>root.showDetails(type)
                     onCanvasNoteRequested: (x, y) => root.invoke("create_comment", { x: x, y: y, text: "" })
-                    onClearRequested: root.invoke("clear_instructions")
+                    onClearRequested: clearInstructionsDialog.open()
                     onCommentMoved: (commentId, x, y) => root.invoke("move_comment", { commentId: commentId, x: x, y: y })
                     onCommentEdited: (commentId, text) => root.invoke("edit_comment_text", { commentId: commentId, text: text })
                     onCommentCollapseChanged: (commentId, collapsed) => root.invoke("set_comment_collapsed", { commentId: commentId, collapsed: collapsed })
@@ -1551,6 +1569,32 @@ Item {
                 renameTarget = ""; listName.clear();
                 if (select) select(name);
             });
+        }
+    }
+    AppDialog {
+        id: clearInstructionsDialog
+        objectName: "clearInstructionsDialog"
+        title: qsTr("Delete all blocks?")
+        width: 400
+        standardButtons: Dialog.NoButton
+        property string macroId: ""
+        onOpened: macroId = root.macro ? root.macro.id : ""
+        Text {
+            width: parent.width
+            text: qsTr("Delete all blocks from this macro? You can undo this action.")
+            color: Theme.text
+            wrapMode: Text.WordWrap
+        }
+        footer: DialogButtonBox {
+            alignment: Qt.AlignRight
+            spacing: 8
+            padding: 18; topPadding: 8
+            background: null
+            BwButton { text: qsTr("Cancel"); onClicked: clearInstructionsDialog.reject() }
+            BwButton { text: qsTr("Delete"); danger: true; onClicked: clearInstructionsDialog.accept() }
+        }
+        onAccepted: {
+            if (root.macro && root.macro.id === macroId) root.invoke("clear_instructions");
         }
     }
     AppDialog {
