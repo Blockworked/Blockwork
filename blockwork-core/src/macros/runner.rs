@@ -326,6 +326,8 @@ const CONDITION_POLL_MS: f64 = 100.0;
 /// to 5 s itself for an element to show up.
 const BROWSER_LIMIT: Duration = Duration::from_secs(20);
 const BROWSER_LOAD_LIMIT: Duration = Duration::from_secs(40);
+// Long enough to allow a new script in the browser's approval window.
+const BROWSER_SCRIPT_LIMIT: Duration = Duration::from_secs(120);
 /// A box this close to where the aimed-at target should be is taken to be it.
 const RELOCK_MIN_PX: f64 = 40.0;
 /// How often the aim mover sends a move: 500 Hz, like a gaming mouse.
@@ -1738,7 +1740,10 @@ fn run_block(
                 let ran = ctx
                     .resolve(code, depth)
                     .and_then(|c| c.eval_text())
-                    .and_then(|code| crate::browser::request("script", serde_json::json!({ "code": code }), BROWSER_LIMIT));
+                    .and_then(|code| {
+                        let stopped = || ctx.stop_flag.as_ref().is_some_and(stop_requested);
+                        crate::browser::request_until("script", serde_json::json!({ "code": code }), BROWSER_SCRIPT_LIMIT, stopped)
+                    });
                 match ran {
                     Ok(result) => set_variable(ctx, variable, Evaluated::Text(crate::browser::text_field(&result, "value"))),
                     Err(e) => soft_fail(ctx, &ins.id, "Run JavaScript", e)?,

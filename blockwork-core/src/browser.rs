@@ -184,6 +184,12 @@ pub fn connected() -> bool {
 
 /// Asks the browser to carry out `cmd` and waits for its answer.
 pub fn request(cmd: &str, args: Value, timeout: Duration) -> Result<Value, String> {
+    request_until(cmd, args, timeout, || false)
+}
+
+/// `request`, giving up early once `stop` says so (checked a few times a
+/// second), for waits as long as someone approving a script in the browser.
+pub fn request_until(cmd: &str, args: Value, timeout: Duration, stop: impl Fn() -> bool) -> Result<Value, String> {
     let client = target()?;
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel();
@@ -195,10 +201,21 @@ pub fn request(cmd: &str, args: Value, timeout: Duration) -> Result<Value, Strin
         .map_err(|e| e.to_string())
         .and_then(|mut s| write_frame(&mut *s, OP_TEXT, message.to_string().as_bytes()).map_err(|e| e.to_string()));
     let answer = match sent {
-        Ok(()) => rx.recv_timeout(timeout).unwrap_or_else(|e| match e {
-            mpsc::RecvTimeoutError::Timeout => Err(format!("the browser didn't answer within {} s", timeout.as_secs())),
-            mpsc::RecvTimeoutError::Disconnected => Err("the browser disconnected".into()),
-        }),
+        Ok(()) => {
+            let end = std::time::Instant::now() + timeout;
+            loop {
+                let left = end.saturating_duration_since(std::time::Instant::now());
+                match rx.recv_timeout(left.min(Duration::from_millis(200))) {
+                    Ok(answer) => break answer,
+                    Err(mpsc::RecvTimeoutError::Disconnected) => break Err("the browser disconnected".into()),
+                    Err(mpsc::RecvTimeoutError::Timeout) if left.is_zero() => {
+                        break Err(format!("the browser didn't answer within {} s", timeout.as_secs()))
+                    }
+                    Err(mpsc::RecvTimeoutError::Timeout) if stop() => break Err("stopped".into()),
+                    Err(mpsc::RecvTimeoutError::Timeout) => {}
+                }
+            }
+        }
         Err(e) => Err(format!("couldn't reach the browser: {e}")),
     };
     if let Ok(mut pending) = client.pending.lock() {
