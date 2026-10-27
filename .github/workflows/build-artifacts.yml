@@ -84,6 +84,9 @@ jobs:
 
       - name: Build (release, Windows)
         if: runner.os == 'Windows'
+        env:
+          # Allow transient registry DNS failures to recover before failing the build.
+          CARGO_NET_RETRY: '10'
         run: cargo build --release --target ${{ matrix.target }} --workspace --exclude blockwork-linux-bridge
 
       - name: Stage Qt application (Windows)
