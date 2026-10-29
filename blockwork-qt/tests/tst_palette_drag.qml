@@ -342,15 +342,27 @@ Item {
         }
         function test_recording_countdown_locks_the_canvas() {
             const page = editor();
-            page.appState = scene.state(scene.macro("macro", scene.strands), "Countdown");
-            wait(20);
-            dragFromPalette(page, "Wait", 900, 650);
-            compare(scene.calls.length, 0);
-            verify(!ghost(page).visible);
-            page.appState = scene.state(scene.macro("macro", scene.strands), "Active");
-            wait(20);
-            dragFromPalette(page, "Wait", 900, 650);
-            compare(scene.calls.length, 0);
+            const drags = page.paletteDrags;
+            const spec = {kind: "instruction", type: "Wait", instruction: {type: "Wait", duration: {kind: "Number", value: 100}}};
+            for (const phase of ["Countdown", "Active"]) {
+                page.appState = scene.state(scene.macro("macro", scene.strands));
+                tryCompare(drags, "locked", false);
+                drags.begin(spec, 900, 650, 12, 12);
+                verify(drags.active);
+
+                page.appState = scene.state(scene.macro("macro", scene.strands), phase);
+                tryCompare(drags, "locked", true);
+                compare(drags.canvas.locked, true);
+                verify(!drags.active, "recording cancels an existing drag");
+                drags.begin(spec, 900, 650, 12, 12);
+                drags.move(920, 670);
+                drags.end(920, 670);
+                drags.addAt(spec, 120, 120);
+                verify(!drags.active, "recording rejects new drags");
+                verify(!drags.holding);
+                verify(!ghost(page).visible);
+                compare(scene.calls.length, 0);
+            }
         }
         function test_switching_macro_mid_drag_cancels() {
             const page = editor();
