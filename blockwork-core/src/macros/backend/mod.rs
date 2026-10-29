@@ -32,6 +32,22 @@ pub enum CaptureEvent {
 }
 
 pub trait InputBackend: Send + 'static {
+    fn launch_android_app(&mut self, _: &str, _: &dyn Fn() -> bool) -> Result<(), String> {
+        Err("Android app launches are unavailable on this platform".into())
+    }
+
+    fn element(&mut self, _: &crate::input::element::ElementSelector, _: crate::input::element::ElementAction, _: &str, _: &dyn Fn() -> bool) -> Result<serde_json::Value, String> {
+        Err("accessibility elements are unavailable on this platform".into())
+    }
+
+    fn gesture(&mut self, _: &crate::input::touch::Gesture, _: &dyn Fn() -> bool) -> Result<(), String> {
+        Err("touch automation is unavailable on this platform".into())
+    }
+
+    /// A matched image is clicked by a mouse on desktop and tapped on Android.
+    fn click_at(&mut self, x: i32, y: i32, button: MacroButton, _: &dyn Fn() -> bool) -> Result<(), String> {
+        self.click_mouse_abs(x, y, button)
+    }
     fn key(&mut self, key: MacroKey, dir: Direction) -> Result<(), String>;
     fn raw_keycode(&mut self, keycode: u16, dir: Direction) -> Result<(), String>;
     fn button(&mut self, button: MacroButton, dir: Direction) -> Result<(), String>;
@@ -282,3 +298,31 @@ pub mod windows;
 
 #[cfg(target_os = "macos")]
 pub mod macos;
+
+#[cfg(test)]
+mod compatibility_tests {
+    use super::*;
+
+    struct OrderedClick(bool);
+    impl InputBackend for OrderedClick {
+        fn key(&mut self, _: MacroKey, _: Direction) -> Result<(), String> { Ok(()) }
+        fn raw_keycode(&mut self, _: u16, _: Direction) -> Result<(), String> { Ok(()) }
+        fn button(&mut self, _: MacroButton, _: Direction) -> Result<(), String> { Err("Separate button path must not be used".into()) }
+        fn move_mouse_rel(&mut self, _: i32, _: i32) -> Result<(), String> { Ok(()) }
+        fn move_mouse_abs(&mut self, _: i32, _: i32) -> Result<(), String> { Err("Separate positioning path must not be used".into()) }
+        fn scroll(&mut self, _: i32, _: Axis) -> Result<(), String> { Ok(()) }
+        fn text(&mut self, _: &str) -> Result<(), String> { Ok(()) }
+        fn cursor_pos(&self) -> Option<(i32, i32)> { None }
+        fn click_mouse_abs(&mut self, x: i32, y: i32, button: MacroButton) -> Result<(), String> {
+            assert_eq!((x, y, button), (12, 34, MacroButton::Right));
+            self.0 = true;
+            Ok(())
+        }
+    }
+    #[test]
+    fn default_image_click_uses_the_desktop_ordered_click_path() {
+        let mut backend = OrderedClick(false);
+        backend.click_at(12, 34, MacroButton::Right, &|| false).unwrap();
+        assert!(backend.0);
+    }
+}

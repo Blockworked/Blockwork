@@ -1,0 +1,71 @@
+name: Android APK
+on:
+  push:
+    paths:
+      - 'android/**'
+      - 'android-fixture/**'
+      - 'blockwork-android/**'
+      - 'blockwork-app/**'
+      - 'blockwork-core/**'
+      - 'blockwork-qt/qml/**'
+      - 'blockwork-qt/cmake/**'
+      - 'Cargo.*'
+      - 'vendor/blockstitch-qml/**'
+      - 'scripts/*android*'
+      - 'scripts/tests/test_android_device_runner.py'
+      - '.github/workflows/android.yml'
+  pull_request:
+  workflow_dispatch:
+jobs:
+  apk:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - abi: arm64-v8a
+            qt: android_arm64_v8a
+            rust: aarch64-linux-android
+          - abi: x86_64
+            qt: android_x86_64
+            rust: x86_64-linux-android
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          targets: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: android-${{ matrix.abi }}
+      - name: Install Android SDK and NDK
+        run: |
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" \
+            'platforms;android-36' 'build-tools;36.0.0' 'ndk;27.2.12479018'
+          echo "ANDROID_SDK_ROOT=$ANDROID_HOME" >> "$GITHUB_ENV"
+          echo "ANDROID_NDK_ROOT=$ANDROID_HOME/ndk/27.2.12479018" >> "$GITHUB_ENV"
+      - name: Install matching Qt kits
+        run: |
+          python -m pip install aqtinstall==3.3.0
+          python -m aqt install-qt linux desktop 6.10.3 linux_gcc_64 -O "$RUNNER_TEMP/Qt" --archives icu qtbase qtdeclarative qtsvg qttools
+          python -m aqt install-qt all_os android 6.10.3 '${{ matrix.qt }}' -O "$RUNNER_TEMP/Qt"
+          echo "QT_ROOT=$RUNNER_TEMP/Qt" >> "$GITHUB_ENV"
+          echo "LD_LIBRARY_PATH=$RUNNER_TEMP/Qt/6.10.3/gcc_64/lib" >> "$GITHUB_ENV"
+      - name: Build installable debug APK
+        run: scripts/build-android.sh '${{ matrix.abi }}'
+      - name: Test device runner failure reporting and setting restoration
+        run: python3 -m unittest discover -s scripts/tests -p test_android_device_runner.py
+      - name: Build fixture and device test APKs
+        run: scripts/build-android-validation.sh '${{ matrix.abi }}'
+      - name: Test Android host policies and geometry
+        run: cd target/android/${{ matrix.abi }}/android-build && ./gradlew testDebugUnitTest
+      - uses: actions/upload-artifact@v4
+        with:
+          name: blockwork-android-${{ matrix.abi }}
+          path: dist/android/*.apk
+          if-no-files-found: error

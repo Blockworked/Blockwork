@@ -1,0 +1,16 @@
+[package]
+name = "blockwork-android"
+version.workspace = true
+edition.workspace = true
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+blockwork-app = { path = "../blockwork-app", default-features = false }
+blockwork-core = { path = "../blockwork-core", default-features = false, features = ["system", "ipc"] }
+serde.workspace = true
+serde_json.workspace = true
+
+[target.'cfg(target_os = "android")'.dependencies]
+jni = "0.21"

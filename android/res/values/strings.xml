@@ -1,0 +1,4 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="accessibility_description">Blockwork runs workflows you create. Accessibility access lets a workflow perform touch gestures, observe foreground app changes, read accessibility elements, launch apps, insert text and take occasional screenshots in other apps. The picker also uses this access when you select a point, region or element. Enable it only when you want to run these workflows. Use Stop in Blockwork to stop active runs.</string>
+</resources>

@@ -1,5 +1,22 @@
 use std::sync::{Arc, Mutex, OnceLock};
 
+/// Called under the registry lock at run boundaries, in registration order.
+/// A host can durably record interrupted runs. The handler must not call
+/// back into this module or start/stop macros.
+pub type Observer = dyn Fn(&[String]) + Send + Sync;
+static OBSERVER: std::sync::RwLock<Option<Arc<Observer>>> = std::sync::RwLock::new(None);
+
+pub fn set_observer(observer: Arc<Observer>) {
+    *OBSERVER.write().unwrap_or_else(|e| e.into_inner()) = Some(observer);
+}
+
+fn changed(runs: &[(Arc<Mutex<bool>>, String)]) {
+    if let Some(observer) = OBSERVER.read().unwrap_or_else(|e| e.into_inner()).as_ref() {
+        let ids: Vec<String> = runs.iter().map(|(_, id)| id.clone()).collect();
+        observer(&ids);
+    }
+}
+
 /// Stop flags for every macro run currently executing, so "Stop Macro" can
 /// abort *any* run, not just loop-mode ones. Loop runs register their shared
 /// `is_looping` flag; single runs register one of their own (see `begin_run`).
@@ -19,6 +36,7 @@ pub fn register(flag: &Arc<Mutex<bool>>) {
 fn register_for(flag: &Arc<Mutex<bool>>, macro_id: &str) {
     if let Ok(mut runs) = active_runs().lock() {
         runs.push((Arc::clone(flag), macro_id.to_string()));
+        changed(&runs);
     }
 }
 
@@ -76,13 +94,19 @@ pub fn stop_macro(macro_id: &str) -> usize {
 }
 
 pub fn end_run(flag: &Arc<Mutex<bool>>) {
+    let mut finished = None;
     if let Ok(mut runs) = active_runs().lock() {
-        // Only drops one registration, so two concurrent runs sharing a flag
-        // (the app's shared `is_looping`) don't deregister each other.
+        // Only drops one registration, so concurrent runs sharing a flag
+        // do not deregister each other.
         if let Some(pos) = runs.iter().position(|(f, _)| Arc::ptr_eq(f, flag)) {
-            runs.remove(pos);
+            let (_, id) = runs.remove(pos);
+            if !id.is_empty() && !runs.iter().any(|(_, running)| running == &id) { finished = Some(id); }
+            changed(&runs);
         }
     }
+    // A host can ask for a trigger grant before any strand/trace exists.
+    // Denial/cancellation must still end that run's temporary answers.
+    if let Some(id) = finished { crate::permissions::run_ended(&id); }
 }
 
 /// Clears every in-flight run's stop flag, returning how many were cleared.

@@ -9,10 +9,11 @@ Rectangle {
     id: root
     property var entries: []
     property string macroId: ""
+    property bool sheetMode: false
     property bool expanded: false
     property bool allMacros: false
     property real panelHeight: 220
-    readonly property int stripHeight: 30
+    readonly property int stripHeight: sheetMode ? 48 : 30
     signal blockRequested(string blockId)
     signal clearRequested()
 
@@ -86,7 +87,7 @@ Rectangle {
     // Drag the top edge to resize while open.
     MouseArea {
         id: edgeDrag
-        visible: root.expanded
+        visible: root.expanded && !root.sheetMode
         anchors.left: parent.left; anchors.right: parent.right; anchors.top: parent.top; height: 5; z: 10
         cursorShape: Qt.SizeVerCursor
         property real startY: 0
@@ -102,7 +103,7 @@ Rectangle {
         anchors.fill: parent; spacing: 0
         Item {
             Layout.fillWidth: true; Layout.preferredHeight: root.stripHeight
-            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: root.expanded = !root.expanded }
+            MouseArea { anchors.fill: parent; cursorShape: Qt.PointingHandCursor; onClicked: if (!root.sheetMode) root.expanded = !root.expanded }
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 8; spacing: 8
                 Rectangle {
@@ -126,21 +127,21 @@ Rectangle {
                 Row {
                     visible: root.expanded; spacing: 4
                     BwButton {
-                        text: qsTr("This macro"); implicitHeight: 22; font.pixelSize: 11; primary: !root.allMacros
+                        text: qsTr("This macro"); implicitHeight: root.sheetMode ? 48 : 22; font.pixelSize: 11; primary: !root.allMacros
                         onClicked: root.allMacros = false
                     }
                     BwButton {
-                        text: qsTr("All"); implicitHeight: 22; font.pixelSize: 11; primary: root.allMacros
+                        text: qsTr("All"); implicitHeight: root.sheetMode ? 48 : 22; font.pixelSize: 11; primary: root.allMacros
                         onClicked: root.allMacros = true
                     }
                     BwButton {
-                        iconName: "trash"; text: ""; implicitWidth: 22; implicitHeight: 22; enabled: root.entries.length > 0
+                        iconName: "trash"; text: ""; implicitWidth: root.sheetMode ? 48 : 22; implicitHeight: root.sheetMode ? 48 : 22; enabled: root.entries.length > 0
                         ToolTip.visible: hovered; ToolTip.text: qsTr("Clear the log")
                         onClicked: root.clearRequested()
                     }
                 }
                 LucideIcon {
-                    name: "chevron-up"; rotation: root.expanded ? 180 : 0; color: Theme.textDim; width: 16; height: 16
+                    visible: !root.sheetMode; name: "chevron-up"; rotation: root.expanded ? 180 : 0; color: Theme.textDim; width: 16; height: 16
                     Behavior on rotation { enabled: Motion.enabled; NumberAnimation { duration: Motion.normal; easing.type: Easing.OutCubic } }
                 }
             }

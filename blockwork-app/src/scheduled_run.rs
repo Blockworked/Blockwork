@@ -51,6 +51,20 @@ pub(crate) fn fire_with_input(
     app: AppHandle,
     input: Option<(String, Evaluated)>,
 ) {
+    fire_with_host_gate(macro_id, instructions, emulator, speed_multiplier, variable_defs, list_defs, shared_state, app, input, None);
+}
+
+pub(crate) type HostGate = Arc<dyn Fn() -> bool + Send + Sync>;
+
+/// Native triggers can require a macro grant and recheck service readiness
+/// after an asynchronous permission prompt, before the body starts.
+#[allow(clippy::too_many_arguments)]
+pub(crate) fn fire_with_host_gate(
+    macro_id: String, instructions: Vec<Instruction>, emulator: Arc<Mutex<dyn InputBackend>>,
+    speed_multiplier: f64, variable_defs: &[VariableDef], list_defs: &[ListDef],
+    shared_state: SharedState, app: AppHandle, input: Option<(String, Evaluated)>,
+    gate: Option<(&'static str, HostGate)>,
+) {
     let variables: VariableStore = Arc::new(Mutex::new(variable_defs.iter().map(|v| (v.name.clone(), v.value.clone())).collect()));
     let lists: ListStore = Arc::new(Mutex::new(list_defs.iter().map(|list| (list.name.clone(), list.items.clone())).collect()));
     std::thread::spawn(move || {
@@ -77,6 +91,23 @@ pub(crate) fn fire_with_input(
         run_log::run_event(&source, run_log::RunEvent::Fired, "Trigger fired");
         let run_flag = run_registry::begin_macro_run(&macro_id);
         let done = limit_run(&source, &run_flag, max_secs);
+        if let Some((ability, ready)) = gate {
+            let stopped = || !ready() || run_flag.lock().map(|running| !*running).unwrap_or(true);
+            let allowed = if stopped() { Err("Native trigger is no longer ready".into()) }
+                else if ability.is_empty() { Ok(()) }
+                else { blockwork_core::permissions::check(&source, ability, &stopped) };
+            if let Err(error) = allowed {
+                run_log::error(&source, error);
+                done.store(true, Ordering::Relaxed);
+                run_registry::end_run(&run_flag);
+                return;
+            }
+            if stopped() {
+                done.store(true, Ordering::Relaxed);
+                run_registry::end_run(&run_flag);
+                return;
+            }
+        }
         run_fired_strand(source, instructions, emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists), block_table, max_loops);
         done.store(true, Ordering::Relaxed);
         run_registry::end_run(&run_flag);
@@ -154,6 +185,12 @@ pub(crate) fn persist_fired_variables(shared_state: &SharedState, app: &AppHandl
             mac.sync_lists_from(&values);
         }
         let mac_to_save = mac.clone();
+        // Trigger runs use their own stores. Refresh the open editor's
+        // previews after completion without replacing a concurrent run's store.
+        if s.current_macro.as_ref().is_some_and(|m| m.id == macro_id) && !run_registry::is_running(macro_id) {
+            if let Ok(mut values) = s.variable_values.lock() { *values = mac_to_save.variable_values(); }
+            if let Ok(mut values) = s.list_values.lock() { *values = mac_to_save.list_values(); }
+        }
         if let Some(entry) = s.macros_list.iter_mut().find(|m| m.id == macro_id) {
             *entry = mac_to_save.clone();
         }

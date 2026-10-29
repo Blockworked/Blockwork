@@ -1022,7 +1022,7 @@ fn operator_capability(op: &str) -> Option<&'static str> {
         "ClipboardText" | "ClipboardHasImage" | "ClipboardHasFiles" => "clipboard",
         "ActiveWindowTitle" | "ActiveWindowApp" | "WindowExists" | "WindowInfo" | "AppRunning" => "windows",
         "MacroRunning" => "macros",
-        "PixelColor" | "AverageColor" | "ScreenText" => "screen",
+        "AndroidElementExists" | "AndroidElementText" | "PixelColor" | "AverageColor" | "ScreenText" => "screen",
         "GlobalVariable" => "globals",
         "Secret" => "secrets",
         "PageUrl" | "PageTitle" | "ElementText" | "ElementExists" | "ElementCount" => "browser",
@@ -1065,11 +1065,13 @@ pub(crate) fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto
         let kind = match &ins.kind {
             InstructionKind::Command(_)
             | InstructionKind::CommandWait(_)
+            | InstructionKind::LaunchAndroidApp { .. }
             | InstructionKind::OpenApp { .. }
             | InstructionKind::CloseApp { .. } => Some("commands"),
             InstructionKind::HttpRequest { .. } => Some("network"),
             InstructionKind::WriteFile { .. } => Some("files_write"),
-            InstructionKind::Token(_) => Some("input"),
+            InstructionKind::Touch { .. } | InstructionKind::Token(_) => Some("input"),
+            InstructionKind::Element { .. } | InstructionKind::WhenForegroundApp { .. } => Some("screen"),
             InstructionKind::SetClipboard(_) | InstructionKind::WhenClipboardChanged => Some("clipboard"),
             InstructionKind::WindowAction { .. }
             | InstructionKind::MoveWindow { .. }
@@ -1090,6 +1092,10 @@ pub(crate) fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto
             _ => None,
         };
         found.extend(kind);
+        if let InstructionKind::Element { action, .. } = &ins.kind {
+            use blockwork_core::input::element::ElementAction;
+            if !matches!(action, ElementAction::Exists | ElementAction::ReadText | ElementAction::Wait) { found.insert("input"); }
+        }
         if matches!(ins.kind, InstructionKind::ClickImage { .. } | InstructionKind::AimAtDetection { .. }) {
             found.insert("screen");
         }
@@ -2928,7 +2934,7 @@ pub(crate) async fn check_for_updates_internal(
     state: &SharedState,
     app: &AppHandle,
 ) {
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(all(feature = "desktop", any(windows, target_os = "macos")))]
     {
         let version = env!("CARGO_PKG_VERSION").to_string();
         let result = tokio::task::spawn_blocking(move || {
@@ -2945,7 +2951,7 @@ pub(crate) async fn check_for_updates_internal(
             emit_state_updated(app, &s);
         }
     }
-    #[cfg(not(any(windows, target_os = "macos")))]
+    #[cfg(not(all(feature = "desktop", any(windows, target_os = "macos"))))]
     if let Ok(mut s) = state.lock() {
         s.update_check_state =
             UpdateCheckState::Error("Updates are only supported on Windows and macOS".to_string());
@@ -2962,7 +2968,7 @@ pub(crate) fn apply_update(
         s.update_check_state = UpdateCheckState::Applying;
         emit_state_updated(&app, &s);
     }
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(all(feature = "desktop", any(windows, target_os = "macos")))]
     {
         let state_clone = Arc::clone(&*state);
         let app_clone = app.clone();
@@ -4333,4 +4339,47 @@ pub(crate) async fn edit_reporter_branch(
         emit_state_updated(app, &s);
     }
     Ok(result)
+}
+
+#[cfg(test)]
+mod android_element_review_tests {
+    use super::*;
+    use blockwork_core::input::element::{ElementAction, ElementSelector};
+    #[test]
+    fn element_import_review_distinguishes_reading_from_interaction() {
+        for action in [ElementAction::Exists, ElementAction::ReadText, ElementAction::Wait, ElementAction::Click, ElementAction::SetText] {
+            let mac = Macro::new("Element permissions".into(), "".into(), vec![Instruction::new(InstructionKind::Element {
+                action, selector: ElementSelector { package: "fixture.app".into(), resource_id: "id".into(), ..Default::default() },
+                text: Value::text(""), timeout: Value::number(1000.0), variable: String::new(),
+            })]);
+            let caps = macro_capabilities(&mac);
+            assert!(caps.iter().any(|c| c.kind == "screen"));
+            assert_eq!(caps.iter().any(|c| c.kind == "input"), matches!(action, ElementAction::Click | ElementAction::SetText));
+        }
+        let value: Value = serde_json::from_value(serde_json::json!({"kind":"Op","op":"AndroidElementText","args":[],"saved":{"kind":"Text","value":""}})).unwrap();
+        let mac = Macro::new("Element reporter".into(), "".into(), vec![Instruction::new(InstructionKind::SetVariable("result".into(), value))]);
+        assert!(macro_capabilities(&mac).iter().any(|c| c.kind == "screen"));
+    }
+}
+
+#[cfg(test)]
+mod android_app_review_tests {
+    use super::*;
+    #[test]
+    fn foreground_observation_and_launches_disclose_different_grants() {
+        let foreground = Macro::new("Foreground".into(), "".into(), vec![Instruction::new(InstructionKind::WhenForegroundApp {package:"fixture.app".into(),entered:true})]);
+        let caps = macro_capabilities(&foreground);
+        assert!(caps.iter().any(|c| c.kind == "screen" && c.guarded));
+        assert!(caps.iter().any(|c| c.kind == "triggers"));
+        assert!(!caps.iter().any(|c| c.kind == "commands"));
+        let launch = Macro::new("Launch".into(), "".into(), vec![Instruction::new(InstructionKind::LaunchAndroidApp {package:Value::text("fixture.app")})]);
+        assert!(macro_capabilities(&launch).iter().any(|c| c.kind == "commands" && c.guarded));
+    }
+}
+
+pub(crate) fn set_macro_android_exact_time(state: &SharedState, app: &AppHandle, enabled: bool) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e|e.to_string())?;
+    if s.capabilities.platform != "android" {return Err("Android exact alarms require an Android host".into());}
+    if let Some(mac) = &mut s.current_macro {mac.settings.android_exact_time=enabled;auto_save(&mut s);}
+    emit_state_updated(app,&s); Ok(())
 }

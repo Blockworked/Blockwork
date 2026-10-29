@@ -2,6 +2,7 @@
 members = [
     "blockwork-qt",
     "blockwork-app",
+    "blockwork-android",
     "blockwork-core",
     "blockwork-daemon",
     "blockwork-ffi",
@@ -21,7 +22,7 @@ version = "0.6.0"
 edition = "2024"
 
 [workspace.dependencies]
-blockstitch-qml = { git = "https://github.com/Blockworked/blockstitch", rev = "0bfc7874bc864024e15ea43cd6aace34b9027d85" }
+blockstitch-qml = { path = "vendor/blockstitch-qml" }
 blockstitch-ffi = { git = "https://github.com/Blockworked/blockstitch", rev = "0bfc7874bc864024e15ea43cd6aace34b9027d85" }
 blockstitch-core = {
     git = "https://github.com/Blockworked/blockstitch",

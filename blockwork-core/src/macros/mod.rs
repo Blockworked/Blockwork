@@ -2,6 +2,8 @@
 //! the `Macro` document wrapped around blockstitch's [`BlockGraph`].
 //! [`InstructionKind`]'s [`BlockKind`] impl is the hinge between the two.
 
+use crate::input::touch::TouchAction;
+use crate::input::element::{ElementAction, ElementSelector};
 use crate::input::schedule::{LegacyTimeSchedule, TimeSchedule};
 use crate::input::types::{Direction, InputToken, MacroButton};
 use crate::input::value::{Op, Value};
@@ -73,7 +75,8 @@ const LEGACY_ROOT_STRAND_ID: &str = "root";
 macro_rules! for_each_ref {
     ($kind:expr, $f:expr) => {
         match $kind {
-            InstructionKind::SetVariable(name, _)
+            InstructionKind::Element { variable: name, .. }
+            | InstructionKind::SetVariable(name, _)
             | InstructionKind::ChangeVariable(name, _)
             | InstructionKind::HttpRequest { variable: name, .. }
             | InstructionKind::BrowserScript { variable: name, .. }
@@ -122,6 +125,11 @@ impl BlockKind for InstructionKind {
 
     fn visit_values_mut(&mut self, f: &mut dyn FnMut(&mut Value, InputValueType)) {
         match self {
+            InstructionKind::LaunchAndroidApp { package } => f(package, InputValueType::Any),
+            InstructionKind::Element { text, timeout, .. } => { f(text, InputValueType::Any); f(timeout, InputValueType::Any); }
+            InstructionKind::Touch { x, y, end_x, end_y, duration, .. } => {
+                for value in [x, y, end_x, end_y, duration] { f(value, InputValueType::Any); }
+            }
             InstructionKind::Token(token) => token.visit_values_mut(f),
             InstructionKind::Wait(value)
             | InstructionKind::Return(value)
@@ -291,6 +299,7 @@ impl BlockKind for InstructionKind {
             | InstructionKind::WhenNetwork { .. }
             | InstructionKind::Forever { .. }
             | InstructionKind::OpenApp { .. }
+            | InstructionKind::WhenForegroundApp { .. }
             | InstructionKind::CloseApp { .. }
             | InstructionKind::DeleteAllOfList { .. }
             | InstructionKind::ReverseList { .. }
@@ -317,6 +326,7 @@ impl BlockKind for InstructionKind {
                 | InstructionKind::WhenFileChanged(_)
                 | InstructionKind::WhenTyped { .. }
                 | InstructionKind::WhenApp { .. }
+                | InstructionKind::WhenForegroundApp { .. }
                 | InstructionKind::WhenIdle(_)
                 | InstructionKind::WhenScreenLock { .. }
                 | InstructionKind::WhenCron(_)
@@ -487,6 +497,12 @@ impl LaunchOptions {
 pub enum InstructionKind {
     Token(InputToken),
     Wait(Value),
+    /// Exact Android package entry/exit, separate from WhenApp process events.
+    WhenForegroundApp { package: String, entered: bool },
+    /// Starts an Android package launcher, with no shell or desktop options.
+    LaunchAndroidApp { package: Value },
+    Element { action: ElementAction, selector: ElementSelector, text: Value, timeout: Value, variable: String },
+    Touch { action: TouchAction, x: Value, y: Value, end_x: Value, end_y: Value, duration: Value },
     /// Starts a shell command and moves on without waiting for it. Files
     /// before format version 2 meant `CommandWait` by it (see `migrate`).
     Command(String),
@@ -980,6 +996,13 @@ pub enum InstructionKind {
 impl std::hash::Hash for InstructionKind {
     fn hash<H: std::hash::Hasher>(&self, state: &mut H) {
         match self {
+            Self::WhenForegroundApp { package, entered } => { "WhenForegroundApp".hash(state); (package, entered).hash(state); }
+            Self::LaunchAndroidApp { package } => { "LaunchAndroidApp".hash(state); package.hash(state); }
+            Self::Element { action, selector, text, timeout, variable } => { "Element".hash(state); (action, selector, text, timeout, variable).hash(state); }
+            Self::Touch { action, x, y, end_x, end_y, duration } => {
+                "Touch".hash(state);
+                (action, x, y, end_x, end_y, duration).hash(state);
+            }
             Self::Token(t) => {
                 0u8.hash(state);
                 t.hash(state);
@@ -1423,6 +1446,10 @@ enum WhenTimeDe {
 enum InstructionKindDe {
     Token(InputToken),
     Wait(WaitDe),
+    WhenForegroundApp { package: String, entered: bool },
+    LaunchAndroidApp { package: Value },
+    Element { action: ElementAction, selector: ElementSelector, text: Value, timeout: Value, variable: String },
+    Touch { action: TouchAction, x: Value, y: Value, end_x: Value, end_y: Value, duration: Value },
     Command(String),
     CommandWait(String),
     Comment(String),
@@ -1818,6 +1845,10 @@ fn migrate_wait_duration(duration: Value, randomness: Value) -> Value {
 impl From<InstructionKindDe> for InstructionKind {
     fn from(de: InstructionKindDe) -> Self {
         match de {
+            InstructionKindDe::WhenForegroundApp { package, entered } => InstructionKind::WhenForegroundApp { package, entered },
+            InstructionKindDe::LaunchAndroidApp { package } => InstructionKind::LaunchAndroidApp { package },
+            InstructionKindDe::Element { action, selector, text, timeout, variable } => InstructionKind::Element { action, selector, text, timeout, variable },
+            InstructionKindDe::Touch { action, x, y, end_x, end_y, duration } => InstructionKind::Touch { action, x, y, end_x, end_y, duration },
             InstructionKindDe::Token(t) => InstructionKind::Token(t),
             InstructionKindDe::Wait(WaitDe::LegacyNumber(d)) => {
                 InstructionKind::Wait(Value::number(d as f64))
@@ -2089,7 +2120,11 @@ pub struct MacroSettings {
     /// Runs schedules and "once at" triggers it missed while Blockwork was
     /// closed or the computer slept, once, when it gets the chance.
     #[serde(default)]
-    pub catch_up_missed: bool,    /// Block packs this macro's blocks came from.
+    pub catch_up_missed: bool,
+    /// Android only: request exact AlarmManager delivery, never silently downgraded.
+    #[serde(default)]
+    pub android_exact_time: bool,
+    /// Block packs this macro's blocks came from.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub block_packs: Vec<crate::block_packs::PackRecord>,
     /// Metadata for packs authored here, restored on the next export.

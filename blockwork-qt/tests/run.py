@@ -9,7 +9,7 @@ import sys
 import tempfile
 
 root = Path(__file__).resolve().parents[2]
-blockstitch = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root.parent / "blockstitch"
+blockstitch = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root / "vendor/blockstitch-qml"
 qtpaths = shutil.which("qtpaths6") or shutil.which("qtpaths")
 qtbin = Path(subprocess.check_output([qtpaths, "--query", "QT_HOST_BINS"], text=True).strip()) if qtpaths else Path("/usr/lib/qt6/bin")
 

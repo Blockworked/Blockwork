@@ -5,16 +5,21 @@ edition.workspace = true
 
 [dependencies]
 blockstitch-core.workspace = true
-blockwork-core = { path = "../blockwork-core" }
+blockwork-core = { path = "../blockwork-core", default-features = false, features = ["system", "ipc"] }
 tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 uuid.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net", "io-util", "time"] }
 chrono.workspace = true
+chrono-tz = "0.10"
 dirs.workspace = true
 base64.workspace = true
 sha2 = "0.10.9"
+
+[features]
+default = ["desktop"]
+desktop = ["blockwork-core/updater", "blockwork-core/onnx", "blockwork-core/gpu"]
 
 [dev-dependencies]
 # The website's editor, replayed against this crate's commands.

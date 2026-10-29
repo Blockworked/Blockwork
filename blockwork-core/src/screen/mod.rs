@@ -21,7 +21,7 @@ mod windows;
 pub use find::{find, find_all, Match};
 pub use image::Image;
 
-use std::sync::{Arc, Mutex};
+use std::sync::{Arc, Mutex, OnceLock};
 use std::time::{Duration, Instant};
 
 #[cfg(target_os = "linux")]
@@ -113,32 +113,62 @@ impl Shot {
 /// takes one screenshot.
 const REUSE_FOR: Duration = Duration::from_millis(60);
 
-static LAST: Mutex<Option<(Instant, Arc<Shot>)>> = Mutex::new(None);
+static LAST: Mutex<Option<(u64, Instant, Arc<Shot>)>> = Mutex::new(None);
+static GENERATION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
+/// An embedding host can supply screen access without desktop capture APIs.
+/// Android uses physical default-display pixels, with origin (0, 0), scale 1.
+pub trait ScreenBackend: Send + Sync {
+    fn capture(&self) -> Result<Shot, String>;
+    fn monitors(&self) -> Vec<Rect>;
+}
+static HOST: OnceLock<Arc<dyn ScreenBackend>> = OnceLock::new();
+
+pub fn install_backend(backend: Arc<dyn ScreenBackend>) -> Result<(), String> {
+    HOST.set(backend).map_err(|_| "screen backend is already installed".to_string())
+}
+
+/// Drop cached pixels after permission, lock or display geometry changes.
+pub fn invalidate() {
+    GENERATION.fetch_add(1, std::sync::atomic::Ordering::SeqCst);
+    // A capture may be waiting for the host's main looper. Revocation on that
+    // looper must never wait for the capture mutex.
+    if let Ok(mut last) = LAST.try_lock() { *last = None; }
+}
 
 /// The current screen contents (reused for a few ms).
 pub fn capture() -> Result<Arc<Shot>, String> {
+    let generation = GENERATION.load(std::sync::atomic::Ordering::SeqCst);
     let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
-    if let Some((at, shot)) = last.as_ref()
+    if let Some((cached_generation, at, shot)) = last.as_ref()
+        && *cached_generation == generation
         && at.elapsed() < REUSE_FOR
     {
         return Ok(Arc::clone(shot));
     }
-    let shot = Arc::new(platform::capture()?);
-    *last = Some((Instant::now(), Arc::clone(&shot)));
+    let shot = Arc::new(match HOST.get() {
+        Some(host) => host.capture()?,
+        None => platform::capture()?,
+    });
+    if generation != GENERATION.load(std::sync::atomic::Ordering::SeqCst) {
+        *last = None;
+        return Err("Screen access or display geometry changed during capture; try again".into());
+    }
+    *last = Some((generation, Instant::now(), Arc::clone(&shot)));
     Ok(shot)
 }
 
 /// A fresh capture, ignoring the reuse window (the screen picker wants
 /// what's there now).
 pub fn capture_fresh() -> Result<Arc<Shot>, String> {
-    *LAST.lock().unwrap_or_else(|e| e.into_inner()) = None;
+    invalidate();
     capture()
 }
 
 /// What's under a screen rectangle: captured on its own where that's cheap,
 /// otherwise cut from the shared desktop capture.
 fn area(rect: Rect) -> Result<Shot, String> {
-    if platform::CHEAP_AREAS
+    if HOST.get().is_none() && platform::CHEAP_AREAS
         && let Some(shot) = platform::capture_area(rect, true)
     {
         return Ok(shot);
@@ -148,7 +178,7 @@ fn area(rect: Rect) -> Result<Shot, String> {
 
 /// The color at screen point (`x`, `y`) as `#rrggbb`.
 pub fn pixel_color(x: f64, y: f64) -> Result<String, String> {
-    let shot = area(Rect { x, y, width: 1.0, height: 1.0 }).map_err(|_| format!("{x},{y} is off screen"))?;
+    let shot = area(Rect { x, y, width: 1.0, height: 1.0 })?;
     let (px, py) = shot.to_image(x, y);
     if px < 0 || py < 0 || px >= shot.image.width as i64 || py >= shot.image.height as i64 {
         return Err(format!("{x},{y} is off screen"));
@@ -263,7 +293,7 @@ fn window_bounds(pattern: &str, by: crate::window::MatchBy) -> Result<Rect, Stri
 
 /// Every monitor, in screen coordinates.
 pub fn monitors() -> Vec<Rect> {
-    platform::monitors()
+    HOST.get().map_or_else(platform::monitors, |host| host.monitors())
 }
 
 /// The box around every monitor.

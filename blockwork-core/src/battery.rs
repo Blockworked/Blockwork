@@ -3,6 +3,8 @@
 //! `WhenBatteryDischargedTo`/`WhenBatteryChargedTo`/`WhenPowerPluggedIn`/
 //! `WhenPowerUnplugged` instructions.
 
+#[cfg(not(target_os = "android"))]
+mod desktop {
 use starship_battery::units::ratio::percent;
 use starship_battery::State;
 
@@ -32,3 +34,19 @@ pub fn is_plugged_in() -> bool {
     let Some(Ok(battery)) = batteries.next() else { return true };
     battery.state() != State::Discharging
 }
+
+}
+
+#[cfg(not(target_os = "android"))]
+pub use desktop::*;
+
+#[cfg(target_os = "android")]
+mod android {
+    pub fn percentage() -> Result<f64, String> {
+        Err("battery reporting is not connected to the Android host".into())
+    }
+    pub fn is_plugged_in() -> bool { false }
+}
+
+#[cfg(target_os = "android")]
+pub use android::*;

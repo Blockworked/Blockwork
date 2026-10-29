@@ -1,0 +1,6 @@
+find_package(Qt6QuickShapesPrivate 6.10.3 EXACT REQUIRED)
+if(NOT TARGET Qt6::QuickShapes)
+    add_library(Qt6::QuickShapes ALIAS Qt6::QuickShapesPrivate)
+endif()
+set(Qt6QuickShapes_FOUND TRUE)
+set(Qt6QuickShapes_VERSION 6.10.3)

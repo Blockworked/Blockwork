@@ -63,6 +63,8 @@ pub(crate) enum KeyCaptureTarget {
 }
 
 pub(crate) struct AppState {
+    pub(crate) capabilities: crate::host::Capabilities,
+    pub(crate) desktop_integration: bool,
     pub(crate) macro_selected: Option<usize>,
     pub(crate) current_macro: Option<Macro>,
     pub(crate) macros_list: Vec<Macro>,
@@ -117,6 +119,7 @@ pub(crate) struct AppState {
 
 #[derive(Serialize, Clone)]
 pub(crate) struct StateDto {
+    pub(crate) capabilities: crate::host::Capabilities,
     pub(crate) macro_names: Vec<String>,
     pub(crate) macro_selected: Option<usize>,
     pub(crate) current_macro: Option<MacroDto>,
@@ -488,6 +491,7 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
     };
 
     StateDto {
+        capabilities: s.capabilities.clone(),
         macro_names: s.macro_strs.clone(),
         macro_selected: s.macro_selected,
         current_macro,
@@ -521,8 +525,8 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         invalid_field_buffers,
         ipc_port_text: s.ipc_port_text.clone(),
         ipc_port_invalid: s.ipc_port_invalid,
-        emulator_available: !blockwork_core::macros::runner::emulator_failed(),
-        grab_available: !blockwork_core::recording::grab_failed(),
+        emulator_available: if s.desktop_integration { !blockwork_core::macros::runner::emulator_failed() } else { s.capabilities.services.get("touch").is_some_and(|c| c.ready) },
+        grab_available: s.desktop_integration && !blockwork_core::recording::grab_failed(),
         razer_permission_warning: crate::razer::permission_warning(),
         update_check_state,
         triggers_paused: s.triggers_paused,

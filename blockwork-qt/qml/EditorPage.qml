@@ -15,6 +15,26 @@ Item {
     // Shared import/export flow (MacroFiles in Main.qml).
     property var macroFiles: null
     property var blockLibrary: null
+    // Embedding hosts can supply platform navigation above the same canvas.
+    property bool showToolbar: true
+    readonly property bool compact: width < 720
+    readonly property bool blocksOpen: blocksSheet.opened
+    readonly property bool activityOpen: activitySheet.opened
+    function openBlocks() {
+        if (compact) { activitySheet.close(); blocksSheet.open(); }
+        else sidebarCollapsed = !sidebarCollapsed;
+    }
+    function openActivity() { blocksSheet.close(); activitySheet.open(); }
+    function dismissSheet() {
+        if (blocksSheet.visible) { blocksSheet.close(); return true; }
+        if (activitySheet.visible) { activitySheet.close(); return true; }
+        return false;
+    }
+    function addPaletteEntry(spec) {
+        if ((compact ? dragController.addAtView(spec) : dragController.addAt(spec, spec.kind === "value" ? 160 : 120, spec.kind === "value" ? 140 : 120)) && compact) { Qt.inputMethod.hide(); blocksSheet.close(); }
+    }
+    onCompactChanged: if (!compact) { blocksSheet.close(); activitySheet.close(); }
+
     readonly property var macro: appState.current_macro
     // Preserve metadata identity so block moves do not refresh palette controls.
     readonly property string blockDefinitionsKey: JSON.stringify(root.macro && root.macro.block_defs ? root.macro.block_defs : [])
@@ -33,7 +53,22 @@ Item {
     property bool sidebarToggling: false
     readonly property real minSidebarWidth: 180
     readonly property real maxSidebarWidth: 600
-    readonly property var instructionTypes: ["WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "WhenTyped", "WhenApp", "WhenIdle", "WhenScreenLock", "WhenCron", "WhenNetwork", "WhenUsb", "WhenMouseButton", "WhenAt", "WhenSignal", "WhenWebhook", "Wait", "Text", "PasteText", "Key", "Button", "MoveMouse", "Scroll", "Command", "CommandWait", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile", "HttpRequest", "Notify", "AskText", "AskYesNo", "AskChoice", "ShowMessage", "Log", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry", "ThrowError", "StopMacro", "WithLock", "SendSignal", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal", "WaitUntil", "FindImage", "ClickImage", "WaitForImage", "DetectObjectsInWindow", "WaitForDetection", "AimStep", "AimAtDetection", "BrowserOpen", "BrowserClick", "BrowserType", "BrowserWaitFor", "BrowserScript"]
+    readonly property var allInstructionTypes: ["WhenForegroundApp", "LaunchAndroidApp", "Element", "Touch", "WhenRan", "WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenTime", "WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "WhenTyped", "WhenApp", "WhenIdle", "WhenScreenLock", "WhenCron", "WhenNetwork", "WhenUsb", "WhenMouseButton", "WhenAt", "WhenSignal", "WhenWebhook", "Wait", "Text", "PasteText", "Key", "Button", "MoveMouse", "Scroll", "Command", "CommandWait", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile", "HttpRequest", "Notify", "AskText", "AskYesNo", "AskChoice", "ShowMessage", "Log", "SetVariable", "ChangeVariable", "SetClipboard", "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry", "ThrowError", "StopMacro", "WithLock", "SendSignal", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal", "WaitUntil", "FindImage", "ClickImage", "WaitForImage", "DetectObjectsInWindow", "WaitForDetection", "AimStep", "AimAtDetection", "BrowserOpen", "BrowserClick", "BrowserType", "BrowserWaitFor", "BrowserScript"]
+    readonly property bool androidHost: !!appState.capabilities && appState.capabilities.platform === "android"
+    Binding { target: BlockRegistry; property: "recordingTargets"; value: !root.androidHost }
+    readonly property var instructionTypes: allInstructionTypes.filter(type => blockAvailable(type))
+    function blockAvailable(type) {
+        if (["WhenForegroundApp", "LaunchAndroidApp", "Touch", "Element"].indexOf(type) >= 0) return androidHost;
+        if (!androidHost) return true;
+        // Only expose integrations the Android host implements. Imported
+        // documents retain their blocks and receive availability markers.
+        return ["WhenRan", "WhenSignal", "WhenTime", "WhenCron", "WhenAt", "Wait", "Text", "Touch", "Log", "SetVariable", "ChangeVariable",
+            "Return", "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop", "TryCatch", "Retry",
+            "ThrowError", "StopMacro", "WithLock", "SendSignal", "RunMacro", "StopMacroNamed", "SetGlobal", "ChangeGlobal",
+            "WaitUntil", "FindImage", "ClickImage", "WaitForImage", "HttpRequest", "AskText", "AskYesNo", "AskChoice", "ShowMessage",
+            "Comment", "BlockHeader", "CallBlock", "RunBranch", "AddToList", "DeleteOfList", "DeleteAllOfList",
+            "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList", "SplitIntoList"].indexOf(type) >= 0;
+    }
     readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList", "SplitIntoList"]
 
     function uuid() { return "xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx".replace(/[xy]/g, c => { const r = Math.random() * 16 | 0; return (c === "x" ? r : (r & 3 | 8)).toString(16); }); }
@@ -106,6 +141,8 @@ Item {
     function totalBlocks() { return (root.macro ? root.macro.strands : []).reduce((n, st) => n + st.instructions.length, 0); }
     function nextPath(path) { const p=JSON.parse(JSON.stringify(path));p[p.length-1].index++;return p; }
     function instructionExplainer(type) {
+        if (type === "WhenForegroundApp") return qsTr("Runs when this Android package enters or leaves the foreground. The first observation after enabling accessibility, unlocking or picking establishes a baseline. Keyboard/system overlays do not count. This is different from a process starting or stopping.");
+        if (type === "LaunchAndroidApp") return qsTr("Launches the Android app's main activity in this profile. Choose an installed app or supply its exact package name. Wait for an element before interacting with the newly opened app.");
         const x={BrowserOpen:qsTr("Opens a web address in the browser's current tab, or a new one, and waits for it to load. Needs the Blockwork browser extension, paired in Settings > Integrations."),BrowserClick:qsTr("Clicks an element on the page in the browser you used last, waiting up to 5 seconds for it to appear. It clicks the first match; add 'which match' with the + to pick another when several fit: 1 is the first, -1 the last. A selector says which element: CSS like button.save, text=Save for what it reads (or its label), focused for the field with the cursor; join parts with >> to search inside the one before, and add >> near=button for the closest button, or >> nth=2 for the second match. The extension's picker makes one for you."),BrowserType:qsTr("Puts text into a field on the page, replacing what was there, the way typing would. It uses the first match; add 'which match' with the + to pick another. Works on text boxes, rich text editors and lists (pick an option by its text). A selector says which element: CSS like button.save, text=Save for what it reads (or its label), focused for the field with the cursor; join parts with >> to search inside the one before, and add >> near=button for the closest button, or >> nth=2 for the second match. The extension's picker makes one for you."),BrowserWaitFor:qsTr("Pauses until an element appears on the page (or goes away). If that hasn't happened within the time limit it's an error; 0 waits forever. A selector says which element: CSS like button.save, text=Save for what it reads (or its label), focused for the field with the cursor; join parts with >> to search inside the one before, and add >> near=button for the closest button, or >> nth=2 for the second match. The extension's picker makes one for you."),BrowserScript:qsTr("Runs JavaScript in the page and puts its result in the variable. Give an expression like document.title, or statements with a return. In Chrome and Edge it needs \"Allow user scripts\" turned on in the extension's details page. Firefox asks you to allow each new script once."),BrowserConnected:qsTr("Whether a browser with the Blockwork extension is connected."),PageUrl:qsTr("The web address of the tab you're on in the browser."),PageTitle:qsTr("The title of the tab you're on in the browser."),ElementText:qsTr("The text of the first element the selector matches, or what's typed in it for a field. An error if nothing matches. Add >> nth=2 for the second match."),ElementExists:qsTr("Whether the selector matches anything on the page right now."),ElementCount:qsTr("How many elements the selector matches on the page. Handy for checking a selector picks only one."),WhenAt:qsTr("Runs once, at a date and time like 2026-12-24 18:00 (local time). Click it to pick the day from a calendar, or drop a reporter that gives one. Turn on 'catch up on missed schedules' in Macro settings to still run it if Blockwork was closed or the computer was asleep at that moment."),WhenSignal:qsTr("Runs when a 'send signal' block in this macro sends the same name. It shares that run's variables, so one strand can hand work to others."),SendSignal:qsTr("Starts this macro's 'when I receive' strands with the same name. With 'and wait' this strand pauses until they've all finished: a way to wait for other strands."),WhenWebhook:qsTr("Runs when a web request reaches Blockwork's webhook server at this path. Turn the server on in Settings > Integrations, where its address and token are. The request body goes into the variable."),AskText:qsTr("Shows a dialog asking for text and puts the answer in the variable. Cancel stops the run, unless it's inside a try block, where it's an error you can catch."),AskYesNo:qsTr("Shows a yes/no question and puts true or false in the variable."),AskChoice:qsTr("Shows the items of a list and puts the one you pick in the variable. Cancel stops the run, unless it's inside a try block."),ShowMessage:qsTr("Shows a message in a dialog and waits until you close it."),WhenNetwork:qsTr("Runs when the computer goes online or offline: when a network route to the internet appears or goes away. Checked once a second."),WhenUsb:qsTr("Runs when a USB device is plugged in or unplugged. The text matches the device's name or its vendor:product id (like 046d:c52b); leave it empty for any device. Hubs don't count."),WhenMouseButton:qsTr("Runs when a mouse button is pressed or released, or the wheel scrolls. Put modifier keys in the box (like Control+Shift) to only run while exactly those are held; leave it empty to ignore modifiers. The click still goes through to the app. On Windows, clicks in programs running as administrator are only seen when Blockwork runs as administrator too."),SplitIntoList:qsTr("Cuts the text at every separator and puts the pieces in the list, replacing what was there. An empty separator splits it into letters."),Secret:qsTr("The value of a secret saved in Settings > Secrets. It comes from your system keyring, isn't stored in the macro file, and shows as dots in the run log."),NetworkConnected:qsTr("Whether the computer has a network route to the internet."),UsbConnected:qsTr("Whether a USB device whose name or vendor:product id contains the text is plugged in. Empty matches any device."),TextCheck:qsTr("Checks text: contains, starts with, ends with, or matches a regular expression. Case matters."),TextReplace:qsTr("Replaces every copy of the first text inside the second with the third."),RegexReplace:qsTr("Replaces every match of a regular expression. Use $1, $2 in the replacement for groups."),RegexFind:qsTr("The first match of a regular expression, or its first group if it has one. Empty when nothing matches."),SplitPart:qsTr("Cuts the text at every separator and gives one piece, counting from 1. Negative numbers count from the end."),SplitCount:qsTr("How many pieces the text has when cut at every separator."),Substring:qsTr("The letters between two positions, counting from 1, both included."),Trim:qsTr("The text without spaces or line breaks at its start and end."),FormatNumber:qsTr("The number as text with exactly this many digits after the point."),Timestamp:qsTr("The current time as a Unix timestamp: seconds since 1970. Add 86400 for a day later."),FormatDate:qsTr("Writes a timestamp as a date in local time. Codes: %Y year, %m month, %d day, %H hour, %M minute, %S second, %A weekday name, %B month name."),ParseDate:qsTr("The timestamp of a date written as text, in local time. Leave the format empty for dates like 2026-01-31 09:00, or use codes like %d.%m.%Y."),DatePart:qsTr("One part of a timestamp in local time. Weekday is 1 for Sunday to 7 for Saturday."),WhenTyped:qsTr("Text expansion: runs when you type the text anywhere, like ;addr. With 'erase it' the typed text is deleted first, so a paste block can replace it. Uses a US keyboard layout for symbols."),PasteText:qsTr("Pastes text with Ctrl+V (Cmd+V on macOS), then puts back the text that was on the clipboard. Faster and more reliable than typing for long text. Terminals that paste with Ctrl+Shift+V need a Key block instead."),WhenApp:qsTr("Runs when a program whose name contains the text starts or exits. Checked once a second."),WhenIdle:qsTr("Runs once you haven't touched the keyboard or mouse for this many minutes. Fires again after the next idle stretch."),WhenScreenLock:qsTr("Runs when the screen locks or unlocks."),WhenCron:qsTr("Runs on a schedule, like every 15 minutes on weekdays or 9:00 on the 1st of each month. Click the schedule to choose it. Underneath it's cron (minute hour day month weekday, like '0 9 * * mon-fri'), so you can also type one under Custom or drop a reporter that gives one."),WithLock:qsTr("Runs its body while holding a named lock. Only one strand, in any macro, can be inside a lock with the same name at a time; others wait their turn. Use it so two macros don't type over each other."),AppRunning:qsTr("Whether a program whose name contains the text is running."),IdleSeconds:qsTr("How many seconds since the last keyboard or mouse input."),ScreenLocked:qsTr("Whether the screen is locked."),WaitUntil:qsTr("Pauses until the condition is true, checking about 10 times a second. Add 'for up to' to continue after a time limit, or 'or error after' to end the strand with an error (catchable with try). Without a limit, or with 0, it waits forever."),FindImage:qsTr("Looks for the picture on screen and puts the screen position of its middle in the two variables, or -1 if it isn't there. Click the picture area to capture one. It uses the best match. When the picture is on screen more than once, add 'which match' with the + to choose a match number (counting left to right, top to bottom; -1 is the last), the one nearest the mouse, or the one nearest a point, like the x and y of another find block. Add 'search region' to only search part of the screen, and 'count matches' to get how many there are. Tolerance is how different the pixels may be, in percent. On Windows, games in exclusive fullscreen capture as black: switch them to borderless windowed."),ClickImage:qsTr("Finds the picture on screen and clicks its middle. It's an error if the picture isn't there. Click the picture area to capture one. It uses the best match. When the picture is on screen more than once, add 'which match' with the + to choose a match number (counting left to right, top to bottom; -1 is the last), the one nearest the mouse, or the one nearest a point. Add 'search region' to only search part of the screen."),WaitForImage:qsTr("Pauses until the picture appears on screen (or goes away). Use the + to add a search region or 'within %' tolerance (10% by default). Add 'for up to' to continue after a time limit, or 'or error after' to end the strand with an error (catchable with try). Without a limit, or with 0, it waits forever. If both limits are added, the earlier one wins; errors win a tie."),DetectObjectsInWindow:qsTr("Captures the window and finds the objects in it, with a built-in model (the name of a .onnx file in Blockwork's models folder, or a path to one) or a detector running on this computer (a local http:// address). Each one becomes a list item, ordered best, closest to the window's center, or largest first; read them with 'detection of'. Objects keep their id from one run of this block to the next. Click the region button to search only part of the window; the aim still uses the window's center. On Windows, games in exclusive fullscreen capture as black: switch them to borderless windowed. Only use it where automation is allowed, never against other players."),WaitForDetection:qsTr("Pauses until the detector sees the label in the window (or stops seeing it). If that hasn't happened within the time limit it's an error; 0 waits forever. Only use it where automation is allowed, never against other players."),AimStep:qsTr("Asks once per session before it moves the mouse. Moves the mouse one small step from the window's center toward a screen point. Games that lock the pointer turn the view instead, so repeat it with a fresh detection each time. Gain is mouse movement per pixel off target in a 1000 pixel tall window (it's scaled to the window's height): tune it to your sensitivity; about 0.5 suits Minecraft's default. Only use it where automation is allowed, never against other players."),AimAtDetection:qsTr("Asks once per session before it moves the mouse. Follows one item of a detections list: detects again and again while gliding the mouse toward it like a hand would, until it's held at the window's center for the hold time. Gain works as in the aim step block. Puts hit, timeout or lost in the variable. Fill the list with a detect block first. Only use it where automation is allowed, never against other players."),WindowInfo:qsTr("The position or size of a window, or its center (where games draw the crosshair), in screen coordinates."),Detection:qsTr("One part of a detection from a detect block's list: its box, center, score (0-100), label or tracking id. An item that isn't a detection is an error."),PixelColor:qsTr("The color of the screen at a point, as #rrggbb. Use the screen picker in the toolbar to find coordinates."),AverageColor:qsTr("The average color of a screen region, as #rrggbb."),ColorsMatch:qsTr("Whether two colors are within the given percentage of each other (0 = identical, 100 = black vs white)."),ScreenText:qsTr("Reads the text in a screen region (OCR). Uses Windows or macOS text recognition, or Tesseract on Linux. Windows reads the languages added in its Language settings."),MousePosition:qsTr("Where the mouse pointer is, in screen coordinates."),ScreenSize:qsTr("The size of the whole desktop, across all monitors."),MonitorInfo:qsTr("The position or size of a monitor, counting from 1."),MonitorCount:qsTr("How many monitors are connected."),RunMacro:qsTr("Starts another macro by name. With 'and wait' this strand pauses until that run ends; stopping this run stops it too."),StopMacroNamed:qsTr("Stops every run of the named macro."),SetGlobal:qsTr("Sets a global variable. Globals are shared by every macro and kept after Blockwork restarts."),ChangeGlobal:qsTr("Adds a number to a global variable. A global that was never set counts as 0."),Retry:qsTr("Runs its body. If a block in it fails, waits and runs the whole body again, up to the given number of attempts. After the last failure it's an error, like any other."),WindowAction:qsTr("Focuses, minimizes, maximizes, restores or closes the first window whose title (window) or app name (app) contains the text. Leave the text empty for the active window. On Windows it can only control programs running as administrator when Blockwork runs as administrator too."),MoveWindow:qsTr("Moves a window to a screen position, or resizes it, in pixels. Picks the first window whose title (window) or app name (app) contains the text; leave it empty for the active window. On Hyprland and Sway the window becomes floating. On Windows it can only move programs running as administrator when Blockwork runs as administrator too."),WhenWindow:qsTr("Runs when a window whose title or app name contains the text gains or loses focus. Leave the text empty to match any window."),WhenFileChanged:qsTr("Runs when the file is created, changed or deleted. Checked once a second."),WriteFile:qsTr("Writes text to a file, replacing it, or appends to the end. ~ means your home folder."),HttpRequest:qsTr("Sends a web request and stores the response in a variable. Headers are one 'Name: value' per line. A 4xx or 5xx response is an error."),Notify:qsTr("Shows a desktop notification."),Log:qsTr("Adds a line to the run log."),TryCatch:qsTr("Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong."),ThrowError:qsTr("Fails with this message. Ends the strand unless a try block catches it."),StopMacro:qsTr("Stops every strand of this run."),WhenRan:qsTr("Runs this strand when the macro starts, from the Run button or the macro's hotkey. A macro can have several, and they all run side by side."),
             WhenBatteryDischargedTo:qsTr("Runs when the battery drops to this percentage or below. It won't run again until the battery charges back above it and drops again."),
             WhenBatteryChargedTo:qsTr("Runs when the battery charges to this percentage or above. It won't run again until the battery drops back below it and charges again."),
@@ -255,7 +292,13 @@ Item {
     readonly property var screenRegionTypes: ["FindImage", "ClickImage", "WaitForImage"]
     function startScreenPick(request) {
         const win = Window.window;
-        if (pickRequest || !win) return;
+        if (pickRequest || (!androidHost && !win)) return;
+        if (androidHost) {
+            pickRequest = request;
+            if (request.kind === "element") screenOverlay.beginElement();
+            else screenOverlay.begin(!!request.region || request.kind === "image" || request.kind === "region" || (request.kind === "value" && !request.point), "");
+            return;
+        }
         pickRequest = request;
         // Out of the way, so whatever is behind the editor can be picked.
         savedVisibility = win.visibility;
@@ -268,6 +311,7 @@ Item {
         root.afterUnmap(() => screenOverlay.begin(regionOnly, hint || qsTr("Click a point or drag out a region")));
     }
     function restoreWindow() {
+        if (androidHost) return;
         const win = Window.window;
         if (!win) return;
         // show*() rather than assigning `visibility`, which fights the window's `visible` binding.
@@ -278,12 +322,33 @@ Item {
     }
     ScreenOverlay {
         id: screenOverlay
+        objectName: "screenOverlay"
         onCanceled: { root.pickRequest = null; root.restoreWindow(); }
+        onFailed: error => { root.pickRequest = null; root.restoreWindow(); pickError.show(error); }
+        onElementPicked: selector => {
+            const request = root.pickRequest;
+            root.pickRequest = null;
+            if (!request) return;
+            const updated = JSON.parse(JSON.stringify(request.instruction));
+            updated.selector = selector;
+            root.invoke("edit_instruction", {strandId: request.strandId, path: request.path, instruction: updated});
+        }
         onPicked: (x, y, width, height) => {
             const request = root.pickRequest;
             root.pickRequest = null;
             if (request && request.kind === "region") { root.setBlockRegion(request, x, y, width, height); return; }
             if (request && request.kind === "value") { root.setValueRegion(request, x, y, width, height); return; }
+            if (root.androidHost && screenOverlay.captureResult) {
+                const result = screenOverlay.captureResult;
+                if (request && request.kind === "touch") {
+                    const updated = JSON.parse(JSON.stringify(request.instruction));
+                    updated[request.end ? "end_x" : "x"] = numberValue(x);
+                    updated[request.end ? "end_y" : "y"] = numberValue(y);
+                    root.invoke("edit_instruction", {strandId: request.strandId, path: request.path, instruction: updated});
+                } else if (request && request.kind === "image") root.setBlockImage(request, result.image);
+                else pickResult.show(result);
+                return;
+            }
             // Capture once the overlay itself is gone.
             root.afterUnmap(() => root.daemonCall("screen_grab", { x: x, y: y, width: width, height: height }, (result, error) => {
                 root.restoreWindow();
@@ -356,7 +421,9 @@ Item {
     }
     function onPieceAction(action, strandId, path, instruction) {
         const request = { kind: "image", strandId: strandId, path: path, instruction: instruction };
-        if (action === "captureImage") root.startScreenPick(request);
+        if (action === "pickElement") root.startScreenPick(Object.assign(request, {kind: "element"}));
+        else if (action === "pickTouch" || action === "pickTouchEnd") root.startScreenPick(Object.assign(request, {kind: "touch", end: action === "pickTouchEnd"}));
+        else if (action === "captureImage") root.startScreenPick(request);
         else if (action === "loadImage") imageFileDialog.openFor(request);
         else if (action === "pickModel") modelDialog.openFor(request);
         else if (action === "pickUsb") usbDialog.openFor(request);
@@ -385,7 +452,8 @@ Item {
         else if (kind === "AverageColor" || kind === "ScreenText") root.invoke("create_floating_value", { x: at.x, y: at.y, value: op(kind, region), originBlockId: null });
         else {
             const block = defaultInstruction(kind);
-            if (kind === "MoveMouse") { block.x = n(pick.x); block.y = n(pick.y); block.coordinate = "Absolute"; }
+            if (kind === "Touch") { block.x = n(pick.x); block.y = n(pick.y); }
+            else if (kind === "MoveMouse") { block.x = n(pick.x); block.y = n(pick.y); block.coordinate = "Absolute"; }
             else block.image = pick.image;
             root.invoke("add_strand", { x: at.x, y: at.y, instruction: block });
         }
@@ -424,17 +492,17 @@ Item {
         if (!req || !app) return;
         if (req.paletteType) {
             const fresh = defaultInstruction(req.paletteType);
-            fresh.command = app.command;
-            fresh.name = app.name;
-            fresh.icon = root.resolvePickedIcon(app);
+            if (req.paletteType === "WhenForegroundApp") fresh.package = app.command;
+            else if (req.paletteType === "LaunchAndroidApp") fresh.package = textValue(app.command);
+            else { fresh.command = app.command; fresh.name = app.name; fresh.icon = root.resolvePickedIcon(app); }
             root.invoke("add_strand", { x: 120, y: 120, instruction: fresh });
             return;
         }
         const current = req.instruction || {};
         const updated = JSON.parse(JSON.stringify(current));
-        updated.command = app.command;
-        updated.name = app.name;
-        updated.icon = root.resolvePickedIcon(app);
+        if (updated.type === "WhenForegroundApp") updated.package = app.command;
+        else if (updated.type === "LaunchAndroidApp") updated.package = textValue(app.command);
+        else { updated.command = app.command; updated.name = app.name; updated.icon = root.resolvePickedIcon(app); }
         root.invoke("edit_instruction", { strandId: req.strandId, path: req.path, instruction: updated });
     }
     // ---- palette drops: the shared controller's edits as daemon commands ----
@@ -496,9 +564,10 @@ Item {
         anchors.fill: parent; spacing: 0
         Rectangle {
             id: toolbar
+            visible: root.showToolbar
             // Collapse stages: 1 Record icon-only, 2 Run icon-only, 3 undo/redo/save in a menu.
             readonly property int tier: width < 700 ? 3 : (width < 780 ? 2 : (width < 860 ? 1 : 0))
-            Layout.fillWidth: true; Layout.preferredHeight: 52; color: Theme.field; border.color: Theme.borderSoft
+            Layout.fillWidth: true; Layout.preferredHeight: visible ? 52 : 0; color: Theme.field; border.color: Theme.borderSoft
             TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
@@ -577,6 +646,7 @@ Item {
                     onClicked: root.invoke("run_macro")
                 }
                 Row {
+                    visible: !root.androidHost
                     spacing: -1
                     BwButton {
                         id: recordButton
@@ -706,6 +776,7 @@ Item {
             Item { anchors.fill: parent
                 Item {
                     id: sidebarHost
+                    visible: !root.compact
                     // Overlay the sidebar so resizing it never moves the workspace.
                     width: root.sidebarCollapsed ? 0 : (palette.layout === "flyout" ? palette.railWidth : root.sidebarWidth)
                     anchors.top: parent.top; anchors.bottom: parent.bottom
@@ -725,30 +796,32 @@ Item {
                     }
                 PalettePanel {
                     id: palette
+                    objectName: "editorPalette"
+                    parent: root.compact ? blocksContent : sidebarHost
                     // Fixed width and visible until the slot is closed, so it slides out under the clip.
                     anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-                    width: palette.layout === "flyout" && !palette.flyoutShown ? palette.railWidth : root.sidebarWidth
-                    visible: sidebarHost.width > 0
-                    layout: appState.palette_layout || "rail"
+                    width: root.compact ? blocksContent.width : palette.layout === "flyout" && !palette.flyoutShown ? palette.railWidth : root.sidebarWidth
+                    visible: root.compact ? blocksSheet.visible : sidebarHost.width > 0
+                    layout: root.compact ? "tiles" : appState.palette_layout || "rail"
                     trashActive: canvas.dragging
                     trashArmed: canvas.dragging && palette.contains(palette.mapFromItem(null, canvas.dragSceneX, canvas.dragSceneY))
                     onResizeRequested: width => root.sidebarWidth = Math.max(root.minSidebarWidth, Math.min(root.maxSidebarWidth, width))
-                    onDragStarted: (spec, sx, sy, ox, oy) => dragController.begin(spec, sx, sy, ox, oy)
+                    onDragStarted: (spec, sx, sy, ox, oy) => { Qt.inputMethod.hide(); dragController.begin(spec, sx, sy, ox, oy); }
                     onDragMoved: (sx, sy) => dragController.move(sx, sy)
-                    onDragEnded: (sx, sy) => dragController.end(sx, sy)
+                    onDragEnded: (sx, sy) => { dragController.end(sx, sy); if (root.compact) blocksSheet.close(); }
                     onDragCanceled: dragController.cancel()
                     instructionTypes: root.instructionTypes
                     listInstructionTypes: root.listInstructionTypes
                     extraOperators: root.extraOperators
                     extraCategories: root.extraCategories
-                    appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "monitor" }, { id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }]
+                    appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "monitor" }].concat(root.androidHost ? [] : [{ id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }])
                     variables: root.macroVariables
                     lists: root.macroLists
                     blockDefinitions: root.macroBlockDefinitions
                     keyCapture: appState.key_capture
                     standaloneKey: root.sidebarKey
-                    onBlockActivated: (type, instruction) => dragController.addAt({ kind: "instruction", type: type, instruction: instruction }, 120, 120)
-                    onCustomBlockActivated: definition => dragController.addAt(root.customEntry(definition), 120, 120)
+                    onBlockActivated: (type, instruction) => root.addPaletteEntry({ kind: "instruction", type: type, instruction: instruction })
+                    onCustomBlockActivated: definition => root.addPaletteEntry(root.customEntry(definition))
                     onMakeVariableRequested: variableDialog.openForCreate()
                     onRenameVariableRequested: name => variableDialog.openForRename(name)
                     onDeleteVariableRequested: name => root.invoke("delete_variable", { name: name })
@@ -766,7 +839,7 @@ Item {
                     onAppPickerRequested: instruction => root.openPaletteAppPicker(instruction)
                     onPieceActionRequested: (action, instruction) => { if (action === "pickApp") root.openPaletteAppPicker(instruction); }
                     onDetailsRequested:(name,identifier,explainer)=>root.blockDefById(identifier)||name===identifier?root.showDetails(identifier,explainer):detailsDialog.show(name,identifier,explainer)
-                    onValueActivated: value => dragController.addAt({ kind: "value", value: value }, 160, 140)
+                    onValueActivated: value => root.addPaletteEntry({ kind: "value", value: value })
                 }
                 }
                 BlockCanvas {
@@ -849,7 +922,7 @@ Item {
         }
         ActivityPanel {
             id: activity
-            visible: !!root.macro
+            visible: !!root.macro && !root.compact
             Layout.fillWidth: true; Layout.preferredHeight: implicitHeight
             entries: root.runLog
             macroId: root.macro ? root.macro.id : ""
@@ -863,6 +936,58 @@ Item {
                 LucideIcon { anchors.horizontalCenter: parent.horizontalCenter; name: "blocks"; color: Theme.textDim; width: 48; height: 48 }
                 Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("No macro selected"); color: Theme.text; font.pixelSize: 16; font.weight: Font.DemiBold }
                 Text { text: qsTr("Choose a macro above or create a new one."); color: Theme.textDim; font.pixelSize: 13 }
+            }
+        }
+    }
+
+    Drawer {
+        id: blocksSheet
+        objectName: "addBlocksSheet"
+        parent: root
+        edge: Qt.BottomEdge
+        width: root.width; height: Math.max(48, root.height * 0.85)
+        modal: !dragController.active; dim: !dragController.active
+        interactive: !dragController.active
+        padding: 0
+        // Keep the drag surface alive while its ghost crosses onto the canvas.
+        background: Rectangle { color: dragController.active ? "transparent" : Theme.panel }
+        contentItem: ColumnLayout {
+            spacing: 0
+            opacity: dragController.active ? 0 : 1
+            RowLayout {
+                Layout.fillWidth: true
+                Label { Layout.fillWidth: true; leftPadding: 12; text: qsTr("Add Blocks"); font.bold: true; color: Theme.text }
+                BwButton { text: qsTr("Done"); implicitHeight: 48; onClicked: blocksSheet.close() }
+            }
+            Label {
+                Layout.fillWidth: true; leftPadding: 12; rightPadding: 12; bottomPadding: 8; wrapMode: Text.Wrap; color: Theme.textDim
+                text: canvas.insertionPoint ? qsTr("Tap a block to insert after your selection.") : qsTr("Tap a block to add it to free canvas space. Hold for options.")
+            }
+            Item { id: blocksContent; Layout.fillWidth: true; Layout.fillHeight: true }
+        }
+        onClosed: { if (dragController.active) dragController.cancel(); }
+    }
+    Drawer {
+        id: activitySheet
+        objectName: "activitySheet"
+        parent: root
+        edge: Qt.BottomEdge
+        width: root.width; height: Math.max(48, root.height * 0.8)
+        padding: 0
+        contentItem: ColumnLayout {
+            spacing: 0
+            RowLayout {
+                Layout.fillWidth: true
+                Label { Layout.fillWidth: true; leftPadding: 12; text: qsTr("Activity"); font.bold: true; color: Theme.text }
+                BwButton { text: qsTr("Done"); implicitHeight: 48; onClicked: activitySheet.close() }
+            }
+            ActivityPanel {
+                id: phoneActivity
+                Layout.fillWidth: true; Layout.fillHeight: true
+                expanded: true; sheetMode: true
+                entries: root.runLog; macroId: root.macro ? root.macro.id : ""
+                onBlockRequested: blockId => { activitySheet.close(); canvas.revealInstruction(blockId); }
+                onClearRequested: root.invoke("clear_run_log")
             }
         }
     }
@@ -1005,6 +1130,17 @@ Item {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
                 text: qsTr("Runs a schedule or \"once at\" trigger once if its time passed while Blockwork was closed or the computer was asleep (up to a week back).")
             }
+            BwSwitch {
+                visible: root.androidHost
+                Accessible.name: qsTr("Exact time on Android")
+                checked: !!macroSettings.settings.android_exact_time
+                onToggled: checked => root.invoke("set_macro_android_exact_time", {enabled: checked})
+            }
+            Text {
+                visible: root.androidHost
+                width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
+                text: qsTr("Exact schedules require Android exact-alarm access. Without access they stay blocked. Best-effort alarms may be delayed; exact alarms also remain subject to Android idle limits.")
+            }
             Text { text: qsTr("Permissions"); color: Theme.textDim; font.pixelSize: 13 }
             BwSwitch {
                 Accessible.name: qsTr("Ask before risky actions")
@@ -1055,6 +1191,7 @@ Item {
                         ContextMenu.menu: Editing.TextEditingMenu { editor: pickCoordinates }
                         readOnly: true; selectByMouse: true; color: Theme.text; font.pixelSize: 13
                         text: !pickResult.pick ? "" : qsTr("x %1   y %2").arg(pickResult.pick.x).arg(pickResult.pick.y)
+                            + (pickResult.pick && pickResult.pick.display_width ? "\n" + qsTr("Reference display: %1 × %2 physical pixels").arg(pickResult.pick.display_width).arg(pickResult.pick.display_height) : "")
                             + (pickResult.region ? "\n" + qsTr("width %1   height %2").arg(pickResult.pick.width).arg(pickResult.pick.height) : "")
                     }
                     Row {
@@ -1074,9 +1211,9 @@ Item {
                 width: parent.width; spacing: 8
                 Repeater {
                     model: pickResult.region
-                        ? [["ScreenText", qsTr("text in this region")], ["AverageColor", qsTr("average color here")], ["ClickImage", qsTr("click this image")],
-                           ["WaitForImage", qsTr("wait for this image")], ["FindImage", qsTr("find this image")]]
-                        : [["PixelColor", qsTr("color at this point")], ["MoveMouse", qsTr("move mouse here")]]
+                        ? (root.androidHost ? [] : [["ScreenText", qsTr("text in this region")]]).concat([["AverageColor", qsTr("average color here")], ["ClickImage", qsTr("click this image")],
+                           ["WaitForImage", qsTr("wait for this image")], ["FindImage", qsTr("find this image")]])
+                        : [["PixelColor", qsTr("color at this point")], [root.androidHost ? "Touch" : "MoveMouse", root.androidHost ? qsTr("tap here") : qsTr("move mouse here")]]
                     delegate: BwButton {
                         required property var modelData
                         text: modelData[1]
@@ -1657,6 +1794,8 @@ Item {
     // types, defaults), for BlockRegistry.freshValue.
     // BEGIN GENERATED operator descriptors (blockwork-core tests/operator_descriptors.rs; BLESS=1 rewrites)
     readonly property var hostDescriptors: [
+        {"kind":"AndroidElementExists","op":"AndroidElementExists","arity":5,"args":[{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}}],"host":true},
+        {"kind":"AndroidElementText","op":"AndroidElementText","arity":5,"args":[{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}}],"host":true},
         {"kind":"BatteryPercentage","op":"BatteryPercentage","arity":0,"args":[],"host":true},
         {"kind":"PluggedIn","op":"PluggedIn","arity":0,"args":[],"host":true},
         {"kind":"ClipboardText","op":"ClipboardText","arity":0,"args":[],"host":true},
@@ -1714,7 +1853,10 @@ Item {
     // END GENERATED operator descriptors
     // Blockwork's reporters for the palette: [op, result, arity, args?]. A
     // fresh one takes hostDescriptors' defaults unless it gives its own args.
-    readonly property var extraOperators: [
+    readonly property var extraOperators: allExtraOperators.filter(spec => root.androidHost ?
+        ["AndroidElementExists", "AndroidElementText", "PixelColor", "AverageColor", "ColorsMatch", "ScreenSize", "MonitorCount", "MonitorInfo", "LastError", "MacroRunning", "GlobalVariable", "HttpGet", "JsonGet", "TextCheck", "TextReplace", "RegexReplace", "RegexFind", "SplitPart", "SplitCount", "Substring", "Timestamp", "FormatDate", "ParseDate", "DatePart"].indexOf(spec[0]) >= 0 : ["AndroidElementExists", "AndroidElementText"].indexOf(spec[0]) < 0)
+    readonly property var allExtraOperators: [
+        ["AndroidElementExists", "bool", 5], ["AndroidElementText", "text", 5],
         ["PluggedIn", "bool", 0], ["BatteryPercentage", "number", 0],
         ["ClipboardText", "text", 0], ["ClipboardHasImage", "bool", 0], ["ClipboardHasFiles", "bool", 0],
         ["ReadFile", "text", 1], ["FileExists", "bool", 1], ["ListDirectory", "text", 1], ["HttpGet", "text", 1], ["JsonGet", "text", 2],
@@ -1735,7 +1877,7 @@ Item {
     ]
     readonly property var extraCategories: ({
         PluggedIn: "system", BatteryPercentage: "system", ClipboardText: "system", ClipboardHasImage: "system", ClipboardHasFiles: "system",
-        CommandWait: "system", WriteFile: "system", HttpRequest: "system", Notify: "system", Log: "system",
+        WhenForegroundApp: "events", LaunchAndroidApp: "system", AndroidElementExists: "input", AndroidElementText: "input", Element: "input", Touch: "input", CommandWait: "system", WriteFile: "system", HttpRequest: "system", Notify: "system", Log: "system",
         AskText: "system", AskYesNo: "system", AskChoice: "system", ShowMessage: "system", SendSignal: "control",
         TryCatch: "control", Retry: "control", ThrowError: "control", WithLock: "control", PasteText: "input",
         AppRunning: "system", IdleSeconds: "system", ScreenLocked: "system", NetworkConnected: "system", UsbConnected: "system", Secret: "data",
@@ -1834,15 +1976,16 @@ Item {
             label(qsTr("count in")), { kind: "dropdown", key: "count_variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") }
         ] };
         // Blockwork's own features and vocabulary; a neutral blockstitch host has none of these.
-        BlockRegistry.recordingTargets = true;
         BlockRegistry.registerDescriptors(hostDescriptors);
         BlockRegistry.registerIcons({
-            WhenRan: "play", WhenBatteryDischargedTo: "battery-warning", WhenBatteryChargedTo: "battery-charging", WhenTime: "clock",
+            Element: "mouse-pointer", Touch: "hand", WhenRan: "play", WhenBatteryDischargedTo: "battery-warning", WhenBatteryChargedTo: "battery-charging", WhenTime: "clock",
             WhenPowerPluggedIn: "plug-zap", WhenPowerUnplugged: "unplug", WhenClipboardChanged: "clipboard-check", WhenKey: "keyboard",
             Text: "text-cursor", Key: "keyboard", Button: "mouse-pointer-click", MoveMouse: "move", Scroll: "mouse", Command: "terminal",
             OpenApp: "app-window", CloseApp: "square-x", SetClipboard: "clipboard"
         });
         BlockRegistry.registerOperators({
+            AndroidElementExists: {prefix: qsTr("Android element exists"), result: "bool", infix: [qsTr("ID"), qsTr("text"), qsTr("description"), qsTr("class")]},
+            AndroidElementText: {prefix: qsTr("text of Android element in app"), result: "text", infix: [qsTr("ID"), qsTr("text"), qsTr("description"), qsTr("class")]},
             BatteryPercentage: { prefix: qsTr("battery percentage"), result: "number" }, PluggedIn: { prefix: qsTr("plugged in?"), result: "bool" },
             ClipboardText: { prefix: qsTr("clipboard text"), result: "text" }, ClipboardHasImage: { prefix: qsTr("clipboard has image"), result: "bool" },
             ClipboardHasFiles: { prefix: qsTr("clipboard has files"), result: "bool" },
@@ -1937,6 +2080,29 @@ Item {
             return l.working_dir || (l.env && l.env.length) || l.new_instance ? qsTr("custom") : "";
         };
         BlockRegistry.registerRows({
+            WhenForegroundApp: { shape: "header", icon: "app-window", head: [label(qsTr("WHEN ANDROID APP")),
+                {kind: "text", key: "package", placeholder: "com.example.app"},
+                {kind: "button", action: "pickApp", palette: true, text: qsTr("Choose app"), icon: "app-window", when: () => root.androidHost},
+                {kind: "dropdown", key: "entered", options: [{value: "entered", label: qsTr("enters foreground")}, {value: "left", label: qsTr("leaves foreground")}],
+                    encode: v => v === "entered", decode: v => v ? "entered" : "left"}] },
+            LaunchAndroidApp: { icon: "app-window", head: [label(qsTr("Launch Android app")), value("AndroidPackage", "package"),
+                {kind: "button", action: "pickApp", palette: true, text: qsTr("Choose app"), icon: "app-window", when: () => root.androidHost}] },
+            Element: { head: [label(qsTr("element")),
+                {kind: "button", action: "pickElement", icon: "crosshair", text: qsTr("Pick element"), when: () => root.androidHost},
+                {kind: "dropdown", key: "action", options: root.choices([["Click", qsTr("click")], ["LongClick", qsTr("long click")], ["ScrollForward", qsTr("scroll forward")], ["ScrollBackward", qsTr("scroll backward")], ["SetText", qsTr("replace text")], ["Exists", qsTr("exists?")], ["ReadText", qsTr("read text")], ["Wait", qsTr("wait until present")]])},
+                label(qsTr("app package")), {kind: "text", key: "selector", index: "package", placeholder: "com.example.app"},
+                label(qsTr("resource ID")), {kind: "text", key: "selector", index: "resource_id"},
+                label(qsTr("text")), {kind: "text", key: "selector", index: "text"},
+                label(qsTr("description")), {kind: "text", key: "selector", index: "description"},
+                label(qsTr("class")), {kind: "text", key: "selector", index: "class"},
+                Object.assign(value("ElementText", "text"), {when: i => i.action === "SetText"}),
+                Object.assign(value("ElementTimeout", "timeout"), {when: i => i.action === "Wait"}),
+                {kind: "dropdown", key: "variable", options: () => root.variableChoices(), when: i => ["Exists", "ReadText"].indexOf(i.action) >= 0}] },
+            Touch: { head: [label(qsTr("touch")),
+                {kind: "dropdown", key: "action", options: root.choices([["Tap", qsTr("tap")], ["LongPress", qsTr("long press")], ["Swipe", qsTr("swipe")], ["Back", qsTr("Back")], ["Home", qsTr("Home")], ["Recents", qsTr("Recents")]])},
+                value("TouchX", "x"), value("TouchY", "y"), {kind: "button", action: "pickTouch", icon: "crosshair", text: qsTr("Pick start")},
+                label(qsTr("to")), value("TouchEndX", "end_x"), value("TouchEndY", "end_y"), {kind: "button", action: "pickTouchEnd", icon: "crosshair", text: qsTr("Pick end")},
+                label(qsTr("for")), value("TouchDuration", "duration"), label(qsTr("ms"))] },
             SetVariable: { head: [label(qsTr("set")),
                 { kind: "dropdown", key: "name", options: () => root.variableChoices() },
                 label(qsTr("to")), value("SetVariableValue", "value")] },
@@ -2087,6 +2253,10 @@ Item {
                 label(qsTr("to result of JavaScript")), value("BrowserCode", "code")] }
         });
         BlockRegistry.registerPrefabs({
+            WhenForegroundApp: {package: "", entered: true},
+            LaunchAndroidApp: () => ({package: textValue("")}),
+            Element: () => ({action: "Click", selector: {package: "", resource_id: "", text: "", description: "", class: ""}, text: textValue(""), timeout: numberValue(10000), variable: ""}),
+            Touch: () => ({action: "Tap", x: numberValue(100), y: numberValue(100), end_x: numberValue(300), end_y: numberValue(300), duration: numberValue(500)}),
             Command: { command: "" },
             CommandWait: { command: "" },
             WhenAt: () => ({ at: textValue(Qt.formatDateTime(new Date(Date.now() + 3600000), "yyyy-MM-dd HH:00")) }),
@@ -2163,6 +2333,13 @@ Item {
             if (e.event === "Started" || e.event === "Fired") break;
             if (e.level === "Error" && e.block_id && !(e.block_id in out)) out[e.block_id] = e.message;
         }
+        function inspect(instructions) {
+            for (const instruction of instructions || []) {
+                if (!root.blockAvailable(instruction.type)) out[instruction.id] = qsTr("This block is unavailable on this platform");
+                for (const key of ["body", "then_body", "else_body", "try_body", "catch_body"]) inspect(instruction[key]);
+            }
+        }
+        if (root.macro) for (const strand of root.macro.strands) inspect(strand.instructions);
         return out;
     }
     Binding { target: BlockRegistry; property: "blockMarks"; value: root.blockMarks }
@@ -2184,7 +2361,13 @@ Item {
     Binding { target: BlockRegistry; property: "pausedIds"; value: debugBar.paused.map(p => p.block_id) }
     Connections {
         target: BlockRegistry
-        function onMarkClicked(instructionId) { activity.showBlockError(instructionId); }
+        function onMarkClicked(instructionId) {
+            const message = root.blockMarks[instructionId];
+            if (message === qsTr("This block is unavailable on this platform"))
+                detailsDialog.show(qsTr("Block availability"), "", message);
+            else if (root.compact) { root.openActivity(); phoneActivity.showBlockError(instructionId); }
+            else activity.showBlockError(instructionId);
+        }
         function onBreakpointClicked(instructionId) { root.invoke("toggle_breakpoint", { blockId: instructionId }); }
     }
     // A block's palette name, for the debugger bar.
@@ -2257,7 +2440,7 @@ Item {
         locked: root.recordingBusy
         documentId: root.macro ? root.macro.id : ""
         document: root.macro ? [root.macro.strands, root.macro.floating_values] : null
-        trashContains: (sx, sy) => !root.sidebarCollapsed && palette.contains(palette.mapFromItem(null, sx, sy))
+        trashContains: (sx, sy) => !root.compact && !root.sidebarCollapsed && palette.contains(palette.mapFromItem(null, sx, sy))
         instructionFor: spec => root.paletteInstruction(spec)
         submit: (edit, reply) => root.submitEdit(edit, reply)
     }

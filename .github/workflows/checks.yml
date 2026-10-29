@@ -65,6 +65,12 @@ jobs:
             libclang-dev \
             libgl-dev
 
+      - name: Editor mouse, touch and phone layout checks
+        run: |
+          export PATH="$(dirname "$QMAKE"):$PATH"
+          vendor/blockstitch-qml/tests/qml/run.sh
+          python3 blockwork-qt/tests/run.py
+
       - name: Clippy
         run: cargo clippy --workspace --all-targets
 

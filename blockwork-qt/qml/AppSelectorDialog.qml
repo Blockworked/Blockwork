@@ -6,7 +6,7 @@ import com.blockworked.Blockstitch 1.0
 AppDialog {
     id: root
     title: qsTr("Choose an App")
-    width: 640
+    width: parent ? Math.min(640, parent.width - 32) : 640
     // Follow the window only while open; closed, a resize would relayout all of it.
     height: visible ? Math.min(620, parent ? parent.height - 32 : 620) : 620
     standardButtons: Dialog.NoButton
@@ -35,7 +35,7 @@ AppDialog {
     property var filteredApps: {
         const q = searchText.trim().toLowerCase();
         if (!q) return allApps;
-        return allApps.filter(a => (a.name || "").toLowerCase().indexOf(q) >= 0);
+        return allApps.filter(a => ((a.name || "") + " " + (a.command || "")).toLowerCase().indexOf(q) >= 0);
     }
 
     function refreshApps() {
@@ -126,7 +126,7 @@ AppDialog {
                 spacing: 8
                 // Fixed-width tiles left a ~150px gutter on the right; size
                 // them to fill the row with exactly four columns instead.
-                readonly property int columns: 4
+                readonly property int columns: Math.max(1, Math.min(4, Math.floor(width / 120)))
                 readonly property real tileWidth: Math.max(1, (width - (columns - 1) * spacing) / columns)
                 Repeater {
                     model: root.filteredApps

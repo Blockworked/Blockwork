@@ -406,6 +406,7 @@ fn guarded_abilities(kind: &InstructionKind) -> &'static [&'static str] {
     match kind {
         InstructionKind::Command(_)
         | InstructionKind::CommandWait(_)
+        | InstructionKind::LaunchAndroidApp { .. }
         | InstructionKind::OpenApp { .. }
         | InstructionKind::CloseApp { .. } => &["commands"],
         InstructionKind::HttpRequest { .. } => &["network"],
@@ -418,7 +419,9 @@ fn guarded_abilities(kind: &InstructionKind) -> &'static [&'static str] {
         InstructionKind::FindImage { .. } | InstructionKind::WaitForImage { .. } => &["screen"],
         InstructionKind::DetectObjectsInWindow { .. } | InstructionKind::WaitForDetection { .. } => &["screen"],
         InstructionKind::ClickImage { .. } | InstructionKind::AimAtDetection { .. } => &["screen", "input"],
-        InstructionKind::Token(_) | InstructionKind::PasteText(_) | InstructionKind::AimStep { .. } => &["input"],
+        InstructionKind::Element { action: crate::input::element::ElementAction::Exists | crate::input::element::ElementAction::ReadText | crate::input::element::ElementAction::Wait, .. } => &["screen"],
+        InstructionKind::Element { .. } => &["screen", "input"],
+        InstructionKind::Touch { .. } | InstructionKind::Token(_) | InstructionKind::PasteText(_) | InstructionKind::AimStep { .. } => &["input"],
         InstructionKind::RunMacro { .. } | InstructionKind::StopMacroNamed(_) => &["macros"],
         InstructionKind::SetGlobal { .. } | InstructionKind::ChangeGlobal { .. } => &["globals"],
         _ => &[],
@@ -1187,12 +1190,82 @@ fn run_block(
             }
         }
 
+        #[cfg(target_os = "android")]
+        if matches!(&ins.kind, InstructionKind::Command(_) | InstructionKind::CommandWait(_)
+            | InstructionKind::OpenApp { .. } | InstructionKind::CloseApp { .. }
+            | InstructionKind::WindowAction { .. } | InstructionKind::MoveWindow { .. }
+            | InstructionKind::SetClipboard(_) | InstructionKind::PasteText(_)
+            | InstructionKind::WriteFile { .. } | InstructionKind::Notify { .. }
+            | InstructionKind::DetectObjectsInWindow { .. } | InstructionKind::WaitForDetection { .. }
+            | InstructionKind::AimStep { .. } | InstructionKind::AimAtDetection { .. }
+            | InstructionKind::BrowserOpen { .. } | InstructionKind::BrowserClick { .. }
+            | InstructionKind::BrowserType { .. } | InstructionKind::BrowserWaitFor { .. } | InstructionKind::BrowserScript { .. })
+        {
+            soft_fail(ctx, &ins.id, "Platform", "This block is unavailable on Android")?;
+            continue;
+        }
+
         if let Some(Err(e)) = guarded_abilities(&ins.kind).iter().map(|a| crate::permissions::require(a)).find(Result::is_err) {
             soft_fail(ctx, &ins.id, "Permission", e)?;
             continue;
         }
 
         match &ins.kind {
+            InstructionKind::LaunchAndroidApp { package } => {
+                let result = (|| {
+                    let package = ctx.resolve(package, depth)?.eval_text()?;
+                    crate::input::android_app::validate_package(&package)?;
+                    let stopped = || ctx.stop_flag.as_ref().is_some_and(stop_requested);
+                    ctx.emulator.lock().map_err(|e| e.to_string())?.launch_android_app(&package, &stopped)
+                })();
+                if let Err(error) = result { soft_fail(ctx, &ins.id, "Launch app", error)?; }
+            }
+            InstructionKind::Element { action, selector, text, timeout, variable } => {
+                let result: Result<serde_json::Value, String> = (|| {
+                    use crate::input::element::ElementAction;
+                    selector.validate()?;
+                    let text = if *action == ElementAction::SetText { ctx.resolve(text, depth)?.eval_text()? } else { String::new() };
+                    let timeout = if *action == ElementAction::Wait { ctx.resolve(timeout, depth)?.eval_number()? } else { 0.0 };
+                    if !timeout.is_finite() || timeout < 0.0 || timeout > 86_400_000.0 { return Err("element wait timeout must be 0–86400000 ms (0 waits until stopped)".into()); }
+                    let started = Instant::now();
+                    let stopped = || ctx.stop_flag.as_ref().is_some_and(stop_requested);
+                    loop {
+                        if stopped() { return Err("element action cancelled".into()); }
+                        let query = if *action == ElementAction::Wait { ElementAction::Exists } else { *action };
+                        let expired = || *action == ElementAction::Wait && timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout;
+                        let response = ctx.emulator.lock().map_err(|e| e.to_string())?.element(selector, query, &text, &|| stopped() || expired());
+                        let value = match response {
+                            Err(_) if !stopped() && expired() => return Err("element did not appear before the timeout".into()),
+                            other => other?,
+                        };
+                        if *action != ElementAction::Wait || value == serde_json::Value::Bool(true) { return Ok(value); }
+                        if timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout { return Err("element did not appear before the timeout".into()); }
+                        for _ in 0..4 { if stopped() { return Err("element wait cancelled".into()); } std::thread::sleep(Duration::from_millis(25)); }
+                    }
+                })();
+                match result {
+                    Ok(value) if !variable.is_empty() => set_variable(ctx, variable, match value {
+                        serde_json::Value::Bool(value) => Evaluated::Bool(value),
+                        serde_json::Value::String(value) => Evaluated::Text(value),
+                        _ => Evaluated::Text(String::new()),
+                    }),
+                    Ok(_) => {},
+                    Err(error) => soft_fail(ctx, &ins.id, "Element", error)?,
+                }
+            }
+            InstructionKind::Touch { action, x, y, end_x, end_y, duration } => {
+                let result = (|| {
+                    let mut number = |value: &Value| ctx.resolve(value, depth)?.eval_number();
+                    let (x, y, end_x, end_y, duration) = (number(x)?, number(y)?, number(end_x)?, number(end_y)?, number(duration)?);
+                    if ![x, y, end_x, end_y, duration].iter().all(|n| n.is_finite()) || duration < 1.0 || duration > 60_000.0 {
+                        return Err("gesture coordinates must be finite and duration must be 1–60000 ms".into());
+                    }
+                    let gesture = crate::input::touch::Gesture { action: *action, x, y, end_x, end_y, duration_ms: duration.round() as u64 };
+                    let stopped = || ctx.stop_flag.as_ref().is_some_and(stop_requested);
+                    ctx.emulator.lock().map_err(|e| e.to_string())?.gesture(&gesture, &stopped)
+                })();
+                if let Err(error) = result { soft_fail(ctx, &ins.id, "Touch", error)?; }
+            }
             InstructionKind::Comment(_) => {}
             InstructionKind::WhenRan => {}
             InstructionKind::BlockHeader(_) => {}
@@ -1212,6 +1285,7 @@ fn run_block(
             InstructionKind::WhenFileChanged(_) => {}
             InstructionKind::WhenTyped { .. } => {}
             InstructionKind::WhenApp { .. } => {}
+            InstructionKind::WhenForegroundApp { .. } => {}
             InstructionKind::WhenIdle(_) => {}
             InstructionKind::WhenScreenLock { .. } => {}
             InstructionKind::WhenCron(_) => {}
@@ -1506,7 +1580,8 @@ fn run_block(
                         _ => "the image isn't on screen".to_string(),
                     })?;
                     let mut em = ctx.emulator.lock().map_err(|e| e.to_string())?;
-                    em.click_mouse_abs(x.round() as i32, y.round() as i32, button.clone())
+                    let stopped = || ctx.stop_flag.as_ref().is_some_and(stop_requested);
+                    em.click_at(x.round() as i32, y.round() as i32, button.clone(), &stopped)
                 })();
                 if let Err(e) = clicked {
                     soft_fail(ctx, &ins.id, "Click image", e)?;
