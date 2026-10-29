@@ -421,8 +421,10 @@ jobs:
     name: Create GitHub Release
     runs-on: ubuntu-latest
     needs: [build, linux-appimage, linux-flatpak]
+    outputs:
+      has_macos: ${{ steps.notes.outputs.has_macos }}
     # A flight build goes to the Store flight only, so no GitHub release (and no Chocolatey, Homebrew or winget)
-    if: ${{ always() && !inputs.flight }}
+    if: ${{ success() && !inputs.flight }}
     permissions:
       contents: write
 
@@ -448,46 +450,21 @@ jobs:
           fi
           echo "value=$NAME" >> "$GITHUB_OUTPUT"
 
-      - name: Build release notes from CHANGELOG.md
-        env:
-          TAG: ${{ steps.tag.outputs.value }}
-        run: |
-          VERSION="${TAG#v}"
-          awk -v ver="$VERSION" 'index($0, "## [" ver "]") == 1 {flag=1; print; next} flag && /^## \[/ {exit} flag' CHANGELOG.md > /tmp/changelog_section.md
-          if [ ! -s /tmp/changelog_section.md ]; then
-            echo "## $TAG" > /tmp/changelog_section.md
-            echo "" >> /tmp/changelog_section.md
-            echo "See commit history since the previous tag for details." >> /tmp/changelog_section.md
-          fi
-          {
-            cat /tmp/changelog_section.md
-            echo ""
-            echo "## Downloads"
-            echo ""
-            echo "| Platform | File |"
-            echo "|---|---|"
-            echo "| Windows x86_64 (installer) | \`blockwork-windows-x86_64-setup.exe\` |"
-            echo "| Windows x86_64 (portable Qt bundle) | \`blockwork-windows-x86_64.zip\` |"
-            echo "| Windows x86_64 (MSIX, for the Microsoft Store) | \`blockwork-windows-x86_64.msix\` |"
-            echo "| Windows arm64 (MSIX, for the Microsoft Store) | \`blockwork-windows-arm64.msix\` |"
-            echo "| Windows arm64 (installer) | \`blockwork-windows-arm64-setup.exe\` |"
-            echo "| Windows arm64 (portable Qt bundle) | \`blockwork-windows-arm64.zip\` |"
-            echo "| Linux x86_64 (AppImage) | \`blockwork-linux-x86_64.AppImage\` |"
-            echo "| Linux x86_64 (Flatpak) | \`blockwork-linux-x86_64.flatpak\` |"
-            echo "| Linux arm64 (AppImage) | \`blockwork-linux-arm64.AppImage\` |"
-            echo "| Linux arm64 (Flatpak) | \`blockwork-linux-arm64.flatpak\` |"
-            echo "| macOS arm64 (app bundle, unsigned) | \`blockwork-macos-arm64.app.zip\` |"
-          } > RELEASE_BODY.md
-          cat RELEASE_BODY.md
-
       - name: Download all artifacts
         uses: actions/download-artifact@v4
         with:
           merge-multiple: true
           path: ./release-artifacts
 
-      - name: List release artifacts
-        run: ls -lh ./release-artifacts/
+      - name: Validate artifacts and build release notes
+        id: notes
+        env:
+          TAG: ${{ steps.tag.outputs.value }}
+        run: |
+          python3 .github/prepare-release.py --tag "$TAG" --artifacts release-artifacts --output RELEASE_BODY.md
+          if [ -s release-artifacts/blockwork-macos-arm64.app.zip ]; then
+            echo "has_macos=true" >> "$GITHUB_OUTPUT"
+          fi
 
       - name: Create GitHub Release
         uses: softprops/action-gh-release@v2
@@ -496,7 +473,7 @@ jobs:
           name: ${{ steps.release_name.outputs.value }}
           draft: false
           prerelease: false
-          fail_on_unmatched_files: false
+          fail_on_unmatched_files: true
           files: ./release-artifacts/*
           body_path: RELEASE_BODY.md
 
@@ -511,6 +488,7 @@ jobs:
   homebrew:
     name: Homebrew
     needs: [release]
+    if: ${{ needs.release.outputs.has_macos == 'true' }}
     uses: ./.github/workflows/homebrew.yml
     with:
       tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}

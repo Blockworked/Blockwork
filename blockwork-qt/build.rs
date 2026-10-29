@@ -4,6 +4,9 @@ use serde_json::Value;
 use std::collections::BTreeSet;
 use std::path::Path;
 
+#[path = "build_support/translations.rs"]
+mod translation_catalogs;
+
 fn main() {
     #[cfg(windows)]
     {
@@ -128,6 +131,9 @@ fn translation_resources() -> QResources {
         let name = path.file_name().unwrap().to_string_lossy().into_owned();
         resource = resource.file(QResourceFile::new(format!("i18n/{name}")).alias(name));
     }
+    let metadata = translation_catalogs::metadata(Path::new("i18n"));
+    let metadata_path = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("languages.json");
+    std::fs::write(&metadata_path, metadata.to_string()).expect("write language completeness");
     QResources::new().resource(resource)
 }
 

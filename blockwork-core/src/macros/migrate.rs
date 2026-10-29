@@ -6,11 +6,11 @@ use crate::macros::{Instruction, Macro};
 use serde_json::{json, Map, Value};
 
 /// The version this build writes; 1 is the format 0.6.0 first had, 2 split
-/// run command into one that waits and one that doesn't. Bump it
+/// run command into one that waits and one that doesn't. Version 3 adds pack state. Bump it
 /// with a new step in [`STEPS`] (a no-op one when old files load as they are)
 /// whenever a release adds block kinds or changes their fields, so an older
 /// Blockwork says the file is too new instead of turning blocks into notes.
-pub const FORMAT_VERSION: u64 = 2;
+pub const FORMAT_VERSION: u64 = 3;
 const VERSION_KEY: &str = "format_version";
 
 /// What loading had to change.
@@ -32,7 +32,10 @@ impl Upgrade {
 type Step = fn(&mut Value, &mut Vec<String>);
 
 /// `STEPS[n]` upgrades version `n` to `n + 1`.
-const STEPS: [Step; FORMAT_VERSION as usize] = [v0_old_window_blocks, v1_run_command_waits];
+const STEPS: [Step; FORMAT_VERSION as usize] = [v0_old_window_blocks, v1_run_command_waits, v2_pack_state];
+
+// Pack ownership is migrated by Macro's deserializer.
+fn v2_pack_state(_: &mut Value, _: &mut Vec<String>) {}
 
 pub fn parse(text: &str) -> Result<(Macro, Upgrade), String> {
     from_value(serde_json::from_str(text).map_err(|e| format!("not a macro file: {e}"))?)

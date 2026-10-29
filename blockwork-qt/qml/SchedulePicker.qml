@@ -13,6 +13,9 @@ AppDialog {
     acceptText: qsTr("Use schedule")
     signal chosen(string expression)
 
+    property bool showCronHelp: false
+    onAboutToShow: showCronHelp = false
+
     // "repeat", "daily", "monthly" or "custom".
     property string mode: "daily"
     property int every: 15
@@ -255,8 +258,21 @@ AppDialog {
                 // ---- custom ----
                 Column {
                     visible: root.mode === "custom"; width: parent.width; spacing: 8
-                    BwTextField { id: customField; width: parent.width; font.family: "monospace"; placeholderText: "*/15 9-17 * * mon-fri"; onAccepted: if (root.valid) root.accept() }
+                    RowLayout {
+                        width: parent.width; spacing: 6
+                        BwTextField { id: customField; Layout.fillWidth: true; font.family: "monospace"; placeholderText: "*/15 9-17 * * mon-fri"; onAccepted: if (root.valid) root.accept() }
+                        BwButton {
+                            objectName: "cronHelpButton"
+                            iconName: "info"; text: ""; flat: true
+                            implicitWidth: 30; implicitHeight: 30
+                            checkable: true; checked: root.showCronHelp
+                            Accessible.name: qsTr("Cron syntax")
+                            ToolTip.visible: hovered; ToolTip.delay: 400; ToolTip.text: qsTr("Cron syntax")
+                            onClicked: root.showCronHelp = !root.showCronHelp
+                        }
+                    }
                     Text {
+                        visible: root.showCronHelp
                         width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
                         text: qsTr("Cron format: minute hour day month weekday. Like '0 9 * * mon-fri' (9:00 on weekdays) or '*/15 * * * *' (every 15 minutes).")
                     }

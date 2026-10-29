@@ -489,7 +489,7 @@ dependencies = [
 [[package]]
 name = "blockstitch-core"
 version = "0.1.0"
-source = "git+https://github.com/Blockworked/blockstitch?rev=7657af47b626d9f8d138f79fa3e198df4830e3b9#7657af47b626d9f8d138f79fa3e198df4830e3b9"
+source = "git+https://github.com/Blockworked/blockstitch?rev=88e0bb30b1272a8d32c7add97669d1cd56d1f511#88e0bb30b1272a8d32c7add97669d1cd56d1f511"
 dependencies = [
  "chrono",
  "rand 0.10.3",
@@ -501,7 +501,7 @@ dependencies = [
 [[package]]
 name = "blockstitch-ffi"
 version = "0.1.0"
-source = "git+https://github.com/Blockworked/blockstitch?rev=7657af47b626d9f8d138f79fa3e198df4830e3b9#7657af47b626d9f8d138f79fa3e198df4830e3b9"
+source = "git+https://github.com/Blockworked/blockstitch?rev=88e0bb30b1272a8d32c7add97669d1cd56d1f511#88e0bb30b1272a8d32c7add97669d1cd56d1f511"
 dependencies = [
  "blockstitch-core",
  "serde",
@@ -511,7 +511,7 @@ dependencies = [
 [[package]]
 name = "blockstitch-qml"
 version = "0.1.0"
-source = "git+https://github.com/Blockworked/blockstitch?rev=7657af47b626d9f8d138f79fa3e198df4830e3b9#7657af47b626d9f8d138f79fa3e198df4830e3b9"
+source = "git+https://github.com/Blockworked/blockstitch?rev=88e0bb30b1272a8d32c7add97669d1cd56d1f511#88e0bb30b1272a8d32c7add97669d1cd56d1f511"
 dependencies = [
  "cxx-qt",
  "cxx-qt-build",
@@ -648,6 +648,7 @@ dependencies = [
  "png",
  "qt-build-utils",
  "qt-version",
+ "quick-xml 0.41.0",
  "serde",
  "serde_json",
  "tokio",
@@ -3624,6 +3625,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "e660451e55124f798a69a5af3f49ccfbefbd41910eefd25caf2393e1f3473ec1"
 dependencies = [
  "memchr",
+ "serde",
 ]
 
 [[package]]

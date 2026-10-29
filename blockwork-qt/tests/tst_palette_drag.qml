@@ -63,13 +63,50 @@ Item {
         }
         // Scrolled into view in the palette's list.
         function paletteBlock(page, type) {
-            const block = all(page).find(o => o.spec && o.spec.kind === "instruction" && o.spec.type === type && o.visible && o.width > 0);
+            let block = null;
+            tryVerify(() => {
+                block = all(page).find(o => o.spec && o.spec.kind === "instruction" && o.spec.type === type && o.visible && o.width > 0);
+                return !!block;
+            }, 5000, type);
             for (let p = block ? block.parent : null; p; p = p.parent)
                 if (p.contentY !== undefined && p.flickableDirection !== undefined) { p.contentY += block.mapToItem(p, 0, 0).y - 100; wait(20); break; }
             return block;
         }
         function canvasBlock(page, id) { return all(page).find(o => o.instruction && o.instruction.id === id && o.paletteMode === false && o.width > 0); }
         function ghost(page) { return all(page).find(o => o.objectName === "paletteGhost"); }
+        function test_key_input_drag_keeps_views_stationary_data() {
+            return [{tag: "key", type: "Key"}, {tag: "trigger", type: "WhenKey"}];
+        }
+        function test_key_input_drag_keeps_views_stationary(data) {
+            const page = editor();
+            const source = paletteBlock(page, data.type);
+            verify(!!source);
+            const key = all(source).find(o => o.keyMode === true && o.width > 0);
+            verify(!!key);
+            const views = all(page).filter(o => o.contentX !== undefined && o.flickableDirection !== undefined);
+            const positions = views.map(o => ({x: o.contentX, y: o.contentY}));
+            const start = key.mapToItem(scene, key.width / 2, key.height / 2);
+            mousePress(scene, start.x, start.y);
+            for (let step = 1; step <= 5; ++step) {
+                mouseMove(scene, start.x + step * 20, start.y - step * 15, 20, Qt.LeftButton);
+                for (let i = 0; i < views.length; ++i) {
+                    compare(views[i].contentX, positions[i].x, "view horizontal position");
+                    compare(views[i].contentY, positions[i].y, "view vertical position");
+                }
+                verify(!page.paletteDrags.drag);
+                verify(!page.paletteDrags.canvas.dragging);
+            }
+            mouseRelease(scene, start.x + 100, start.y - 75);
+            wait(100);
+            for (let i = 0; i < views.length; ++i) {
+                compare(views[i].contentX, positions[i].x);
+                compare(views[i].contentY, positions[i].y);
+            }
+            compare(scene.calls.length, 0);
+            const click = key.mapToItem(scene, key.width / 2, key.height / 2);
+            mouseClick(scene, click.x, click.y);
+            compare(scene.calls.map(c => c.command), ["start_standalone_key_capture"]);
+        }
         function test_sidebar_keeps_workspace_stationary_data() {
             const rows = [];
             for (const layout of ["rail", "chips", "accordion", "flyout", "tiles"])
@@ -229,6 +266,30 @@ Item {
                 compare(source.instruction[key].value, 42);
                 row.removeComponent(component);
                 verify(!(key in source.instruction), key + " is removed");
+            }
+        }
+        function test_wait_components_conflict_data() {
+            return [{tag: "condition", type: "WaitUntil"}, {tag: "image", type: "WaitForImage"}];
+        }
+        function test_wait_components_conflict(data) {
+            const page = editor();
+            const source = paletteBlock(page, data.type);
+            verify(!!source);
+            const row = all(source).find(o => o.paletteMode === true);
+            for (const key of ["timeout", "error_timeout"]) {
+                const other = key === "timeout" ? "error_timeout" : "timeout";
+                const component = row.rowSpec.components.find(c => c.key === key);
+                row.addComponent(component);
+                verify(key in source.instruction);
+                verify(!(other in source.instruction));
+                verify(!BlockRegistry.missingComponents(row.rowSpec, source.instruction).some(c => c.key === other));
+                row.removeComponent(component);
+                verify(BlockRegistry.missingComponents(row.rowSpec, source.instruction).some(c => c.key === other));
+                row.addComponent(row.rowSpec.components.find(c => c.key === other));
+                row.addComponent(component);
+                verify(key in source.instruction);
+                verify(!(other in source.instruction));
+                row.removeComponent(component);
             }
         }
         function test_sidebar_pickup_matches_canvas_zoom() {

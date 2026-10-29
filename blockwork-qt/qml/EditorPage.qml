@@ -735,7 +735,7 @@ Item {
                     listInstructionTypes: root.listInstructionTypes
                     extraOperators: root.extraOperators
                     extraCategories: root.extraCategories
-                    appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "crosshair" }, { id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }]
+                    appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "monitor" }, { id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }]
                     variables: root.macro ? root.macro.variables : []
                     lists: root.macro && root.macro.lists ? root.macro.lists : []
                     blockDefinitions: root.macro ? root.macro.block_defs : []
@@ -1606,13 +1606,37 @@ Item {
         onAccepted: root.invoke("delete_list", { name: deleteListDialog.listName })
     }
     AppDialog {
-        id:detailsDialog;standardButtons:Dialog.NoButton;width:430;padding:0;topPadding:0;bottomPadding:0;showClose:false
+        id:detailsDialog;standardButtons:Dialog.NoButton;width:Math.min(430, parent.width - 32);padding:0;topPadding:0;bottomPadding:0;showClose:false
         property string detailName:"";property string detailIdentifier:"";property string detailExplainer:""
         function show(name,identifier,explainer){detailName=name;detailIdentifier=identifier;detailExplainer=explainer;open()}
         contentItem:Column{spacing:12;padding:18
-            Row{spacing:9;LucideIcon{name:"info";width:20;height:20;color:Theme.accent;anchors.verticalCenter:parent.verticalCenter}Text{text:detailsDialog.detailName;color:Theme.text;font.pixelSize:17;font.weight:Font.Bold;anchors.verticalCenter:parent.verticalCenter}}
-            Rectangle{width:parent.width-36;height:30;radius:5;color:Theme.field;border.color:Theme.border;Text{anchors.centerIn:parent;text:detailsDialog.detailIdentifier;color:Theme.accent;font.family:"monospace";font.pixelSize:12}}
-            Text{width:parent.width-36;text:detailsDialog.detailExplainer;color:Theme.textDim;font.pixelSize:13;wrapMode:Text.WordWrap}
+            Row {
+                width: parent.width - 36
+                spacing: 9
+                LucideIcon { name: "info"; width: 20; height: 20; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
+                Text {
+                    width: parent.width - 29
+                    text: detailsDialog.detailName
+                    color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold
+                    wrapMode: Text.Wrap
+                    anchors.verticalCenter: parent.verticalCenter
+                }
+            }
+            Rectangle {
+                width: parent.width - 36
+                height: Math.max(30, identifierText.implicitHeight + 12)
+                radius: 5; color: Theme.field; border.color: Theme.border
+                Text {
+                    id: identifierText
+                    anchors.centerIn: parent
+                    width: parent.width - 16
+                    text: detailsDialog.detailIdentifier
+                    color: Theme.accent; font.family: "monospace"; font.pixelSize: 12
+                    wrapMode: Text.WrapAnywhere
+                    horizontalAlignment: Text.AlignHCenter
+                }
+            }
+            Text{width:parent.width-36;text:detailsDialog.detailExplainer;color:Theme.textDim;font.pixelSize:13;wrapMode:Text.Wrap}
             Row{anchors.right:parent.right;anchors.rightMargin:18;BwButton{text:qsTr("Close");onClicked:detailsDialog.close()}}
         }
     }
@@ -1772,10 +1796,10 @@ Item {
             { kind: "button", action: "pickRegion", icon: "square-dashed", text: i => i && i.region ? qsTr("region %1").arg(i.region) : qsTr("whole window") },
             { kind: "button", action: "clearRegion", icon: "x", when: i => !!i && !!i.region }
         ];
-        const timeoutComponent = { key: "timeout", label: qsTr("for up to"), icon: "timer", fresh: () => numberValue(10000), pieces: [
+        const timeoutComponent = { key: "timeout", conflicts: ["error_timeout"], label: qsTr("for up to"), icon: "timer", fresh: () => numberValue(10000), pieces: [
             label(qsTr("for up to")), value("WaitTimeout", "timeout"), label(qsTr("ms"))
         ] };
-        const errorTimeoutComponent = { key: "error_timeout", label: qsTr("or error after"), icon: "timer", fresh: () => numberValue(10000), pieces: [
+        const errorTimeoutComponent = { key: "error_timeout", conflicts: ["timeout"], label: qsTr("or error after"), icon: "timer", fresh: () => numberValue(10000), pieces: [
             label(qsTr("or error after")), value("WaitErrorTimeout", "error_timeout"), label(qsTr("ms"))
         ] };
         const toleranceComponent = { key: "tolerance", label: qsTr("within %"), icon: "scan", fresh: () => numberValue(10), pieces: [
@@ -2183,11 +2207,14 @@ Item {
     onUiLanguageChanged: Qt.callLater(() => { BlockRegistry.resetOperators(); registerBlocks(); BlockRegistry.blockMenu = [{ id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }]; })
     property var createListFromDropdown: (select, location) => listDialog.openForCreate(location
         ? name => root.invoke("edit_value_field", { location: location, text: name }) : select)
+    property var replaceComponentValue: (location, value) => root.invoke("put_value", { location: location, value: value })
     Component.onDestruction: {
         if (BlockRegistry.listCreationHandler === root.createListFromDropdown) BlockRegistry.listCreationHandler = null;
+        if (BlockRegistry.valueReplacementHandler === root.replaceComponentValue) BlockRegistry.valueReplacementHandler = null;
     }
     Component.onCompleted: {
         BlockRegistry.listCreationHandler = root.createListFromDropdown;
+        BlockRegistry.valueReplacementHandler = root.replaceComponentValue;
         registerBlocks();
         BlockRegistry.blockMenu = [{ id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }];
         BlockRegistry.previewHandler = (key, value) => root.appBridge.previewValue(key, JSON.stringify(value));

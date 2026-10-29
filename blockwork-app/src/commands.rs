@@ -3814,6 +3814,7 @@ mod value_location_tests {
     }
     fn input(id: &str, name: &str) -> BlockPiece {
         BlockPiece::Input {
+            component: false,
             id: id.to_string(),
             name: name.to_string(),
             value_type: Default::default(),
@@ -4008,6 +4009,7 @@ mod value_location_tests {
         let new_pieces = vec![
             input("i1", "a"),
             BlockPiece::Input {
+                component: false,
                 id: "i2".into(),
                 name: "b".into(),
                 value_type: InputValueType::Bool,

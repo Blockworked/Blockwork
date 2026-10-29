@@ -35,7 +35,8 @@ Item {
                     floating_values:[{id:"param",x:40,y:250,value:{kind:"Param",name:"gain"},origin_block_id:"custom"}],
                     block_defs:[{id:"custom",identifier:"Custom",color:"#51b84b",shape:"Normal",pieces:[
                         {kind:"Label",text:"custom"}, {kind:"Input",name:"gain",value_type:"Number"},
-                        {kind:"Input",name:"enabled",value_type:"Bool"}]}],
+                        {kind:"Input",name:"enabled",value_type:"Bool"},
+                        {kind:"Input",name:"optional",value_type:"Bool",component:true}]}],
                     strands:[{id:"definition",x:40,y:40,instructions:[{id:"header",type:"BlockHeader",block_id:"custom"},{id:"wait",type:"Wait",duration:{kind:"Number",value:100}}]}]},
                 recording_phase:{phase:"Idle"}, key_capture:null, can_undo:false, can_redo:false,
                 record_mouse_movement:false, record_mouse_relative:false, absolute_mouse_position_available:true
@@ -83,7 +84,7 @@ Item {
             compare(call.args.instruction.args[1].value, 1);
             compare(call.args.instruction.branches.length, 1);
         }
-        function test_drag_to_canvas_data() { return [{tag:"number",name:"gain",boolean:false},{tag:"boolean",name:"enabled",boolean:true}]; }
+        function test_drag_to_canvas_data() { return [{tag:"number",name:"gain",boolean:false},{tag:"boolean",name:"enabled",boolean:true},{tag:"component",name:"optional",boolean:true}]; }
         function test_drag_to_canvas(data) {
             const page = editor();
             const chip = parameter(page, data.name);
@@ -95,6 +96,7 @@ Item {
             compare(page.paletteDrags.drag.spec.originBlockId, "custom");
             const ghost = all(page).find(o => o.isValueChip && o.valueData && o.valueData.name === data.name && !o.paletteMode && !o.location);
             verify(!!ghost);
+            compare(ghost.booleanShape, data.boolean);
             compare(ghost.refColor, Qt.color("#51b84b"));
             verify(ghost.dragPreview);
             const outline = all(ghost).find(o => o.edge !== undefined);
@@ -131,6 +133,33 @@ Item {
             const chip = all(page).find(o => o.isValueChip && o.originBlockId === "custom" && o.location && o.location.kind === "Floating" && o.valueData.kind === "Param");
             verify(!!chip);
             compare(chip.refColor, Qt.color("#51b84b"));
+        }
+        function test_parameter_shapes_after_drop_data() {
+            const out = [];
+            for (const name of ["gain", "enabled", "optional"])
+                for (const context of ["floating", "field", "nested"])
+                    out.push({tag: name + "_" + context, name: name, context: context});
+            return out;
+        }
+        function test_parameter_shapes_after_drop(data) {
+            const page = editor();
+            const state = JSON.parse(JSON.stringify(page.appState));
+            const value = {kind: "Param", name: data.name};
+            if (data.context === "floating") state.current_macro.floating_values[0].value = value;
+            else state.current_macro.strands[0].instructions[1].duration = data.context === "nested"
+                ? {kind: "Op", op: "Add", args: [value, {kind: "Number", value: 1}]}
+                : value;
+            page.appState = state;
+            wait(30);
+            const chip = all(page).find(o => o.isValueChip && o.location && o.valueData && o.valueData.kind === "Param"
+                && o.valueData.name === data.name && (data.context === "floating" ? o.location.kind === "Floating" : o.location.strand_id === "definition"));
+            verify(!!chip);
+            compare(chip.booleanShape, data.name !== "gain");
+            dragExisting(chip);
+            const ghost = all(page).find(o => o.isValueChip && o.dragPreview && o.valueData && o.valueData.kind === "Param" && !o.location);
+            verify(!!ghost);
+            compare(ghost.booleanShape, data.name !== "gain");
+            mouseRelease(scene, 1000, 700);
         }
         function canvas(page) {
             return all(page).find(o => typeof o.parameterOrigin === "function");

@@ -31,5 +31,6 @@ with tempfile.TemporaryDirectory(prefix="blockwork-qml-") as temporary:
     environment = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "QML_DISABLE_DISK_CACHE": "1"}
     result = subprocess.run([
         str(qtbin / "qmltestrunner"), "-input", str(root / "blockwork-qt/tests"), "-import", str(modules),
+        *sys.argv[2:],
     ], env=environment)
     sys.exit(result.returncode)

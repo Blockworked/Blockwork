@@ -8,9 +8,9 @@ import com.blockworked.Blockstitch 1.0
 AppDialog {
     id: root
     title: editBlockId.length ? qsTr("Edit Block") : qsTr("Make a Block")
-    width: 720
+    width: Math.min(800, parent ? parent.width - 32 : 800)
     // Follow the window only while open; closed, a resize would relayout all of it.
-    height: visible ? Math.min(760, parent ? parent.height - 32 : 760) : 760
+    height: visible ? Math.min(660, parent ? parent.height - 32 : 660) : 660
     standardButtons: Dialog.NoButton
 
     signal createRequested(var pieces, string shape, string color, string icon, string identifier, string description)

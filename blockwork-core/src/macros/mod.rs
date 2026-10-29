@@ -2055,7 +2055,7 @@ pub const SPEED_MULTIPLIER_RANGE: std::ops::RangeInclusive<f64> = 0.1..=10.0;
 /// the app treats it. Persisted and exported/imported with the macro like
 /// everything else in `Macro`, so a new field here needs no separate wiring
 /// to survive a save/export round-trip.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize, Default)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, Default)]
 pub struct MacroSettings {
     /// When `true`, this macro's `WhenBattery*`/`WhenTime`/`WhenPower*`
     /// strands are watched by the background watchers (`battery_watch`/
@@ -2218,6 +2218,7 @@ impl From<MacroDe> for Macro {
         mac.graph.normalize_block_colors();
         mac.migrate_legacy_comments();
         mac.collect_named_signals();
+        crate::block_packs::migrate_variables(&mut mac);
         mac
     }
 }

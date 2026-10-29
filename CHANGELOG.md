@@ -8,16 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Tag releases (`0.x.y`, see `.github/workflows/release.yml`) publish the matching
 section below as the GitHub release notes, followed by the downloads table.
 
-## [Unreleased]
+## [0.6.0] - Unreleased
 
 ### Added
 - Launch options for the Open app block: a gear on the block opens a panel
   for arguments (like `--incognito`), a working folder, environment variables,
   and opening a new copy on macOS.
-
-## [0.6.0] - 2026-10-21
-
-### Added
 - File blocks:
   - Write or append to a file, read a file, check a file exists, list a folder.
   - "When file changes" trigger.
@@ -75,6 +71,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Global variables:
   - Set/change global blocks and a "global" reporter, shared by every macro and kept across restarts.
   - Listed in Settings, where they can be deleted.
+  - Create variables, global variables and lists directly from their block dropdowns, then select the new name automatically.
 - Secrets:
   - Named passwords and API keys in Settings > Integrations, kept in the system keyring (Secret Service, Credential Manager, Keychain) and read with the "secret" block.
   - Values are masked in the run log, previews and saved or exported macro files.
@@ -113,10 +110,19 @@ section below as the GitHub release notes, followed by the downloads table.
   - Packs published by the Blockworked team show a blue verified badge next to their publisher in Browse library. Only the built-in library can mark packs this way.
   - Right-click a custom block to share it, and the blocks it uses, as a `.blockpack` file.
   - After saving a pack, "Submit to community library..." opens the library site, where you sign in with GitHub or Google and upload it for review.
+- Custom blocks:
+  - Set default values for inputs, including boolean inputs.
+  - Add optional components that callers can turn on with the block's "+" menu and remove with "x". Each component has a boolean enabled input and can contain labels and parameters.
+  - Create and edit custom reporters with body slots, and drag their parameters into the canvas.
+- Community pack variables:
+  - Private variables keep each pack's state separate from the macro and from other packs, even when names match.
+  - Pack authors can expose variables as output reporters or editable settings. Installed packs have a Settings panel with an inspector for values from the last completed run.
+  - Pack updates preserve saved values and existing output reporters. Installation and setting changes can be undone.
 - Translatable UI:
   - Every editor and dialog string goes through Qt's translation system, with a language setting in Settings > General.
   - Ships with English and pirate-speak English; every built-in language shows up in the setting by itself.
   - Translation happens on Weblate.
+  - A searchable language dialog shows translation completeness and lets you review a choice before applying it.
 - Command line: `blockwork list`, `blockwork run <name> [--wait]` and `blockwork stop <name>` drive macros through the daemon without a window.
 - Starter templates (auto clicker, text snippet, break reminder, website watcher) in the welcome screen and the macro menu's "New from template".
 - UI animations: menus and drop-downs fade and grow open, dialogs ease in over a fading backdrop, and buttons, switches, check boxes and list rows ease between hover and pressed states. Panels like the sidebar and run log slide open and shut, and pages and Settings tabs fade in.
@@ -147,6 +153,10 @@ section below as the GitHub release notes, followed by the downloads table.
 - Click-to-preview won't run shell or web blocks.
 - While recording, the canvas shows a card with a live timer, what's being recorded, where the blocks will go, the stop shortcut and a Stop button, instead of a bare "Recording..." message. The countdown shows on the canvas too, which stays locked during it.
 - Block text no longer ends labels with a colon, so blocks read as plain sentences ("Run command [cmd]" instead of "Run command: [cmd]").
+- Settings use grouped panels that reflow on narrower windows, with more room for shortcuts.
+- The welcome screen groups preferences and starter templates into panels that reflow on narrower windows. Cron syntax help opens from an info button beside the custom schedule field.
+- Clearing all blocks uses a Cancel/Delete confirmation popup and can be undone.
+- Legacy pack variables migrate to private pack state where possible. Variables used by the macro or shared by older packs stay shared so existing macros keep working.
 
 ### Fixed
 - On Linux, evdev waits for held keys and mouse buttons to be released before
@@ -158,6 +168,16 @@ section below as the GitHub release notes, followed by the downloads table.
 - Every event block label now uses the same bold caption style; newer event blocks (when run, when file changes, when idle and others) were drawn in plain text while the older ones were bold.
 - Clicking Record during the countdown cancels the recording instead of starting the countdown over, and the Record button's label no longer gets cut off or overlaps its neighbours.
 - Images taken with the screen picker no longer catch the picker's own close animation (such as KDE's shattering windows) as stray lines and shapes.
+- Dropping blocks above a stack keeps the existing stack in place, with matching connectors and smoother branch previews.
+- Dragging a block over the sidebar keeps the canvas still, and dropping it there deletes it. Dragging a key input from the palette no longer pans the sidebar.
+- Custom block headers appear inside the visible canvas when created, and dragging blocks and parameters keeps their position and color until the edit lands.
+- List and dictionary editors stay fixed while the canvas pans or zooms, keep header drags through state updates, and preserve the current edit when adding an item.
+- Comment editing scrolls correctly, attached comments keep their connector lines, and comments drag from their header. Text context menus follow the app theme.
+- Renaming a variable updates both output fields of Find image, as well as nested reads and writes.
+- Browser scripts can wait up to two minutes for a result and stop promptly when the macro is stopped.
+- Wait until and Wait for image no longer allow conflicting "for up to" and "or error after" timeout options on the same block.
+- Windows x64 builds use the full Qt package required to bundle the app.
+- Release publishing waits for required builds and downloads to succeed, and lists only available packages. Creating a Microsoft Store test flight reports missing tester-group IDs before submitting it.
 
 ## [0.5.4] - 2026-09-20
 
@@ -294,7 +314,6 @@ Initial release.
 - Global shortcuts (navigation, loop mode) on Linux; global keybinds on Windows.
 - App icons, updater and confirm dialogs, Wayland support.
 
-[Unreleased]: https://github.com/Blockworked/Blockwork/compare/0.6.0...HEAD
 [0.6.0]: https://github.com/Blockworked/Blockwork/compare/0.5.4...0.6.0
 [0.5.4]: https://github.com/Blockworked/Blockwork/compare/0.5.3...0.5.4
 [0.5.3]: https://github.com/Blockworked/Blockwork/compare/0.5.2...0.5.3

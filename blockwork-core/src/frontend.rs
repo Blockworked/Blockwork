@@ -70,6 +70,7 @@ pub struct MacroDto {
     /// Declared variable names only, for the sidebar/dropdowns - current
     /// values aren't surfaced to the frontend.
     pub variables: Vec<String>,
+    pub pack_data: Vec<PackDataDto>,
     /// Macro-scoped lists, including their literal items for the list editor.
     pub lists: Vec<ListDto>,
     pub signals: Vec<String>,
@@ -77,6 +78,21 @@ pub struct MacroDto {
     pub block_defs: Vec<BlockDefinitionDto>,
     /// Settings edited from the "Macro Settings" popup - see `MacroSettingsDto`.
     pub settings: MacroSettingsDto,
+}
+
+#[derive(Serialize, Clone)]
+pub struct PackDataDto {
+    pub id: String,
+    pub name: String,
+    pub variables: Vec<PackVariableDto>,
+}
+
+#[derive(Serialize, Clone)]
+pub struct PackVariableDto {
+    pub name: String,
+    pub label: String,
+    pub value: crate::input::value::Evaluated,
+    pub role: block_packs::VariableRole,
 }
 
 #[derive(Serialize, Clone)]
@@ -1611,6 +1627,17 @@ pub fn macro_to_dto(mac: &Macro) -> MacroDto {
             comment.attached_to.as_ref().is_none_or(|id| !hidden_instruction_ids.contains(id))
         }).cloned().collect(),
         variables: mac.variables.iter().map(|v| v.name.clone()).collect(),
+        pack_data: mac.settings.block_packs.iter().map(|pack| PackDataDto {
+            id: pack.id.clone(), name: pack.name.clone(),
+            variables: pack.variables.iter().map(|var| PackVariableDto {
+                name: var.name.clone(), label: block_packs::variable_label(&var.name).into(),
+                value: match &var.value {
+                    #[cfg(feature = "system")]
+                    crate::input::value::Evaluated::Text(text) => crate::input::value::Evaluated::Text(crate::secrets::redact(text)),
+                    _ => var.value.clone(),
+                }, role: var.role,
+            }).collect(),
+        }).collect(),
         lists: mac.lists.iter().map(list_to_dto).collect(),
         signals: mac.signals.clone(),
         block_defs: mac.block_defs.iter().map(|def| {

@@ -9,7 +9,12 @@ from them by the Translations workflow and embedded by the build.
   translation.
 
 Every `.qm` here shows up in Settings > Language by itself, named with
-Qt's own name for the code (`pt_BR` is "Português (Brasil)").
+Qt's own name for the code (`pt_BR` is "Português (Brasil)"). The language
+dialog includes empty catalogs and shows their completeness. The build counts
+finished, nonempty messages against the union of active catalog messages;
+plural messages count once and require every listed form to be nonempty.
+Unfinished, vanished and obsolete translations do not count. English is the
+source language and always shows 100%.
 
 ## Translating
 

@@ -144,6 +144,17 @@ impl Backend {
             }
             "confirm_block_pack" => to_json(crate::block_library::confirm(&self.state, &self.app)?),
             "cancel_block_pack" => to_json(crate::block_library::cancel(&self.state, &self.app)?),
+            "set_pack_setting" => {
+                to_json(crate::block_library::set_setting(&self.state, &self.app,
+                    arg(&args, "packId")?, arg(&args, "name")?, arg(&args, "value")?)?)
+            }
+            "pack_variable_candidates" => {
+                let s = self.state.lock().map_err(|e| e.to_string())?;
+                let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+                let pack = blockwork_core::block_packs::pack_from_macro(mac, &arg::<Vec<String>>(&args, "blockIds")?,
+                    blockwork_core::block_packs::PackInfo { name: "Preview".into(), ..Default::default() })?;
+                to_json(pack.content.variables.iter().map(|v| v.name.clone()).collect::<Vec<_>>())
+            }
             "export_block_pack" => {
                 let block_ids: Vec<String> = arg(&args, "blockIds")?;
                 let info = blockwork_core::block_packs::PackInfo {
@@ -154,7 +165,7 @@ impl Backend {
                     version: arg::<Option<String>>(&args, "version")?.unwrap_or_default(),
                 };
                 let path: String = arg(&args, "path")?;
-                to_json(crate::block_library::export(&self.state, block_ids, info, path)?)
+                to_json(crate::block_library::export(&self.state, block_ids, info, path, arg::<Option<Vec<blockwork_core::block_packs::VariableInterface>>>(&args, "variableRoles")?.unwrap_or_default())?)
             }
             "set_browser_bridge" => {
                 let (enabled, port): (bool, u16) = (arg(&args, "enabled")?, arg(&args, "port")?);

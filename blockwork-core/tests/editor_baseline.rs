@@ -64,7 +64,8 @@ fn reads(value: &Value, out: &mut Vec<String>) {
 
 #[test]
 fn saved_macro_loads_without_upgrade_and_saves_back_unchanged() {
-    let mac = load();
+    blockwork_core::init();
+    let (mac, upgrade) = migrate::parse(&std::fs::read_to_string(fixture()).unwrap()).unwrap();
     let saved = migrate::to_value(&mac).unwrap();
     if std::env::var_os("BLOCKWORK_BLESS").is_some() {
         std::fs::write(
@@ -74,6 +75,10 @@ fn saved_macro_loads_without_upgrade_and_saves_back_unchanged() {
         .unwrap();
         return;
     }
+    assert!(
+        !upgrade.changed(),
+        "the fixture needed an upgrade: {upgrade:?}"
+    );
     let original: serde_json::Value =
         serde_json::from_str(&std::fs::read_to_string(fixture()).unwrap()).unwrap();
     assert_eq!(saved, original);

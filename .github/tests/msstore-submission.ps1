@@ -17,7 +17,7 @@ function Invoke-RestMethod {
   $global:msstoreTestCalls.Add("$Method $Uri")
   if ($Uri -like 'https://login.microsoftonline.com/*') { return @{ access_token = 'mock' } }
   if ($Uri -match '/listflights') {
-    if ($global:msstoreTestScenario -eq 'empty') {
+    if ($global:msstoreTestScenario -in @('empty', 'missing-groups')) {
       $exception = [Exception]::new('No flights')
       $exception | Add-Member Response ([pscustomobject]@{ StatusCode = 404 })
       throw $exception
@@ -53,7 +53,7 @@ function Invoke-RestMethod {
   throw "Unexpected request: $Method $Uri"
 }
 try {
-  foreach ($global:msstoreTestScenario in @('existing', 'empty', 'paged', 'portal', 'public-portal', 'missing-id', 'denied')) {
+  foreach ($global:msstoreTestScenario in @('existing', 'empty', 'paged', 'portal', 'public-portal', 'missing-id', 'denied', 'missing-groups')) {
     $global:msstoreTestCalls = [Collections.Generic.List[string]]::new()
     $flight = if ($global:msstoreTestScenario -eq 'public-portal') { '' } elseif ($global:msstoreTestScenario -eq 'missing-id') { 'cbe98074-b874-41d4-8807-6440e1bcde2e' } else { '0.6 Test' }
     $expected = switch ($global:msstoreTestScenario) {
@@ -61,14 +61,17 @@ try {
       'public-portal' { 'Delete the in-progress app submission' }
       'missing-id' { 'no longer exists' }
       'denied' { 'Access denied' }
+      'missing-groups' { 'requires at least one tester group ID' }
       default { $null }
     }
     $failure = $null
-    try { & $submit -Msix $file -Flight $flight -FlightGroupIds 'one, two' }
+    $groups = if ($global:msstoreTestScenario -in @('existing', 'missing-groups')) { ' , ' } else { 'one, two' }
+    try { & $submit -Msix $file -Flight $flight -FlightGroupIds $groups }
     catch { $failure = $_.Exception.Message }
     if ($expected) {
       if (-not $failure -or -not $failure.Contains($expected)) { throw "${global:msstoreTestScenario}: expected '$expected', got '$failure'" }
       if ($global:msstoreTestCalls | Where-Object { $_ -match '^Post .*/submissions' -or $_ -like '*mock-upload*' }) { throw 'Submission continued after failure' }
+      if ($global:msstoreTestScenario -eq 'missing-groups' -and ($global:msstoreTestCalls | Where-Object { $_ -match '^Post .*/flights$' })) { throw 'Created flight without tester groups' }
     } elseif ($failure) { throw "${global:msstoreTestScenario}: $failure" }
     else {
       if (-not ($global:msstoreTestCalls | Where-Object { $_ -match '^Post .*/submissions/new/commit$' })) { throw 'Missing commit' }

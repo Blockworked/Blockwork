@@ -28,6 +28,7 @@ pub struct BlockRuntime {
     pub input_names: Vec<String>,
     pub branch_names: Vec<String>,
     pub body: Vec<Instruction>,
+    pub variable_defaults: Vec<(String, Evaluated)>,
 }
 
 /// Guards against runaway recursive custom blocks; without it a cycle would
@@ -199,6 +200,9 @@ fn call_block(
     let runtime = block_table
         .get(block_id)
         .ok_or_else(|| format!("call to unknown custom block '{block_id}'"))?;
+    if !runtime.variable_defaults.is_empty() && let Ok(mut vars) = ctx.variables.lock() {
+        for (key, value) in &runtime.variable_defaults { vars.entry(key.clone()).or_insert_with(|| value.clone()); }
+    }
     let new_env: HashMap<String, Evaluated> = runtime
         .input_names
         .iter()
@@ -777,7 +781,7 @@ impl Macro {
         // so every run entry point can reach them without another argument.
         for (index, strand) in self.graph.strands.iter().enumerate() {
             if matches!(strand.instructions.first().map(|i| &i.kind), Some(InstructionKind::WhenSignal(_))) {
-                let runtime = BlockRuntime { input_names: Vec::new(), branch_names: Vec::new(), body: strand.instructions.clone() };
+                let runtime = BlockRuntime { input_names: Vec::new(), branch_names: Vec::new(), body: strand.instructions.clone(), variable_defaults: Vec::new() };
                 table.insert(format!("{SIGNAL_KEY}{index}"), runtime);
             }
         }
@@ -794,8 +798,26 @@ impl Macro {
                         input_names: def.input_names().map(str::to_string).collect(),
                         branch_names: def.branch_names().map(str::to_string).collect(),
                         body: strand.instructions[1..].to_vec(),
+                        variable_defaults: Vec::new(),
                     },
                 );
+            }
+        }
+        for pack in &self.settings.block_packs {
+            let defaults: Vec<_> = pack.variables.iter().map(|v| (pack.variable_key(&v.name), v.value.clone())).collect();
+            for id in &pack.blocks {
+                if crate::block_packs::owner(self, id).is_some_and(|owner| owner.id != pack.id) { continue; }
+                if let Some(runtime) = table.get_mut(id) {
+                    crate::block_packs::scope_body(&mut runtime.body, pack);
+                    runtime.variable_defaults = defaults.clone();
+                }
+            }
+            for var in pack.variables.iter().filter(|v| v.role == crate::block_packs::VariableRole::Output) {
+                table.insert(pack.output_id(&var.name), BlockRuntime {
+                    input_names: Vec::new(), branch_names: Vec::new(),
+                    body: vec![Instruction::new(InstructionKind::Return(Value::Var { name: pack.variable_key(&var.name) }))],
+                    variable_defaults: defaults.clone(),
+                });
             }
         }
         Arc::new(table)
@@ -3044,6 +3066,7 @@ mod tests {
                             text: "double".into(),
                         },
                         BlockPiece::Input {
+                            component: false,
                             id: "p2".into(),
                             name: "n".into(),
                             value_type: InputValueType::Any,
@@ -3135,6 +3158,46 @@ mod tests {
     }
 
     #[test]
+    fn pack_state_is_isolated_persistent_and_available_to_reporters_and_triggers() {
+        use crate::block_packs::{self, PackInfo, VariableInterface, VariableRole};
+        use crate::macros::{BlockPiece, BlockShape, VariableDef};
+        let mut mac = Macro::new("user".into(), String::new(), vec![]);
+        mac.graph.variables.push(VariableDef { name: "counter".into(), value: Evaluated::Number(99.0) });
+        let mut calls = Vec::new();
+        for name in ["first", "second"] {
+            let mut author = Macro::new("author".into(), String::new(), vec![]);
+            author.graph.variables.push(VariableDef { name: "counter".into(), value: Evaluated::Number(5.0) });
+            let block = author.create_block(vec![BlockPiece::Label { id: "label".into(), text: name.into() }], BlockShape::Normal, "#4C97FF".into(), 0, 0);
+            author.graph.strands.iter_mut().find(|s| s.block_header_id() == Some(block.as_str())).unwrap().instructions.push(Instruction::new(InstructionKind::ChangeVariable("counter".into(), Value::number(1.0))));
+            let mut pack = block_packs::pack_from_macro(&author, &[block.clone()], PackInfo { id: name.into(), name: name.into(), ..Default::default() }).unwrap();
+            pack.variable_roles.push(VariableInterface { name: "counter".into(), role: VariableRole::Output });
+            block_packs::merge_into(&mut mac, &pack, "");
+            calls.push(Instruction::new(InstructionKind::CallBlock { block_id: block, args: vec![], branches: vec![] }));
+        }
+        let first = mac.settings.block_packs[0].clone();
+        let second = mac.settings.block_packs[1].clone();
+        let reporter = Value::Call { block_id: first.output_id("counter"), args: vec![], branches: vec![], saved: Box::new(Value::number(0.0)) };
+        let mut body = calls.clone();
+        body.push(Instruction::new(InstructionKind::SetVariable("result".into(), reporter)));
+        mac.graph.strands.push(Strand::with_instructions(0, 0, [vec![Instruction::new(InstructionKind::WhenRan)], body.clone()].concat()));
+        let vars = Arc::new(Mutex::new(mac.variable_values()));
+        mac.clone().run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+        {
+            let values = vars.lock().unwrap();
+            assert_eq!(values.get("counter"), Some(&Evaluated::Number(99.0)));
+            assert_eq!(values.get("result"), Some(&Evaluated::Number(6.0)));
+            assert_eq!(values.get(&first.variable_key("counter")), Some(&Evaluated::Number(6.0)));
+            assert_eq!(values.get(&second.variable_key("counter")), Some(&Evaluated::Number(6.0)));
+            mac.sync_variables_from(&values);
+        }
+        let (loaded, _) = crate::macros::migrate::from_value(crate::macros::migrate::to_value(&mac).unwrap()).unwrap();
+        let triggered = empty_vars();
+        run_fired_strand(crate::run_log::Source::default(), body, noop_emulator(), None, 1.0, Arc::clone(&triggered),
+            Arc::new(Mutex::new(HashMap::new())), loaded.block_table(), 0);
+        assert_eq!(triggered.lock().unwrap().get("result"), Some(&Evaluated::Number(7.0)));
+    }
+
+    #[test]
     fn shipped_text_helpers_pack_runs() {
         crate::input::value::register_blockwork_operators();
         let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../blockwork-core/tests/fixtures/blocks/packs/text-helpers.json");
@@ -3185,6 +3248,44 @@ mod tests {
         let vars = vars.lock().unwrap();
         assert_eq!(vars.get("branch_ran"), Some(&Evaluated::Number(7.0)));
         assert_eq!(vars.get("result"), Some(&Evaluated::Number(42.0)));
+    }
+
+    #[test]
+    fn custom_components_bind_their_enabled_parameter_in_commands_and_reporters() {
+        for reporter in [false, true] {
+            for enabled in [false, true] {
+                let vars = empty_vars();
+                let args = vec![Evaluated::Bool(enabled).into_value(), Value::number(21.0)];
+                let call = if reporter {
+                    InstructionKind::SetVariable("x".into(), Value::Call {
+                        block_id: "double".into(), args, branches: vec![], saved: Box::new(Value::number(0.0))
+                    })
+                } else {
+                    InstructionKind::CallBlock { block_id: "double".into(), args, branches: vec![] }
+                };
+                let mut mac = macro_with_double_block(vec![Instruction::new(call)]);
+                mac.graph.block_defs[0].pieces = serde_json::from_value(serde_json::json!([
+                    {"kind":"Label","id":"name","text":"example"},
+                    {"kind":"Input","id":"enabled","name":"optional","value_type":"Bool","component":true},
+                    {"kind":"Input","id":"value","name":"n"}
+                ])).unwrap();
+                mac.graph.block_defs[0].shape = if reporter { BlockShape::ReturnsValue } else { BlockShape::Normal };
+                let result = |value| Instruction::new(if reporter {
+                    InstructionKind::Return(value)
+                } else {
+                    InstructionKind::SetVariable("x".into(), value)
+                });
+                mac.graph.strands[1].instructions.truncate(1);
+                mac.graph.strands[1].instructions.push(Instruction::new(InstructionKind::IfElse {
+                    condition: Value::Param { name: "optional".into() },
+                    then_body: vec![result(Value::Param { name: "n".into() })],
+                    else_body: vec![result(Value::number(7.0))],
+                }));
+                let (mac, _) = crate::macros::migrate::from_value(crate::macros::migrate::to_value(&mac).unwrap()).unwrap();
+                mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+                assert_eq!(vars.lock().unwrap().get("x"), Some(&Evaluated::Number(if enabled { 21.0 } else { 7.0 })));
+            }
+        }
     }
 
     #[test]
@@ -3547,6 +3648,7 @@ mod tests {
                     BlockDef {
                         id: double_id,
                         pieces: vec![BlockPiece::Input {
+                            component: false,
                             id: "p1".into(),
                             name: "n".into(),
                             value_type: InputValueType::Any,
@@ -3561,6 +3663,7 @@ mod tests {
                     BlockDef {
                         id: triple_id,
                         pieces: vec![BlockPiece::Input {
+                            component: false,
                             id: "p1".into(),
                             name: "n".into(),
                             value_type: InputValueType::Any,

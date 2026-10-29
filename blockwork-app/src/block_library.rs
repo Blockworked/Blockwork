@@ -408,12 +408,33 @@ pub(crate) fn cancel(state: &SharedState, app: &AppHandle) -> Result<(), String>
     Ok(())
 }
 
+pub(crate) fn set_setting(state: &SharedState, app: &AppHandle, pack_id: String, name: String,
+    value: blockwork_core::input::value::Evaluated) -> Result<(), String> {
+    use blockwork_core::input::value::Evaluated;
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let pack = s.current_macro.as_ref().and_then(|mac| mac.settings.block_packs.iter().find(|p| p.id == pack_id))
+        .ok_or("That pack isn't installed")?;
+    let var = pack.variables.iter().find(|v| v.name == name && v.role == block_packs::VariableRole::Setting)
+        .ok_or("That variable isn't a pack setting")?;
+    if std::mem::discriminant(&var.value) != std::mem::discriminant(&value)
+        || matches!(&value, Evaluated::Number(n) if !n.is_finite()) { return Err("Invalid setting value".into()); }
+    let key = pack.variable_key(&name);
+    crate::commands::push_undo(&mut s);
+    let pack = s.current_macro.as_mut().unwrap().settings.block_packs.iter_mut().find(|p| p.id == pack_id).unwrap();
+    pack.variables.iter_mut().find(|v| v.name == name).unwrap().value = value.clone();
+    if let Ok(mut values) = s.variable_values.lock() { values.insert(key, value); }
+    crate::commands::auto_save(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
 /// Writes the chosen blocks of the open macro, and the blocks they call,
 /// to a pack file. Returns how many blocks it holds.
-pub(crate) fn export(state: &SharedState, block_ids: Vec<String>, info: block_packs::PackInfo, path: String) -> Result<usize, String> {
+pub(crate) fn export(state: &SharedState, block_ids: Vec<String>, info: block_packs::PackInfo, path: String, variable_roles: Vec<block_packs::VariableInterface>) -> Result<usize, String> {
     let s = state.lock().map_err(|e| e.to_string())?;
     let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
-    let pack = block_packs::pack_from_macro(mac, &block_ids, info)?;
+    let mut pack = block_packs::pack_from_macro(mac, &block_ids, info)?;
+    pack.variable_roles = variable_roles.into_iter().filter(|r| pack.content.variables.iter().any(|v| v.name == r.name)).collect();
     let text = block_packs::write_pack(&pack)?;
     std::fs::write(&path, text).map_err(|e| format!("Couldn't write '{path}': {e}"))?;
     Ok(pack.content.block_defs.len())

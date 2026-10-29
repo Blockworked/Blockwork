@@ -19,6 +19,11 @@ pub mod qobject {
         #[cxx_name = "setLanguage"]
         fn set_language(self: &Translator, code: &QString) -> bool;
 
+        /// Bundled language codes and finished/total message counts as JSON.
+        #[qinvokable]
+        #[cxx_name = "languageDetails"]
+        fn language_details(self: &Translator) -> QString;
+
         /// Codes of the languages with a translation, like "pirate" or "pt_BR".
         #[qinvokable]
         fn languages(self: &Translator) -> QStringList;
@@ -31,6 +36,10 @@ pub struct TranslatorRust;
 impl qobject::Translator {
     fn set_language(&self, code: &cxx_qt_lib::QString) -> bool {
         crate::translations::set_language(&code.to_string())
+    }
+
+    fn language_details(&self) -> cxx_qt_lib::QString {
+        cxx_qt_lib::QString::from(include_str!(concat!(env!("OUT_DIR"), "/languages.json")))
     }
 
     fn languages(&self) -> cxx_qt_lib::QStringList {

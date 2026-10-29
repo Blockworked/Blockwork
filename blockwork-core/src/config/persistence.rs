@@ -56,11 +56,12 @@ pub fn read_macro_file_upgrading(path: &Path) -> Result<(Macro, Upgrade), String
 }
 
 /// Loads one of the app's own macro files, rewriting it in the current
-/// format. When blocks changed, the original is kept as `<file>.v<N>.bak`.
+/// format. Changed blocks or migrated pack state keep a `<file>.v<N>.bak` copy.
 fn load_own_macro_file(path: &Path) -> Result<Macro, String> {
     let (mac, upgrade) = read_macro_file_upgrading(path)?;
     if upgrade.changed() {
-        if !upgrade.notes.is_empty() {
+        let moved_pack_state = upgrade.from < 3 && mac.settings.block_packs.iter().any(|p| !p.variables.is_empty());
+        if !upgrade.notes.is_empty() || moved_pack_state {
             // A fresh backup every time: a file can be salvaged more than
             // once (opened in an older build, edited in a newer one, opened
             // in the older one again), and each time loses different blocks.
@@ -133,13 +134,20 @@ fn without_secrets(mac: &Macro) -> Option<Macro> {
     use blockstitch_core::graph::ListItem;
     let secret_var = |v: &Evaluated| matches!(v, Evaluated::Text(t) if crate::secrets::contains_secret(t));
     let secret_item = |i: &ListItem| matches!(i, ListItem::Text(t) if crate::secrets::contains_secret(t));
-    if !mac.variables.iter().any(|v| secret_var(&v.value)) && !mac.lists.iter().any(|l| l.items.iter().any(secret_item)) {
+    if !mac.variables.iter().any(|v| secret_var(&v.value))
+        && !mac.settings.block_packs.iter().any(|p| p.variables.iter().any(|v| secret_var(&v.value)))
+        && !mac.lists.iter().any(|l| l.items.iter().any(secret_item)) {
         return None;
     }
     let mut clean = mac.clone();
     for var in &mut clean.graph.variables {
         if let Evaluated::Text(t) = &mut var.value {
             *t = crate::secrets::redact(t);
+        }
+    }
+    for pack in &mut clean.settings.block_packs {
+        for var in &mut pack.variables {
+            if let Evaluated::Text(text) = &mut var.value { *text = crate::secrets::redact(text); }
         }
     }
     for list in &mut clean.graph.lists {
@@ -330,6 +338,30 @@ mod tests {
         let read = read_import_file(&single).unwrap();
         assert_eq!((read.name.as_str(), read.macros.len()), ("A", 1));
         let _ = fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn private_pack_migration_keeps_the_original_file() {
+        use crate::input::value::Evaluated;
+        let dir = std::env::temp_dir().join(format!("bw-pack-migration-{}", uuid::Uuid::new_v4()));
+        fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("macro.json");
+        let original = serde_json::json!({
+            "format_version": 2, "id": "legacy", "name": "Legacy", "description": "",
+            "variables": [{"name":"counter", "value":{"kind":"Number", "value":42}}],
+            "strands": [{"id":"body", "x":0, "y":0, "instructions":[
+                {"id":"header", "kind":{"BlockHeader":"block"}},
+                {"id":"set", "kind":{"SetVariable":["counter", {"kind":"Number", "value":43}]}}
+            ]}],
+            "block_defs":[{"id":"block", "pieces":[{"kind":"Label", "id":"label", "text":"example"}], "shape":"Normal"}],
+            "settings":{"block_packs":[{"id":"example", "name":"Example", "blocks":["block"]}]}
+        }).to_string();
+        fs::write(&path, &original).unwrap();
+        let loaded = load_own_macro_file(&path).unwrap();
+        assert_eq!(loaded.settings.block_packs[0].variables[0].value, Evaluated::Number(42.0));
+        assert_eq!(fs::read_to_string(path.with_extension("json.v2.bak")).unwrap(), original);
+        assert_eq!(serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&path).unwrap()).unwrap()["format_version"], 3);
+        fs::remove_dir_all(dir).unwrap();
     }
 
     #[test]

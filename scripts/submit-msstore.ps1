@@ -64,12 +64,12 @@ if ($Flight) {
       throw "Package flight ID '$Flight' no longer exists. Enter a flight name to create a new flight through the API."
     }
     $groups = @($FlightGroupIds | ForEach-Object { $_.Split(',') } | ForEach-Object { $_.Trim() } | Where-Object { $_ })
+    if (-not $groups) {
+      throw "Creating package flight '$Flight' requires at least one tester group ID. Set the workflow's flight_group_ids input or pass -FlightGroupIds. Existing flights keep their groups."
+    }
     Write-Host "Creating package flight '$Flight' through the API"
     $match = Call Post "$api/flights" @{ friendlyName = $Flight; groupIds = $groups }
     if (-not $match.flightId) { throw "The Store did not return an ID for the new package flight." }
-    if (-not $groups) {
-      Write-Warning "The new flight has no tester groups. Assign groups in Partner Center before testers can receive it; do not edit its submission there."
-    }
   }
   Write-Host "Submitting to package flight '$($match.friendlyName)' ($($match.flightId))"
   $base = "$api/flights/$($match.flightId)"

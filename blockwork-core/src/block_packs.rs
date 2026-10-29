@@ -8,6 +8,9 @@ use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
 
+mod variables;
+pub use variables::*;
+
 /// Top-level key marking a block pack file.
 pub const PACK_KEY: &str = "blockwork_block_pack";
 /// Top-level key marking a library index.
@@ -45,6 +48,7 @@ pub struct BlockPack {
     pub content: Macro,
     /// What upgrading an older pack changed.
     pub notes: Vec<String>,
+    pub variable_roles: Vec<VariableInterface>,
 }
 
 /// One pack an index lists.
@@ -72,7 +76,7 @@ pub struct Index {
 }
 
 /// Which pack a macro's blocks came from, so the library can offer updates.
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub struct PackRecord {
     pub id: String,
     pub name: String,
@@ -87,6 +91,10 @@ pub struct PackRecord {
     /// Ids of the blocks it added.
     #[serde(default)]
     pub blocks: Vec<String>,
+    #[serde(default)]
+    pub variables: Vec<PackVariable>,
+    #[serde(default)]
+    pub variables_scoped: bool,
 }
 
 /// The installed pack that owns a definition, including older imported packs.
@@ -179,7 +187,15 @@ fn names_used(strands: &[Strand]) -> HashSet<String> {
             Value::Text { value } => {
                 out.insert(value.clone());
             }
-            Value::Op { args, .. } | Value::Call { args, .. } => args.iter().for_each(|a| walk_value(a, out)),
+            Value::Op { args, .. } => args.iter().for_each(|a| walk_value(a, out)),
+            Value::Call { args, branches, .. } => {
+                args.iter().for_each(|a| walk_value(a, out));
+                for branch in branches {
+                    if let Ok(body) = crate::frontend::reporter_branch_to_instructions(branch) {
+                        out.extend(names_used(&[Strand::with_instructions(0, 0, body)]));
+                    }
+                }
+            }
             _ => {}
         }
     }
@@ -209,6 +225,7 @@ pub fn pack_from_macro(mac: &Macro, block_ids: &[String], info: PackInfo) -> Res
     }
     let strands: Vec<Strand> = ids.iter().filter_map(|id| mac.block_body(id).cloned()).collect();
     let used = names_used(&strands);
+    let used_variables = variable_names_used(&strands);
     let instruction_ids: HashSet<String> = {
         let mut set = HashSet::new();
         for s in &strands {
@@ -226,7 +243,13 @@ pub fn pack_from_macro(mac: &Macro, block_ids: &[String], info: PackInfo) -> Res
         block_defs: mac.block_defs.iter().filter(|b| ids.contains(&b.id)).cloned().collect(),
         strands,
         // Their starting values travel too, minus anything secret.
-        variables: mac.variables.iter().filter(|v| used.contains(&v.name)).cloned().collect(),
+        variables: {
+            let mut vars: Vec<_> = mac.variables.iter().filter(|v| used_variables.contains(&v.name)).cloned().collect();
+            let mut missing: Vec<_> = used_variables.into_iter().filter(|name| !vars.iter().any(|v| &v.name == name)).collect();
+            missing.sort();
+            vars.extend(missing.into_iter().map(|name| crate::macros::VariableDef { name, value: crate::input::value::Evaluated::Number(0.0) }));
+            vars
+        },
         lists: mac.lists.iter().filter(|l| used.contains(&l.name)).cloned().collect(),
         comments: mac
             .comments
@@ -241,7 +264,7 @@ pub fn pack_from_macro(mac: &Macro, block_ids: &[String], info: PackInfo) -> Res
         crate::macros::BlockDef::validate_input_defaults(&def.pieces)?;
     }
     apply_details(&mut content, &info);
-    Ok(BlockPack { info, content, notes: Vec::new() })
+    Ok(BlockPack { info, content, notes: Vec::new(), variable_roles: Vec::new() })
 }
 
 fn clean_info(mut info: PackInfo) -> Result<PackInfo, String> {
@@ -286,6 +309,7 @@ pub fn write_pack(pack: &BlockPack) -> Result<String, String> {
     let mut value = serde_json::to_value(&pack.info).map_err(|e| e.to_string())?;
     let object = value.as_object_mut().ok_or("bad pack info")?;
     object.insert(PACK_KEY.into(), 1.into());
+    object.insert("variable_roles".into(), serde_json::to_value(&pack.variable_roles).map_err(|e| e.to_string())?);
     object.insert("blocks".into(), migrate::to_value(&content)?);
     serde_json::to_string_pretty(&value).map_err(|e| e.to_string())
 }
@@ -316,7 +340,9 @@ pub fn read_pack(text: &str) -> Result<BlockPack, String> {
         crate::macros::BlockDef::validate_input_defaults(&def.pieces)?;
     }
     apply_details(&mut content, &info);
-    Ok(BlockPack { info, content, notes: upgrade.notes })
+    let variable_roles: Vec<VariableInterface> = value.get("variable_roles").cloned()
+        .map(serde_json::from_value).transpose().map_err(|e| format!("Invalid pack variable interface: {e}"))?.unwrap_or_default();
+    Ok(BlockPack { info, content, notes: upgrade.notes, variable_roles })
 }
 
 pub fn read_index(text: &str, base_url: &str) -> Result<Index, String> {
@@ -403,6 +429,8 @@ pub fn existing_blocks(mac: &Macro, pack: &BlockPack) -> Vec<String> {
 /// Adds the pack's blocks to `mac`. Blocks it already has from an earlier
 /// version are replaced in place, keeping their call sites.
 pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeReport {
+    migrate_variables(mac);
+    let previous = mac.settings.block_packs.iter().find(|p| p.id == pack.info.id).cloned();
     let mut report = MergeReport::default();
     // New bodies go to the right of everything on the canvas.
     let right = mac.strands.iter().map(|s| s.x).max().map_or(0, |x| x + 420);
@@ -431,9 +459,26 @@ pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeRepor
             report.added.push(block_name(def));
         }
     }
-    for var in &pack.content.variables {
-        if !mac.variables.iter().any(|v| v.name == var.name) {
-            mac.graph.variables.push(var.clone());
+    let mut variables = previous.as_ref().map(|p| p.variables.clone()).unwrap_or_default();
+    let mut declared = pack.content.variables.clone();
+    let mut used_names: Vec<_> = variable_names_used(&pack.content.strands).into_iter().collect();
+    used_names.sort();
+    for name in used_names {
+        if !declared.iter().any(|v| v.name == name) {
+            declared.push(crate::macros::VariableDef { name, value: crate::input::value::Evaluated::Number(0.0) });
+        }
+    }
+    for var in &declared {
+        // Existing shared variables remain shared when updating an old install.
+        let shared = previous.is_some() && !variables.iter().any(|v| v.name == var.name)
+            && mac.variables.iter().any(|v| v.name == var.name);
+        if shared { continue; }
+        let role = pack.variable_roles.iter().find(|r| r.name == var.name).map(|r| r.role).unwrap_or_default();
+        if let Some(old) = variables.iter_mut().find(|v| v.name == var.name) {
+            // Keep old outputs callable even when a newer pack hides them.
+            if old.role != VariableRole::Output { old.role = role; }
+        } else {
+            variables.push(PackVariable { name: var.name.clone(), value: var.value.clone(), role });
         }
     }
     for list in &pack.content.lists {
@@ -456,7 +501,10 @@ pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeRepor
         author: pack.info.author.clone(),
         description: pack.info.description.clone(),
         blocks: pack.content.block_defs.iter().map(|b| b.id.clone()).collect(),
+        variables,
+        variables_scoped: true,
     });
+    install_outputs(mac);
     report
 }
 
@@ -508,10 +556,45 @@ mod tests {
 
     #[test]
     #[cfg(feature = "system")]
+    fn components_survive_pack_install_update_and_save() {
+        let mut author = Macro::new("author".into(), String::new(), vec![]);
+        let pieces = serde_json::from_value(serde_json::json!([
+            {"kind":"Label","id":"name","text":"example"},
+            {"kind":"Input","id":"enabled","name":"timeout","value_type":"Bool","component":true},
+            {"kind":"Input","id":"duration","name":"duration","default_value":{"kind":"Number","value":100}}
+        ])).unwrap();
+        let id = author.create_block(pieces, BlockShape::Normal, "#4C97FF".into(), 0, 0);
+        let pack = pack_from_macro(&author, &[id.clone()], PackInfo {
+            id: "components".into(), name: "Components".into(), ..PackInfo::default()
+        }).unwrap();
+        let mut pack = read_pack(&write_pack(&pack).unwrap()).unwrap();
+        let mut target = Macro::new("target".into(), String::new(), vec![]);
+        merge_into(&mut target, &pack, "");
+        let def = target.block_def(&id).unwrap();
+        assert!(matches!(def.pieces[1], BlockPiece::Input { component: true, .. }));
+        assert_eq!(def.input_defaults().next().unwrap().eval(), Ok(crate::input::value::Evaluated::Bool(false)));
+        let args = vec![crate::input::value::Evaluated::Bool(true).into_value(), Value::number(250.0)];
+        target.graph.strands.push(Strand::with_instructions(0, 0, vec![Instruction::new(
+            InstructionKind::CallBlock { block_id: id.clone(), args: args.clone(), branches: vec![] }
+        )]));
+        if let BlockPiece::Input { name, .. } = &mut pack.content.graph.block_defs[0].pieces[1] {
+            *name = "with timeout".into();
+        }
+        merge_into(&mut target, &pack, "updated");
+        let (loaded, _) = migrate::from_value(migrate::to_value(&target).unwrap()).unwrap();
+        assert_eq!(loaded.block_def(&id).unwrap().pieces, pack.content.block_def(&id).unwrap().pieces);
+        let InstructionKind::CallBlock { args: saved, .. } = &loaded.strands.last().unwrap().instructions[0].kind else { panic!("call") };
+        assert_eq!(saved[0].eval(), args[0].eval());
+        assert_eq!(saved[1], args[1]);
+    }
+
+    #[test]
+    #[cfg(feature = "system")]
     fn input_defaults_survive_pack_updates_without_resetting_calls() {
         use crate::input::value::Evaluated;
         let mut author = Macro::new("author".into(), String::new(), vec![]);
         let id = author.create_block(vec![label("example"), BlockPiece::Input {
+            component: false,
             id: "input".into(), name: "text".into(), value_type: Default::default(),
             default_value: Some(Evaluated::Text("example".into())),
         }], crate::macros::BlockShape::Normal, "#4C97FF".into(), 0, 0);
@@ -528,6 +611,7 @@ mod tests {
             *default_value = Some(Evaluated::Text("new default".into()));
         }
         pack.content.graph.block_defs[0].pieces.push(BlockPiece::Input {
+            component: false,
             id: "attempts".into(), name: "attempts".into(), value_type: Default::default(),
             default_value: Some(Evaluated::Number(3.0)),
         });
