@@ -15,6 +15,26 @@ Item {
     // Shared import/export flow (MacroFiles in Main.qml).
     property var macroFiles: null
     property var blockLibrary: null
+    // Embedding hosts can supply platform navigation above the same canvas.
+    property bool showToolbar: true
+    readonly property bool compact: width < 720
+    readonly property bool blocksOpen: blocksSheet.opened
+    readonly property bool activityOpen: activitySheet.opened
+    function openBlocks() {
+        if (compact) { activitySheet.close(); blocksSheet.open(); }
+        else sidebarCollapsed = !sidebarCollapsed;
+    }
+    function openActivity() { blocksSheet.close(); activitySheet.open(); }
+    function dismissSheet() {
+        if (blocksSheet.visible) { blocksSheet.close(); return true; }
+        if (activitySheet.visible) { activitySheet.close(); return true; }
+        return false;
+    }
+    function addPaletteEntry(spec) {
+        if ((compact ? dragController.addAtView(spec) : dragController.addAt(spec, spec.kind === "value" ? 160 : 120, spec.kind === "value" ? 140 : 120)) && compact) { Qt.inputMethod.hide(); blocksSheet.close(); }
+    }
+    onCompactChanged: if (!compact) { blocksSheet.close(); activitySheet.close(); }
+
     readonly property var macro: appState.current_macro
     // Preserve metadata identity so block moves do not refresh palette controls.
     readonly property string blockDefinitionsKey: JSON.stringify(root.macro && root.macro.block_defs ? root.macro.block_defs : [])
@@ -42,7 +62,23 @@ Item {
     function defaultInstruction(type) { return catalog.defaultInstruction(type); }
     // Blockstitch's own defaults for the shared control, variable and list blocks.
     function sharedPrefab(type) { return palette.prefab(type); }
-    readonly property var extraOperators: catalog.extraOperators
+    readonly property bool androidHost: !!appState.capabilities && appState.capabilities.platform === "android"
+    readonly property var extraOperators: catalog.extraOperators.filter(spec => blockAvailable(spec[0]))
+    readonly property var paletteSections: catalog.paletteSections.map(section => Object.assign({}, section,
+        { items: section.items.filter(type => root.blockAvailable(type)) })).filter(section => section.items.length > 0)
+    function blockAvailable(type) {
+        if (["WhenForegroundApp", "LaunchAndroidApp", "Touch", "Element", "AndroidElementExists", "AndroidElementText"].indexOf(type) >= 0) return androidHost;
+        if (!androidHost) return true;
+        if (catalog.categoryOf(type) === "browser") return false;
+        return ["WhenBatteryDischargedTo", "WhenBatteryChargedTo", "WhenPowerPluggedIn", "WhenPowerUnplugged",
+            "WhenClipboardChanged", "WhenKey", "WhenWindow", "WhenFileChanged", "WhenTyped", "WhenApp", "WhenIdle",
+            "WhenScreenLock", "WhenNetwork", "WhenUsb", "WhenMouseButton", "WhenWebhook", "PasteText", "Key", "Button",
+            "MoveMouse", "Scroll", "Command", "CommandWait", "OpenApp", "CloseApp", "WindowAction", "MoveWindow", "WriteFile",
+            "Notify", "SetClipboard", "DetectObjectsInWindow", "WaitForDetection", "AimStep", "AimAtDetection", "Detection",
+            "PluggedIn", "BatteryPercentage", "ClipboardText", "ClipboardHasImage", "ClipboardHasFiles", "ReadFile", "FileExists",
+            "ListDirectory", "ShellOutput", "ShellSucceeded", "ActiveWindowTitle", "ActiveWindowApp", "WindowExists", "WindowInfo",
+            "AppRunning", "IdleSeconds", "ScreenLocked", "NetworkConnected", "UsbConnected", "Secret", "ScreenText", "MousePosition"].indexOf(type) < 0;
+    }
     function registerBlocks() { catalog.register(); }
     function userVariableNames() {
         const packNames = new Set((root.macro && root.macro.pack_data || [])
@@ -129,6 +165,9 @@ Item {
 
     // ---- screen picker: images for image blocks, points/regions for reporters ----
     ScreenPicker { id: screenPicker; page: root; onFailed: message => pickError.show(message) }
+    function openMacroSettings() { macroSettings.open(); }
+    function createMacro() { newMacroDialog.open(); }
+    function selectionPosition() { return canvas.findEmptyPosition(240, 80); }
     function startScreenPick(request) { screenPicker.startScreenPick(request); }
     function setBlockDetector(request, detector) {
         const updated = JSON.parse(JSON.stringify(request.instruction || {}));
@@ -164,7 +203,9 @@ Item {
     }
     function onPieceAction(action, strandId, path, instruction) {
         const request = { kind: "image", strandId: strandId, path: path, instruction: instruction };
-        if (action === "captureImage") root.startScreenPick(request);
+        if (action === "pickElement") root.startScreenPick(Object.assign(request, {kind: "element"}));
+        else if (action === "pickTouch" || action === "pickTouchEnd") root.startScreenPick(Object.assign(request, {kind: "touch", end: action === "pickTouchEnd"}));
+        else if (action === "captureImage") root.startScreenPick(request);
         else if (action === "loadImage") imageFileDialog.openFor(request);
         else if (action === "pickModel") modelDialog.openFor(request);
         else if (action === "pickUsb") usbDialog.openFor(request);
@@ -210,17 +251,17 @@ Item {
         if (!req || !app) return;
         if (req.paletteType) {
             const fresh = defaultInstruction(req.paletteType);
-            fresh.command = app.command;
-            fresh.name = app.name;
-            fresh.icon = root.resolvePickedIcon(app);
+            if (req.paletteType === "WhenForegroundApp") fresh.package = app.command;
+            else if (req.paletteType === "LaunchAndroidApp") fresh.package = textValue(app.command);
+            else { fresh.command = app.command; fresh.name = app.name; fresh.icon = root.resolvePickedIcon(app); }
             root.invoke("add_strand", { x: 120, y: 120, instruction: fresh });
             return;
         }
         const current = req.instruction || {};
         const updated = JSON.parse(JSON.stringify(current));
-        updated.command = app.command;
-        updated.name = app.name;
-        updated.icon = root.resolvePickedIcon(app);
+        if (updated.type === "WhenForegroundApp") updated.package = app.command;
+        else if (updated.type === "LaunchAndroidApp") updated.package = textValue(app.command);
+        else { updated.command = app.command; updated.name = app.name; updated.icon = root.resolvePickedIcon(app); }
         root.invoke("edit_instruction", { strandId: req.strandId, path: req.path, instruction: updated });
     }
     // ---- palette drops: the shared controller's edits as daemon commands ----
@@ -285,9 +326,10 @@ Item {
         anchors.fill: parent; spacing: 0
         Rectangle {
             id: toolbar
+            visible: root.showToolbar
             // Collapse stages: 1 Record icon-only, 2 Run icon-only, 3 undo/redo/save in a menu.
             readonly property int tier: width < 700 ? 3 : (width < 780 ? 2 : (width < 860 ? 1 : 0))
-            Layout.fillWidth: true; Layout.preferredHeight: 52; color: Theme.field; border.color: Theme.borderSoft
+            Layout.fillWidth: true; Layout.preferredHeight: visible ? 52 : 0; color: Theme.field; border.color: Theme.borderSoft
             TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
@@ -367,6 +409,7 @@ Item {
                     onClicked: root.invoke("run_macro")
                 }
                 Row {
+                    visible: !root.androidHost
                     spacing: -1
                     StitchButton {
                         id: recordButton
@@ -491,6 +534,7 @@ Item {
             Item { anchors.fill: parent
                 Item {
                     id: sidebarHost
+                    visible: !root.compact
                     // Overlay the sidebar so resizing it never moves the workspace.
                     width: root.sidebarCollapsed ? 0 : (palette.layout === "flyout" ? palette.railWidth : root.sidebarWidth)
                     anchors.top: parent.top; anchors.bottom: parent.bottom
@@ -510,11 +554,13 @@ Item {
                     }
                 PalettePanel {
                     id: palette
+                    objectName: "editorPalette"
+                    parent: root.compact ? blocksContent : sidebarHost
                     // Fixed width and visible until the slot is closed, so it slides out under the clip.
                     anchors.left: parent.left; anchors.top: parent.top; anchors.bottom: parent.bottom
-                    width: palette.layout === "flyout" && !palette.flyoutShown ? palette.railWidth : root.sidebarWidth
-                    visible: sidebarHost.width > 0
-                    layout: appState.palette_layout || "rail"
+                    width: root.compact ? blocksContent.width : palette.layout === "flyout" && !palette.flyoutShown ? palette.railWidth : root.sidebarWidth
+                    visible: root.compact ? blocksSheet.visible : sidebarHost.width > 0
+                    layout: root.compact ? "tiles" : appState.palette_layout || "rail"
                     customBlockDetails: qsTr("A custom block defined in this macro.")
                     customReporterDetails: qsTr("A custom reporter block defined in this macro.")
                     trashActive: canvas.dragging
@@ -526,8 +572,8 @@ Item {
                     onDragCanceled: dragController.cancel()
                     sectionsListBlocks: true
                     listInstructionTypes: root.catalog.listInstructionTypes
-                    extraOperators: root.browserShown ? root.catalog.extraOperators : root.catalog.extraOperators.filter(o => root.catalog.categoryOf(o[0]) !== "browser")
-                    sections: root.browserShown ? root.catalog.paletteSections : root.catalog.paletteSections.filter(s => s.category !== "browser")
+                    extraOperators: root.browserShown ? root.extraOperators : root.extraOperators.filter(o => root.catalog.categoryOf(o[0]) !== "browser")
+                    sections: root.browserShown ? root.paletteSections : root.paletteSections.filter(s => s.category !== "browser")
                     appCategories: [
                         { id: "input", name: qsTr("Input"), icon: "keyboard", after: "events" },
                         { id: "system", name: qsTr("System"), icon: "settings" },
@@ -540,8 +586,8 @@ Item {
                     lists: root.macroLists
                     blockDefinitions: root.macroBlockDefinitions
                     keyCapture: appState.key_capture
-                    onBlockActivated: (type, instruction) => dragController.addAt({ kind: "instruction", type: type, instruction: instruction }, 120, 120)
-                    onCustomBlockActivated: definition => dragController.addAt(root.customEntry(definition), 120, 120)
+                    onBlockActivated: (type, instruction) => root.addPaletteEntry({ kind: "instruction", type: type, instruction: instruction })
+                    onCustomBlockActivated: definition => root.addPaletteEntry(root.customEntry(definition))
                     onMakeVariableRequested: variableDialog.openForCreate()
                     onSectionActionRequested: action => { if (action === "makeGlobal") globalPicker.openForCreate(null); }
                     onRenameVariableRequested: name => variableDialog.openForRename(name)
@@ -561,7 +607,7 @@ Item {
                     onStandaloneKeyCaptureRequested: root.invoke("start_standalone_key_capture")
                     onPieceActionRequested: (action, instruction) => { if (action === "pickApp") root.openPaletteAppPicker(instruction); }
                     onDetailsRequested:(name,identifier,explainer)=>root.blockDefById(identifier)||name===identifier?root.showDetails(identifier,explainer):detailsDialog.show(name,identifier,explainer)
-                    onValueActivated: value => dragController.addAt({ kind: "value", value: value }, 160, 140)
+                    onValueActivated: value => root.addPaletteEntry({ kind: "value", value: value })
                 }
                 }
                 BlockCanvas {
@@ -570,7 +616,12 @@ Item {
                     breakpointIds: appState.breakpoints || []
                     pausedIds: debugBar.paused.map(p => p.block_id)
                     blockMarks: root.blockMarks
-                    onMarkClicked: instructionId => activity.showBlockError(instructionId)
+                    onMarkClicked: instructionId => {
+                        const message = root.blockMarks[instructionId];
+                        if (message === qsTr("This block is unavailable on this platform")) detailsDialog.show(qsTr("Block availability"), "", message);
+                        else if (root.compact) { root.openActivity(); phoneActivity.showBlockError(instructionId); }
+                        else activity.showBlockError(instructionId);
+                    }
                     onBreakpointClicked: instructionId => root.invoke("toggle_breakpoint", { blockId: instructionId })
                     // Covered space belongs to the sidebar, including for drag releases.
                     containmentMask: QtObject {
@@ -583,7 +634,7 @@ Item {
                     textMenu: Component { Editing.TextEditingMenu {} }
                     anchors.fill: parent
                     strands: root.macro ? root.macro.strands : []
-                    markedStrandId: root.macro && root.macro.recording_target_strand_id ? root.macro.recording_target_strand_id : ""
+                    markedStrandId: !root.androidHost && root.macro && root.macro.recording_target_strand_id ? root.macro.recording_target_strand_id : ""
                     comments: root.macro ? root.macro.comments : []
                     floatingValues: root.macro ? root.macro.floating_values : []
                     variables: root.macroVariables
@@ -650,7 +701,7 @@ Item {
         }
         ActivityPanel {
             id: activity
-            visible: !!root.macro
+            visible: !!root.macro && !root.compact
             Layout.fillWidth: true; Layout.preferredHeight: implicitHeight
             entries: root.runLog
             macroId: root.macro ? root.macro.id : ""
@@ -664,6 +715,58 @@ Item {
                 LucideIcon { anchors.horizontalCenter: parent.horizontalCenter; name: "blocks"; color: Theme.textDim; width: 48; height: 48 }
                 Text { anchors.horizontalCenter: parent.horizontalCenter; text: qsTr("No macro selected"); color: Theme.text; font.pixelSize: 16; font.weight: Font.DemiBold }
                 Text { text: qsTr("Choose a macro above or create a new one."); color: Theme.textDim; font.pixelSize: 13 }
+            }
+        }
+    }
+
+    Drawer {
+        id: blocksSheet
+        objectName: "addBlocksSheet"
+        parent: root
+        edge: Qt.BottomEdge
+        width: root.width; height: Math.max(48, root.height * 0.85)
+        modal: !dragController.active; dim: !dragController.active
+        interactive: !dragController.active
+        padding: 0
+        // Keep the drag surface alive while its ghost crosses onto the canvas.
+        background: Rectangle { color: dragController.active ? "transparent" : Theme.panel }
+        contentItem: ColumnLayout {
+            spacing: 0
+            opacity: dragController.active ? 0 : 1
+            RowLayout {
+                Layout.fillWidth: true
+                Label { Layout.fillWidth: true; leftPadding: 12; text: qsTr("Add Blocks"); font.bold: true; color: Theme.text }
+                StitchButton { text: qsTr("Done"); implicitHeight: 48; onClicked: blocksSheet.close() }
+            }
+            Label {
+                Layout.fillWidth: true; leftPadding: 12; rightPadding: 12; bottomPadding: 8; wrapMode: Text.Wrap; color: Theme.textDim
+                text: canvas.insertionPoint ? qsTr("Tap a block to insert after your selection.") : qsTr("Tap a block to add it to free canvas space. Hold for options.")
+            }
+            Item { id: blocksContent; Layout.fillWidth: true; Layout.fillHeight: true }
+        }
+        onClosed: { if (dragController.active) dragController.cancel(); }
+    }
+    Drawer {
+        id: activitySheet
+        objectName: "activitySheet"
+        parent: root
+        edge: Qt.BottomEdge
+        width: root.width; height: Math.max(48, root.height * 0.8)
+        padding: 0
+        contentItem: ColumnLayout {
+            spacing: 0
+            RowLayout {
+                Layout.fillWidth: true
+                Label { Layout.fillWidth: true; leftPadding: 12; text: qsTr("Activity"); font.bold: true; color: Theme.text }
+                StitchButton { text: qsTr("Done"); implicitHeight: 48; onClicked: activitySheet.close() }
+            }
+            ActivityPanel {
+                id: phoneActivity
+                Layout.fillWidth: true; Layout.fillHeight: true
+                expanded: true; sheetMode: true
+                entries: root.runLog; macroId: root.macro ? root.macro.id : ""
+                onBlockRequested: blockId => { activitySheet.close(); canvas.revealInstruction(blockId); }
+                onClearRequested: root.invoke("clear_run_log")
             }
         }
     }
@@ -688,6 +791,7 @@ Item {
 
     MacroSettingsDialog {
         id: macroSettings
+        androidHost: root.androidHost
         macro: root.macro
         invoke: root.invoke
         permissions: root.permissions
@@ -872,7 +976,7 @@ Item {
 
     // Browser blocks stay out of the palette until a browser has paired once,
     // unless the open macro already uses them.
-    readonly property bool browserShown: !!(appState.browser && appState.browser.unlocked) || !!appState.macro_uses_browser
+    readonly property bool browserShown: !root.androidHost && (!!(appState.browser && appState.browser.unlocked) || !!appState.macro_uses_browser)
     function variableChoices() {
         return BlockRegistry.variableChoices(userVariableNames())
             .concat([{ label: qsTr("Make a Variable…"), action: select => variableDialog.openForCreate(select) }]);
@@ -906,6 +1010,14 @@ Item {
             if (e.event === "Started" || e.event === "Fired") break;
             if (e.level === "Error" && e.block_id && !(e.block_id in out)) out[e.block_id] = e.message;
         }
+        function inspect(instructions) {
+            for (const instruction of instructions || []) {
+                if (!root.blockAvailable(instruction.type)) out[instruction.id] = qsTr("This block is unavailable on this platform");
+                for (const key of ["body", "then_body", "else_body", "catch_body"]) inspect(instruction[key]);
+                for (const branch of instruction.branches || []) inspect(branch);
+            }
+        }
+        if (root.macro) for (const strand of root.macro.strands) inspect(strand.instructions);
         return out;
     }
     // Blocks this macro's running strands are on, outlined live.
@@ -948,7 +1060,7 @@ Item {
                   when: (instruction, strandId, path) => path.length === 1 && path[0].index === 0 && !!instruction && instruction.type !== "BlockHeader" },
                 { id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" },
                 // New recordings go to the end of this strand; the canvas badges its first block.
-                { id: "recording_target", icon: "target",
+                { id: "recording_target", icon: "target", when: () => !root.androidHost,
                   text: (instruction, strandId) => root.macro && root.macro.recording_target_strand_id === strandId
                       ? qsTr("Recording Target (current)") : qsTr("Set Recording Target") }];
     }
@@ -1002,7 +1114,7 @@ Item {
         locked: root.recordingBusy
         documentId: root.macro ? root.macro.id : ""
         document: root.macro ? [root.macro.strands, root.macro.floating_values] : null
-        trashContains: (sx, sy) => !root.sidebarCollapsed && palette.contains(palette.mapFromItem(null, sx, sy))
+        trashContains: (sx, sy) => !root.compact && !root.sidebarCollapsed && palette.contains(palette.mapFromItem(null, sx, sy))
         instructionFor: spec => root.paletteInstruction(spec)
         submit: (edit, reply) => root.submitEdit(edit, reply)
     }

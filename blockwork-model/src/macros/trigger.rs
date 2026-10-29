@@ -108,6 +108,10 @@ impl InstructionKind {
             }
             K::WhenFileChanged(path) => format!("when file {} changes", show(path)),
             K::WhenTyped { text, .. } => format!("when I type {}", show(text)),
+            K::WhenForegroundApp { package, entered } => format!(
+                "when Android app {package} {} foreground",
+                if *entered { "enters" } else { "leaves" }
+            ),
             K::WhenApp { pattern, started } => format!(
                 "when app {} {}",
                 show(pattern),

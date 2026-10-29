@@ -96,7 +96,11 @@ pub fn operator_capability(op: &str) -> Option<&'static str> {
             "windows"
         }
         "MacroRunning" => "macros",
-        "PixelColor" | "AverageColor" | "ScreenText" => "screen",
+        "AndroidElementExists"
+        | "AndroidElementText"
+        | "PixelColor"
+        | "AverageColor"
+        | "ScreenText" => "screen",
         "GlobalVariable" => "globals",
         "Secret" => "secrets",
         "PageUrl" | "PageTitle" | "ElementText" | "ElementExists" | "ElementCount" => "browser",

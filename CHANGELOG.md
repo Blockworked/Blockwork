@@ -11,6 +11,7 @@ section below as the GitHub release notes, followed by the downloads table.
 ## [0.6.0] - Unreleased
 
 ### Added
+- Android development host with accessibility touch and element automation, foreground app triggers, alarms, and a compact editor using the shared palette and macro settings.
 - "Run strand" in a strand's right-click menu (on its top block): runs just that strand from the top, without waiting for its event.
 - "Set value" in a sidebar variable's right-click menu: sets what the variable holds, and what the next run starts with.
 - Text with several lines:

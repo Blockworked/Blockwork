@@ -9,6 +9,7 @@ AppDialog {
     id: dialog
     title: qsTr("Macro settings")
     standardButtons: Dialog.Close
+    property bool androidHost: false
     required property var macro
     required property var invoke
     required property var permissions
@@ -19,6 +20,7 @@ AppDialog {
     onOpened: editor.reset()
     contentItem: MacroSettingsEditor {
         id: editor
+        androidHost: dialog.androidHost
         macro: dialog.macro
         invoke: dialog.invoke
         permissions: dialog.permissions

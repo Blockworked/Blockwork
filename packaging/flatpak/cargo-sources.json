@@ -2,8 +2,8 @@
     {
         "type": "git",
         "url": "https://github.com/blockworked/blockstitch",
-        "commit": "6a1aee2d6844987619c972b5cbc401627fe380af",
-        "dest": "flatpak-cargo/git/blockstitch-6a1aee2"
+        "commit": "10b2f32beb695de18d8db1d6aab7d027f60e9920",
+        "dest": "flatpak-cargo/git/blockstitch-10b2f32"
     },
     {
         "type": "git",
@@ -618,7 +618,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-6a1aee2/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-10b2f32/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
         ]
     },
     {
@@ -636,7 +636,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-6a1aee2/crates/blockstitch-ffi\" \"cargo/vendor/blockstitch-ffi\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-10b2f32/crates/blockstitch-ffi\" \"cargo/vendor/blockstitch-ffi\""
         ]
     },
     {
@@ -654,7 +654,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-6a1aee2/.\" \"cargo/vendor/blockstitch-qml\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-10b2f32/.\" \"cargo/vendor/blockstitch-qml\""
         ]
     },
     {
@@ -888,6 +888,19 @@
         "type": "inline",
         "contents": "{\"package\": \"1aa79e62e7697b8e29b513a68abacf485adcd1fe8284a4316c5ae868e6633327\", \"files\": {}}",
         "dest": "cargo/vendor/chrono-0.4.45",
+        "dest-filename": ".cargo-checksum.json"
+    },
+    {
+        "type": "archive",
+        "archive-type": "tar-gzip",
+        "url": "https://static.crates.io/crates/chrono-tz/chrono-tz-0.10.4.crate",
+        "sha256": "a6139a8597ed92cf816dfb33f5dd6cf0bb93a6adc938f11039f371bc5bcd26c3",
+        "dest": "cargo/vendor/chrono-tz-0.10.4"
+    },
+    {
+        "type": "inline",
+        "contents": "{\"package\": \"a6139a8597ed92cf816dfb33f5dd6cf0bb93a6adc938f11039f371bc5bcd26c3\", \"files\": {}}",
+        "dest": "cargo/vendor/chrono-tz-0.10.4",
         "dest-filename": ".cargo-checksum.json"
     },
     {
@@ -4205,6 +4218,32 @@
     {
         "type": "archive",
         "archive-type": "tar-gzip",
+        "url": "https://static.crates.io/crates/phf/phf-0.12.1.crate",
+        "sha256": "913273894cec178f401a31ec4b656318d95473527be05c0752cc41cdc32be8b7",
+        "dest": "cargo/vendor/phf-0.12.1"
+    },
+    {
+        "type": "inline",
+        "contents": "{\"package\": \"913273894cec178f401a31ec4b656318d95473527be05c0752cc41cdc32be8b7\", \"files\": {}}",
+        "dest": "cargo/vendor/phf-0.12.1",
+        "dest-filename": ".cargo-checksum.json"
+    },
+    {
+        "type": "archive",
+        "archive-type": "tar-gzip",
+        "url": "https://static.crates.io/crates/phf_shared/phf_shared-0.12.1.crate",
+        "sha256": "06005508882fb681fd97892ecff4b7fd0fee13ef1aa569f8695dae7ab9099981",
+        "dest": "cargo/vendor/phf_shared-0.12.1"
+    },
+    {
+        "type": "inline",
+        "contents": "{\"package\": \"06005508882fb681fd97892ecff4b7fd0fee13ef1aa569f8695dae7ab9099981\", \"files\": {}}",
+        "dest": "cargo/vendor/phf_shared-0.12.1",
+        "dest-filename": ".cargo-checksum.json"
+    },
+    {
+        "type": "archive",
+        "archive-type": "tar-gzip",
         "url": "https://static.crates.io/crates/pin-project-lite/pin-project-lite-0.2.17.crate",
         "sha256": "a89322df9ebe1c1578d689c92318e070967d1042b512afbe49518723f4e6d5cd",
         "dest": "cargo/vendor/pin-project-lite-0.2.17"
@@ -5344,6 +5383,19 @@
         "type": "inline",
         "contents": "{\"package\": \"e3a9fe34e3e7a50316060351f37187a3f546bce95496156754b601a5fa71b76e\", \"files\": {}}",
         "dest": "cargo/vendor/simdutf8-0.1.5",
+        "dest-filename": ".cargo-checksum.json"
+    },
+    {
+        "type": "archive",
+        "archive-type": "tar-gzip",
+        "url": "https://static.crates.io/crates/siphasher/siphasher-1.0.4.crate",
+        "sha256": "33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256",
+        "dest": "cargo/vendor/siphasher-1.0.4"
+    },
+    {
+        "type": "inline",
+        "contents": "{\"package\": \"33f4fe9184a62d842c9ef383018f3306d8ba224fd9d836f56d7288308847c256\", \"files\": {}}",
+        "dest": "cargo/vendor/siphasher-1.0.4",
         "dest-filename": ".cargo-checksum.json"
     },
     {
@@ -8065,7 +8117,7 @@
     },
     {
         "type": "inline",
-        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/blockworked/blockstitch\"]\ngit = \"https://github.com/blockworked/blockstitch\"\nreplace-with = \"vendored-sources\"\nrev = \"6a1aee2d6844987619c972b5cbc401627fe380af\"\n\n[source.\"https://github.com/enigo-rs/enigo\"]\ngit = \"https://github.com/enigo-rs/enigo\"\nreplace-with = \"vendored-sources\"\nrev = \"a88d9b7\"\n\n[source.\"https://github.com/blockworked/lucide-qt\"]\ngit = \"https://github.com/blockworked/lucide-qt\"\nreplace-with = \"vendored-sources\"\ntag = \"v0.1.0\"\n",
+        "contents": "[source.vendored-sources]\ndirectory = \"cargo/vendor\"\n\n[source.crates-io]\nreplace-with = \"vendored-sources\"\n\n[source.\"https://github.com/blockworked/blockstitch\"]\ngit = \"https://github.com/blockworked/blockstitch\"\nreplace-with = \"vendored-sources\"\nrev = \"10b2f32beb695de18d8db1d6aab7d027f60e9920\"\n\n[source.\"https://github.com/enigo-rs/enigo\"]\ngit = \"https://github.com/enigo-rs/enigo\"\nreplace-with = \"vendored-sources\"\nrev = \"a88d9b7\"\n\n[source.\"https://github.com/blockworked/lucide-qt\"]\ngit = \"https://github.com/blockworked/lucide-qt\"\nreplace-with = \"vendored-sources\"\ntag = \"v0.1.0\"\n",
         "dest": "cargo",
         "dest-filename": "config"
     }

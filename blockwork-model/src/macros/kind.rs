@@ -2,7 +2,9 @@
 //! the small value types their fields use.
 
 use super::Instruction;
+use crate::input::element::{ElementAction, ElementSelector};
 use crate::input::schedule::TimeSchedule;
+use crate::input::touch::TouchAction;
 use crate::input::types::{Direction, InputToken, MacroButton};
 use crate::input::value::Value;
 use serde::{Deserialize, Serialize};
@@ -82,6 +84,33 @@ pub enum StopScope {
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 #[serde(remote = "Self")]
 pub enum InstructionKind {
+    /// Exact Android package entry/exit, separate from desktop process events.
+    WhenForegroundApp {
+        package: String,
+        entered: bool,
+    },
+    /// Starts an Android package launcher in the current profile.
+    LaunchAndroidApp {
+        package: Value,
+    },
+    /// Queries or interacts with an Android accessibility element.
+    Element {
+        action: ElementAction,
+        selector: ElementSelector,
+        text: Value,
+        timeout: Value,
+        variable: String,
+    },
+    /// Sends an Android gesture or navigation action.
+    Touch {
+        action: TouchAction,
+        x: Value,
+        y: Value,
+        end_x: Value,
+        end_y: Value,
+        duration: Value,
+    },
+
     Token(InputToken),
     #[serde(deserialize_with = "super::saved_shapes::wait")]
     Wait(Value),

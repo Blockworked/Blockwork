@@ -23,6 +23,30 @@ impl Backend {
     /// Runs the command named `cmd` with `args` (a JSON object keyed by
     /// camelCase argument name) and returns its result as JSON.
     pub async fn dispatch(&self, cmd: &str, args: Value) -> Result<Value, String> {
+        if !self
+            .state
+            .lock()
+            .map_err(|e| e.to_string())?
+            .desktop_integration
+            && matches!(
+                cmd,
+                "start_recording"
+                    | "start_key_capture"
+                    | "start_standalone_key_capture"
+                    | "start_combo_capture"
+                    | "start_binding_combo_capture"
+                    | "start_pending_combo_capture"
+                    | "set_close_to_tray"
+                    | "set_start_at_startup"
+                    | "set_ipc_auto_start"
+                    | "start_ipc_server"
+                    | "set_webhook"
+                    | "check_for_updates"
+                    | "apply_update"
+            )
+        {
+            return Err(format!("{cmd} is unavailable in this host"));
+        }
         if let Some(result) = commands::edit_command(&self.state, &self.app, cmd, &args).await {
             return result;
         }
@@ -111,6 +135,14 @@ impl Backend {
             "set_macro_always_listen" => {
                 let enabled: bool = arg(&args, "enabled")?;
                 to_json(commands::set_macro_always_listen(
+                    &self.state,
+                    &self.app,
+                    enabled,
+                )?)
+            }
+            "set_macro_android_exact_time" => {
+                let enabled: bool = arg(&args, "enabled")?;
+                to_json(commands::set_macro_android_exact_time(
                     &self.state,
                     &self.app,
                     enabled,
@@ -393,20 +425,45 @@ impl Backend {
                     .await
                     .map_err(|e| e.to_string())??,
             ),
-            "list_models" => to_json(blockwork_core::detect::models::catalog()?),
+            "list_models" => {
+                #[cfg(feature = "desktop")]
+                {
+                    to_json(blockwork_core::detect::models::catalog()?)
+                }
+                #[cfg(not(feature = "desktop"))]
+                {
+                    Err("on-device object detection is unavailable in this build".into())
+                }
+            }
             "download_model" => {
                 let id: String = arg(&args, "id")?;
-                to_json(
-                    tokio::task::spawn_blocking(move || {
-                        blockwork_core::detect::models::install(&id)
-                    })
-                    .await
-                    .map_err(|e| e.to_string())??,
-                )
+                #[cfg(feature = "desktop")]
+                {
+                    to_json(
+                        tokio::task::spawn_blocking(move || {
+                            blockwork_core::detect::models::install(&id)
+                        })
+                        .await
+                        .map_err(|e| e.to_string())??,
+                    )
+                }
+                #[cfg(not(feature = "desktop"))]
+                {
+                    let _ = id;
+                    Err("on-device object detection is unavailable in this build".into())
+                }
             }
             "import_model" => {
                 let path: String = arg(&args, "path")?;
-                to_json(blockwork_core::detect::models::import(&path)?)
+                #[cfg(feature = "desktop")]
+                {
+                    to_json(blockwork_core::detect::models::import(&path)?)
+                }
+                #[cfg(not(feature = "desktop"))]
+                {
+                    let _ = path;
+                    Err("on-device object detection is unavailable in this build".into())
+                }
             }
             "image_from_file" => {
                 let path: String = arg(&args, "path")?;
@@ -430,9 +487,13 @@ impl Backend {
             }
             "emergency_stop" => {
                 commands::emergency_stop(&self.state, &self.app);
+                self.persist_android_trigger_pause(true)?;
                 to_json(())
             }
-            "resume_triggers" => to_json(commands::resume_triggers(&self.state, &self.app)?),
+            "resume_triggers" => {
+                self.persist_android_trigger_pause(false)?;
+                to_json(commands::resume_triggers(&self.state, &self.app)?)
+            }
             "clear_run_log" => to_json(commands::clear_run_log(&self.state, &self.app)?),
             "save_macro" => to_json(commands::save_macro(&self.state, &self.app)?),
             "export_macro_file_name" => {

@@ -11,6 +11,21 @@ pub(super) fn run_system_block(
     depth: u32,
 ) -> Result<(), String> {
     match &ins.kind {
+        InstructionKind::LaunchAndroidApp { package } => {
+            let result = (|| {
+                let package = ctx.resolve(package, depth)?.eval_text()?;
+                crate::input::android_app::validate_package(&package)?;
+                let stopped = || ctx.stop_flag.as_ref().is_some_and(stop_requested);
+                ctx.emulator
+                    .lock()
+                    .map_err(|e| e.to_string())?
+                    .launch_android_app(&package, &stopped)
+            })();
+            if let Err(error) = result {
+                soft_fail(ctx, &ins.id, "Launch app", error)?;
+            }
+        }
+
         InstructionKind::SendSignal { name, wait } => {
             let name = match ctx.resolve(&name.value, depth).and_then(|v| v.eval_text()) {
                 Ok(name) => name,

@@ -199,12 +199,14 @@ fn process_names() -> Result<Vec<String>, String> {
     Err("listing programs isn't supported on this system".into())
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos", windows, test))]
 #[cfg_attr(windows, allow(dead_code))]
 fn basename(path: &str) -> String {
     let name = path.rsplit(['/', '\\']).next().unwrap_or(path);
     strip_exe(name).to_string()
 }
 
+#[cfg(any(target_os = "linux", target_os = "macos", windows, test))]
 fn strip_exe(name: &str) -> &str {
     name.strip_suffix(".exe")
         .or_else(|| name.strip_suffix(".EXE"))

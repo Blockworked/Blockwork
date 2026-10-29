@@ -177,3 +177,83 @@ mod value_location_tests;
 
 #[cfg(test)]
 mod import_review_tests;
+
+#[cfg(test)]
+mod android_element_review_tests {
+    use super::*;
+    use blockwork_core::input::element::{ElementAction, ElementSelector};
+    #[test]
+    fn element_import_review_distinguishes_reading_from_interaction() {
+        for action in [
+            ElementAction::Exists,
+            ElementAction::ReadText,
+            ElementAction::Wait,
+            ElementAction::Click,
+            ElementAction::SetText,
+        ] {
+            let mac = Macro::new(
+                "Element permissions".into(),
+                "".into(),
+                vec![Instruction::new(InstructionKind::Element {
+                    action,
+                    selector: ElementSelector {
+                        package: "fixture.app".into(),
+                        resource_id: "id".into(),
+                        ..Default::default()
+                    },
+                    text: Value::text(""),
+                    timeout: Value::number(1000.0),
+                    variable: String::new(),
+                })],
+            );
+            let caps = macro_capabilities(&mac);
+            assert!(caps.iter().any(|c| c.kind == "screen"));
+            assert_eq!(
+                caps.iter().any(|c| c.kind == "input"),
+                matches!(action, ElementAction::Click | ElementAction::SetText)
+            );
+        }
+        let value: Value = serde_json::from_value(serde_json::json!({"kind":"Op","op":"AndroidElementText","args":[],"saved":{"kind":"Text","value":""}})).unwrap();
+        let mac = Macro::new(
+            "Element reporter".into(),
+            "".into(),
+            vec![Instruction::new(InstructionKind::SetVariable(
+                "result".into(),
+                value,
+            ))],
+        );
+        assert!(macro_capabilities(&mac).iter().any(|c| c.kind == "screen"));
+    }
+}
+
+#[cfg(test)]
+mod android_app_review_tests {
+    use super::*;
+    #[test]
+    fn foreground_observation_and_launches_disclose_different_grants() {
+        let foreground = Macro::new(
+            "Foreground".into(),
+            "".into(),
+            vec![Instruction::new(InstructionKind::WhenForegroundApp {
+                package: "fixture.app".into(),
+                entered: true,
+            })],
+        );
+        let caps = macro_capabilities(&foreground);
+        assert!(caps.iter().any(|c| c.kind == "screen" && c.guarded));
+        assert!(caps.iter().any(|c| c.kind == "triggers"));
+        assert!(!caps.iter().any(|c| c.kind == "commands"));
+        let launch = Macro::new(
+            "Launch".into(),
+            "".into(),
+            vec![Instruction::new(InstructionKind::LaunchAndroidApp {
+                package: Value::text("fixture.app"),
+            })],
+        );
+        assert!(
+            macro_capabilities(&launch)
+                .iter()
+                .any(|c| c.kind == "commands" && c.guarded)
+        );
+    }
+}

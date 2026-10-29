@@ -30,6 +30,10 @@ Item {
 
     signal picked(real x, real y, real width, real height)
     signal canceled()
+    signal failed(string error)
+    signal elementPicked(var selector)
+    property var captureResult: null
+    function beginElement() { failed(qsTr("Element picking requires Android")); }
 
     function begin(regionOnly, text) {
         requireRegion = regionOnly; hint = text;

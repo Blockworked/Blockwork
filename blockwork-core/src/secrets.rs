@@ -7,6 +7,7 @@ use std::collections::HashMap;
 use std::sync::Mutex;
 
 /// Keyring service / target prefix.
+#[cfg(any(target_os = "linux", target_os = "macos", windows))]
 #[cfg_attr(test, allow(dead_code))]
 const SERVICE: &str = "com.blockworked.Blockwork";
 /// Shown in place of a secret's value.

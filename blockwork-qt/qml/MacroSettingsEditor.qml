@@ -11,6 +11,7 @@ ColumnLayout {
     required property var permissions
     required property var guardedAbilities
     property bool showTitle: true
+    property bool androidHost: false
     readonly property var settings: macro && macro.settings ? macro.settings : ({})
     function reset() { tabs.currentIndex = 0; settingsFlick.contentY = 0; }
     function saveConditions(days, from, until) {
@@ -275,6 +276,13 @@ ColumnLayout {
                         onToggled: checked => editor.invoke("set_macro_catch_up", { enabled: checked })
                     }
                     Help { text: qsTr("Runs a schedule or \"once at\" trigger once if its time passed while Blockwork was closed or the computer was asleep (up to a week back).") }
+                    StitchSwitch {
+                        visible: editor.androidHost
+                        Accessible.name: qsTr("Exact time on Android")
+                        checked: !!editor.settings.android_exact_time
+                        onToggled: checked => editor.invoke("set_macro_android_exact_time", {enabled: checked})
+                    }
+                    Help { visible: editor.androidHost; text: qsTr("Exact schedules require Android exact-alarm access. Without access they stay blocked. Best-effort alarms may be delayed.") }
                 }
             }
             Column {

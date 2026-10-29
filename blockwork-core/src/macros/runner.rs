@@ -962,6 +962,38 @@ fn run_block(
             }
         }
 
+        #[cfg(target_os = "android")]
+        if matches!(
+            &ins.kind,
+            InstructionKind::Command(_)
+                | InstructionKind::CommandWait(_)
+                | InstructionKind::OpenApp { .. }
+                | InstructionKind::CloseApp { .. }
+                | InstructionKind::WindowAction { .. }
+                | InstructionKind::MoveWindow { .. }
+                | InstructionKind::SetClipboard(_)
+                | InstructionKind::PasteText(_)
+                | InstructionKind::WriteFile { .. }
+                | InstructionKind::Notify { .. }
+                | InstructionKind::DetectObjectsInWindow { .. }
+                | InstructionKind::WaitForDetection { .. }
+                | InstructionKind::AimStep { .. }
+                | InstructionKind::AimAtDetection { .. }
+                | InstructionKind::BrowserOpen { .. }
+                | InstructionKind::BrowserClick { .. }
+                | InstructionKind::BrowserType { .. }
+                | InstructionKind::BrowserWaitFor { .. }
+                | InstructionKind::BrowserScript { .. }
+        ) {
+            soft_fail(
+                ctx,
+                &ins.id,
+                "Platform",
+                "This block is unavailable on Android",
+            )?;
+            continue;
+        }
+
         if let Some(Err(e)) = crate::capabilities::checked_when_run(&ins.kind)
             .map(crate::permissions::require)
             .find(Result::is_err)
@@ -1007,6 +1039,11 @@ fn run_block(
                     && let Some(flow) = input::run_token(token, ins, ctx, depth)?
                 {
                     return Ok(flow);
+                } else if matches!(
+                    ins.kind,
+                    InstructionKind::Touch { .. } | InstructionKind::Element { .. }
+                ) {
+                    input::run_android_input(ins, ctx, depth)?;
                 }
             }
             Role::Data => {

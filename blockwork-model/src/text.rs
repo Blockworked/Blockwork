@@ -136,6 +136,14 @@ const AUTO_FORMATS: [&str; 5] = [
 /// The Unix timestamp of a local date written in `format`, or in a common
 /// format when it's empty.
 pub fn parse_date(text: &str, format: &str) -> Result<f64, String> {
+    parse_date_in_zone(text, format, &Local)
+}
+
+pub fn parse_date_in_zone<Tz: TimeZone>(
+    text: &str,
+    format: &str,
+    zone: &Tz,
+) -> Result<f64, String> {
     let text = text.trim();
     let naive = if format.trim().is_empty() {
         if let Ok(dt) = DateTime::parse_from_rfc3339(text) {
@@ -160,8 +168,7 @@ pub fn parse_date(text: &str, format: &str) -> Result<f64, String> {
             })
     };
     let naive = naive.ok_or_else(|| format!("couldn't read \"{text}\" as a date"))?;
-    Local
-        .from_local_datetime(&naive)
+    zone.from_local_datetime(&naive)
         .earliest()
         .map(|dt| dt.timestamp() as f64)
         .ok_or_else(|| format!("\"{text}\" doesn't exist in the local time zone"))

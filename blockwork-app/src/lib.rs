@@ -5,12 +5,16 @@
 //! reaches it through [`Backend::dispatch`] over the daemon's
 //! local socket (see `blockwork-protocol`).
 
+mod android_alarms;
 pub mod autostart;
 pub(crate) mod block_library;
 pub(crate) mod browser_bridge;
 pub(crate) mod commands;
 pub(crate) mod community;
 mod dispatch;
+pub mod embedded;
+mod foreground_events;
+pub mod host;
 pub(crate) mod installed_apps;
 pub(crate) mod macro_runs;
 pub(crate) mod macros_thread;
@@ -138,6 +142,8 @@ pub(crate) mod async_runtime {
 pub struct Backend {
     state: SharedState,
     app: AppHandle,
+    foreground: Arc<Mutex<foreground_events::Observation>>,
+    alarms: Arc<Mutex<android_alarms::Store>>,
 }
 
 /// The editor's state before any macro loads, from saved settings. The
@@ -150,6 +156,8 @@ fn initial_state(
     wayland_session: bool,
 ) -> AppState {
     AppState {
+        capabilities: host::Capabilities::desktop(),
+        desktop_integration: true,
         macro_selected: None,
         current_macro: None,
         macros_list: vec![],
@@ -230,6 +238,8 @@ impl Backend {
         Backend {
             state: Arc::new(Mutex::new(state)),
             app: AppHandle { events },
+            foreground: Arc::new(Mutex::new(Default::default())),
+            alarms: Arc::new(Mutex::new(Default::default())),
         }
     }
 
@@ -238,6 +248,12 @@ impl Backend {
     /// check). Must be called from within `runtime`'s context or with a
     /// handle to it.
     pub fn start(runtime: tokio::runtime::Handle) -> Backend {
+        Self::start_with_host(runtime, host::HostConfig::default())
+    }
+
+    /// Starts a backend with explicit platform services. Embedders call this
+    /// once per process and retain the handle across editor attach/detach.
+    pub fn start_with_host(runtime: tokio::runtime::Handle, host: host::HostConfig) -> Backend {
         // Registers Blockwork's own value operators before any macro loads.
         blockwork_core::init();
         async_runtime::init(runtime);
@@ -249,16 +265,26 @@ impl Backend {
         // selected, so startup itself remains silent.
         // Without input emulation macros still run; their input blocks
         // report that they can't (see `UnavailableBackend`).
-        let emulator = Some(make_backend_or_unavailable());
+        if let Some(prompt) = host.prompt {
+            blockwork_core::prompt::set_handler(prompt);
+        }
+        let emulator = Some(host.input.unwrap_or_else(make_backend_or_unavailable));
         let absolute_mouse_position_available =
             blockwork_core::macros::backend::absolute_mouse_position_available();
-        let initial_state = initial_state(
+        let mut initial_state = initial_state(
             &settings,
             emulator,
-            absolute_mouse_position_available,
-            blockwork_core::macros::backend::is_wayland_session(),
+            host.desktop_integration && absolute_mouse_position_available,
+            host.desktop_integration && blockwork_core::macros::backend::is_wayland_session(),
         );
 
+        initial_state.capabilities = host.capabilities;
+        initial_state.desktop_integration = host.desktop_integration;
+        if !host.desktop_integration {
+            initial_state.ipc_auto_start = false;
+            initial_state.close_to_tray = false;
+            initial_state.start_at_startup = false;
+        }
         let shared: SharedState = Arc::new(Mutex::new(initial_state));
 
         {
@@ -287,13 +313,15 @@ impl Backend {
                 }
             }
 
-            recording::start_grab_thread();
-            recording::RECORD_MOUSE_RELATIVE.store(s.record_mouse_relative, Ordering::Relaxed);
-            recording::RECORD_MOUSE_MOVEMENT.store(s.record_mouse_movement, Ordering::Relaxed);
+            if host.watchers.desktop {
+                recording::start_grab_thread();
+                recording::RECORD_MOUSE_RELATIVE.store(s.record_mouse_relative, Ordering::Relaxed);
+                recording::RECORD_MOUSE_MOVEMENT.store(s.record_mouse_movement, Ordering::Relaxed);
 
-            let bindings = config::load_hotkey_bindings();
-            recording::update_hotkey_table(bindings.clone());
-            s.hotkey_bindings = bindings;
+                let bindings = config::load_hotkey_bindings();
+                recording::update_hotkey_table(bindings.clone());
+                s.hotkey_bindings = bindings;
+            }
 
             // Auto-start IPC server if configured
             if s.ipc_auto_start
@@ -313,26 +341,23 @@ impl Backend {
             app: app.clone(),
         }));
 
-        // ── Background battery-event watcher (see watch/battery.rs) ──────
-        watch::battery::start(Arc::clone(&shared), app.clone());
-
-        // ── Background time-event watcher (see watch/time.rs) ────────────
-        watch::time::start(Arc::clone(&shared), app.clone());
-
-        // ── Background clipboard-event watcher (see watch/clipboard.rs) ───
-        watch::clipboard::start(Arc::clone(&shared), app.clone());
-
-        // ── Background key-event watcher (see watch/key.rs) ──────────────
-        watch::key::start(Arc::clone(&shared), app.clone());
-
-        watch::window::start(Arc::clone(&shared), app.clone());
-
-        watch::file::start(Arc::clone(&shared), app.clone());
-        watch::typed::start(Arc::clone(&shared), app.clone());
-        watch::system::start(Arc::clone(&shared), app.clone());
-        watch::mouse::start(Arc::clone(&shared), app.clone());
-        webhook::start(Arc::clone(&shared), app.clone());
-        browser_bridge::start(Arc::clone(&shared), app.clone());
+        if host.watchers.desktop {
+            watch::battery::start(Arc::clone(&shared), app.clone());
+            watch::clipboard::start(Arc::clone(&shared), app.clone());
+            watch::key::start(Arc::clone(&shared), app.clone());
+            watch::window::start(Arc::clone(&shared), app.clone());
+            watch::file::start(Arc::clone(&shared), app.clone());
+            watch::typed::start(Arc::clone(&shared), app.clone());
+            watch::system::start(Arc::clone(&shared), app.clone());
+            watch::mouse::start(Arc::clone(&shared), app.clone());
+            browser_bridge::start(Arc::clone(&shared), app.clone());
+        }
+        if host.watchers.time {
+            watch::time::start(Arc::clone(&shared), app.clone());
+        }
+        if host.watchers.webhook {
+            webhook::start(Arc::clone(&shared), app.clone());
+        }
 
         // Pushes run log updates to the UI, at most a few times a second.
         {
@@ -403,7 +428,7 @@ impl Backend {
         }
 
         // ── QueueSignal consumer (hotkeys and the recording stop key) ────
-        {
+        if host.watchers.desktop {
             let app = app.clone();
             let state = Arc::clone(&shared);
             async_runtime::spawn(async move {
@@ -420,7 +445,7 @@ impl Backend {
         }
 
         // ── Delayed update check (Windows/macOS only) ────────────────────
-        #[cfg(any(windows, target_os = "macos"))]
+        #[cfg(all(feature = "desktop", any(windows, target_os = "macos")))]
         {
             let state = Arc::clone(&shared);
             let app = app.clone();
@@ -430,7 +455,12 @@ impl Backend {
             });
         }
 
-        Backend { state: shared, app }
+        Backend {
+            state: shared,
+            app,
+            foreground: Arc::new(Mutex::new(Default::default())),
+            alarms: Arc::new(Mutex::new(Default::default())),
+        }
     }
 
     /// Receives every [`Event`] published from now on.
@@ -446,6 +476,55 @@ impl Backend {
 
     pub fn close_to_tray(&self) -> bool {
         self.state.lock().map(|s| s.close_to_tray).unwrap_or(false)
+    }
+
+    /// Permission/service changes come from the native host and do not
+    /// modify the per-macro permission store.
+    pub fn update_capabilities(&self, capabilities: host::Capabilities) -> Result<(), String> {
+        let mut foreground = self.foreground.lock().map_err(|e| e.to_string())?;
+        let mut state = self.state.lock().map_err(|e| e.to_string())?;
+        if state.capabilities.platform != capabilities.platform {
+            return Err("the host platform cannot change while running".into());
+        }
+        if !capabilities
+            .services
+            .get("foreground_events")
+            .is_some_and(|c| c.ready)
+        {
+            foreground.reset();
+        }
+        state.capabilities = capabilities;
+        state::emit_state_updated(&self.app, &state);
+        Ok(())
+    }
+
+    /// Patch observed native services without overwriting independent
+    /// permission state (accessibility and exact alarms change independently).
+    pub fn update_host_services(
+        &self,
+        services: Vec<(String, host::Capability)>,
+    ) -> Result<(), String> {
+        let mut foreground = self.foreground.lock().map_err(|e| e.to_string())?;
+        let mut state = self.state.lock().map_err(|e| e.to_string())?;
+        let mut changed = false;
+        for (name, capability) in services {
+            if name == "foreground_events" && !capability.ready {
+                foreground.reset();
+            }
+            let old = state.capabilities.services.get(&name);
+            if old.is_none_or(|old| {
+                old.ready != capability.ready
+                    || old.supported != capability.supported
+                    || old.reason != capability.reason
+            }) {
+                state.capabilities.services.insert(name, capability);
+                changed = true;
+            }
+        }
+        if changed {
+            state::emit_state_updated(&self.app, &state);
+        }
+        Ok(())
     }
 
     /// Asks every subscriber to shut down (publishes [`Event::Quit`]).

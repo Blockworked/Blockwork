@@ -4,6 +4,8 @@
 pub use blockwork_model::input::*;
 
 pub mod cron;
+pub mod due;
+pub mod element;
 pub mod instruction_utils;
 pub mod typed;
 pub mod ui_utils;

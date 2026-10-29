@@ -106,6 +106,17 @@ impl InstructionKind {
                 of(Dialogs, &[])
             }
 
+            K::WhenForegroundApp { .. } => of(Trigger, &["screen"]),
+            K::LaunchAndroidApp { .. } => of(System, &["commands"]),
+            K::Touch { .. } => of(Input, &["input"]),
+            K::Element {
+                action:
+                    crate::input::element::ElementAction::Exists
+                    | crate::input::element::ElementAction::ReadText
+                    | crate::input::element::ElementAction::Wait,
+                ..
+            } => of(Input, &["screen"]),
+            K::Element { .. } => of(Input, &["screen", "input"]),
             K::Token(_) => of(Input, &["input"]),
 
             K::SendSignal { .. } | K::Log(_) | K::Notify { .. } => of(System, &[]),

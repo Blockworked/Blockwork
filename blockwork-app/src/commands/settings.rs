@@ -435,7 +435,7 @@ pub(crate) fn check_for_updates(state: &SharedState, app: &AppHandle) -> Result<
 }
 
 pub(crate) async fn check_for_updates_internal(state: &SharedState, app: &AppHandle) {
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(all(feature = "desktop", any(windows, target_os = "macos")))]
     {
         let version = env!("CARGO_PKG_VERSION").to_string();
         let result = tokio::task::spawn_blocking(move || {
@@ -452,7 +452,7 @@ pub(crate) async fn check_for_updates_internal(state: &SharedState, app: &AppHan
             emit_state_updated(app, &s);
         }
     }
-    #[cfg(not(any(windows, target_os = "macos")))]
+    #[cfg(not(all(feature = "desktop", any(windows, target_os = "macos"))))]
     if let Ok(mut s) = state.lock() {
         s.update_check_state =
             UpdateCheckState::Error("Updates are only supported on Windows and macOS".to_string());
@@ -466,7 +466,7 @@ pub(crate) fn apply_update(state: &SharedState, app: &AppHandle) -> Result<(), S
         s.update_check_state = UpdateCheckState::Applying;
         emit_state_updated(app, &s);
     }
-    #[cfg(any(windows, target_os = "macos"))]
+    #[cfg(all(feature = "desktop", any(windows, target_os = "macos")))]
     {
         let state_clone = Arc::clone(&*state);
         let app_clone = app.clone();
@@ -488,5 +488,22 @@ pub(crate) fn apply_update(state: &SharedState, app: &AppHandle) -> Result<(), S
             }
         });
     }
+    Ok(())
+}
+
+pub(crate) fn set_macro_android_exact_time(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if s.capabilities.platform != "android" {
+        return Err("Android exact alarms require an Android host".into());
+    }
+    if let Some(mac) = &mut s.current_macro {
+        mac.settings.android_exact_time = enabled;
+        auto_save(&mut s);
+    }
+    emit_state_updated(app, &s);
     Ok(())
 }

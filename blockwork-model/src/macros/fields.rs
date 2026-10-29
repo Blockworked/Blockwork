@@ -11,6 +11,15 @@ use serde::{Deserialize, Serialize};
 /// `Display`/`FromStr` string form, which is what the frontend sends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FieldId {
+    AndroidPackage,
+    ElementText,
+    ElementTimeout,
+    TouchX,
+    TouchY,
+    TouchEndX,
+    TouchEndY,
+    TouchDuration,
+
     WaitDuration,
     MoveMouseX,
     MoveMouseY,
@@ -146,6 +155,25 @@ pub(crate) fn slots_mut<'a>(
     use FieldId as F;
     use InputValueType::{Any, Bool};
     match kind {
+        InstructionKind::LaunchAndroidApp { package } => f(F::AndroidPackage, package, Any),
+        InstructionKind::Element { text, timeout, .. } => {
+            f(F::ElementText, text, Any);
+            f(F::ElementTimeout, timeout, Any);
+        }
+        InstructionKind::Touch {
+            x,
+            y,
+            end_x,
+            end_y,
+            duration,
+            ..
+        } => {
+            f(F::TouchX, x, Any);
+            f(F::TouchY, y, Any);
+            f(F::TouchEndX, end_x, Any);
+            f(F::TouchEndY, end_y, Any);
+            f(F::TouchDuration, duration, Any);
+        }
         InstructionKind::Token(token) => match token {
             InputToken::MoveMouse(x, y, _) => {
                 f(F::MoveMouseX, x, Any);
@@ -409,6 +437,7 @@ pub(crate) fn slots_mut<'a>(
         | InstructionKind::CloseApp { .. }
         | InstructionKind::DeleteAllOfList { .. }
         | InstructionKind::ReverseList { .. }
+        | InstructionKind::WhenForegroundApp { .. }
         | InstructionKind::RunBranch(_) => {}
     }
 }

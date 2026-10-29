@@ -150,6 +150,9 @@ pub struct MacroSettings {
     /// closed or the computer slept, once, when it gets the chance.
     #[serde(default)]
     pub catch_up_missed: bool,
+    /// Android only: request exact alarm delivery.
+    #[serde(default)]
+    pub android_exact_time: bool,
     /// Block packs this macro's blocks came from.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub block_packs: Vec<crate::block_packs::PackRecord>,

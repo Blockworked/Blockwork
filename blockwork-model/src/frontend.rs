@@ -126,6 +126,8 @@ pub struct MacroSettingsDto {
     pub active_days: u8,
     pub folder: String,
     pub catch_up_missed: bool,
+    #[serde(default)]
+    pub android_exact_time: bool,
 }
 
 pub fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
@@ -145,6 +147,7 @@ pub fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
         active_days: settings.active_days,
         folder: settings.folder.clone(),
         catch_up_missed: settings.catch_up_missed,
+        android_exact_time: settings.android_exact_time,
     }
 }
 

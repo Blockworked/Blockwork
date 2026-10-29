@@ -41,11 +41,18 @@
     "DetectObjectsInWindow": [
       "screen"
     ],
+    "Element": [
+      "screen",
+      "input"
+    ],
     "FindImage": [
       "screen"
     ],
     "HttpRequest": [
       "network"
+    ],
+    "LaunchAndroidApp": [
+      "commands"
     ],
     "MoveWindow": [
       "windows"
@@ -70,6 +77,9 @@
       "macros"
     ],
     "Token": [
+      "input"
+    ],
+    "Touch": [
       "input"
     ],
     "WaitForDetection": [
@@ -100,6 +110,10 @@
     ],
     "WhenFileChanged": [
       "files_read",
+      "triggers"
+    ],
+    "WhenForegroundApp": [
+      "screen",
       "triggers"
     ],
     "WhenIdle": [
@@ -220,6 +234,8 @@
   "operators": {
     "ActiveWindowApp": "windows",
     "ActiveWindowTitle": "windows",
+    "AndroidElementExists": "screen",
+    "AndroidElementText": "screen",
     "AppRunning": "windows",
     "AverageColor": "screen",
     "ClipboardHasFiles": "clipboard",

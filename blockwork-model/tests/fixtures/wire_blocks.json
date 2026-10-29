@@ -1025,5 +1025,62 @@
   },
   "variable": "BrowserScript.variable",
   "id": "browserscript"
+ },
+ {
+  "type": "WhenForegroundApp",
+  "id": "android-foreground",
+  "package": "fixture.app",
+  "entered": true
+ },
+ {
+  "type": "LaunchAndroidApp",
+  "id": "android-launch",
+  "package": {
+   "kind": "Text",
+   "value": "fixture.app"
+  }
+ },
+ {
+  "type": "Element",
+  "id": "android-element",
+  "action": "Click",
+  "selector": {
+   "package": "fixture.app",
+   "resource_id": "fixture.app:id/button"
+  },
+  "text": {
+   "kind": "Text",
+   "value": ""
+  },
+  "timeout": {
+   "kind": "Number",
+   "value": 1000
+  },
+  "variable": "result"
+ },
+ {
+  "type": "Touch",
+  "id": "android-touch",
+  "action": "Tap",
+  "x": {
+   "kind": "Number",
+   "value": 10
+  },
+  "y": {
+   "kind": "Number",
+   "value": 20
+  },
+  "end_x": {
+   "kind": "Number",
+   "value": 30
+  },
+  "end_y": {
+   "kind": "Number",
+   "value": 40
+  },
+  "duration": {
+   "kind": "Number",
+   "value": 100
+  }
  }
 ]

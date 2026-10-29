@@ -8,7 +8,8 @@ use super::*;
 macro_rules! for_each_ref {
     ($kind:expr, $f:expr) => {
         match $kind {
-            InstructionKind::SetVariable(name, _)
+            InstructionKind::Element { variable: name, .. }
+            | InstructionKind::SetVariable(name, _)
             | InstructionKind::ChangeVariable(name, _)
             | InstructionKind::HttpRequest { variable: name, .. }
             | InstructionKind::BrowserScript { variable: name, .. }

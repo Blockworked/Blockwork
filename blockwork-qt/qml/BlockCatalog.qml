@@ -33,6 +33,8 @@ QtObject {
     // types, defaults), for BlockRegistry.freshValue.
     // BEGIN GENERATED operator descriptors (blockwork-core tests/operator_descriptors.rs; BLESS=1 rewrites)
     readonly property var hostDescriptors: [
+        {"kind":"AndroidElementExists","op":"AndroidElementExists","arity":5,"args":[{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}}],"host":true},
+        {"kind":"AndroidElementText","op":"AndroidElementText","arity":5,"args":[{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":""}}],"host":true},
         {"kind":"BatteryPercentage","op":"BatteryPercentage","arity":0,"args":[],"host":true},
         {"kind":"PluggedIn","op":"PluggedIn","arity":0,"args":[],"host":true},
         {"kind":"ClipboardText","op":"ClipboardText","arity":0,"args":[],"host":true},
@@ -104,6 +106,8 @@ QtObject {
     // palette list above and BlockRegistry both come from this one table.
     function operatorRows() {
         return {
+            AndroidElementExists: {prefix: qsTr("Android element exists"), result: "bool", infix: [qsTr("ID"), qsTr("text"), qsTr("description"), qsTr("class")]},
+            AndroidElementText: {prefix: qsTr("text of Android element in app"), result: "text", infix: [qsTr("ID"), qsTr("text"), qsTr("description"), qsTr("class")]},
             BatteryPercentage: { prefix: qsTr("battery percentage"), result: "number" }, PluggedIn: { prefix: qsTr("plugged in?"), result: "bool" },
             ClipboardText: { prefix: qsTr("clipboard text"), result: "text" }, ClipboardHasImage: { prefix: qsTr("clipboard has image"), result: "bool" },
             ClipboardHasFiles: { prefix: qsTr("clipboard has files"), result: "bool" },
@@ -166,10 +170,11 @@ QtObject {
     // The palette's sections, in order. Statements come before reporters,
     // except where a section holds data: there the reporter comes first.
     readonly property var paletteSections: [
+        { category: "input", title: qsTr("Touch and elements"), items: ["Touch", "Element", "AndroidElementExists", "AndroidElementText"] },
         { category: "events", title: qsTr("Start"), items: ["WhenRan", "WhenSignal", "WhenWebhook"] },
         { category: "events", title: qsTr("Keyboard and mouse"), items: ["WhenKey", "WhenTyped", "WhenMouseButton"] },
         { category: "events", title: qsTr("Time"), items: ["WhenTime", "WhenAt", "WhenCron", "WhenIdle"] },
-        { category: "events", title: qsTr("Apps and windows"), items: ["WhenApp", "WhenWindow"] },
+        { category: "events", title: qsTr("Apps and windows"), items: ["WhenApp", "WhenWindow", "WhenForegroundApp"] },
         { category: "events", title: qsTr("Files and clipboard"), items: ["WhenFileChanged", "WhenClipboardChanged"] },
         { category: "events", title: qsTr("Computer"), items: ["WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenBatteryDischargedTo", "WhenBatteryChargedTo",
             "WhenScreenLock", "WhenNetwork", "WhenUsb"] },
@@ -193,7 +198,7 @@ QtObject {
             "Substring", "Case", "Trim", "TextCheck", "TextReplace", "SplitPart", "SplitCount", "RegexFind", "RegexReplace"] },
         { category: "operators", title: qsTr("Comparisons and logic"), items: ["Eq", "Neq", "Gt", "Lt", "Gte", "Lte", "And", "Or", "Not", "True", "False"] },
         { category: "operators", title: qsTr("Dates and times"), items: ["CurrentTime", "Timestamp", "FormatDate", "ParseDate", "DatePart"] },
-        { category: "system", title: qsTr("Apps and commands"), items: ["OpenApp", "CloseApp", "Command", "CommandWait", "AppRunning",
+        { category: "system", title: qsTr("Apps and commands"), items: ["LaunchAndroidApp", "OpenApp", "CloseApp", "Command", "CommandWait", "AppRunning",
             "ShellOutput", "ShellSucceeded"] },
         { category: "system", title: qsTr("Windows"), items: ["WindowAction", "MoveWindow", "ActiveWindowTitle", "ActiveWindowApp", "WindowExists", "WindowInfo"] },
         { category: "system", title: qsTr("Clipboard"), items: ["ClipboardText", "ClipboardHasImage", "ClipboardHasFiles", "SetClipboard"] },
@@ -328,6 +333,11 @@ QtObject {
     function eventRows(p) {
         const { label, value, signalPieces, whenTimeHead, direction, keyValue } = p;
         return {
+            WhenForegroundApp: { shape: "header", icon: "app-window", head: [label(qsTr("WHEN ANDROID APP")),
+                {kind: "text", key: "package", placeholder: "com.example.app"},
+                {kind: "button", action: "pickApp", palette: true, text: qsTr("Choose app"), icon: "app-window", when: () => page.androidHost},
+                {kind: "dropdown", key: "entered", options: [{value: "entered", label: qsTr("enters foreground")}, {value: "left", label: qsTr("leaves foreground")}],
+                    encode: v => v === "entered", decode: v => v ? "entered" : "left"}] },
             WhenBatteryDischargedTo: { shape: "header", head: [label(qsTr("WHEN BATTERY DISCHARGED TO")),
                 value("BatteryDischargeThreshold", "threshold"), label("%")] },
             WhenBatteryChargedTo: { shape: "header", head: [label(qsTr("WHEN BATTERY CHARGED TO")),
@@ -382,6 +392,22 @@ QtObject {
     function inputRows(p) {
         const { label, value, direction, keyValue } = p;
         return {
+            Element: { head: [label(qsTr("element")),
+                {kind: "button", action: "pickElement", icon: "crosshair", text: qsTr("Pick element"), when: () => page.androidHost},
+                {kind: "dropdown", key: "action", options: choices([["Click", qsTr("click")], ["LongClick", qsTr("long click")], ["ScrollForward", qsTr("scroll forward")], ["ScrollBackward", qsTr("scroll backward")], ["SetText", qsTr("replace text")], ["Exists", qsTr("exists?")], ["ReadText", qsTr("read text")], ["Wait", qsTr("wait until present")]])},
+                label(qsTr("app package")), {kind: "text", key: "selector", index: "package", placeholder: "com.example.app"},
+                label(qsTr("resource ID")), {kind: "text", key: "selector", index: "resource_id"},
+                label(qsTr("text")), {kind: "text", key: "selector", index: "text"},
+                label(qsTr("description")), {kind: "text", key: "selector", index: "description"},
+                label(qsTr("class")), {kind: "text", key: "selector", index: "class"},
+                Object.assign(value("ElementText", "text"), {when: i => i.action === "SetText"}),
+                Object.assign(value("ElementTimeout", "timeout"), {when: i => i.action === "Wait"}),
+                {kind: "dropdown", key: "variable", options: () => page.variableChoices(), when: i => ["Exists", "ReadText"].indexOf(i.action) >= 0}] },
+            Touch: { head: [label(qsTr("touch")),
+                {kind: "dropdown", key: "action", options: choices([["Tap", qsTr("tap")], ["LongPress", qsTr("long press")], ["Swipe", qsTr("swipe")], ["Back", qsTr("Back")], ["Home", qsTr("Home")], ["Recents", qsTr("Recents")]])},
+                value("TouchX", "x"), value("TouchY", "y"), {kind: "button", action: "pickTouch", icon: "crosshair", text: qsTr("Pick start")},
+                label(qsTr("to")), value("TouchEndX", "end_x"), value("TouchEndY", "end_y"), {kind: "button", action: "pickTouchEnd", icon: "crosshair", text: qsTr("Pick end")},
+                label(qsTr("for")), value("TouchDuration", "duration"), label(qsTr("ms"))] },
             Text: { head: [label(qsTr("Text")), value("TextValue", "text")] },
             Key: { head: [label(qsTr("Key")), keyValue,
                 direction([["Click", qsTr("Click")], ["Press", qsTr("Press")], ["Release", qsTr("Release")]])] },
@@ -443,6 +469,8 @@ QtObject {
     function systemRows(p) {
         const { label, commandField, value, box, launchSummary } = p;
         return {
+            LaunchAndroidApp: { icon: "app-window", head: [label(qsTr("Launch Android app")), value("AndroidPackage", "package"),
+                {kind: "button", action: "pickApp", palette: true, text: qsTr("Choose app"), icon: "app-window", when: () => page.androidHost}] },
             CloseApp: { head: [label(qsTr("Close app")),
                 { kind: "button", action: "pickApp", palette: true, image: "icon", icon: "square-x", text: i => i && i.name ? i.name : qsTr("Choose app...") }] },
             SetClipboard: { head: [label(qsTr("set clipboard to")), value("SetClipboardValue", "value")] },
@@ -554,10 +582,10 @@ QtObject {
         // with blockstitch's, so hand it the ones it lacks.
         Stitch.Icons.add(Bw.Icons.paths);
         // Blockwork's own features and vocabulary; a neutral blockstitch host has none of these.
-        BlockRegistry.strandMark = { text: qsTr("Recording target"), color: "" };
+        BlockRegistry.strandMark = { text: page.androidHost ? "" : qsTr("Recording target"), color: "" };
         BlockRegistry.registerDescriptors(hostDescriptors);
         BlockRegistry.registerIcons({
-            WhenRan: "play", WhenBatteryDischargedTo: "battery-warning", WhenBatteryChargedTo: "battery-charging", WhenTime: "clock",
+            Element: "mouse-pointer-click", Touch: "hand", WhenRan: "play", WhenBatteryDischargedTo: "battery-warning", WhenBatteryChargedTo: "battery-charging", WhenTime: "clock",
             WhenPowerPluggedIn: "plug-zap", WhenPowerUnplugged: "unplug", WhenClipboardChanged: "clipboard-check", WhenKey: "keyboard",
             Text: "text-cursor", Key: "keyboard", Button: "mouse-pointer-click", MoveMouse: "move", Scroll: "mouse", Command: "terminal",
             OpenApp: "app-window", CloseApp: "square-x", SetClipboard: "clipboard", Wait: "clock"
@@ -567,12 +595,17 @@ QtObject {
         const rows = Object.assign({}, eventRows(p), inputRows(p), controlRows(p), dataRows(p), systemRows(p), screenRows(p), browserRows(p));
         BlockRegistry.registerRows(rows);
         BlockRegistry.registerVariableFields({
-            WhenWebhook: ["variable"], AskText: ["name"], AskYesNo: ["name"], AskChoice: ["name"],
+            Element: ["variable"], WhenWebhook: ["variable"], AskText: ["name"], AskYesNo: ["name"], AskChoice: ["name"],
             HttpRequest: ["variable"], BrowserScript: ["variable"],
             FindImage: ["x_variable", "y_variable", "count_variable"],
             DetectObjectsInWindow: ["count_variable"], AimAtDetection: ["status_variable"]
         });
         BlockRegistry.registerPrefabs({
+            WhenForegroundApp: {package: "", entered: true},
+            LaunchAndroidApp: () => ({package: textValue("")}),
+            Element: () => ({action: "Click", selector: {package: "", resource_id: "", text: "", description: "", class: ""}, text: textValue(""), timeout: numberValue(10000), variable: ""}),
+            Touch: () => ({action: "Tap", x: numberValue(100), y: numberValue(100), end_x: numberValue(300), end_y: numberValue(300), duration: numberValue(500)}),
+
             Command: { command: "" },
             WhenBatteryDischargedTo: { threshold: numberValue(20) },
             WhenBatteryChargedTo: { threshold: numberValue(100) },

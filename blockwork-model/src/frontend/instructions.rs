@@ -7,7 +7,9 @@
 //! `tests/wire_blocks.rs` holds every block's round trip.
 
 use super::*;
+use crate::input::element::{ElementAction, ElementSelector};
 use crate::input::index_to_mouse_button;
+use crate::input::touch::TouchAction;
 use crate::macros::StopScope;
 
 /// One field's wire form: the same value for most types, the DTO list for a
@@ -124,6 +126,10 @@ wire_blocks! {
         WhenAt(at: Value),
     }
     named {
+        WhenForegroundApp { package: String, entered: bool },
+        LaunchAndroidApp { package: Value },
+        Element { action: ElementAction, selector: ElementSelector, text: Value, timeout: Value, variable: String },
+        Touch { action: TouchAction, x: Value, y: Value, end_x: Value, end_y: Value, duration: Value },
         #[serde(alias = "StopMacro")] Stop { #[serde(default)] scope: StopScope },
         OpenApp { command: String, name: String, icon: Option<String>, #[serde(default)] launch: LaunchOptions },
         CloseApp { command: String, name: String, icon: Option<String> },

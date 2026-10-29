@@ -473,7 +473,8 @@ pub(super) fn run_screen_block(
                     _ => "the image isn't on screen".to_string(),
                 })?;
                 let mut em = ctx.emulator.lock().map_err(|e| e.to_string())?;
-                em.click_mouse_abs(x.round() as i32, y.round() as i32, button.clone())
+                let stopped = || ctx.stop_flag.as_ref().is_some_and(stop_requested);
+                em.click_at(x.round() as i32, y.round() as i32, button.clone(), &stopped)
             })();
             if let Err(e) = clicked {
                 soft_fail(ctx, &ins.id, "Click image", e)?;
