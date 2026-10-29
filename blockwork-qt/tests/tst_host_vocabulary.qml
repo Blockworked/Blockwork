@@ -53,6 +53,113 @@ Item {
             compare(BlockRegistry.iconFor("WhenRan"), "play");
             compare(BlockRegistry.iconFor("If"), "git-branch");
         }
+        function test_android_filters_palette_and_preserves_imported_desktop_blocks() {
+            const page = createTemporaryObject(editorComponent, scene);
+            const state = JSON.parse(JSON.stringify(page.appState));
+            state.capabilities = {platform: "android", services: {touch: {supported: true, ready: false}}};
+            state.current_macro.strands.push({id: "imported", x: 400, y: 40, instructions: [
+                {id: "desktop-key", type: "Key", key: {kind: "Text", value: "a"}, direction: "Click"}
+            ]});
+            page.appState = state;
+            wait(50);
+            verify(page.instructionTypes.indexOf("Touch") >= 0);
+            compare(page.instructionTypes.indexOf("Key"), -1);
+            compare(page.instructionTypes.indexOf("WhenApp"), -1);
+            verify(!BlockRegistry.recordingTargets);
+            compare(page.macro.strands[1].instructions[0].type, "Key");
+            verify(!!page.blockMarks["desktop-key"]);
+            compare(page.defaultInstruction("Touch").action, "Tap");
+            verify(page.instructionTypes.indexOf("Element") >= 0);
+            verify(page.instructionTypes.indexOf("WhenTime") >= 0);
+            verify(page.instructionTypes.indexOf("WhenCron") >= 0);
+            verify(page.instructionTypes.indexOf("WhenAt") >= 0);
+            compare(page.defaultInstruction("Element").selector.package, "");
+            verify(page.extraOperators.some(spec => spec[0] === "AndroidElementExists"));
+            verify(page.extraOperators.some(spec => spec[0] === "AndroidElementText"));
+        }
+        function test_android_picker_uses_confirmed_values_without_recapturing_editor() {
+            const page = createTemporaryObject(editorComponent, scene);
+            const state = JSON.parse(JSON.stringify(page.appState));
+            state.capabilities = {platform: "android", services: {screenshots: {supported: true, ready: true}}};
+            page.appState = state;
+            wait(50);
+            const overlay = all(page).find(o => o.objectName === "screenOverlay");
+            verify(!!overlay);
+            scene.calls = [];
+            const instruction = page.defaultInstruction("Touch");
+            page.pickRequest = {kind: "touch", strandId: "strand", path: [{index: 1, slot: null}], instruction: instruction, end: true};
+            overlay.captureResult = {x: 1079, y: 2399, width: 0, height: 0, color: "#ff0000", image: ""};
+            overlay.picked(1079, 2399, 0, 0);
+            compare(scene.calls.length, 1);
+            compare(scene.calls[0].command, "edit_instruction");
+            compare(scene.calls[0].args.instruction.end_x, {kind: "Number", value: 1079});
+            compare(scene.calls[0].args.instruction.end_y, {kind: "Number", value: 2399});
+            compare(scene.calls[0].args.instruction.x, instruction.x);
+            compare(page.pickRequest, null);
+            scene.calls = [];
+            page.pickRequest = {kind: "image", strandId: "strand", path: [], instruction: page.defaultInstruction("FindImage")};
+            overlay.captureResult = {x: 12, y: 34, width: 56, height: 78, color: "#000000", image: "data:image/png;base64,confirmed"};
+            overlay.picked(12, 34, 56, 78);
+            compare(scene.calls.length, 1);
+            compare(scene.calls[0].args.instruction.image, "data:image/png;base64,confirmed");
+            verify(!Object.keys(page.callbacks).length);
+        }
+        function test_android_element_pick_preserves_action_and_other_fields() {
+            const page = createTemporaryObject(editorComponent, scene);
+            const state = JSON.parse(JSON.stringify(page.appState));
+            state.capabilities = {platform: "android", services: {}};
+            page.appState = state;
+            wait(50);
+            const overlay = all(page).find(o => o.objectName === "screenOverlay");
+            const instruction = page.defaultInstruction("Element");
+            instruction.action = "SetText";
+            instruction.text = {kind: "Text", value: "hello"};
+            page.pickRequest = {kind: "element", strandId: "strand", path: [], instruction: instruction};
+            scene.calls = [];
+            const selector = {package: "fixture.app", resource_id: "fixture.app:id/name", text: "", description: "", class: "android.widget.EditText"};
+            overlay.elementPicked(selector);
+            compare(scene.calls.length, 1);
+            compare(scene.calls[0].args.instruction.selector, selector);
+            compare(scene.calls[0].args.instruction.action, "SetText");
+            compare(scene.calls[0].args.instruction.text, instruction.text);
+            verify(page.instructionTypes.indexOf("FindImage") >= 0);
+            verify(page.extraOperators.some(spec => spec[0] === "PixelColor"));
+            verify(!page.extraOperators.some(spec => spec[0] === "ScreenText"));
+        }
+        function test_android_app_blocks_and_package_picker_keep_process_blocks_separate() {
+            const page = createTemporaryObject(editorComponent, scene);
+            const state = JSON.parse(JSON.stringify(page.appState));
+            state.capabilities = {platform: "android", services: {foreground_events: {supported: true, ready: true}}};
+            page.appState = state;
+            wait(50);
+            verify(page.instructionTypes.indexOf("WhenForegroundApp") >= 0);
+            verify(page.instructionTypes.indexOf("LaunchAndroidApp") >= 0);
+            compare(page.instructionTypes.indexOf("WhenApp"), -1);
+            compare(page.instructionTypes.indexOf("OpenApp"), -1);
+            scene.calls = [];
+            const launch = page.defaultInstruction("LaunchAndroidApp");
+            page.appPickerRequest = {strandId: "strand", path: [], instruction: launch};
+            page.applyPickedApp({command: "fixture.app", name: "Fixture", icon: null});
+            compare(scene.calls[0].args.instruction.package, {kind: "Text", value: "fixture.app"});
+            compare(scene.calls[0].args.instruction.command, undefined);
+            scene.calls = [];
+            const event = page.defaultInstruction("WhenForegroundApp");
+            event.entered = false;
+            page.appPickerRequest = {strandId: "strand", path: [], instruction: event};
+            page.applyPickedApp({command: "fixture.app", name: "Fixture", icon: null});
+            compare(scene.calls[0].args.instruction.package, "fixture.app");
+            compare(scene.calls[0].args.instruction.entered, false);
+            const desktop = JSON.parse(JSON.stringify(page.appState));
+            desktop.capabilities = {platform: "linux", services: {}};
+            desktop.current_macro.strands.push({id: "android-import", x: 400, y: 40, instructions: [launch, event]});
+            page.appState = desktop;
+            wait(50);
+            compare(page.instructionTypes.indexOf("LaunchAndroidApp"), -1);
+            compare(page.instructionTypes.indexOf("WhenForegroundApp"), -1);
+            verify(!!page.blockMarks[launch.id]);
+            verify(!!page.blockMarks[event.id]);
+            compare(page.macro.strands[1].instructions[1].entered, false);
+        }
         function test_palette_reporters_start_from_the_core_defaults() {
             const page = createTemporaryObject(editorComponent, scene);
             wait(50);

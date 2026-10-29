@@ -20,7 +20,6 @@ const POLL_INTERVAL: Duration = Duration::from_secs(1);
 /// A gap between ticks longer than this means time was missed.
 const MISSED_AFTER_SECS: i64 = 90;
 /// How far back a catch-up looks.
-const MAX_CATCH_UP_SECS: i64 = 7 * 24 * 3600;
 /// How often the last-seen time is saved, in ticks.
 const SAVE_EVERY: u32 = 30;
 const STATE_FILE: &str = "schedule_state.json";
@@ -48,36 +47,8 @@ fn save_last_seen(now: DateTime<Local>) {
 
 /// Whether `strand`'s schedule had a time in (`from`, `to`], checked minute by minute.
 fn missed(strand: &Strand, env: &HashMap<String, blockwork_core::input::value::Evaluated>, from: DateTime<Local>, to: DateTime<Local>) -> bool {
-    let from = from.max(to - chrono::Duration::seconds(MAX_CATCH_UP_SECS));
-    let matches: Box<dyn Fn(&DateTime<Local>) -> bool> = match strand.instructions.first().map(|i| &i.kind) {
-        Some(InstructionKind::WhenTime(schedule, time)) => {
-            let Some((hour, minute)) = time_of_day(time, env) else { return false };
-            let schedule = *schedule;
-            Box::new(move |t| schedule.matches(t, hour, minute))
-        }
-        Some(InstructionKind::WhenCron(expression)) => {
-            let Ok(cron) = expression.resolve_vars(env).eval_text().unwrap_or_default().parse::<Cron>() else { return false };
-            Box::new(move |t| cron.matches(t))
-        }
-        Some(InstructionKind::WhenAt(at)) => {
-            let Some(at) = at_time(at, env) else { return false };
-            return from < at && at <= to;
-        }
-        _ => return false,
-    };
-    let Some(mut minute) = (from + chrono::Duration::minutes(1)).with_second(0).and_then(|t| t.with_nanosecond(0)) else { return false };
-    while minute <= to {
-        if matches(&minute) {
-            return true;
-        }
-        minute += chrono::Duration::minutes(1);
-    }
-    false
-}
-
-/// A `WhenTime` header's time of day, as 24-hour `(hour, minute)`.
-fn time_of_day(time: &blockwork_core::input::value::Value, env: &HashMap<String, blockwork_core::input::value::Evaluated>) -> Option<(u8, u8)> {
-    parse_time_of_day(&time.resolve_vars(env).eval_text().ok()?).ok()
+    strand.instructions.first().and_then(|header| blockwork_core::input::due::DueSchedule::resolve(&header.kind, env, &Local).ok().flatten())
+        .is_some_and(|schedule| schedule.latest_between(&from, &to).is_some())
 }
 
 /// A `WhenAt` header's moment.

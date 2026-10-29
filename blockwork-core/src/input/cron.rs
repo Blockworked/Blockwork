@@ -2,7 +2,9 @@
 //! day of month, month, day of week) with `*`, lists, ranges, steps and
 //! names, plus the `@hourly`-style shortcuts.
 
-use chrono::{DateTime, Datelike, Duration, Local, Timelike};
+use chrono::{DateTime, Datelike, Duration, Timelike};
+#[cfg(test)]
+use chrono::Local;
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct Cron {
@@ -111,30 +113,30 @@ fn field(text: &str, min: u32, max: u32, names: &[&str], what: &str) -> Result<u
 
 impl Cron {
     /// Whether `at`'s minute is one this schedule fires on.
-    pub fn matches(&self, at: &DateTime<Local>) -> bool {
+    pub fn matches<Tz: chrono::TimeZone>(&self, at: &DateTime<Tz>) -> bool {
         has(self.minutes, at.minute()) && has(self.hours, at.hour()) && has(self.months, at.month()) && self.day_matches(at)
     }
 
-    fn day_matches(&self, at: &DateTime<Local>) -> bool {
+    fn day_matches<Tz: chrono::TimeZone>(&self, at: &DateTime<Tz>) -> bool {
         let day = has(self.days, at.day());
         let weekday = has(self.weekdays, at.weekday().num_days_from_sunday());
         if self.days_restricted && self.weekdays_restricted { day || weekday } else { day && weekday }
     }
 
-    /// The first minute after `at` this fires on, within about four years.
-    pub fn next_after(&self, at: &DateTime<Local>) -> Option<DateTime<Local>> {
-        let mut t = at.with_second(0)?.with_nanosecond(0)? + Duration::minutes(1);
-        let end = t + Duration::days(366 * 4 + 1);
+    /// The first minute after `at` this fires on, within about eight years.
+    pub fn next_after<Tz: chrono::TimeZone>(&self, at: &DateTime<Tz>) -> Option<DateTime<Tz>> {
+        let mut t = at.timezone().timestamp_opt(at.timestamp().div_euclid(60) * 60 + 60, 0).single()?;
+        let end = t.clone() + Duration::days(366 * 8 + 1);
         while t < end {
             // Skip whole months, days and hours that can't match.
             if !has(self.months, t.month()) {
                 let (y, m) = if t.month() == 12 { (t.year() + 1, 1) } else { (t.year(), t.month() + 1) };
-                t = local_midnight(y, m, 1)?;
+                t = local_midnight(&at.timezone(), y, m, 1)?;
             } else if !self.day_matches(&t) {
                 let next = t.date_naive().succ_opt()?;
-                t = local_midnight(next.year(), next.month(), next.day())?;
+                t = local_midnight(&at.timezone(), next.year(), next.month(), next.day())?;
             } else if !has(self.hours, t.hour()) {
-                t = t.with_minute(0)? + Duration::hours(1);
+                t += Duration::minutes(60 - i64::from(t.minute()));
             } else if has(self.minutes, t.minute()) {
                 return Some(t);
             } else {
@@ -149,9 +151,16 @@ fn has(mask: u64, value: u32) -> bool {
     mask & (1 << value) != 0
 }
 
-fn local_midnight(year: i32, month: u32, day: u32) -> Option<DateTime<Local>> {
-    use chrono::TimeZone;
-    Local.with_ymd_and_hms(year, month, day, 0, 0, 0).earliest()
+fn local_midnight<Tz: chrono::TimeZone>(zone: &Tz, year: i32, month: u32, day: u32) -> Option<DateTime<Tz>> {
+    let mut date = chrono::NaiveDate::from_ymd_opt(year,month,day)?;
+    // A few zones advance at midnight, or skip a whole civil date.
+    for _ in 0..3 {
+        for minute in 0..1440 {
+            if let Some(at) = zone.from_local_datetime(&date.and_hms_opt(minute / 60,minute % 60,0)?).earliest() { return Some(at); }
+        }
+        date=date.succ_opt()?;
+    }
+    None
 }
 
 #[cfg(test)]

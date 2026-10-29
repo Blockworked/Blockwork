@@ -3,6 +3,8 @@
 //! instruction. Built on `arboard`, which abstracts Windows/macOS/X11/Wayland
 //! itself, so (like `battery.rs`) there's no per-platform branching here.
 
+#[cfg(not(target_os = "android"))]
+mod desktop {
 /// Current clipboard contents as UTF-8 text. Errs if the clipboard is
 /// unavailable or holds no text (e.g. an image or file list with no text
 /// fallback).
@@ -31,3 +33,23 @@ pub fn has_file_list() -> bool {
     let Ok(mut clipboard) = arboard::Clipboard::new() else { return false };
     matches!(clipboard.get().file_list(), Ok(paths) if !paths.is_empty())
 }
+
+}
+
+#[cfg(not(target_os = "android"))]
+pub use desktop::*;
+
+#[cfg(target_os = "android")]
+mod android {
+    pub fn get_text() -> Result<String, String> {
+        Err("global clipboard access is unavailable on Android".into())
+    }
+    pub fn set_text(_: String) -> Result<(), String> {
+        Err("clipboard writes are not connected to the Android host".into())
+    }
+    pub fn has_image() -> bool { false }
+    pub fn has_file_list() -> bool { false }
+}
+
+#[cfg(target_os = "android")]
+pub use android::*;

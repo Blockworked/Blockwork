@@ -68,7 +68,7 @@
       "y": 200
     }
   ],
-  "format_version": 3,
+  "format_version": 7,
   "id": "baseline-macro",
   "lists": [
     {
@@ -94,6 +94,7 @@
     "active_days": 0,
     "active_hours": null,
     "always_listen": false,
+    "android_exact_time": false,
     "catch_up_missed": false,
     "max_loop_iterations": 0,
     "max_run_secs": 0,

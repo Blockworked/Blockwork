@@ -96,6 +96,14 @@ jobs:
             libclang-dev \
             libgl-dev
 
+      - name: Editor mouse, touch and phone layout checks
+        run: |
+          export PATH="$(dirname "$QMAKE"):$PATH"
+          python3 scripts/android-deps.py > "$RUNNER_TEMP/qml-deps-paths.txt"
+          mapfile -t deps < "$RUNNER_TEMP/qml-deps-paths.txt"
+          "${deps[0]}/tests/qml/run.sh"
+          python3 blockwork-qt/tests/run.py "${deps[0]}"
+
       - name: Clippy
         run: cargo clippy --workspace --all-targets
 
@@ -118,7 +126,7 @@ jobs:
         run: |
           git init ../blockstitch
           git -C ../blockstitch remote add origin https://github.com/Blockworked/blockstitch.git
-          git -C ../blockstitch fetch --depth 1 origin c6276edfae0f3187e796f3b385f27befb8d2602c
+          git -C ../blockstitch fetch --depth 1 origin 26ad841108537238494441bf3d5fe0fad84586c1
           git -C ../blockstitch checkout --detach FETCH_HEAD
       - uses: actions/setup-python@v5
         with:

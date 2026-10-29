@@ -10,6 +10,14 @@ use serde::{Deserialize, Serialize};
 /// `Display`/`FromStr` string form, which is what the frontend sends.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FieldId {
+    AndroidPackage,
+    ElementText,
+    ElementTimeout,
+    TouchX,
+    TouchY,
+    TouchEndX,
+    TouchEndY,
+    TouchDuration,
     WaitDuration,
     MoveMouseX,
     MoveMouseY,
@@ -116,6 +124,14 @@ impl FieldId {
 impl std::fmt::Display for FieldId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
+            FieldId::AndroidPackage => write!(f, "AndroidPackage"),
+            FieldId::ElementText => write!(f, "ElementText"),
+            FieldId::ElementTimeout => write!(f, "ElementTimeout"),
+            FieldId::TouchX => write!(f, "TouchX"),
+            FieldId::TouchY => write!(f, "TouchY"),
+            FieldId::TouchEndX => write!(f, "TouchEndX"),
+            FieldId::TouchEndY => write!(f, "TouchEndY"),
+            FieldId::TouchDuration => write!(f, "TouchDuration"),
             FieldId::WaitDuration => write!(f, "WaitDuration"),
             FieldId::MoveMouseX => write!(f, "MoveMouseX"),
             FieldId::MoveMouseY => write!(f, "MoveMouseY"),
@@ -202,6 +218,14 @@ impl std::str::FromStr for FieldId {
     type Err = String;
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         match s {
+            "AndroidPackage" => Ok(FieldId::AndroidPackage),
+            "ElementText" => Ok(FieldId::ElementText),
+            "ElementTimeout" => Ok(FieldId::ElementTimeout),
+            "TouchX" => Ok(FieldId::TouchX),
+            "TouchY" => Ok(FieldId::TouchY),
+            "TouchEndX" => Ok(FieldId::TouchEndX),
+            "TouchEndY" => Ok(FieldId::TouchEndY),
+            "TouchDuration" => Ok(FieldId::TouchDuration),
             "WaitDuration" => Ok(FieldId::WaitDuration),
             "MoveMouseX" => Ok(FieldId::MoveMouseX),
             "MoveMouseY" => Ok(FieldId::MoveMouseY),
@@ -291,6 +315,14 @@ impl std::str::FromStr for FieldId {
 /// Locates the value tree a [`FieldId`] names on a given instruction.
 pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Option<&mut Value> {
     match (kind, field) {
+        (InstructionKind::LaunchAndroidApp { package }, FieldId::AndroidPackage) => Some(package),
+        (InstructionKind::Element { text, .. }, FieldId::ElementText) => Some(text),
+        (InstructionKind::Element { timeout, .. }, FieldId::ElementTimeout) => Some(timeout),
+        (InstructionKind::Touch { x, .. }, FieldId::TouchX) => Some(x),
+        (InstructionKind::Touch { y, .. }, FieldId::TouchY) => Some(y),
+        (InstructionKind::Touch { end_x, .. }, FieldId::TouchEndX) => Some(end_x),
+        (InstructionKind::Touch { end_y, .. }, FieldId::TouchEndY) => Some(end_y),
+        (InstructionKind::Touch { duration, .. }, FieldId::TouchDuration) => Some(duration),
         (InstructionKind::Wait(d), FieldId::WaitDuration) => Some(d),
         (InstructionKind::Token(InputToken::MoveMouse(x, _, _)), FieldId::MoveMouseX) => Some(x),
         (InstructionKind::Token(InputToken::MoveMouse(_, y, _)), FieldId::MoveMouseY) => Some(y),

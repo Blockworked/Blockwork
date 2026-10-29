@@ -42,3 +42,5 @@ AppDir/
 blockwork-qt/qml/Lucide/
 
 *.log
+# Python validation runner caches.
+__pycache__/

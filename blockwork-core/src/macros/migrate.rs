@@ -6,11 +6,12 @@ use crate::macros::{Instruction, Macro};
 use serde_json::{json, Map, Value};
 
 /// The version this build writes; 1 is the format 0.6.0 first had, 2 split
-/// run command into one that waits and one that doesn't. Version 3 adds pack state. Bump it
-/// with a new step in [`STEPS`] (a no-op one when old files load as they are)
-/// whenever a release adds block kinds or changes their fields, so an older
-/// Blockwork says the file is too new instead of turning blocks into notes.
-pub const FORMAT_VERSION: u64 = 3;
+/// run command into one that waits and one that doesn't. Android versions 3–6
+/// added touch, elements, foreground apps and exact-time settings. Master also
+/// introduced pack state at version 3; its ownership migration runs in Macro's
+/// deserializer. Version 7 combines those formats and preserves pack metadata,
+/// so Android builds that only understand version 6 reject these newer files.
+pub const FORMAT_VERSION: u64 = 7;
 const VERSION_KEY: &str = "format_version";
 
 /// What loading had to change.
@@ -32,10 +33,14 @@ impl Upgrade {
 type Step = fn(&mut Value, &mut Vec<String>);
 
 /// `STEPS[n]` upgrades version `n` to `n + 1`.
-const STEPS: [Step; FORMAT_VERSION as usize] = [v0_old_window_blocks, v1_run_command_waits, v2_pack_state];
+const STEPS: [Step; FORMAT_VERSION as usize] = [v0_old_window_blocks, v1_run_command_waits, v2_android_touch, v3_android_elements, v4_android_apps, v5_android_alarms, v6_pack_state];
 
-// Pack ownership is migrated by Macro's deserializer.
-fn v2_pack_state(_: &mut Value, _: &mut Vec<String>) {}
+// Pack ownership is migrated by Macro's deserializer, including master v3 files.
+fn v6_pack_state(_: &mut Value, _: &mut Vec<String>) {}
+fn v5_android_alarms(_: &mut Value, _: &mut Vec<String>) {}
+fn v4_android_apps(_: &mut Value, _: &mut Vec<String>) {}
+fn v3_android_elements(_: &mut Value, _: &mut Vec<String>) {}
+fn v2_android_touch(_: &mut Value, _: &mut Vec<String>) {}
 
 pub fn parse(text: &str) -> Result<(Macro, Upgrade), String> {
     from_value(serde_json::from_str(text).map_err(|e| format!("not a macro file: {e}"))?)
@@ -239,6 +244,35 @@ mod tests {
         let (back, upgrade) = from_value(value).unwrap();
         assert_eq!(back, mac);
         assert!(!upgrade.changed());
+    }
+
+    #[test]
+    fn master_v3_and_android_v6_preserve_pack_metadata_and_touch() {
+        use crate::block_packs::{PackExport, PackInfo};
+        use crate::input::touch::TouchAction;
+        use crate::input::value::Value as InputValue;
+        let touch = Instruction::new(InstructionKind::Touch {
+            action: TouchAction::Tap,
+            x: InputValue::Number { value: 10.0 }, y: InputValue::Number { value: 20.0 },
+            end_x: InputValue::Number { value: 10.0 }, end_y: InputValue::Number { value: 20.0 },
+            duration: InputValue::Number { value: 80.0 },
+        });
+        let mut mac = Macro::new("Rebase compatibility".into(), String::new(), vec![touch]);
+        mac.settings.android_exact_time = true;
+        mac.settings.pack_exports.push(PackExport {
+            info: PackInfo { id: "fixture-pack".into(), name: "Fixture pack".into(), ..Default::default() },
+            block_ids: Vec::new(), variable_roles: Vec::new(),
+        });
+        for version in [3, 6] {
+            let mut value = to_value(&mac).unwrap();
+            value[VERSION_KEY] = json!(version);
+            let (back, upgrade) = from_value(value).unwrap();
+            assert_eq!(upgrade.from, version);
+            assert!(upgrade.changed());
+            assert!(upgrade.notes.is_empty());
+            assert_eq!(back, mac);
+            assert_eq!(to_value(&back).unwrap()[VERSION_KEY], 7);
+        }
     }
 
     #[test]

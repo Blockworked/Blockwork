@@ -43,8 +43,6 @@ rand.workspace = true
 tokio = { workspace = true, optional = true }
 spin_sleep = { workspace = true, optional = true }
 bincode = { workspace = true, optional = true }
-starship-battery = { workspace = true, optional = true }
-arboard = { workspace = true, optional = true }
 chrono.workspace = true
 # HTTP blocks (see src/http.rs).
 ureq = { workspace = true, optional = true }
@@ -56,6 +54,10 @@ regex.workspace = true
 tract-onnx = { version = "0.23.9", optional = true }
 # Pins downloaded model files.
 sha2 = "0.10.9"
+
+[target.'cfg(not(target_os = "android"))'.dependencies]
+starship-battery = { workspace = true, optional = true }
+arboard = { workspace = true, optional = true }
 
 [target.'cfg(unix)'.dependencies]
 libc = { workspace = true, optional = true }

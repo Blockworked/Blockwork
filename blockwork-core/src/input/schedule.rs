@@ -3,7 +3,9 @@
 //! background time watcher (e.g. blockwork-app's `time_watch` module), the same way `InstructionKind::WhenBatteryDischargedTo`/
 //! `WhenBatteryChargedTo` back the battery watcher.
 
-use chrono::{DateTime, Datelike, Local, Timelike};
+use chrono::{DateTime, Datelike, Timelike};
+#[cfg(test)]
+use chrono::Local;
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -65,7 +67,7 @@ impl TimeSchedule {
     /// Doesn't know or care whether it already *has* fired for this exact
     /// occurrence; callers (the time watcher) dedup that themselves so a
     /// schedule fires once per matching minute, not once per poll tick within it.
-    pub fn matches(&self, now: &DateTime<Local>, hour: u8, minute: u8) -> bool {
+    pub fn matches<Tz: chrono::TimeZone>(&self, now: &DateTime<Tz>, hour: u8, minute: u8) -> bool {
         if now.hour() as u8 != hour || now.minute() as u8 != minute {
             return false;
         }

@@ -10,6 +10,16 @@ pub use blockstitch_core::value::*;
 #[cfg(feature = "system")]
 static OPERATORS: &[ExtOperator] = &[
     ExtOperator {
+        kind: "AndroidElementExists", op: "AndroidElementExists", arity: 5,
+        default_args: || vec![Value::text(""), Value::text(""), Value::text(""), Value::text(""), Value::text("")],
+        eval: |args| element_report(args, crate::input::element::ElementAction::Exists),
+    },
+    ExtOperator {
+        kind: "AndroidElementText", op: "AndroidElementText", arity: 5,
+        default_args: || vec![Value::text(""), Value::text(""), Value::text(""), Value::text(""), Value::text("")],
+        eval: |args| element_report(args, crate::input::element::ElementAction::ReadText),
+    },
+    ExtOperator {
         kind: "BatteryPercentage",
         op: "BatteryPercentage",
         arity: 0,
@@ -575,5 +585,16 @@ mod tests {
             // missing-operator error.
             Err(e) => assert!(!e.contains("unknown operator"), "{e}"),
         }
+    }
+}
+
+#[cfg(feature = "system")]
+fn element_report(args: &[Evaluated], action: crate::input::element::ElementAction) -> Result<Evaluated, String> {
+    crate::permissions::require("screen")?;
+    let selector = crate::input::element::ElementSelector { package: args[0].as_text(), resource_id: args[1].as_text(), text: args[2].as_text(), description: args[3].as_text(), class: args[4].as_text() };
+    match crate::input::element::query(&selector, action)? {
+        serde_json::Value::Bool(value) => Ok(Evaluated::Bool(value)),
+        serde_json::Value::String(value) => Ok(Evaluated::Text(value)),
+        _ => Err("invalid accessibility reporter response".into()),
     }
 }

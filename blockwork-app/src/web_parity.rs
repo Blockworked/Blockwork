@@ -17,7 +17,7 @@ fn backend() -> Backend {
     let settings = blockwork_core::config::AppSettings::default();
     let state = initial_state(&settings, None, true, false);
     let (events, _) = broadcast::channel(16);
-    Backend { state: Arc::new(Mutex::new(state)), app: AppHandle { events } }
+    Backend { state: Arc::new(Mutex::new(state)), app: AppHandle { events }, foreground: Arc::new(Mutex::new(Default::default())), alarms: Arc::new(Mutex::new(Default::default())) }
 }
 
 fn is_id(text: &str) -> bool {

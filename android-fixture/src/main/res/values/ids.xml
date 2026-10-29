@@ -1,0 +1,16 @@
+<resources>
+    <item name="status" type="id"/>
+    <item name="input" type="id"/>
+    <item name="password" type="id"/>
+    <item name="click_target" type="id"/>
+    <item name="long_target" type="id"/>
+    <item name="duplicate_target" type="id"/>
+    <item name="changing_target" type="id"/>
+    <item name="replace_target" type="id"/>
+    <item name="show_delayed" type="id"/>
+    <item name="delayed_label" type="id"/>
+    <item name="scroll_panel" type="id"/>
+    <item name="scroll_end" type="id"/>
+    <item name="gesture_area" type="id"/>
+    <item name="focus_middle" type="id"/>
+</resources>

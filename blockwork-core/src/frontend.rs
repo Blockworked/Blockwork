@@ -3,6 +3,8 @@
 //! website's in-browser editor both speak exactly this, so it lives with the
 //! vocabulary rather than in either host.
 
+use crate::input::touch::TouchAction;
+use crate::input::element::{ElementAction, ElementSelector};
 use crate::block_packs;
 use crate::input::schedule::TimeSchedule;
 use crate::input::types::{Axis, Coordinate, Direction, InputToken};
@@ -125,6 +127,8 @@ pub struct MacroSettingsDto {
     pub active_days: u8,
     pub folder: String,
     pub catch_up_missed: bool,
+    #[serde(default)]
+    pub android_exact_time: bool,
 }
 
 pub fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
@@ -141,6 +145,7 @@ pub fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
         active_days: settings.active_days,
         folder: settings.folder.clone(),
         catch_up_missed: settings.catch_up_missed,
+        android_exact_time: settings.android_exact_time,
     }
 }
 
@@ -189,6 +194,10 @@ pub fn dto_to_fragment(dto: &FragmentDto) -> Option<Fragment<InstructionKind>> {
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "type")]
 pub enum InstructionDto {
+    WhenForegroundApp { id: String, package: String, entered: bool },
+    LaunchAndroidApp { id: String, package: Value },
+    Element { id: String, action: ElementAction, selector: ElementSelector, text: Value, timeout: Value, variable: String },
+    Touch { id: String, action: TouchAction, x: Value, y: Value, end_x: Value, end_y: Value, duration: Value },
     Wait {
         id: String,
         duration: Value,
@@ -717,6 +726,14 @@ fn match_by_title() -> String {
 pub fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
     let id = ins.id.clone();
     match &ins.kind {
+        InstructionKind::WhenForegroundApp { package, entered } => InstructionDto::WhenForegroundApp { id, package: package.clone(), entered: *entered },
+        InstructionKind::LaunchAndroidApp { package } => InstructionDto::LaunchAndroidApp { id, package: package.clone() },
+        InstructionKind::Element { action, selector, text, timeout, variable } => InstructionDto::Element {
+            id, action: *action, selector: selector.clone(), text: text.clone(), timeout: timeout.clone(), variable: variable.clone(),
+        },
+        InstructionKind::Touch { action, x, y, end_x, end_y, duration } => InstructionDto::Touch {
+            id, action: *action, x: x.clone(), y: y.clone(), end_x: end_x.clone(), end_y: end_y.clone(), duration: duration.clone(),
+        },
         InstructionKind::Wait(dur) => InstructionDto::Wait {
             id,
             duration: dur.clone(),
@@ -1127,6 +1144,13 @@ pub fn instruction_to_dto(ins: &Instruction) -> InstructionDto {
 pub fn dto_to_instruction(dto: &InstructionDto) -> Option<Instruction> {
     use crate::input::index_to_mouse_button;
     let (id, kind) = match dto {
+        InstructionDto::WhenForegroundApp { id, package, entered } => (id, InstructionKind::WhenForegroundApp { package: package.clone(), entered: *entered }),
+        InstructionDto::LaunchAndroidApp { id, package } => (id, InstructionKind::LaunchAndroidApp { package: package.clone() }),
+        InstructionDto::Element { id, action, selector, text, timeout, variable } => (id, InstructionKind::Element {
+            action: *action, selector: selector.clone(), text: text.clone(), timeout: timeout.clone(), variable: variable.clone(),
+        }),
+        InstructionDto::Touch { id, action, x, y, end_x, end_y, duration } => (id,
+            InstructionKind::Touch { action: *action, x: x.clone(), y: y.clone(), end_x: end_x.clone(), end_y: end_y.clone(), duration: duration.clone() }),
         InstructionDto::Wait { id, duration } => {
             (id, InstructionKind::Wait(duration.clone()))
         }
