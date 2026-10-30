@@ -69,8 +69,11 @@ Item {
                 for (const width of [600, 900, 1700]) {
                     page.width = width;
                     wait(30);
-                    const rows = descendants(page).filter(o => o.stacked !== undefined && o.visible);
-                    verify(rows.length > 0);
+                    let rows = [];
+                    tryVerify(() => {
+                        rows = descendants(page).filter(o => o.stacked !== undefined && o.visible);
+                        return rows.length > 0 && rows.every(row => row.width > 0 && row.height >= 28);
+                    }, 5000, "Settings rows must finish layout for tab " + tab + " at width " + width);
                     for (const row of rows) {
                         verify(row.width > 0);
                         verify(row.height >= 28);

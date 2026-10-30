@@ -65,11 +65,27 @@ Item {
         function paletteBlock(page, type) {
             let block = null;
             tryVerify(() => {
+                // A category/registry refresh can replace delegates while the
+                // ScrollView is polishing. Reacquire the live visible entry.
                 block = all(page).find(o => o.spec && o.spec.kind === "instruction" && o.spec.type === type && o.visible && o.width > 0);
-                return !!block;
-            }, 5000, type);
-            for (let p = block ? block.parent : null; p; p = p.parent)
-                if (p.contentY !== undefined && p.flickableDirection !== undefined) { p.contentY += block.mapToItem(p, 0, 0).y - 100; wait(20); break; }
+                if (!block) return false;
+                for (let parent = block.parent; parent; parent = parent.parent) {
+                    const view = parent.contentY !== undefined && parent.flickableDirection !== undefined ? parent
+                        : parent.contentItem && parent.contentItem.contentY !== undefined && parent.contentItem.flickableDirection !== undefined ? parent.contentItem : null;
+                    if (!view) continue;
+                    if (view.height <= 0 || view.contentHeight <= 0) return false;
+                    const at = block.mapToItem(view, 12, block.height / 2);
+                    if (at.y < 0 || at.y >= view.height) {
+                        const origin = view.originY || 0;
+                        const limit = origin + Math.max(0, view.contentHeight - view.height);
+                        view.contentY = Math.max(origin, Math.min(limit, view.contentY + at.y - 100));
+                        return false;
+                    }
+                    const point = block.mapToItem(scene, 12, block.height / 2);
+                    return point.x >= 0 && point.x < scene.width && point.y >= 0 && point.y < scene.height;
+                }
+                return false;
+            }, 5000, type + " must be visible in the palette viewport before interaction");
             return block;
         }
         function canvasBlock(page, id) { return all(page).find(o => o.instruction && o.instruction.id === id && o.paletteMode === false && o.width > 0); }
@@ -153,10 +169,14 @@ Item {
             const source = paletteBlock(page, type);
             verify(!!source, type);
             const start = source.mapToItem(scene, 12, source.height / 2);
+            // Real pointer movement leaves the category rail before pressing;
+            // a synthetic teleporting press can leave its hover timer armed.
+            mouseMove(scene, start.x, start.y, 20, Qt.NoButton);
             mousePress(scene, start.x, start.y);
-            mouseMove(scene, start.x + 30, start.y + 10, 20);
-            mouseMove(scene, x, y, 20);
-            mouseMove(scene, x + 1, y + 1, 20);
+            mouseMove(scene, start.x + 30, start.y + 10, 20, Qt.LeftButton);
+            tryVerify(() => page.paletteDrags.active, 5000, "Palette press must become a real drag before dropping");
+            mouseMove(scene, x, y, 20, Qt.LeftButton);
+            mouseMove(scene, x + 1, y + 1, 20, Qt.LeftButton);
             mouseRelease(scene, x + 1, y + 1);
             wait(20);
         }
@@ -336,8 +356,9 @@ Item {
             const page = editor();
             scene.failCalls = true;
             dragFromPalette(page, "Wait", 900, 650);
-            verify(!page.paletteDrags.holding);
-            compare(bridge.lastError, "Can't put that there");
+            tryCompare(bridge, "lastError", "Can't put that there");
+            compare(scene.calls.filter(c => c.command === "add_strand").length, 1, "The rejected drag must have reached the host");
+            tryCompare(page.paletteDrags, "holding", false);
             bridge.lastError = "";
         }
         function test_recording_countdown_locks_the_canvas() {

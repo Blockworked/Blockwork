@@ -34,7 +34,10 @@ with tempfile.TemporaryDirectory(prefix="blockwork-qml-") as temporary:
     with (prompt_module / "qmldir").open("a") as module_file:
         module_file.write("PromptBridge 1.0 PromptBridge.qml\n")
     shutil.copytree(root / "blockwork-qt/qml/BlockworkStyle", modules / "BlockworkStyle")
-    environment = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "QML_DISABLE_DISK_CACHE": "1"}
+    # Match qt_diagnostics.cpp: the app uses its text-editing style and Basic
+    # fallback, not macOS's non-customizable native controls.
+    environment = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "QML_DISABLE_DISK_CACHE": "1",
+                   "QT_QUICK_CONTROLS_STYLE": "BlockworkStyle", "QT_QUICK_CONTROLS_FALLBACK_STYLE": "Basic"}
     result = subprocess.run([
         str(qtbin / "qmltestrunner"), "-input", str(root / "blockwork-qt/tests"), "-import", str(modules),
         *sys.argv[2:],
