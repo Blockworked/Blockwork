@@ -7,6 +7,7 @@ import shutil
 import subprocess
 import sys
 import tempfile
+import time
 
 root = Path(__file__).resolve().parents[2]
 blockstitch = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root.parent / "blockstitch"
@@ -38,8 +39,25 @@ with tempfile.TemporaryDirectory(prefix="blockwork-qml-") as temporary:
     # fallback, not macOS's non-customizable native controls.
     environment = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "QML_DISABLE_DISK_CACHE": "1",
                    "QT_QUICK_CONTROLS_STYLE": "BlockworkStyle", "QT_QUICK_CONTROLS_FALLBACK_STYLE": "Basic"}
+    started_at = time.time()
     result = subprocess.run([
         str(qtbin / "qmltestrunner"), "-input", str(root / "blockwork-qt/tests"), "-import", str(modules),
         *sys.argv[2:],
     ], env=environment)
+    if sys.platform == "darwin" and os.environ.get("GITHUB_ACTIONS") == "true" and result.returncode < 0:
+        # Preserve only this runner process's new reports, never local-user
+        # diagnostics. macOS can finish writing a crash report after exit.
+        reports_dir = Path.home() / "Library/Logs/DiagnosticReports"
+        destination = root / "target/macos-qml-crashes"
+        deadline = time.monotonic() + 8
+        while True:
+            reports = [report for pattern in ("qmltestrunner*.ips", "qmltestrunner*.crash")
+                       for report in reports_dir.glob(pattern) if report.stat().st_mtime >= started_at]
+            if reports or time.monotonic() >= deadline:
+                break
+            time.sleep(0.2)
+        for report in reports:
+            destination.mkdir(parents=True, exist_ok=True)
+            shutil.copyfile(report, destination / report.name)
+            print(f"Preserved native QML crash report: {report.name}", flush=True)
     sys.exit(result.returncode)

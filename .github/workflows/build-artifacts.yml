@@ -185,6 +185,15 @@ jobs:
         if: runner.os == 'macOS'
         run: ditto -c -k --sequesterRsrc --keepParent dist/Blockwork.app ${{ matrix.artifact_name }}.app.zip
 
+      - name: Preserve native QML crash reports
+        if: failure() && runner.os == 'macOS'
+        uses: actions/upload-artifact@v4
+        with:
+          name: qml-crashes-${{ matrix.name }}
+          path: target/macos-qml-crashes/
+          if-no-files-found: ignore
+          retention-days: 14
+
       - name: Upload macOS app bundle
         if: runner.os == 'macOS'
         uses: actions/upload-artifact@v4

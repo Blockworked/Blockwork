@@ -58,6 +58,11 @@ Item {
             // A new page must not inherit a hover over the previous page's
             // category rail while its delegates are being created.
             mouseMove(scene, scene.width - 2, scene.height - 2, 0, Qt.NoButton);
+            // The app has one editor per engine. These tests recreate it in
+            // the same engine; discard callbacks bound to the destroyed page
+            // before the next page's children evaluate their dropdown models.
+            BlockRegistry.rows = ({});
+            BlockRegistry.resetOperators();
             const page = createTemporaryObject(editorComponent, scene);
             verify(!!page);
             wait(100);
