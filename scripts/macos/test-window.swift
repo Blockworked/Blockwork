@@ -41,6 +41,11 @@ class TestApplication: NSApplication {
     }
 }
 
+class TestWindow: NSWindow {
+    // Keep AX naming stable when AppKit falls back to the bundle name.
+    override func accessibilityTitle() -> String? { return title }
+}
+
 class TestView: NSView {
     override func draw(_ dirtyRect: NSRect) {
         NSColor.black.setFill()
@@ -72,7 +77,7 @@ for (title, action, key) in [("Cut", "cut:", "x"), ("Copy", "copy:", "c"),
 editItem.submenu = editMenu
 menu.addItem(editItem)
 app.mainMenu = menu
-let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 640, height: 400),
+let window = TestWindow(contentRect: NSRect(x: 200, y: 200, width: 640, height: 400),
     styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
 // Keep exact-color fixtures independent of the display backing color space.
 window.colorSpace = .sRGB
