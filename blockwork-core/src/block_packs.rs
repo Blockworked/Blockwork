@@ -113,23 +113,59 @@ pub fn check_editable(mac: &Macro, block_id: &str) -> Result<(), String> {
     Ok(())
 }
 
-/// Public Details ids use the author's name and chosen block name.
-pub fn details_identifier(author: &str, name: &str) -> String {
-    fn part(text: &str) -> String {
-        text.chars().filter(|c| c.is_alphanumeric()).collect()
+/// Separates the author from the block's own name in a Details id, so a
+/// block's own identifier can't contain it.
+pub const ID_SEPARATOR: char = ':';
+
+/// Refuses a block identifier with the author separator in it.
+pub fn check_identifier(identifier: &str) -> Result<(), String> {
+    if identifier.contains(ID_SEPARATOR) {
+        return Err(format!("Block IDs can't contain \"{ID_SEPARATOR}\". Your name is added in front when the block is shared"));
     }
-    let author = part(author);
-    let author = if author.is_empty() { "Community" } else { &author };
-    let prefix = format!("{author}_");
-    let name = name.strip_prefix(&prefix).unwrap_or(name);
-    let name = part(name);
-    format!("{prefix}{}", if name.is_empty() { "Block" } else { &name })
+    Ok(())
 }
 
+fn id_part(text: &str) -> String {
+    text.chars().filter(|c| c.is_alphanumeric()).collect()
+}
+
+/// The block's own name in a Details id: any "Author:" (or older
+/// "Author_") prefix dropped, letters and digits only.
+pub fn bare_identifier(author: &str, name: &str) -> String {
+    let name = name.rsplit(ID_SEPARATOR).next().unwrap_or(name);
+    let author = id_part(author);
+    let name = if author.is_empty() { name } else { name.strip_prefix(&format!("{author}_")).unwrap_or(name) };
+    let name = id_part(name);
+    if name.is_empty() { "Block".into() } else { name }
+}
+
+/// Public Details ids are "Author:BlockName".
+pub fn details_identifier(author: &str, name: &str) -> String {
+    let bare = bare_identifier(author, name);
+    let author = id_part(author);
+    let author = if author.is_empty() { "Community" } else { &author };
+    format!("{author}{ID_SEPARATOR}{bare}")
+}
+
+fn def_name(def: &blockstitch_core::graph::BlockDef) -> String {
+    if def.identifier.is_empty() { block_name(def) } else { def.identifier.clone() }
+}
+
+/// Installed blocks show their author in front of their id.
 fn apply_details(content: &mut Macro, info: &PackInfo) {
     for def in &mut content.graph.block_defs {
-        let name = if def.identifier.is_empty() { block_name(def) } else { def.identifier.clone() };
-        def.identifier = details_identifier(&info.author, &name);
+        def.identifier = details_identifier(&info.author, &def_name(def));
+        if def.description.trim().is_empty() {
+            def.description = info.description.clone();
+        }
+    }
+}
+
+/// A shared file carries bare ids; the library puts the uploader's name in
+/// front, and an install the pack's author.
+fn export_details(content: &mut Macro, info: &PackInfo) {
+    for def in &mut content.graph.block_defs {
+        def.identifier = bare_identifier(&info.author, &def_name(def));
         if def.description.trim().is_empty() {
             def.description = info.description.clone();
         }
@@ -263,7 +299,7 @@ pub fn pack_from_macro(mac: &Macro, block_ids: &[String], info: PackInfo) -> Res
     for def in &content.block_defs {
         crate::macros::BlockDef::validate_input_defaults(&def.pieces)?;
     }
-    apply_details(&mut content, &info);
+    export_details(&mut content, &info);
     Ok(BlockPack { info, content, notes: Vec::new(), variable_roles: Vec::new() })
 }
 
@@ -300,7 +336,7 @@ pub fn slug(text: &str) -> String {
 #[cfg(feature = "system")]
 pub fn write_pack(pack: &BlockPack) -> Result<String, String> {
     let mut content = pack.content.clone();
-    apply_details(&mut content, &pack.info);
+    export_details(&mut content, &pack.info);
     for var in &mut content.graph.variables {
         if let crate::input::value::Evaluated::Text(t) = &mut var.value {
             *t = crate::secrets::redact(t);
@@ -639,7 +675,12 @@ mod tests {
 
         let text = write_pack(&pack).unwrap();
         let read = read_pack(&text).unwrap();
-        assert_eq!(read.content.block_defs, pack.content.block_defs);
+        // The file carries bare ids; reading puts the author in front.
+        assert_eq!(pack.content.block_defs[0].identifier, "inner");
+        assert_eq!(read.content.block_defs[0].identifier, "Community:inner");
+        let bare: Vec<_> = read.content.block_defs.iter()
+            .map(|d| blockstitch_core::graph::BlockDef { identifier: bare_identifier("", &d.identifier), ..d.clone() }).collect();
+        assert_eq!(bare, pack.content.block_defs);
 
         let mut user = Macro::new("User".into(), String::new(), vec![Instruction::new(call(&outer))]);
         let report = merge_into(&mut user, &read, &sha256_hex(text.as_bytes()));
@@ -755,7 +796,7 @@ mod tests {
         merge_into(&mut mac, &pack, "");
         let (saved, _) = migrate::from_value(migrate::to_value(&mac).unwrap()).unwrap();
         let def = saved.block_def(&id).unwrap();
-        assert_eq!(def.identifier, "Community_WaitSeconds");
+        assert_eq!(def.identifier, "Community:WaitSeconds");
         assert_eq!(def.description, author.block_def(&id).unwrap().description);
         let legacy: blockstitch_core::graph::BlockDef = serde_json::from_str(
             r#"{"id":"legacy","pieces":[],"shape":"Normal"}"#
@@ -797,8 +838,15 @@ mod tests {
     #[test]
     #[cfg(feature = "system")]
     fn details_ids_use_author_and_block_name_without_changing_internal_ids() {
-        assert_eq!(details_identifier("Example Author", "WaitSeconds"), "ExampleAuthor_WaitSeconds");
-        assert_eq!(details_identifier("ExampleAuthor", "ExampleAuthor_WaitSeconds"), "ExampleAuthor_WaitSeconds");
+        assert_eq!(details_identifier("Example Author", "WaitSeconds"), "ExampleAuthor:WaitSeconds");
+        // Older packs used an underscore, and the library already prefixes.
+        assert_eq!(details_identifier("ExampleAuthor", "ExampleAuthor_WaitSeconds"), "ExampleAuthor:WaitSeconds");
+        assert_eq!(details_identifier("Example Author", "ExampleAuthor:WaitSeconds"), "ExampleAuthor:WaitSeconds");
+        // Whatever a file puts in front, the pack's own author wins.
+        assert_eq!(details_identifier("Alice", "Mallory:WaitSeconds"), "Alice:WaitSeconds");
+        assert_eq!(bare_identifier("Alice", "Alice_Wait Seconds"), "WaitSeconds");
+        assert!(check_identifier("Alice:Wait").is_err());
+        assert!(check_identifier("Wait").is_ok());
         let mut author = Macro::new("Author".into(), String::new(), vec![]);
         let id = make_block(&mut author, "wait", vec![]);
         author.graph.block_def_mut(&id).unwrap().identifier = "WaitSeconds".into();
@@ -806,9 +854,12 @@ mod tests {
         let pack = pack_from_macro(&author, &[id.clone()], PackInfo {
             name: "Timing".into(), author: "Alice".into(), ..Default::default()
         }).unwrap();
-        let pack = read_pack(&write_pack(&pack).unwrap()).unwrap();
+        // The file carries the bare id; reading it puts the author in front.
+        let text = write_pack(&pack).unwrap();
+        assert!(text.contains("\"identifier\": \"WaitSeconds\""));
+        let pack = read_pack(&text).unwrap();
         let def = pack.content.block_def(&id).unwrap();
-        assert_eq!(def.identifier, "Alice_WaitSeconds");
+        assert_eq!(def.identifier, "Alice:WaitSeconds");
         assert_eq!(def.description, "Author's description");
         assert!(pack.content.block_body(&id).is_some());
     }

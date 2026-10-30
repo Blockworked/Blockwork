@@ -35,9 +35,11 @@ AppDialog {
         editor.submit();
     }
     onOpened: {
-        if (pendingDef)
+        if (pendingDef) {
             editor.load(pendingDef);
-        else
+            // ":" separates the sharer's name, so an older id can't keep one.
+            editor.blockIdentifier = editor.blockIdentifier.replace(/:/g, "");
+        } else
             editor.reset();
         editor.focusFirst();
     }
@@ -51,7 +53,9 @@ AppDialog {
         id: editor
         detailsTitle: qsTr("Publishing")
         detailsIcon: "upload"
-        detailsNote: qsTr("Details shown when sharing this block in a community pack.")
+        detailsNote: qsTr("Details shown when sharing this block in a community pack. Your name is added in front of the identifier when you share it, like YourName:BlockName.")
+        identifierPlaceholder: qsTr("BlockName")
+        identifierValidator: RegularExpressionValidator { regularExpression: /[^:]*/ }
         textMenu: Component { Editing.TextEditingMenu {} }
         onCreateRequested: draft => {
             root.createRequested(draft.pieces, draft.shape, draft.color, draft.icon, draft.identifier, draft.description);

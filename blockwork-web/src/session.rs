@@ -648,6 +648,7 @@ impl Demo {
                     (opt(a, "icon")?, opt(a, "identifier")?, opt(a, "description")?);
                 let position = arg::<Option<i32>>(a, "x")?.zip(arg::<Option<i32>>(a, "y")?);
                 BlockDef::validate_pieces(&pieces)?;
+                block_packs::check_identifier(&identifier)?;
                 self.open()?;
                 self.push_undo();
                 let mac = self.open_mut().ok_or("No macro selected")?;
@@ -665,6 +666,7 @@ impl Demo {
                     (opt(a, "icon")?, opt(a, "identifier")?, opt(a, "description")?);
                 block_packs::check_editable(self.open()?, &block_id)?;
                 BlockDef::validate_pieces(&pieces)?;
+                block_packs::check_identifier(&identifier)?;
                 block_color(&color)?;
                 self.push_undo();
                 let mac = self.open_mut().ok_or("No macro selected")?;

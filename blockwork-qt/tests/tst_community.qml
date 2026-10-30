@@ -116,7 +116,9 @@ Item {
             const identifier = named(publishing, "detailsIdentifier");
             identifier.forceActiveFocus();
             keyClick(Qt.Key_X);
-            compare(identifier.text, "x");
+            keyClick(Qt.Key_Colon, Qt.ShiftModifier);
+            keyClick(Qt.Key_Y);
+            compare(identifier.text, "xy");
             let saved = null;
             dialog.editRequested.connect((id, pieces) => { saved = pieces; });
             dialog.submit();
@@ -137,14 +139,14 @@ Item {
         }
         function test_details_round_trip_and_unknown_keys_survive() {
             const dialog = createTemporaryObject(blockDialogComponent, scene);
-            const definition = {id:"kept",shape:"ReturnsBool",color:"#FF6680",icon:"rocket",identifier:"Alice_Kept",description:"Keeps things",pieces:[
+            const definition = {id:"kept",shape:"ReturnsBool",color:"#FF6680",icon:"rocket",identifier:"Alice:Kept",description:"Keeps things",pieces:[
                 {kind:"Label",id:"l",text:"kept",future:"label data"},
                 {kind:"Input",id:"x",name:"x",value_type:"Any",default_value:{kind:"Number",value:2},future:{a:1}},
                 {kind:"Branch",id:"b",name:"body"}
             ]};
             dialog.openForEdit(definition);
             tryCompare(dialog, "opened", true);
-            compare(named(dialog, "detailsIdentifier").text, "Alice_Kept");
+            compare(named(dialog, "detailsIdentifier").text, "AliceKept");
             let saved = null;
             dialog.editRequested.connect((id, pieces, shape, color, icon, identifier, description) => {
                 saved = {id: id, pieces: pieces, shape: shape, color: color, icon: icon, identifier: identifier, description: description};
@@ -155,7 +157,7 @@ Item {
             compare(saved.shape, "ReturnsBool");
             compare(saved.color, "#FF6680");
             compare(saved.icon, "rocket");
-            compare(saved.identifier, "Alice_Kept");
+            compare(saved.identifier, "AliceKept");
             compare(saved.description, "Keeps things");
             compare(saved.pieces.map(p => p.id).join(","), "l,x,b");
             compare(saved.pieces[0].future, "label data");

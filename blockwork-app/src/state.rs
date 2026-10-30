@@ -604,7 +604,7 @@ mod tests {
         assert_eq!(dto.strands.len(), 1);
         assert!(dto.comments.is_empty());
         assert!(dto.block_defs[0].read_only);
-        assert_eq!(dto.block_defs[0].definition.identifier, "Alice_Wait");
+        assert_eq!(dto.block_defs[0].definition.identifier, "Alice:Wait");
         assert_eq!(dto.block_defs[0].definition.description, "Waits for an interval.");
         let json = serde_json::to_value(&dto).unwrap();
         assert_eq!(json["block_defs"][0]["id"], id);

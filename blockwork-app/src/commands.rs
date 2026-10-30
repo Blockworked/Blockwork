@@ -846,6 +846,7 @@ pub(crate) fn create_block(
 ) -> Result<String, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     BlockDef::validate_pieces(&pieces)?;
+    blockwork_core::block_packs::check_identifier(&identifier)?;
     let color = normalize_block_color(&color)?;
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
@@ -878,6 +879,7 @@ pub(crate) fn edit_block(
     // `update_block` re-checks both; doing it first keeps a rejected edit
     // from leaving a useless undo step.
     BlockDef::validate_pieces(&pieces)?;
+    blockwork_core::block_packs::check_identifier(&identifier)?;
     normalize_block_color(&color)?;
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;

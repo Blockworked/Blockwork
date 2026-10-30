@@ -489,7 +489,7 @@ dependencies = [
 [[package]]
 name = "blockstitch-core"
 version = "0.1.0"
-source = "git+https://github.com/Blockworked/blockstitch?rev=88e0bb30b1272a8d32c7add97669d1cd56d1f511#88e0bb30b1272a8d32c7add97669d1cd56d1f511"
+source = "git+https://github.com/Blockworked/blockstitch?rev=6e9edd7290a0a85c17e93f59546908c9c1747b12#6e9edd7290a0a85c17e93f59546908c9c1747b12"
 dependencies = [
  "chrono",
  "rand 0.10.3",
@@ -501,7 +501,7 @@ dependencies = [
 [[package]]
 name = "blockstitch-ffi"
 version = "0.1.0"
-source = "git+https://github.com/Blockworked/blockstitch?rev=88e0bb30b1272a8d32c7add97669d1cd56d1f511#88e0bb30b1272a8d32c7add97669d1cd56d1f511"
+source = "git+https://github.com/Blockworked/blockstitch?rev=6e9edd7290a0a85c17e93f59546908c9c1747b12#6e9edd7290a0a85c17e93f59546908c9c1747b12"
 dependencies = [
  "blockstitch-core",
  "serde",
@@ -511,7 +511,7 @@ dependencies = [
 [[package]]
 name = "blockstitch-qml"
 version = "0.1.0"
-source = "git+https://github.com/Blockworked/blockstitch?rev=88e0bb30b1272a8d32c7add97669d1cd56d1f511#88e0bb30b1272a8d32c7add97669d1cd56d1f511"
+source = "git+https://github.com/Blockworked/blockstitch?rev=6e9edd7290a0a85c17e93f59546908c9c1747b12#6e9edd7290a0a85c17e93f59546908c9c1747b12"
 dependencies = [
  "cxx-qt",
  "cxx-qt-build",
