@@ -15,7 +15,7 @@
 <context>
     <name>BlockCanvas</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1746"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1750"/>
         <source>%n item(s)</source>
         <translation>
             <numerusform>%n item</numerusform>
@@ -23,7 +23,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1869"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1873"/>
         <source>%n entry(s)</source>
         <translation>
             <numerusform>%n entry</numerusform>
@@ -34,7 +34,7 @@
 <context>
     <name>BlockLibrary</name>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="345"/>
+        <location filename="../qml/BlockLibrary.qml" line="288"/>
         <source>Replaces %n existing block definition(s). Blocks that use them keep working.</source>
         <translation>
             <numerusform>Replaces %n existing block definition. Blocks that use it keep working.</numerusform>
@@ -42,11 +42,11 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/BlockLibrary.qml" line="569"/>
-        <source>Saved %n block(s). Others can add them with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</source>
+        <location filename="../qml/BlockLibrary.qml" line="583"/>
+        <source>Saved %n block(s). Others can add them with My Blocks &gt; Browse &gt; From file, or you can send the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</source>
         <translation>
-            <numerusform>Saved %n block. Others can add it with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</numerusform>
-            <numerusform>Saved %n blocks. Others can add them with My Blocks &gt; Browse &gt; From file, or you can submit the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</numerusform>
+            <numerusform>Saved %n block. Others can add them with My Blocks &gt; Browse &gt; From file, or you can send the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</numerusform>
+            <numerusform>Saved %n blocks. Others can add them with My Blocks &gt; Browse &gt; From file, or you can send the pack to the community library, where it&apos;s reviewed before it&apos;s listed.</numerusform>
         </translation>
     </message>
 </context>
@@ -69,7 +69,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="1416"/>
+        <location filename="../qml/EditorPage.qml" line="1429"/>
         <source>%n second(s)</source>
         <translation>
             <numerusform>%n second</numerusform>
@@ -80,7 +80,7 @@
 <context>
     <name>MacroFiles</name>
     <message numerus="yes">
-        <location filename="../qml/MacroFiles.qml" line="105"/>
+        <location filename="../qml/MacroFiles.qml" line="170"/>
         <source>Exported %n macro(s), including any macros they run.</source>
         <translation>
             <numerusform>Exported %n macro, including any macros it runs.</numerusform>
@@ -88,7 +88,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/MacroFiles.qml" line="146"/>
+        <location filename="../qml/MacroFiles.qml" line="211"/>
         <source>This bundle has %n macro(s): %1.</source>
         <translation>
             <numerusform>This bundle has %n macro: %1.</numerusform>
@@ -137,7 +137,7 @@
 <context>
     <name>SettingsPage</name>
     <message numerus="yes">
-        <location filename="../qml/SettingsPage.qml" line="330"/>
+        <location filename="../qml/SettingsPage.qml" line="336"/>
         <source>%n pack(s)</source>
         <translation>
             <numerusform>%n pack</numerusform>

@@ -456,6 +456,12 @@ dependencies = [
 ]
 
 [[package]]
+name = "block"
+version = "0.1.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0d8c1fef690941d3e7788d328517591fecc684c084084702d6ff1641e993699a"
+
+[[package]]
 name = "block-buffer"
 version = "0.10.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -489,7 +495,7 @@ dependencies = [
 [[package]]
 name = "blockstitch-core"
 version = "0.1.0"
-source = "git+https://github.com/Blockworked/blockstitch?rev=0bfc7874bc864024e15ea43cd6aace34b9027d85#0bfc7874bc864024e15ea43cd6aace34b9027d85"
+source = "git+https://github.com/Blockworked/blockstitch?rev=af6587a88b3afd2221f4baae23a06e3f4978d6da#af6587a88b3afd2221f4baae23a06e3f4978d6da"
 dependencies = [
  "chrono",
  "rand 0.10.3",
@@ -501,7 +507,7 @@ dependencies = [
 [[package]]
 name = "blockstitch-ffi"
 version = "0.1.0"
-source = "git+https://github.com/Blockworked/blockstitch?rev=0bfc7874bc864024e15ea43cd6aace34b9027d85#0bfc7874bc864024e15ea43cd6aace34b9027d85"
+source = "git+https://github.com/Blockworked/blockstitch?rev=af6587a88b3afd2221f4baae23a06e3f4978d6da#af6587a88b3afd2221f4baae23a06e3f4978d6da"
 dependencies = [
  "blockstitch-core",
  "serde",
@@ -511,7 +517,7 @@ dependencies = [
 [[package]]
 name = "blockstitch-qml"
 version = "0.1.0"
-source = "git+https://github.com/Blockworked/blockstitch?rev=0bfc7874bc864024e15ea43cd6aace34b9027d85#0bfc7874bc864024e15ea43cd6aace34b9027d85"
+source = "git+https://github.com/Blockworked/blockstitch?rev=af6587a88b3afd2221f4baae23a06e3f4978d6da#af6587a88b3afd2221f4baae23a06e3f4978d6da"
 dependencies = [
  "cxx-qt",
  "cxx-qt-build",
@@ -556,6 +562,8 @@ dependencies = [
  "foreign-types",
  "http",
  "libc",
+ "objc2",
+ "objc2-app-kit",
  "png",
  "rand 0.10.3",
  "regex",
@@ -569,6 +577,7 @@ dependencies = [
  "tokio",
  "tracing",
  "tract-cuda",
+ "tract-metal",
  "tract-onnx",
  "ureq",
  "uuid",
@@ -2719,6 +2728,15 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "dae608c151f68243f2b000364e1f7b186d9c29845f7d2d85bd31b9ad77ad552b"
 
 [[package]]
+name = "malloc_buf"
+version = "0.0.6"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "62bb907fe88d54d8d9ce32a3cceab4218ed2f6b7d35617cafe9adf84e43919cb"
+dependencies = [
+ "libc",
+]
+
+[[package]]
 name = "maplit"
 version = "1.0.2"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2762,6 +2780,21 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "488016bfae457b036d996092f6cb448677611ce4449e970ceaf42695203f218a"
 dependencies = [
  "autocfg",
+]
+
+[[package]]
+name = "metal"
+version = "0.33.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "c7047791b5bc903b8cd963014b355f71dc9864a9a0b727057676c1dcae5cbc15"
+dependencies = [
+ "bitflags",
+ "block",
+ "core-graphics-types",
+ "foreign-types",
+ "log",
+ "objc",
+ "paste",
 ]
 
 [[package]]
@@ -3051,6 +3084,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "objc"
+version = "0.2.7"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "915b1b472bc21c53464d6c8461c9d3af805ba1ef837e1cac254428f4a77177b1"
+dependencies = [
+ "malloc_buf",
+]
+
+[[package]]
 name = "objc2"
 version = "0.6.4"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3292,7 +3334,7 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "7d8fae84b431384b68627d0f9b3b1245fcf9f46f6c0e3dc902e9dce64edd1967"
 dependencies = [
  "libc",
- "windows-sys 0.45.0",
+ "windows-sys 0.61.2",
 ]
 
 [[package]]
@@ -3348,6 +3390,12 @@ dependencies = [
  "smallvec",
  "windows-link",
 ]
+
+[[package]]
+name = "paste"
+version = "1.0.15"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "57c0d7b74b563b49d38dae00a0c37d4d6de9b432382b2892f0574ddcae73fd0a"
 
 [[package]]
 name = "pastey"
@@ -5080,6 +5128,26 @@ dependencies = [
  "pastey",
  "tract-data",
  "walkdir",
+]
+
+[[package]]
+name = "tract-metal"
+version = "0.23.9"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "8655591a28032a9f7b5575ddb260a94bd2947d287043a232e32f671c5eee4c86"
+dependencies = [
+ "anyhow",
+ "derive-new",
+ "downcast-rs 2.0.2",
+ "inventory",
+ "log",
+ "metal",
+ "num-traits",
+ "objc",
+ "tract-core",
+ "tract-gpu",
+ "tract-pulse-opl",
+ "tract-transformers",
 ]
 
 [[package]]

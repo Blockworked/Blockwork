@@ -75,7 +75,7 @@ jobs:
         run: |
           # Match the Rust dependency used by the executable and its QML tests.
           git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
-          git -C ../blockstitch fetch --depth 1 origin 250bf3620dc276eca96bb849ef765459b7dfe3c8
+          git -C ../blockstitch fetch --depth 1 origin 8ef2cc6c122710e18b97c565a6c7ef0e97f9f4da
           git -C ../blockstitch checkout --detach FETCH_HEAD
 
       # Official Qt builds where CXX-Qt's Qt download is missing or broken.
@@ -242,7 +242,7 @@ jobs:
         run: |
           # Match the Rust dependency used by the executable and its QML tests.
           git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
-          git -C ../blockstitch fetch --depth 1 origin 250bf3620dc276eca96bb849ef765459b7dfe3c8
+          git -C ../blockstitch fetch --depth 1 origin 8ef2cc6c122710e18b97c565a6c7ef0e97f9f4da
           git -C ../blockstitch checkout --detach FETCH_HEAD
 
       # Official Qt builds where CXX-Qt's Qt download is missing or broken.
@@ -368,7 +368,7 @@ jobs:
         run: |
           # Match the Rust dependency used by the executable and its QML tests.
           git clone --depth 1 https://github.com/Blockworked/blockstitch.git ../blockstitch
-          git -C ../blockstitch fetch --depth 1 origin 250bf3620dc276eca96bb849ef765459b7dfe3c8
+          git -C ../blockstitch fetch --depth 1 origin 8ef2cc6c122710e18b97c565a6c7ef0e97f9f4da
           git -C ../blockstitch checkout --detach FETCH_HEAD
 
       - name: Install Flatpak tooling

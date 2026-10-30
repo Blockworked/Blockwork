@@ -64,6 +64,13 @@ class ReleasePreparationTests(unittest.TestCase):
             path.write_bytes(b"package")
             self.assertIn(filename, release.release_body(CHANGELOG, "0.6.0", self.artifacts))
 
+    def test_native_mac_builds_are_required_and_listed(self):
+        required = {filename for _, filename, needed in release.DOWNLOADS if needed}
+        body = release.release_body(CHANGELOG, "0.6.0", self.artifacts)
+        for filename in ("blockwork-macos-arm64.app.zip", "blockwork-macos-x86_64.app.zip"):
+            self.assertIn(filename, required)
+            self.assertIn(filename, body)
+
     def test_unknown_version_does_not_publish_generic_notes(self):
         with self.assertRaisesRegex(ValueError, "No changelog section"):
             release.release_body(CHANGELOG, "0.6", self.artifacts)

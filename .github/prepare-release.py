@@ -16,7 +16,8 @@ DOWNLOADS = [
     ("Linux x86_64 (Flatpak)", "blockwork-linux-x86_64.flatpak", True),
     ("Linux arm64 (AppImage)", "blockwork-linux-arm64.AppImage", True),
     ("Linux arm64 (Flatpak)", "blockwork-linux-arm64.flatpak", True),
-    ("macOS arm64 (app bundle, unsigned)", "blockwork-macos-arm64.app.zip", False),
+    ("macOS arm64 (app bundle, unsigned)", "blockwork-macos-arm64.app.zip", True),
+    ("macOS x86_64 (app bundle, unsigned)", "blockwork-macos-x86_64.app.zip", True),
 ]
 
 
