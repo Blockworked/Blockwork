@@ -94,8 +94,18 @@ Item {
         function test_close_button_still_works() {
             const canvas = setup();
             const card = findChild(canvas, "dictEditor_groceries");
-            mouseClick(card, 337, 18);
-            compare(canvas.editorMoves.length, 1);
+            function descendants(item) {
+                let result = [item];
+                for (const child of item.children || []) result = result.concat(descendants(child));
+                return result;
+            }
+            const close = descendants(card).find(item => item.iconName === "x");
+            verify(!!close);
+            tryVerify(() => close.width > 0 && close.height > 0);
+            waitForRendering(close);
+            mouseMove(close, close.width / 2, close.height / 2, 0, Qt.NoButton);
+            mouseClick(close, close.width / 2, close.height / 2);
+            tryVerify(() => canvas.editorMoves.length === 1);
             compare(canvas.editorMoves[0].visible, false);
         }
         function test_repeated_header_drags_with_position_echo() {

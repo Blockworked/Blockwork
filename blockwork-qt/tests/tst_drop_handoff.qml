@@ -97,19 +97,26 @@ Item {
             tryCompare(block,"displayedSnapShift",0);
         }
         function test_container_adjustments_ease() {
-            const setup = createTemporaryObject(setupComponent, scene);
-            const canvas = setup.canvas;
-            canvas.strands = [{id:"target",x:0,y:0,instructions:[{id:"wrap",type:"If",condition:{kind:"Bool"},body:[]}]}];
-            wait(40);
-            const block = canvas.findBlockItem(canvas,"wrap");
-            const initial = block.effMouthHeights[0];
-            canvas.applySnap({targetId:"target",path:[{index:0,slot:0},{index:0}],x:0,y:0,empty:true},200,58,false);
-            wait(60);
-            verify(block.effMouthHeights[0] > initial && block.effMouthHeights[0] < 50);
-            tryVerify(() => Math.abs(block.effMouthHeights[0] - 50) < 0.01);
-            canvas.clearSnap();
-            verify(block.effMouthHeights[0] > initial);
-            tryVerify(() => Math.abs(block.effMouthHeights[0] - initial) < 0.01);
+            const previousScale = Motion.durationScale;
+            // Observe an actual intermediate value rather than assuming that
+            // a busy CI runner presents a frame exactly 60 ms after the edit.
+            Motion.durationScale = 4;
+            try {
+                const setup = createTemporaryObject(setupComponent, scene);
+                const canvas = setup.canvas;
+                canvas.strands = [{id:"target",x:0,y:0,instructions:[{id:"wrap",type:"If",condition:{kind:"Bool"},body:[]}]}];
+                wait(40);
+                const block = canvas.findBlockItem(canvas,"wrap");
+                const initial = block.effMouthHeights[0];
+                canvas.applySnap({targetId:"target",path:[{index:0,slot:0},{index:0}],x:0,y:0,empty:true},200,58,false);
+                tryVerify(() => block.effMouthHeights[0] > initial && block.effMouthHeights[0] < 50);
+                tryVerify(() => Math.abs(block.effMouthHeights[0] - 50) < 0.01);
+                canvas.clearSnap();
+                verify(block.effMouthHeights[0] > initial);
+                tryVerify(() => Math.abs(block.effMouthHeights[0] - initial) < 0.01);
+            } finally {
+                Motion.durationScale = previousScale;
+            }
         }
         function test_canvas_resize_during_drag() {
             const setup = createTemporaryObject(setupComponent, scene);

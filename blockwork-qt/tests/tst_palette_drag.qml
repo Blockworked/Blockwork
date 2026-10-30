@@ -55,6 +55,9 @@ Item {
             return found;
         }
         function editor() {
+            // A new page must not inherit a hover over the previous page's
+            // category rail while its delegates are being created.
+            mouseMove(scene, scene.width - 2, scene.height - 2, 0, Qt.NoButton);
             const page = createTemporaryObject(editorComponent, scene);
             verify(!!page);
             wait(100);

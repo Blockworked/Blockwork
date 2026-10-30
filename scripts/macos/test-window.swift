@@ -74,6 +74,8 @@ menu.addItem(editItem)
 app.mainMenu = menu
 let window = NSWindow(contentRect: NSRect(x: 200, y: 200, width: 640, height: 400),
     styleMask: [.titled, .closable, .miniaturizable, .resizable], backing: .buffered, defer: false)
+// Keep exact-color fixtures independent of the display backing color space.
+window.colorSpace = .sRGB
 window.title = "Blockwork macOS Test Window"
 let view = TestView(frame: NSRect(x: 0, y: 0, width: 640, height: 400))
 let editor = NSTextView(frame: NSRect(x: 30, y: 25, width: 580, height: 100))
