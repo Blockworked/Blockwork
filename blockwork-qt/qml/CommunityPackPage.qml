@@ -430,7 +430,7 @@ ColumnLayout {
                     }
                     RowLayout {
                         Layout.fillWidth: true; spacing: 8
-                        Text { Layout.fillWidth: true; text: qsTr("Plain text. Links work. Be kind."); color: Theme.textDim; font.pixelSize: 12 }
+                        Item { Layout.fillWidth: true }
                         Text {
                             visible: !!(page.host.community.tasks.comment || {}).error
                             color: Theme.danger; font.pixelSize: 12

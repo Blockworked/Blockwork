@@ -56,10 +56,6 @@ ColumnLayout {
             ColumnLayout {
                 Layout.fillWidth: true; spacing: 2
                 Text { text: mine.community.user.name; color: Theme.text; font.pixelSize: 16; font.weight: Font.DemiBold }
-                Text {
-                    Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                    text: qsTr("Every pack and update is reviewed before it's listed.")
-                }
             }
             BwButton {
                 objectName: "shareNewPack"

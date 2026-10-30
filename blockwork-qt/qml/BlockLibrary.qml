@@ -443,11 +443,7 @@ Item {
                         Text { text: qsTr("Author"); color: Theme.textDim; font.pixelSize: 12 }
                         BwTextField { id: packAuthor; objectName: "sharePackAuthor"; Layout.fillWidth: true; Layout.minimumWidth: 0 }
                     }
-                    Text {
-                        visible: shareDialog.publishing
-                        Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                        text: qsTr("Shared as %1. Your name goes in front of each block's ID.").arg(root.community.user.name)
-                    }
+                    Item { visible: shareDialog.publishing; Layout.fillWidth: true }
                     ColumnLayout {
                         spacing: 4
                         Text { text: qsTr("Version"); color: Theme.textDim; font.pixelSize: 12 }
@@ -554,10 +550,6 @@ Item {
                             }
                         }
                     }
-                }
-                Text {
-                    Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                    text: qsTr("Blocks these use come along, with the variables and lists they need. Secret values are left out. Keep the same name for later versions so they replace the old blocks.")
                 }
             }
         }
