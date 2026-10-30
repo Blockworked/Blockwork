@@ -23,6 +23,7 @@ pub(crate) mod screen_pick;
 pub(crate) mod state;
 pub(crate) mod system_watch;
 pub(crate) mod block_library;
+pub(crate) mod community;
 pub(crate) mod templates;
 pub(crate) mod time_watch;
 pub(crate) mod webhook;

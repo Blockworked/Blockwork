@@ -168,6 +168,37 @@ impl Backend {
                 let path: String = arg(&args, "path")?;
                 to_json(crate::block_library::export(&self.state, &self.app, block_ids, info, path, arg::<Option<Vec<blockwork_core::block_packs::VariableInterface>>>(&args, "variableRoles")?.unwrap_or_default())?)
             }
+            "block_library_previews" => to_json(crate::block_library::previews(&self.state, &self.app, arg(&args, "keys")?)),
+            "block_library_pack" => to_json(crate::block_library::pack_view(&self.state, &self.app,
+                arg(&args, "key")?, arg::<Option<String>>(&args, "sha256")?.unwrap_or_default())?),
+            "community_pack" => to_json(crate::community::pack_detail(&self.state, &self.app,
+                &arg::<String>(&args, "packId")?, arg::<Option<bool>>(&args, "refresh")?.unwrap_or(false))),
+            "community_sign_in" => to_json(crate::community::sign_in(&self.state, &self.app)?),
+            "community_cancel_sign_in" => to_json(crate::community::cancel_sign_in(&self.state, &self.app)?),
+            "community_sign_out" => {
+                let (state, app) = (self.state.clone(), self.app.clone());
+                to_json(tokio::task::spawn_blocking(move || crate::community::sign_out(&state, &app))
+                    .await.map_err(|e| e.to_string())??)
+            }
+            "community_post_comment" => to_json(crate::community::post_comment(&self.state, &self.app,
+                arg(&args, "packId")?, arg(&args, "body")?)?),
+            "community_delete_comment" => to_json(crate::community::delete_comment(&self.state, &self.app,
+                arg(&args, "packId")?, arg(&args, "id")?)?),
+            "community_my_packs" => to_json(crate::community::my_packs(&self.state, &self.app,
+                arg::<Option<bool>>(&args, "refresh")?.unwrap_or(false))),
+            "community_publish_file" => to_json(crate::community::publish_file(&self.state, &self.app, arg(&args, "path")?)?),
+            "community_publish" => {
+                let block_ids: Vec<String> = arg(&args, "blockIds")?;
+                let info = blockwork_core::block_packs::PackInfo {
+                    id: arg::<Option<String>>(&args, "id")?.unwrap_or_default(),
+                    name: arg(&args, "name")?,
+                    description: arg::<Option<String>>(&args, "description")?.unwrap_or_default(),
+                    author: String::new(),
+                    version: arg::<Option<String>>(&args, "version")?.unwrap_or_default(),
+                };
+                to_json(crate::community::publish_blocks(&self.state, &self.app, block_ids, info,
+                    arg::<Option<Vec<blockwork_core::block_packs::VariableInterface>>>(&args, "variableRoles")?.unwrap_or_default())?)
+            }
             "set_browser_bridge" => {
                 let (enabled, port): (bool, u16) = (arg(&args, "enabled")?, arg(&args, "port")?);
                 to_json(crate::browser_bridge::configure(&self.state, &self.app, enabled, port)?)

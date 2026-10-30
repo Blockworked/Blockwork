@@ -533,6 +533,7 @@ dependencies = [
  "dirs 7.0.0",
  "serde",
  "serde_json",
+ "sha2",
  "tokio",
  "tracing",
  "uuid",

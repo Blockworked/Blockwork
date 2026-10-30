@@ -26,7 +26,12 @@
     "SectionCard.qml",
     "MacroFiles.qml",
     "PromptWindow.qml",
-    "BlockLibrary.qml"
+    "BlockLibrary.qml",
+    "BlockLibraryBrowser.qml",
+    "CommunityBlock.qml",
+    "CommunityParts.qml",
+    "CommunityPackPage.qml",
+    "CommunityMyPacks.qml"
   ],
   "style_modules": {
     "BlockworkStyle": ["qmldir", "TextField.qml", "TextArea.qml", "TextEditingMenu.qml"]

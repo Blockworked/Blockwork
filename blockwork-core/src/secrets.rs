@@ -107,6 +107,20 @@ pub fn delete(name: &str) -> Result<(), String> {
     save_names(&all)
 }
 
+/// Keeps a value only Blockwork itself reads, like a sign-in token: in the
+/// keyring, but not listed with the user's secrets.
+pub fn store_private(name: &str, value: &str) -> Result<(), String> {
+    backend::store(name, value)
+}
+
+pub fn load_private(name: &str) -> Result<Option<String>, String> {
+    backend::load(name)
+}
+
+pub fn remove_private(name: &str) -> Result<(), String> {
+    backend::remove(name)
+}
+
 /// `text` with every secret value read or saved this session masked.
 pub fn redact(text: &str) -> String {
     let guard = CACHE.lock().unwrap_or_else(|e| e.into_inner());

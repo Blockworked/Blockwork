@@ -13,12 +13,8 @@ uuid.workspace = true
 tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net", "io-util", "time"] }
 chrono.workspace = true
 dirs.workspace = true
-
-[target.'cfg(target_os = "linux")'.dependencies]
-# Encodes application icons found via .desktop entries as data: URIs for the
-# "Open App" picker (see src/installed_apps.rs) - Linux-only, since the
-# Windows/Mac listings there don't resolve icons at all yet.
 base64.workspace = true
+sha2 = "0.10.9"
 
 [dev-dependencies]
 # The website's editor, replayed against this crate's commands.

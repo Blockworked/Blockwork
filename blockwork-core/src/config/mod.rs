@@ -31,7 +31,7 @@ pub fn set_config_dir_override(dir: PathBuf) {
     let _ = CONFIG_DIR_OVERRIDE.set(dir);
 }
 
-pub(crate) fn config_root() -> Result<PathBuf, String> {
+pub fn config_root() -> Result<PathBuf, String> {
     if let Some(dir) = CONFIG_DIR_OVERRIDE.get() {
         return Ok(dir.join(APP_ID));
     }

@@ -109,7 +109,11 @@ section below as the GitHub release notes, followed by the downloads table.
   - Packs are checked against the SHA-256 their index pins, reviewed before they're added, and replace their older versions in place.
   - Packs published by the Blockworked team show a blue verified badge next to their publisher in Browse library. Only the built-in library can mark packs this way.
   - Right-click a custom block to share it, and the blocks it uses, as a `.blockpack` file.
-  - After saving a pack, "Submit to community library..." opens the library site, where you sign in with GitHub or Google and upload it for review.
+  - After saving a pack, "Send to the community library" uploads it for review.
+  - Browse draws each pack's blocks as real blocks, with search, a permissions filter, sorting (name, recently updated, newest, most discussed), Official only and Hide installed.
+  - Each pack has its own page: an overview of every block with its description and ID, a Source tab with the blocks' bodies on a read-only canvas and the pack file, earlier versions, and comments.
+  - Sign in from the app with your browser to post and delete comments.
+  - My packs lists the packs you've shared with their review status and earlier uploads. Publish update picks the pack's blocks from the open macro and bumps the version; Share a new pack sends a macro's blocks for review without leaving the app.
 - Custom blocks:
   - Set default values for inputs, including boolean inputs.
   - Add optional components that callers can turn on with the block's "+" menu and remove with "x". Each component has a boolean enabled input and can contain labels and parameters.

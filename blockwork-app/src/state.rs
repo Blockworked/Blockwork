@@ -172,6 +172,7 @@ pub(crate) struct StateDto {
     pub(crate) browser: blockwork_core::browser::Status,
     pub(crate) block_library: crate::block_library::LibraryDto,
     pub(crate) pack_review: Option<crate::block_library::PackReviewDto>,
+    pub(crate) community: crate::community::CommunityDto,
     /// UI language code; empty follows the system.
     pub(crate) language: String,
     /// UI animation duration multiplier; 0 is instant, 1 normal.
@@ -547,6 +548,7 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         browser: blockwork_core::browser::status(),
         block_library: crate::block_library::dto(s),
         pack_review: s.pending_pack.as_ref().map(|p| p.review.clone()),
+        community: crate::community::dto(),
         language: crate::ui_language(),
         animation_speed: crate::animation_speed(),
         clock_format: blockwork_core::config::load_settings().clock_format.unwrap_or_default(),

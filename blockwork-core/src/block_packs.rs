@@ -76,6 +76,16 @@ pub struct IndexEntry {
     /// library, since any index could claim it.
     #[serde(default)]
     pub official: bool,
+    /// What its blocks can do, by capability kind, for filtering before download.
+    #[serde(default)]
+    pub capabilities: Vec<String>,
+    /// When its current version and its first one were shared, in ms since 1970.
+    #[serde(default)]
+    pub updated: u64,
+    #[serde(default)]
+    pub created: u64,
+    #[serde(default)]
+    pub comments: u64,
 }
 
 #[derive(Debug, Clone, PartialEq)]

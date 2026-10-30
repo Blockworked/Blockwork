@@ -17,14 +17,94 @@ Item {
 
     readonly property var library: appState.block_library || ({ loaded: false, loading: false, packs: [], sources: [], fetching: "", error: "" })
     readonly property var macro: appState.current_macro || null
+    readonly property var community: appState.community || ({ site: "", signed_in: false, user: { name: "", avatar: "", page: "" }, sign_in_url: "", revision: 0, tasks: {} })
+    readonly property int communityRevision: community.revision
 
     function browse() {
         if (!library.loaded && !library.loading) invoke("refresh_block_library");
+        browseDialog.showList();
         browseDialog.open();
+    }
+    function confirmRemove(packId, packName) {
+        removeDialog.packId = packId;
+        removeDialog.packName = packName;
+        removeDialog.macroId = root.macro ? root.macro.id : "";
+        removeDialog.open();
+    }
+
+    // Signing in: the browser opens the site, which hands this computer a code.
+    // `then` runs once the sign-in lands.
+    property var afterSignIn: null
+    function signIn(then) {
+        afterSignIn = then || null;
+        daemonCall("community_sign_in", {}, result => {
+            Qt.openUrlExternally(result.url);
+            signInDialog.open();
+        });
+    }
+    readonly property var signInTask: community.tasks.sign_in || ({ running: false, error: "", message: "", done: 0 })
+    readonly property int signInDone: signInTask.done
+    onSignInDoneChanged: {
+        const then = afterSignIn;
+        afterSignIn = null;
+        if (signInTask.error) { signInDialog.close(); failed.show(signInTask.error); return; }
+        signInDialog.close();
+        if (then && community.signed_in) then();
+    }
+    // Runs `action` now if signed in, or after signing in.
+    function whenSignedIn(action) {
+        if (community.signed_in) action(); else signIn(action);
+    }
+
+    // Sharing to the community library
+    function nextVersion(version) {
+        const m = String(version || "").match(/^(.*?)(\d+)([^\d]*)$/);
+        return m ? m[1] + (Number(m[2]) + 1) + m[3] : "1.0.0";
+    }
+    function publishNew() {
+        whenSignedIn(() => {
+            if (!root.macro) { failed.show(qsTr("Open the macro your blocks are in first.")); return; }
+            shareDialog.publishing = true;
+            shareDialog.saved = null;
+            // Start with every block the macro made, so a one-block macro is one click.
+            shareDialog.picked = shareDialog.defs.map(d => d.id);
+            shareDialog.open();
+        });
+    }
+    // An update to one of the account's packs, from this macro's blocks.
+    function publishUpdate(pack) {
+        whenSignedIn(() => {
+            if (!root.macro) { failed.show(qsTr("Open the macro your blocks are in first.")); return; }
+            const latest = pack.versions[0] || { version: "", blocks: [] };
+            const exported = (root.macro.pack_exports || []).find(p => p.info.id === pack.id);
+            const defs = shareDialog.defs;
+            const ids = exported ? exported.block_ids.filter(id => defs.some(d => d.id === id))
+                : defs.filter(d => (latest.blocks || []).indexOf(root.blockLabel(d)) >= 0).map(d => d.id);
+            shareDialog.publishing = true;
+            shareDialog.saved = {
+                info: { id: pack.id, name: exported ? exported.info.name : pack.name, description: exported ? exported.info.description : pack.description,
+                        author: "", version: root.nextVersion(latest.version || (exported ? exported.info.version : "")) },
+                block_ids: ids, variable_roles: exported ? exported.variable_roles : []
+            };
+            shareDialog.picked = ids;
+            shareDialog.open();
+        });
+    }
+    function publishFromFile() {
+        whenSignedIn(() => publishFileDialog.open());
+    }
+    function sendFile(path) {
+        whenSignedIn(() => {
+            daemonCall("community_publish_file", { path: path }, () => {
+                browseDialog.showMine();
+                browseDialog.open();
+            });
+        });
     }
     function addFromFile() { packFileDialog.open(); }
     function share(definition) {
         if (definition && definition.read_only) return;
+        shareDialog.publishing = false;
         const saved = ((root.macro && root.macro.pack_exports) || []).find(pack => definition && pack.block_ids.indexOf(definition.id) >= 0);
         shareDialog.saved = saved || null;
         shareDialog.picked = saved ? saved.block_ids.filter(id => shareDialog.defs.some(d => d.id === id)) : definition ? [definition.id] : [];
@@ -40,165 +120,26 @@ Item {
 
     property int callSeq: 0
     property var callbacks: ({})
-    function daemonCall(command, args, done) {
+    // `fail` takes the error instead of the error dialog.
+    function daemonCall(command, args, done, fail) {
         const key = "library" + (++callSeq);
-        callbacks[key] = done;
+        callbacks[key] = { done: done, fail: fail };
         root.appBridge.callCommand(key, command, JSON.stringify(args || {}));
     }
     Connections {
         target: root.appBridge
         function onReplySerialChanged() {
-            const key = root.appBridge.replyKey, done = root.callbacks[key];
-            if (!done) return;
+            const key = root.appBridge.replyKey, call = root.callbacks[key];
+            if (!call) return;
             delete root.callbacks[key];
-            if (root.appBridge.replyError) failed.show(root.appBridge.replyError);
-            else done(JSON.parse(root.appBridge.replyJson || "null"));
+            if (root.appBridge.replyError) {
+                if (call.fail) call.fail(root.appBridge.replyError);
+                else failed.show(root.appBridge.replyError);
+            } else call.done(JSON.parse(root.appBridge.replyJson || "null"));
         }
     }
 
-    AppDialog {
-        id: browseDialog
-        title: qsTr("Block library")
-        readonly property string query: search.text.trim().toLowerCase()
-        readonly property var shown: (root.library.packs || []).filter(p => (!hideInstalled.checked || !p.installed)
-            && (!query || (p.name + " " + p.description + " " + p.author + " " + p.blocks.join(" ")).toLowerCase().indexOf(query) >= 0))
-        readonly property var brokenSources: (root.library.sources || []).filter(s => s.error)
-        width: Math.min(624, parent.width - 32)
-        contentItem: ColumnLayout {
-            implicitWidth: 580; spacing: 10
-            RowLayout {
-                Layout.fillWidth: true; spacing: 8
-                BwTextField { id: search; Layout.fillWidth: true; placeholderText: qsTr("Search blocks") }
-                BwButton {
-                    iconName: "refresh-cw"; text: qsTr("Refresh"); enabled: !root.library.loading
-                    onClicked: root.invoke("refresh_block_library")
-                }
-                BwButton { iconName: "folder-open"; text: qsTr("From file..."); onClicked: root.addFromFile() }
-            }
-            BwCheckBox { id: hideInstalled; text: qsTr("Hide installed") }
-            Text {
-                visible: !root.macro
-                Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.warning; font.pixelSize: 12
-                text: qsTr("Open a macro to add blocks to it.")
-            }
-            Text {
-                visible: root.library.error !== ""
-                Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.danger; font.pixelSize: 12
-                text: root.library.error
-            }
-            Repeater {
-                model: browseDialog.brokenSources
-                delegate: Text {
-                    required property var modelData
-                    Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.danger; font.pixelSize: 12
-                    text: qsTr("Couldn't load %1: %2").arg(modelData.url).arg(modelData.error)
-                }
-            }
-            Text {
-                visible: root.library.loading
-                color: Theme.textDim; font.pixelSize: 13
-                text: qsTr("Loading the library...")
-            }
-            Text {
-                visible: !root.library.loading && root.library.loaded && browseDialog.shown.length === 0
-                Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 13
-                text: (root.library.packs || []).length ? qsTr("No packs match your search.")
-                    : qsTr("No packs here yet. Add a library in Settings > Block library, or add a pack from a file.")
-            }
-            ListView {
-                id: packList
-                Layout.fillWidth: true
-                Layout.preferredHeight: Math.min(420, contentHeight)
-                clip: true; spacing: 6
-                model: browseDialog.shown
-                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-                WheelPan { flickable: packList }
-                delegate: Rectangle {
-                    id: packRow
-                    required property var modelData
-                    readonly property bool fetching: modelData.key !== "" && root.library.fetching === modelData.key
-                    readonly property bool installed: modelData.installed !== ""
-                    width: packList.width; radius: 8
-                    implicitHeight: Math.max(packCol.implicitHeight, packActions.implicitHeight) + 20
-                    color: Theme.panelRaised; border.color: Theme.borderSoft
-                    ColumnLayout {
-                        id: packCol
-                        anchors.left: parent.left; anchors.right: packActions.left; anchors.top: parent.top
-                        anchors.margins: 10; anchors.rightMargin: 12; spacing: 3
-                        Text {
-                            Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 14; font.weight: Font.DemiBold
-                            text: packRow.modelData.name + (packRow.modelData.version ? "  " + packRow.modelData.version : "")
-                        }
-                        Row {
-                            id: byRow
-                            readonly property string author: packRow.modelData.author
-                            visible: author !== ""
-                            Layout.fillWidth: true; spacing: 4
-                            Text {
-                                width: Math.min(implicitWidth, Math.max(0, byRow.width - (verifiedBadge.visible ? verifiedBadge.width + byRow.spacing : 0)))
-                                anchors.verticalCenter: parent.verticalCenter
-                                elide: Text.ElideRight; color: Theme.textDim; font.pixelSize: 11
-                                text: qsTr("by %1").arg(byRow.author)
-                            }
-                            // Same badge the community library site shows next to the team's packs.
-                            Rectangle {
-                                id: verifiedBadge
-                                anchors.verticalCenter: parent.verticalCenter
-                                visible: packRow.modelData.official === true
-                                implicitWidth: 13; implicitHeight: 13; radius: 6.5; color: Theme.accent
-                                Accessible.role: Accessible.Graphic; Accessible.name: verifiedTip.text
-                                LucideIcon { anchors.centerIn: parent; width: 9; height: 9; strokeWidth: 3.5; name: "check"; color: "#ffffff" }
-                                HoverHandler { id: badgeHover }
-                                ToolTip { id: verifiedTip; visible: badgeHover.hovered; delay: 300; text: qsTr("Verified official pack") }
-                            }
-                        }
-                        Text {
-                            visible: packRow.modelData.description !== ""
-                            Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 12
-                            text: packRow.modelData.description
-                        }
-                        Text {
-                            Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
-                            text: packRow.modelData.blocks.join("  -  ")
-                        }
-                        Text {
-                            visible: packRow.installed
-                            Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
-                            text: !packRow.modelData.available ? qsTr("Installed - unavailable from the library")
-                                : qsTr("Installed %1").arg(packRow.modelData.installed)
-                        }
-                    }
-                    Column {
-                        id: packActions
-                        anchors.right: parent.right; anchors.rightMargin: 10; anchors.verticalCenter: parent.verticalCenter
-                        spacing: 6
-                        BwButton {
-                            visible: packRow.modelData.available && (!packRow.installed || packRow.modelData.update)
-                            enabled: !!root.macro && !packRow.fetching && root.library.fetching === ""
-                            primary: true; iconName: "download"
-                            text: packRow.fetching ? qsTr("Downloading...") : packRow.installed ? qsTr("Update") : qsTr("Add")
-                            onClicked: root.invoke("review_block_pack", { key: packRow.modelData.key })
-                        }
-                        BwButton {
-                            visible: packRow.installed
-                            text: qsTr("Settings"); iconName: "settings"
-                            onClicked: root.showPackData(packRow.modelData.id)
-                        }
-                        BwButton {
-                            visible: packRow.installed
-                            text: qsTr("Remove"); iconName: "trash-2"
-                            onClicked: {
-                                removeDialog.packId = packRow.modelData.id;
-                                removeDialog.packName = packRow.modelData.name;
-                                removeDialog.macroId = root.macro.id;
-                                removeDialog.open();
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
+    BlockLibraryBrowser { id: browseDialog; host: root }
 
     function showPackData(packId) {
         packDataDialog.packId = packId;
@@ -450,7 +391,10 @@ Item {
     AppDialog {
         id: shareDialog
         objectName: "sharePackDialog"
-        title: qsTr("Share blocks as a pack")
+        title: publishing ? (saved ? qsTr("Publish an update to %1").arg(saved.info.name) : qsTr("Share a pack with the community"))
+            : qsTr("Share blocks as a pack")
+        // Sends the pack to the community library instead of saving a file.
+        property bool publishing: false
         width: Math.min(624, parent.width - 32)
         height: Math.min(740, parent.height - 32)
         standardButtons: Dialog.Ok | Dialog.Cancel
@@ -467,7 +411,7 @@ Item {
             });
         }
         readonly property var defs: root.macro ? (root.macro.block_defs || []).filter(def => !def.read_only) : []
-        acceptText: qsTr("Save pack...")
+        acceptText: publishing ? qsTr("Send for review") : qsTr("Save pack...")
         onOpened: {
             const roles = Object.create(null);
             if (saved) (saved.variable_roles || []).forEach(r => roles[r.name] = r.role);
@@ -494,9 +438,15 @@ Item {
                 RowLayout {
                     Layout.fillWidth: true; spacing: 8
                     ColumnLayout {
+                        visible: !shareDialog.publishing
                         Layout.fillWidth: true; spacing: 4
                         Text { text: qsTr("Author"); color: Theme.textDim; font.pixelSize: 12 }
                         BwTextField { id: packAuthor; objectName: "sharePackAuthor"; Layout.fillWidth: true; Layout.minimumWidth: 0 }
+                    }
+                    Text {
+                        visible: shareDialog.publishing
+                        Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
+                        text: qsTr("Shared as %1. Your name goes in front of each block's ID.").arg(root.community.user.name)
                     }
                     ColumnLayout {
                         spacing: 4
@@ -505,6 +455,13 @@ Item {
                     }
                 }
                 Text { topPadding: 4; text: qsTr("Blocks"); color: Theme.textDim; font.pixelSize: 12 }
+                Text {
+                    visible: shareDialog.defs.length === 0
+                    Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.warning; font.pixelSize: 13
+                    text: shareDialog.saved
+                        ? qsTr("This macro has no blocks of its own. Open the macro you made %1's blocks in to publish an update.").arg(shareDialog.saved.info.name)
+                        : qsTr("This macro has no blocks of its own yet. Make one with Make a Block in the Custom category first.")
+                }
                 Repeater {
                     objectName: "sharePackBlockRows"
                     model: shareDialog.defs
@@ -606,6 +563,14 @@ Item {
         }
         onAccepted: {
             if (!picked.length) { failed.show(qsTr("Pick at least one block to share.")); return; }
+            if (publishing) {
+                root.daemonCall("community_publish", {
+                    blockIds: picked, id: saved ? saved.info.id : "", name: packName.text, description: packDescription.text,
+                    version: packVersion.text,
+                    variableRoles: variableCandidates.map(name => ({name: name, role: variableRoles[name] || "internal"}))
+                }, () => { browseDialog.showMine(); browseDialog.open(); });
+                return;
+            }
             const folder = StandardPaths.writableLocation(StandardPaths.DocumentsLocation).toString();
             packSaveDialog.currentFolder = folder;
             packSaveDialog.selectedFile = folder + "/" + encodeURIComponent((packName.text.trim() || "blocks").replace(/[\\/:*?"<>|]/g, "_") + ".blockpack");
@@ -623,18 +588,46 @@ Item {
             author: packAuthor.text, version: packVersion.text,
             variableRoles: shareDialog.variableCandidates.map(name => ({name: name, role: shareDialog.variableRoles[name] || "internal"})), path: root.localPath(selectedFile)
         }, count => {
-            shared.message = qsTr("Saved %n block(s). Others can add them with My Blocks > Browse > From file, or you can submit the pack to the community library, where it's reviewed before it's listed.", "", count);
+            shared.message = qsTr("Saved %n block(s). Others can add them with My Blocks > Browse > From file, or you can send the pack to the community library, where it's reviewed before it's listed.", "", count);
+            shared.path = root.localPath(selectedFile);
             shared.open();
         })
     }
     AppDialog {
         id: shared
         title: qsTr("Pack saved"); standardButtons: Dialog.Ok | Dialog.Close
-        acceptText: qsTr("Submit to community library...")
+        acceptText: qsTr("Send to the community library")
         property string message: ""
-        // The library site takes uploads after signing in.
-        onAccepted: Qt.openUrlExternally("https://community.blockworked.com/submit")
+        property string path: ""
+        onAccepted: root.sendFile(path)
         Text { width: 400; wrapMode: Text.WordWrap; text: shared.message; color: Theme.text; font.pixelSize: 13 }
+    }
+    FileDialog {
+        id: publishFileDialog
+        title: qsTr("Send a pack to the community library")
+        fileMode: FileDialog.OpenFile
+        currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
+        nameFilters: [qsTr("Block packs (*.blockpack *.json)"), qsTr("All files (*)")]
+        onAccepted: root.sendFile(root.localPath(selectedFile))
+    }
+    AppDialog {
+        id: signInDialog
+        objectName: "communitySignInDialog"
+        title: qsTr("Sign in with your browser")
+        standardButtons: Dialog.Cancel
+        onRejected: { root.afterSignIn = null; root.invoke("community_cancel_sign_in"); }
+        Column {
+            width: 420; spacing: 12
+            Text {
+                width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
+                text: qsTr("Your browser opened the community library. Sign in there with GitHub or Google, then come back here.")
+            }
+            BwButton {
+                flat: true; iconName: "external-link"; text: qsTr("Open the page again")
+                enabled: root.community.sign_in_url !== ""
+                onClicked: Qt.openUrlExternally(root.community.sign_in_url)
+            }
+        }
     }
     AppDialog {
         id: failed

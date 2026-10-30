@@ -1044,6 +1044,20 @@ fn value_capabilities(value: &Value, found: &mut std::collections::HashSet<&'sta
 /// Everything `mac` can do anywhere, nested blocks included, for the import
 /// review. `OpenApp`'s command can be any shell string in a hand-edited
 /// file, so it counts as running commands.
+/// Capabilities named by kind (as a library index lists them), in the usual order.
+pub(crate) fn capabilities_named(kinds: &[String]) -> Vec<crate::state::CapabilityDto> {
+    CAPABILITIES
+        .iter()
+        .filter(|(kind, ..)| kinds.iter().any(|k| k == kind))
+        .map(|(kind, label, risky)| crate::state::CapabilityDto {
+            kind: kind.to_string(),
+            label: label.to_string(),
+            risky: *risky,
+            guarded: blockwork_core::permissions::GUARDED.iter().any(|(k, _)| k == kind),
+        })
+        .collect()
+}
+
 pub(crate) fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
     use blockwork_core::macros::BlockKind;
     let mut found = std::collections::HashSet::new();

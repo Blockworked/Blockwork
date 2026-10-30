@@ -39,6 +39,17 @@ pub(crate) struct PackDto {
     /// Installed, but the library has a different file.
     pub(crate) update: bool,
     pub(crate) available: bool,
+    pub(crate) sha256: String,
+    /// What its blocks can do, as the library lists it.
+    pub(crate) capabilities: Vec<CapabilityDto>,
+    /// Milliseconds since 1970, or 0 when the library doesn't say.
+    pub(crate) updated: u64,
+    pub(crate) created: u64,
+    pub(crate) comments: u64,
+    /// From the community site, which has comments and older versions.
+    pub(crate) community: bool,
+    /// The pack's page on the site, or empty.
+    pub(crate) page: String,
 }
 
 #[derive(Serialize, Clone, Default)]
@@ -79,7 +90,17 @@ pub(crate) struct PendingPack {
     pub(crate) review: PackReviewDto,
 }
 
+/// A downloaded pack file, checked against its hash.
+struct Fetched {
+    pack: BlockPack,
+    text: String,
+}
+
 struct Cache {
+    /// Pack files by hash, fetched to show their blocks.
+    files: Option<std::collections::HashMap<String, Result<Arc<Fetched>, String>>>,
+    /// Hashes being fetched.
+    fetching_files: Vec<String>,
     loaded: bool,
     loading: bool,
     sources: Vec<SourceDto>,
@@ -90,6 +111,8 @@ struct Cache {
 }
 
 static CACHE: Mutex<Cache> = Mutex::new(Cache {
+    files: None,
+    fetching_files: Vec::new(),
     loaded: false,
     loading: false,
     sources: Vec::new(),
@@ -110,10 +133,13 @@ pub(crate) fn sources() -> Vec<String> {
 /// Swaps old built-in addresses for the current one and puts the built-in
 /// library back if an earlier version let it be removed.
 fn upgrade_sources(list: Vec<String>) -> Vec<String> {
-    let mut out = vec![block_packs::DEFAULT_INDEX.to_string()];
+    let builtin = crate::community::index_url();
+    let mut out = vec![builtin.clone()];
     for url in list {
-        let url = if block_packs::OLD_DEFAULT_INDEXES.contains(&url.as_str()) {
-            block_packs::DEFAULT_INDEX.to_string()
+        let url = if block_packs::OLD_DEFAULT_INDEXES.contains(&url.as_str())
+            || url == block_packs::DEFAULT_INDEX
+        {
+            builtin.clone()
         } else {
             url
         };
@@ -139,6 +165,21 @@ fn pack_entries(mac: Option<&blockwork_core::macros::Macro>, entries: &[(String,
             installed: installed.map(|r| if r.version.is_empty() { "?".into() } else { r.version.clone() }).unwrap_or_default(),
             update: installed.is_some_and(|r| r.sha256 != entry.sha256),
             available: true,
+            sha256: entry.sha256.clone(),
+            capabilities: crate::commands::capabilities_named(&entry.capabilities),
+            updated: entry.updated,
+            created: entry.created,
+            comments: entry.comments,
+            community: crate::community::serves(url),
+            page: if crate::community::serves(url) {
+                format!(
+                    "{}/packs/{}",
+                    crate::community::site(),
+                    crate::community::percent_encode(&entry.info.id)
+                )
+            } else {
+                String::new()
+            },
         });
     }
     for record in records {
@@ -147,11 +188,28 @@ fn pack_entries(mac: Option<&blockwork_core::macros::Macro>, entries: &[(String,
             key: String::new(), id: record.id.clone(), name: record.name.clone(),
             description: record.description.clone(), author: record.author.clone(),
             version: record.version.clone(),
-            blocks: mac.into_iter().flat_map(|m| m.block_defs.iter())
-                .filter(|def| record.blocks.contains(&def.id)).map(block_packs::block_name).collect(),
-            source: String::new(), official: false,
-            installed: if record.version.is_empty() { "?".into() } else { record.version.clone() },
-            update: false, available: false,
+            blocks: mac
+                .into_iter()
+                .flat_map(|m| m.block_defs.iter())
+                .filter(|def| record.blocks.contains(&def.id))
+                .map(block_packs::block_name)
+                .collect(),
+            source: String::new(),
+            official: false,
+            installed: if record.version.is_empty() {
+                "?".into()
+            } else {
+                record.version.clone()
+            },
+            update: false,
+            available: false,
+            sha256: record.sha256.clone(),
+            capabilities: Vec::new(),
+            updated: 0,
+            created: 0,
+            comments: 0,
+            community: false,
+            page: String::new(),
         });
     }
     packs.sort_by(|a, b| a.installed.is_empty().cmp(&b.installed.is_empty())
@@ -166,7 +224,13 @@ pub(crate) fn dto(s: &AppState) -> LibraryDto {
     let mut sources = cache.sources.clone();
     for url in self::sources() {
         if !sources.iter().any(|s| s.url == url) {
-            sources.push(SourceDto { builtin: url == block_packs::DEFAULT_INDEX, url, name: String::new(), error: String::new(), packs: 0 });
+            sources.push(SourceDto {
+                builtin: url == crate::community::index_url(),
+                url,
+                name: String::new(),
+                error: String::new(),
+                packs: 0,
+            });
         }
     }
     sources.retain(|s| self::sources().contains(&s.url));
@@ -252,10 +316,27 @@ pub(crate) fn refresh(state: &SharedState, app: &AppHandle) -> Result<(), String
             });
             match result {
                 Ok(index) => {
-                    sources.push(SourceDto { builtin: url == block_packs::DEFAULT_INDEX, url: url.clone(), name: index.name.clone(), error: String::new(), packs: index.packs.len() });
-                    packs.extend(index.packs.into_iter().map(|p| (url.clone(), index.name.clone(), p)));
+                    sources.push(SourceDto {
+                        builtin: url == crate::community::index_url(),
+                        url: url.clone(),
+                        name: index.name.clone(),
+                        error: String::new(),
+                        packs: index.packs.len(),
+                    });
+                    packs.extend(
+                        index
+                            .packs
+                            .into_iter()
+                            .map(|p| (url.clone(), index.name.clone(), p)),
+                    );
                 }
-                Err(error) => sources.push(SourceDto { builtin: url == block_packs::DEFAULT_INDEX, url, name: String::new(), error, packs: 0 }),
+                Err(error) => sources.push(SourceDto {
+                    builtin: url == crate::community::index_url(),
+                    url,
+                    name: String::new(),
+                    error,
+                    packs: 0,
+                }),
             }
         }
         {
@@ -283,8 +364,12 @@ pub(crate) fn add_source(state: &SharedState, app: &AppHandle, url: String) -> R
     refresh(state, app)
 }
 
-pub(crate) fn remove_source(state: &SharedState, app: &AppHandle, url: String) -> Result<(), String> {
-    if url == block_packs::DEFAULT_INDEX {
+pub(crate) fn remove_source(
+    state: &SharedState,
+    app: &AppHandle,
+    url: String,
+) -> Result<(), String> {
+    if url == crate::community::index_url() {
         return Err("The built-in library can't be removed".into());
     }
     let list: Vec<String> = sources().into_iter().filter(|u| *u != url).collect();
@@ -352,6 +437,163 @@ pub(crate) fn review(state: &SharedState, app: &AppHandle, key: String) -> Resul
         emit(&state, &app);
     });
     Ok(())
+}
+
+/// Finds a listed pack by its key.
+fn entry(key: &str) -> Option<(String, String, IndexEntry)> {
+    cache()
+        .packs
+        .iter()
+        .find(|(url, _, entry)| format!("{url}#{}", entry.info.id) == key)
+        .cloned()
+}
+
+/// Fetches pack files by (url, hash, allow_local) in the background, one at
+/// a time, then sends the snapshot.
+fn fetch_files(state: &SharedState, app: &AppHandle, wanted: Vec<(String, String, bool)>) {
+    let wanted: Vec<_> = {
+        let mut cache = cache();
+        let files = cache.files.get_or_insert_with(Default::default);
+        let wanted: Vec<_> = wanted
+            .into_iter()
+            .filter(|(_, sha, _)| !files.contains_key(sha))
+            .collect();
+        let wanted: Vec<_> = wanted
+            .into_iter()
+            .filter(|(_, sha, _)| !cache.fetching_files.contains(sha))
+            .collect();
+        cache
+            .fetching_files
+            .extend(wanted.iter().map(|(_, sha, _)| sha.clone()));
+        wanted
+    };
+    if wanted.is_empty() {
+        return;
+    }
+    let (state, app) = (Arc::clone(state), app.clone());
+    std::thread::spawn(move || {
+        for (url, sha, allow_local) in wanted {
+            let result = fetch(&url, allow_local).and_then(|bytes| {
+                block_packs::verify(&bytes, &sha)?;
+                let text =
+                    String::from_utf8(bytes).map_err(|_| "The pack isn't text".to_string())?;
+                let pack = block_packs::read_pack(&text)?;
+                Ok(Arc::new(Fetched { pack, text }))
+            });
+            let mut cache = cache();
+            cache.fetching_files.retain(|s| *s != sha);
+            cache
+                .files
+                .get_or_insert_with(Default::default)
+                .insert(sha, result);
+        }
+        crate::community::changed(&state, &app);
+    });
+}
+
+fn cached_file(sha: &str) -> Option<Result<Arc<Fetched>, String>> {
+    cache()
+        .files
+        .as_ref()
+        .and_then(|files| files.get(sha).cloned())
+}
+
+/// The blocks each listed pack defines, drawn the way the palette draws them.
+/// Packs not downloaded yet are fetched, and turn up in a later call.
+pub(crate) fn previews(
+    state: &SharedState,
+    app: &AppHandle,
+    keys: Vec<String>,
+) -> serde_json::Value {
+    let mut out = serde_json::Map::new();
+    let mut wanted = Vec::new();
+    for key in keys {
+        let Some((source_url, _, entry)) = entry(&key) else {
+            continue;
+        };
+        match cached_file(&entry.sha256) {
+            Some(Ok(fetched)) => {
+                let defs = blockwork_core::frontend::macro_to_dto(&fetched.pack.content).block_defs;
+                out.insert(key, serde_json::json!({ "defs": defs }));
+            }
+            Some(Err(error)) => {
+                out.insert(key, serde_json::json!({ "defs": [], "error": error }));
+            }
+            None => wanted.push((
+                entry.url.clone(),
+                entry.sha256.clone(),
+                is_local(&source_url),
+            )),
+        }
+    }
+    fetch_files(state, app, wanted);
+    serde_json::Value::Object(out)
+}
+
+/// What the pack page shows from the pack file itself: its blocks, their
+/// bodies for the source view, the file, and what it can do. `sha256` picks
+/// an older version the community site still has.
+pub(crate) fn pack_view(
+    state: &SharedState,
+    app: &AppHandle,
+    key: String,
+    sha256: String,
+) -> Result<serde_json::Value, String> {
+    let (source_url, _, entry) =
+        entry(&key).ok_or("That pack isn't in the library any more. Refresh it")?;
+    let (url, sha) = if sha256.is_empty() || sha256 == entry.sha256 {
+        (entry.url.clone(), entry.sha256.clone())
+    } else if crate::community::serves(&source_url)
+        && sha256.len() == 64
+        && sha256.bytes().all(|b| b.is_ascii_hexdigit())
+    {
+        (
+            format!("{}/packs/{sha256}.json", crate::community::site()),
+            sha256.to_ascii_lowercase(),
+        )
+    } else {
+        return Err("That version isn't in the library".into());
+    };
+    match cached_file(&sha) {
+        Some(Ok(fetched)) => {
+            let view = blockwork_core::frontend::macro_to_dto(&fetched.pack.content);
+            Ok(serde_json::json!({
+                "loading": false, "error": "",
+                "sha256": sha,
+                "version": fetched.pack.info.version,
+                "macro": {
+                    "block_defs": view.block_defs, "strands": view.strands, "comments": view.comments,
+                    "floating_values": view.floating_values, "variables": view.variables, "lists": view.lists,
+                },
+                "capabilities": crate::commands::macro_capabilities(&fetched.pack.content),
+                "file": pretty(&fetched.text),
+            }))
+        }
+        Some(Err(error)) => {
+            Ok(serde_json::json!({ "loading": false, "error": error, "sha256": sha }))
+        }
+        None => {
+            fetch_files(state, app, vec![(url, sha.clone(), is_local(&source_url))]);
+            Ok(serde_json::json!({ "loading": true, "error": "", "sha256": sha }))
+        }
+    }
+}
+
+/// The pack file laid out for reading, capped so a huge one doesn't stall the view.
+fn pretty(text: &str) -> String {
+    let pretty = serde_json::from_str::<serde_json::Value>(text)
+        .ok()
+        .and_then(|v| serde_json::to_string_pretty(&v).ok())
+        .unwrap_or_else(|| text.to_string());
+    if pretty.len() > 400_000 {
+        let mut end = 400_000;
+        while !pretty.is_char_boundary(end) {
+            end -= 1;
+        }
+        format!("{}\n...", &pretty[..end])
+    } else {
+        pretty
+    }
 }
 
 /// Opens the review for a pack file the user picked.

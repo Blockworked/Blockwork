@@ -106,6 +106,25 @@ pub fn get_bytes(url: &str, limit: u64) -> Result<Vec<u8>, String> {
         .map_err(|e| format!("couldn't download {url}: {e}"))
 }
 
+/// Sends a request and returns the status and body, whatever the status, so
+/// a caller can read an API's own error. The body is cut off past `limit`.
+pub fn send(method: &str, url: &str, headers: &[(&str, &str)], body: Option<Vec<u8>>, limit: u64) -> Result<(u16, Vec<u8>), String> {
+    let mut builder = ureq::http::Request::builder().method(method).uri(url);
+    for (name, value) in headers {
+        builder = builder.header(*name, *value);
+    }
+    let request = builder.body(body.unwrap_or_default()).map_err(|e| e.to_string())?;
+    let mut response = agent().run(request).map_err(|e| format!("{method} {url} failed: {e}"))?;
+    let status = response.status().as_u16();
+    let bytes = response
+        .body_mut()
+        .with_config()
+        .limit(limit)
+        .read_to_vec()
+        .map_err(|e| format!("couldn't read the response from {url}: {e}"))?;
+    Ok((status, bytes))
+}
+
 pub fn get(url: &str) -> Result<String, String> {
     request("GET", url, "", "")
 }
