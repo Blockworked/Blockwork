@@ -39,6 +39,12 @@ with tempfile.TemporaryDirectory(prefix="blockwork-qml-") as temporary:
     # fallback, not macOS's non-customizable native controls.
     environment = {**os.environ, "QT_QPA_PLATFORM": "offscreen", "QML_DISABLE_DISK_CACHE": "1",
                    "QT_QUICK_CONTROLS_STYLE": "BlockworkStyle", "QT_QUICK_CONTROLS_FALLBACK_STYLE": "Basic"}
+    # Match the Mac app's Qt 6.10 incremental-GC mitigation. An explicit
+    # override still permits before/after diagnostics on the same sources.
+    if sys.platform == "darwin":
+        version = subprocess.check_output([str(qtbin / "qtpaths"), "--qt-version"], text=True).strip()
+        if version.startswith("6.10."):
+            environment.setdefault("QV4_GC_TIMELIMIT", "0")
     started_at = time.time()
     result = subprocess.run([
         str(qtbin / "qmltestrunner"), "-input", str(root / "blockwork-qt/tests"), "-import", str(modules),

@@ -5,9 +5,20 @@ name: Checks
 on:
   push:
   workflow_dispatch:
+    inputs:
+      qml_probe:
+        description: Run only native Mac QML checks for a focused diagnostic
+        type: boolean
+        default: false
+      gc_limit:
+        description: Qt GC time limit (0 matches the Mac app; 1 is the incremental control)
+        type: choice
+        default: '0'
+        options: ['0', '1']
 
 jobs:
   macos-core:
+    if: ${{ !inputs.qml_probe }}
     name: macOS core and standalone FFI (${{ matrix.runner }})
     strategy:
       fail-fast: false
@@ -27,6 +38,7 @@ jobs:
         run: python3 scripts/macos/test-verify-bundle.py
 
   test:
+    if: ${{ !inputs.qml_probe }}
     name: Tests and clippy
     runs-on: ubuntu-latest
 
@@ -89,3 +101,40 @@ jobs:
 
       - name: Tests
         run: cargo test --workspace --exclude blockwork-linux-bridge
+
+  macos-qml-probe:
+    if: ${{ inputs.qml_probe }}
+    name: macOS QML (GC=${{ inputs.gc_limit }}, ${{ matrix.runner }})
+    strategy:
+      fail-fast: false
+      matrix:
+        runner: [macos-latest, macos-15-intel]
+    runs-on: ${{ matrix.runner }}
+    env:
+      QV4_GC_TIMELIMIT: ${{ inputs.gc_limit }}
+    steps:
+      - uses: actions/checkout@v4
+      - name: Checkout pinned Blockstitch QML
+        run: |
+          git init ../blockstitch
+          git -C ../blockstitch remote add origin https://github.com/Blockworked/blockstitch.git
+          git -C ../blockstitch fetch --depth 1 origin af6587a88b3afd2221f4baae23a06e3f4978d6da
+          git -C ../blockstitch checkout --detach FETCH_HEAD
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+      - name: Install Qt
+        run: |
+          python -m pip install aqtinstall==3.3.0
+          python -m aqt install-qt mac desktop 6.10.3 clang_64 --outputdir "$RUNNER_TEMP/Qt"
+          echo "$RUNNER_TEMP/Qt/6.10.3/macos/bin" >> "$GITHUB_PATH"
+      - name: Run application QML tests
+        run: python3 blockwork-qt/tests/run.py ../blockstitch
+      - name: Preserve native QML crash reports
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: qml-probe-crashes-${{ matrix.runner }}-gc${{ inputs.gc_limit }}
+          path: target/macos-qml-crashes/
+          if-no-files-found: ignore
+          retention-days: 14

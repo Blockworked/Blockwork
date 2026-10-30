@@ -81,20 +81,25 @@ Item {
             compare(misses,[],"document confirmation must not replay the gap animation");
         }
         function test_gap_adjustments_ease_in_and_out() {
-            const setup = createTemporaryObject(setupComponent, scene);
-            const canvas = setup.canvas;
-            canvas.strands = [{id:"target",x:0,y:0,instructions:[instruction("target-block")]}];
-            wait(40);
-            const block = canvas.findBlockItem(canvas,"target-block");
-            canvas.applySnap({targetId:"target",path:[{index:0}],x:0,y:0},200,58,false);
-            compare(block.snapShift,50);
-            verify(block.displayedSnapShift < 50);
-            wait(60);
-            verify(block.displayedSnapShift > 0 && block.displayedSnapShift < 50);
-            tryCompare(block,"displayedSnapShift",50);
-            canvas.clearSnap();
-            verify(block.displayedSnapShift > 0);
-            tryCompare(block,"displayedSnapShift",0);
+            const previousScale = Motion.durationScale;
+            Motion.durationScale = 4;
+            try {
+                const setup = createTemporaryObject(setupComponent, scene);
+                const canvas = setup.canvas;
+                canvas.strands = [{id:"target",x:0,y:0,instructions:[instruction("target-block")]}];
+                wait(40);
+                const block = canvas.findBlockItem(canvas,"target-block");
+                canvas.applySnap({targetId:"target",path:[{index:0}],x:0,y:0},200,58,false);
+                compare(block.snapShift,50);
+                verify(block.displayedSnapShift < 50);
+                tryVerify(() => block.displayedSnapShift > 0 && block.displayedSnapShift < 50);
+                tryCompare(block,"displayedSnapShift",50);
+                canvas.clearSnap();
+                verify(block.displayedSnapShift > 0);
+                tryCompare(block,"displayedSnapShift",0);
+            } finally {
+                Motion.durationScale = previousScale;
+            }
         }
         function test_container_adjustments_ease() {
             const previousScale = Motion.durationScale;

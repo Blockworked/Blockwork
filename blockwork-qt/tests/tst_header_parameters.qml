@@ -52,6 +52,9 @@ Item {
             return found;
         }
         function editor() {
+            mouseMove(scene, scene.width - 2, scene.height - 2, 0, Qt.NoButton);
+            BlockRegistry.rows = ({});
+            BlockRegistry.resetOperators();
             const page = createTemporaryObject(editorComponent, scene);
             verify(!!page);
             wait(100);
@@ -195,9 +198,11 @@ Item {
             return all(page).find(o => typeof o.parameterOrigin === "function");
         }
         function dragExisting(chip) {
+            waitForRendering(chip);
             const at = chip.mapToItem(scene, chip.width / 2, chip.height / 2);
+            mouseMove(scene, at.x, at.y, 20, Qt.NoButton);
             mousePress(scene, at.x, at.y);
-            mouseMove(scene, at.x + 80, at.y + 80, 20);
+            mouseMove(scene, at.x + 80, at.y + 80, 20, Qt.LeftButton);
         }
         function test_second_drag_keeps_color() {
             const page = editor();
