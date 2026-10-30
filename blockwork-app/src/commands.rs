@@ -1269,14 +1269,8 @@ pub(crate) async fn confirm_import_macro(
     commit_imported_macros(macros, &allow, state, app)
 }
 
-/// Exports macros as one `.blockwork` bundle, adding any macros they run
-/// by name so it works on its own. Returns how many it wrote.
-pub(crate) fn export_bundle(macro_ids: Vec<String>, name: String, path: String) -> Result<usize, String> {
-    let all = config::get_macros_from_config();
+fn bundle_macros(all: &[Macro], macro_ids: &[String]) -> Vec<Macro> {
     let mut picked: Vec<Macro> = macro_ids.iter().filter_map(|id| all.iter().find(|m| &m.id == id).cloned()).collect();
-    if picked.is_empty() {
-        return Err("No macros to export".into());
-    }
     let mut i = 0;
     while i < picked.len() {
         let mut targets = Vec::new();
@@ -1294,6 +1288,19 @@ pub(crate) fn export_bundle(macro_ids: Vec<String>, name: String, path: String) 
             }
         }
         i += 1;
+    }
+    picked
+}
+
+pub(crate) fn bundle_macro_ids(macro_ids: Vec<String>) -> Vec<String> {
+    bundle_macros(&config::get_macros_from_config(), &macro_ids).into_iter().map(|m| m.id).collect()
+}
+
+/// Exports macros and their dependencies together. Returns how many it wrote.
+pub(crate) fn export_bundle(macro_ids: Vec<String>, name: String, path: String) -> Result<usize, String> {
+    let picked = bundle_macros(&config::get_macros_from_config(), &macro_ids);
+    if picked.is_empty() {
+        return Err("No macros to export".into());
     }
     config::persistence::write_bundle(std::path::Path::new(&path), name.trim(), &picked)?;
     Ok(picked.len())
@@ -3211,6 +3218,29 @@ mod value_location_tests {
             speed_multiplier: 1.0,
             settings: blockwork_core::macros::MacroSettings::default(),
         }
+    }
+
+    #[test]
+    fn bundle_dependencies_are_transitive_and_handle_cycles() {
+        let mut a = test_macro();
+        a.id = "a".into();
+        a.name = "First".into();
+        a.strands[0].instructions = vec![Instruction::new(InstructionKind::RunMacro {
+            target: Value::text(" second "), wait: false,
+        })];
+        let mut b = test_macro();
+        b.id = "b".into();
+        b.name = "Second".into();
+        b.strands[0].instructions = vec![Instruction::new(InstructionKind::StopMacroNamed(Value::text("Third")))];
+        let mut c = test_macro();
+        c.id = "c".into();
+        c.name = "Third".into();
+        c.strands[0].instructions = vec![Instruction::new(InstructionKind::StopMacroNamed(Value::text("First")))];
+        let all = vec![a, b, c];
+        let ids = bundle_macros(&all, &["a".into()]).into_iter().map(|m| m.id).collect::<Vec<_>>();
+        assert_eq!(ids, ["a", "b", "c"]);
+        assert!(bundle_macros(&all, &[]).is_empty());
+        assert!(bundle_macros(&all, &["missing".into()]).is_empty());
     }
 
     #[test]

@@ -25,7 +25,9 @@ Item {
     function addFromFile() { packFileDialog.open(); }
     function share(definition) {
         if (definition && definition.read_only) return;
-        shareDialog.picked = definition ? [definition.id] : [];
+        const saved = ((root.macro && root.macro.pack_exports) || []).find(pack => definition && pack.block_ids.indexOf(definition.id) >= 0);
+        shareDialog.saved = saved || null;
+        shareDialog.picked = saved ? saved.block_ids.filter(id => shareDialog.defs.some(d => d.id === id)) : definition ? [definition.id] : [];
         shareDialog.open();
     }
     function blockLabel(def) {
@@ -449,8 +451,10 @@ Item {
         id: shareDialog
         objectName: "sharePackDialog"
         title: qsTr("Share blocks as a pack")
-        width: Math.min(504, parent.width - 32)
+        width: Math.min(624, parent.width - 32)
+        height: Math.min(740, parent.height - 32)
         standardButtons: Dialog.Ok | Dialog.Cancel
+        property var saved: null
         property var picked: []
         property var variableCandidates: []
         property var variableRoles: Object.create(null)
@@ -465,86 +469,139 @@ Item {
         readonly property var defs: root.macro ? (root.macro.block_defs || []).filter(def => !def.read_only) : []
         acceptText: qsTr("Save pack...")
         onOpened: {
-            variableRoles = Object.create(null);
+            const roles = Object.create(null);
+            if (saved) (saved.variable_roles || []).forEach(r => roles[r.name] = r.role);
+            variableRoles = roles;
             showVariables = false;
-            packName.text = picked.length === 1 ? root.blockLabel(defs.find(d => d.id === picked[0]) || {}) : (root.macro ? root.macro.name : "");
+            packName.text = saved ? saved.info.name : picked.length === 1
+                ? (defs.find(d => d.id === picked[0]) || {pieces: []}).pieces.filter(p => p.kind === "Label").map(p => p.text).join(" ")
+                : root.macro ? root.macro.name : "";
+            packDescription.text = saved ? saved.info.description : "";
+            packAuthor.text = saved ? saved.info.author : "";
+            packVersion.text = saved ? saved.info.version : "1.0.0";
             packName.forceActiveFocus();
         }
-        contentItem: ColumnLayout {
-            implicitWidth: 460; spacing: 8
-            Text { text: qsTr("Name"); color: Theme.textDim; font.pixelSize: 12 }
-            BwTextField { id: packName; Layout.fillWidth: true }
-            Text { text: qsTr("What the blocks do"); color: Theme.textDim; font.pixelSize: 12 }
-            BwTextField { id: packDescription; Layout.fillWidth: true }
-            RowLayout {
-                Layout.fillWidth: true; spacing: 8
-                ColumnLayout {
-                    Layout.fillWidth: true; spacing: 4
-                    Text { text: qsTr("Author"); color: Theme.textDim; font.pixelSize: 12 }
-                    BwTextField { id: packAuthor; Layout.fillWidth: true }
-                }
-                ColumnLayout {
-                    spacing: 4
-                    Text { text: qsTr("Version"); color: Theme.textDim; font.pixelSize: 12 }
-                    BwTextField { id: packVersion; Layout.preferredWidth: 110; text: "1.0.0" }
-                }
-            }
-            Text { topPadding: 4; text: qsTr("Blocks"); color: Theme.textDim; font.pixelSize: 12 }
-            Repeater {
-                model: shareDialog.defs
-                delegate: BwCheckBox {
-                    required property var modelData
-                    text: root.blockLabel(modelData)
-                    checked: shareDialog.picked.indexOf(modelData.id) >= 0
-                    onToggled: shareDialog.picked = checked ? shareDialog.picked.concat([modelData.id]) : shareDialog.picked.filter(id => id !== modelData.id)
-                }
-            }
-            BwButton {
-                visible: shareDialog.variableCandidates.length > 0
-                flat: true; text: qsTr("Pack variables")
-                iconName: shareDialog.showVariables ? "chevron-up" : "chevron-down"
-                onClicked: shareDialog.showVariables = !shareDialog.showVariables
-            }
+        contentItem: ScrollView {
+            id: shareScroll
+            objectName: "sharePackScroll"
+            clip: true; contentWidth: availableWidth
             ColumnLayout {
-                visible: shareDialog.showVariables
-                Layout.fillWidth: true
-                Text {
-                    Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                    text: qsTr("Keep working variables internal. Outputs become reporter blocks; settings appear in the pack's settings. Use block inputs for per-call options.")
-                }
-                ScrollView {
-                    id: authorVariablesScroll
-                    Layout.fillWidth: true
-                    Layout.preferredHeight: Math.min(240, authorVariablesContent.implicitHeight)
-                    clip: true; contentWidth: availableWidth
+                width: shareScroll.availableWidth; spacing: 8
+                Text { text: qsTr("Name"); color: Theme.textDim; font.pixelSize: 12 }
+                BwTextField { id: packName; objectName: "sharePackName"; Layout.fillWidth: true; Layout.minimumWidth: 0 }
+                Text { text: qsTr("What the blocks do"); color: Theme.textDim; font.pixelSize: 12 }
+                BwTextField { id: packDescription; objectName: "sharePackDescription"; Layout.fillWidth: true; Layout.minimumWidth: 0 }
+                RowLayout {
+                    Layout.fillWidth: true; spacing: 8
                     ColumnLayout {
-                        id: authorVariablesContent
-                        width: authorVariablesScroll.availableWidth
-                        Repeater {
-                            objectName: "packVariableRoleRows"
-                            model: shareDialog.variableCandidates
-                            delegate: RowLayout {
-                                required property string modelData
-                                Layout.fillWidth: true
-                                Text { Layout.fillWidth: true; text: modelData; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 12 }
-                                BwComboBox {
-                                    objectName: "packVariableRole"
-                                    model: [qsTr("Internal"), qsTr("Output"), qsTr("Setting")]
-                                    currentIndex: ["internal", "output", "setting"].indexOf(shareDialog.variableRoles[modelData] || "internal")
-                                    onActivated: {
-                                        const roles = Object.assign(Object.create(null), shareDialog.variableRoles);
-                                        roles[modelData] = ["internal", "output", "setting"][currentIndex];
-                                        shareDialog.variableRoles = roles;
+                        Layout.fillWidth: true; spacing: 4
+                        Text { text: qsTr("Author"); color: Theme.textDim; font.pixelSize: 12 }
+                        BwTextField { id: packAuthor; objectName: "sharePackAuthor"; Layout.fillWidth: true; Layout.minimumWidth: 0 }
+                    }
+                    ColumnLayout {
+                        spacing: 4
+                        Text { text: qsTr("Version"); color: Theme.textDim; font.pixelSize: 12 }
+                        BwTextField { id: packVersion; objectName: "sharePackVersion"; Layout.preferredWidth: 110; text: "1.0.0" }
+                    }
+                }
+                Text { topPadding: 4; text: qsTr("Blocks"); color: Theme.textDim; font.pixelSize: 12 }
+                Repeater {
+                    objectName: "sharePackBlockRows"
+                    model: shareDialog.defs
+                    delegate: RowLayout {
+                        id: blockRow
+                        required property var modelData
+                        Layout.fillWidth: true
+                        BwCheckBox {
+                            objectName: "sharePackBlockCheck"
+                            checked: shareDialog.picked.indexOf(blockRow.modelData.id) >= 0
+                            onToggled: shareDialog.picked = checked ? shareDialog.picked.concat([blockRow.modelData.id]) : shareDialog.picked.filter(id => id !== blockRow.modelData.id)
+                        }
+                        Flickable {
+                            objectName: "sharePackBlockViewport"
+                            Layout.fillWidth: true; Layout.minimumWidth: 0
+                            Layout.preferredHeight: preview.height + 8
+                            contentWidth: preview.width; contentHeight: height
+                            clip: true; flickableDirection: Flickable.HorizontalFlick
+                            Loader {
+                                id: preview
+                                objectName: "sharePackBlockPreview"
+                                readonly property bool reporter: blockRow.modelData.shape === "ReturnsValue" || blockRow.modelData.shape === "ReturnsBool"
+                                readonly property var args: (blockRow.modelData.pieces || []).filter(p => p.kind === "Input").map(p => p.default_value || {kind: "Number", value: 0})
+                                width: item ? item.implicitWidth : 0
+                                height: item ? item.implicitHeight : 0
+                                y: 4
+                                sourceComponent: reporter ? valuePreview : instructionPreview
+                                Component {
+                                    id: instructionPreview
+                                    InstructionBlock {
+                                        locked: true; paletteMode: true
+                                        blockDefinitions: shareDialog.defs
+                                        instruction: ({type: (blockRow.modelData.pieces || []).some(p => p.kind === "Branch") ? "BranchCallBlock" : "CallBlock",
+                                            block_id: blockRow.modelData.id, args: preview.args, branches: []})
+                                    }
+                                }
+                                Component {
+                                    id: valuePreview
+                                    ValueChip {
+                                        editable: false; paletteMode: true
+                                        blockDefinitions: shareDialog.defs
+                                        forceBoolean: blockRow.modelData.shape === "ReturnsBool"
+                                        valueData: ({kind: "Call", block_id: blockRow.modelData.id, args: preview.args})
+                                    }
+                                }
+                                enabled: false
+                            }
+                        }
+                    }
+                }
+                BwButton {
+                    visible: shareDialog.variableCandidates.length > 0
+                    flat: true; text: qsTr("Pack variables")
+                    iconName: shareDialog.showVariables ? "chevron-up" : "chevron-down"
+                    onClicked: shareDialog.showVariables = !shareDialog.showVariables
+                }
+                ColumnLayout {
+                    visible: shareDialog.showVariables
+                    Layout.fillWidth: true
+                    Text {
+                        Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
+                        text: qsTr("Keep working variables internal. Outputs become reporter blocks; settings appear in the pack's settings. Use block inputs for per-call options.")
+                    }
+                    ScrollView {
+                        id: authorVariablesScroll
+                        Layout.fillWidth: true
+                        Layout.preferredHeight: Math.min(240, authorVariablesContent.implicitHeight)
+                        clip: true; contentWidth: availableWidth
+                        ColumnLayout {
+                            id: authorVariablesContent
+                            width: authorVariablesScroll.availableWidth
+                            Repeater {
+                                objectName: "packVariableRoleRows"
+                                model: shareDialog.variableCandidates
+                                delegate: RowLayout {
+                                    required property string modelData
+                                    Layout.fillWidth: true
+                                    Text { Layout.fillWidth: true; text: modelData; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 12 }
+                                    BwComboBox {
+                                        objectName: "packVariableRole"
+                                        model: [qsTr("Internal"), qsTr("Output"), qsTr("Setting")]
+                                        currentIndex: ["internal", "output", "setting"].indexOf(shareDialog.variableRoles[modelData] || "internal")
+                                        onActivated: {
+                                            const roles = Object.assign(Object.create(null), shareDialog.variableRoles);
+                                            roles[modelData] = ["internal", "output", "setting"][currentIndex];
+                                            shareDialog.variableRoles = roles;
+                                        }
                                     }
                                 }
                             }
                         }
                     }
                 }
-            }
-            Text {
-                Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                text: qsTr("Blocks these use come along, with the variables and lists they need. Secret values are left out. Keep the same name for later versions so they replace the old blocks.")
+                Text {
+                    Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
+                    text: qsTr("Blocks these use come along, with the variables and lists they need. Secret values are left out. Keep the same name for later versions so they replace the old blocks.")
+                }
             }
         }
         onAccepted: {
@@ -562,7 +619,7 @@ Item {
         defaultSuffix: "blockpack"
         nameFilters: [qsTr("Block packs (*.blockpack)")]
         onAccepted: root.daemonCall("export_block_pack", {
-            blockIds: shareDialog.picked, name: packName.text, description: packDescription.text,
+            blockIds: shareDialog.picked, id: shareDialog.saved ? shareDialog.saved.info.id : "", name: packName.text, description: packDescription.text,
             author: packAuthor.text, version: packVersion.text,
             variableRoles: shareDialog.variableCandidates.map(name => ({name: name, role: shareDialog.variableRoles[name] || "internal"})), path: root.localPath(selectedFile)
         }, count => {

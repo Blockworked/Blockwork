@@ -26,7 +26,7 @@ pub const OLD_DEFAULT_INDEXES: [&str; 2] = [
 pub const MAX_DOWNLOAD: u64 = 2 * 1024 * 1024;
 
 /// A pack's description, as its file and the index give it.
-#[derive(Debug, Clone, PartialEq, Default, Serialize, Deserialize)]
+#[derive(Debug, Clone, PartialEq, Hash, Default, Serialize, Deserialize)]
 pub struct PackInfo {
     /// Stable id, so a newer version replaces the blocks an older one added.
     pub id: String,
@@ -37,6 +37,15 @@ pub struct PackInfo {
     pub author: String,
     #[serde(default)]
     pub version: String,
+}
+
+/// Last successful export of a pack authored in this macro.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+pub struct PackExport {
+    pub info: PackInfo,
+    pub block_ids: Vec<String>,
+    #[serde(default)]
+    pub variable_roles: Vec<VariableInterface>,
 }
 
 /// A pack: some custom blocks with their bodies, plus the variables and

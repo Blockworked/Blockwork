@@ -45,6 +45,11 @@ Item {
     }
     // Several macros in one .blockwork file; the daemon adds macros they run.
     function exportBundle(macroIds, name) {
+        bundlePicker.bundleName = name;
+        bundlePicker.selectedIds = macroIds.slice();
+        bundlePicker.open();
+    }
+    function saveBundle(macroIds, name) {
         bundleDialog.macroIds = macroIds;
         bundleDialog.bundleName = name;
         const folder = StandardPaths.writableLocation(StandardPaths.DocumentsLocation).toString();
@@ -93,8 +98,68 @@ Item {
         nameFilters: [qsTr("Blockwork macros (*.macro)")]
         onAccepted: root.daemonCall("export_macro", { macroId: macroId, path: root.localPath(selectedFile) }, () => {})
     }
+    AppDialog {
+        id: bundlePicker
+        objectName: "bundlePicker"
+        title: qsTr("Choose macros to export")
+        width: Math.min(504, parent.width - 32)
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        acceptText: qsTr("Save bundle...")
+        property string bundleName: ""
+        property var selectedIds: []
+        property var includedIds: []
+        property int requestSerial: 0
+        readonly property var macroIds: selectedIds
+        function updateAccept() {
+            const button = standardButton(Dialog.Ok);
+            if (button) button.enabled = selectedIds.length > 0;
+        }
+        onSelectedIdsChanged: {
+            updateAccept();
+            const serial = ++requestSerial;
+            includedIds = selectedIds.slice();
+            if (!selectedIds.length) return;
+            root.daemonCall("bundle_macro_ids", {macroIds: selectedIds}, ids => {
+                if (serial !== requestSerial) return;
+                includedIds = ids;
+            });
+        }
+        onOpened: updateAccept()
+        contentItem: ScrollView {
+            id: bundleScroll
+            implicitHeight: Math.min(400, bundleRows.implicitHeight)
+            clip: true; contentWidth: availableWidth
+            Column {
+                id: bundleRows
+                width: bundleScroll.availableWidth
+                Text {
+                    width: parent.width; wrapMode: Text.WordWrap
+                    text: qsTr("Macros used by your selection are included automatically.")
+                    color: Theme.textDim; font.pixelSize: 12
+                }
+                Repeater {
+                    model: root.appState.library || []
+                    delegate: BwCheckBox {
+                        required property var modelData
+                        objectName: "bundleMacro_" + modelData.id
+                        width: bundleRows.width
+                        text: modelData.name
+                        readonly property bool dependency: bundlePicker.includedIds.indexOf(modelData.id) >= 0 && bundlePicker.selectedIds.indexOf(modelData.id) < 0
+                        checked: bundlePicker.includedIds.indexOf(modelData.id) >= 0
+                        enabled: !dependency
+                        opacity: dependency ? 0.6 : 1
+                        onToggled: bundlePicker.selectedIds = checked
+                            ? bundlePicker.selectedIds.concat([modelData.id])
+                            : bundlePicker.selectedIds.filter(id => id !== modelData.id)
+                    }
+                }
+            }
+        }
+        onAccepted: root.saveBundle(selectedIds, bundleName)
+    }
     FileDialog {
         id: bundleDialog
+        objectName: "bundleSaveDialog"
         property var macroIds: []
         property string bundleName: ""
         title: qsTr("Export bundle")

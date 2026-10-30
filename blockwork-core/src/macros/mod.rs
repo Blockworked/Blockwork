@@ -2092,6 +2092,9 @@ pub struct MacroSettings {
     pub catch_up_missed: bool,    /// Block packs this macro's blocks came from.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub block_packs: Vec<crate::block_packs::PackRecord>,
+    /// Metadata for packs authored here, restored on the next export.
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub pack_exports: Vec<crate::block_packs::PackExport>,
 }
 
 /// Deserialization shape supporting both the current multi-strand format and

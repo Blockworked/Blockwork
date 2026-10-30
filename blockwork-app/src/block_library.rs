@@ -430,19 +430,84 @@ pub(crate) fn set_setting(state: &SharedState, app: &AppHandle, pack_id: String,
 
 /// Writes the chosen blocks of the open macro, and the blocks they call,
 /// to a pack file. Returns how many blocks it holds.
-pub(crate) fn export(state: &SharedState, block_ids: Vec<String>, info: block_packs::PackInfo, path: String, variable_roles: Vec<block_packs::VariableInterface>) -> Result<usize, String> {
-    let s = state.lock().map_err(|e| e.to_string())?;
-    let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+pub(crate) fn export(state: &SharedState, app: &AppHandle, block_ids: Vec<String>, info: block_packs::PackInfo, path: String, variable_roles: Vec<block_packs::VariableInterface>) -> Result<usize, String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
+    let count = export_to_file(mac, block_ids, info, &path, variable_roles)?;
+    crate::commands::auto_save(&mut s);
+    emit_state_updated(app, &s);
+    Ok(count)
+}
+
+fn export_to_file(mac: &mut blockwork_core::macros::Macro, mut block_ids: Vec<String>, info: block_packs::PackInfo,
+    path: &str, variable_roles: Vec<block_packs::VariableInterface>) -> Result<usize, String> {
     let mut pack = block_packs::pack_from_macro(mac, &block_ids, info)?;
     pack.variable_roles = variable_roles.into_iter().filter(|r| pack.content.variables.iter().any(|v| v.name == r.name)).collect();
     let text = block_packs::write_pack(&pack)?;
-    std::fs::write(&path, text).map_err(|e| format!("Couldn't write '{path}': {e}"))?;
+    std::fs::write(path, text).map_err(|e| format!("Couldn't write '{path}': {e}"))?;
+    block_ids.sort();
+    block_ids.dedup();
+    mac.settings.pack_exports.retain(|saved| saved.info.id != pack.info.id && saved.block_ids != block_ids);
+    mac.settings.pack_exports.push(block_packs::PackExport {
+        info: pack.info.clone(), block_ids, variable_roles: pack.variable_roles.clone(),
+    });
     Ok(pack.content.block_defs.len())
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn pack_export_metadata_survives_reload_and_tracks_the_latest_version() {
+        use blockwork_core::macros::{BlockShape, Macro};
+        let mut mac = Macro::new("Author".into(), String::new(), vec![]);
+        let first = mac.create_block(vec![], BlockShape::Normal, "#4C97FF".into(), 0, 0);
+        let second = mac.create_block(vec![], BlockShape::Normal, "#4C97FF".into(), 0, 0);
+        let path = std::env::temp_dir().join(format!("blockwork-pack-{}.blockpack", uuid::Uuid::new_v4()));
+        let info = block_packs::PackInfo {
+            name: "Aim helpers".into(), description: "Aim at the nearest player.".into(),
+            author: "Alice".into(), version: "1.2.0".into(), ..Default::default()
+        };
+        export_to_file(&mut mac, vec![first.clone(), second.clone()], info.clone(), path.to_str().unwrap(), vec![]).unwrap();
+        let mut reloaded: Macro = serde_json::from_str(&serde_json::to_string(&mac).unwrap()).unwrap();
+        let saved = &reloaded.settings.pack_exports[0];
+        assert_eq!(saved.info.description, info.description);
+        assert_eq!(saved.info.version, "1.2.0");
+        assert_eq!(saved.info.author, "Alice");
+        assert_eq!(blockwork_core::frontend::macro_to_dto(&reloaded).pack_exports, reloaded.settings.pack_exports);
+        let next = block_packs::PackInfo { version: "1.3.0".into(), ..info };
+        export_to_file(&mut reloaded, vec![second, first], next, path.to_str().unwrap(), vec![]).unwrap();
+        assert_eq!(reloaded.settings.pack_exports.len(), 1);
+        assert_eq!(reloaded.settings.pack_exports[0].info.version, "1.3.0");
+        let written = block_packs::read_pack(&std::fs::read_to_string(&path).unwrap()).unwrap();
+        assert_eq!(written.info, reloaded.settings.pack_exports[0].info);
+        assert!(written.content.settings.pack_exports.is_empty());
+        let third = reloaded.create_block(vec![], BlockShape::Normal, "#4C97FF".into(), 0, 0);
+        let mut expanded = reloaded.settings.pack_exports[0].block_ids.clone();
+        expanded.push(third);
+        let info = reloaded.settings.pack_exports[0].info.clone();
+        export_to_file(&mut reloaded, expanded, info, path.to_str().unwrap(), vec![]).unwrap();
+        assert_eq!(reloaded.settings.pack_exports.len(), 1);
+        assert_eq!(reloaded.settings.pack_exports[0].block_ids.len(), 3);
+        std::fs::remove_file(path).unwrap();
+    }
+
+    #[test]
+    fn failed_pack_export_keeps_the_saved_metadata() {
+        use blockwork_core::macros::{BlockShape, Macro};
+        let mut mac = Macro::new("Author".into(), String::new(), vec![]);
+        let block = mac.create_block(vec![], BlockShape::Normal, "#4C97FF".into(), 0, 0);
+        let saved = block_packs::PackExport {
+            info: block_packs::PackInfo { name: "Helpers".into(), version: "1.0.0".into(), ..Default::default() },
+            block_ids: vec![block.clone()], variable_roles: vec![],
+        };
+        mac.settings.pack_exports.push(saved.clone());
+        let path = std::env::temp_dir().join(format!("blockwork-missing-{}", uuid::Uuid::new_v4())).join("pack.blockpack");
+        let next = block_packs::PackInfo { version: "2.0.0".into(), ..saved.info.clone() };
+        assert!(export_to_file(&mut mac, vec![block], next, path.to_str().unwrap(), vec![]).is_err());
+        assert_eq!(mac.settings.pack_exports, vec![saved]);
+    }
 
     #[test]
     fn installed_packs_stay_in_one_sorted_list_when_the_source_disappears() {

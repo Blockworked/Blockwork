@@ -71,6 +71,7 @@ pub struct MacroDto {
     /// values aren't surfaced to the frontend.
     pub variables: Vec<String>,
     pub pack_data: Vec<PackDataDto>,
+    pub pack_exports: Vec<block_packs::PackExport>,
     /// Macro-scoped lists, including their literal items for the list editor.
     pub lists: Vec<ListDto>,
     pub signals: Vec<String>,
@@ -1627,6 +1628,7 @@ pub fn macro_to_dto(mac: &Macro) -> MacroDto {
             comment.attached_to.as_ref().is_none_or(|id| !hidden_instruction_ids.contains(id))
         }).cloned().collect(),
         variables: mac.variables.iter().map(|v| v.name.clone()).collect(),
+        pack_exports: mac.settings.pack_exports.clone(),
         pack_data: mac.settings.block_packs.iter().map(|pack| PackDataDto {
             id: pack.id.clone(), name: pack.name.clone(),
             variables: pack.variables.iter().map(|var| PackVariableDto {

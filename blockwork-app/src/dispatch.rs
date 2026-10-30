@@ -112,6 +112,7 @@ impl Backend {
                 let (kind, allowed): (String, bool) = (arg(&args, "kind")?, arg(&args, "allowed")?);
                 to_json(commands::set_macro_permission(&self.state, &self.app, &kind, allowed)?)
             }
+            "bundle_macro_ids" => to_json(commands::bundle_macro_ids(arg(&args, "macroIds")?)),
             "export_bundle" => {
                 let ids: Vec<String> = arg(&args, "macroIds")?;
                 let (name, path): (String, String) = (arg(&args, "name")?, arg(&args, "path")?);
@@ -158,14 +159,14 @@ impl Backend {
             "export_block_pack" => {
                 let block_ids: Vec<String> = arg(&args, "blockIds")?;
                 let info = blockwork_core::block_packs::PackInfo {
-                    id: String::new(),
+                    id: arg::<Option<String>>(&args, "id")?.unwrap_or_default(),
                     name: arg(&args, "name")?,
                     description: arg::<Option<String>>(&args, "description")?.unwrap_or_default(),
                     author: arg::<Option<String>>(&args, "author")?.unwrap_or_default(),
                     version: arg::<Option<String>>(&args, "version")?.unwrap_or_default(),
                 };
                 let path: String = arg(&args, "path")?;
-                to_json(crate::block_library::export(&self.state, block_ids, info, path, arg::<Option<Vec<blockwork_core::block_packs::VariableInterface>>>(&args, "variableRoles")?.unwrap_or_default())?)
+                to_json(crate::block_library::export(&self.state, &self.app, block_ids, info, path, arg::<Option<Vec<blockwork_core::block_packs::VariableInterface>>>(&args, "variableRoles")?.unwrap_or_default())?)
             }
             "set_browser_bridge" => {
                 let (enabled, port): (bool, u16) = (arg(&args, "enabled")?, arg(&args, "port")?);
