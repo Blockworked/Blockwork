@@ -476,6 +476,13 @@ pub fn existing_blocks(mac: &Macro, pack: &BlockPack) -> Vec<String> {
 pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeReport {
     migrate_variables(mac);
     let previous = mac.settings.block_packs.iter().find(|p| p.id == pack.info.id).cloned();
+    // Names the installed bodies read, before the new bodies replace them.
+    let old_names = previous.as_ref().map(|p| {
+        let strands: Vec<_> = mac.strands.iter()
+            .filter(|s| s.block_header_id().is_some_and(|id| p.blocks.iter().any(|b| b == id)))
+            .cloned().collect();
+        variable_names_used(&strands)
+    }).unwrap_or_default();
     let mut report = MergeReport::default();
     // New bodies go to the right of everything on the canvas.
     let right = mac.strands.iter().map(|s| s.x).max().map_or(0, |x| x + 420);
@@ -515,7 +522,9 @@ pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeRepor
     }
     for var in &declared {
         // Existing shared variables remain shared when updating an old install.
-        let shared = previous.is_some() && !variables.iter().any(|v| v.name == var.name)
+        // A name the old bodies never read is new and stays private, even if
+        // the user has a variable called that.
+        let shared = old_names.contains(&var.name) && !variables.iter().any(|v| v.name == var.name)
             && mac.variables.iter().any(|v| v.name == var.name);
         if shared { continue; }
         let role = pack.variable_roles.iter().find(|r| r.name == var.name).map(|r| r.role).unwrap_or_default();
@@ -526,6 +535,8 @@ pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeRepor
             variables.push(PackVariable { name: var.name.clone(), value: var.value.clone(), role });
         }
     }
+    // Private scratch the new version no longer uses, e.g. renamed variables.
+    variables.retain(|v| v.role != VariableRole::Internal || declared.iter().any(|d| d.name == v.name));
     for list in &pack.content.lists {
         if !mac.lists.iter().any(|l| l.name == list.name) {
             mac.graph.lists.push(blockstitch_core::graph::ListDef { editor_visible: false, ..list.clone() });

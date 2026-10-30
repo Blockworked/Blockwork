@@ -445,6 +445,44 @@ mod tests {
     }
 
     #[test]
+    fn renamed_variables_stay_private_and_drop_the_old_names() {
+        fn rename(pack: &mut BlockPack, from: &str, to: &str) {
+            for var in &mut pack.content.graph.variables {
+                if var.name == from {
+                    var.name = to.into();
+                }
+            }
+            for strand in &mut pack.content.graph.strands {
+                for ins in &mut strand.instructions {
+                    ins.kind.visit_refs_mut(&mut |_, name| {
+                        if name == from {
+                            *name = to.into();
+                        }
+                    });
+                }
+            }
+        }
+        let mut old = pack("renamed");
+        rename(&mut old, "counter", "Author renamed: counter");
+        let mut mac = Macro::new("User".into(), String::new(), vec![]);
+        mac.graph.variables.push(VariableDef {
+            name: "counter".into(),
+            value: Evaluated::Number(99.0),
+        });
+        merge_into(&mut mac, &old, "1");
+        merge_into(&mut mac, &pack("renamed"), "2");
+        assert_eq!(mac.variables.len(), 1);
+        assert_eq!(mac.variables[0].value, Evaluated::Number(99.0));
+        let mut names: Vec<_> = mac.settings.block_packs[0]
+            .variables
+            .iter()
+            .map(|v| v.name.as_str())
+            .collect();
+        names.sort();
+        assert_eq!(names, vec!["counter", "status"]);
+    }
+
+    #[test]
     fn legacy_shared_names_are_not_split_between_packs() {
         let mut mac = Macro::new("User".into(), String::new(), vec![]);
         let one = pack("one");
