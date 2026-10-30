@@ -65,7 +65,8 @@ evdev = { workspace = true, optional = true }
 # Read-only cursor-position query via XWayland (see backend/x11_cursor.rs) -
 # not the removed XTest emission backend; core X11 protocol only.
 x11rb = { workspace = true, optional = true }
-enigo = { workspace = true, features = ["x11rb", "libei", "smol"], optional = true }
+# Keep Enigo on the portal; its X11 backend takes priority even on Wayland.
+enigo = { workspace = true, features = ["libei", "smol"], optional = true }
 wayland-client = { workspace = true, optional = true }
 wayland-protocols = { workspace = true, optional = true }
 # Desktop notifications over the session bus (see src/notify.rs).

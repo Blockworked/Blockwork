@@ -305,6 +305,24 @@ fn move_mouse_abs_libei(x: i32, y: i32) -> Result<(), String> {
     Ok(())
 }
 
+fn click_mouse_abs_portal(mouse: &mut impl Mouse, x: i32, y: i32, button: MacroButton) -> Result<(), String> {
+    let button = match button {
+        MacroButton::Left => enigo::Button::Left,
+        MacroButton::Right => enigo::Button::Right,
+        MacroButton::Middle => enigo::Button::Middle,
+        MacroButton::Back => enigo::Button::Back,
+        MacroButton::Forward => enigo::Button::Forward,
+        MacroButton::ScrollUp => enigo::Button::ScrollUp,
+        MacroButton::ScrollDown => enigo::Button::ScrollDown,
+        MacroButton::ScrollLeft => enigo::Button::ScrollLeft,
+        MacroButton::ScrollRight => enigo::Button::ScrollRight,
+        MacroButton::Other(code) => return Err(format!("no portal mapping for mouse button {code}")),
+    };
+    mouse.move_mouse(x, y, EnigoCoordinate::Abs).map_err(|err| err.to_string())?;
+    cursor_track::set_exact(f64::from(x), f64::from(y));
+    mouse.button(button, enigo::Direction::Click).map_err(|err| err.to_string())
+}
+
 /// Opens the libei connection (and so the portal permission dialog) if it
 /// hasn't been opened yet.
 fn request_libei() -> Result<(), String> {
@@ -537,6 +555,17 @@ impl InputBackend for EvdevBackend {
         let dx = x - cur_x;
         let dy = y - cur_y;
         self.move_mouse_rel(dx, dy)
+    }
+
+    fn click_mouse_abs(&mut self, x: i32, y: i32, button: MacroButton) -> Result<(), String> {
+        if !wayland_display::is_wayland_session() {
+            self.move_mouse_abs(x, y)?;
+            return self.button(button, Direction::Click);
+        }
+
+        // Use one portal connection so the click cannot overtake the move.
+        let mut state = libei().lock().map_err(|err| err.to_string())?;
+        click_mouse_abs_portal(ensure_libei(&mut state)?, x, y, button)
     }
 
     fn scroll(&mut self, amount: i32, axis: Axis) -> Result<(), String> {
@@ -1147,6 +1176,51 @@ fn reemit(vd: &'static Mutex<VirtualDevice>, events: &[InputEvent]) {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[derive(Default)]
+    struct PortalMouse {
+        events: Vec<&'static str>,
+        fail_move: bool,
+        fail_click: bool,
+    }
+
+    impl Mouse for PortalMouse {
+        fn move_mouse(&mut self, x: i32, y: i32, coordinate: EnigoCoordinate) -> enigo::InputResult<()> {
+            assert_eq!((x, y, coordinate), (120, 240, EnigoCoordinate::Abs));
+            self.events.push("move");
+            if self.fail_move { Err(enigo::InputError::Simulate("move failed")) } else { Ok(()) }
+        }
+        fn button(&mut self, button: enigo::Button, direction: enigo::Direction) -> enigo::InputResult<()> {
+            assert_eq!((button, direction), (enigo::Button::Right, enigo::Direction::Click));
+            self.events.push("click");
+            if self.fail_click { Err(enigo::InputError::Simulate("click failed")) } else { Ok(()) }
+        }
+        fn scroll(&mut self, _: i32, _: enigo::Axis) -> enigo::InputResult<()> { unreachable!() }
+        fn main_display(&self) -> enigo::InputResult<(i32, i32)> { unreachable!() }
+        fn location(&self) -> enigo::InputResult<(i32, i32)> { unreachable!() }
+    }
+
+    #[test]
+    fn image_click_uses_portal_after_absolute_move() {
+        let mut mouse = PortalMouse::default();
+        click_mouse_abs_portal(&mut mouse, 120, 240, MacroButton::Right).unwrap();
+        assert_eq!(mouse.events, ["move", "click"]);
+    }
+
+    #[test]
+    fn image_click_stops_if_portal_move_fails() {
+        let mut mouse = PortalMouse { fail_move: true, ..Default::default() };
+        assert!(click_mouse_abs_portal(&mut mouse, 120, 240, MacroButton::Right).is_err());
+        assert_eq!(mouse.events, ["move"]);
+    }
+
+    #[test]
+    fn image_click_reports_portal_click_failure() {
+        let mut mouse = PortalMouse { fail_click: true, ..Default::default() };
+        let err = click_mouse_abs_portal(&mut mouse, 120, 240, MacroButton::Right).unwrap_err();
+        assert!(err.contains("click failed"));
+        assert_eq!(mouse.events, ["move", "click"]);
+    }
 
     #[test]
     fn text_expansion_can_retype_its_held_trigger() {

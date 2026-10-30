@@ -37,6 +37,11 @@ pub trait InputBackend: Send + 'static {
     fn button(&mut self, button: MacroButton, dir: Direction) -> Result<(), String>;
     fn move_mouse_rel(&mut self, dx: i32, dy: i32) -> Result<(), String>;
     fn move_mouse_abs(&mut self, x: i32, y: i32) -> Result<(), String>;
+    /// Keeps positioning and clicking ordered on backends with multiple input paths.
+    fn click_mouse_abs(&mut self, x: i32, y: i32, button: MacroButton) -> Result<(), String> {
+        self.move_mouse_abs(x, y)?;
+        self.button(button, Direction::Click)
+    }
     fn scroll(&mut self, amount: i32, axis: Axis) -> Result<(), String>;
     fn text(&mut self, s: &str) -> Result<(), String>;
     fn cursor_pos(&self) -> Option<(i32, i32)>;

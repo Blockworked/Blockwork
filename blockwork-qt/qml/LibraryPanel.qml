@@ -106,7 +106,7 @@ Popup {
                         visible: row.isFolder; width: 14; height: 14; color: Theme.textDim
                         name: row.isFolder && row.modelData.open ? "chevron-down" : "chevron-right"
                     }
-                    LucideIcon { name: row.isFolder ? "folder" : "blocks"; width: 15; height: 15; color: row.isFolder ? Theme.warning : Theme.textDim }
+                    LucideIcon { visible: row.isFolder; name: "folder"; width: 15; height: 15; color: Theme.warning }
                     Text {
                         Layout.fillWidth: true; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 13
                         font.weight: row.isFolder || row.current ? Font.DemiBold : Font.Normal
@@ -125,11 +125,11 @@ Popup {
                         ToolTip.visible: shieldHover.hovered; ToolTip.text: qsTr("Asks before risky actions (see its Macro settings)")
                         HoverHandler { id: shieldHover }
                     }
-                    LucideIcon {
+                    Text {
                         visible: !row.isFolder && row.entry.has_triggers && row.entry.always_listen
-                        name: "zap"; width: 14; height: 14; color: Theme.accent
-                        ToolTip.visible: zapHover.hovered; ToolTip.text: qsTr("Listens for its triggers even when it isn't open")
-                        HoverHandler { id: zapHover }
+                        text: qsTr("Always listening"); color: Theme.accent; font.pixelSize: 11
+                        ToolTip.visible: listeningHover.hovered; ToolTip.text: qsTr("Listens for its triggers even when it isn't open")
+                        HoverHandler { id: listeningHover }
                     }
                     BwButton {
                         id: moreButton

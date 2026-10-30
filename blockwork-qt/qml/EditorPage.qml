@@ -16,6 +16,13 @@ Item {
     property var macroFiles: null
     property var blockLibrary: null
     readonly property var macro: appState.current_macro
+    // Preserve metadata identity so block moves do not refresh palette controls.
+    readonly property string blockDefinitionsKey: JSON.stringify(root.macro && root.macro.block_defs ? root.macro.block_defs : [])
+    readonly property var macroBlockDefinitions: JSON.parse(blockDefinitionsKey)
+    readonly property string macroVariablesKey: JSON.stringify(root.macro && root.macro.variables ? root.macro.variables : [])
+    readonly property var macroVariables: JSON.parse(macroVariablesKey)
+    readonly property string macroListsKey: JSON.stringify(root.macro && root.macro.lists ? root.macro.lists : [])
+    readonly property var macroLists: JSON.parse(macroListsKey)
     readonly property bool recording: appState.recording_phase && appState.recording_phase.phase === "Active"
     readonly property bool recordingCountdown: !!appState.recording_phase && appState.recording_phase.phase === "Countdown"
     // Counting down or recording: the canvas stays locked for both.
@@ -515,7 +522,6 @@ Item {
                     Accessible.role: Accessible.Button; Accessible.name: qsTr("Macro library")
                     RowLayout {
                         anchors.fill: parent; anchors.leftMargin: 10; anchors.rightMargin: 8; spacing: 7
-                        LucideIcon { name: "blocks"; width: 15; height: 15; color: Theme.textDim }
                         Text {
                             Layout.fillWidth: true; elide: Text.ElideRight; font.pixelSize: 13
                             text: root.macro ? (root.macro.settings.folder ? root.macro.settings.folder + " / " : "") + root.macro.name : qsTr("Choose a macro")
@@ -736,9 +742,9 @@ Item {
                     extraOperators: root.extraOperators
                     extraCategories: root.extraCategories
                     appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "monitor" }, { id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }]
-                    variables: root.macro ? root.macro.variables : []
-                    lists: root.macro && root.macro.lists ? root.macro.lists : []
-                    blockDefinitions: root.macro ? root.macro.block_defs : []
+                    variables: root.macroVariables
+                    lists: root.macroLists
+                    blockDefinitions: root.macroBlockDefinitions
                     keyCapture: appState.key_capture
                     standaloneKey: root.sidebarKey
                     onBlockActivated: (type, instruction) => dragController.addAt({ kind: "instruction", type: type, instruction: instruction }, 120, 120)
@@ -779,9 +785,9 @@ Item {
                     recordingTargetId: root.macro && root.macro.recording_target_strand_id ? root.macro.recording_target_strand_id : ""
                     comments: root.macro ? root.macro.comments : []
                     floatingValues: root.macro ? root.macro.floating_values : []
-                    variables: root.macro ? root.macro.variables : []
-                    lists: root.macro && root.macro.lists ? root.macro.lists : []
-                    blockDefinitions: root.macro ? root.macro.block_defs : []
+                    variables: root.macroVariables
+                    lists: root.macroLists
+                    blockDefinitions: root.macroBlockDefinitions
                     keyCapture: appState.key_capture
                     locked: root.recordingBusy
                     onStrandMoved: (strandId, x, y) => root.invoke("move_strand", { strandId: strandId, x: x, y: y })
@@ -2244,9 +2250,9 @@ Item {
         id: dragController
         anchors.fill: parent
         canvas: canvas
-        variables: root.macro ? root.macro.variables : []
-        lists: root.macro && root.macro.lists ? root.macro.lists : []
-        blockDefinitions: root.macro ? root.macro.block_defs : []
+        variables: root.macroVariables
+        lists: root.macroLists
+        blockDefinitions: root.macroBlockDefinitions
         // Counting down or recording: nothing lands on the canvas.
         locked: root.recordingBusy
         documentId: root.macro ? root.macro.id : ""

@@ -67,6 +67,36 @@ Item {
             mouseMove(scene, start.x + 30, start.y + 20, 20);
             verify(!!page.paletteDrags.drag, "Header parameter starts the editor's palette drag");
         }
+        function test_block_moves_preserve_palette_metadata() {
+            const page = editor();
+            const canvas = all(page).find(o => o.isBlockCanvas);
+            const palette = all(page).find(o => typeof o.customInstruction === "function");
+            const definitions = canvas.blockDefinitions;
+            const variables = canvas.variables;
+            const lists = canvas.lists;
+            const moved = JSON.parse(JSON.stringify(page.appState));
+            moved.current_macro.strands[0].instructions[1].duration.value = 200;
+            page.appState = moved;
+            wait(30);
+            verify(canvas.blockDefinitions === definitions);
+            verify(canvas.variables === variables);
+            verify(canvas.lists === lists);
+            verify(palette.blockDefinitions === definitions);
+            verify(palette.variables === variables);
+            verify(palette.lists === lists);
+
+            const edited = JSON.parse(JSON.stringify(moved));
+            edited.current_macro.variables = ["score"];
+            edited.current_macro.lists = [{name:"players",items:[],editor_visible:false,editor_x:36,editor_y:36}];
+            edited.current_macro.block_defs[0].pieces[1].name = "strength";
+            page.appState = edited;
+            wait(30);
+            compare(canvas.variables, ["score"]);
+            compare(palette.variables, ["score"]);
+            compare(canvas.lists[0].name, "players");
+            compare(palette.lists[0].name, "players");
+            verify(!!parameter(canvas.findBlockItem(canvas, "header"), "strength"));
+        }
         function test_new_custom_calls_keep_pack_defaults() {
             const page = editor();
             const definition = {id:"example",shape:"Normal",pieces:[
