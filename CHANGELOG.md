@@ -165,7 +165,8 @@ section below as the GitHub release notes, followed by the downloads table.
 - Legacy pack variables migrate to private pack state where possible. Variables used by the macro or shared by older packs stay shared so existing macros keep working.
 - macOS 13 or newer is required (Qt 6.10).
 - macOS window blocks use the Accessibility API directly instead of System Events, so they no longer need an Automation permission. Maximize fills the screen's usable area like on Windows and Linux instead of opening a fullscreen Space, and Restore puts the window back.
-- On macOS, "close app" asks the chosen copy of the app to quit, so an app with unsaved work can still ask to save.
+- On macOS, "close app" closes only the chosen copy of the app. It asks the app to quit and force-closes it after three seconds, so a save prompt can't keep it open, matching Windows and Linux.
+- On macOS, horizontal scrolling goes the same way as on Windows and Linux (positive is right). Horizontal scrolls recorded on a Mac with an earlier build replay mirrored.
 - A key that can't be pressed shows as an error on its block (and can be caught by a try block) instead of being skipped silently. On macOS, F21-F24 and Select can't be pressed.
 - The legacy `LMenu` key name means left Alt everywhere; Windows and Linux used to press the Windows/Meta key for it.
 - On macOS, PrintScreen, ScrollLock and Pause are pressed and matched as F13, F14 and F15, which is how Macs see those keys on a PC keyboard.
@@ -199,7 +200,9 @@ section below as the GitHub release notes, followed by the downloads table.
   - Text recognition no longer hangs on a stalled Vision service; it falls back to a faster recognizer for a while and tries the accurate one again later.
   - Window Focus and Restore work on windows that can't be minimized, and "window exists?" answers false instead of an error without Accessibility access.
   - The app picker lists system apps and apps in category folders like Utilities, with their icons.
-  - Dialogs close when Blockwork's background process exits, and reopening the app shows the editor after it was closed to the tray.
+  - Reopening the app shows the editor after it was closed to the tray.
+- Macro dialogs close when Blockwork's background process exits (Windows, macOS and Linux) instead of staying on screen.
+- Settings switches show a focus ring when reached with Tab.
   - Detection models can run on the GPU through Metal.
   - Updates install correctly when the app is on a different drive from the download, and the app restarts after the old one has exited.
 - Release publishing waits for required builds and downloads to succeed, and lists only available packages. Creating a Microsoft Store test flight reports missing tester-group IDs before submitting it.

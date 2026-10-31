@@ -37,6 +37,10 @@ pub mod qobject {
 static REQUEST: OnceLock<String> = OnceLock::new();
 #[cfg(unix)]
 static PARENT: OnceLock<libc::pid_t> = OnceLock::new();
+/// A handle to the daemon, opened at launch so a reused PID can't pass for it.
+/// `None` when it had already exited before the dialog started.
+#[cfg(windows)]
+static PARENT: OnceLock<Option<usize>> = OnceLock::new();
 
 /// Whether this launch is a prompt; reads the request if so. Call before Qt starts.
 pub fn requested() -> bool {
@@ -47,6 +51,12 @@ pub fn requested() -> bool {
     PARENT.get_or_init(|| std::env::var("BLOCKWORK_PROMPT_PARENT_PID")
         .ok().and_then(|value| value.parse().ok())
         .unwrap_or_else(|| unsafe { libc::getppid() }));
+    #[cfg(windows)]
+    if let Some(pid) = std::env::var("BLOCKWORK_PROMPT_PARENT_PID").ok().and_then(|value| value.parse::<u32>().ok()) {
+        use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_SYNCHRONIZE};
+        let handle = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, pid) };
+        PARENT.get_or_init(|| (!handle.is_null()).then_some(handle as usize));
+    }
     let mut text = String::new();
     let _ = std::io::stdin().read_to_string(&mut text);
     let _ = REQUEST.set(text);
@@ -87,6 +97,13 @@ impl qobject::PromptBridge {
             // Reparenting also covers a parent that died before this dialog
             // finished launching, without relying on PID liveness/reuse.
             return unsafe { libc::getppid() } == *parent;
+        }
+        #[cfg(windows)]
+        if let Some(parent) = PARENT.get() {
+            use windows_sys::Win32::Foundation::WAIT_TIMEOUT;
+            use windows_sys::Win32::System::Threading::WaitForSingleObject;
+            // The handle is signalled once the daemon exits.
+            return parent.is_some_and(|handle| unsafe { WaitForSingleObject(handle as _, 0) } == WAIT_TIMEOUT);
         }
         true
     }

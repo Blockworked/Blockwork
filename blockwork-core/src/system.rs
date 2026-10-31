@@ -107,22 +107,38 @@ fn app_target_matches(command: &str, name: &str, bundle: Option<&str>, running_n
     !name.trim().is_empty() && name.trim().eq_ignore_ascii_case(running_name)
 }
 
-/// Ask the selected application to quit normally. NSRunningApplication is
-/// thread-safe and does not send Apple Events or need an Automation grant.
+/// Close the selected application. It is asked to quit first, then forced
+/// after a short grace period, so an unsaved-changes prompt can't keep it open
+/// (Windows force-closes and Linux sends SIGTERM). NSRunningApplication is
+/// thread-safe and needs no Apple Events or Automation grant.
 #[cfg(target_os = "macos")]
 pub fn close_application(command: &str, name: &str) -> std::io::Result<()> {
     use objc2_app_kit::NSWorkspace;
-    objc2::rc::autoreleasepool(|_| {
+    const GRACE: std::time::Duration = std::time::Duration::from_secs(3);
+    let targets = objc2::rc::autoreleasepool(|_| {
+        let mut targets = Vec::new();
         for app in NSWorkspace::sharedWorkspace().runningApplications().iter() {
             let path = app.bundleURL().and_then(|url| url.path()).map(|path| path.to_string());
             let running_name = app.localizedName().map(|name| name.to_string()).unwrap_or_default();
-            if app_target_matches(command, name, path.as_deref(), &running_name)
-                && !app.terminate() && !app.isTerminated() {
-                return Err(std::io::Error::other(format!("couldn't request that {running_name} quit")));
+            if app_target_matches(command, name, path.as_deref(), &running_name) {
+                app.terminate();
+                targets.push((app.processIdentifier(), app, running_name));
             }
         }
-        Ok(())
-    })
+        targets
+    });
+    // isTerminated is only refreshed on the main run loop, so poll the PID.
+    let alive = |pid: i32| pid > 0 && unsafe { libc::kill(pid, 0) } == 0;
+    let deadline = std::time::Instant::now() + GRACE;
+    while targets.iter().any(|(pid, ..)| alive(*pid)) && std::time::Instant::now() < deadline {
+        std::thread::sleep(std::time::Duration::from_millis(50));
+    }
+    for (pid, app, running_name) in &targets {
+        if alive(*pid) && !app.forceTerminate() && alive(*pid) {
+            return Err(std::io::Error::other(format!("couldn't close {running_name}")));
+        }
+    }
+    Ok(())
 }
 
 #[cfg(windows)]

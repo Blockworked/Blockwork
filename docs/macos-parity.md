@@ -25,9 +25,12 @@ launch the intended bundle by its path.
 - PrintScreen, ScrollLock and Pause are pressed and matched as F13, F14 and
   F15, as macOS translates them from a PC keyboard. F14 and F15 are brightness
   shortcuts by default.
-- Close app asks the chosen app bundle to quit, so an app with unsaved work
-  may stay open behind a save prompt. Windows force-closes and Linux sends
-  SIGTERM.
+- Close app asks the chosen app bundle to quit and force-closes it after
+  three seconds, so a save prompt can't keep it open (Windows force-closes,
+  Linux sends SIGTERM).
+- Horizontal scroll is positive to the right, as on Windows and Linux;
+  CoreGraphics' own axis is the other way round, so the backend flips it in
+  both directions.
 - Maximize fills the usable area of the window's screen; it doesn't enter
   native fullscreen. Restore undoes either.
 - Text on screen uses Vision. After a stall it falls back to Vision's fast

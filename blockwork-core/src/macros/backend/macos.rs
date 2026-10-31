@@ -243,7 +243,9 @@ impl ScrollAccumulator {
             EventField::SCROLL_WHEEL_EVENT_DELTA_AXIS_1,
             &mut self.vertical,
         );
-        let h = axis(
+        // CoreGraphics' horizontal axis is positive to the left; Blockwork's
+        // (like evdev's REL_HWHEEL and Windows) is positive to the right.
+        let h = -axis(
             event,
             EventField::SCROLL_WHEEL_EVENT_FIXED_POINT_DELTA_AXIS_2,
             EventField::SCROLL_WHEEL_EVENT_DELTA_AXIS_2,
@@ -617,11 +619,11 @@ impl InputBackend for MacosBackend {
                 return Ok(());
             }
             MacroButton::ScrollLeft => {
-                self.scroll_raw(0, -1, 0)?;
+                self.scroll_raw(0, 1, 0)?;
                 return Ok(());
             }
             MacroButton::ScrollRight => {
-                self.scroll_raw(0, 1, 0)?;
+                self.scroll_raw(0, -1, 0)?;
                 return Ok(());
             }
             MacroButton::Left => (
@@ -701,7 +703,8 @@ impl InputBackend for MacosBackend {
     fn scroll(&mut self, amount: i32, axis: Axis) -> Result<(), String> {
         let (v, h) = match axis {
             Axis::Vertical => (amount, 0),
-            Axis::Horizontal => (0, amount),
+            // Positive is right here and left in CoreGraphics.
+            Axis::Horizontal => (0, -amount),
         };
         self.scroll_raw(v, h, 0)?;
         Ok(())
@@ -1416,9 +1419,10 @@ mod tests {
         );
         let mut scroll = ScrollAccumulator::default();
         assert_eq!(scroll.read(&event), (0, 0));
-        assert_eq!(scroll.read(&event), (-1, 0));
+        // A negative (rightward) CoreGraphics delta is a positive Blockwork one.
+        assert_eq!(scroll.read(&event), (1, 0));
         assert_eq!(scroll.read(&event), (0, 0));
-        assert_eq!(scroll.read(&event), (-1, 1));
+        assert_eq!(scroll.read(&event), (1, 1));
     }
 
     #[test]

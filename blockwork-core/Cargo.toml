@@ -85,7 +85,7 @@ http = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
 objc2 = { version = "0.6", optional = true }
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSWorkspace", "NSRunningApplication", "NSEvent", "NSGraphicsContext", "NSScreen", "objc2-core-graphics"], optional = true }
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSWorkspace", "NSRunningApplication", "NSEvent", "NSGraphicsContext", "NSScreen", "libc", "objc2-core-graphics"], optional = true }
 tract-metal = { version = "=0.23.9", optional = true }
 core-graphics = { workspace = true, optional = true }
 core-foundation = { workspace = true, optional = true }
