@@ -519,23 +519,36 @@ mod macos {
     }
 
     fn list_in(roots: &[std::path::PathBuf]) -> Vec<AppEntry> {
-        let mut seen = std::collections::HashSet::new();
-        let mut pending = roots.to_vec();
+        // Folders reached through a symlink can turn up again at a shallower
+        // depth, so remember the shallowest visit; apps are listed once.
+        let mut seen = std::collections::HashMap::new();
+        let mut listed = std::collections::HashSet::new();
+        // Category folders (Utilities, a vendor's suite) are shallow. The cap
+        // keeps a large non-app tree under ~/Applications from being walked.
+        const MAX_DEPTH: usize = 3;
+        let mut pending: Vec<_> = roots.iter().map(|root| (root.clone(), 0)).collect();
         let mut apps = Vec::new();
-        while let Some(path) = pending.pop() {
+        while let Some((path, depth)) = pending.pop() {
             if !path.is_dir() {
                 continue;
             }
             let Ok(canonical) = path.canonicalize() else {
                 continue;
             };
-            if !seen.insert(canonical) {
+            if seen
+                .get(&canonical)
+                .is_some_and(|&visited| visited <= depth)
+            {
                 continue;
             }
+            seen.insert(canonical.clone(), depth);
             if path
                 .extension()
                 .is_some_and(|ext| ext.eq_ignore_ascii_case("app"))
             {
+                if !listed.insert(canonical) {
+                    continue;
+                }
                 let Some(name) = path.file_stem().and_then(|s| s.to_str()) else {
                     continue;
                 };
@@ -548,7 +561,10 @@ mod macos {
             }
             // Renamed bundles (for example Editor.app.backup) still contain
             // helpers. They aren't category folders or independent apps.
-            if path.join("Contents/Info.plist").is_file() || path.join("Contents/MacOS").is_dir() {
+            if depth >= MAX_DEPTH
+                || path.join("Contents/Info.plist").is_file()
+                || path.join("Contents/MacOS").is_dir()
+            {
                 continue;
             }
             let Ok(entries) = std::fs::read_dir(&path) else {
@@ -556,7 +572,7 @@ mod macos {
             };
             for entry in entries.flatten() {
                 if !entry.file_name().to_string_lossy().starts_with('.') {
-                    pending.push(entry.path());
+                    pending.push((entry.path(), depth + 1));
                 }
             }
         }
@@ -583,6 +599,7 @@ mod macos {
                 user.join("Editor.app.backup/Contents/Helpers/Old Helper.app"),
                 system.join("Notes.app"),
                 system.join("Utilities/Terminal.app"),
+                user.join("a/b/c/Too Deep.app"),
             ] {
                 std::fs::create_dir_all(path).unwrap();
             }

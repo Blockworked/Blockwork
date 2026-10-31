@@ -101,6 +101,17 @@ fn set(element: &CFType, name: &str, value: &CFType) -> Result<(), String> {
     })
 }
 
+/// Un-minimizes a window. Panels and other windows that can't minimize
+/// reject the attribute, which only means there's nothing to undo.
+fn unminimize(window: &CFType) -> Result<(), String> {
+    match set(window, "AXMinimized", &CFBoolean::false_value().as_CFType()) {
+        Err(e) if UNSUPPORTED.iter().any(|&code| e == error(code)) => Ok(()),
+        result => result,
+    }
+}
+
+const UNSUPPORTED: [i32; 3] = [-25205, -25206, -25212];
+
 fn perform(element: &CFType, action: &str) -> Result<(), String> {
     check(unsafe {
         AXUIElementPerformAction(
@@ -318,12 +329,10 @@ pub fn exists(pattern: &str) -> Result<bool, String> {
     // while AppKit no longer lists it as an actionable window. Prefer the AX
     // tree when available so "window exists" agrees with the action blocks.
     // Keep read-only discovery working when Accessibility hasn't been granted.
-    if !unsafe { AXIsProcessTrusted() }
-        && windows(false)?
+    if !unsafe { AXIsProcessTrusted() } {
+        return Ok(windows(false)?
             .iter()
-            .any(|w| w.info.matches(pattern, MatchBy::Any))
-    {
-        return Ok(true);
+            .any(|w| w.info.matches(pattern, MatchBy::Any)));
     }
     match find(pattern, MatchBy::Any) {
         Ok(_) => Ok(true),
@@ -369,13 +378,107 @@ fn fullscreen(window: &CFType, enabled: bool, pattern: &str, by: MatchBy) -> Res
     }
 }
 
+/// Window frames saved by Maximize, so Restore can put them back. AppKit's
+/// zoom button toggles to an app-chosen "standard" size rather than the screen.
+static ZOOMED: std::sync::Mutex<Vec<(i32, String, Rect)>> = std::sync::Mutex::new(Vec::new());
+
+fn window_key(window: &CFType) -> Result<(i32, String), String> {
+    let mut pid = 0;
+    check(unsafe { AXUIElementGetPid(window.as_CFTypeRef(), &mut pid) })?;
+    Ok((pid, text_attribute(window, "AXTitle")))
+}
+
+fn set_frame(window: &CFType, frame: Rect) -> Result<(), String> {
+    let point = CGPoint::new(frame.x, frame.y);
+    let size = CGSize::new(frame.width, frame.height);
+    for (name, kind, value) in [
+        ("AXPosition", 1, &point as *const _ as *const c_void),
+        ("AXSize", 2, &size as *const _ as *const c_void),
+        // Moving first can leave a big window clipped; set the origin again.
+        ("AXPosition", 1, &point as *const _ as *const c_void),
+    ] {
+        let raw = unsafe { AXValueCreate(kind, value) };
+        if raw.is_null() {
+            return Err("couldn't create macOS window coordinates".into());
+        }
+        set(window, name, &unsafe {
+            CFType::wrap_under_create_rule(raw)
+        })?;
+    }
+    Ok(())
+}
+
+/// Fill the work area of the screen holding the window's centre, like
+/// Maximize on Windows and Linux (not native fullscreen, which opens a Space).
+fn zoom(window: &CFType) -> Result<(), String> {
+    let before = ax_bounds(window)?;
+    let area = work_area((
+        before.x + before.width / 2.0,
+        before.y + before.height / 2.0,
+    ))
+    .ok_or("couldn't find the screen the window is on")?;
+    let key = window_key(window)?;
+    if let Ok(mut zoomed) = ZOOMED.lock() {
+        if !zoomed
+            .iter()
+            .any(|(pid, title, _)| (*pid, title) == (key.0, &key.1))
+        {
+            zoomed.push((key.0, key.1, before));
+        }
+    }
+    set_frame(window, area)
+}
+
+fn unzoom(window: &CFType) -> Result<(), String> {
+    let key = window_key(window)?;
+    let saved = ZOOMED.lock().ok().and_then(|mut zoomed| {
+        let index = zoomed
+            .iter()
+            .position(|(pid, title, _)| (*pid, title) == (key.0, &key.1))?;
+        Some(zoomed.remove(index).2)
+    });
+    match saved {
+        Some(frame) => set_frame(window, frame),
+        None => Ok(()),
+    }
+}
+
+/// The visible frame (minus menu bar and Dock) of the screen containing
+/// `point`, in the same top-left global coordinates AX uses.
+fn work_area(point: (f64, f64)) -> Option<Rect> {
+    use objc2::MainThreadMarker;
+    use objc2_app_kit::NSScreen;
+    // NSScreen is documented main-thread only, but reading frames is safe in
+    // practice; the marker is the type-level opt-in for that read.
+    let mtm = unsafe { MainThreadMarker::new_unchecked() };
+    let screens = NSScreen::screens(mtm);
+    // Cocoa's origin is the bottom-left of the primary (first) screen.
+    let primary_height = screens.iter().next()?.frame().size.height;
+    screens.iter().find_map(|screen| {
+        let frame = screen.frame();
+        let top = primary_height - (frame.origin.y + frame.size.height);
+        let inside = point.0 >= frame.origin.x
+            && point.0 < frame.origin.x + frame.size.width
+            && point.1 >= top
+            && point.1 < top + frame.size.height;
+        inside.then(|| {
+            let visible = screen.visibleFrame();
+            Rect {
+                x: visible.origin.x,
+                y: primary_height - (visible.origin.y + visible.size.height),
+                width: visible.size.width,
+                height: visible.size.height,
+            }
+        })
+    })
+}
+
 pub fn act(action: Action, pattern: &str, by: MatchBy) -> Result<(), String> {
     let (app, window) = find(pattern, by)?;
     let yes = CFBoolean::true_value().as_CFType();
-    let no = CFBoolean::false_value().as_CFType();
     match action {
         Action::Focus => {
-            set(&window, "AXMinimized", &no)?;
+            unminimize(&window)?;
             set(&app, "AXFrontmost", &yes)?;
             perform(&window, "AXRaise")?;
             let mut target_pid = 0;
@@ -398,13 +501,20 @@ pub fn act(action: Action, pattern: &str, by: MatchBy) -> Result<(), String> {
             }
         }
         Action::Minimize => set(&window, "AXMinimized", &yes),
-        Action::Maximize => fullscreen(&window, true, pattern, by),
+        Action::Maximize => {
+            unminimize(&window)?;
+            zoom(&window)
+        }
         Action::Restore => {
-            set(&window, "AXMinimized", &no)?;
-            match fullscreen(&window, false, pattern, by) {
-                Err(e) if e == error(-25205) => Ok(()),
-                result => result,
+            unminimize(&window)?;
+            let fullscreen_now = attribute(&window, "AXFullScreen")
+                .ok()
+                .and_then(|v| v.downcast::<CFBoolean>())
+                .is_some_and(bool::from);
+            if fullscreen_now {
+                return fullscreen(&window, false, pattern, by);
             }
+            unzoom(&window)
         }
         Action::Close => perform(&attribute(&window, "AXCloseButton")?, "AXPress"),
     }
@@ -578,7 +688,7 @@ mod tests {
     }
 
     #[test]
-    #[ignore = "enters fullscreen, restores and closes only the dedicated native fixture"]
+    #[ignore = "maximizes, restores, fullscreens and closes only the dedicated native fixture"]
     fn live_window_maximize_restore_and_close_fixture() {
         let title = std::env::var("BW_LIVE_WINDOW").expect("set BW_LIVE_WINDOW");
         assert_eq!(title, "Blockwork macOS Test Window");
@@ -589,30 +699,54 @@ mod tests {
             }
         }
         let _restore = Restore(title.clone());
-        let wait_fullscreen = |expected: bool| {
+        let fullscreen_is = |expected: bool| {
+            let (_, window) = find(&title, MatchBy::Title).unwrap();
+            attribute(&window, "AXFullScreen")
+                .ok()
+                .and_then(|v| v.downcast::<CFBoolean>())
+                .is_some_and(bool::from)
+                == expected
+        };
+        let wait_for = |what: &str, done: &dyn Fn() -> bool| {
             let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
-            loop {
-                let (_, window) = find(&title, MatchBy::Title).unwrap();
-                let actual: bool = attribute(&window, "AXFullScreen")
-                    .unwrap()
-                    .downcast::<CFBoolean>()
-                    .unwrap()
-                    .into();
-                if actual == expected {
-                    break;
-                }
-                assert!(
-                    std::time::Instant::now() < deadline,
-                    "fullscreen did not become {expected}"
-                );
+            while !done() {
+                assert!(std::time::Instant::now() < deadline, "{what}");
                 std::thread::sleep(std::time::Duration::from_millis(20));
             }
         };
         act(Action::Focus, &title, MatchBy::Title).unwrap();
+        let original = bounds(&title, MatchBy::Title).unwrap();
+        // Maximize fills the screen's work area without a fullscreen Space.
         act(Action::Maximize, &title, MatchBy::Title).unwrap();
-        wait_fullscreen(true);
+        let (_, window) = find(&title, MatchBy::Title).unwrap();
+        let area = work_area((
+            original.x + original.width / 2.0,
+            original.y + original.height / 2.0,
+        ))
+        .unwrap();
+        wait_for("window did not fill the work area", &|| {
+            ax_bounds(&window).is_ok_and(|now| {
+                (now.x - area.x).abs() < 2.0
+                    && (now.y - area.y).abs() < 2.0
+                    && (now.width - area.width).abs() < 2.0
+                    && (now.height - area.height).abs() < 2.0
+            })
+        });
+        assert!(fullscreen_is(false));
         act(Action::Restore, &title, MatchBy::Title).unwrap();
-        wait_fullscreen(false);
+        wait_for("Restore did not return the original frame", &|| {
+            ax_bounds(&window).is_ok_and(|now| {
+                (now.x - original.x).abs() < 2.0
+                    && (now.y - original.y).abs() < 2.0
+                    && (now.width - original.width).abs() < 2.0
+                    && (now.height - original.height).abs() < 2.0
+            })
+        });
+        // Restore also leaves a native fullscreen Space.
+        let (_, window) = find(&title, MatchBy::Title).unwrap();
+        fullscreen(&window, true, &title, MatchBy::Title).unwrap();
+        act(Action::Restore, &title, MatchBy::Title).unwrap();
+        wait_for("fullscreen did not end", &|| fullscreen_is(false));
         act(Action::Close, &title, MatchBy::Title).unwrap();
         let deadline = std::time::Instant::now() + std::time::Duration::from_secs(5);
         while exists(&title).unwrap() {

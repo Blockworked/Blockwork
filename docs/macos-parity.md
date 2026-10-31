@@ -1,58 +1,39 @@
-# macOS parity verification
+# macOS
 
-Verification record for the macOS implementation, with exercised behavior and coverage limits recorded below. Minecraft verification is excluded at the user's request.
+How the macOS build behaves next to Windows and Linux, how to build it, and
+how to run the native checks.
 
-Current GD acceptance passed Windows/universal Mac CI, a fresh normal-speed completion, 20/20 full-profile fresh-import QOL 10x completions and both recording probes. The latest audit below records the exact package and restored state. Historical startup failures remain documented; their causes are not claimed resolved.
+## Permissions
 
-Blockwork is the first gate. The later blockwork-gd gate requires fresh imports of `~/Downloads/ChesszDC-Bloodbath-Infinity-zBot.gdr` against the local level named approximately **Bloodbath Infinity 2**, accurate completion at normal speed, and reliable repeated completion at QOL Mod 10x. The game gate completed normal-speed fresh imports, 20/20 direct 10x attempts, 20/20 queued 10x attempts, and a final 3/3 universal-package 10x batch. Current game evidence and remaining checks are documented in the sibling `blockwork-gd/docs/macos-parity.md`.
+- **Accessibility** (Privacy & Security > Accessibility): pressing keys,
+  moving the mouse, hotkeys, recording and window blocks. Without it, input
+  blocks report the missing permission instead of claiming success.
+- **Screen Recording** (Privacy & Security > Screen & System Audio Recording):
+  colors, image search, text on screen and detection. Without it, capture
+  blocks report the missing permission; macOS would otherwise return images
+  with other apps left out.
 
-## Implemented and exercised
+An ad-hoc signed rebuild can keep a stale entry that still denies access.
+Remove the app from both lists, add the exact bundle again and restart it.
+System Settings' "Quit & Reopen" may start a different installed copy, so
+launch the intended bundle by its path.
 
-| Area | Evidence | Coverage limits |
-|---|---|---|
-| Keyboard | Native Unicode/surrogate pairs, extended keys, side-specific modifier ordering, explicit Fn/keypad cleanup, event-synthesis permission preflight; packaged text delivered exactly `Mac parity: café 中 🦀` | More keyboard layouts and physical devices |
-| Recording/hotkeys | Hardware timestamps, modifier suppression, playback filtering, disabled-tap recovery; packaged recording/replay preserved a/Shift+b/c, original waits, and Escape stop | Long-duration recording |
-| Mouse | Extra buttons, absolute event coordinates, drag deltas, fractional two-axis scrolling; queued-target tracking prevents stale live coordinates after asynchronous posting | Additional mouse hardware |
-| Screen | Native/nominal clipped capture, explicit sRGB/RGBA, permission preflight; packaged colors, image search/click, OCR and HTTP detection all succeeded | Mixed 1x/2x virtual-display test passed; physical monitor hot-plug not exercised |
-| Detection | Local HTTP detector positive fixture; real shipped ONNX model Metal/CPU comparison on three deterministic inputs, maximum absolute difference 0.000519 | Minecraft verification skipped at user request; broader models not claimed |
-| Windows | CoreGraphics + bounded Accessibility operations; focus, consecutive geometry operations, minimize/restore, fullscreen, close; geometry tolerates redacted CG titles | More third-party application window types |
-| Application lifecycle | Native NSWorkspace close by canonical bundle path; fixture close/open/close passed without AppleEvents; reopening the packaged app recreated the editor from its background daemon | More application types |
-| Picker | System/Cryptex/Utilities/user roots; symlink-loop and helper filtering; accessible search/select; native macOS icons displayed | Broader application catalog |
-| Dialogs | Packaged text/yes/choice/message IPC returned `text=café 中 🦀;yes=true;choice=Second`; keyboard choice navigation and accessible actions; parent watchdog closed an orphan prompt in 0.651 seconds | More assistive-technology clients |
-| Persistence | Restoring selected macros now restores saved lists; regression plus fresh packaged restart; accessible slider changes persisted | Broader settings combinations |
-| Battery/priority | Reject invalid capacity; native interactive QoS verified on a playback thread | Battery transitions and sustained load |
-| FFI | Explicit standalone system feature and native linking | Game integration remains a separate gate |
-| Packaging/updating | macOS 13 floor, nested signing and 97 Mach-O dependency checks; same-volume staging with ditto, symlink preservation, rollback, deferred relaunch waiting for old daemon | Production network/replacement/relaunch passed in a disposable app; live user-installation upgrade and Intel game runtime remain unclaimed |
+## Differences from Windows and Linux
 
-Media keys now use native system-defined events, with a raw-integer keyboard tap because the CoreGraphics Rust event enum omits type 14. Constructor tests pass; a real native event-tap test captured and suppressed all six dispatched volume events before they reached the system. Evidence: `/tmp/blockwork-macos-final-native-tests.log`.
-
-Vision OCR uses a bounded subprocess with concurrent output draining and kill/reap on timeout. Blank/transparent images return immediately. An automatic worker gets five seconds; after a timeout, CPU mode is cached. After an accurate CPU timeout, a fresh process uses Vision’s fast recognizer on the CPU. Each fallback has a fifteen-second timeout, preserving a 35-second initial budget; the fallback mode is cached. Injected regressions cover the mode sequence, caching and bounded failure. Sampling a stalled worker showed Apple Neural Engine compilation even with the CPU device selected. The fast recognizer read the same saved desktop crops in 0.17–0.32 seconds. Its recognition accuracy can differ from the accurate model; it is used only after a timeout.
-
-## Packaged evidence
-
-The exact rebuilt `dist/Blockwork.app` has Accessibility and Screen Recording enabled. Stale entries for an ad-hoc rebuilt bundle can still deny access: removing and re-adding this exact bundle, then restarting, resolved both. Verify actual delivery and capture after rebuilding. System Settings' “Quit & Reopen” launched the older installed `/Applications/Blockwork.app` during testing; launch the intended bundle by exact path.
-
-Positive packaged screen workflow: focus + four move/resize operations, wait/find/click image, score-sorted HTTP detection, wait detection, OCR and text reporting. Result: `pixel=#ff0000;average=#ff0000;image=520,1020;detections=1`, with OCR containing `BLOCKWORK MACOS 12345`. Evidence: `/tmp/blockwork-approved-screen-result.json`. A previous negative test without Screen Recording correctly returned the explicit permission error while window geometry continued to work: `/tmp/blockwork-packaged-missing-screen-permission-result.json`.
-
-Saved gesture replay preserved click (260,1158), drag (234,1158) to (294,1158), delta (60,0), scroll -2 at (294,1158), and exact text `aBc`. Evidence: `/tmp/blockwork-macos-fixed-gesture-replay-result.json`. CLI completion means events were posted; poll fixture delivery before evaluating the result.
-
-Additional evidence: `/tmp/blockwork-packaged-dialogs-result.json`, `/tmp/blockwork-macos-prompt-parent-exit-result.json`, `/tmp/blockwork-macos-reopen-result.json`, `/tmp/blockwork-macos-native-app-lifecycle.log`, `/tmp/blockwork-updater-bundle-keyboard-result.json`.
-
-## Reproducibility and test checkpoints
-
-All three Blockstitch dependencies are pinned to published Git commit `250bf3620dc276eca96bb849ef765459b7dfe3c8`. It contains semantic accessibility groups that prevent exponential AX traversal of large macros, named icon buttons, and accessible switches. There is no active local Cargo path override. The release build and workspace suite passed against this Git pin. Flatpak source metadata is regenerated from Cargo.lock, including the updated pin and Metal dependencies.
-
-The full workspace checkpoint passed 340 tests (78 app, 242 core, five integration, ten protocol, five web), with 19 opt-in tests ignored (`/tmp/blockwork-macos-final-workspace-tests.log`). The subsequent post-authorship workspace suite also passed after the fast-recognizer fix (`/tmp/blockwork-post-authorship-workspace-tests.log`). Application QML passed 45 tests, including actual prompt-window navigation and parent-death behavior; shared editor QML passed 30. The final native fixture suite passed 245 core tests with no ignored tests, plus five integration tests and FFI (`/tmp/blockwork-macos-fast-ocr-native-tests.log`). The earlier attempt failed two OCR tests; the fast-recognizer change repaired both, and the real desktop OCR diagnostic also returned text. Core/FFI Clippy passes with warnings (`/tmp/blockwork-macos-final-clippy.log`).
-
-Intel core/FFI compile checks passed including the native application and media additions (`/tmp/blockwork-macos-final-intel-check.log`). Apple Silicon runtime is tested locally. Linux workspace/Clippy and Apple Silicon + Intel core/FFI CI checks passed at commit `e285eac69af1759811b39aeedd861653bd06a30b`: https://github.com/Blockworked/Blockwork/actions/runs/40147159871. These are core/FFI runtime checks, not Intel GUI testing. Rosetta is absent, so no local Intel runtime test has run.
-
-## Run native verification
-
-```sh
-BLOCKWORK_TEST_PYTHON=/path/to/python-with-numpy-pillow-scipy scripts/macos/verify.sh --offline --target-dir /path/to/test-cache
-```
-
-The runner builds a disposable AppKit fixture with a known red marker, label and editable view; launches a local detector; runs serial native tests; and cleans up its processes. The development executable needs its own Accessibility and Screen Recording grants. This suite uses core/system features and does not establish updater or ONNX coverage.
+- F21-F24 and Select have no native key code, so pressing them is an error on
+  the block. Remap them when moving a macro to a Mac.
+- PrintScreen, ScrollLock and Pause are pressed and matched as F13, F14 and
+  F15, as macOS translates them from a PC keyboard. F14 and F15 are brightness
+  shortcuts by default.
+- Close app asks the chosen app bundle to quit, so an app with unsaved work
+  may stay open behind a save prompt. Windows force-closes and Linux sends
+  SIGTERM.
+- Maximize fills the usable area of the window's screen; it doesn't enter
+  native fullscreen. Restore undoes either.
+- Text on screen uses Vision. After a stall it falls back to Vision's fast
+  recognizer for ten minutes, then tries the accurate one again.
+- Detection models run on the GPU through Metal when available.
+- macOS 13 is the minimum, because of Qt 6.10.
 
 ## Build and verify the app
 
@@ -63,118 +44,50 @@ QMAKE=/path/to/Qt/6.10.3/macos/bin/qmake scripts/build-macos-bundle.sh
 python3 scripts/macos/verify-bundle.py dist/Blockwork.app
 ```
 
-The validator checks nested signatures, architectures, escaping symlinks, host-specific search paths and every non-system Mach-O dependency. A successful macdeployqt exit alone is insufficient.
+The validator checks nested signatures, architectures, escaping symlinks,
+host-specific search paths and every non-system Mach-O dependency. A
+successful macdeployqt exit alone is not enough.
 
-## Validation scope
-
-The final release is built and the bundle validates all 97 Mach-O images. The existing grants survived this rebuild: packaged Unicode input and the complete screen/window/detection/OCR workflow passed. An unnecessary refresh prompted for authentication; it was cancelled without changing the grants. Evidence: `/tmp/blockwork-final-packaged-input-result.json` and `/tmp/blockwork-final-packaged-screen-result.json`. No authentication remains pending. The exercised packaged workflows passed; the later audit and explicit coverage limits below govern the current status. The later checks below add native Intel app build/QML coverage, a real released archive replacement fixture, and mixed 1x/2x virtual-display coverage. Physical monitor hot-plug and Intel game execution remain unexercised. The later disposable fixture exercised the updater’s production network-to-GUI relaunch path.
-
-The universal embedder build isolates Cargo objects by deployment target. Reusing the Qt app’s cache had linked macOS 13 objects into an 11.0-targeted Geode library; a separate cache prevents that mismatch. Translation catalogs were refreshed with the repository workflow, and all 31 catalogs (37,275 messages) pass structural checks.
-
-## Final coverage audit
-
-The final installed Apple Silicon bundle passed Unicode delivery, window geometry, pixel/average colors, image search/click, HTTP detection and Vision OCR again after the dependency pins were updated. Durable local evidence is in `target/macos-parity-evidence/final-input-result.json` and `final-screen-result.json`. The original user macros are byte-identical, temporary test macros are archived, and the verified fresh Bloodbath replay remains selected and linked to the local level.
-
-The post-authorship workspace suite also passed (`/tmp/blockwork-post-authorship-workspace-tests.log`). Checks at `30f92a46f19ebab1cd7bff7f6b8e9c984c17e51a` passed Linux workspace tests/Clippy and both native Mac core/FFI jobs: https://github.com/Blockworked/Blockwork/actions/runs/40231358858.
-
-The app artifact and release matrices now include native Intel Macs, alongside Apple Silicon. Both Mac app jobs are required rather than experimental. Each builds and validates the complete bundle, starts its packaged executable with `--help`, and runs the application QML tests with the installed Qt runtime. This adds Intel application coverage; it does not establish permission-dependent desktop input/capture on that runner. Both jobs passed at the final platform checkpoint below. The separate virtual-display, real-archive replacement and later network-to-GUI fixtures are described below; physical monitor hot-plug and updating the user’s live installation remain coverage limits.
-
-The real-archive updater fixture passed with the published 0.5.4 Apple Silicon archive (180,394,802 bytes; SHA-256 `12d70042ea7282a269606d6c9592d234a88f1c5fb00e4d3e30f6ba0f6701694a`). It extracts the archive using ditto, creates a disposable installed copy, calls the production replacement function with the rebuilt app, verifies the previous release's plist and executable bytes in the backup, validates the promoted bundle's signatures/dependencies, and starts its packaged CLI. The test removes its disposable install afterward. The live user installation is not replaced. This narrows the updater coverage gap; live GUI relaunch and the updater's network selection/download path are not established by this fixture. Evidence: `target/macos-parity-evidence/update-fixture/source.json` and `test.log`.
-
-To repeat this opt-in integration gate after downloading a release archive and building the new bundle:
+## Run the native checks
 
 ```sh
+BLOCKWORK_TEST_PYTHON=/path/to/python-with-numpy-pillow-scipy scripts/macos/verify.sh --offline --target-dir /path/to/test-cache
+```
+
+This builds a disposable AppKit fixture window (`scripts/macos/test-window.swift`)
+with a known red marker, label and text field, starts a local detector, runs
+the ignored native tests serially and cleans up afterwards. The test
+executable needs its own Accessibility and Screen Recording grants. It covers
+the core system features, not the updater or ONNX models.
+
+Other opt-in checks:
+
+```sh
+# Upgrade a real release archive to a rebuilt app, inside a temporary folder.
 BLOCKWORK_TEST_RELEASE_ZIP=/absolute/path/blockwork-macos-arm64.app.zip \
 BLOCKWORK_TEST_UPDATE_APP=/absolute/path/Blockwork.app \
 cargo test -p blockwork-core --no-default-features --features updater \
   macos_released_bundle_upgrades_to_rebuilt_app -- --ignored --nocapture
+
+# Compare Metal and CPU outputs for a model.
+BLOCKWORK_TEST_MODEL=/path/to/model.onnx \
+cargo test -p blockwork-core metal_matches_cpu_on_real_model_outputs -- --ignored --nocapture
 ```
 
-## Final platform checkpoints
+The `blockwork-core/examples/macos-*-probe.rs` examples exercise app launch
+and close, recording, and the network updater against disposable copies.
 
-Checks at `41d4511` passed Linux workspace tests/Clippy and native Apple Silicon + Intel core/FFI tests: https://github.com/Blockworked/Blockwork/actions/runs/40232665736. All eight artifact jobs passed at the same revision, including both Windows architectures, both Linux AppImage/Flatpak architectures, and both Mac architectures: https://github.com/Blockworked/Blockwork/actions/runs/40232665698. Each Mac bundle validates 97 Mach-O images and passes packaged CLI startup plus all 45 application QML tests. These are native Intel app build/QML checks; Intel game execution is not claimed.
+## CI
 
-A disposable 800×600 logical virtual display with 1600×1200 pixels at x=-800 was tested alongside the physical 1x display. The installed bundle read the known pixel and region colors, picked a 40×40 logical crop into an 80×80 PNG, and found its asymmetric blue marker at exactly (-670,90). This verifies Retina scaling and negative coordinates together. The virtual display, daemon and temporary macro were removed; the physical display layout and original user macros were verified afterward. Evidence: `target/macos-parity-evidence/virtual-retina-screen-result.json`, `virtual-display-cleanup.txt`, and the preserved fixture sources in that directory. A synthetic exact-red search was correctly rejected when compositing changed one channel by one level; the actual picker template matched exactly without relaxing tolerance.
+`checks.yml` runs core and FFI tests plus the bundle validator's own tests on
+Apple Silicon and Intel runners. The artifact and release workflows build,
+validate and start both Mac bundles and run the application QML tests on
+them. Dispatching `checks.yml` with `qml_probe=true` runs only the Mac QML
+tests, with `gc_limit` choosing Qt's GC time limit (`0` is what the app uses
+on Qt 6.10, `1` the incremental collector that crashed there).
 
-The latest rebuilt GD package also passed separate step-recording probes at normal speed and QOL 10x, another 3/3 fresh-import full-level 10x batch, and a final normal/10x trace pair with all 724 inputs identical. Full trace positions match through step 26,841, beyond the final input at 26,741. The latest successful fresh replay is selected and linked to the local level, and all original user macros remain byte-identical. The sibling GD verification report records the complete acceptance and CI evidence.
+## Not covered yet
 
-The clean GD CI build passed Windows and universal Mac checks after the pinned-source Codegen fix: https://github.com/Blockworked/blockwork-gd/actions/runs/40236673481. The Mac artifact (SHA-256 `3b240ef6c01ccd1735a1b5b2890a37b6655919f66ee1984f9df4e505ca4f8d00`) was then installed and verified on this Mac: one normal-speed completion, 3/3 fresh-import queued+CBS+foreign-input 10x completions, and both normal/10x step-recording probes passed. All three 10x schedules matched the normal run's 724 inputs exactly. Positions matched through step 26,840, beyond the final input at 26,741. Nine configuration/save files were verified byte-identical before the intentional final replay selection/link; original user macros remain byte-identical. Minecraft verification was skipped at the user's request.
-
-
-The final GD startup-diagnostics build passed [Windows and universal Mac CI](https://github.com/Blockworked/blockwork-gd/actions/runs/40262690447). Its installed package SHA-256 is `7b59595f2ee65330734b211ba0ddf36bee0c6f0e019693adb5aa2728b5cc1755`. The actual user profile, including CBF and QOL safe mode off, completed 20/20 fresh-import 10x runs after replacing speed-scaled startup delays with wall-time deadlines. All 724 input events matched normal speed; positions matched through step 26,844, beyond the final input at 26,741. Both recording probes passed. A preceding SIGINT shutdown batch passed another 20/20. No new crash reports appeared in either batch. The earlier initialization SIGSEGV remains unproven as resolved. All ten test configuration/save files and both original user macros were verified restored byte-for-byte before intentionally selecting and linking the latest successful full replay; test imports and raw evidence were archived. Minecraft remains excluded.
-
-
-The key audit found an additional legacy alias mismatch: `LMenu` was treated as Alt by combo matching, emitted Meta on Windows/Linux, emitted the application-menu key on macOS, and had no modifier bit. It now consistently means left Alt (Option on macOS), matching [the original virtual-key definition](https://learn.microsoft.com/en-us/windows/win32/inputdev/virtual-key-codes). Mac application-menu key 110 retains a raw `Other(110)` round trip. New regressions reproduced the missing modifier bit and Option flag before the fix; the full Mac core suite then passed 244 unit tests, with 20 external-interaction tests ignored. The native keyboard fixture also checks the delivered alias combo's Option flag and release.
-
-
-## Later audit: alias consistency and network updater
-
-At `78946c1`, [Checks](https://github.com/Blockworked/Blockwork/actions/runs/40265712704) and [all eight artifact jobs](https://github.com/Blockworked/Blockwork/actions/runs/40265712643) passed, including native Intel/Apple Silicon Mac bundles, both Windows architectures and all Linux packages. The local rebuilt bundle validates 97 Mach-O images. Its packaged daemon delivered an actual `LMenu+x` combo with Option held and released, followed by exact Unicode text; configuration was restored. Evidence: `target/macos-parity-evidence/menu-alias-*`.
-
-A new opt-in example, `blockwork-core/examples/macos-network-update-probe.rs`, exercised production release lookup, download, extraction, replacement and deferred GUI relaunch using a marked disposable `Blockwork.app`. It downloaded the public 0.5.4 ARM archive (180,394,802 bytes; SHA-256 `12d70042ea7282a269606d6c9592d234a88f1c5fb00e4d3e30f6ba0f6701694a`), preserved the old main executable in its backup, proved the GUI stayed closed while the old process was held behind an exit barrier, and then observed a new on-screen GUI window after releasing that process. All prior configuration bytes were restored, no extra config files remained, and both temporary installations were removed. This closes the previously unexercised production network-to-GUI path in a disposable installation; it does not update the user's installed app or exercise clicking its update button.
-
-The first updater attempt completed those production steps but failed an additional validator check. Inspection exposed two validator errors: Apple's `otool` parsed a `(Renderer)` filename as archive-member syntax, and `otool -L` includes `LC_ID_DYLIB` install names that are not load dependencies. The validator now reads literal files through passed descriptors and checks actual load commands. A fresh complete updater fixture then passed, as did both the 13-image published app and the 97-image current app. A signed native regression fixture accepts the parenthesized helper and relative install ID, and still rejects a real host-only load dependency. That regression runs in both native Mac checks. Both updater attempts, raw metadata, validation output and the fixture driver are retained in `target/macos-parity-evidence/network-update-fixture/`.
-
-The updated embedded engine and native diagnostics also passed [Windows/universal Mac CI](https://github.com/Blockworked/blockwork-gd/actions/runs/40265778037). That downloaded package completed another 20/20 full-profile fresh-import QOL 10x attempts, a normal-speed completion, and both recording probes. All 724 input events match normal speed exactly, with positions matching through at least step 26,843, after the final input at 26,741. The installed package SHA-256 is `3993824168d5b3fe29b96b586a54f1553c8590de0ebe06f6f0f8e58dc82f73a1`. The latest successful full replay is selected and linked; original user macros remain byte-identical. This brings the post-shutdown-correction full-profile 10x observations to 60 consecutive successes. The earlier native initialization SIGSEGV still has no proven cause despite 200,000 in-game resource parses and 60 controlled level-initialization probes without reproduction.
-
-Intel game runtime verification remains pending at the user's explicit request. Rosetta 2 was not installed. Intel core/FFI, GUI build, packaging and application QML CI evidence remain recorded separately from game runtime.
-
-The native validator regression passed on both Apple Silicon and Intel in [Checks at `65adf2a`](https://github.com/Blockworked/Blockwork/actions/runs/40269745942), alongside Linux workspace tests/Clippy and Mac core/FFI checks. The Intel fixture explicitly signs nested binaries before the outer application; a local cross-compiled Intel fixture also passes static validation without executing Intel code or installing Rosetta.
-
-## Keyboard compatibility investigation
-
-The audit initially found unsupported-key errors for F21–F24, PrintScr, ScrollLock, Pause and Select. The fixes and remaining OS limits are recorded below. AppKit defines function characters for these names, but constructing a CGEvent containing those characters does not establish working playback. Native controlled probes confirmed the fixture was frontmost, Accessibility posting was allowed, and an ordinary `a` press/release was delivered. Adding the function modifier to Unicode events delivered none of the extended-key pairs. Without it, the function characters reached key-down events but every key-up became `a` at virtual code zero. That is not a reliable logical-key implementation, so no such fallback was shipped. Earlier un-focused probes also produced empty logs and remain separate from that controlled evidence.
-
-Apple’s [USB-to-ADB mapping](https://github.com/apple-oss-distributions/IOHIDFamily/blob/main/IOHIDFamily/Cosmo_USB2ADB.c) marks F21–F24 as `DEADKEY`; the AppKit character constants alone do not supply missing virtual codes. Further work needs a verified native route rather than an invented code or a text-only fallback. Probe sources, delivered events and logs are preserved in `target/macos-parity-evidence/extended-function-key-probes/`.
-
-The corrected local-entry GD CI package subsequently passed one normal completion, 20/20 fresh full-profile queued+CBS+foreign-input QOL 10x completions, and both recording probes. All 724 inputs match exactly; positions match through step 26,843. The sibling GD report records its package hash, restored configuration and selected replay. These observations do not establish a fix for the earlier intermittent native initialization crash; the keyboard audit continued from that checkpoint. The user subsequently removed further startup-crash investigation from the remaining completion requirements. Intel gameplay remains deferred and Minecraft verification remains excluded at the user’s request.
-
-## Final keyboard fixes
-
-PrintScreen/PrintScr, ScrollLock and Pause now follow Apple’s USB keyboard translation to native F13, F14 and F15. Recording retains the canonical native function-key names. Hotkey matching and the stop-recording binding recognize these aliases on Mac, while other platforms retain their separate PC key names. The shared F13–F24 hotkey-name omission was fixed as well; previously these captured keys could not trigger hotkeys or stop recording. `PrintScreen` is accepted alongside the existing `PrintScr` input spelling.
-
-The hotkey-name and Mac-alias regressions failed before the implementation changes. The system-feature core suite then passed 234 unit tests plus five integration tests. A native tap received all six alias events, checking each matching down/up code and function flag. The tap suppresses the test events to avoid changing brightness: macOS reserves F14/F15 as brightness shortcuts, so an initial app-delivery assertion saw only F13 and correctly failed. That failed fixture is preserved alongside the successful native-boundary test, rather than counted as passing application delivery.
-
-F21–F24 and Select remain explicit OS limitations, with an actionable error on Press, Release and Click. A further targeted CoreGraphics prototype delivered their presses to AppKit but empty release characters; a Qt 6.10.3 fixture confirmed every release was `Key_unknown`. This route was rejected. No arbitrary native codes, text-only fallback or substitute key is silently emitted. These five keys must be remapped to supported keys when moving a Windows/Linux macro to Mac. Evidence, including before-fix failures and rejected prototypes, is retained in `target/macos-parity-evidence/final-keyboard/`.
-
-At the user’s latest direction, completion requires the keyboard work and final audit. The historical GD startup crash remains documented, and further root-cause investigation is no longer a completion gate. Intel gameplay is deferred and Minecraft is excluded as previously requested.
-
-The final audit also aligned `WhenKey` trigger matching with the Mac aliases and corrected keyboard error propagation: failed key emissions now appear as errors on the originating block in the app’s run log and are catchable by Try/Catch. Combo release attempts finish before reporting the failure, so a failed key does not skip releasing the combo’s modifiers. A mocked unsupported-key regression reproduced the missing block error before the fix, then verified normal continuation, a single block error, catch-body execution and Control release afterward. The first final full core/FFI pass had 248 unit tests; subsequent audit regressions are recorded with their updated counts in the final evidence.
-
-## Rebase onto the October 30 master updates
-
-The Mac branch now contains Blockwork master `078fb706768a934626428f74cdbc1f1b73be1c8f`. The shared editor accessibility changes were rebased onto Blockstitch master `6e9edd7290a0a85c17e93f59546908c9c1747b12`, producing `8ef2cc6c122710e18b97c565a6c7ef0e97f9f4da`; Cargo, CI QML checkouts and Flatpak sources use that same revision.
-
-Conflict resolution retained master’s launch options, region/image search, settings sections and Store flight release planning. Mac launches retain argument/environment/new-instance support while reporting an unsuccessful `open` exit. The release matrix retains both native Mac targets, and the new release-notes generator now requires and lists both Mac bundles. Accessibility roles and keyboard-capable animation controls remain present in the new editor/settings layout. The native input, capture, window, detector and bundle-validator implementations are byte-identical to the pre-rebase fixes.
-
-The rebased core/FFI suite passed 276 unit tests plus five integration tests. The native workspace library/binary/integration suite passed 386 tests, with 22 external-interaction tests ignored by default; the Linux-only input bridge is excluded from this Mac command. All 268 application QML tests passed. The repository workflow refreshed all 31 catalogs; a newly exposed unfinished English community-sharing plural was completed, and validation passed for 44,565 messages. Flatpak sources were regenerated from the updated lockfile. All five release-preparation tests passed, including the new native Mac artifact check. Raw outputs and pre-rebase refs/local-edit backups are retained in `target/macos-parity-evidence/rebase-2026-10-30/`.
-
-An initial broader build included the Linux-only bridge and was rerun with the native platform scope. A subsequent build exhausted disk space while writing generated Rust archives; compiler products were cleaned with source, local edits and verification evidence preserved. The native workspace retry passed with incremental compilation disabled and two build jobs. These failed attempts remain recorded separately.
-
-The first rebased artifact run built and validated both Mac apps, but its source QML checks failed: ARM reported 266/268 passing and Intel 267/268. The rejected-drop test tried to press a palette delegate at scene y=1521 in an 800-pixel test scene. The fixture now reacquires live delegates after category/layout updates, scrolls into view with bounded waits, and sends a held-button drag from the actual visible source; it also asserts that the rejected edit reached the host. Resize checks wait for nonzero row geometry while retaining all size/bounds assertions. The test runner now matches the application's `BlockworkStyle`/`Basic` selection instead of macOS's non-customizable native control style. All 66 palette tests and all 268 application QML tests then passed locally with that production style. These changes affect test infrastructure; the GD embedded engine remains pinned to production commit `4028ba796210d4aa9b6e94a23b001afa3e349801`.
-
-The local committed-version 0.6 bundle validates 97 Mach-O images. Its actual packaged daemon passed F13/Option/Unicode delivery, block-specific unsupported-key errors and Try/Catch, after the native fixture was made to wait for Accessibility visibility. It also launched two owned app instances with exact quoted arguments and literal per-app environment values, proving that the new master launch options survived the rebase. The user's pre-existing local 0.2.1 manifest/lock edits were restored after building the committed-version bundle; they remain uncommitted. The interrupted October 26 test's known speed/tracing/selection overrides were repaired from the preserved baseline after confirming no subsequent user edits; game saves and loader settings were already byte-identical. That interrupted batch is recorded as one normal success, two 10x successes and one unfinished import, not a completed 20-run batch.
-
-The rebased packaged screen workflow also passed master's new image-search region (`400,900,300,200`): it found exactly one match, clicked its native center at `(520,1020)`, captured the full window twice for HTTP detection, and read the expected OCR marker. Its pixel and average samples both returned `#ff0000`. The initial exact-color fixture returned `#fe0002`/`#fe0100` with the display-selected backing color space; declaring the test window's backing space as sRGB restored exact samples and image matching without changing application capture or matching tolerances. Both failed attempts and the successful `packaged-screen-srgb/result.json` remain in the durable rebase evidence.
-
-
-## Latest October 30 audit
-
-A final fetch found one additional update in each upstream repository. The branch now contains Blockwork master `18e71d49b8d66ca64cee616043df408a79583bd2`; the shared accessibility commit is `af6587a88b3afd2221f4baae23a06e3f4978d6da` on Blockstitch master `0bfc7874bc864024e15ea43cd6aace34b9027d85`. Cargo, Flatpak and every QML checkout, including the manual diagnostic job, use this same shared pin. GD master is unchanged at `f8f8a2b59868e73f8d2e65cadf2d8cf80f8bef0b`.
-
-The latest local core/FFI check again passed 276 unit tests and five integration tests. The expanded application QML suite passed all 280 tests. The packaged 0.6 app validates 97 Mach-O images, opens its actual native window, and passes exact F13/Option/Unicode delivery, block-specific unsupported-key errors, Try/Catch, region image search/count/click, HTTP detection and Vision OCR. Strict final fixture assertions are retained: the native AppKit test window now explicitly declares its sRGB backing space and Accessibility title, so both APIs report the intended fixture contract. The two original macros and the selected verified replay were preserved; automatic schema migrations during owned GUI/CLI checks were archived and undone from durable byte backups. The user's local 0.2.1 Cargo version overrides remain uncommitted.
-
-CI also exposed additional fixture timing assumptions. Close-button checks now target the rendered live button; gap-animation checks observe an intermediate value and its endpoint using a longer fixture animation; nested layout checks wait for fully reported initial/new heights and preserve the zero-tree-search, growth, path, binding and removal assertions. Header drags render and move the pointer before pressing. Fresh palette/header fixtures clear registry callbacks belonging to destroyed pages. Five repeated focused palette checks passed without the stale-callback warnings. All failed attempts and subsequent complete/focused results remain under `target/macos-parity-evidence/rebase-2026-10-30/`.
-
-A native Apple Silicon QML crash persisted after the initial fixture corrections. Its captured `.ips` report places the failure in QtQml's garbage collector while incubating components; the framework UUID matches the unmodified local Qt 6.10.3 framework. Exact upstream causality is not claimed. The Mac Qt 6.10 GUI now defaults to `QV4_GC_TIMELIMIT=0`, the [documented non-incremental collection mode](https://doc.qt.io/qt-6/qtqml-javascript-finetuning.html). Collection remains enabled and can pause the UI while it completes; explicit overrides remain available for diagnosis. The test runner matches this initialization. A native probe linked against the actual initialization source verifies the default, explicit override and 100 collection cycles per mode; the rebuilt GUI also opens successfully with the actual profile, which is then restored byte-for-byte. The local full suite passes all 280 tests in the selected mode. [Native QML probe 41115602102](https://github.com/Blockworked/Blockwork/actions/runs/41115602102) passes all 280 tests on both Apple Silicon and Intel. A separate incremental control is recorded with its own result rather than counted as a required production-mode gate.
-
-The Qt initialization change affects the frontend. The committed embedded core/FFI sources and dependency lockfile are byte-identical to `fd23ad4c33205f643d9e12fb9f0ebd7b545fc873`; `embedded-engine-source-preservation.diff` is empty. The matching GD package therefore retains its verified engine pin. [GD CI 41110902404](https://github.com/Blockworked/blockwork-gd/actions/runs/41110902404) passed Windows and universal Mac builds. Its installed package `dad0f84603dc159bd98cd7cb4dc1d62e2f4e96f23b845b9f9205990ec130c8eb` completed normal speed, 20/20 full-profile fresh-import queued+CBS+foreign-input QOL 10x runs, and both recording probes. All 724 inputs match normal speed exactly; dense positions match through at least step 26,840. All ten configuration/save files matched their backups before intentionally selecting/linking the latest full replay `d1178f1f35bd4619b2634129c616eca6`. Original user macros remain byte-identical; temporary imports are archived. Detailed evidence is in the sibling `build/macos-verification/latest-master-2026-10-30/`.
-
-F21–F24 and Select remain explicit native playback limitations with actionable errors. Intel game runtime is deferred without Rosetta, Minecraft verification is excluded, and further investigation of the historical GD initialization crashes is outside the user's remaining completion requirements. Physical monitor hot-plug and upgrading the user's live installed app remain unexercised coverage limits. Commit identities resolve to GitHub account `EthanRStokes` as Ethan Stokes `<erstokes10@gmail.com>` in all three repositories; the renamed branches are pushed and the prior PRs remain closed.
-
-
-The final application checkpoint `d13391e78988154becb4858998f23b403777a2c1` passed [Checks 41115603183](https://github.com/Blockworked/Blockwork/actions/runs/41115603183) and [all eight artifact jobs 41115603335](https://github.com/Blockworked/Blockwork/actions/runs/41115603335). Both Mac jobs validate 97 Mach-O images, start the packaged executable and pass all 280 QML tests with the default mitigation. Both Windows architectures and all Linux AppImage/Flatpak jobs also pass. Translation validation passed in [41110773906](https://github.com/Blockworked/Blockwork/actions/runs/41110773906); subsequent changes introduce no translatable application strings.
-
-The same-source [incremental-GC control 41115952441](https://github.com/Blockworked/Blockwork/actions/runs/41115952441) passed all 280 tests on Intel and reproduced a native SIGSEGV during palette component creation on Apple Silicon. This failed diagnostic is retained as negative evidence and is outside the production-mode completion gates. Its raw log and the earlier full GC crash report are preserved; no additional control report appeared within the bounded collection window. The supported non-incremental mode passed both independent native probes and both full artifact jobs. This supports the mitigation without establishing an exact upstream fix. To repeat either native diagnostic on a chosen branch, dispatch `checks.yml` with `qml_probe=true` and `gc_limit=0` or `1`.
-
-Final cleanup verifies that the selected replay's full payload equals the last successful import apart from its display name, the live directory contains only the two original macros and that replay, no autotest request remains, and all owned GUI/daemon/game/fixture processes have stopped. `final-audit.json`, `final-ci-runs.json`, the final native job logs, `packaged-completion-keyboard/result.json`, `packaged-completion-screen/result.json` and the sibling `post-gui-final-state.json` form the durable completion record. The final follow-up commit contains this report and the locally compiled/exercised Swift fixture title declaration; application and embedded-engine code remain at their tested checkpoints.
+- Physical monitor hot-plug.
+- Updating a live installed copy by clicking its update button.
+- Permission-dependent input and capture on the Intel CI runner.

@@ -298,13 +298,31 @@ function run(argv) {
 
 #[cfg(target_os = "macos")]
 fn native(png: &[u8]) -> Option<Result<String, String>> {
-    use std::sync::atomic::AtomicU8;
+    use std::sync::Mutex;
+    use std::sync::atomic::{AtomicU8, Ordering};
+    use std::time::{Duration, Instant};
     static MODE: AtomicU8 = AtomicU8::new(0);
+    // A stall can be transient, so retry accurate recognition now and then
+    // rather than reading everything with the fast recognizer until restart.
+    static DEGRADED_AT: Mutex<Option<Instant>> = Mutex::new(None);
+    const RETRY_ACCURATE_AFTER: Duration = Duration::from_secs(10 * 60);
+    if let Ok(mut since) = DEGRADED_AT.lock() {
+        if since.is_some_and(|at| at.elapsed() >= RETRY_ACCURATE_AFTER) {
+            MODE.store(0, Ordering::Relaxed);
+            *since = None;
+        }
+    }
     let file = match temp_png(png) {
         Ok(file) => file,
         Err(e) => return Some(Err(e)),
     };
+    let before = MODE.load(Ordering::Relaxed);
     let output = retry_vision(&MODE, |mode| vision(&file.0, mode));
+    if MODE.load(Ordering::Relaxed) != before {
+        if let Ok(mut since) = DEGRADED_AT.lock() {
+            *since = Some(Instant::now());
+        }
+    }
     Some(match output {
         Ok(out) if out.status.success() => {
             Ok(String::from_utf8_lossy(&out.stdout).trim_end().to_owned())

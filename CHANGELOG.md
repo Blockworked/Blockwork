@@ -143,6 +143,8 @@ section below as the GitHub release notes, followed by the downloads table.
 - Image blocks choose which match to use when the picture is on screen more than once: the best match, a match number (left to right, top to bottom; -1 is the last), the one nearest the mouse, or the one nearest a point. They can also search just a region of the screen, and "find image" can count the matches into a variable.
 - Some blocks start short and have a "+" at the end that adds more options to them, each with an "x" to take it off again. The image blocks keep "which match", "search region" and "count matches" there.
 - "Text on screen" and "average color" have a button that picks their x, y, width and height by dragging a region on screen, and "color at" one that picks its x and y with a click.
+- macOS builds for Intel Macs, alongside Apple Silicon.
+- Hotkeys and the stop-recording key can use F13-F24.
 
 ### Changed
 - "Run command" starts its command and moves straight on down the strand instead of waiting for it to finish. Run command blocks in saved macros and block packs become "run command and wait" blocks when loaded, so they keep waiting (the original file is kept as a backup).
@@ -161,6 +163,12 @@ section below as the GitHub release notes, followed by the downloads table.
 - The welcome screen groups preferences and starter templates into panels that reflow on narrower windows. Cron syntax help opens from an info button beside the custom schedule field.
 - Clearing all blocks uses a Cancel/Delete confirmation popup and can be undone.
 - Legacy pack variables migrate to private pack state where possible. Variables used by the macro or shared by older packs stay shared so existing macros keep working.
+- macOS 13 or newer is required (Qt 6.10).
+- macOS window blocks use the Accessibility API directly instead of System Events, so they no longer need an Automation permission. Maximize fills the screen's usable area like on Windows and Linux instead of opening a fullscreen Space, and Restore puts the window back.
+- On macOS, "close app" asks the chosen copy of the app to quit, so an app with unsaved work can still ask to save.
+- A key that can't be pressed shows as an error on its block (and can be caught by a try block) instead of being skipped silently. On macOS, F21-F24 and Select can't be pressed.
+- The legacy `LMenu` key name means left Alt everywhere; Windows and Linux used to press the Windows/Meta key for it.
+- On macOS, PrintScreen, ScrollLock and Pause are pressed and matched as F13, F14 and F15, which is how Macs see those keys on a PC keyboard.
 
 ### Fixed
 - On Linux, evdev waits for held keys and mouse buttons to be released before
@@ -181,6 +189,19 @@ section below as the GitHub release notes, followed by the downloads table.
 - Browser scripts can wait up to two minutes for a result and stop promptly when the macro is stopped.
 - Wait until and Wait for image no longer allow conflicting "for up to" and "or error after" timeout options on the same block.
 - Windows x64 builds use the full Qt package required to bundle the app.
+- Releasing one Shift (or Control/Alt) while the other is still held no longer drops the modifier for hotkeys.
+- Reading text from a blank or single-color area returns nothing straight away instead of calling the OCR engine.
+- macOS:
+  - Holding a hotkey runs its action once instead of once per key repeat, and the hotkey's key-up no longer reaches the focused app.
+  - Recording keeps both scroll axes, extra mouse buttons, the real cursor position and hardware timestamps, and keeps right-side modifiers apart from left.
+  - Typing and key presses keep non-US text, emoji and modifier order, and media keys work.
+  - Screen capture reads colors in sRGB, captures only the asked-for region and works on Retina and mixed-scale displays. Missing Screen Recording or Accessibility permission is reported instead of giving wrong results.
+  - Text recognition no longer hangs on a stalled Vision service; it falls back to a faster recognizer for a while and tries the accurate one again later.
+  - Window Focus and Restore work on windows that can't be minimized, and "window exists?" answers false instead of an error without Accessibility access.
+  - The app picker lists system apps and apps in category folders like Utilities, with their icons.
+  - Dialogs close when Blockwork's background process exits, and reopening the app shows the editor after it was closed to the tray.
+  - Detection models can run on the GPU through Metal.
+  - Updates install correctly when the app is on a different drive from the download, and the app restarts after the old one has exited.
 - Release publishing waits for required builds and downloads to succeed, and lists only available packages. Creating a Microsoft Store test flight reports missing tester-group IDs before submitting it.
 
 ## [0.5.4] - 2026-09-20

@@ -805,6 +805,40 @@ fn recover_tap_type(kind: u32, port: core_foundation::mach_port::CFMachPortRef) 
 
 // ── Capture ───────────────────────────────────────────────────────────────────
 
+/// Pairs a swallowed hotkey press with its repeats and release, as the
+/// Windows hook and evdev reader do. Repeats are never reported, so a held
+/// hotkey fires once and recordings don't fill with autorepeat presses.
+#[derive(Default)]
+struct SuppressedKeys(std::collections::HashSet<u16>);
+
+impl SuppressedKeys {
+    /// Decides an event without the callback, or `None` to ask it.
+    fn filter(&self, ev_type: u32, code: u16, repeat: bool) -> Option<CaptureDecision> {
+        (ev_type == 10 && repeat).then(|| {
+            if self.0.contains(&code) {
+                CaptureDecision::Suppress
+            } else {
+                CaptureDecision::Passthrough
+            }
+        })
+    }
+
+    fn decide(&mut self, ev_type: u32, code: u16, decision: CaptureDecision) -> CaptureDecision {
+        let suppress = matches!(decision, CaptureDecision::Suppress);
+        match ev_type {
+            10 if suppress => {
+                self.0.insert(code);
+            }
+            10 => {
+                self.0.remove(&code);
+            }
+            11 if self.0.remove(&code) => return CaptureDecision::Suppress,
+            _ => {}
+        }
+        decision
+    }
+}
+
 pub(super) fn start_capture_thread(
     callback: Box<dyn FnMut(CaptureEvent, CaptureTimestamp) -> CaptureDecision + Send + 'static>,
 ) {
@@ -835,6 +869,7 @@ pub(super) fn start_capture_thread(
                 // when they match a hotkey. FlagsChanged is mapped to synthetic
                 // KeyPress/KeyRelease so modifier-only hotkeys work.
                 let cb_kb = Arc::clone(&callback);
+                let mut suppressed = SuppressedKeys::default();
                 match system_keys::KeyTap::new(
                     move |ev_type, event| {
                         // Playback must not start hotkeys or re-record itself.
@@ -853,28 +888,27 @@ pub(super) fn start_capture_thread(
                             return CaptureDecision::Passthrough;
                         }
 
+                        let kc = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) as u16;
+                        let repeat = ev_type == 10
+                            && event.get_integer_value_field(EventField::KEYBOARD_EVENT_AUTOREPEAT) != 0;
+                        if let Some(decision) = suppressed.filter(ev_type, kc, repeat) {
+                            return decision;
+                        }
                         let capture_ev: Option<CaptureEvent> = match ev_type {
-                            10 => {
-                                let kc = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) as u16;
-                                cg_keycode_to_macro_key(kc).map(CaptureEvent::KeyPress)
-                            }
-                            11 => {
-                                let kc = event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE) as u16;
-                                cg_keycode_to_macro_key(kc).map(CaptureEvent::KeyRelease)
-                            }
+                            10 => cg_keycode_to_macro_key(kc).map(CaptureEvent::KeyPress),
+                            11 => cg_keycode_to_macro_key(kc).map(CaptureEvent::KeyRelease),
                             14 => system_keys::capture(event),
                             _ => None,
                         };
 
+                        let mut decision = CaptureDecision::Passthrough;
                         if let Some(ev) = capture_ev {
                             if let Ok(mut cb) = cb_kb.lock() {
                                 let ts = CaptureTimestamp::Hardware(cgevent_hardware_timestamp(event));
-                                if matches!(cb(ev, ts), CaptureDecision::Suppress) {
-                                    return CaptureDecision::Suppress;
-                                }
+                                decision = cb(ev, ts);
                             }
                         }
-                        CaptureDecision::Passthrough
+                        suppressed.decide(ev_type, kc, decision)
                     },
                 ) {
                     Ok(tap) => {
@@ -1097,6 +1131,19 @@ fn cg_keycode_to_macro_key(code: u16) -> Option<MacroKey> {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn swallowed_hotkeys_swallow_their_repeats_and_release() {
+        let mut keys = SuppressedKeys::default();
+        assert!(keys.filter(10, 1, false).is_none());
+        assert!(matches!(keys.decide(10, 1, CaptureDecision::Suppress), CaptureDecision::Suppress));
+        assert!(matches!(keys.filter(10, 1, true), Some(CaptureDecision::Suppress)));
+        assert!(matches!(keys.filter(10, 2, true), Some(CaptureDecision::Passthrough)));
+        assert!(matches!(keys.decide(11, 1, CaptureDecision::Passthrough), CaptureDecision::Suppress));
+        assert!(matches!(keys.decide(11, 1, CaptureDecision::Passthrough), CaptureDecision::Passthrough));
+        assert!(matches!(keys.decide(10, 1, CaptureDecision::Passthrough), CaptureDecision::Passthrough));
+        assert!(matches!(keys.filter(10, 1, true), Some(CaptureDecision::Passthrough)));
+    }
 
     #[test]
     fn media_events_preserve_key_direction_and_modifiers() {
