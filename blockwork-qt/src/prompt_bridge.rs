@@ -35,8 +35,9 @@ pub mod qobject {
 }
 
 static REQUEST: OnceLock<String> = OnceLock::new();
+/// The daemon's PID, and whether it was our direct parent at launch.
 #[cfg(unix)]
-static PARENT: OnceLock<libc::pid_t> = OnceLock::new();
+static PARENT: OnceLock<(libc::pid_t, bool)> = OnceLock::new();
 /// A handle to the daemon, opened at launch so a reused PID can't pass for it.
 /// `None` when it had already exited before the dialog started.
 #[cfg(windows)]
@@ -48,14 +49,24 @@ pub fn requested() -> bool {
         return false;
     }
     #[cfg(unix)]
-    PARENT.get_or_init(|| std::env::var("BLOCKWORK_PROMPT_PARENT_PID")
-        .ok().and_then(|value| value.parse().ok())
-        .unwrap_or_else(|| unsafe { libc::getppid() }));
+    PARENT.get_or_init(|| {
+        let ppid = unsafe { libc::getppid() };
+        let pid = std::env::var("BLOCKWORK_PROMPT_PARENT_PID").ok().and_then(|value| value.parse().ok()).unwrap_or(ppid);
+        (pid, pid == ppid)
+    });
     #[cfg(windows)]
     if let Some(pid) = std::env::var("BLOCKWORK_PROMPT_PARENT_PID").ok().and_then(|value| value.parse::<u32>().ok()) {
         use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_SYNCHRONIZE};
+        use windows_sys::Win32::Foundation::{ERROR_INVALID_PARAMETER, GetLastError};
         let handle = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, pid) };
-        PARENT.get_or_init(|| (!handle.is_null()).then_some(handle as usize));
+        if !handle.is_null() {
+            PARENT.get_or_init(|| Some(handle as usize));
+        } else if unsafe { GetLastError() } == ERROR_INVALID_PARAMETER {
+            // No such process: the daemon is already gone.
+            PARENT.get_or_init(|| None);
+        }
+        // Any other failure leaves the daemon unwatched rather than
+        // cancelling a dialog it may still be waiting on.
     }
     let mut text = String::new();
     let _ = std::io::stdin().read_to_string(&mut text);
@@ -93,17 +104,20 @@ impl qobject::PromptBridge {
 
     fn parent_alive(&self) -> bool {
         #[cfg(unix)]
-        if let Some(parent) = PARENT.get() {
+        if let Some(&(parent, direct)) = PARENT.get() {
             // Reparenting also covers a parent that died before this dialog
-            // finished launching, without relying on PID liveness/reuse.
-            return unsafe { libc::getppid() } == *parent;
+            // finished launching, without relying on PID liveness/reuse. A
+            // launcher in between (a wrapper that doesn't exec) breaks that,
+            // so fall back to asking whether the daemon's PID still exists.
+            let alive = if direct { unsafe { libc::getppid() == parent } } else { unsafe { libc::kill(parent, 0) == 0 } };
+            return alive;
         }
         #[cfg(windows)]
         if let Some(parent) = PARENT.get() {
             use windows_sys::Win32::Foundation::WAIT_TIMEOUT;
             use windows_sys::Win32::System::Threading::WaitForSingleObject;
             // The handle is signalled once the daemon exits.
-            return parent.is_some_and(|handle| unsafe { WaitForSingleObject(handle as _, 0) } == WAIT_TIMEOUT);
+            return parent.is_some_and(|handle| unsafe { WaitForSingleObject(handle as _, 0) == WAIT_TIMEOUT });
         }
         true
     }

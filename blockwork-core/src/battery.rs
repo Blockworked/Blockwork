@@ -21,9 +21,11 @@ pub fn percentage() -> Result<f64, String> {
     checked_percentage(battery.state_of_charge().get::<percent>() as f64)
 }
 
+/// Rejects readings that aren't numbers. Out-of-range ones are clamped: a
+/// worn battery can report a little over its design capacity (101%).
 fn checked_percentage(value: f64) -> Result<f64, String> {
-    if value.is_finite() && (0.0..=100.0).contains(&value) {
-        Ok(value)
+    if value.is_finite() {
+        Ok(value.clamp(0.0, 100.0))
     } else {
         Err("battery charge unavailable: the system returned an invalid percentage".into())
     }
@@ -35,9 +37,11 @@ mod tests {
 
     #[test]
     fn unavailable_capacity_does_not_become_a_numeric_charge() {
-        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY, -1.0, 101.0] {
+        for value in [f64::NAN, f64::INFINITY, f64::NEG_INFINITY] {
             assert!(checked_percentage(value).is_err());
         }
+        assert_eq!(checked_percentage(101.3), Ok(100.0));
+        assert_eq!(checked_percentage(-1.0), Ok(0.0));
         for value in [0.0, 45.5, 100.0] {
             assert_eq!(checked_percentage(value), Ok(value));
         }
