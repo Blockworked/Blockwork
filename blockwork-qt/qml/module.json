@@ -37,7 +37,8 @@
     "BlockworkStyle": ["qmldir", "TextField.qml", "TextArea.qml", "TextEditingMenu.qml"]
   },
   "editor_resources": {
-    "/icons": ["../../res/icons/blockwork.png"]
+    "/icons": ["../../res/icons/blockwork.png"],
+    "/fonts": ["../../res/fonts/AtkinsonHyperlegibleNext-Regular.ttf", "../../res/fonts/AtkinsonHyperlegibleNext-Medium.ttf", "../../res/fonts/AtkinsonHyperlegibleNext-SemiBold.ttf", "../../res/fonts/AtkinsonHyperlegibleNext-Bold.ttf", "../../res/fonts/AtkinsonHyperlegibleNext-ExtraBold.ttf", "../../res/fonts/AtkinsonHyperlegibleNext-Italic.ttf"]
   },
   "lucide": { "files": ["Icons.qml", "LucideIcon.qml"], "singletons": ["Icons.qml"] }
 }

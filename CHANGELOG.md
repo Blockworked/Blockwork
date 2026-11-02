@@ -151,6 +151,9 @@ section below as the GitHub release notes, followed by the downloads table.
 - Hotkeys and the stop-recording key can use F13-F24.
 
 ### Changed
+- Blockwork has its own typeface, Atkinson Hyperlegible Next, built into the
+  app. Block sidebar sections, My blocks, Community blocks and units like "ms"
+  are written in sentence case instead of small capitals.
 - The block sidebar is grouped into titled sections (Keyboard, Mouse, Loops,
   Clipboard, Windows and so on), in the same order in All and in each category.
   Your variables now sit right under Make a Variable, above set and change

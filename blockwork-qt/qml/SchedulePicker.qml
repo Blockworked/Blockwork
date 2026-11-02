@@ -95,7 +95,7 @@ AppDialog {
     }
     onAccepted: if (valid) chosen(expression)
 
-    component SectionLabel: Text { color: Theme.textDim; font.pixelSize: 11; font.weight: Font.DemiBold; font.letterSpacing: 0.5 }
+    component SectionLabel: Text { color: Theme.textDim; font.pixelSize: 13; font.weight: Font.Medium }
     component Phrase: Text { color: Theme.text; font.pixelSize: 13; Layout.alignment: Qt.AlignVCenter }
     // A time that opens the time picker.
     component TimeButton: BwButton {
@@ -208,7 +208,7 @@ AppDialog {
                 // ---- days, for both of those ----
                 Column {
                     visible: root.mode === "repeat" || root.mode === "daily"; width: parent.width; spacing: 8
-                    SectionLabel { text: qsTr("ON THESE DAYS") }
+                    SectionLabel { text: qsTr("On these days") }
                     Row {
                         spacing: 6
                         Repeater {
