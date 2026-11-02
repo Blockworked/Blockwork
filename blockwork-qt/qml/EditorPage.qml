@@ -725,6 +725,7 @@ Item {
                     onBlockActivated: (type, instruction) => dragController.addAt({ kind: "instruction", type: type, instruction: instruction }, 120, 120)
                     onCustomBlockActivated: definition => dragController.addAt(root.customEntry(definition), 120, 120)
                     onMakeVariableRequested: variableDialog.openForCreate()
+                    onSectionActionRequested: action => { if (action === "makeGlobal") globalPicker.openForCreate(null); }
                     onRenameVariableRequested: name => variableDialog.openForRename(name)
                     onDeleteVariableRequested: name => root.invoke("delete_variable", { name: name })
                     onEditBlockRequested: definition => { if (!definition.read_only) blockDialog.openForEdit(definition); }
@@ -1693,7 +1694,7 @@ Item {
         { category: "control", title: qsTr("Other macros"), items: ["RunMacro", "StopMacroNamed", "MacroRunning"] },
         { category: "control", title: qsTr("Signals and locks"), items: ["SendSignal", "WithLock"] },
         { category: "data", title: qsTr("Variables"), action: "makeVariable", items: ["@variables", "SetVariable", "ChangeVariable"] },
-        { category: "data", title: qsTr("Global variables"), items: ["GlobalVariable", "SetGlobal", "ChangeGlobal"] },
+        { category: "data", title: qsTr("Global variables"), action: "makeGlobal", actionText: qsTr("Make a Global"), items: ["GlobalVariable", "SetGlobal", "ChangeGlobal"] },
         { category: "data", title: qsTr("Lists"), action: "makeList", items: ["@lists", "ListItem", "ListItemNumber", "ListAmount", "ListLength",
             "ListContains", "ListItemExists", "ListIsEmpty", "ListAsJson", "AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList",
             "InsertIntoList", "ReplaceItemOfList", "ReverseList", "SplitIntoList"] },

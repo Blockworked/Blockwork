@@ -150,8 +150,9 @@ section below as the GitHub release notes, followed by the downloads table.
 - The block sidebar is grouped into titled sections (Keyboard, Mouse, Loops,
   Clipboard, Windows and so on), in the same order in All and in each category.
   Your variables now sit right under Make a Variable, above set and change
-  variable; set clipboard moved to System beside the clipboard reporters, and
-  mouse position to Input and current time to Operators.
+  variable, and global variables get their own Make a Global button. Set
+  clipboard moved to System beside the clipboard reporters, mouse position to
+  Input and current time to Operators.
 - "Run command" starts its command and moves straight on down the strand instead of waiting for it to finish. Run command blocks in saved macros and block packs become "run command and wait" blocks when loaded, so they keep waiting (the original file is kept as a backup).
 - Macro files now carry a format version and are upgraded step by step when
   loaded. Blocks a version can't run become notes on the canvas instead of

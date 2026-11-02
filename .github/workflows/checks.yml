@@ -118,7 +118,7 @@ jobs:
         run: |
           git init ../blockstitch
           git -C ../blockstitch remote add origin https://github.com/Blockworked/blockstitch.git
-          git -C ../blockstitch fetch --depth 1 origin b7c951e9bbc2992879aae9d440227c121da31ff4
+          git -C ../blockstitch fetch --depth 1 origin b2f52bb2314da261f556bbcb7ddb42008f2208fb
           git -C ../blockstitch checkout --detach FETCH_HEAD
       - uses: actions/setup-python@v5
         with:
