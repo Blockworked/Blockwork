@@ -4571,12 +4571,12 @@
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1953"/>
-        <source>When run</source>
+        <source>WHEN RUN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1954"/>
-        <source>Once at</source>
+        <source>ONCE AT</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4586,17 +4586,17 @@
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1956"/>
-        <source>When I receive</source>
+        <source>WHEN I RECEIVE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1957"/>
-        <source>When webhook</source>
+        <source>WHEN WEBHOOK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1957"/>
-        <source>is called, body in</source>
+        <source>IS CALLED, BODY IN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4657,13 +4657,13 @@
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1969"/>
-        <source>When window</source>
+        <source>WHEN WINDOW</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1969"/>
         <location filename="../qml/EditorPage.qml" line="1989"/>
-        <source>is</source>
+        <source>IS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4678,22 +4678,22 @@
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1972"/>
-        <source>When file</source>
+        <source>WHEN FILE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1972"/>
-        <source>changes</source>
+        <source>CHANGES</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1973"/>
-        <source>When I type</source>
+        <source>WHEN I TYPE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1973"/>
-        <source>then</source>
+        <source>THEN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4708,7 +4708,7 @@
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1976"/>
-        <source>When app</source>
+        <source>WHEN APP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4723,17 +4723,17 @@
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1979"/>
-        <source>When idle for</source>
+        <source>WHEN IDLE FOR</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1979"/>
-        <source>minutes</source>
+        <source>MINUTES</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1980"/>
-        <source>When screen is</source>
+        <source>WHEN SCREEN IS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4748,7 +4748,7 @@
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1983"/>
-        <source>On schedule</source>
+        <source>ON SCHEDULE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4758,7 +4758,7 @@
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1986"/>
-        <source>When network</source>
+        <source>WHEN NETWORK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4773,7 +4773,7 @@
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1989"/>
-        <source>When USB device</source>
+        <source>WHEN USB DEVICE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4789,7 +4789,7 @@
     <message>
         <location filename="../qml/EditorPage.qml" line="1916"/>
         <location filename="../qml/EditorPage.qml" line="1997"/>
-        <source>When</source>
+        <source>WHEN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4851,7 +4851,7 @@
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1995"/>
-        <source>with keys</source>
+        <source>WITH KEYS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4912,6 +4912,11 @@
         <location filename="../qml/EditorPage.qml" line="2018"/>
         <location filename="../qml/EditorPage.qml" line="2093"/>
         <source>set</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/EditorPage.qml" line="1993"/>
+        <source>with keys</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5391,23 +5396,23 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="496"/>
-        <source>When run</source>
+        <source>WHEN RAN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="502"/>
-        <source>When battery discharged to</source>
+        <source>WHEN BATTERY DISCHARGED TO</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="510"/>
-        <source>When battery charged to</source>
+        <source>WHEN BATTERY CHARGED TO</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="518"/>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="574"/>
-        <source>When</source>
+        <source>WHEN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5438,17 +5443,17 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="527"/>
-        <source>When power plugged in</source>
+        <source>WHEN POWER PLUGGED IN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="533"/>
-        <source>When power unplugged</source>
+        <source>WHEN POWER UNPLUGGED</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="539"/>
-        <source>When clipboard changes</source>
+        <source>WHEN CLIPBOARD CHANGES</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
