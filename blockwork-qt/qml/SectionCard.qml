@@ -21,7 +21,7 @@ Rectangle {
         Rectangle { anchors.left: parent.left; anchors.right: parent.right; anchors.bottom: parent.bottom; height: root.radius; color: parent.color }
         Row { anchors.left: parent.left; anchors.leftMargin: 18; anchors.verticalCenter: parent.verticalCenter; spacing: 9
             LucideIcon { name: root.iconName; color: Theme.textDim; width: 16; height: 16; anchors.verticalCenter:parent.verticalCenter }
-            Text { text: root.title.toUpperCase(); color: Theme.textDim; font.pixelSize: 12; font.weight: Font.Bold; font.letterSpacing: 1.2; anchors.verticalCenter:parent.verticalCenter }
+            Text { text: root.title; color: Theme.text; font.pixelSize: 15; font.weight: Font.Bold; anchors.verticalCenter:parent.verticalCenter }
         }
     }
     ColumnLayout { id: body; anchors.left: parent.left; anchors.right: parent.right; anchors.top: header.bottom; anchors.margins: 18; spacing: 12 }

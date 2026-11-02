@@ -183,7 +183,7 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1552"/>
-        <source>COMMENT</source>
+        <source>Comment</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5463,7 +5463,7 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="551"/>
-        <source>MS</source>
+        <source>ms</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5551,12 +5551,12 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="597"/>
-        <source>X</source>
+        <source>x</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="605"/>
-        <source>Y</source>
+        <source>y</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5566,7 +5566,7 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="619"/>
-        <source>AMOUNT</source>
+        <source>amount</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6472,7 +6472,7 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="341"/>
-        <source>MY BLOCKS</source>
+        <source>My blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6482,7 +6482,7 @@
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="379"/>
-        <source>COMMUNITY BLOCKS</source>
+        <source>Community blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6494,11 +6494,6 @@
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="357"/>
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="414"/>
         <source>A custom block defined in this macro.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="105"/>
-        <source>Community blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6747,7 +6742,7 @@
     </message>
     <message>
         <location filename="../qml/SchedulePicker.qml" line="211"/>
-        <source>ON THESE DAYS</source>
+        <source>On these days</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
