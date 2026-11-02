@@ -183,6 +183,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Every event block label now uses the same bold caption style; newer event blocks (when run, when file changes, when idle and others) were drawn in plain text while the older ones were bold.
 - Clicking Record during the countdown cancels the recording instead of starting the countdown over, and the Record button's label no longer gets cut off or overlaps its neighbours.
 - Images taken with the screen picker no longer catch the picker's own close animation (such as KDE's shattering windows) as stray lines and shapes.
+- Cancelling the screen picker (Cancel or Esc) brings the editor back instead of closing it.
 - Dropping blocks above a stack keeps the existing stack in place, with matching connectors and smoother branch previews.
 - Dragging a block over the sidebar keeps the canvas still, and dropping it there deletes it. Dragging a key input from the palette no longer pans the sidebar.
 - Custom block headers appear inside the visible canvas when created, and dragging blocks and parameters keeps their position and color until the edit lands.

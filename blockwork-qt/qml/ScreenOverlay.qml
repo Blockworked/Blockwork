@@ -37,6 +37,9 @@ Item {
         active = true;
     }
     function end() { active = false; }
+    // Here rather than in an overlay's handler: end() destroys the overlays,
+    // and a handler whose window is gone stops before it can emit canceled().
+    function cancel() { end(); canceled(); }
 
     // Screen coordinates from a point on one overlay. X11 captures native
     // pixels. So does Windows (the daemon is per-monitor DPI aware), but Qt
@@ -90,7 +93,7 @@ Item {
                 anchors.fill: parent
                 visible: !root.clearing
                 focus: true
-                Keys.onEscapePressed: { root.end(); root.canceled(); }
+                Keys.onEscapePressed: root.cancel()
                 Keys.onReturnPressed: root.accept()
                 Keys.onEnterPressed: root.accept()
 
@@ -160,7 +163,7 @@ Item {
                         anchors.centerIn: parent; spacing: 10
                         LucideIcon { name: "crosshair"; width: 16; height: 16; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
                         Text { text: root.hint; color: Theme.text; font.pixelSize: 13; anchors.verticalCenter: parent.verticalCenter }
-                        BwButton { text: qsTr("Cancel"); onClicked: { root.end(); root.canceled(); } }
+                        BwButton { text: qsTr("Cancel"); onClicked: root.cancel() }
                         BwButton { iconName: "check"; text: qsTr("Use selection"); primary: true; enabled: root.hasSelection; onClicked: root.accept() }
                     }
                 }
