@@ -129,6 +129,9 @@ Item {
             id: bundleScroll
             implicitHeight: Math.min(400, bundleRows.implicitHeight)
             clip: true; contentWidth: availableWidth
+            ScrollBar.vertical.policy: ScrollBar.AsNeeded
+            ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
+            WheelPan { flickable: bundleScroll.contentItem }
             Column {
                 id: bundleRows
                 width: bundleScroll.availableWidth

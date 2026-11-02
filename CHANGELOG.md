@@ -176,6 +176,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - On Linux, evdev waits for held keys and mouse buttons to be released before
   grabbing an input device, preventing stuck input when Blockwork starts.
 - A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
+- The "Choose macros to export" list scrolls like the app's other lists: smooth wheel and touchpad scrolling and the same scroll bar.
 - Ctrl+scroll zooms the canvas around the mouse pointer instead of pushing the view right and down, and mouse wheel zoom, the zoom buttons and reset now ease in (follows the animation speed setting).
 - The "when every day at" block saves its day, weekday, month and time again.
 - Dragging the canvas with the mouse stops where you let go instead of gliding on, and two-finger touchpad panning is smoothed slightly.

@@ -41,6 +41,14 @@ Item {
             appBridge: bridge
         }
     }
+    Component {
+        id: longFilesComponent
+        MacroFiles {
+            appState: ({ library: Array.from({ length: 40 }, (_, i) => ({ id: "m" + i, name: "Macro " + i, folder: "" })) })
+            invoke: function(command, args) {}
+            appBridge: bridge
+        }
+    }
     TestCase {
         name: "BundleExport"
         when: windowShown
@@ -48,6 +56,19 @@ Item {
             bridge.dependencies = false;
             bridge.deferReplies = false;
             bridge.pending = [];
+        }
+
+        function test_long_list_scrolls_with_the_wheel() {
+            const files = createTemporaryObject(longFilesComponent, scene);
+            files.exportBundle(["m0"], "Macro 0");
+            const picker = findChild(files, "bundlePicker");
+            tryCompare(picker, "opened", true);
+            const flick = picker.contentItem.contentItem;
+            verify(flick.contentHeight > flick.height);
+            compare(flick.contentY, 0);
+            mouseWheel(picker.contentItem, 40, 40, 0, -120);
+            tryVerify(() => flick.contentY > 0);
+            picker.reject();
         }
 
         function test_dependencies_are_checked_disabled_and_update() {
