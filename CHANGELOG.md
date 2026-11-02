@@ -48,9 +48,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Image blocks:
   - Find an image on screen, click on it, and wait for it to appear or disappear, with a tolerance.
   - Capture the image from the screen or load a PNG.
-- Screen picker in the editor toolbar:
-  - A see-through overlay on every monitor: click a point or drag a region to get its coordinates and color, and add matching blocks.
-  - On Wayland, captures go through the desktop portal (KDE and GNOME may ask for permission once) or `grim` on wlroots desktops.
+- Screen captures (image blocks and the region and point pickers on screen reporters) use a see-through overlay on every monitor. On Wayland they go through the desktop portal (KDE and GNOME may ask for permission once) or `grim` on wlroots desktops.
 - "Wait until" block that pauses until a condition is true, with a time limit.
 - Error handling:
   - Try/on error, throw error, error message, stop macro.
