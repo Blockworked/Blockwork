@@ -1420,6 +1420,16 @@ pub(crate) fn delete_secret(state: &SharedState, app: &AppHandle, name: &str) ->
 
 // ─── Instructions ──────────────────────────────────────────────────────────
 
+// Declare a palette default only after its block was successfully inserted.
+fn ensure_inserted_variable(s: &mut AppState, name: Option<String>) {
+    let Some(name) = name else { return; };
+    let Some(mac) = s.current_macro.as_mut() else { return; };
+    let Ok(name) = mac.create_variable(&name) else { return; };
+    if let Ok(mut store) = s.variable_values.lock() {
+        store.insert(name, Evaluated::Number(0.0));
+    }
+}
+
 pub(crate) async fn add_instruction(
     state: &SharedState,
     app: &AppHandle,
@@ -1427,6 +1437,7 @@ pub(crate) async fn add_instruction(
     path: Vec<PathStep>,
     instruction: InstructionDto,
     target_y: Option<i32>,
+    variable_to_create: Option<String>,
 ) -> Result<(), String> {
     let ins = dto_to_instruction(&instruction).ok_or("Unknown instruction type")?;
     if matches!(
@@ -1455,6 +1466,7 @@ pub(crate) async fn add_instruction(
         {
             strand.y = y;
         }
+        ensure_inserted_variable(&mut s, variable_to_create);
         s.invalid_field_buffers.clear();
         auto_save(&mut s);
     }
@@ -1977,6 +1989,7 @@ pub(crate) fn add_strand(
     x: Option<i32>,
     y: Option<i32>,
     instruction: Option<InstructionDto>,
+    variable_to_create: Option<String>,
 ) -> Result<String, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let ins = match instruction {
@@ -1986,7 +1999,11 @@ pub(crate) fn add_strand(
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let (default_x, default_y) = mac.next_editor_position();
+    let has_instruction = !ins.is_empty();
     let new_id = mac.add_strand(x.unwrap_or(default_x), y.unwrap_or(default_y), ins);
+    if has_instruction {
+        ensure_inserted_variable(&mut s, variable_to_create);
+    }
     auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(new_id)
@@ -3769,6 +3786,63 @@ mod value_location_tests {
             saved: Box::new(Value::Number { value: 0.0 }),
         };
         assert!(preview_value_with_env(&dto, &HashMap::new()).is_err());
+    }
+
+    #[tokio::test]
+    async fn palette_variable_creation_is_atomic_with_insertion_and_undo() {
+        config::set_config_dir_override(std::env::temp_dir().join(format!(
+            "blockwork-palette-variables-{}", std::process::id()
+        )));
+        blockwork_core::init();
+        let mut initial = crate::initial_state(&config::AppSettings::default(), None, true, false);
+        initial.current_macro = Some(Macro::new("Palette variables".into(), "".into(), vec![]));
+        let initial_strands = initial.current_macro.as_ref().unwrap().strands.len();
+        let state = Arc::new(Mutex::new(initial));
+        let (events, _) = tokio::sync::broadcast::channel(16);
+        let app = AppHandle { events };
+        let variable_block = || serde_json::from_value::<InstructionDto>(serde_json::json!({
+            "id": "set", "type": "SetVariable", "name": "my variable",
+            "value": {"kind": "Number", "value": 0}
+        })).unwrap();
+        let name = || Some("my variable".to_string());
+        add_strand(&state, &app, Some(20), Some(30), Some(variable_block()), name()).unwrap();
+        {
+            let s = state.lock().unwrap();
+            assert_eq!(s.current_macro.as_ref().unwrap().variables.len(), 1);
+            assert_eq!(s.variable_values.lock().unwrap().get("my variable"), Some(&Evaluated::Number(0.0)));
+        }
+        undo(&state, &app).unwrap();
+        {
+            let s = state.lock().unwrap();
+            assert!(s.current_macro.as_ref().unwrap().variables.is_empty());
+            assert_eq!(s.current_macro.as_ref().unwrap().strands.len(), initial_strands);
+            assert!(s.variable_values.lock().unwrap().is_empty());
+        }
+        redo(&state, &app).unwrap();
+        {
+            let mut s = state.lock().unwrap();
+            s.current_macro.as_mut().unwrap().variables[0].value = Evaluated::Number(42.0);
+            sync_variable_values(&mut s);
+        }
+        add_strand(&state, &app, None, None, Some(variable_block()), name()).unwrap();
+        {
+            let s = state.lock().unwrap();
+            assert_eq!(s.current_macro.as_ref().unwrap().variables.len(), 1);
+            assert_eq!(s.variable_values.lock().unwrap().get("my variable"), Some(&Evaluated::Number(42.0)));
+        }
+        // Start a fresh canvas and attach the variable block to an existing strand.
+        state.lock().unwrap().current_macro = Some(Macro::new("Snapped variables".into(), "".into(), vec![]));
+        let strand = add_strand(&state, &app, None, None, None, None).unwrap();
+        let rejected = serde_json::from_value(serde_json::json!({"id": "break", "type": "EscapeLoop"})).unwrap();
+        assert!(add_instruction(&state, &app, strand.clone(), top(0), rejected, None, name()).await.is_err());
+        assert!(state.lock().unwrap().current_macro.as_ref().unwrap().variables.is_empty());
+        add_instruction(&state, &app, strand.clone(), top(0), variable_block(), None, name()).await.unwrap();
+        assert_eq!(state.lock().unwrap().current_macro.as_ref().unwrap().variables.len(), 1);
+        undo(&state, &app).unwrap();
+        let s = state.lock().unwrap();
+        let mac = s.current_macro.as_ref().unwrap();
+        assert!(mac.variables.is_empty());
+        assert!(mac.strand(&strand).unwrap().instructions.is_empty());
     }
 
     #[test]

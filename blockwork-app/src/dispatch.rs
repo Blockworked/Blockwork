@@ -321,6 +321,7 @@ impl Backend {
                         path,
                         instruction,
                         arg(&args, "targetY")?,
+                        arg(&args, "variableToCreate")?,
                     )
                     .await?,
                 )
@@ -631,6 +632,7 @@ impl Backend {
                     x,
                     y,
                     instruction,
+                    arg(&args, "variableToCreate")?,
                 )?)
             }
             "remove_strand" => {

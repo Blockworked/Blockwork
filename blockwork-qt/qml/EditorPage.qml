@@ -68,11 +68,17 @@ Item {
         else if (type === "Repeat") { i.count = numberValue(10); i.body = []; }
         else if (type === "Forever") i.body = [];
         else if (type === "While") { i.condition = { kind: "Bool" }; i.body = []; }
-        else if (type === "SetVariable") { i.name = root.macro && root.macro.variables.length ? root.macro.variables[0] : "variable"; i.value = numberValue(0); }
-        else if (type === "ChangeVariable") { i.name = root.macro && root.macro.variables.length ? root.macro.variables[0] : "variable"; i.value = numberValue(1); }
+        else if (type === "SetVariable") { i.name = root.firstVariableName(); i.value = numberValue(0); }
+        else if (type === "ChangeVariable") { i.name = root.firstVariableName(); i.value = numberValue(1); }
         else if (type === "Return") i.value = numberValue(0);
         return i;
     }
+    function userVariableNames() {
+        const packNames = new Set((root.macro && root.macro.pack_data || [])
+            .reduce((names, pack) => names.concat((pack.variables || []).map(v => v.name)), []));
+        return BlockRegistry.sortedVariables(root.macroVariables.filter(name => !packNames.has(name)));
+    }
+    function firstVariableName() { return BlockRegistry.defaultVariableName(userVariableNames()); }
     function firstListName() { return root.macro && root.macro.lists && root.macro.lists.length ? root.macro.lists[0].name : ""; }
     function customEntry(definition) { return { kind: "custom", definition: definition, instruction: palette.customInstruction(definition) }; }
     // The palette drag controller, for tests.
@@ -429,10 +435,13 @@ Item {
         return first && first.type === "BlockHeader" ? first : null;
     }
     function submitEdit(edit, reply) {
-        const call = (command, args) => root.daemonCall(command, args, (result, error) => {
-            if (error) root.appBridge.lastError = error;
-            reply(!error, error);
-        });
+        const call = (command, args) => {
+            if (edit.variableToCreate) args.variableToCreate = edit.variableToCreate;
+            root.daemonCall(command, args, (result, error) => {
+                if (error) root.appBridge.lastError = error;
+                reply(!error, error);
+            });
+        };
         if (edit.kind === "insert_instruction") call("add_instruction", { strandId: edit.strandId, path: edit.path, instruction: edit.instruction, targetY: edit.targetY });
         else if (edit.kind === "add_strand") call("add_strand", { x: edit.x, y: edit.y, instruction: edit.instruction });
         else if (edit.kind === "put_value") call("put_value", { location: edit.location, value: edit.value });
@@ -717,7 +726,7 @@ Item {
                     appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "monitor" }].concat(root.browserShown ? [{ id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }] : [])
                     // Leaves the Browser category when switching to a macro that hides it.
                     onAppCategoriesChanged: if (category === "browser" && !root.browserShown) category = layout === "accordion" ? "input" : "all"
-                    variables: root.macroVariables
+                    variables: root.userVariableNames()
                     lists: root.macroLists
                     blockDefinitions: root.macroBlockDefinitions
                     keyCapture: appState.key_capture
@@ -1739,8 +1748,7 @@ Item {
     // [[value, label]] as dropdown options.
     function choices(pairs) { return pairs.map(p => ({ value: p[0], label: p[1] })); }
     function variableChoices() {
-        return [{ value: "", label: qsTr("(no variable)") }]
-            .concat((root.macro ? root.macro.variables : []).map(v => ({ value: v, label: v })))
+        return BlockRegistry.variableChoices(userVariableNames())
             .concat([{ label: qsTr("Make a Variable…"), action: select => variableDialog.openForCreate(select) }]);
     }
     function globalChoices() {
@@ -1819,7 +1827,7 @@ Item {
             label(qsTr("match")), value("BrowserNth", "nth")
         ] };
         const countComponent = { key: "count_variable", label: qsTr("count matches"), icon: "hash",
-            fresh: () => root.macro && root.macro.variables.length ? root.macro.variables[0] : "", pieces: [
+            fresh: () => root.firstVariableName(), pieces: [
             label(qsTr("count in")), { kind: "dropdown", key: "count_variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") }
         ] };
         // Blockwork's own features and vocabulary; a neutral blockstitch host has none of these.
@@ -2075,16 +2083,22 @@ Item {
             BrowserScript: { icon: "square-code", head: [label(qsTr("set")), { kind: "dropdown", key: "variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") },
                 label(qsTr("to result of JavaScript")), Object.assign(box("BrowserCode", "code", ""), { monospace: true })] }
         });
+        BlockRegistry.registerVariableFields({
+            WhenWebhook: ["variable"], AskText: ["name"], AskYesNo: ["name"], AskChoice: ["name"],
+            HttpRequest: ["variable"], BrowserScript: ["variable"],
+            FindImage: ["x_variable", "y_variable", "count_variable"],
+            DetectObjectsInWindow: ["count_variable"], AimAtDetection: ["status_variable"]
+        });
         BlockRegistry.registerPrefabs({
             Command: { command: "" },
             CommandWait: { command: "" },
             WhenAt: () => ({ at: textValue(Qt.formatDateTime(new Date(Date.now() + 3600000), "yyyy-MM-dd HH:00")) }),
             WhenSignal: () => ({ name: textValue(root.macro && root.macro.signals.length ? root.macro.signals[0] : "go"), expression: false }),
-            WhenWebhook: () => ({ path: textValue("hello"), variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
+            WhenWebhook: () => ({ path: textValue("hello"), variable: root.firstVariableName() }),
             SendSignal: () => ({ name: textValue(root.macro && root.macro.signals.length ? root.macro.signals[0] : "go"), expression: false, wait: true }),
-            AskText: () => ({ prompt: textValue(qsTr("What's your name?")), default: textValue(""), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
-            AskYesNo: () => ({ prompt: textValue(qsTr("Continue?")), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
-            AskChoice: () => ({ prompt: textValue(qsTr("Pick one")), list: root.firstListName(), name: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
+            AskText: () => ({ prompt: textValue(qsTr("What's your name?")), default: textValue(""), name: root.firstVariableName() }),
+            AskYesNo: () => ({ prompt: textValue(qsTr("Continue?")), name: root.firstVariableName() }),
+            AskChoice: () => ({ prompt: textValue(qsTr("Pick one")), list: root.firstListName(), name: root.firstVariableName() }),
             ShowMessage: { message: textValue(qsTr("Done!")) },
             WhenWindow: { pattern: textValue("Firefox"), focused: true },
             WhenFileChanged: { path: textValue("~/notes.txt") },
@@ -2102,7 +2116,7 @@ Item {
             WithLock: { name: textValue("keyboard"), body: [] },
             WriteFile: { path: textValue("~/notes.txt"), text: textValue("hello"), append: true },
             HttpRequest: () => ({ method: "GET", url: textValue("https://example.com"), body: textValue(""), headers: textValue(""),
-                variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
+                variable: root.firstVariableName() }),
             Notify: { title: textValue("Blockwork"), message: textValue(qsTr("Done!")) },
             Log: { value: textValue(qsTr("checkpoint")) },
             TryCatch: { body: [], catch_body: [] },
@@ -2116,25 +2130,25 @@ Item {
             SetGlobal: () => ({ name: textValue(firstGlobalName()), value: numberValue(0) }),
             ChangeGlobal: () => ({ name: textValue(firstGlobalName()), by: numberValue(1) }),
             WaitUntil: { condition: { kind: "Bool" } },
-            FindImage: () => ({ image: "", x_variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "",
-                y_variable: root.macro && root.macro.variables.length > 1 ? root.macro.variables[1] : "" }),
+            FindImage: () => ({ image: "", x_variable: root.firstVariableName(),
+                y_variable: root.firstVariableName() }),
             ClickImage: { image: "", button: "Left" },
             WaitForImage: { image: "", appear: true },
             DetectObjectsInWindow: () => ({ pattern: textValue("Minecraft"), by: "Title", detector: textValue(root.defaultDetector),
                 label: textValue("player"), confidence: numberValue(50), sort: "Closest", results_list: root.firstListName(), region: "",
-                count_variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
+                count_variable: root.firstVariableName() }),
             WaitForDetection: { pattern: textValue("Minecraft"), by: "Title", detector: textValue(root.defaultDetector),
                 label: textValue("player"), confidence: numberValue(50), appear: true, timeout: numberValue(10000), region: "" },
             AimStep: { pattern: textValue("Minecraft"), by: "Title", target_x: numberValue(0), target_y: numberValue(0),
                 gain: numberValue(0.5), max_step: numberValue(40), deadzone: numberValue(6) },
             AimAtDetection: () => ({ results_list: root.firstListName(), index: numberValue(1), gain: numberValue(0.5),
                 max_step: numberValue(40), deadzone: numberValue(6), settle_ms: numberValue(150), timeout: numberValue(3000),
-                status_variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" }),
+                status_variable: root.firstVariableName() }),
             BrowserOpen: { url: textValue("https://example.com"), new_tab: false },
             BrowserClick: { selector: textValue("text=Sign in") },
             BrowserType: { text: textValue(qsTr("Hello!")), selector: textValue("focused") },
             BrowserWaitFor: { selector: textValue("text=Done"), appear: true, timeout: numberValue(10000) },
-            BrowserScript: () => ({ code: textValue("document.title"), variable: root.macro && root.macro.variables.length ? root.macro.variables[0] : "" })
+            BrowserScript: () => ({ code: textValue("document.title"), variable: root.firstVariableName() })
         });
     }
     // The variable dropdowns read macro state through a function, so nudge them.
@@ -2239,7 +2253,7 @@ Item {
         id: dragController
         anchors.fill: parent
         canvas: canvas
-        variables: root.macroVariables
+        variables: root.userVariableNames()
         lists: root.macroLists
         blockDefinitions: root.macroBlockDefinitions
         // Counting down or recording: nothing lands on the canvas.

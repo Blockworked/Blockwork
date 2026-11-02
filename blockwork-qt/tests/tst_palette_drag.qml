@@ -98,6 +98,74 @@ Item {
         }
         function canvasBlock(page, id) { return all(page).find(o => o.instruction && o.instruction.id === id && o.paletteMode === false && o.width > 0); }
         function ghost(page) { return all(page).find(o => o.objectName === "paletteGhost"); }
+        function test_variable_defaults_data() {
+            return [
+                {tag: "set", type: "SetVariable", keys: ["name"]},
+                {tag: "change", type: "ChangeVariable", keys: ["name"]},
+                {tag: "webhook", type: "WhenWebhook", keys: ["variable"]},
+                {tag: "text", type: "AskText", keys: ["name"]},
+                {tag: "yes_no", type: "AskYesNo", keys: ["name"]},
+                {tag: "choice", type: "AskChoice", keys: ["name"]},
+                {tag: "http", type: "HttpRequest", keys: ["variable"]},
+                {tag: "browser", type: "BrowserScript", keys: ["variable"]},
+                {tag: "image", type: "FindImage", keys: ["x_variable", "y_variable"]},
+                {tag: "detection", type: "DetectObjectsInWindow", keys: ["count_variable"]},
+                {tag: "aim", type: "AimAtDetection", keys: ["status_variable"]}
+            ];
+        }
+        function test_variable_defaults(data) {
+            const page = editor();
+            const spec = {kind: "instruction", type: data.type};
+            const fresh = page.defaultInstruction(data.type);
+            for (const key of data.keys) compare(fresh[key], "my variable");
+            if (data.type === "FindImage") {
+                const count = BlockRegistry.row("FindImage").components.find(c => c.key === "count_variable");
+                compare(count.fresh(), "my variable");
+            }
+            compare(scene.calls.length, 0);
+            page.paletteDrags.begin(spec, 650, 500, 10, 10);
+            compare(scene.calls.length, 0);
+            page.paletteDrags.cancel();
+            compare(scene.calls.length, 0);
+            page.paletteDrags.addAt(spec, 400, 350);
+            compare(scene.calls.length, 1);
+            compare(scene.calls[0].command, "add_strand");
+            compare(scene.calls[0].args.variableToCreate, "my variable");
+            for (const key of data.keys) compare(scene.calls[0].args.instruction[key], "my variable");
+        }
+        function test_variable_defaults_sort_and_exclude_pack_variables() {
+            const page = editor();
+            const mac = scene.macro("macro", scene.strands);
+            mac.variables = ["zebra", "apple", "aardvark pack"];
+            mac.pack_data = [{id: "pack", variables: [{name: "aardvark pack"}]}];
+            page.appState = scene.state(mac);
+            compare(page.firstVariableName(), "apple");
+            compare(mac.variables, ["zebra", "apple", "aardvark pack"]);
+            const count = BlockRegistry.row("FindImage").components.find(c => c.key === "count_variable");
+            compare(count.fresh(), "apple");
+            for (const row of test_variable_defaults_data()) {
+                const fresh = page.defaultInstruction(row.type);
+                for (const key of row.keys) compare(fresh[key], "apple");
+            }
+            page.paletteDrags.addAt({kind: "instruction", type: "HttpRequest"}, 400, 350);
+            compare(scene.calls.length, 1);
+            verify(scene.calls[0].args.variableToCreate === undefined);
+            const packOnly = JSON.parse(JSON.stringify(mac));
+            packOnly.variables = ["aardvark pack"];
+            page.appState = scene.state(packOnly);
+            compare(page.defaultInstruction("HttpRequest").variable, "my variable");
+            page.paletteDrags.addAt({kind: "instruction", type: "HttpRequest"}, 400, 350);
+            compare(scene.calls.length, 2);
+            compare(scene.calls[1].args.variableToCreate, "my variable");
+        }
+        function test_snapped_variable_block_creates_default_in_same_command() {
+            const page = editor();
+            page.paletteDrags.send({kind: "insert_instruction", strandId: "main", path: [{index: 1}],
+                instruction: page.defaultInstruction("HttpRequest")}, () => {});
+            compare(scene.calls.length, 1);
+            compare(scene.calls[0].command, "add_instruction");
+            compare(scene.calls[0].args.variableToCreate, "my variable");
+        }
         function test_key_input_drag_keeps_views_stationary_data() {
             return [{tag: "key", type: "Key"}, {tag: "trigger", type: "WhenKey"}];
         }

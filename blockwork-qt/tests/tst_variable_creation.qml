@@ -77,6 +77,33 @@ Item {
             verify(dialog.visible);
             return {page: page, block: block, dropdown: dropdown, dialog: dialog, name: findChild(page, "variableName")};
         }
+        function test_pending_default_is_in_dropdown_without_creation_data() {
+            return [
+                {tag: "set", type: "SetVariable", key: "name"},
+                {tag: "change", type: "ChangeVariable", key: "name"},
+                {tag: "http", type: "HttpRequest", key: "variable"},
+                {tag: "image", type: "FindImage", key: "x_variable"}
+            ];
+        }
+        function test_pending_default_is_in_dropdown_without_creation(data) {
+            scene.calls = []; scene.edits = []; scene.failure = "";
+            const page = createTemporaryObject(editorComponent, scene);
+            const state = JSON.parse(JSON.stringify(page.appState));
+            state.current_macro.variables = [];
+            page.appState = state;
+            const block = createTemporaryObject(blockComponent, scene, {
+                instruction: page.defaultInstruction(data.type), paletteMode: true
+            });
+            wait(20);
+            const dropdown = all(block).find(o => o.choices && o.parent.modelData.key === data.key);
+            verify(!!dropdown);
+            compare(dropdown.choices.filter(choice => !choice.action), [{value: "my variable", label: "my variable"}]);
+            compare(dropdown.currentIndex, 0);
+            compare(dropdown.displayText, "my variable");
+            dropdown.activated(0);
+            compare(scene.calls.length, 0);
+            compare(page.appState.current_macro.variables, []);
+        }
         function test_create_and_select_data() {
             return [
                 {tag: "image_x", type: "FindImage", key: "x_variable"},
@@ -132,7 +159,7 @@ Item {
         function test_existing_choice_edits_directly() {
             const ui = setup("SetVariable", "name");
             ui.dialog.reject();
-            ui.dropdown.activated(1);
+            ui.dropdown.activated(ui.dropdown.choices.findIndex(choice => choice.value === "existing"));
             compare(scene.calls.length, 0);
             compare(scene.edits.length, 1);
             compare(scene.edits[0].name, "existing");
