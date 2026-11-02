@@ -3900,6 +3900,7 @@ mod value_location_tests {
             name: name.to_string(),
             value_type: Default::default(),
             default_value: None,
+            multiline: false,
         }
     }
 
@@ -4095,6 +4096,7 @@ mod value_location_tests {
                 name: "b".into(),
                 value_type: InputValueType::Bool,
                 default_value: None,
+                multiline: false,
             },
         ];
         mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);

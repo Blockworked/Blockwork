@@ -663,6 +663,7 @@ mod tests {
             component: false,
             id: "input".into(), name: "text".into(), value_type: Default::default(),
             default_value: Some(Evaluated::Text("example".into())),
+            multiline: false,
         }], crate::macros::BlockShape::Normal, "#4C97FF".into(), 0, 0);
         let info = PackInfo { id: "example".into(), name: "Example".into(), ..PackInfo::default() };
         let pack = pack_from_macro(&author, &[id.clone()], info).unwrap();
@@ -680,6 +681,7 @@ mod tests {
             component: false,
             id: "attempts".into(), name: "attempts".into(), value_type: Default::default(),
             default_value: Some(Evaluated::Number(3.0)),
+            multiline: false,
         });
         merge_into(&mut target, &pack, "");
         let call = target.strands.last().unwrap().instructions.first().unwrap();

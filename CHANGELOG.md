@@ -11,6 +11,10 @@ section below as the GitHub release notes, followed by the downloads table.
 ## [0.6.0] - Unreleased
 
 ### Added
+- Text with several lines:
+  - Any text box opens a bigger editor from its expand button or Shift+Enter, and text that already has line breaks shows its first line and how many more there are.
+  - The HTTP request (body and headers), JavaScript, write file and notify blocks get a text box of their own under the block that shows every line.
+  - Custom blocks can give an input the same box ("Inputs" in the Make a Block editor).
 - Launch options for the Open app block: a gear on the block opens a panel
   for arguments (like `--incognito`), a working folder, environment variables,
   and opening a new copy on macOS.
