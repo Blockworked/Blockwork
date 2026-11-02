@@ -1783,6 +1783,8 @@ Item {
             { kind: "button", action: "loadImage", icon: "folder-open" }
         ];
         const value = (field, key) => ({ kind: "value", field: field, key: key });
+        // A text slot drawn as a box of its own under the row, for text with several lines.
+        const box = (field, key, caption) => ({ kind: "value", field: field, key: key, box: true, boxLabel: caption });
         const signalPieces = [{ kind: "value", field: "SignalName", key: "name", pickAction: "pickSignal", expression: "expression" }];
         // The detect blocks' search area: the whole window, or a part picked on screen.
         const regionPieces = [
@@ -1992,15 +1994,15 @@ Item {
             WriteFile: { icon: "file-text", head: [
                 { kind: "dropdown", key: "append", options: [{ value: "write", label: qsTr("write") }, { value: "append", label: qsTr("append") }],
                   encode: v => v === "append", decode: v => v ? "append" : "write" },
-                value("WriteFileText", "text"), label(qsTr("to file")), value("WriteFilePath", "path")] },
+                label(qsTr("to file")), value("WriteFilePath", "path"), box("WriteFileText", "text", qsTr("text"))] },
             // Target first, like "set", so it isn't lost at the end of a long row.
             HttpRequest: { icon: "cloud", head: [
                 label(qsTr("set")), { kind: "dropdown", key: "variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") },
                 label(qsTr("to response of")), { kind: "dropdown", key: "method", options: ["GET", "POST", "PUT", "PATCH", "DELETE"].map(m => ({ value: m, label: m })) },
                 value("HttpUrl", "url"),
-                Object.assign(label(qsTr("with body")), { when: i => !i || i.method !== "GET" }), Object.assign(value("HttpBody", "body"), { when: i => !i || i.method !== "GET" }),
-                label(qsTr("headers")), value("HttpHeaders", "headers")] },
-            Notify: { icon: "message-square", head: [label(qsTr("notify")), value("NotifyTitle", "title"), label(qsTr("saying")), value("NotifyMessage", "message")] },
+                Object.assign(box("HttpBody", "body", qsTr("body")), { when: i => !i || i.method !== "GET" }),
+                box("HttpHeaders", "headers", qsTr("headers"))] },
+            Notify: { icon: "message-square", head: [label(qsTr("notify")), value("NotifyTitle", "title"), box("NotifyMessage", "message", qsTr("saying"))] },
             Log: { icon: "list", head: [label(qsTr("log")), value("LogValue", "value")] },
             TryCatch: { icon: "circle-alert", mouths: ["body", "catch_body"], separators: [qsTr("on error")], head: [label(qsTr("try"))] },
             ThrowError: { shape: "cap", icon: "triangle-alert", head: [label(qsTr("throw error")), value("ErrorMessage", "message")] },
@@ -2071,7 +2073,7 @@ Item {
                   encode: v => v === "appears", decode: v => v ? "appears" : "gone" },
                 label(qsTr("for up to")), value("WaitTimeout", "timeout"), label(qsTr("ms"))] },
             BrowserScript: { icon: "square-code", head: [label(qsTr("set")), { kind: "dropdown", key: "variable", options: () => root.variableChoices(), placeholder: qsTr("(no variable)") },
-                label(qsTr("to result of JavaScript")), value("BrowserCode", "code")] }
+                label(qsTr("to result of JavaScript")), Object.assign(box("BrowserCode", "code", ""), { monospace: true })] }
         });
         BlockRegistry.registerPrefabs({
             Command: { command: "" },
