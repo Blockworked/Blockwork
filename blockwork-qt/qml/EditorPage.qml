@@ -713,6 +713,7 @@ Item {
                     listInstructionTypes: root.listInstructionTypes
                     extraOperators: root.browserShown ? root.extraOperators : root.extraOperators.filter(o => root.extraCategories[o[0]] !== "browser")
                     extraCategories: root.extraCategories
+                    sections: root.paletteSections
                     appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "monitor" }].concat(root.browserShown ? [{ id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }] : [])
                     // Leaves the Browser category when switching to a macro that hides it.
                     onAppCategoriesChanged: if (category === "browser" && !root.browserShown) category = layout === "accordion" ? "input" : "all"
@@ -1672,17 +1673,63 @@ Item {
         ["BrowserConnected", "bool", 0], ["PageUrl", "text", 0], ["PageTitle", "text", 0],
         ["ElementText", "text", 1], ["ElementExists", "bool", 1], ["ElementCount", "number", 1]
     ]
+    // The palette's sections, in order. Statements come before reporters,
+    // except where a section holds data: there the reporter comes first.
+    readonly property var paletteSections: [
+        { category: "events", title: qsTr("Start"), items: ["WhenRan", "WhenSignal", "WhenWebhook"] },
+        { category: "events", title: qsTr("Keyboard and mouse"), items: ["WhenKey", "WhenTyped", "WhenMouseButton"] },
+        { category: "events", title: qsTr("Time"), items: ["WhenTime", "WhenAt", "WhenCron", "WhenIdle"] },
+        { category: "events", title: qsTr("Apps and windows"), items: ["WhenApp", "WhenWindow"] },
+        { category: "events", title: qsTr("Files and clipboard"), items: ["WhenFileChanged", "WhenClipboardChanged"] },
+        { category: "events", title: qsTr("Computer"), items: ["WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenBatteryDischargedTo", "WhenBatteryChargedTo",
+            "WhenScreenLock", "WhenNetwork", "WhenUsb"] },
+        { category: "input", title: qsTr("Keyboard"), items: ["Text", "PasteText", "Key"] },
+        { category: "input", title: qsTr("Mouse"), items: ["Button", "MoveMouse", "Scroll", "MousePosition"] },
+        { category: "control", title: qsTr("Waiting"), items: ["Wait", "WaitUntil"] },
+        { category: "control", title: qsTr("Conditions"), items: ["If", "IfElse"] },
+        { category: "control", title: qsTr("Loops"), items: ["Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"] },
+        { category: "control", title: qsTr("Errors"), items: ["TryCatch", "Retry", "ThrowError", "LastError"] },
+        { category: "control", title: qsTr("Stopping"), items: ["StopMacro", "Return"] },
+        { category: "control", title: qsTr("Other macros"), items: ["RunMacro", "StopMacroNamed", "MacroRunning"] },
+        { category: "control", title: qsTr("Signals and locks"), items: ["SendSignal", "WithLock"] },
+        { category: "data", title: qsTr("Variables"), action: "makeVariable", items: ["@variables", "SetVariable", "ChangeVariable"] },
+        { category: "data", title: qsTr("Global variables"), items: ["GlobalVariable", "SetGlobal", "ChangeGlobal"] },
+        { category: "data", title: qsTr("Lists"), action: "makeList", items: ["@lists", "ListItem", "ListItemNumber", "ListAmount", "ListLength",
+            "ListContains", "ListItemExists", "ListIsEmpty", "ListAsJson", "AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList",
+            "InsertIntoList", "ReplaceItemOfList", "ReverseList", "SplitIntoList"] },
+        { category: "data", title: qsTr("Secrets"), items: ["Secret"] },
+        { category: "operators", title: qsTr("Math"), items: ["Add", "Sub", "Mul", "Div", "Mod", "Round", "Math", "Random", "FormatNumber"] },
+        { category: "operators", title: qsTr("Text"), items: ["Join", "Join3", "NewLine", "Tab", "Length", "LetterOf", "IndexOf", "LastIndexOf",
+            "Substring", "Case", "Trim", "TextCheck", "TextReplace", "SplitPart", "SplitCount", "RegexFind", "RegexReplace"] },
+        { category: "operators", title: qsTr("Comparisons and logic"), items: ["Eq", "Neq", "Gt", "Lt", "Gte", "Lte", "And", "Or", "Not", "True", "False"] },
+        { category: "operators", title: qsTr("Dates and times"), items: ["CurrentTime", "Timestamp", "FormatDate", "ParseDate", "DatePart"] },
+        { category: "system", title: qsTr("Apps and commands"), items: ["OpenApp", "CloseApp", "Command", "CommandWait", "AppRunning",
+            "ShellOutput", "ShellSucceeded"] },
+        { category: "system", title: qsTr("Windows"), items: ["WindowAction", "MoveWindow", "ActiveWindowTitle", "ActiveWindowApp", "WindowExists", "WindowInfo"] },
+        { category: "system", title: qsTr("Clipboard"), items: ["ClipboardText", "ClipboardHasImage", "ClipboardHasFiles", "SetClipboard"] },
+        { category: "system", title: qsTr("Files"), items: ["WriteFile", "ReadFile", "FileExists", "ListDirectory"] },
+        { category: "system", title: qsTr("Web"), items: ["HttpRequest", "HttpGet", "JsonGet"] },
+        { category: "system", title: qsTr("Messages and dialogs"), items: ["Notify", "ShowMessage", "AskText", "AskYesNo", "AskChoice", "Log"] },
+        { category: "system", title: qsTr("Computer"), items: ["PluggedIn", "BatteryPercentage", "IdleSeconds", "ScreenLocked", "NetworkConnected", "UsbConnected"] },
+        { category: "screen", title: qsTr("Images"), items: ["FindImage", "ClickImage", "WaitForImage"] },
+        { category: "screen", title: qsTr("Colors and text"), items: ["PixelColor", "AverageColor", "ColorsMatch", "ScreenText"] },
+        { category: "screen", title: qsTr("Monitors"), items: ["ScreenSize", "MonitorCount", "MonitorInfo"] },
+        { category: "screen", title: qsTr("Object detection"), items: ["DetectObjectsInWindow", "WaitForDetection", "Detection", "AimStep", "AimAtDetection"] },
+        { category: "browser", title: qsTr("Tabs"), items: ["BrowserOpen", "BrowserConnected", "PageUrl", "PageTitle"] },
+        { category: "browser", title: qsTr("Page elements"), items: ["BrowserClick", "BrowserType", "BrowserWaitFor", "ElementText", "ElementExists", "ElementCount"] },
+        { category: "browser", title: qsTr("Scripts"), items: ["BrowserScript"] }
+    ]
     readonly property var extraCategories: ({
         PluggedIn: "system", BatteryPercentage: "system", ClipboardText: "system", ClipboardHasImage: "system", ClipboardHasFiles: "system",
         CommandWait: "system", WriteFile: "system", HttpRequest: "system", Notify: "system", Log: "system",
         AskText: "system", AskYesNo: "system", AskChoice: "system", ShowMessage: "system", SendSignal: "control",
-        TryCatch: "control", Retry: "control", ThrowError: "control", WithLock: "control", PasteText: "input",
+        TryCatch: "control", Retry: "control", ThrowError: "control", WithLock: "control", PasteText: "input", SetClipboard: "system", MousePosition: "input", CurrentTime: "operators",
         AppRunning: "system", IdleSeconds: "system", ScreenLocked: "system", NetworkConnected: "system", UsbConnected: "system", Secret: "data",
         WindowAction: "system", MoveWindow: "system", WindowExists: "system", StopMacro: "control", LastError: "control",
         RunMacro: "control", StopMacroNamed: "control", MacroRunning: "control", SetGlobal: "data", ChangeGlobal: "data", GlobalVariable: "data",
         WaitUntil: "control", FindImage: "screen", ClickImage: "screen", WaitForImage: "screen", PixelColor: "screen", AverageColor: "screen",
-        ColorsMatch: "screen", ScreenText: "screen", MousePosition: "screen", ScreenSize: "screen", MonitorCount: "screen", MonitorInfo: "screen",
-        DetectObjectsInWindow: "screen", WaitForDetection: "screen", AimStep: "screen", AimAtDetection: "screen", WindowInfo: "screen", Detection: "screen",
+        ColorsMatch: "screen", ScreenText: "screen", ScreenSize: "screen", MonitorCount: "screen", MonitorInfo: "screen",
+        DetectObjectsInWindow: "screen", WaitForDetection: "screen", AimStep: "screen", AimAtDetection: "screen", WindowInfo: "system", Detection: "screen",
         ReadFile: "system", FileExists: "system", ListDirectory: "system", HttpGet: "system", JsonGet: "system",
         ShellOutput: "system", ShellSucceeded: "system", ActiveWindowTitle: "system", ActiveWindowApp: "system",
         BrowserOpen: "browser", BrowserClick: "browser", BrowserType: "browser", BrowserWaitFor: "browser", BrowserScript: "browser",
