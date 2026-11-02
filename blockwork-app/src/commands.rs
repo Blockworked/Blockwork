@@ -1058,6 +1058,41 @@ pub(crate) fn capabilities_named(kinds: &[String]) -> Vec<crate::state::Capabili
         .collect()
 }
 
+/// Whether `mac` has any Browser block, reporters included, which keeps the
+/// Browser palette category shown before a browser has ever paired.
+pub(crate) fn uses_browser(mac: &Macro) -> bool {
+    use blockwork_core::macros::BlockKind;
+    fn in_value(value: &Value) -> bool {
+        match value {
+            Value::Op { op, args, .. } => {
+                matches!(op.name(), "BrowserConnected" | "PageUrl" | "PageTitle" | "ElementText" | "ElementExists" | "ElementCount")
+                    || args.iter().any(in_value)
+            }
+            Value::Call { args, .. } => args.iter().any(in_value),
+            _ => false,
+        }
+    }
+    let mut found = false;
+    mac.graph.walk_instructions(&mut |ins| {
+        if found {
+            return;
+        }
+        found = matches!(
+            ins.kind,
+            InstructionKind::BrowserOpen { .. }
+                | InstructionKind::BrowserClick { .. }
+                | InstructionKind::BrowserType { .. }
+                | InstructionKind::BrowserWaitFor { .. }
+                | InstructionKind::BrowserScript { .. }
+        );
+        if !found {
+            let mut kind = ins.kind.clone();
+            kind.visit_values_mut(&mut |value, _| found |= in_value(value));
+        }
+    });
+    found
+}
+
 pub(crate) fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
     use blockwork_core::macros::BlockKind;
     let mut found = std::collections::HashSet::new();
@@ -4304,6 +4339,35 @@ mod import_review_tests {
                 ("triggers".to_string(), false),
             ]
         );
+    }
+
+    fn macro_of(instructions: Vec<Instruction>) -> Macro {
+        Macro {
+            id: "m".into(),
+            name: "Test".into(),
+            description: "".into(),
+            graph: MacroGraph {
+                strands: vec![Strand { id: "s1".into(), x: 0, y: 0, instructions }],
+                ..MacroGraph::new()
+            },
+            signals: Vec::new(),
+            recording_target: None,
+            speed_multiplier: 1.0,
+            settings: blockwork_core::macros::MacroSettings::default(),
+        }
+    }
+
+    #[test]
+    fn spots_browser_blocks_and_reporters_anywhere() {
+        blockwork_core::init();
+        assert!(!uses_browser(&macro_of(vec![Instruction::new(InstructionKind::Log(Value::text("hi")))])));
+        let open = Instruction::new(InstructionKind::BrowserOpen { url: Value::text("https://example.com"), new_tab: false });
+        assert!(uses_browser(&macro_of(vec![open])));
+        let nested = Instruction::new(InstructionKind::If {
+            condition: Value::op(Op::from_name("BrowserConnected"), vec![]),
+            body: vec![],
+        });
+        assert!(uses_browser(&macro_of(vec![nested])));
     }
 }
 

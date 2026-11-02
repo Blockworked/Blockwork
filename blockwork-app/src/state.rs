@@ -170,6 +170,8 @@ pub(crate) struct StateDto {
     pub(crate) permissions: Option<Vec<String>>,
     pub(crate) webhook: crate::webhook::WebhookDto,
     pub(crate) browser: blockwork_core::browser::Status,
+    /// Whether the open macro has Browser blocks.
+    pub(crate) macro_uses_browser: bool,
     pub(crate) block_library: crate::block_library::LibraryDto,
     pub(crate) pack_review: Option<crate::block_library::PackReviewDto>,
     pub(crate) community: crate::community::CommunityDto,
@@ -546,6 +548,7 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         permissions: s.current_macro.as_ref().and_then(|m| blockwork_core::permissions::grants(&m.id)).map(|g| g.allowed),
         webhook: crate::webhook::dto(),
         browser: blockwork_core::browser::status(),
+        macro_uses_browser: s.current_macro.as_ref().is_some_and(crate::commands::uses_browser),
         block_library: crate::block_library::dto(s),
         pack_review: s.pending_pack.as_ref().map(|p| p.review.clone()),
         community: crate::community::dto(),

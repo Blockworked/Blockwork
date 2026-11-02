@@ -737,11 +737,13 @@ Item {
                     onDragMoved: (sx, sy) => dragController.move(sx, sy)
                     onDragEnded: (sx, sy) => dragController.end(sx, sy)
                     onDragCanceled: dragController.cancel()
-                    instructionTypes: root.instructionTypes
+                    instructionTypes: root.browserShown ? root.instructionTypes : root.instructionTypes.filter(t => root.extraCategories[t] !== "browser")
                     listInstructionTypes: root.listInstructionTypes
-                    extraOperators: root.extraOperators
+                    extraOperators: root.browserShown ? root.extraOperators : root.extraOperators.filter(o => root.extraCategories[o[0]] !== "browser")
                     extraCategories: root.extraCategories
-                    appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "monitor" }, { id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }]
+                    appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "monitor" }].concat(root.browserShown ? [{ id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }] : [])
+                    // Leaves the Browser category when switching to a macro that hides it.
+                    onAppCategoriesChanged: if (category === "browser" && !root.browserShown) category = layout === "accordion" ? "input" : "all"
                     variables: root.macroVariables
                     lists: root.macroLists
                     blockDefinitions: root.macroBlockDefinitions
@@ -1725,6 +1727,9 @@ Item {
         {"kind":"LastError","op":"LastError","arity":0,"args":[],"host":true}
     ]
     // END GENERATED operator descriptors
+    // Browser blocks stay out of the palette until a browser has paired once,
+    // unless the open macro already uses them.
+    readonly property bool browserShown: !!(appState.browser && appState.browser.unlocked) || !!appState.macro_uses_browser
     // Blockwork's reporters for the palette: [op, result, arity, args?]. A
     // fresh one takes hostDescriptors' defaults unless it gives its own args.
     readonly property var extraOperators: [

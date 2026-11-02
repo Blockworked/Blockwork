@@ -55,6 +55,8 @@ pub struct Status {
     pub error: String,
     /// The connected browsers, like "Firefox 131.0".
     pub browsers: Vec<String>,
+    /// Whether a browser has ever paired, which shows the Browser blocks.
+    pub unlocked: bool,
 }
 
 pub fn status() -> Status {
@@ -64,6 +66,7 @@ pub fn status() -> Status {
         port: settings.browser_port.unwrap_or(DEFAULT_PORT),
         error: PROBLEM.lock().map(|p| p.clone()).unwrap_or_default(),
         browsers: clients().iter().map(|c| c.browser.clone()).collect(),
+        unlocked: settings.browser_unlocked.unwrap_or(false),
     }
 }
 

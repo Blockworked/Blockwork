@@ -8,6 +8,10 @@ use blockwork_core::config::update_settings;
 
 pub(crate) fn start(state: SharedState, app: AppHandle) {
     browser::start(move || {
+        // The first pairing shows the Browser palette category for good.
+        if browser::connected() && blockwork_core::config::load_settings().browser_unlocked != Some(true) {
+            update_settings(|s| s.browser_unlocked = Some(true));
+        }
         if let Ok(s) = state.lock() {
             emit_state_updated(&app, &s);
         }

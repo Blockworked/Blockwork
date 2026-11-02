@@ -31,7 +31,7 @@ Item {
     }
     function state(m, phase) {
         return {current_macro: m, recording_phase: {phase: phase || "Idle", countdown: phase === "Countdown" ? 3 : null}, key_capture: null, can_undo: false, can_redo: false,
-            record_mouse_movement: false, record_mouse_relative: false, absolute_mouse_position_available: true};
+            record_mouse_movement: false, record_mouse_relative: false, absolute_mouse_position_available: true, browser: {unlocked: true}};
     }
     readonly property var strands: [
         {id: "main", x: 40, y: 40, instructions: [{id: "wait", type: "Wait", duration: {kind: "Number", value: 100}}]},
@@ -499,6 +499,22 @@ Item {
             compare(scene.calls[0].args.x, 120);
             compare(scene.calls[0].args.y, 120);
             compare(scene.calls[0].args.instruction.duration.value, 1000);
+        }
+        function test_browser_category_waits_for_a_pairing() {
+            const page = editor();
+            const palette = all(page).find(o => o.appCategories !== undefined && o.railModel !== undefined);
+            const shown = () => palette.appCategories.some(c => c.id === "browser")
+                && Array.from(palette.instructionTypes).indexOf("BrowserClick") >= 0
+                && Array.from(palette.extraOperators).some(o => o[0] === "PageUrl");
+            verify(shown(), "a paired browser shows the Browser blocks");
+            palette.category = "browser";
+            page.appState = Object.assign({}, page.appState, {browser: {unlocked: false}});
+            verify(!palette.appCategories.some(c => c.id === "browser"));
+            verify(Array.from(palette.instructionTypes).indexOf("BrowserOpen") < 0);
+            verify(!Array.from(palette.extraOperators).some(o => o[0] === "PageTitle"));
+            compare(palette.category, "all", "leaves the hidden category");
+            page.appState = Object.assign({}, page.appState, {macro_uses_browser: true});
+            verify(shown(), "a macro with Browser blocks shows them before any pairing");
         }
     }
 }

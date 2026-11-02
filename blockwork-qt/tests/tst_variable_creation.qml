@@ -38,7 +38,8 @@ Item {
                         {kind:"Input",name:"enabled",value_type:"Bool"}]}],
                     strands:[{id:"definition",x:40,y:40,instructions:[{id:"header",type:"BlockHeader",block_id:"custom"},{id:"wait",type:"Wait",duration:{kind:"Number",value:100}}]}]},
                 recording_phase:{phase:"Idle"}, key_capture:null, can_undo:false, can_redo:false,
-                record_mouse_movement:false, record_mouse_relative:false, absolute_mouse_position_available:true
+                record_mouse_movement:false, record_mouse_relative:false, absolute_mouse_position_available:true,
+                browser:{unlocked:true}
             })
         }
     }

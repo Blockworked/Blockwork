@@ -28,6 +28,7 @@ section below as the GitHub release notes, followed by the downloads table.
   - Reporters for page address and title, an element's text, whether it exists and how many match.
   - Elements are named by selectors, including `focused`, `text=` and `near=`, so a macro can pick the button beside the box you're typing in when a page has several alike.
   - Opt-in local bridge in Settings > Integrations, paired with a key; macros need the new "browser" permission.
+  - The Browser category stays out of the palette until a browser has connected once (then it stays for good), or while the open macro already has Browser blocks.
 - Notify block for desktop notifications.
 - Dialog blocks: ask for text, ask yes or no, choose from a list, show a message.
   - They work with the editor closed.

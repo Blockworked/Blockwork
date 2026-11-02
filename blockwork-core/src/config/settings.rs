@@ -71,6 +71,9 @@ pub struct AppSettings {
     /// The extension and Blockwork each prove they know this before talking.
     #[serde(default)]
     pub browser_key: Option<String>,
+    /// Set once a browser has paired; the Browser palette category stays shown after.
+    #[serde(default)]
+    pub browser_unlocked: Option<bool>,
     /// Block library index addresses. The built-in one is always used, saved or not.
     #[serde(default)]
     pub block_library_sources: Option<Vec<String>>,

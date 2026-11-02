@@ -492,7 +492,8 @@ Item {
                                     readonly property int connections: (bridge.browsers || []).length
                                     title: qsTr("Browser extension")
                                     detail: bridge.error || (connections ? qsTr("Connected: %1").arg(bridge.browsers.join(", "))
-                                        : qsTr("Lets macros click, type and read on web pages with the Browser blocks, by element instead of by picture. Install the Blockwork extension in Chrome, Edge or Firefox and paste the pairing key into it."))
+                                        : qsTr("Lets macros click, type and read on web pages with the Browser blocks, by element instead of by picture. Install the Blockwork extension in Chrome, Edge or Firefox and paste the pairing key into it.")
+                                            + (bridge.unlocked ? "" : " " + qsTr("The Browser blocks show up in the editor once a browser connects.")))
                                     Row {
                                         anchors.verticalCenter: parent.verticalCenter; spacing: 6
                                         readonly property color tint: !browserRow.bridge.enabled ? Theme.textDim : browserRow.bridge.error ? Theme.warning
