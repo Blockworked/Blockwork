@@ -146,7 +146,7 @@ Item {
                         // General
                         SettingsGrid { visible: root.tab === 0
                             SettingsSection { title: qsTr("Preferences")
-                                SettingsRow { first: true; title: qsTr("Appearance"); detail: qsTr("Choose a light or dark theme, or follow your system setting.")
+                                SettingsRow { first: true; title: qsTr("Appearance")
                                     BwComboBox {
                                         readonly property var schemes: [{ id: "", text: qsTr("System default") }, { id: "light", text: qsTr("Light") }, { id: "dark", text: qsTr("Dark") }]
                                         model: schemes; textRole: "text"; implicitWidth: 210
@@ -157,10 +157,10 @@ Item {
                                 SettingsRow { title: qsTr("Close to tray"); detail: qsTr("Keep hotkeys and schedules active after closing the editor.")
                                     BwSwitch { checked: appState.close_to_tray; onToggled: checked => root.invoke("set_close_to_tray", { enabled: checked }) }
                                 }
-                                SettingsRow { title: qsTr("Start at system startup"); detail: qsTr("Launch Blockwork in the background when you log in so hotkeys work right away.")
+                                SettingsRow { title: qsTr("Start at system startup")
                                     BwSwitch { checked: appState.start_at_startup === true; onToggled: checked => root.invoke("set_start_at_startup", { enabled: checked }) }
                                 }
-                                SettingsRow { title: qsTr("Language"); detail: qsTr("The language of the editor and macro dialogs. Run log messages stay in English.")
+                                SettingsRow { title: qsTr("Language")
                                     BwButton {
                                         objectName: "chooseLanguage"
                                         implicitWidth: 210
@@ -169,7 +169,7 @@ Item {
                                         onClicked: languageDialog.open()
                                     }
                                 }
-                                SettingsRow { title: qsTr("Time format"); detail: qsTr("How times show in blocks and pickers.")
+                                SettingsRow { title: qsTr("Time format")
                                     BwComboBox {
                                         readonly property var formats: [{ id: "", text: qsTr("System default") }, { id: "12h", text: qsTr("12-hour (9:30 PM)") }, { id: "24h", text: qsTr("24-hour (21:30)") }]
                                         model: formats; textRole: "text"; implicitWidth: 210
@@ -320,9 +320,7 @@ Item {
                                 }
                             }
                             SettingsSection {
-                                SettingsRow { first: true; title: qsTr("Block library")
-                                    detail: qsTr("Where My Blocks > Browse finds shared blocks: the address of each library's index.json. Each pack is checked against the checksum its library lists before it's used.")
-                                }
+                                SettingsRow { first: true; title: qsTr("Block library") }
                                 Repeater {
                                     model: appState.block_library ? appState.block_library.sources : []
                                     delegate: RowLayout {
@@ -360,14 +358,12 @@ Item {
                                     BwTextField { id: port; text: appState.ipc_port_text || "47821"; validator: IntValidator { bottom: 1; top: 65535 } implicitWidth: 100; onEditingFinished: root.invoke("set_ipc_port_text", { text: text }) }
                                     BwButton { text: appState.ipc_active_port === null ? qsTr("Start") : qsTr("Stop"); primary: appState.ipc_active_port === null; onClicked: root.invoke(appState.ipc_active_port === null ? "start_ipc_server" : "stop_ipc_server") }
                                 }
-                                SettingsRow { title: qsTr("Start automatically"); detail: qsTr("Start the TCP server whenever Blockwork launches.")
+                                SettingsRow { title: qsTr("Start automatically")
                                     BwSwitch { Accessible.name: qsTr("Start TCP server automatically"); checked: appState.ipc_auto_start; onToggled: checked => root.invoke("set_ipc_auto_start", { enabled: checked }) }
                                 }
                             }
                             SettingsSection {
-                                SettingsRow { first: true; title: qsTr("Secrets")
-                                    detail: qsTr("Passwords and API keys macros can use with the \"secret\" block. They're kept in your system keyring, never in macro files, and show as dots in the run log.")
-                                }
+                                SettingsRow { first: true; title: qsTr("Secrets") }
                                 Repeater {
                                     model: appState.secret_names || []
                                     delegate: RowLayout {

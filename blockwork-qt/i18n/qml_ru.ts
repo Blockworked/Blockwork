@@ -7060,19 +7060,9 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="160"/>
-        <source>Launch Blockwork in the background when you log in so hotkeys work right away.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../qml/SettingsPage.qml" line="163"/>
         <location filename="../qml/SettingsPage.qml" line="616"/>
         <source>Language</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/SettingsPage.qml" line="163"/>
-        <source>The language of the editor and macro dialogs. Run log messages stay in English.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -7094,11 +7084,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="149"/>
-        <source>Choose a light or dark theme, or follow your system setting.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../qml/SettingsPage.qml" line="151"/>
         <source>Light</source>
         <translation type="unfinished"></translation>
@@ -7111,11 +7096,6 @@
     <message>
         <location filename="../qml/SettingsPage.qml" line="172"/>
         <source>Time format</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/SettingsPage.qml" line="172"/>
-        <source>How times show in blocks and pickers.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -7265,11 +7245,6 @@
         <source>Block library</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <location filename="../qml/SettingsPage.qml" line="324"/>
-        <source>Where My Blocks &gt; Browse finds shared blocks: the address of each library&apos;s index.json. Each pack is checked against the checksum its library lists before it&apos;s used.</source>
-        <translation type="unfinished"></translation>
-    </message>
     <message numerus="yes">
         <location filename="../qml/SettingsPage.qml" line="336"/>
         <source>%n pack(s)</source>
@@ -7330,11 +7305,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="363"/>
-        <source>Start the TCP server whenever Blockwork launches.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../qml/SettingsPage.qml" line="364"/>
         <source>Start TCP server automatically</source>
         <translation type="unfinished"></translation>
@@ -7342,11 +7312,6 @@
     <message>
         <location filename="../qml/SettingsPage.qml" line="368"/>
         <source>Secrets</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/SettingsPage.qml" line="369"/>
-        <source>Passwords and API keys macros can use with the &quot;secret&quot; block. They&apos;re kept in your system keyring, never in macro files, and show as dots in the run log.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

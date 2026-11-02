@@ -161,6 +161,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - While recording, the canvas shows a card with a live timer, what's being recorded, where the blocks will go, the stop shortcut and a Stop button, instead of a bare "Recording..." message. The countdown shows on the canvas too, which stays locked during it.
 - Block text no longer ends labels with a colon, so blocks read as plain sentences ("Run command [cmd]" instead of "Run command: [cmd]").
 - Settings use grouped panels that reflow on narrower windows, with more room for shortcuts.
+- Settings drop the description lines under Appearance, Start at system startup, Language, Time format, Block library, Start automatically and Secrets.
 - The welcome screen groups preferences and starter templates into panels that reflow on narrower windows. Cron syntax help opens from an info button beside the custom schedule field.
 - Clearing all blocks uses a Cancel/Delete confirmation popup and can be undone.
 - Legacy pack variables migrate to private pack state where possible. Variables used by the macro or shared by older packs stay shared so existing macros keep working.
