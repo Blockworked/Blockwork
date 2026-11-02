@@ -2,6 +2,7 @@
 //! is created, modified or deleted. Polls the file's modified time and size,
 //! like `clipboard_watch` polls the clipboard.
 
+use blockwork_core::macros::trigger::fired_message;
 use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
@@ -41,20 +42,20 @@ fn run(shared_state: SharedState, app: AppHandle) {
                     if path.trim().is_empty() {
                         continue;
                     }
-                    watched.push(((mac.id.clone(), strand.id.clone(), path), strand.instructions[1..].to_vec(), mac.variables.clone(), mac.lists.clone()));
+                    watched.push(((mac.id.clone(), strand.id.clone(), path), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), mac.variables.clone(), mac.lists.clone()));
                 }
             }
             (watched, emulator, s.global_speed_multiplier)
         };
 
         let mut next = HashMap::with_capacity(watched.len());
-        for (key, body, variables, lists) in watched {
+        for (key, message, body, variables, lists) in watched {
             let stamp = blockwork_core::files::stamp(&key.2);
             // The first poll only records a baseline.
             if let Some(previous) = last_seen.get(&key)
                 && *previous != stamp
             {
-                scheduled_run::fire(key.0.clone(), body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
+                scheduled_run::fire(key.0.clone(), message, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
             }
             next.insert(key, stamp);
         }

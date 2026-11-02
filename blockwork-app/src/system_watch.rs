@@ -3,6 +3,7 @@
 //! the last poll and fire the strand when it becomes what the header waits
 //! for. USB fires once per matching device that comes or goes.
 
+use blockwork_core::macros::trigger::fired_message;
 use crate::scheduled_run;
 use crate::state::SharedState;
 use crate::AppHandle;
@@ -27,6 +28,7 @@ enum Condition {
 struct Watched {
     key: (String, String),
     condition: Condition,
+    message: String,
     body: Vec<Instruction>,
     variables: Vec<VariableDef>,
     lists: Vec<ListDef>,
@@ -96,6 +98,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
                     watched.push(Watched {
                         key: (mac.id.clone(), strand.id.clone()),
                         condition,
+                        message: fired_message(strand.instructions.first().map(|i| &i.kind)),
                         body: strand.instructions[1..].to_vec(),
                         variables: mac.variables.clone(),
                         lists: mac.lists.clone(),
@@ -151,7 +154,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
                 Condition::Usb { pattern, connected } => {
                     let changed: &Vec<system::UsbDevice> = if *connected { &added } else { &removed };
                     for _ in changed.iter().filter(|d| d.matches(pattern)) {
-                        scheduled_run::fire(w.key.0.clone(), w.body.clone(), Arc::clone(&emulator), speed_multiplier, &w.variables, &w.lists, Arc::clone(&shared_state), app.clone());
+                        scheduled_run::fire(w.key.0.clone(), w.message.clone(), w.body.clone(), Arc::clone(&emulator), speed_multiplier, &w.variables, &w.lists, Arc::clone(&shared_state), app.clone());
                     }
                     continue;
                 }
@@ -161,7 +164,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
                 && previous != now
                 && now == fire_on
             {
-                scheduled_run::fire(w.key.0.clone(), w.body, Arc::clone(&emulator), speed_multiplier, &w.variables, &w.lists, Arc::clone(&shared_state), app.clone());
+                scheduled_run::fire(w.key.0.clone(), w.message.clone(), w.body, Arc::clone(&emulator), speed_multiplier, &w.variables, &w.lists, Arc::clone(&shared_state), app.clone());
             }
             next.insert(w.key, now);
         }

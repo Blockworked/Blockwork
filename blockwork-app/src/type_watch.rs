@@ -1,6 +1,7 @@
 //! Text expansion: fires `WhenTyped` strands when what the user just typed
 //! ends with their abbreviation. Scoped like the other watchers.
 
+use blockwork_core::macros::trigger::fired_message;
 use crate::scheduled_run;
 use crate::state::SharedState;
 use crate::AppHandle;
@@ -60,7 +61,7 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
                     }
                     let mut body = if *erase_it { erase(text.chars().count()) } else { Vec::new() };
                     body.extend_from_slice(&strand.instructions[1..]);
-                    fires.push((mac.id.clone(), body, mac.variables.clone(), mac.lists.clone()));
+                    fires.push((mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), body, mac.variables.clone(), mac.lists.clone()));
                 }
             }
             (emulator, s.global_speed_multiplier)
@@ -70,8 +71,8 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
         }
         // The expansion's own output isn't typing to match again.
         typed.clear();
-        for (macro_id, body, variables, lists) in fires {
-            scheduled_run::fire(macro_id, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
+        for (macro_id, message, body, variables, lists) in fires {
+            scheduled_run::fire(macro_id, message, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
         }
     }
 }

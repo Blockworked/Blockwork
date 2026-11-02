@@ -2,6 +2,7 @@
 //! gains or loses focus. Same shape as `clipboard_watch`: poll, compare with
 //! the last poll, fire the strand body on a change.
 
+use blockwork_core::macros::trigger::fired_message;
 use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
@@ -17,6 +18,7 @@ struct Watched {
     key: (String, String),
     pattern: String,
     focused: bool,
+    message: String,
     body: Vec<Instruction>,
     variables: Vec<VariableDef>,
     lists: Vec<ListDef>,
@@ -49,6 +51,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
                         key: (mac.id.clone(), strand.id.clone()),
                         pattern: pattern.resolve_vars(&env).eval_text().unwrap_or_default(),
                         focused: *focused,
+                        message: fired_message(strand.instructions.first().map(|i| &i.kind)),
                         body: strand.instructions[1..].to_vec(),
                         variables: mac.variables.clone(),
                         lists: mac.lists.clone(),
@@ -85,7 +88,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
                 && previous != matched
                 && matched == w.focused
             {
-                scheduled_run::fire(w.key.0.clone(), w.body, Arc::clone(&emulator), speed_multiplier, &w.variables, &w.lists, Arc::clone(&shared_state), app.clone());
+                scheduled_run::fire(w.key.0.clone(), w.message.clone(), w.body, Arc::clone(&emulator), speed_multiplier, &w.variables, &w.lists, Arc::clone(&shared_state), app.clone());
             }
             next.insert(w.key, matched);
         }

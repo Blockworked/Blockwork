@@ -15,6 +15,7 @@
 //! clipboard content doesn't immediately fire just because this watcher has
 //! never looked before.
 
+use blockwork_core::macros::trigger::fired_message;
 use crate::scheduled_run;
 use crate::state::SharedState;
 use blockwork_core::macros::InstructionKind;
@@ -89,7 +90,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
                 let key = (mac.id.clone(), strand.id.clone());
                 if let Some(previous) = last_seen.get(&key) {
                     if *previous != current {
-                        scheduled_run::fire(mac.id.clone(), strand.instructions[1..].to_vec(), Arc::clone(&emulator), speed_multiplier, &mac.variables, &mac.lists, Arc::clone(&shared_state), app.clone());
+                        scheduled_run::fire(mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), Arc::clone(&emulator), speed_multiplier, &mac.variables, &mac.lists, Arc::clone(&shared_state), app.clone());
                     }
                 }
                 next_last_seen.insert(key, current.clone());

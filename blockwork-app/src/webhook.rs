@@ -2,6 +2,7 @@
 //! carrying the token fires the live macros' `WhenWebhook` strands for that
 //! path. Only listens on this computer.
 
+use blockwork_core::macros::trigger::fired_message;
 use crate::scheduled_run;
 use crate::state::{emit_state_updated, SharedState};
 use crate::AppHandle;
@@ -276,14 +277,14 @@ fn fire(path: &str, body: &str, state: &SharedState, app: &AppHandle) -> usize {
                     input = Some((var.name.clone(), var.value.clone()));
                     var.value = Evaluated::Text(body.to_string());
                 }
-                fires.push((mac.id.clone(), strand.instructions[1..].to_vec(), variables, mac.lists.clone(), input));
+                fires.push((mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), variables, mac.lists.clone(), input));
             }
         }
         (emulator, s.global_speed_multiplier)
     };
     let count = fires.len();
-    for (id, body, variables, lists, input) in fires {
-        scheduled_run::fire_with_input(id, body, Arc::clone(&emulator), speed, &variables, &lists, Arc::clone(state), app.clone(), input);
+    for (id, message, body, variables, lists, input) in fires {
+        scheduled_run::fire_with_input(id, message, body, Arc::clone(&emulator), speed, &variables, &lists, Arc::clone(state), app.clone(), input);
     }
     count
 }

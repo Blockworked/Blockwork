@@ -37,6 +37,7 @@ pub mod runner;
 pub mod thread_pool;
 #[cfg(feature = "system")]
 pub mod trace;
+pub mod trigger;
 
 pub use blockstitch_core::graph::{
     BlockDef, BlockGraph, BlockKind, BlockPiece, BlockShape, Comment, DictDef, FloatingValue,

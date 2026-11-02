@@ -23,8 +23,11 @@ use tracing::warn;
 /// "live" store for a macro that isn't open/running) and are written back to
 /// that macro's saved variables once the fired strand finishes, same as a
 /// normal run does.
+/// `message` is the run log line, from `trigger::fired_message`.
+#[allow(clippy::too_many_arguments)]
 pub(crate) fn fire(
     macro_id: String,
+    message: String,
     instructions: Vec<Instruction>,
     emulator: Arc<Mutex<dyn InputBackend>>,
     speed_multiplier: f64,
@@ -33,7 +36,7 @@ pub(crate) fn fire(
     shared_state: SharedState,
     app: AppHandle,
 ) {
-    fire_with_input(macro_id, instructions, emulator, speed_multiplier, variable_defs, list_defs, shared_state, app, None)
+    fire_with_input(macro_id, message, instructions, emulator, speed_multiplier, variable_defs, list_defs, shared_state, app, None)
 }
 
 /// `fire`, where `input` is a variable the trigger filled for this run only
@@ -42,6 +45,7 @@ pub(crate) fn fire(
 #[allow(clippy::too_many_arguments)]
 pub(crate) fn fire_with_input(
     macro_id: String,
+    message: String,
     instructions: Vec<Instruction>,
     emulator: Arc<Mutex<dyn InputBackend>>,
     speed_multiplier: f64,
@@ -74,7 +78,7 @@ pub(crate) fn fire_with_input(
         if settings.blocked_by().is_some() {
             return;
         }
-        run_log::run_event(&source, run_log::RunEvent::Fired, "Trigger fired");
+        run_log::run_event(&source, run_log::RunEvent::Fired, message);
         let run_flag = run_registry::begin_macro_run(&macro_id);
         let done = limit_run(&source, &run_flag, max_secs);
         run_fired_strand(source, instructions, emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists), block_table, max_loops);

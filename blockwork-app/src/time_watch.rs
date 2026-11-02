@@ -3,6 +3,7 @@
 //! with "catch up" on also get one run for times missed while Blockwork
 //! was closed or the computer slept.
 
+use blockwork_core::macros::trigger::fired_message;
 use crate::scheduled_run;
 use crate::state::SharedState;
 use crate::AppHandle;
@@ -88,7 +89,7 @@ fn at_time(at: &blockwork_core::input::value::Value, env: &HashMap<String, block
 }
 
 fn fire(mac: &Macro, strand: &Strand, emulator: &Arc<std::sync::Mutex<dyn blockwork_core::macros::backend::InputBackend>>, speed: f64, shared_state: &SharedState, app: &AppHandle) {
-    scheduled_run::fire(mac.id.clone(), strand.instructions[1..].to_vec(), Arc::clone(emulator), speed, &mac.variables, &mac.lists, Arc::clone(shared_state), app.clone());
+    scheduled_run::fire(mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), Arc::clone(emulator), speed, &mac.variables, &mac.lists, Arc::clone(shared_state), app.clone());
 }
 
 fn run(shared_state: SharedState, app: AppHandle) {

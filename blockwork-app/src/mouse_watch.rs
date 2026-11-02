@@ -1,6 +1,7 @@
 //! Fires `WhenMouseButton` strands on physical mouse button presses and
 //! releases (and scrolls). Scoped like the other watchers.
 
+use blockwork_core::macros::trigger::fired_message;
 use crate::scheduled_run;
 use crate::state::SharedState;
 use crate::AppHandle;
@@ -46,13 +47,13 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
                     if !combo.trim().is_empty() && modifier_bits(&combo) != Some(event.modifiers) {
                         continue;
                     }
-                    fires.push((mac.id.clone(), strand.instructions[1..].to_vec(), mac.variables.clone(), mac.lists.clone()));
+                    fires.push((mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), mac.variables.clone(), mac.lists.clone()));
                 }
             }
             (emulator, s.global_speed_multiplier)
         };
-        for (macro_id, body, variables, lists) in fires {
-            scheduled_run::fire(macro_id, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
+        for (macro_id, message, body, variables, lists) in fires {
+            scheduled_run::fire(macro_id, message, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
         }
     }
 }

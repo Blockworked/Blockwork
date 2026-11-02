@@ -5,6 +5,7 @@
 //! Scoping matches `battery_watch`: the selected macro, plus any macro with
 //! `MacroSettings::always_listen`.
 
+use blockwork_core::macros::trigger::fired_message;
 use crate::scheduled_run;
 use crate::state::SharedState;
 use crate::AppHandle;
@@ -79,7 +80,7 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
                         continue;
                     }
                     trigger_keys.extend(combo);
-                    fires.push((mac.id.clone(), strand.instructions[1..].to_vec(), mac.variables.clone(), mac.lists.clone()));
+                    fires.push((mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), mac.variables.clone(), mac.lists.clone()));
                 }
             }
         }
@@ -87,8 +88,8 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
         if !fires.is_empty() {
             blockwork_core::macros::backend::release_held_keys(&trigger_keys);
         }
-        for (macro_id, body, variables, lists) in fires {
-            scheduled_run::fire(macro_id, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
+        for (macro_id, message, body, variables, lists) in fires {
+            scheduled_run::fire(macro_id, message, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
         }
     }
 }

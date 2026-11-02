@@ -60,6 +60,7 @@ section below as the GitHub release notes, followed by the downloads table.
   - Blocks that failed in the last run get a red marker; click a logged error to jump to its block.
   - Activity strip under the canvas shows the latest run event; click it to open the run log.
   - Tray menu "Recent activity" lists the latest runs, triggers and errors.
+  - A fired trigger is logged by name, like `Trigger fired: when key "F8" is pressed`, so the activity strip, run log and tray say which one ran.
 - Debugger:
   - Right-click a block to toggle a breakpoint.
   - Pause, resume, step one block at a time (F8/F10) or stop from the bar above the canvas, which shows the paused strand's variables and lists.
