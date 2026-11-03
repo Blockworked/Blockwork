@@ -66,6 +66,9 @@ Item {
             const page = createTemporaryObject(editorComponent, scene);
             verify(!!page);
             wait(100);
+            // The palette builds most of its blocks over the first frames;
+            // let it finish so nothing shifts under a press.
+            tryVerify(() => !all(page).some(o => o.pendingEntries > 0), 10000, "palette finished building");
             scene.calls = []; scene.failCalls = false;
             return page;
         }
