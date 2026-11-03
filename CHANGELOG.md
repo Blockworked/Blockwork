@@ -161,6 +161,8 @@ section below as the GitHub release notes, followed by the downloads table.
   variable, and global variables get their own Make a Global button. Set
   clipboard moved to System beside the clipboard reporters, mouse position to
   Input and current time to Operators.
+- Big macros open faster: the editor builds the blocks you can see first and the rest in the background, and blocks far off screen aren't drawn.
+- The editor reacts to the background service as soon as it answers instead of checking on a timer, and uses no CPU while idle. Edits no longer wait for the macro file to be written, and app icons in the app picker load in the background on Windows.
 - "Run command" starts its command and moves straight on down the strand instead of waiting for it to finish. Run command blocks in saved macros and block packs become "run command and wait" blocks when loaded, so they keep waiting (the original file is kept as a backup).
 - Macro files now carry a format version and are upgraded step by step when
   loaded. Blocks a version can't run become notes on the canvas instead of

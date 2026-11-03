@@ -163,9 +163,10 @@ pub(crate) fn sync_list_values(s: &mut crate::state::AppState) {
 pub(crate) fn auto_save(s: &mut crate::state::AppState) {
     if let Some(mac) = &mut s.current_macro {
         mac.collect_named_signals();
-        if let Err(e) = mac.save() {
+        // Written on the save thread, so the edit's state goes out first.
+        if let Err(e) = mac.save_soon() {
             warn!("Failed to auto-save macro: {e}");
-        } else {
+        } else if config::get_selected_macro_id().as_deref() != Some(mac.id.as_str()) {
             config::set_selected_macro_id(Some(&mac.id));
         }
     }

@@ -153,6 +153,7 @@ async fn forward_backend_events(
                 // before the process (and the socket) goes away.
                 tokio::time::sleep(std::time::Duration::from_millis(300)).await;
                 listener.cleanup();
+                blockwork_app::flush_saves();
                 std::process::exit(0);
             }
             Ok(Event::State(_) | Event::Trace(_)) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}

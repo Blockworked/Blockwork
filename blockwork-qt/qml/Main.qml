@@ -151,7 +151,6 @@ ApplicationWindow {
     // Compositor treats the shadow as outside the window, so it can reach the screen edges.
     onShadowMarginChanged: bridge.setWindowFrameMargin(shadowMargin)
     onActiveChanged: if (!active && appState.combo_capture) invoke("cancel_combo_capture")
-    Timer { interval: 16; running: true; repeat: true; onTriggered: bridge.poll() }
 
     // Pre-baked 9-slice shadow: scaling a bitmap is far cheaper per resize frame than a live blur.
     BorderImage {

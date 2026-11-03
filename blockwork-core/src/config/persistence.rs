@@ -3,7 +3,7 @@ use crate::macros::Macro;
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
-use std::sync::{Mutex, OnceLock};
+use std::sync::{Condvar, Mutex, OnceLock};
 use std::time::SystemTime;
 use tracing::warn;
 
@@ -102,6 +102,7 @@ fn unused_backup_path(path: &Path, from: u64) -> PathBuf {
 /// cached, which is the common case for a level-attempt retry loop
 /// re-resolving the same macro on every attempt.
 pub fn read_macro_by_id(id: &str) -> Option<Macro> {
+    flush_saves();
     let path = macro_file_path(id).ok()?;
     let mtime = fs::metadata(&path).and_then(|m| m.modified()).ok()?;
 
@@ -189,6 +190,7 @@ pub fn write_macro_file(path: &Path, mac: &Macro) -> Result<(), String> {
 }
 
 fn list_macro_file_paths() -> Result<Vec<PathBuf>, String> {
+    flush_saves();
     let dir = ensure_macros_dir()?;
     let entries = fs::read_dir(&dir)
         .map_err(|err| format!("Failed to scan macros directory '{}': {}", dir.display(), err))?;
@@ -202,9 +204,87 @@ fn list_macro_file_paths() -> Result<Vec<PathBuf>, String> {
     Ok(paths)
 }
 
+/// Saves queued by [`Macro::save_soon`], written by one background thread so
+/// an edit doesn't wait on the disk. Every reader of the macro files calls
+/// [`flush_saves`] first, so nobody in this process sees a stale file.
+struct Saves {
+    queue: Mutex<HashMap<PathBuf, Macro>>,
+    queued: Condvar,
+    /// Held for each write, so a newer save of a file never lands before an older one.
+    writing: Mutex<()>,
+}
+
+fn saves() -> &'static Saves {
+    static SAVES: OnceLock<Saves> = OnceLock::new();
+    SAVES.get_or_init(|| {
+        let spawned = std::thread::Builder::new().name("blockwork-saves".into()).spawn(|| {
+            let saves = saves();
+            loop {
+                {
+                    let mut queue = saves.queue.lock().unwrap();
+                    while queue.is_empty() {
+                        queue = saves.queued.wait(queue).unwrap();
+                    }
+                }
+                let _writing = saves.writing.lock().unwrap();
+                let next = {
+                    let mut queue = saves.queue.lock().unwrap();
+                    let key = queue.keys().next().cloned();
+                    key.and_then(|key| queue.remove_entry(&key))
+                };
+                if let Some((path, mac)) = next {
+                    write_saved(&path, &mac);
+                }
+            }
+        });
+        if let Err(e) = spawned {
+            warn!("Couldn't start the save thread, saving in place: {e}");
+        }
+        Saves { queue: Mutex::new(HashMap::new()), queued: Condvar::new(), writing: Mutex::new(()) }
+    })
+}
+
+fn write_saved(path: &Path, mac: &Macro) {
+    if let Err(e) = write_macro_file(path, mac) {
+        warn!("Failed to auto-save macro: {e}");
+    }
+    macro_cache().lock().unwrap().remove(&mac.id);
+}
+
+/// Writes every queued save now. Call before reading macro files or exiting.
+pub fn flush_saves() {
+    let Some(saves) = SAVES_STARTED.get().map(|_| saves()) else { return };
+    let _writing = saves.writing.lock().unwrap();
+    let queued: Vec<_> = saves.queue.lock().unwrap().drain().collect();
+    for (path, mac) in queued {
+        write_saved(&path, &mac);
+    }
+}
+
+/// Set once something was queued, so readers that never save skip the lock.
+static SAVES_STARTED: OnceLock<()> = OnceLock::new();
+
 impl Macro {
+    /// Queues a save on the save thread and returns at once; a later save of
+    /// the same macro replaces a queued one.
+    pub fn save_soon(&self) -> Result<(), String> {
+        let path = macro_file_path(&self.id)?;
+        let saves = saves();
+        let _ = SAVES_STARTED.set(());
+        saves.queue.lock().unwrap().insert(path, self.clone());
+        saves.queued.notify_one();
+        Ok(())
+    }
+
     pub fn save(&self) -> Result<(), String> {
         let path = macro_file_path(&self.id)?;
+        // Drop a queued older copy, and wait out one being written.
+        let _writing = SAVES_STARTED.get().map(|_| {
+            let saves = saves();
+            let writing = saves.writing.lock().unwrap();
+            saves.queue.lock().unwrap().remove(&path);
+            writing
+        });
         write_macro_file(&path, self)?;
         // Belt-and-suspenders alongside the mtime check in `read_macro_by_id`:
         // a rapid save-then-reload in the same process could otherwise land
@@ -214,6 +294,7 @@ impl Macro {
     }
 
     pub fn remove(self) -> Result<(), String> {
+        flush_saves();
         let path = macro_file_path(&self.id)?;
         if path.exists() {
             fs::remove_file(&path)
@@ -226,6 +307,7 @@ impl Macro {
 }
 
 pub fn get_macros_from_config() -> Vec<Macro> {
+    flush_saves();
     let mut macros = Vec::new();
     let paths = match list_macro_file_paths() {
         Ok(paths) => paths,
@@ -390,5 +472,40 @@ mod tests {
         assert_eq!(backups.len(), 2);
         assert!(backups.iter().any(|b| b.contains("first")) && backups.iter().any(|b| b.contains("second")));
         let _ = fs::remove_dir_all(&dir);
+    }
+}
+
+#[cfg(test)]
+mod background_saves {
+    use super::*;
+
+    #[test]
+    fn queued_saves_are_seen_by_readers_and_never_land_late() {
+        super::super::set_config_dir_override(std::env::temp_dir().join(format!("bw-saves-{}", std::process::id())));
+        let mut mac = Macro::new("Queued".into(), String::new(), Vec::new());
+        mac.ensure_id();
+        for i in 0..50 {
+            mac.name = format!("Queued {i}");
+            mac.save_soon().unwrap();
+        }
+        // A reader flushes what is queued first.
+        assert_eq!(read_macro_by_id(&mac.id).unwrap().name, "Queued 49");
+        assert!(get_macros_from_config().iter().any(|m| m.id == mac.id));
+
+        // A direct save replaces a queued older copy rather than racing it.
+        mac.name = "Queued again".into();
+        mac.save_soon().unwrap();
+        mac.name = "Saved".into();
+        mac.save().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        flush_saves();
+        assert_eq!(read_macro_by_id(&mac.id).unwrap().name, "Saved");
+
+        // Removing waits for a queued save, so the file doesn't come back.
+        mac.save_soon().unwrap();
+        let id = mac.id.clone();
+        mac.remove().unwrap();
+        std::thread::sleep(std::time::Duration::from_millis(50));
+        assert!(read_macro_by_id(&id).is_none());
     }
 }

@@ -32,7 +32,28 @@ pub enum Event {
     Reply { key: String, json: String, error: String },
 }
 
-pub fn spawn(requests: tokio::sync::mpsc::UnboundedReceiver<Request>, events: mpsc::Sender<Event>) {
+/// Wakes the UI thread to read new events.
+pub type Wake = std::sync::Arc<dyn Fn() + Send + Sync>;
+
+/// Sends events to the UI and wakes it.
+pub struct EventSink {
+    tx: mpsc::Sender<Event>,
+    wake: Wake,
+}
+
+impl EventSink {
+    pub fn new(tx: mpsc::Sender<Event>, wake: Wake) -> Self {
+        Self { tx, wake }
+    }
+
+    pub fn send(&self, event: Event) -> Result<(), mpsc::SendError<Event>> {
+        let sent = self.tx.send(event);
+        (self.wake)();
+        sent
+    }
+}
+
+pub fn spawn(requests: tokio::sync::mpsc::UnboundedReceiver<Request>, events: EventSink) {
     std::thread::Builder::new()
         .name("blockwork-qt-ipc".into())
         .spawn(move || {
@@ -50,7 +71,7 @@ pub fn spawn(requests: tokio::sync::mpsc::UnboundedReceiver<Request>, events: mp
 
 async fn run(
     mut requests: tokio::sync::mpsc::UnboundedReceiver<Request>,
-    events: &mpsc::Sender<Event>,
+    events: &EventSink,
 ) -> io::Result<()> {
     let connection = connect_or_spawn(false).await?;
     let (reader, mut writer) = tokio::io::split(connection);

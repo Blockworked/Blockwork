@@ -2,7 +2,7 @@ pub mod persistence;
 pub mod selection;
 pub mod settings;
 
-pub use persistence::{get_macros_from_config, read_macro_by_id, read_macro_file, write_macro_file};
+pub use persistence::{flush_saves, get_macros_from_config, read_macro_by_id, read_macro_file, write_macro_file};
 pub use selection::{get_macro_by_id, get_selected_macro_id, set_selected_macro_id};
 pub use settings::{load_settings, save_settings, update_settings, AppSettings};
 

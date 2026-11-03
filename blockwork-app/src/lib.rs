@@ -71,7 +71,7 @@ use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use tokio::sync::broadcast;
 
-pub use blockwork_core::config::migrate_legacy_app_id;
+pub use blockwork_core::config::{flush_saves, migrate_legacy_app_id};
 pub use blockwork_core::run_log;
 
 /// Something the backend tells whoever is hosting it.

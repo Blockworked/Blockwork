@@ -142,7 +142,10 @@ AppDialog {
                         // target's native file icon instead, so tiles show
                         // real icons rather than placeholders.
                         readonly property string resolvedIcon: modelData.icon
-                            || (root.bridge && typeof root.bridge.nativeAppIcon === "function"
+                            || (root.bridge && typeof root.bridge.nativeAppIconAsync === "function"
+                                // The serial re-reads it once a worker has resolved it.
+                                ? (root.bridge.nativeIconsSerial, root.bridge.nativeAppIconAsync(modelData.command || ""))
+                                : root.bridge && typeof root.bridge.nativeAppIcon === "function"
                                 ? root.bridge.nativeAppIcon(modelData.command || "") : "")
                         width: appGrid.tileWidth
                         height: 104
