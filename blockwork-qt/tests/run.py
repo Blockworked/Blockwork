@@ -1,5 +1,6 @@
 #!/usr/bin/env python3
-"""Run source QML tests. Args: [blockstitch checkout] [qmltestrunner options/test filters...]."""
+"""Run source QML tests. Args: [blockstitch checkout] [qmltestrunner options/test filters...].
+BLOCKWORK_QML_TESTS names another test directory (the perf benchmarks use it)."""
 
 import os
 from pathlib import Path
@@ -47,7 +48,7 @@ with tempfile.TemporaryDirectory(prefix="blockwork-qml-") as temporary:
             environment.setdefault("QV4_GC_TIMELIMIT", "0")
     started_at = time.time()
     result = subprocess.run([
-        str(qtbin / "qmltestrunner"), "-input", str(root / "blockwork-qt/tests"), "-import", str(modules),
+        str(qtbin / "qmltestrunner"), "-input", os.environ.get("BLOCKWORK_QML_TESTS", str(root / "blockwork-qt/tests")), "-import", str(modules),
         *sys.argv[2:],
     ], env=environment)
     if sys.platform == "darwin" and os.environ.get("GITHUB_ACTIONS") == "true" and result.returncode < 0:

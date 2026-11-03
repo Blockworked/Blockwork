@@ -38,6 +38,11 @@ run: build
 test:
     cargo test --workspace --exclude blockwork-linux-bridge
 
+# Editor timings with a big macro (page, load, edit, drag, zoom), offscreen.
+# Prints PERF lines; pass a blockstitch checkout and optional test filters.
+bench-qml blockstitch="../blockstitch" *filters="":
+    blockwork-qt/tests/perf/run.sh "{{blockstitch}}" {{filters}}
+
 # Run a command (default: the live screen tests) on a headless desktop with
 # a stand-in game window. See docs/mock-desktop.md.
 [linux]
