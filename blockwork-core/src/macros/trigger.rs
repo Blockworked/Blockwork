@@ -24,6 +24,20 @@ fn bare(value: &Value) -> String {
     }
 }
 
+/// A key combo as the key chips show it: one-letter keys in capitals, so "r"
+/// and "R" read as the same key.
+fn key_combo(value: &Value) -> String {
+    let Value::Text { value } = value else { return show(value) };
+    let parts: Vec<String> = value
+        .split_inclusive('+')
+        .map(|p| {
+            let key = p.strip_suffix('+').filter(|k| !k.is_empty()).unwrap_or(p);
+            if key.chars().count() == 1 { p.to_uppercase() } else { p.to_string() }
+        })
+        .collect();
+    format!("\"{}\"", parts.concat())
+}
+
 fn weekday(day: Weekday) -> &'static str {
     match day {
         Weekday::Sunday => "Sunday",
@@ -73,7 +87,7 @@ impl InstructionKind {
             K::WhenClipboardChanged => "when clipboard changes".into(),
             K::WhenKey(key, dir) => {
                 let dir = if *dir == Direction::Release { "released" } else { "pressed" };
-                format!("when key {} is {dir}", show(key))
+                format!("when key {} is {dir}", key_combo(key))
             }
             K::WhenWindow { pattern, focused } => {
                 format!("when window {} is {}", show(pattern), if *focused { "focused" } else { "unfocused" })
@@ -130,6 +144,12 @@ mod tests {
         assert_eq!(usb.trigger_label().unwrap(), "when any USB device is unplugged");
         assert_eq!(InstructionKind::WhenIdle(Value::number(5.0)).trigger_label().unwrap(), "when idle for 5 minutes");
         assert_eq!(fired_message(None), "Trigger fired");
+        let r = InstructionKind::WhenKey(Value::text("r"), Direction::Release);
+        assert_eq!(r.trigger_label().unwrap(), "when key \"R\" is released");
+        let combo = InstructionKind::WhenKey(Value::text("Control++"), Direction::Press);
+        assert_eq!(combo.trigger_label().unwrap(), "when key \"Control++\" is pressed");
+        let combo = InstructionKind::WhenKey(Value::text("Control+Alt+o"), Direction::Press);
+        assert_eq!(combo.trigger_label().unwrap(), "when key \"Control+Alt+O\" is pressed");
         assert_eq!(InstructionKind::WhenRan.trigger_label(), None);
     }
 }
