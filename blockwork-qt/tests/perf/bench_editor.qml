@@ -110,12 +110,66 @@ Item {
                 const t1 = Date.now();
                 frame();
                 best = Math.min(best, Date.now() - t0); bestSync = Math.min(bestSync, t1 - t0);
-                tryVerify(() => !canvas.pendingStrands || canvas.pendingStrands() === 0, 30000);
+                tryVerify(() => canvas.pendingBuilds ? canvas.pendingBuilds() === 0 : (!canvas.pendingStrands || canvas.pendingStrands() === 0), 30000);
                 bestAll = Math.min(bestAll, Date.now() - t0);
             }
             report("load_only_400", best);
             report("load_only_400_sync", bestSync);
             report("load_all_400", bestAll);
+        }
+        // One very long strand: load, edits that shift every block below,
+        // dragging its head (the whole strand) and its tail, and scrolling.
+        function test_long() {
+            mouseMove(scene, scene.width - 2, scene.height - 2, 0, Qt.NoButton);
+            const page = createTemporaryObject(editorComponent, scene);
+            wait(200);
+            tryVerify(() => !all(page).some(o => o.pendingEntries > 0), 20000);
+            const palette = all(page).find(o => typeof o.prefab === "function" && o.standaloneKey !== undefined);
+            const types = Object.keys(BlockRegistry.rows).filter(t => !BlockRegistry.isHeader(t)
+                && !/^When|Header|CallBlock|BranchCallBlock|^Test/.test(t) && palette.prefab(t));
+            const canvas = all(page).find(o => o.strands !== undefined && typeof o.syncStrands === "function");
+            const flick = all(canvas).find(o => o.contentY !== undefined && o.flickableDirection !== undefined);
+            const wait0 = () => tryVerify(() => canvas.pendingBuilds ? canvas.pendingBuilds() === 0 : (!canvas.pendingStrands || canvas.pendingStrands() === 0), 60000);
+            for (const count of [400, 800]) {
+                const big = strands(palette, types, count, count);
+                page.appState = scene.state(scene.macro([]));
+                wait(300);
+                time("long_load_" + count, () => { page.appState = scene.state(scene.macro(big)); });
+                const t0 = Date.now(); wait0(); report("long_load_all_" + count, Date.now() - t0);
+                time("long_edit_" + count, i => {
+                    const next = JSON.parse(JSON.stringify(big));
+                    next[0].instructions[Math.floor(count / 2)]["__edit"] = i;
+                    page.appState = scene.state(scene.macro(next));
+                }, 5);
+                time("long_republish_" + count, () => { page.appState = scene.state(scene.macro(JSON.parse(JSON.stringify(big)))); }, 5);
+                // A block added at the top, then taken away again.
+                time("long_insert_top_" + count, i => {
+                    const next = JSON.parse(JSON.stringify(big));
+                    if (i % 2 === 0) next[0].instructions.unshift({id: "new" + i, type: "Wait", duration: {kind: "Number", value: 5}});
+                    page.appState = scene.state(scene.macro(next));
+                }, 4);
+                for (const which of ["head", "tail"]) {
+                    const id = which === "head" ? "b0" : "b" + (count - 1);
+                    const index = which === "head" ? 0 : count - 1;
+                    if (which === "tail") { flick.contentY = Math.max(0, flick.contentHeight - flick.height); frame(); }
+                    else { flick.contentY = 0; frame(); }
+                    const block = all(canvas).find(o => o.instruction && o.instruction.id === id && o.paletteMode === false);
+                    verify(!!block, "dragged " + which);
+                    const p = block.mapToItem(null, 10, 10);
+                    canvas.beginDrag("s0", [{index: index}], count - index, p.x, p.y, 10, 10, block.width, block.height);
+                    frame();
+                    const t1 = Date.now();
+                    const moves = 30;
+                    for (let m = 0; m < moves; ++m) { canvas.moveDrag(p.x + 300 + (m % 10) * 10, p.y + 100 - m * 5); frame(); }
+                    report("long_drag_" + which + "_" + count, (Date.now() - t1) / moves);
+                    canvas.cancelDrag();
+                    wait(300);
+                }
+                flick.contentY = 0; frame();
+                const t2 = Date.now();
+                for (let k = 0; k < 40; ++k) { flick.contentY = k * 120; frame(); }
+                report("long_scroll_" + count, (Date.now() - t2) / 40);
+            }
         }
         function test_editor() {
             mouseMove(scene, scene.width - 2, scene.height - 2, 0, Qt.NoButton);
