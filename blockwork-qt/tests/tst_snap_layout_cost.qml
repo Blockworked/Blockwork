@@ -56,9 +56,9 @@ Item {
                 const inner = block(canvas, "if");
                 return loop && inner && inner.mouthHeights[0] === 26
                     && loop.mouthHeights[0] === Math.max(26, inner.height - 8)
-                    && canvas.needHalfH === 1000 + loop.parent.implicitHeight;
+                    && canvas.needBottom === 1000 + loop.parent.implicitHeight;
             }, 5000, "initial nested layout must finish before sampling its height");
-            const before = canvas.needHalfH;
+            const before = canvas.needBottom;
             canvas.searches = [];
             const updated = JSON.parse(JSON.stringify(canvas.strands));
             updated[0].instructions[0].body[0].body = [{id:"attached",type:"Wait",duration:{kind:"Number",value:100}}];
@@ -66,12 +66,12 @@ Item {
             let attached = null;
             tryVerify(() => {
                 attached = block(canvas, "attached");
-                return attached && canvas.needHalfH > before
-                    && canvas.needHalfH === 1000 + loop.parent.implicitHeight;
+                return attached && canvas.needBottom > before
+                    && canvas.needBottom === 1000 + loop.parent.implicitHeight;
             }, 5000, "attached content must propagate its measured height");
             compare(canvas.searches.length, 0, "sizing must not search the control tree as a nested block initializes");
-            compare(canvas.needHalfH, 1000 + loop.parent.implicitHeight);
-            verify(canvas.needHalfH > before, "canvas includes the new nested content");
+            compare(canvas.needBottom, 1000 + loop.parent.implicitHeight);
+            verify(canvas.needBottom > before, "canvas includes the new nested content");
             verify(!!attached);
             compare(attached.path, [{index:0,slot:0},{index:0,slot:0},{index:0}]);
 
@@ -82,9 +82,9 @@ Item {
             tryVerify(() => attached.instruction.duration.value === 500);
             tryCompare(attached, "variables", ["new variable"], 5000, "nested properties remain bound after loading");
             canvas.strands = [{id:"main",x:0,y:1000,instructions:[]}];
-            tryCompare(canvas, "needHalfH", 1000, 5000, "empty strands report zero height");
+            tryCompare(canvas, "needBottom", 1000, 5000, "empty strands report zero height");
             canvas.strands = [];
-            tryCompare(canvas, "needHalfH", 0, 5000, "removed strands no longer affect canvas height");
+            tryCompare(canvas, "needBottom", 0, 5000, "removed strands no longer affect canvas height");
         }
     }
 }
