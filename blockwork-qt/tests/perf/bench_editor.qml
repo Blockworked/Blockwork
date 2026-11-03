@@ -98,8 +98,10 @@ Item {
             const types = Object.keys(BlockRegistry.rows).filter(t => !BlockRegistry.isHeader(t)
                 && !/^When|Header|CallBlock|BranchCallBlock|^Test/.test(t) && palette.prefab(t));
             const big = strands(palette, types, 400, 25);
+            const canvas = all(page).find(o => o.strands !== undefined && typeof o.syncStrands === "function");
             // Best of three, since one load swings by a few hundred ms.
-            let best = 1e9, bestSync = 1e9;
+            // "all" waits until strands outside the view have built too.
+            let best = 1e9, bestSync = 1e9, bestAll = 1e9;
             for (let round = 0; round < 3; ++round) {
                 page.appState = scene.state(scene.macro([]));
                 wait(300);
@@ -108,9 +110,12 @@ Item {
                 const t1 = Date.now();
                 frame();
                 best = Math.min(best, Date.now() - t0); bestSync = Math.min(bestSync, t1 - t0);
+                tryVerify(() => !canvas.pendingStrands || canvas.pendingStrands() === 0, 30000);
+                bestAll = Math.min(bestAll, Date.now() - t0);
             }
             report("load_only_400", best);
             report("load_only_400_sync", bestSync);
+            report("load_all_400", bestAll);
         }
         function test_editor() {
             mouseMove(scene, scene.width - 2, scene.height - 2, 0, Qt.NoButton);
