@@ -3,7 +3,7 @@ use crate::input::value::{Evaluated, Op, Value};
 use crate::macros::backend::{create_backend, InputBackend};
 use crate::macros::host_clock;
 use crate::macros::priority::raise_current_thread_priority;
-use crate::macros::{BlockKind, ImageMatch, ImagePick, Instruction, InstructionKind, LaunchOptions, Macro};
+use crate::macros::{BlockKind, ImageMatch, ImagePick, Instruction, InstructionKind, LaunchOptions, Macro, Strand};
 use blockstitch_core::graph::{
     ListItem, ListStore, is_list_reporter, list_index, resolve_list_reporter,
 };
@@ -904,18 +904,66 @@ impl Macro {
         lists: ListStore,
         initial_offset: Duration,
     ) {
+        // Trigger strands are fired by the app's watchers via
+        // `run_fired_strand`, never by a manual Run.
+        self.run_entries(
+            |s| matches!(s.instructions.first().map(|i| &i.kind), Some(InstructionKind::WhenRan)),
+            emulator,
+            stop_flag,
+            speed_multiplier,
+            variables,
+            lists,
+            initial_offset,
+        )
+    }
+
+    /// Runs just the strand `strand_id`, from its top block, whatever event
+    /// heads it. False when there's no such strand or it's a custom block's
+    /// definition, which only runs when called.
+    pub fn run_strand_with_lists(
+        self,
+        strand_id: &str,
+        emulator: Arc<Mutex<dyn InputBackend>>,
+        stop_flag: Option<Arc<Mutex<bool>>>,
+        speed_multiplier: f64,
+        variables: VariableStore,
+        lists: ListStore,
+    ) -> bool {
+        if !self.can_run_strand(strand_id) {
+            return false;
+        }
+        self.run_entries(|s| s.id == strand_id, emulator, stop_flag, speed_multiplier, variables, lists, Duration::ZERO);
+        true
+    }
+
+    /// Whether `run_strand_with_lists` would run `strand_id`.
+    pub fn can_run_strand(&self, strand_id: &str) -> bool {
+        self.graph.strand(strand_id).is_some_and(|s| {
+            !s.instructions.is_empty() && !matches!(s.instructions[0].kind, InstructionKind::BlockHeader(_))
+        })
+    }
+
+    /// Runs every strand `pick` accepts side by side, each on its own thread.
+    fn run_entries(
+        self,
+        pick: impl Fn(&Strand) -> bool,
+        emulator: Arc<Mutex<dyn InputBackend>>,
+        stop_flag: Option<Arc<Mutex<bool>>>,
+        speed_multiplier: f64,
+        variables: VariableStore,
+        lists: ListStore,
+        initial_offset: Duration,
+    ) {
         let source = Arc::new(crate::run_log::Source::for_macro(&self.id, &self.name));
         let max_loop_iterations = self.settings.max_loop_iterations;
         // StopMacro needs a flag every strand of this run shares.
         let stop_flag = stop_flag.or_else(|| Some(Arc::new(Mutex::new(true))));
         let block_table = self.block_table();
-        // Trigger strands are fired by the app's watchers via
-        // `run_fired_strand`, never by a manual Run.
         let entry_strands: Vec<Vec<Instruction>> = self
             .graph
             .strands
             .into_iter()
-            .filter(|s| matches!(s.instructions.first().map(|i| &i.kind), Some(InstructionKind::WhenRan)))
+            .filter(|s| pick(s))
             .map(|s| s.instructions)
             .collect();
 
@@ -3949,6 +3997,29 @@ mod tests {
         let vars = vars.lock().unwrap();
         assert_eq!(vars.get("seen"), Some(&Evaluated::Number(5.0)));
         assert_eq!(vars.get("wrong"), None);
+    }
+
+    #[test]
+    fn run_strand_runs_one_strand_whatever_heads_it() {
+        let mut mac = Macro::new("One strand".into(), String::new(), vec![set("main", Value::number(1.0))]);
+        let mut keyed = Strand::with_instructions(0, 200, vec![
+            Instruction::new(InstructionKind::WhenIdle(Value::number(5.0))),
+            Instruction::new(InstructionKind::SendSignal { name: Value::text("go").into(), wait: true }),
+            set("keyed", Value::Var { name: "x".into() }),
+        ]);
+        keyed.id = "keyed".into();
+        mac.graph.strands.push(keyed);
+        mac.graph.strands.push(Strand::with_instructions(0, 400, vec![
+            Instruction::new(InstructionKind::WhenSignal(Value::text("go").into())),
+            set("x", Value::number(7.0)),
+        ]));
+        assert!(!mac.can_run_strand("missing"));
+        let vars = empty_vars();
+        let lists: ListStore = Arc::new(Mutex::new(HashMap::new()));
+        assert!(mac.run_strand_with_lists("keyed", noop_emulator(), None, 1.0, Arc::clone(&vars), lists));
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("keyed"), Some(&Evaluated::Number(7.0)));
+        assert_eq!(vars.get("main"), None);
     }
 
     #[test]

@@ -21,11 +21,11 @@ version = "0.6.0"
 edition = "2024"
 
 [workspace.dependencies]
-blockstitch-qml = { git = "https://github.com/Blockworked/blockstitch", rev = "6e35393c96534b7f1cd47b570c863df98e541785" }
-blockstitch-ffi = { git = "https://github.com/Blockworked/blockstitch", rev = "6e35393c96534b7f1cd47b570c863df98e541785" }
+blockstitch-qml = { git = "https://github.com/Blockworked/blockstitch", rev = "15a9a9e8cfe3f4e6d97fd54def717646fee6adb0" }
+blockstitch-ffi = { git = "https://github.com/Blockworked/blockstitch", rev = "15a9a9e8cfe3f4e6d97fd54def717646fee6adb0" }
 blockstitch-core = {
     git = "https://github.com/Blockworked/blockstitch",
-    rev = "6e35393c96534b7f1cd47b570c863df98e541785",
+    rev = "15a9a9e8cfe3f4e6d97fd54def717646fee6adb0",
     #path = "../blockstitch/crates/blockstitch-core"
 }
 tracing = "0.1.44"

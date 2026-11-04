@@ -84,7 +84,7 @@ pub const COMMANDS: &[&str] = &[
     "create_floating_value", "move_floating_value", "remove_floating_value",
     "create_comment", "create_attached_comment", "move_comment", "edit_comment_text", "set_comment_collapsed",
     "remove_comment",
-    "create_variable", "rename_variable", "delete_variable",
+    "create_variable", "rename_variable", "set_variable_value", "delete_variable",
     "create_signal", "rename_signal", "delete_signal",
     "create_list", "rename_list", "delete_list", "set_list_items", "set_list_editor_state",
     "create_block", "edit_block", "delete_block",
@@ -531,6 +531,12 @@ impl Demo {
                     self.push_undo();
                     self.open_mut().ok_or("No macro selected")?.graph = graph;
                 }
+                Ok(Json::Null)
+            }
+            "set_variable_value" => {
+                let (name, value): (String, String) = (arg(a, "name")?, arg(a, "value")?);
+                let value = blockwork_core::macros::typed_value(&value);
+                self.open_mut().ok_or("No macro selected")?.set_variable_value(&name, value)?;
                 Ok(Json::Null)
             }
             "delete_variable" => {

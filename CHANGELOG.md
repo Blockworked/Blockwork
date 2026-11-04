@@ -11,6 +11,8 @@ section below as the GitHub release notes, followed by the downloads table.
 ## [0.6.0] - Unreleased
 
 ### Added
+- "Run strand" in a strand's right-click menu (on its top block): runs just that strand from the top, without waiting for its event.
+- "Set value" in a sidebar variable's right-click menu: sets what the variable holds, and what the next run starts with.
 - Text with several lines:
   - Any text box opens a bigger editor from its expand button or Shift+Enter, and text that already has line breaks shows its first line and how many more there are.
   - The HTTP request (body and headers), JavaScript, write file and notify blocks get a text box of their own under the block that shows every line.

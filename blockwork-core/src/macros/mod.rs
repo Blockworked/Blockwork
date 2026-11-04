@@ -51,6 +51,15 @@ pub use fields::FieldId;
 pub type Instruction = blockstitch_core::graph::Instruction<InstructionKind>;
 /// One draggable stack of Blockwork instructions.
 pub type Strand = blockstitch_core::graph::Strand<InstructionKind>;
+
+/// What a typed-in value is stored as: a number when it reads as one, else text.
+pub fn typed_value(text: &str) -> crate::input::value::Evaluated {
+    use crate::input::value::Evaluated;
+    match text.trim().parse::<f64>() {
+        Ok(n) if n.is_finite() && !text.trim().is_empty() => Evaluated::Number(n),
+        _ => Evaluated::Text(text.to_string()),
+    }
+}
 /// Everything on a macro's canvas - see [`Macro`], which owns one.
 pub type MacroGraph = BlockGraph<InstructionKind>;
 
@@ -2470,6 +2479,16 @@ impl std::hash::Hash for Macro {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn typed_values_keep_numbers_as_numbers() {
+        use crate::input::value::Evaluated;
+        assert_eq!(typed_value(" 42 "), Evaluated::Number(42.0));
+        assert_eq!(typed_value("-1.5"), Evaluated::Number(-1.5));
+        assert_eq!(typed_value("hello"), Evaluated::Text("hello".into()));
+        assert_eq!(typed_value("inf"), Evaluated::Text("inf".into()));
+        assert_eq!(typed_value(""), Evaluated::Text(String::new()));
+    }
     use crate::input::value::Evaluated;
     use crate::input::types::Coordinate;
 

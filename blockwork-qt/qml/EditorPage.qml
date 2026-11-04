@@ -736,6 +736,8 @@ Item {
                     onMakeVariableRequested: variableDialog.openForCreate()
                     onSectionActionRequested: action => { if (action === "makeGlobal") globalPicker.openForCreate(null); }
                     onRenameVariableRequested: name => variableDialog.openForRename(name)
+                    offerSetVariableValue: true
+                    onSetVariableValueRequested: name => variableValueDialog.openFor(name)
                     onDeleteVariableRequested: name => root.invoke("delete_variable", { name: name })
                     onEditBlockRequested: definition => { if (!definition.read_only) blockDialog.openForEdit(definition); }
                     onDeleteBlockRequested: blockId => root.invoke("delete_block", { blockId: blockId })
@@ -789,6 +791,7 @@ Item {
                     onBlockMenuAction: (action, strandId, path, instruction) => {
                         if (action === "edit_block") root.editBlockById(instruction.block_id);
                         else if (action === "breakpoint") root.invoke("toggle_breakpoint", { blockId: instruction.id });
+                        else if (action === "run_strand") root.invoke("run_strand", { strandId: strandId });
                         else if (action === "copy") root.copyBlocks(strandId, path, 1);
                         else if (action === "copy_all") root.copyBlocks(strandId, path, null);
                         else if (action === "cut") root.copyBlocks(strandId, path, 1, () => root.removeInstruction(strandId, path));
@@ -1411,6 +1414,35 @@ Item {
                 selectCreated = null;
                 renameTarget = ""; variableName.clear();
                 if (select) select(name);
+            });
+        }
+    }
+    AppDialog {
+        id: variableValueDialog
+        objectName: "variableValueDialog"
+        property string target: ""
+        property string errorText: ""
+        title: qsTr("Set Value")
+        standardButtons: Dialog.Ok | Dialog.Cancel
+        function openFor(name) {
+            target = name; errorText = ""; variableValue.text = ""; open(); variableValue.forceActiveFocus();
+            // Starts from what the variable holds now.
+            root.daemonCall("preview_value", { value: { kind: "Var", name: name } }, (result, error) => {
+                if (error || target !== name || variableValue.text.length) return;
+                variableValue.text = String(result); variableValue.selectAll();
+            });
+        }
+        Column { width: 340; spacing: 8
+            Text { width: parent.width; text: qsTr("Value of %1").arg(variableValueDialog.target); color: Theme.text; elide: Text.ElideRight }
+            BwTextField { id: variableValue; objectName: "variableValue"; width: parent.width; placeholderText: qsTr("0"); onAccepted: variableValueDialog.accept() }
+            Text { width: parent.width; visible: text.length > 0; text: variableValueDialog.errorText; color: Theme.text; wrapMode: Text.WordWrap }
+        }
+        onAccepted: {
+            const name = target, macroId = root.macro ? root.macro.id : "";
+            root.daemonCall("set_variable_value", { name: name, value: variableValue.text }, (result, error) => {
+                if (!root.macro || root.macro.id !== macroId || !error) return;
+                errorText = error;
+                open(); variableValue.forceActiveFocus();
             });
         }
     }
@@ -2210,10 +2242,17 @@ Item {
         return ins.type.replace(/([a-z0-9])([A-Z])/g, "$1 $2").toLowerCase();
     }
 
+    // Right-click entries the canvas adds to every block. Run strand only
+    // shows on a strand's top block, and not on a custom block's definition.
+    function blockMenu() {
+        return [{ id: "run_strand", text: qsTr("Run strand"), icon: "play",
+                  when: (instruction, strandId, path) => path.length === 1 && path[0].index === 0 && !!instruction && instruction.type !== "BlockHeader" },
+                { id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }];
+    }
     // Click-to-preview on operators: the daemon evaluates, the chip shows the answer.
     // Block labels are read once, so register them again in a new language.
     readonly property string uiLanguage: appState.language || ""
-    onUiLanguageChanged: Qt.callLater(() => { BlockRegistry.resetOperators(); registerBlocks(); BlockRegistry.blockMenu = [{ id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }]; })
+    onUiLanguageChanged: Qt.callLater(() => { BlockRegistry.resetOperators(); registerBlocks(); BlockRegistry.blockMenu = root.blockMenu(); })
     property var createListFromDropdown: (select, location) => listDialog.openForCreate(location
         ? name => root.invoke("edit_value_field", { location: location, text: name }) : select)
     property var replaceComponentValue: (location, value) => root.invoke("put_value", { location: location, value: value })
@@ -2225,7 +2264,7 @@ Item {
         BlockRegistry.listCreationHandler = root.createListFromDropdown;
         BlockRegistry.valueReplacementHandler = root.replaceComponentValue;
         registerBlocks();
-        BlockRegistry.blockMenu = [{ id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }];
+        BlockRegistry.blockMenu = root.blockMenu();
         BlockRegistry.previewHandler = (key, value) => root.appBridge.previewValue(key, JSON.stringify(value));
         // Name slots share the same picker in instructions and reporters.
         BlockRegistry.pickHandler = (action, location, value, anchor) => {

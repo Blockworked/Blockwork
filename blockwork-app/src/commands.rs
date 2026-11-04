@@ -589,6 +589,26 @@ pub(crate) fn rename_variable(
     Ok(())
 }
 
+/// Sets a declared variable's stored value, the one the next run starts
+/// from. Text that reads as a number is stored as one.
+pub(crate) fn set_variable_value(
+    state: &SharedState,
+    app: &AppHandle,
+    name: String,
+    value: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
+    let value = blockwork_core::macros::typed_value(&value);
+    mac.set_variable_value(&name, value.clone())?;
+    if let Ok(mut store) = s.variable_values.lock() {
+        store.insert(name, value);
+    }
+    auto_save(&mut s);
+    emit_state_updated(&app, &s);
+    Ok(())
+}
+
 /// Deletes a declared variable. No `push_undo` - same precedent as
 /// `create_variable`.
 pub(crate) fn delete_variable(
@@ -2331,6 +2351,30 @@ pub(crate) fn run_macro(
     state: &SharedState,
     app: &AppHandle,
 ) -> Result<(), String> {
+    run_open_macro(state, app, None)
+}
+
+/// Runs one strand of the open macro from its top block, skipping its event.
+pub(crate) fn run_strand(
+    state: &SharedState,
+    app: &AppHandle,
+    strand_id: String,
+) -> Result<(), String> {
+    {
+        let s = state.lock().map_err(|e| e.to_string())?;
+        let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
+        if !mac.can_run_strand(&strand_id) {
+            return Err("That strand can't be run on its own".into());
+        }
+    }
+    run_open_macro(state, app, Some(strand_id))
+}
+
+fn run_open_macro(
+    state: &SharedState,
+    app: &AppHandle,
+    strand: Option<String>,
+) -> Result<(), String> {
     let (mac, emulator, is_looping, speed_multiplier, variables, lists) = {
         let s = state.lock().map_err(|e| e.to_string())?;
         let mac = s.current_macro.clone();
@@ -2362,6 +2406,7 @@ pub(crate) fn run_macro(
             lists,
             Arc::clone(&*state),
             app.clone(),
+            strand,
         );
         let mut s = state.lock().map_err(|e| e.to_string())?;
         if let Err(e) = macros_thread::spawn_macro_thread(
@@ -3209,6 +3254,7 @@ fn run_macro_task(
         lists,
         state,
         app,
+        None,
     );
     tokio::task::spawn_blocking(move || {
         // Same pre-registration as the loop branch above.

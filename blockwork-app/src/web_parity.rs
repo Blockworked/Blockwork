@@ -145,11 +145,15 @@ fn script() -> Vec<(&'static str, Value)> {
         /* 53 */ ("add_instruction", json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "h", "type": "WhenRan" } })),
         /* 54 */ ("rename_list", json!({ "oldName": "nope", "newName": "x" })),
         /* 55 */ ("undo", json!({})),
+        /* 56 */ ("create_variable", json!({ "name": "speed" })),
+        /* 57 */ ("set_variable_value", json!({ "name": "speed", "value": " 2.5 " })),
+        /* 58 */ ("set_variable_value", json!({ "name": "speed", "value": "fast" })),
+        /* 59 */ ("set_variable_value", json!({ "name": "nope", "value": "1" })),
     ]
 }
 
 /// Steps the script expects to be refused.
-const REFUSED: &[usize] = &[52, 53, 54];
+const REFUSED: &[usize] = &[52, 53, 54, 59];
 
 #[test]
 fn web_editor_replays_like_the_app() {

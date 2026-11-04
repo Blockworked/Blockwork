@@ -44,6 +44,7 @@ pub(crate) fn into_single_run_task(
     lists: ListStore,
     shared_state: SharedState,
     app: AppHandle,
+    strand: Option<String>,
 ) -> impl FnOnce() + Send + 'static {
     move || {
         println!("Running macro: {}", mac.name);
@@ -55,7 +56,13 @@ pub(crate) fn into_single_run_task(
         // which would spuriously cut a concurrently-started run short.
         let run_flag = run_registry::begin_macro_run(&mac.id);
         let done = crate::scheduled_run::limit_run(&source, &run_flag, mac.settings.max_run_secs);
-        mac.run_with_lists(emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists));
+        match strand {
+            // Run strand: just that one, from its top block.
+            Some(id) => {
+                mac.run_strand_with_lists(&id, emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists));
+            }
+            None => mac.run_with_lists(emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists)),
+        }
         done.store(true, std::sync::atomic::Ordering::Relaxed);
         let stopped = !run_flag.lock().map(|r| *r).unwrap_or(true);
         blockwork_core::run_log::run_event(&source, blockwork_core::run_log::RunEvent::Ended, if stopped { "Run stopped" } else { "Run finished" });

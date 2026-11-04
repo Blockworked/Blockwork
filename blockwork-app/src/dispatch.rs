@@ -349,6 +349,11 @@ impl Backend {
                     new_name,
                 )?)
             }
+            "set_variable_value" => {
+                let name: String = arg(&args, "name")?;
+                let value: String = arg(&args, "value")?;
+                to_json(commands::set_variable_value(&self.state, &self.app, name, value)?)
+            }
             "delete_variable" => {
                 let name: String = arg(&args, "name")?;
                 to_json(commands::delete_variable(&self.state, &self.app, name)?)
@@ -773,6 +778,10 @@ impl Backend {
                 &self.app,
             )?),
             "run_macro" => to_json(commands::run_macro(&self.state, &self.app)?),
+            "run_strand" => {
+                let strand_id: String = arg(&args, "strandId")?;
+                to_json(commands::run_strand(&self.state, &self.app, strand_id)?)
+            }
             "set_global_speed_multiplier" => {
                 let multiplier: f64 = arg(&args, "multiplier")?;
                 to_json(commands::set_global_speed_multiplier(
