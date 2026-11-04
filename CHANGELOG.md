@@ -196,6 +196,7 @@ section below as the GitHub release notes, followed by the downloads table.
   grabbing an input device, preventing stuck input when Blockwork starts.
 - A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
 - Dragging inside a text field on the canvas selects text instead of also panning the canvas.
+- Dragging a tall block (like an HTTP request with its headers box) from the sidebar shows a drop preview of its real height and snaps where it will land, as dragging it on the canvas does.
 - The "Choose macros to export" list scrolls like the app's other lists: smooth wheel and touchpad scrolling and the same scroll bar.
 - Ctrl+scroll zooms the canvas around the mouse pointer instead of pushing the view right and down, and mouse wheel zoom, the zoom buttons and reset now ease in (follows the animation speed setting).
 - The "when every day at" block saves its day, weekday, month and time again.
