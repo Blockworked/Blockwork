@@ -164,6 +164,7 @@ section below as the GitHub release notes, followed by the downloads table.
   clipboard moved to System beside the clipboard reporters, mouse position to
   Input and current time to Operators.
 - Big macros open faster: the editor builds the blocks you can see first and the rest in the background, and blocks far off screen aren't drawn.
+- Very long strands stay responsive: picking up part of one, dragging it, attaching or detaching it and every background update are many times faster (on a 1,356-block macro a detach went from about 24 s to 1.4 s, and picking up mid-strand from 10 s to under a second). The editor no longer receives every macro in the library with each update.
 - The editor reacts to the background service as soon as it answers instead of checking on a timer, and uses no CPU while idle. Edits no longer wait for the macro file to be written, and app icons in the app picker load in the background on Windows.
 - "Run command" starts its command and moves straight on down the strand instead of waiting for it to finish. Run command blocks in saved macros and block packs become "run command and wait" blocks when loaded, so they keep waiting (the original file is kept as a backup).
 - Macro files now carry a format version and are upgraded step by step when

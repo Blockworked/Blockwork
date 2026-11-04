@@ -120,7 +120,6 @@ pub(crate) struct StateDto {
     pub(crate) macro_names: Vec<String>,
     pub(crate) macro_selected: Option<usize>,
     pub(crate) current_macro: Option<MacroDto>,
-    pub(crate) macros_data: Vec<MacroDto>,
     pub(crate) global_speed_multiplier: f64,
     pub(crate) is_looping: bool,
     pub(crate) ipc_active_port: Option<u16>,
@@ -378,8 +377,6 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         },
     });
 
-    let macros_data: Vec<MacroDto> = s.macros_list.iter().map(macro_to_dto).collect();
-
     let macros_list = &s.macros_list;
     let hotkey_bindings: Vec<HotkeyBindingDto> = s
         .hotkey_bindings
@@ -493,7 +490,6 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         macro_names: s.macro_strs.clone(),
         macro_selected: s.macro_selected,
         current_macro,
-        macros_data,
         global_speed_multiplier: s.global_speed_multiplier,
         is_looping,
         ipc_active_port: s.ipc_active_port,
@@ -692,6 +688,29 @@ mod tests {
             // Through JSON too, the way the frontend sends it back.
             let dto: InstructionDto = serde_json::from_str(&serde_json::to_string(&dto).unwrap()).unwrap();
             assert_eq!(dto_to_instruction(&dto).map(|i| i.kind), Some(kind));
+        }
+    }
+}
+
+#[cfg(test)]
+mod state_size {
+    #[test]
+    #[ignore]
+    fn time_state_for_a_real_library() {
+        let Ok(dir) = std::env::var("BW_STATE_DIR") else { return };
+        blockwork_core::config::set_config_dir_override(dir.into());
+        let mut s = crate::initial_state(&Default::default(), None, true, false);
+        s.macros_list = blockwork_core::config::get_macros_from_config();
+        let want = std::env::var("BW_STATE_MACRO").unwrap_or_default();
+        s.current_macro = s.macros_list.iter().find(|m| m.name == want).cloned();
+        for _ in 0..3 {
+            let t = std::time::Instant::now();
+            let dto = super::build_state_dto(&s);
+            let built = t.elapsed();
+            let json = serde_json::to_string(&dto).unwrap();
+            let cur = serde_json::to_string(&dto.current_macro).unwrap().len();
+            if let Ok(out) = std::env::var("BW_STATE_OUT") { std::fs::write(out, &json).unwrap(); }
+            eprintln!("macros {} build {:?} total {:?} bytes {} current_macro bytes {}", s.macros_list.len(), built, t.elapsed(), json.len(), cur);
         }
     }
 }
