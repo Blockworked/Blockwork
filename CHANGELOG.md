@@ -134,7 +134,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Command line: `blockwork list`, `blockwork run <name> [--wait]` and `blockwork stop <name>` drive macros through the daemon without a window.
 - Starter templates (auto clicker, text snippet, break reminder, website watcher) in the welcome screen and the macro menu's "New from template".
 - UI animations: menus and drop-downs fade and grow open, dialogs ease in over a fading backdrop, and buttons, switches, check boxes and list rows ease between hover and pressed states. Panels like the sidebar and run log slide open and shut, and pages and Settings tabs fade in.
-- Smooth scrolling: a mouse wheel notch glides to its spot instead of jumping, in the editor canvas, the block palette, Settings and the other scrolling lists. Jumping to a block from the run log glides there too.
+- Smooth scrolling: a mouse wheel notch glides to its spot instead of jumping, in the editor canvas, the block palette, Settings and the other scrolling lists. Jumping to a block from the run log glides there too. Spinning the wheel scrolls at an even pace: a notch mid-glide carries on at the current speed rather than kicking the view forward again.
 - Settings > General > Animation speed, a slider from Instant to Slow. Instant turns every animation off.
 - Pinch on a touchpad to zoom the canvas.
 - Time and schedule pickers:
