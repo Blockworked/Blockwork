@@ -114,15 +114,16 @@ Item {
                             id: navItem
                             required property var modelData
                             required property int index
-                            width: parent.width; height: 38; radius: 8
-                            color: root.tab === index ? Theme.selection : (navMouse.containsMouse ? Theme.hover : "transparent")
+                            width: parent.width; height: 38; radius: 6
+                            // Same as the palette rail: a raised neutral tile, only the icon takes the accent
+                            color: root.tab === index ? Theme.panelRaised : (navMouse.containsMouse ? Theme.field : "transparent")
                             Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
                             Row { anchors.left: parent.left; anchors.leftMargin: 12; anchors.verticalCenter: parent.verticalCenter; spacing: 10
                                 LucideIcon { name: navItem.modelData.icon; width: 16; height: 16; anchors.verticalCenter: parent.verticalCenter
                                     color: root.tab === navItem.index ? Theme.accent : Theme.textDim }
                                 Text { text: navItem.modelData.name; font.pixelSize: 14; anchors.verticalCenter: parent.verticalCenter
                                     font.weight: root.tab === navItem.index ? Font.DemiBold : Font.Normal
-                                    color: root.tab === navItem.index ? Theme.accent : Theme.text }
+                                    color: root.tab === navItem.index ? Theme.text : Theme.textDim }
                             }
                             MouseArea { id: navMouse; anchors.fill: parent; hoverEnabled: true; onClicked: root.tab = navItem.index }
                         }
