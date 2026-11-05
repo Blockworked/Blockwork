@@ -17,17 +17,17 @@ fn every_reporter_has_a_slot_per_arg() {
 #[test]
 fn editor_page_carries_the_current_table() {
     register_blockwork_operators();
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../blockwork-qt/qml/EditorPage.qml");
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../blockwork-qt/qml/BlockCatalog.qml");
     let text = std::fs::read_to_string(path).unwrap();
     let block = format!(
         "    readonly property var hostDescriptors: {}",
         render_descriptors_qml(&host_operator_descriptors(), "    ")
     );
     let next = replace_generated(&text, "// BEGIN GENERATED operator descriptors", "// END GENERATED operator descriptors", &block)
-        .expect("markers in EditorPage.qml");
+        .expect("markers in BlockCatalog.qml");
     if std::env::var_os("BLESS").is_some() {
         std::fs::write(path, &next).unwrap();
     } else {
-        assert!(next == text, "EditorPage.qml's operator table is stale; rerun with BLESS=1");
+        assert!(next == text, "BlockCatalog.qml's operator table is stale; rerun with BLESS=1");
     }
 }

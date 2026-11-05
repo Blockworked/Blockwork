@@ -5,7 +5,8 @@
   "singletons": ["Schedules.qml"],
   "editor": [
     "EditorPage.qml",
-    "WheelPan.qml",
+    "BlockCatalog.qml",
+    "BlockHelp.qml",
     "MakeBlockDialog.qml",
     "AppSelectorDialog.qml",
     "ActivityPanel.qml",

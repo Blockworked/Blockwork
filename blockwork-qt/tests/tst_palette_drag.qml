@@ -575,13 +575,13 @@ Item {
             const page = editor();
             const palette = all(page).find(o => o.appCategories !== undefined && o.railModel !== undefined);
             const shown = () => palette.appCategories.some(c => c.id === "browser")
-                && Array.from(palette.instructionTypes).indexOf("BrowserClick") >= 0
+                && Array.from(palette.allInstructionTypes).indexOf("BrowserClick") >= 0
                 && Array.from(palette.extraOperators).some(o => o[0] === "PageUrl");
             verify(shown(), "a paired browser shows the Browser blocks");
             palette.category = "browser";
             page.appState = Object.assign({}, page.appState, {browser: {unlocked: false}});
             verify(!palette.appCategories.some(c => c.id === "browser"));
-            verify(Array.from(palette.instructionTypes).indexOf("BrowserOpen") < 0);
+            verify(Array.from(palette.allInstructionTypes).indexOf("BrowserOpen") < 0);
             verify(!Array.from(palette.extraOperators).some(o => o[0] === "PageTitle"));
             compare(palette.category, "all", "leaves the hidden category");
             page.appState = Object.assign({}, page.appState, {macro_uses_browser: true});
