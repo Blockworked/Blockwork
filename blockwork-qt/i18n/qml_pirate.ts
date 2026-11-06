@@ -6084,6 +6084,69 @@
     </message>
 </context>
 <context>
+    <name>PaletteBlockList</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="101"/>
+        <source>See what this block does and where it can be used.</source>
+        <translation>See what this block does an&apos; where it can be used.</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="149"/>
+        <source>Rename variable</source>
+        <translation>Rechristen variable</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="154"/>
+        <source>Delete variable</source>
+        <translation>Scuttle variable</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="178"/>
+        <source>A document-wide ordered collection of text and number items.</source>
+        <translation>A ship-wide ordered collection o&apos; text an&apos; number cargo.</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="187"/>
+        <source>Make a dict, then check it to open its editor on the canvas.</source>
+        <translation>Make a dict, then tick it to open its editor on the deck.</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="191"/>
+        <source>A document-wide collection of text and number values, looked up by key.</source>
+        <translation>A ship-wide collection o&apos; text an&apos; number values, looked up by key.</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="203"/>
+        <source>My blocks</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="207"/>
+        <source>Make a Block</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="276"/>
+        <source>Community blocks</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="280"/>
+        <source>Browse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="342"/>
+        <source>Details</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="385"/>
+        <source>No blocks match &quot;%1&quot;</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>PaletteDragController</name>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/PaletteDragController.qml" line="291"/>
@@ -6151,13 +6214,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="230"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="298"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="336"/>
-        <source>See what this block does and where it can be used.</source>
-        <translation>See what this block does an&apos; where it can be used.</translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="233"/>
         <source>OPERATORS</source>
         <translation type="unfinished"></translation>
@@ -6178,16 +6234,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="258"/>
-        <source>Rename variable</source>
-        <translation>Rechristen variable</translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="258"/>
-        <source>Delete variable</source>
-        <translation>Scuttle variable</translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="266"/>
         <source>LISTS</source>
         <translation type="unfinished"></translation>
@@ -6196,11 +6242,6 @@
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="267"/>
         <source>Make a List</source>
         <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="275"/>
-        <source>A document-wide ordered collection of text and number items.</source>
-        <translation>A ship-wide ordered collection o&apos; text an&apos; number cargo.</translation>
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="286"/>
@@ -6218,43 +6259,13 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="309"/>
-        <source>Make a dict, then check it to open its editor on the canvas.</source>
-        <translation>Make a dict, then tick it to open its editor on the deck.</translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="313"/>
-        <source>A document-wide collection of text and number values, looked up by key.</source>
-        <translation>A ship-wide collection o&apos; text an&apos; number values, looked up by key.</translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="324"/>
         <source>A dict reporter block that reads data without changing the dict.</source>
         <translation>A dict reporter block that reads cargo without changin&apos; the dict.</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="341"/>
-        <source>My blocks</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="342"/>
-        <source>Make a Block</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="379"/>
         <source>Community blocks</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="380"/>
-        <source>Browse</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="437"/>
-        <source>No blocks match &quot;%1&quot;</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
