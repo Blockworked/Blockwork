@@ -603,6 +603,14 @@ fn legacy_single_arg_wait_migrates_to_value() {
 }
 
 #[test]
+fn fields_added_later_load_with_their_defaults() {
+    let pattern = serde_json::to_string(&Value::text("Firefox")).unwrap();
+    let json = format!(r#"{{"WindowAction":{{"action":"Focus","pattern":{pattern}}}}}"#);
+    let ins: Instruction = serde_json::from_str(&json).unwrap();
+    assert!(matches!(ins.kind, InstructionKind::WindowAction { ref by, .. } if by == "Title"));
+}
+
+#[test]
 fn legacy_bare_number_move_mouse_fields_migrate_to_value() {
     let json = r#"{"Token":{"MoveMouse":[5,10,"Rel"]}}"#;
     let ins: Instruction = serde_json::from_str(json).unwrap();

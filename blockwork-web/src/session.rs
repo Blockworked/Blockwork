@@ -335,11 +335,8 @@ impl Demo {
                 let (strand_id, path): (String, Vec<PathStep>) = (arg(a, "strandId")?, arg(a, "path")?);
                 let ins = instruction(arg(a, "instruction")?)?;
                 // Freeform text coalesces keystrokes into one step, as in the app.
-                let session = matches!(
-                    &ins.kind,
-                    InstructionKind::Command(_) | InstructionKind::CommandWait(_) | InstructionKind::Comment(_)
-                )
-                .then(|| EditSession::Instruction { strand_id: strand_id.clone(), index: path.clone() });
+                let session = ins.kind.edits_as_text()
+                    .then(|| EditSession::Instruction { strand_id: strand_id.clone(), index: path.clone() });
                 self.push_undo_for(session);
                 if let Some(mac) = self.open_mut() {
                     mac.replace_instruction(&strand_id, &path, ins);

@@ -76,9 +76,7 @@ fn default_speed_multiplier() -> f64 {
 const LEGACY_ROOT_STRAND_ID: &str = "root";
 
 mod block_kind;
-mod hashing;
 mod saved_shapes;
-use saved_shapes::*;
 
 /// A named choice or an unrestricted expression, both resolved as text at runtime.
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize, Hash)]
@@ -144,10 +142,10 @@ impl LaunchOptions {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[serde(from = "InstructionKindDe")]
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
 pub enum InstructionKind {
     Token(InputToken),
+    #[serde(deserialize_with = "saved_shapes::wait")]
     Wait(Value),
     /// Starts a shell command and moves on without waiting for it. Files
     /// before format version 2 meant `CommandWait` by it (see `migrate`).
@@ -177,6 +175,7 @@ pub enum InstructionKind {
     /// in the desktop app) but for a recurring point in local time instead
     /// of a battery level. See `TimeSchedule` for the recurrence shapes; the
     /// value is the time of day, like `09:30` (see `parse_time_of_day`).
+    #[serde(deserialize_with = "saved_shapes::when_time")]
     WhenTime(TimeSchedule, Value),
     /// Header-only marker, no payload (like `WhenRan`) - excluded from
     /// Run/Loop and driven by the same background watcher as
@@ -368,12 +367,14 @@ pub enum InstructionKind {
     WindowAction {
         action: String,
         pattern: Value,
+        #[serde(default = "match_by_title")]
         by: String,
     },
     /// Moves a matching window to (`x`, `y`), or with `resize` sizes it
     /// to `x` by `y`.
     MoveWindow {
         pattern: Value,
+        #[serde(default = "match_by_title")]
         by: String,
         resize: bool,
         x: Value,
@@ -565,6 +566,7 @@ pub enum InstructionKind {
         sort: String,
         results_list: String,
         count_variable: String,
+        #[serde(default)]
         region: String,
     },
     /// Pauses until `label` appears in the window (or with `appear` false,
@@ -577,6 +579,7 @@ pub enum InstructionKind {
         confidence: Value,
         appear: bool,
         timeout: Value,
+        #[serde(default)]
         region: String,
     },
     /// One relative mouse move from the window's center toward the screen
@@ -637,6 +640,13 @@ pub enum InstructionKind {
         code: Value,
         variable: String,
     },
+}
+
+impl InstructionKind {
+    /// Blocks edited as free text, whose keystrokes make one undo step.
+    pub fn edits_as_text(&self) -> bool {
+        matches!(self, InstructionKind::Command(_) | InstructionKind::CommandWait(_) | InstructionKind::Comment(_))
+    }
 }
 
 fn match_by_title() -> String {

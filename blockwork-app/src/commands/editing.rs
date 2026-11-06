@@ -71,13 +71,9 @@ pub(crate) async fn edit_instruction(
         request_absolute_mouse_support(state, app).await?;
     }
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    // Freeform text fields coalesce keystrokes into one undo group, like
+    // Free text coalesces keystrokes into one undo step, like
     // `edit_value_field`; every other kind gets its own undo step.
-    let session = matches!(
-        &ins.kind,
-        InstructionKind::Command(_) | InstructionKind::CommandWait(_) | InstructionKind::Comment(_)
-    )
-    .then(|| EditSession::Instruction {
+    let session = ins.kind.edits_as_text().then(|| EditSession::Instruction {
         strand_id: strand_id.clone(),
         index: path.clone(),
     });
