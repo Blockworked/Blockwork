@@ -47,9 +47,8 @@ struct HookThreadState {
     /// swallowed too rather than reaching the focused window unpaired.
     key_suppressed: [bool; 256],
     /// Last absolute cursor position, used to turn `WM_MOUSEMOVE`'s absolute
-    /// coords into relative deltas. `None` until the first move, rather than
-    /// a sentinel - a magic `i32::MIN` here previously caused an overflow
-    /// panic on startup.
+    /// coords into relative deltas. `None` until the first move (a sentinel
+    /// value would overflow on the first subtraction).
     last_cursor: Option<(i32, i32)>,
     /// Wheel movement not yet reported, (horizontal, vertical), in
     /// `WHEEL_DELTA` (120) units per notch. Touchpads and free-spinning
@@ -235,9 +234,8 @@ impl InputBackend for WinApiBackend {
         use enigo::{Axis as EAxis, Button as EButton};
         let dir = to_enigo_dir(dir);
         match button {
-            // enigo's vertical scroll sign is inverted relative to the raw
-            // wheel delta this used to send directly; negate to keep
-            // "ScrollUp" scrolling up.
+            // enigo's vertical scroll sign is inverted relative to the wheel
+            // delta; negate so "ScrollUp" scrolls up.
             MacroButton::ScrollUp => self.enigo.scroll(-1, EAxis::Vertical),
             MacroButton::ScrollDown => self.enigo.scroll(1, EAxis::Vertical),
             MacroButton::ScrollLeft => self.enigo.scroll(-1, EAxis::Horizontal),

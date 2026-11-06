@@ -7,6 +7,10 @@ on:
   pull_request:
   workflow_dispatch:
 
+env:
+  # The Qt every job installs; bump it here and in the other workflows.
+  QT_VERSION: 6.10.3
+
 jobs:
   macos-core:
     name: macOS core and standalone FFI (${{ matrix.runner }})
@@ -65,8 +69,8 @@ jobs:
       - name: Install Qt
         run: |
           python -m pip install aqtinstall==3.3.0
-          python -m aqt install-qt linux desktop 6.10.3 linux_gcc_64 --outputdir "$RUNNER_TEMP/Qt"
-          qmake=$(find "$RUNNER_TEMP/Qt/6.10.3" -maxdepth 3 -path '*/bin/*' -name qmake | head -n 1)
+          python -m aqt install-qt linux desktop ${{ env.QT_VERSION }} linux_gcc_64 --outputdir "$RUNNER_TEMP/Qt"
+          qmake=$(find "$RUNNER_TEMP/Qt/${{ env.QT_VERSION }}" -maxdepth 3 -path '*/bin/*' -name qmake | head -n 1)
           test -n "$qmake"
           echo "QMAKE=$qmake" >> "$GITHUB_ENV"
           echo "LD_LIBRARY_PATH=$($qmake -query QT_INSTALL_LIBS)" >> "$GITHUB_ENV"

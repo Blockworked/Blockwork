@@ -132,7 +132,7 @@ other. The rest are listed so nothing is missed.
 2. `blockwork-app/src/dispatch.rs`: its arm, reading arguments with `arg`.
    QML spells argument names in camelCase.
 3. If it edits the document, the same command in
-   `blockwork-web/src/session.rs`; `tests/web_parity.rs` compares the two.
+   `blockwork-web/src/session.rs`; `blockwork-app/src/web_parity.rs` compares the two.
 4. QML calls it with `invoke("name", {...})`. `tests/qml_commands.rs` fails
    if QML names a command `dispatch.rs` doesn't have.
 

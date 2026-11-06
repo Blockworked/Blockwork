@@ -652,7 +652,7 @@ fn one_text() -> Vec<Value> {
 /// Operators that run commands or go online, so evaluating one has side
 /// effects. Click-to-preview refuses these, and importing a macro that uses
 /// one asks first.
-pub const SIDE_EFFECT_OPERATORS: [&str; 3] = ["ShellOutput", "ShellSucceeded", "HttpGet"];
+pub const SIDE_EFFECT_OPERATORS: &[&str] = &["ShellOutput", "ShellSucceeded", "HttpGet"];
 
 /// Whether `value` contains any of [`SIDE_EFFECT_OPERATORS`].
 pub fn has_side_effect_operator(value: &Value) -> bool {

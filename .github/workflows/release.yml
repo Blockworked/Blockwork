@@ -26,6 +26,10 @@ on:
         type: string
         default: ""
 
+env:
+  # The Qt every job installs; bump it here and in the other workflows.
+  QT_VERSION: 6.10.3
+
 jobs:
   plan:
     name: Plan builds
@@ -87,8 +91,8 @@ jobs:
         shell: bash
         run: |
           python -m pip install aqtinstall==3.3.0
-          python -m aqt install-qt ${{ matrix.qt_host }} desktop 6.10.3 ${{ matrix.qt_arch }} --outputdir "$RUNNER_TEMP/Qt"
-          qmake=$(find "$RUNNER_TEMP/Qt/6.10.3" -maxdepth 3 -path '*/bin/*' \( -name qmake -o -name qmake.exe \) | head -n 1)
+          python -m aqt install-qt ${{ matrix.qt_host }} desktop ${{ env.QT_VERSION }} ${{ matrix.qt_arch }} --outputdir "$RUNNER_TEMP/Qt"
+          qmake=$(find "$RUNNER_TEMP/Qt/${{ env.QT_VERSION }}" -maxdepth 3 -path '*/bin/*' \( -name qmake -o -name qmake.exe \) | head -n 1)
           test -n "$qmake"
           if [[ "$RUNNER_OS" == Windows ]]; then qmake=$(cygpath -w "$qmake"); fi
           echo "QMAKE=$qmake" >> "$GITHUB_ENV"
@@ -251,8 +255,8 @@ jobs:
         shell: bash
         run: |
           python -m pip install aqtinstall==3.3.0
-          python -m aqt install-qt ${{ matrix.qt_host }} desktop 6.10.3 ${{ matrix.qt_arch }} --outputdir "$RUNNER_TEMP/Qt"
-          qmake=$(find "$RUNNER_TEMP/Qt/6.10.3" -maxdepth 3 -path '*/bin/*' \( -name qmake -o -name qmake.exe \) | head -n 1)
+          python -m aqt install-qt ${{ matrix.qt_host }} desktop ${{ env.QT_VERSION }} ${{ matrix.qt_arch }} --outputdir "$RUNNER_TEMP/Qt"
+          qmake=$(find "$RUNNER_TEMP/Qt/${{ env.QT_VERSION }}" -maxdepth 3 -path '*/bin/*' \( -name qmake -o -name qmake.exe \) | head -n 1)
           test -n "$qmake"
           if [[ "$RUNNER_OS" == Windows ]]; then qmake=$(cygpath -w "$qmake"); fi
           echo "QMAKE=$qmake" >> "$GITHUB_ENV"

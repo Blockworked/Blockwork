@@ -133,7 +133,7 @@ pub fn checked_when_run(kind: &InstructionKind) -> impl Iterator<Item = &'static
 
 /// Blockwork reporters that read nothing guarded. Every reporter in
 /// `input/value.rs` is either here or in [`operator_capability`].
-pub const UNGUARDED_OPERATORS: [&str; 28] = [
+pub const UNGUARDED_OPERATORS: &[&str] = &[
     "BatteryPercentage",
     "PluggedIn",
     "JsonGet",
