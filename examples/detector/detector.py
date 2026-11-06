@@ -15,7 +15,7 @@ Two modes:
         Runs an Ultralytics model (pip install ultralytics).
 
 It listens on http://127.0.0.1:8765/detect unless --port says otherwise.
-See docs/window-detection-aim.md.
+The reply format is documented in blockwork-core/src/detect/http.rs.
 """
 import argparse
 import io
