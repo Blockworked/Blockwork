@@ -48,13 +48,8 @@ const STRAND_STACK_SIZE: usize = 8 * 1024 * 1024;
 #[cfg(windows)]
 const CREATE_NO_WINDOW: u32 = 0x0800_0000;
 
-/// What a `run_block` invocation is telling its caller to do next: the
-/// "did a Return happen" signal, generalized to also carry loop control.
-/// `If`/`IfElse` forward every non-`Normal` variant unchanged (not loops,
-/// nothing to catch); `Repeat`/`Forever`/`While` catch `Break`/`Continue`
-/// but let `Return` keep unwinding. `call_block` absorbs `Break`/`Continue`
-/// at its own boundary - a custom block's body is a separate context, so
-/// loop control can't cross into or out of it.
+/// How a block list ended. Loops catch `Break`/`Continue`; a custom block
+/// call also stops them, so loop control never crosses into a block body.
 #[derive(Debug, Clone, PartialEq)]
 enum Flow {
     Normal,
@@ -526,8 +521,34 @@ impl RunOptions {
 }
 
 impl Macro {
+    /// A fresh variable store holding the macro's saved values.
+    pub fn variable_store(&self) -> VariableStore {
+        Arc::new(Mutex::new(
+            self.variables
+                .iter()
+                .map(|v| (v.name.clone(), v.value.clone()))
+                .collect(),
+        ))
+    }
+
+    /// Runs to the end, then saves the variables and lists the run finished
+    /// with. For hosts with no open editor copy to merge into.
+    pub fn run_and_save(self, mut options: RunOptions) -> Result<(), String> {
+        let lists = Arc::clone(options.lists.get_or_insert_with(|| self.list_store()));
+        let variables = Arc::clone(&options.variables);
+        let mut saved = self.clone();
+        self.run_with(options);
+        if let Ok(values) = variables.lock() {
+            saved.sync_variables_from(&values);
+        }
+        if let Ok(values) = lists.lock() {
+            saved.sync_lists_from(&values);
+        }
+        saved.save()
+    }
+
     /// A fresh list store holding the macro's saved lists.
-    fn list_store(&self) -> ListStore {
+    pub fn list_store(&self) -> ListStore {
         Arc::new(Mutex::new(
             self.lists
                 .iter()
@@ -866,20 +887,9 @@ pub fn run_fired_strand(
     run_strand(run, instructions, Duration::ZERO);
 }
 
-/// Runs `instructions` top to bottom, returning `Ok(Flow::Return(v))` the
-/// instant a `Return` is hit, `Ok(Flow::Break)`/`Ok(Flow::Continue)` the
-/// instant an `EscapeLoop`/`ContinueLoop` is hit, `Ok(Flow::Normal)` on
-/// completion, or `Err` on a hard failure (call-depth overrun, or a
-/// `Return`'s value failing to resolve). Most per-instruction resolve errors
-/// are non-fatal and just `warn!`-log + skip.
-///
-/// `stop_flag`, when present, is checked between every instruction (and
-/// during a `Wait`, `Repeat`, `Forever`, or `While`) so the run can be
-/// aborted early.
-///
-/// `speed_multiplier` scales every `Wait` inversely (2.0 = half-length,
-/// twice as fast), combining the macro's own multiplier with the global
-/// runtime override.
+/// Runs `instructions` in order, sending each block to its category's file.
+/// Returns early on a return or loop-control block; `Err` is a hard failure
+/// (too deep, or a bad return value). The stop flag is checked between blocks.
 fn run_block(
     instructions: &[Instruction],
     ctx: &mut ExecCtx,
@@ -890,11 +900,8 @@ fn run_block(
         return Err("custom block call depth exceeded (possible infinite recursion)".to_string());
     }
 
-    // Local to this invocation (not in `ctx`) so a nested call's waits pace
-    // independently; the caller's deadline re-anchors on its next Wait.
-    // `start` is `Instant::now()` at every call site except the outermost
-    // one (`run_strand`'s top-level call), backdated by that strand's
-    // `initial_offset` - see `RunOptions::offset`.
+    // Each block list keeps its own wait schedule. Only a strand's top
+    // level starts backdated (`RunOptions::offset`).
     let mut deadline = start;
 
     for ins in instructions {

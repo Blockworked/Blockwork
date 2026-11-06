@@ -9,7 +9,7 @@ use blockwork_core::config;
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::host_clock;
 use blockwork_core::macros::run_registry;
-use blockwork_core::macros::runner::{self, RunOptions, VariableStore};
+use blockwork_core::macros::runner::{self, RunOptions};
 use blockwork_core::macros::{Instruction, Macro};
 use blockwork_core::recording;
 use std::ffi::{CStr, CString};
@@ -256,12 +256,7 @@ pub unsafe extern "C" fn blockwork_run_macro(
             return -2;
         };
 
-        let variables: VariableStore = Arc::new(Mutex::new(
-            mac.variables
-                .iter()
-                .map(|v| (v.name.clone(), v.value.clone()))
-                .collect(),
-        ));
+        let variables = mac.variable_store();
         let settings = config::load_settings();
         let speed_multiplier =
             mac.speed_multiplier * settings.global_speed_multiplier.unwrap_or(1.0);
@@ -272,19 +267,15 @@ pub unsafe extern "C" fn blockwork_run_macro(
         let spawned = std::thread::Builder::new()
             .name("macros-run".to_string())
             .spawn(move || {
-                mac.clone().run_with(RunOptions {
+                let saved = mac.run_and_save(RunOptions {
                     stop_flag: Some(Arc::clone(&flag)),
                     speed_multiplier,
                     offset: initial_offset,
-                    ..RunOptions::new(Arc::clone(&emulator), Arc::clone(&variables))
+                    ..RunOptions::new(emulator, variables)
                 });
                 run_registry::end_run(&flag);
-                if let Ok(values) = variables.lock() {
-                    let mut mac = mac.clone();
-                    mac.sync_variables_from(&values);
-                    if let Err(e) = mac.save() {
-                        tracing::warn!("blockwork-ffi: failed to persist variable values: {e}");
-                    }
+                if let Err(e) = saved {
+                    tracing::warn!("blockwork-ffi: failed to persist variable values: {e}");
                 }
             });
 
@@ -323,12 +314,7 @@ pub unsafe extern "C" fn blockwork_sync_begin(id_utf8: *const c_char) -> i32 {
         host_clock::finish();
 
         let emulator: Arc<Mutex<dyn InputBackend>> = Arc::new(Mutex::new(host_clock::HostBackend));
-        let variables: VariableStore = Arc::new(Mutex::new(
-            mac.variables
-                .iter()
-                .map(|v| (v.name.clone(), v.value.clone()))
-                .collect(),
-        ));
+        let variables = mac.variable_store();
         // Waits are in the host's own time, which already carries any game speed.
         let speed_multiplier = 1.0;
 

@@ -11,7 +11,6 @@ use blockwork_core::macros::backend::evdev_mapping::{
 use blockwork_core::macros::priority::raise_current_thread_priority;
 use blockwork_core::macros::run_registry;
 use blockwork_core::macros::runner::RunOptions;
-use blockwork_core::macros::runner::VariableStore;
 use blockwork_core::wine_bridge::{
     self, SharedRegion, WireCapture, WireCaptureEvent, WireControlCommand, WireTimestamp,
 };
@@ -352,12 +351,7 @@ fn run_macro_blocking(
     };
 
     let emulator = backend;
-    let variables: VariableStore = Arc::new(Mutex::new(
-        mac.variables
-            .iter()
-            .map(|v| (v.name.clone(), v.value.clone()))
-            .collect(),
-    ));
+    let variables = mac.variable_store();
     let settings = config::load_settings();
     let speed_multiplier = mac.speed_multiplier * settings.global_speed_multiplier.unwrap_or(1.0);
     // Log accept so a missing playback attempt is distinguishable from a lost command.
@@ -368,18 +362,14 @@ fn run_macro_blocking(
 
     let offset = Duration::from_secs_f64(elapsed_overshoot_ms.max(0.0) / 1000.0);
     let flag = run_registry::begin_run();
-    mac.clone().run_with(RunOptions {
+    let saved = mac.run_and_save(RunOptions {
         stop_flag: Some(Arc::clone(&flag)),
         speed_multiplier,
         offset,
-        ..RunOptions::new(Arc::clone(&emulator), Arc::clone(&variables))
+        ..RunOptions::new(emulator, variables)
     });
     run_registry::end_run(&flag);
-    if let Ok(values) = variables.lock() {
-        let mut mac = mac.clone();
-        mac.sync_variables_from(&values);
-        if let Err(e) = mac.save() {
-            tracing::warn!("blockwork-linux-bridge: failed to persist variable values: {e}");
-        }
+    if let Err(e) = saved {
+        tracing::warn!("blockwork-linux-bridge: failed to persist variable values: {e}");
     }
 }

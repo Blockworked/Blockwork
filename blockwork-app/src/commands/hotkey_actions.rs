@@ -32,12 +32,7 @@ pub(crate) fn handle_hotkey_action(state: &SharedState, app: &AppHandle, action:
                     let speed_multiplier = mac.speed_multiplier * global_speed_multiplier;
                     // Seeded from this macro's own persisted values, not
                     // `AppState::variable_values` (tracks the *selected* macro).
-                    let variables: VariableStore = Arc::new(Mutex::new(
-                        mac.variables
-                            .iter()
-                            .map(|v| (v.name.clone(), v.value.clone()))
-                            .collect(),
-                    ));
+                    let variables: VariableStore = mac.variable_store();
                     let lists: ListStore = Arc::new(Mutex::new(
                         mac.lists
                             .iter()

@@ -8,9 +8,8 @@ use blockwork_core::macros::run_registry;
 use blockwork_core::macros::runner::RunOptions;
 use blockwork_core::run_log;
 use serde::Serialize;
-use std::collections::HashMap;
+use std::sync::Arc;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Arc, Mutex};
 
 /// Serves `Run macro` blocks from the app's macro list.
 pub(crate) struct Host {
@@ -64,20 +63,7 @@ pub(crate) fn start(
     let (variables, lists) = if is_open {
         (Arc::clone(&s.variable_values), Arc::clone(&s.list_values))
     } else {
-        (
-            Arc::new(Mutex::new(
-                mac.variables
-                    .iter()
-                    .map(|v| (v.name.clone(), v.value.clone()))
-                    .collect::<HashMap<_, _>>(),
-            )),
-            Arc::new(Mutex::new(
-                mac.lists
-                    .iter()
-                    .map(|l| (l.name.clone(), l.items.clone()))
-                    .collect::<HashMap<_, _>>(),
-            )),
-        )
+        (mac.variable_store(), mac.list_store())
     };
     let thread_name = format!("called_{}", mac.name);
     let done = Arc::new(AtomicBool::new(false));

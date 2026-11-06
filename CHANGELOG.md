@@ -192,6 +192,8 @@ section below as the GitHub release notes, followed by the downloads table.
 - On macOS, PrintScreen, ScrollLock and Pause are pressed and matched as F13, F14 and F15, which is how Macs see those keys on a PC keyboard.
 
 ### Fixed
+- Macros run by a game mod or the Linux input bridge now save their list
+  changes when they finish, the same as runs started in the app.
 - On Linux, evdev waits for held keys and mouse buttons to be released before
   grabbing an input device, preventing stuck input when Blockwork starts.
 - A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
