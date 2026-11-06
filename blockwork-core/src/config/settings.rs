@@ -5,12 +5,8 @@ use std::sync::{Mutex, OnceLock};
 use std::time::SystemTime;
 use tracing::warn;
 
-/// Same rationale as `MACRO_CACHE` in `persistence.rs`: `load_settings()` is
-/// called on every `RunMacro` dispatch (i.e. every level attempt) by a
-/// long-lived, stateless reader (the Linux Wine bridge process), and used to
-/// re-read-and-reparse `settings.json` from disk every single time. Cached
-/// by mtime so a repeat call for an unchanged file costs one `stat()` instead
-/// of a read + JSON parse.
+/// `load_settings` runs on every run a host starts, so the parsed file is
+/// cached by mtime: an unchanged file costs one `stat()`.
 static SETTINGS_CACHE: OnceLock<Mutex<Option<(SystemTime, AppSettings)>>> = OnceLock::new();
 
 fn settings_cache() -> &'static Mutex<Option<(SystemTime, AppSettings)>> {

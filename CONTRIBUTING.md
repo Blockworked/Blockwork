@@ -133,7 +133,7 @@ other. The rest are listed so nothing is missed.
    QML spells argument names in camelCase.
 3. If it edits the document, the same command in
    `blockwork-web/src/session.rs`; `blockwork-app/src/web_parity.rs` compares the two.
-4. QML calls it with `invoke("name", {...})`. `tests/qml_commands.rs` fails
+4. QML calls it with `invoke("name", {...})`. `blockwork-app/tests/qml_commands.rs` fails
    if QML names a command `dispatch.rs` doesn't have.
 
 ## Adding a setting
@@ -145,8 +145,10 @@ other. The rest are listed so nothing is missed.
    default from the settings file at start.
 3. A `set_...` command (see above) in `commands/settings.rs` that saves it
    with `config::update_settings`.
-4. `blockwork-qt/qml/Main.qml`: its default in `appState`, then its control
-   in `SettingsPage.qml`, and `just translations`.
+4. QML reads it from `appState` until the first state snapshot arrives, so
+   give it a fallback where it is read (`appState.x ?? default`), as
+   `animation_speed` does in `Main.qml`. Then its control in
+   `SettingsPage.qml`, and `just translations`.
 
 ## Rules
 

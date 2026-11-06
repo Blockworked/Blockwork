@@ -110,13 +110,9 @@ fn unused_backup_path(path: &Path, from: u64) -> PathBuf {
         .expect("an unused backup name")
 }
 
-/// Reads and parses the single macro file for `id` directly, without
-/// scanning or parsing every other macro in the directory - `get_macro_by_id`
-/// used to go through `get_macros_from_config()`, which does exactly that
-/// fan-out for what's ultimately a single lookup. Backed by `MACRO_CACHE`:
-/// skips the read+parse entirely when the file's mtime matches what's
-/// cached, which is the common case for a level-attempt retry loop
-/// re-resolving the same macro on every attempt.
+/// Reads one macro file without scanning the others. `MACRO_CACHE` skips
+/// the parse while the file's mtime is unchanged, since hosts that start
+/// runs often (game mods, the Wine bridge) look the same macro up each time.
 pub fn read_macro_by_id(id: &str) -> Option<Macro> {
     flush_saves();
     let path = macro_file_path(id).ok()?;
