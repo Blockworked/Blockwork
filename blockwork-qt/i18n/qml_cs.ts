@@ -1824,31 +1824,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="301"/>
-        <source>Number</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="301"/>
-        <source>Text</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="315"/>
-        <source>True</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="315"/>
-        <source>False</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="340"/>
-        <source>Enter a finite number</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="545"/>
         <source>component</source>
         <translation type="unfinished"></translation>
@@ -3037,6 +3012,39 @@
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockIconPopup.qml" line="93"/>
         <source>No icons match</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>BlockInputsPopup</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="78"/>
+        <source>Number</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="78"/>
+        <source>Text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="92"/>
+        <source>False</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="92"/>
+        <source>True</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="117"/>
+        <source>Enter a finite number</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="126"/>
+        <source>Done</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
