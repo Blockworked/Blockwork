@@ -91,3 +91,26 @@ fn the_c_abi_answers_in_the_shared_envelope() {
         assert_eq!(call(handle, r#"{"command":"state"}"#)["error"], "no such session");
     }
 }
+
+#[test]
+fn blocks_can_be_dropped_into_a_reporters_branch() {
+    use blockwork_core::input::value::Value as BlockValue;
+    let mut demo = loaded();
+    let call = BlockValue::Call {
+        block_id: "custom".into(),
+        args: vec![],
+        branches: vec![],
+        saved: Box::new(BlockValue::number(0.0)),
+    };
+    demo.dispatch("create_floating_value", &json!({ "x": 0, "y": 0, "value": call })).unwrap();
+    let floating = |demo: &Demo| demo.state()["current_macro"]["floating_values"].as_array().unwrap().last().unwrap().clone();
+    let id = floating(&demo)["id"].as_str().unwrap().to_string();
+    let location = json!({ "kind": "Floating", "floating_id": id, "path": [] });
+    let strand = format!("@reporter-branch:{}", json!({ "location": location, "slot": 0 }));
+    let wait = json!({ "id": "nested", "type": "Wait", "duration": { "kind": "Number", "value": 10 } });
+    demo.dispatch("add_instruction", &json!({ "strandId": strand, "path": [{ "index": 0 }], "instruction": wait }))
+        .unwrap();
+    assert_eq!(floating(&demo)["value"]["branches"][0][0]["id"], "nested");
+    demo.dispatch("undo", &json!({})).unwrap();
+    assert!(floating(&demo)["value"]["branches"].as_array().unwrap().is_empty());
+}

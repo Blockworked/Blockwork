@@ -1,3 +1,5 @@
+// The native app icon lookup is only called on macOS.
+#[cfg_attr(not(target_os = "macos"), allow(dead_code))]
 #[cxx::bridge]
 mod ffi {
     unsafe extern "C++" {

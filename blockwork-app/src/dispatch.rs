@@ -24,7 +24,7 @@ impl Backend {
     /// Runs the command named `cmd` with `args` (a JSON object keyed by
     /// camelCase argument name) and returns its result as JSON.
     pub async fn dispatch(&self, cmd: &str, args: Value) -> Result<Value, String> {
-        if crate::reporter_branches::targets_branch(&args) {
+        if blockstitch_core::editor::targets_reporter_branch(&args) {
             return commands::edit_reporter_branch(&self.state, &self.app, cmd, &args).await;
         }
         match cmd {

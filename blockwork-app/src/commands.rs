@@ -254,7 +254,7 @@ pub(crate) async fn edit_reporter_branch(
     }
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let mut graph = s.current_macro.as_ref().ok_or("No macro selected")?.graph.clone();
-    let result = crate::reporter_branches::edit(&mut graph, cmd, args)?;
+    let result = blockwork_core::frontend::edit_reporter_branch(&mut graph, cmd, args)?;
     if cmd != "copy_instructions" {
         push_undo(&mut s);
         s.current_macro.as_mut().ok_or("No macro selected")?.graph = graph;

@@ -4,7 +4,7 @@
 
 use blockstitch_core::editor::{EditCommand, EditContext, ValueDestination, ValueLocation};
 use blockstitch_core::graph::BlockGraph;
-use blockwork_core::macros::InstructionKind;
+use crate::macros::InstructionKind;
 use serde::de::DeserializeOwned;
 use serde_json::{Value as Json, json};
 
@@ -14,27 +14,24 @@ fn arg<T: DeserializeOwned>(args: &Json, name: &str) -> Result<T, String> {
     serde_json::from_value(args.get(name).cloned().unwrap_or(Json::Null)).map_err(|e| e.to_string())
 }
 
-pub(crate) fn targets_branch(args: &Json) -> bool {
-    blockstitch_core::editor::targets_reporter_branch(args)
+fn read_body(body: &[Json]) -> Result<Vec<crate::macros::Instruction>, String> {
+    crate::frontend::reporter_branch_to_instructions(body)
 }
 
-fn read_body(body: &[Json]) -> Result<Vec<blockwork_core::macros::Instruction>, String> {
-    blockwork_core::frontend::reporter_branch_to_instructions(body)
+fn write_instruction(instruction: &crate::macros::Instruction) -> Result<Json, String> {
+    serde_json::to_value(crate::frontend::instruction_to_dto(instruction)).map_err(|e| e.to_string())
 }
 
-fn write_instruction(instruction: &blockwork_core::macros::Instruction) -> Result<Json, String> {
-    serde_json::to_value(blockwork_core::frontend::instruction_to_dto(instruction)).map_err(|e| e.to_string())
-}
-
-/// Edits a clone; only a completely restored graph can be committed.
-pub(crate) fn edit(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, String> {
+/// Runs one editor command inside a reporter's branches (an `args` naming a
+/// `@reporter-branch:` strand). Call it on a clone and commit only on `Ok`.
+pub fn edit_reporter_branch(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, String> {
     let ids = blockstitch_core::editor::reporter_branch_ids(args);
     let branches = graph.open_reporter_branches(&ids, &read_body)?;
     let strand = || arg::<String>(args, "strandId");
     let path = || arg(args, "path");
     let result = match cmd {
         "add_instruction" => {
-            let instruction = crate::state::dto_to_instruction(&arg(args, "instruction")?)
+            let instruction = crate::frontend::dto_to_instruction(&arg(args, "instruction")?)
                 .ok_or("Unknown instruction type")?;
             graph
                 .apply_edit(
@@ -49,7 +46,7 @@ pub(crate) fn edit(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, St
             Json::Null
         }
         "edit_instruction" => {
-            let instruction = crate::state::dto_to_instruction(&arg(args, "instruction")?)
+            let instruction = crate::frontend::dto_to_instruction(&arg(args, "instruction")?)
                 .ok_or("Unknown instruction type")?;
             if !graph.replace_instruction(&strand()?, &path()?, instruction) {
                 return Err("Instruction is missing".into());
@@ -69,7 +66,7 @@ pub(crate) fn edit(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, St
                 &strand()?,
                 &path()?,
                 &arg::<String>(args, "targetId")?,
-                &arg::<Vec<crate::state::PathStep>>(args, "targetPath")?,
+                &arg::<Vec<blockstitch_core::editor::PathStep>>(args, "targetPath")?,
             )?;
             Json::Null
         }
@@ -78,7 +75,7 @@ pub(crate) fn edit(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, St
         }
         "move_strand" => json!(graph.split_strand(
             &strand()?,
-            &[crate::state::PathStep {
+            &[blockstitch_core::editor::PathStep {
                 index: 0,
                 slot: None
             }],
@@ -120,7 +117,7 @@ pub(crate) fn edit(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, St
             graph.reorder_instruction(&strand()?, &path()?, arg(args, "direction")?);
             Json::Null
         }
-        "copy_instructions" => serde_json::to_value(crate::state::fragment_to_dto(
+        "copy_instructions" => serde_json::to_value(crate::frontend::fragment_to_dto(
             &graph.copy_fragment(&strand()?, &path()?, arg(args, "count")?)?,
         ))
         .map_err(|e| e.to_string())?,
@@ -172,7 +169,7 @@ pub(crate) fn edit(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, St
     if matches!(cmd, "merge_strand" | "merge_tail")
         && let Some(y) = arg::<Option<i32>>(args, "targetY")?
     {
-        let target_path: Vec<crate::state::PathStep> = arg(
+        let target_path: Vec<blockstitch_core::editor::PathStep> = arg(
             args,
             if cmd == "merge_tail" {
                 "targetPath"
@@ -196,7 +193,7 @@ mod tests {
     use super::*;
     use blockstitch_core::editor::REPORTER_BRANCH_PREFIX as PREFIX;
     use blockstitch_core::graph::Strand;
-    use blockwork_core::input::value::Value;
+    use crate::input::value::Value;
     use blockstitch_core::graph::{FloatingValue, Instruction};
 
     fn fixture() -> (Graph, String, ValueLocation) {
@@ -232,7 +229,7 @@ mod tests {
     #[test]
     fn palette_drop_edit_and_detach_survive_serialization() {
         let (mut graph, id, location) = fixture();
-        edit(
+        edit_reporter_branch(
             &mut graph,
             "add_instruction",
             &json!({"strandId": id, "path": [{"index": 0}], "instruction": wait("wait")}),
@@ -241,14 +238,14 @@ mod tests {
         assert!(graph.strands.is_empty());
         graph = serde_json::from_value(serde_json::to_value(&graph).unwrap()).unwrap();
         let value_location = json!({"kind": "Field", "strand_id": id, "index": [{"index": 0}], "field_id": "WaitDuration", "path": []});
-        edit(
+        edit_reporter_branch(
             &mut graph,
             "put_value",
             &json!({"location": value_location, "value": {"kind": "Number", "value": 42}}),
         )
         .unwrap();
         assert_eq!(body(&mut graph, &location)[0]["duration"]["value"], 42.0);
-        edit(
+        edit_reporter_branch(
             &mut graph,
             "move_strand",
             &json!({"strandId": id, "x": 100, "y": 200}),
@@ -266,13 +263,13 @@ mod tests {
             0,
             0,
             vec![
-                crate::state::dto_to_instruction(&serde_json::from_value(wait("first")).unwrap())
+                crate::frontend::dto_to_instruction(&serde_json::from_value(wait("first")).unwrap())
                     .unwrap(),
-                crate::state::dto_to_instruction(&serde_json::from_value(wait("second")).unwrap())
+                crate::frontend::dto_to_instruction(&serde_json::from_value(wait("second")).unwrap())
                     .unwrap(),
             ],
         );
-        edit(
+        edit_reporter_branch(
             &mut graph,
             "merge_strand",
             &json!({"draggedId": source, "targetId": id, "path": [{"index": 0}]}),
@@ -281,7 +278,7 @@ mod tests {
         assert!(graph.strands.is_empty());
         assert_eq!(body(&mut graph, &location).len(), 2);
         let target = graph.add_strand(0, 0, vec![]);
-        edit(&mut graph, "merge_tail", &json!({"strandId": id, "path": [{"index": 1}], "targetId": target, "targetPath": [{"index": 0}]})).unwrap();
+        edit_reporter_branch(&mut graph, "merge_tail", &json!({"strandId": id, "path": [{"index": 1}], "targetId": target, "targetPath": [{"index": 0}]})).unwrap();
         assert_eq!(body(&mut graph, &location).len(), 1);
         assert_eq!(graph.strands[0].instructions[0].id, "second");
     }
@@ -299,7 +296,7 @@ mod tests {
             x: 0,
             y: 0,
             instructions: vec![
-                crate::state::dto_to_instruction(&serde_json::from_value(wait("first")).unwrap())
+                crate::frontend::dto_to_instruction(&serde_json::from_value(wait("first")).unwrap())
                     .unwrap(),
                 Instruction {
                     id: "owner".into(),
@@ -312,7 +309,7 @@ mod tests {
         let branches = graph.open_reporter_branches(&[id.clone()], &read_body).unwrap();
         graph.strands[0].instructions.remove(0);
         graph.strand_mut(&id).unwrap().instructions.push(
-            crate::state::dto_to_instruction(&serde_json::from_value(wait("nested")).unwrap())
+            crate::frontend::dto_to_instruction(&serde_json::from_value(wait("nested")).unwrap())
                 .unwrap(),
         );
         graph.close_reporter_branches(branches, &write_instruction).unwrap();

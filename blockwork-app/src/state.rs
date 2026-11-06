@@ -33,7 +33,10 @@ pub(crate) enum RecordingPhase {
 pub(crate) enum UpdateCheckState {
     Idle,
     Checking,
+    // Only Windows and macOS check for updates.
+    #[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
     UpToDate,
+    #[cfg_attr(not(any(windows, target_os = "macos")), allow(dead_code))]
     UpdateAvailable(String),
     Applying,
     Error(String),

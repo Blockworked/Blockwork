@@ -126,6 +126,17 @@ impl Host for Demo {
 impl Demo {
     fn run(&mut self, command: &str, args: &Json) -> Result<Json, String> {
         let a = args;
+        if blockstitch_core::editor::targets_reporter_branch(a) {
+            // Edited on a copy, so a rejected edit costs no undo step.
+            let mut graph = self.open()?.graph.clone();
+            let result = blockwork_core::frontend::edit_reporter_branch(&mut graph, command, a)?;
+            if command != "copy_instructions" {
+                self.push_undo();
+                self.open_mut().ok_or("No macro selected")?.graph = graph;
+                self.buffers.clear();
+            }
+            return Ok(result);
+        }
         match command {
             "state" => Ok(self.state()),
             "commands" => to_json(COMMANDS),

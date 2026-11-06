@@ -99,6 +99,8 @@ unsafe fn cstr_to_owned(ptr: *const c_char) -> Option<String> {
 #[no_mangle]
 pub unsafe extern "C" fn blockwork_init(config_dir_override_utf8: *const c_char, linux_bridge_resource_path_utf8: *const c_char) -> i32 {
     let override_dir = unsafe { cstr_to_owned(config_dir_override_utf8) };
+    // Only read under Wine, which is a Windows build.
+    #[cfg_attr(not(windows), allow(unused_variables))]
     let linux_bridge_resource_path = unsafe { cstr_to_owned(linux_bridge_resource_path_utf8) };
     catch(move || {
         // Registers Blockwork's own value operators before any macro loads.

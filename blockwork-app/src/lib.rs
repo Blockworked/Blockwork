@@ -12,7 +12,6 @@ pub(crate) mod key_watch;
 pub(crate) mod commands;
 pub(crate) mod file_watch;
 mod dispatch;
-mod reporter_branches;
 pub(crate) mod installed_apps;
 pub(crate) mod macro_runs;
 pub(crate) mod macros_thread;
