@@ -553,7 +553,7 @@ QtObject {
         // with blockstitch's, so hand it the ones it lacks.
         Stitch.Icons.add(Bw.Icons.paths);
         // Blockwork's own features and vocabulary; a neutral blockstitch host has none of these.
-        BlockRegistry.recordingTargets = true;
+        BlockRegistry.strandMark = { text: qsTr("Recording target"), color: "" };
         BlockRegistry.registerDescriptors(hostDescriptors);
         BlockRegistry.registerIcons({
             WhenRan: "play", WhenBatteryDischargedTo: "battery-warning", WhenBatteryChargedTo: "battery-charging", WhenTime: "clock",

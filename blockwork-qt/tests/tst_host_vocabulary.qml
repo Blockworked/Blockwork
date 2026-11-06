@@ -41,7 +41,8 @@ Item {
             const page = createTemporaryObject(editorComponent, scene);
             verify(!!page);
             wait(50);
-            verify(BlockRegistry.recordingTargets);
+            verify(BlockRegistry.strandMark.text.length > 0);
+            verify(BlockRegistry.blockMenu.some(item => item.id === "recording_target"));
             compare(BlockRegistry.operator("BatteryPercentage").result, "number");
             compare(BlockRegistry.operator("ClipboardHasFiles").result, "bool");
             compare(BlockRegistry.iconFor("MoveMouse"), "move");

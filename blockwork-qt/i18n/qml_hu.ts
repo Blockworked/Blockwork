@@ -1753,6 +1753,11 @@
         <source>Choose list</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockCatalog.qml" line="556"/>
+        <source>Recording target</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>BlockDefinitionEditor</name>
@@ -3596,16 +3601,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="20"/>
-        <source>Recording Target (current)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="20"/>
-        <source>Set Recording Target</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="26"/>
         <source>Copy block</source>
         <translation type="unfinished"></translation>
@@ -5258,6 +5253,16 @@
         <source>Toggle breakpoint</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/EditorPage.qml" line="1204"/>
+        <source>Recording Target (current)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/EditorPage.qml" line="1204"/>
+        <source>Set Recording Target</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>GlobalPicker</name>
@@ -5350,11 +5355,6 @@
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="926"/>
         <source>while</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="1201"/>
-        <source>Recording target</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

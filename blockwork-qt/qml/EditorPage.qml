@@ -569,7 +569,7 @@ Item {
                     textMenu: Component { Editing.TextEditingMenu {} }
                     anchors.fill: parent
                     strands: root.macro ? root.macro.strands : []
-                    recordingTargetId: root.macro && root.macro.recording_target_strand_id ? root.macro.recording_target_strand_id : ""
+                    markedStrandId: root.macro && root.macro.recording_target_strand_id ? root.macro.recording_target_strand_id : ""
                     comments: root.macro ? root.macro.comments : []
                     floatingValues: root.macro ? root.macro.floating_values : []
                     variables: root.macroVariables
@@ -592,6 +592,7 @@ Item {
                         if (action === "edit_block") root.editBlockById(instruction.block_id);
                         else if (action === "breakpoint") root.invoke("toggle_breakpoint", { blockId: instruction.id });
                         else if (action === "run_strand") root.invoke("run_strand", { strandId: strandId });
+                        else if (action === "recording_target") root.invoke("set_recording_target", { strandId: strandId });
                         else if (action === "copy") root.copyBlocks(strandId, path, 1);
                         else if (action === "copy_all") root.copyBlocks(strandId, path, null);
                         else if (action === "cut") root.copyBlocks(strandId, path, 1, () => root.removeInstruction(strandId, path));
@@ -609,7 +610,6 @@ Item {
                         if (existing) { if (existing.collapsed) root.invoke("set_comment_collapsed", { commentId: existing.id, collapsed: false }); }
                         else root.invoke("create_attached_comment", { instructionId: instruction.id, dx: 48, dy: 18, text: "" });
                     }
-                    onRecordingTargetRequested: strandId => root.invoke("set_recording_target", { strandId: strandId })
                     onKeyCaptureRequested:(strandId,path)=>root.invoke("start_key_capture",{strandId:strandId,path:path})
                     onPieceActionRequested:(action,strandId,path,instruction)=>root.onPieceAction(action,strandId,path,instruction)
                     onDetailsRequested:type=>root.showDetails(type)
@@ -1197,7 +1197,11 @@ Item {
     function blockMenu() {
         return [{ id: "run_strand", text: qsTr("Run strand"), icon: "play",
                   when: (instruction, strandId, path) => path.length === 1 && path[0].index === 0 && !!instruction && instruction.type !== "BlockHeader" },
-                { id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" }];
+                { id: "breakpoint", text: qsTr("Toggle breakpoint"), icon: "circle-dot" },
+                // New recordings go to the end of this strand; the canvas badges its first block.
+                { id: "recording_target", icon: "target",
+                  text: (instruction, strandId) => root.macro && root.macro.recording_target_strand_id === strandId
+                      ? qsTr("Recording Target (current)") : qsTr("Set Recording Target") }];
     }
     // Click-to-preview on operators: the daemon evaluates, the chip shows the answer.
     // Block labels are read once, so register them again in a new language.
