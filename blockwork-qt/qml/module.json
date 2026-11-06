@@ -5,6 +5,9 @@
   "singletons": ["Schedules.qml"],
   "editor": [
     "EditorPage.qml",
+    "MacroSettingsDialog.qml",
+    "LaunchOptionsDialog.qml",
+    "UsbDeviceDialog.qml",
     "BlockCatalog.qml",
     "BlockHelp.qml",
     "MakeBlockDialog.qml",
