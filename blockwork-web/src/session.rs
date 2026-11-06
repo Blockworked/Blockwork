@@ -179,7 +179,7 @@ impl Host for Demo {
 impl Demo {
     fn run(&mut self, command: &str, args: &Json) -> Result<Json, String> {
         let a = args;
-        if blockstitch_core::editor::targets_reporter_branch(a) {
+        if blockwork_core::frontend::targets_reporter_branch(a) {
             // Edited on a copy, so a rejected edit costs no undo step.
             let mut graph = self.open()?.graph.clone();
             let result = blockwork_core::frontend::edit_reporter_branch(&mut graph, command, a)?;

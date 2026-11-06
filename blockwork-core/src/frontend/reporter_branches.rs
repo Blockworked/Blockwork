@@ -3,12 +3,25 @@
 //! and blockstitch writes them back.
 
 use crate::macros::InstructionKind;
-use blockstitch_core::editor::{EditCommand, EditContext, ValueDestination, ValueLocation};
+use blockstitch_core::editor::{
+    BranchArgKeys, EditCommand, EditContext, ValueDestination, ValueLocation,
+};
 use blockstitch_core::graph::BlockGraph;
 use serde::de::DeserializeOwned;
 use serde_json::{Value as Json, json};
 
 type Graph = BlockGraph<InstructionKind>;
+
+/// Where Blockwork's commands put strand ids and value locations.
+pub const BRANCH_ARG_KEYS: BranchArgKeys<'static> = BranchArgKeys {
+    ids: &["strandId", "targetId", "draggedId"],
+    locations: &["location", "from", "to"],
+};
+
+/// Whether a command's arguments name a reporter branch.
+pub fn targets_reporter_branch(args: &Json) -> bool {
+    blockstitch_core::editor::targets_reporter_branch(args, BRANCH_ARG_KEYS)
+}
 
 fn arg<T: DeserializeOwned>(args: &Json, name: &str) -> Result<T, String> {
     serde_json::from_value(args.get(name).cloned().unwrap_or(Json::Null)).map_err(|e| e.to_string())
@@ -26,7 +39,7 @@ fn write_instruction(instruction: &crate::macros::Instruction) -> Result<Json, S
 /// Runs one editor command inside a reporter's branches (an `args` naming a
 /// `@reporter-branch:` strand). Call it on a clone and commit only on `Ok`.
 pub fn edit_reporter_branch(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, String> {
-    let ids = blockstitch_core::editor::reporter_branch_ids(args);
+    let ids = blockstitch_core::editor::reporter_branch_ids(args, BRANCH_ARG_KEYS);
     let branches = graph.open_reporter_branches(&ids, &read_body)?;
     let strand = || arg::<String>(args, "strandId");
     let path = || arg(args, "path");

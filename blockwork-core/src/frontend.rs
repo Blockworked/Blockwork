@@ -196,7 +196,7 @@ pub fn dto_to_fragment(dto: &FragmentDto) -> Option<Fragment<InstructionKind>> {
 mod instructions;
 mod reporter_branches;
 pub use instructions::*;
-pub use reporter_branches::edit_reporter_branch;
+pub use reporter_branches::{BRANCH_ARG_KEYS, edit_reporter_branch, targets_reporter_branch};
 
 pub fn strand_to_dto(strand: &Strand) -> StrandDto {
     StrandDto {

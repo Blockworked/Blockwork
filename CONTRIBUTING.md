@@ -140,9 +140,11 @@ other. The rest are listed so nothing is missed.
 
 1. `blockwork-core/src/config/settings.rs`: an `Option<T>` field on
    `AppSettings`, so older settings files still load.
-2. `blockwork-app/src/state.rs`: the field on `AppState`, on `StateDto`, and
-   its line in `build_state_dto`. `blockwork-app/src/lib.rs` reads its
-   default from the settings file at start.
+2. `blockwork-app/src/state.rs`: the field on `StateDto` and its line in
+   `build_state_dto`. A setting only the UI reads comes straight from the
+   settings file there (like `animation_speed`); one the backend checks
+   often also lives on `AppState`, loaded in `lib.rs` at start (like
+   `close_to_tray`).
 3. A `set_...` command (see above) in `commands/settings.rs` that saves it
    with `config::update_settings`.
 4. QML reads it from `appState` until the first state snapshot arrives, so
