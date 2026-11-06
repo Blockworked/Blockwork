@@ -114,3 +114,25 @@ fn blocks_can_be_dropped_into_a_reporters_branch() {
     demo.dispatch("undo", &json!({})).unwrap();
     assert!(floating(&demo)["value"]["branches"].as_array().unwrap().is_empty());
 }
+
+/// The other direction: every command `Demo::run` answers is in `COMMANDS`,
+/// so the parity script and the page's contract check see it too.
+#[test]
+fn every_answered_command_is_listed() {
+    let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/session.rs")).unwrap();
+    let body = &source[source.find("fn run(&mut self").unwrap()..];
+    let mut missing = Vec::new();
+    for line in body.lines() {
+        let trimmed = line.trim_start();
+        if line.len() - trimmed.len() != 12 || !trimmed.starts_with('"') || !trimmed.contains("=>") {
+            continue;
+        }
+        let pattern = trimmed.split("=>").next().unwrap();
+        for name in pattern.split('"').skip(1).step_by(2) {
+            if !blockwork_web::COMMANDS.contains(&name) {
+                missing.push(name.to_owned());
+            }
+        }
+    }
+    assert!(missing.is_empty(), "add to COMMANDS: {missing:?}");
+}
