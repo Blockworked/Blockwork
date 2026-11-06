@@ -163,7 +163,7 @@ fn every_answered_command_is_listed() {
     let source =
         std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/session.rs")).unwrap();
     let body = &source[source.find("fn run(&mut self").unwrap()..];
-    let mut missing = Vec::new();
+    let (mut seen, mut missing) = (0, Vec::new());
     for line in body.lines() {
         let trimmed = line.trim_start();
         if line.len() - trimmed.len() != 12 || !trimmed.starts_with('"') || !trimmed.contains("=>")
@@ -172,10 +172,12 @@ fn every_answered_command_is_listed() {
         }
         let pattern = trimmed.split("=>").next().unwrap();
         for name in pattern.split('"').skip(1).step_by(2) {
+            seen += 1;
             if !blockwork_web::COMMANDS.contains(&name) {
                 missing.push(name.to_owned());
             }
         }
     }
+    assert!(seen > 20, "found only {seen} commands; is the scan still reading run()?");
     assert!(missing.is_empty(), "add to COMMANDS: {missing:?}");
 }

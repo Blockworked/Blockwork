@@ -70,7 +70,10 @@ jobs:
       - name: Install Rust toolchain
         uses: dtolnay/rust-toolchain@stable
         with:
-          components: clippy
+          components: clippy, rustfmt
+
+      - name: Formatting
+        run: cargo fmt --all --check
 
       - name: Cache Rust build artifacts
         uses: Swatinem/rust-cache@v2

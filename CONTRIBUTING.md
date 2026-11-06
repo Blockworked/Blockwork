@@ -49,9 +49,15 @@ just test-qml         # QML tests (needs Qt 6's qmltestrunner)
 just translations     # refresh blockwork-qt/i18n after changing UI text
 ```
 
-Two tests check generated files and rewrite them with `BLESS=1`:
-`--test operator_descriptors` (the reporter table in `BlockCatalog.qml`) and
-`--test editor_baseline` (a saved macro in the current format).
+Three tests check generated files and rewrite them with `BLESS=1`:
+`--test operator_descriptors` (the reporter table in `BlockCatalog.qml`),
+`--test editor_baseline` (a saved macro in the current format) and
+`--lib capabilities` (`blockwork-core/capabilities.json`, which the community
+site copies).
+
+Rust is formatted with `cargo fmt --all` (rustfmt's defaults, as in
+blockstitch), and CI fails on unformatted code. Whole-tree formatting commits
+are listed in `.git-blame-ignore-revs`.
 
 ## Adding a block
 
