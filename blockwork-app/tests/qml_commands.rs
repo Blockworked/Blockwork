@@ -81,8 +81,13 @@ fn every_command_the_qml_sends_is_dispatched() {
             if line.trim_start().starts_with("//") {
                 continue;
             }
-            // Rows that name the command they run, like the onboarding toggles.
-            for part in line.split("command: \"").skip(1) {
+            // Rows that name the command they run, like the onboarding toggles,
+            // and pickers told which command creates a name (`createCommand`).
+            let named = line
+                .split("command: \"")
+                .skip(1)
+                .chain(line.split("createCommand: \"").skip(1));
+            for part in named {
                 if let Some(name) = part
                     .split('"')
                     .next()
