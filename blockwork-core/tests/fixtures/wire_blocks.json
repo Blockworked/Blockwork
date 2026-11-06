@@ -1,0 +1,1029 @@
+[
+ {
+  "type": "Wait",
+  "duration": {
+   "kind": "Number",
+   "value": 1
+  },
+  "id": "wait"
+ },
+ {
+  "type": "Text",
+  "text": {
+   "kind": "Number",
+   "value": 2
+  },
+  "id": "text"
+ },
+ {
+  "type": "Key",
+  "key": {
+   "kind": "Number",
+   "value": 3
+  },
+  "direction": "Release",
+  "id": "key"
+ },
+ {
+  "type": "WhenKey",
+  "key": {
+   "kind": "Number",
+   "value": 4
+  },
+  "direction": "Release",
+  "id": "whenkey"
+ },
+ {
+  "type": "Button",
+  "button": "Right",
+  "direction": "Release",
+  "id": "button"
+ },
+ {
+  "type": "MoveMouse",
+  "x": {
+   "kind": "Number",
+   "value": 5
+  },
+  "y": {
+   "kind": "Number",
+   "value": 6
+  },
+  "coordinate": "Relative",
+  "id": "movemouse"
+ },
+ {
+  "type": "Scroll",
+  "amount": {
+   "kind": "Number",
+   "value": 7
+  },
+  "axis": "Horizontal",
+  "id": "scroll"
+ },
+ {
+  "type": "Command",
+  "command": "Command.command",
+  "id": "command"
+ },
+ {
+  "type": "CommandWait",
+  "command": "CommandWait.command",
+  "id": "commandwait"
+ },
+ {
+  "type": "Comment",
+  "comment": "Comment.comment",
+  "id": "comment"
+ },
+ {
+  "type": "WhenRan",
+  "id": "whenran"
+ },
+ {
+  "type": "WhenBatteryDischargedTo",
+  "threshold": {
+   "kind": "Number",
+   "value": 8
+  },
+  "id": "whenbatterydischargedto"
+ },
+ {
+  "type": "WhenBatteryChargedTo",
+  "threshold": {
+   "kind": "Number",
+   "value": 9
+  },
+  "id": "whenbatterychargedto"
+ },
+ {
+  "type": "WhenTime",
+  "schedule": {
+   "kind": "Monthly",
+   "day": 3
+  },
+  "time": {
+   "kind": "Number",
+   "value": 10
+  },
+  "id": "whentime"
+ },
+ {
+  "type": "WhenPowerPluggedIn",
+  "id": "whenpowerpluggedin"
+ },
+ {
+  "type": "WhenPowerUnplugged",
+  "id": "whenpowerunplugged"
+ },
+ {
+  "type": "WhenClipboardChanged",
+  "id": "whenclipboardchanged"
+ },
+ {
+  "type": "OpenApp",
+  "command": "OpenApp.command",
+  "name": "OpenApp.name",
+  "icon": "OpenApp.icon",
+  "launch": {
+   "args": "a b",
+   "working_dir": "/w",
+   "env": [],
+   "new_instance": true
+  },
+  "id": "openapp"
+ },
+ {
+  "type": "CloseApp",
+  "command": "CloseApp.command",
+  "name": "CloseApp.name",
+  "icon": "CloseApp.icon",
+  "id": "closeapp"
+ },
+ {
+  "type": "SetVariable",
+  "name": "SetVariable.name",
+  "value": {
+   "kind": "Number",
+   "value": 11
+  },
+  "id": "setvariable"
+ },
+ {
+  "type": "ChangeVariable",
+  "name": "ChangeVariable.name",
+  "value": {
+   "kind": "Number",
+   "value": 12
+  },
+  "id": "changevariable"
+ },
+ {
+  "type": "SetClipboard",
+  "value": {
+   "kind": "Number",
+   "value": 13
+  },
+  "id": "setclipboard"
+ },
+ {
+  "type": "AddToList",
+  "value": {
+   "kind": "Number",
+   "value": 14
+  },
+  "name": "AddToList.name",
+  "id": "addtolist"
+ },
+ {
+  "type": "DeleteOfList",
+  "index": {
+   "kind": "Number",
+   "value": 15
+  },
+  "name": "DeleteOfList.name",
+  "id": "deleteoflist"
+ },
+ {
+  "type": "DeleteAllOfList",
+  "name": "DeleteAllOfList.name",
+  "id": "deletealloflist"
+ },
+ {
+  "type": "ShiftList",
+  "name": "ShiftList.name",
+  "amount": {
+   "kind": "Number",
+   "value": 16
+  },
+  "id": "shiftlist"
+ },
+ {
+  "type": "InsertIntoList",
+  "value": {
+   "kind": "Number",
+   "value": 17
+  },
+  "index": {
+   "kind": "Number",
+   "value": 18
+  },
+  "name": "InsertIntoList.name",
+  "id": "insertintolist"
+ },
+ {
+  "type": "ReplaceItemOfList",
+  "index": {
+   "kind": "Number",
+   "value": 19
+  },
+  "name": "ReplaceItemOfList.name",
+  "value": {
+   "kind": "Number",
+   "value": 20
+  },
+  "id": "replaceitemoflist"
+ },
+ {
+  "type": "ReverseList",
+  "name": "ReverseList.name",
+  "id": "reverselist"
+ },
+ {
+  "type": "BlockHeader",
+  "block_id": "BlockHeader.block_id",
+  "id": "blockheader"
+ },
+ {
+  "type": "CallBlock",
+  "block_id": "CallBlock.block_id",
+  "args": [
+   {
+    "kind": "Number",
+    "value": 21
+   },
+   {
+    "kind": "Number",
+    "value": 22
+   }
+  ],
+  "id": "callblock"
+ },
+ {
+  "type": "BranchCallBlock",
+  "block_id": "BranchCallBlock.block_id",
+  "args": [
+   {
+    "kind": "Number",
+    "value": 23
+   },
+   {
+    "kind": "Number",
+    "value": 24
+   }
+  ],
+  "branches": [
+   [
+    {
+     "type": "Wait",
+     "id": "child25",
+     "duration": {
+      "kind": "Number",
+      "value": 25
+     }
+    }
+   ],
+   []
+  ],
+  "id": "branchcallblock"
+ },
+ {
+  "type": "RunBranch",
+  "name": "RunBranch.name",
+  "id": "runbranch"
+ },
+ {
+  "type": "Return",
+  "value": {
+   "kind": "Number",
+   "value": 26
+  },
+  "id": "return"
+ },
+ {
+  "type": "If",
+  "condition": {
+   "kind": "Number",
+   "value": 27
+  },
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child28",
+    "duration": {
+     "kind": "Number",
+     "value": 28
+    }
+   }
+  ],
+  "id": "if"
+ },
+ {
+  "type": "IfElse",
+  "condition": {
+   "kind": "Number",
+   "value": 29
+  },
+  "then_body": [
+   {
+    "type": "Wait",
+    "id": "child30",
+    "duration": {
+     "kind": "Number",
+     "value": 30
+    }
+   }
+  ],
+  "else_body": [
+   {
+    "type": "Wait",
+    "id": "child31",
+    "duration": {
+     "kind": "Number",
+     "value": 31
+    }
+   }
+  ],
+  "id": "ifelse"
+ },
+ {
+  "type": "Repeat",
+  "count": {
+   "kind": "Number",
+   "value": 32
+  },
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child33",
+    "duration": {
+     "kind": "Number",
+     "value": 33
+    }
+   }
+  ],
+  "id": "repeat"
+ },
+ {
+  "type": "Forever",
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child34",
+    "duration": {
+     "kind": "Number",
+     "value": 34
+    }
+   }
+  ],
+  "id": "forever"
+ },
+ {
+  "type": "While",
+  "condition": {
+   "kind": "Number",
+   "value": 35
+  },
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child36",
+    "duration": {
+     "kind": "Number",
+     "value": 36
+    }
+   }
+  ],
+  "id": "while"
+ },
+ {
+  "type": "EscapeLoop",
+  "id": "escapeloop"
+ },
+ {
+  "type": "ContinueLoop",
+  "id": "continueloop"
+ },
+ {
+  "type": "WriteFile",
+  "path": {
+   "kind": "Number",
+   "value": 37
+  },
+  "text": {
+   "kind": "Number",
+   "value": 38
+  },
+  "append": true,
+  "id": "writefile"
+ },
+ {
+  "type": "HttpRequest",
+  "method": "POST",
+  "url": {
+   "kind": "Number",
+   "value": 39
+  },
+  "body": {
+   "kind": "Number",
+   "value": 40
+  },
+  "headers": {
+   "kind": "Number",
+   "value": 41
+  },
+  "variable": "HttpRequest.variable",
+  "id": "httprequest"
+ },
+ {
+  "type": "Notify",
+  "title": {
+   "kind": "Number",
+   "value": 42
+  },
+  "message": {
+   "kind": "Number",
+   "value": 43
+  },
+  "id": "notify"
+ },
+ {
+  "type": "Log",
+  "value": {
+   "kind": "Number",
+   "value": 44
+  },
+  "id": "log"
+ },
+ {
+  "type": "TryCatch",
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child45",
+    "duration": {
+     "kind": "Number",
+     "value": 45
+    }
+   }
+  ],
+  "catch_body": [
+   {
+    "type": "Wait",
+    "id": "child46",
+    "duration": {
+     "kind": "Number",
+     "value": 46
+    }
+   }
+  ],
+  "id": "trycatch"
+ },
+ {
+  "type": "ThrowError",
+  "message": {
+   "kind": "Number",
+   "value": 47
+  },
+  "id": "throwerror"
+ },
+ {
+  "type": "StopMacro",
+  "id": "stopmacro"
+ },
+ {
+  "type": "WhenWindow",
+  "pattern": {
+   "kind": "Number",
+   "value": 48
+  },
+  "focused": true,
+  "id": "whenwindow"
+ },
+ {
+  "type": "WhenFileChanged",
+  "path": {
+   "kind": "Number",
+   "value": 49
+  },
+  "id": "whenfilechanged"
+ },
+ {
+  "type": "Retry",
+  "count": {
+   "kind": "Number",
+   "value": 50
+  },
+  "delay": {
+   "kind": "Number",
+   "value": 51
+  },
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child52",
+    "duration": {
+     "kind": "Number",
+     "value": 52
+    }
+   }
+  ],
+  "id": "retry"
+ },
+ {
+  "type": "WindowAction",
+  "action": "minimize",
+  "pattern": {
+   "kind": "Number",
+   "value": 53
+  },
+  "by": "class",
+  "id": "windowaction"
+ },
+ {
+  "type": "MoveWindow",
+  "pattern": {
+   "kind": "Number",
+   "value": 54
+  },
+  "by": "class",
+  "resize": true,
+  "x": {
+   "kind": "Number",
+   "value": 55
+  },
+  "y": {
+   "kind": "Number",
+   "value": 56
+  },
+  "id": "movewindow"
+ },
+ {
+  "type": "RunMacro",
+  "target": {
+   "kind": "Number",
+   "value": 57
+  },
+  "wait": true,
+  "id": "runmacro"
+ },
+ {
+  "type": "StopMacroNamed",
+  "target": {
+   "kind": "Number",
+   "value": 58
+  },
+  "id": "stopmacronamed"
+ },
+ {
+  "type": "SetGlobal",
+  "name": {
+   "kind": "Number",
+   "value": 59
+  },
+  "value": {
+   "kind": "Number",
+   "value": 60
+  },
+  "id": "setglobal"
+ },
+ {
+  "type": "ChangeGlobal",
+  "name": {
+   "kind": "Number",
+   "value": 61
+  },
+  "by": {
+   "kind": "Number",
+   "value": 62
+  },
+  "id": "changeglobal"
+ },
+ {
+  "type": "WaitUntil",
+  "condition": {
+   "kind": "Number",
+   "value": 63
+  },
+  "timeout": {
+   "kind": "Number",
+   "value": 64
+  },
+  "error_timeout": {
+   "kind": "Number",
+   "value": 65
+  },
+  "id": "waituntil"
+ },
+ {
+  "type": "FindImage",
+  "image": "FindImage.image",
+  "tolerance": {
+   "kind": "Number",
+   "value": 66
+  },
+  "x_variable": "FindImage.x_variable",
+  "y_variable": "FindImage.y_variable",
+  "pick": {
+   "mode": "NearPoint",
+   "index": {
+    "kind": "Number",
+    "value": 67
+   },
+   "near_x": {
+    "kind": "Number",
+    "value": 68
+   },
+   "near_y": {
+    "kind": "Number",
+    "value": 69
+   }
+  },
+  "region": "FindImage.region",
+  "count_variable": "FindImage.count_variable",
+  "id": "findimage"
+ },
+ {
+  "type": "ClickImage",
+  "image": "ClickImage.image",
+  "tolerance": {
+   "kind": "Number",
+   "value": 70
+  },
+  "button": "Right",
+  "pick": {
+   "mode": "NearPoint",
+   "index": {
+    "kind": "Number",
+    "value": 71
+   },
+   "near_x": {
+    "kind": "Number",
+    "value": 72
+   },
+   "near_y": {
+    "kind": "Number",
+    "value": 73
+   }
+  },
+  "region": "ClickImage.region",
+  "id": "clickimage"
+ },
+ {
+  "type": "WaitForImage",
+  "image": "WaitForImage.image",
+  "tolerance": {
+   "kind": "Number",
+   "value": 74
+  },
+  "appear": true,
+  "timeout": {
+   "kind": "Number",
+   "value": 75
+  },
+  "region": "WaitForImage.region",
+  "error_timeout": {
+   "kind": "Number",
+   "value": 76
+  },
+  "id": "waitforimage"
+ },
+ {
+  "type": "WhenTyped",
+  "text": {
+   "kind": "Number",
+   "value": 77
+  },
+  "erase": true,
+  "id": "whentyped"
+ },
+ {
+  "type": "PasteText",
+  "text": {
+   "kind": "Number",
+   "value": 78
+  },
+  "id": "pastetext"
+ },
+ {
+  "type": "WhenApp",
+  "pattern": {
+   "kind": "Number",
+   "value": 79
+  },
+  "started": true,
+  "id": "whenapp"
+ },
+ {
+  "type": "WhenIdle",
+  "minutes": {
+   "kind": "Number",
+   "value": 80
+  },
+  "id": "whenidle"
+ },
+ {
+  "type": "WhenScreenLock",
+  "locked": true,
+  "id": "whenscreenlock"
+ },
+ {
+  "type": "WithLock",
+  "name": {
+   "kind": "Number",
+   "value": 81
+  },
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child82",
+    "duration": {
+     "kind": "Number",
+     "value": 82
+    }
+   }
+  ],
+  "id": "withlock"
+ },
+ {
+  "type": "WhenCron",
+  "expression": {
+   "kind": "Number",
+   "value": 83
+  },
+  "id": "whencron"
+ },
+ {
+  "type": "SplitIntoList",
+  "text": {
+   "kind": "Number",
+   "value": 84
+  },
+  "separator": {
+   "kind": "Number",
+   "value": 85
+  },
+  "name": "SplitIntoList.name",
+  "id": "splitintolist"
+ },
+ {
+  "type": "WhenNetwork",
+  "connected": true,
+  "id": "whennetwork"
+ },
+ {
+  "type": "WhenUsb",
+  "pattern": {
+   "kind": "Number",
+   "value": 86
+  },
+  "connected": true,
+  "id": "whenusb"
+ },
+ {
+  "type": "WhenMouseButton",
+  "button": "Right",
+  "pressed": true,
+  "modifiers": {
+   "kind": "Number",
+   "value": 87
+  },
+  "id": "whenmousebutton"
+ },
+ {
+  "type": "AskText",
+  "prompt": {
+   "kind": "Number",
+   "value": 88
+  },
+  "default": {
+   "kind": "Number",
+   "value": 89
+  },
+  "name": "AskText.name",
+  "id": "asktext"
+ },
+ {
+  "type": "AskYesNo",
+  "prompt": {
+   "kind": "Number",
+   "value": 90
+  },
+  "name": "AskYesNo.name",
+  "id": "askyesno"
+ },
+ {
+  "type": "AskChoice",
+  "prompt": {
+   "kind": "Number",
+   "value": 91
+  },
+  "list": "AskChoice.list",
+  "name": "AskChoice.name",
+  "id": "askchoice"
+ },
+ {
+  "type": "ShowMessage",
+  "message": {
+   "kind": "Number",
+   "value": 92
+  },
+  "id": "showmessage"
+ },
+ {
+  "type": "WhenAt",
+  "at": {
+   "kind": "Number",
+   "value": 93
+  },
+  "id": "whenat"
+ },
+ {
+  "type": "WhenSignal",
+  "expression": true,
+  "name": {
+   "kind": "Number",
+   "value": 94
+  },
+  "id": "whensignal"
+ },
+ {
+  "type": "SendSignal",
+  "expression": true,
+  "name": {
+   "kind": "Number",
+   "value": 95
+  },
+  "wait": true,
+  "id": "sendsignal"
+ },
+ {
+  "type": "WhenWebhook",
+  "path": {
+   "kind": "Number",
+   "value": 96
+  },
+  "variable": "WhenWebhook.variable",
+  "id": "whenwebhook"
+ },
+ {
+  "type": "DetectObjectsInWindow",
+  "pattern": {
+   "kind": "Number",
+   "value": 97
+  },
+  "by": "class",
+  "detector": {
+   "kind": "Number",
+   "value": 98
+  },
+  "label": {
+   "kind": "Number",
+   "value": 99
+  },
+  "confidence": {
+   "kind": "Number",
+   "value": 100
+  },
+  "sort": "confidence",
+  "results_list": "DetectObjectsInWindow.results_list",
+  "count_variable": "DetectObjectsInWindow.count_variable",
+  "region": "DetectObjectsInWindow.region",
+  "id": "detectobjectsinwindow"
+ },
+ {
+  "type": "WaitForDetection",
+  "pattern": {
+   "kind": "Number",
+   "value": 101
+  },
+  "by": "class",
+  "detector": {
+   "kind": "Number",
+   "value": 102
+  },
+  "label": {
+   "kind": "Number",
+   "value": 103
+  },
+  "confidence": {
+   "kind": "Number",
+   "value": 104
+  },
+  "appear": true,
+  "timeout": {
+   "kind": "Number",
+   "value": 105
+  },
+  "region": "WaitForDetection.region",
+  "id": "waitfordetection"
+ },
+ {
+  "type": "AimStep",
+  "pattern": {
+   "kind": "Number",
+   "value": 106
+  },
+  "by": "class",
+  "target_x": {
+   "kind": "Number",
+   "value": 107
+  },
+  "target_y": {
+   "kind": "Number",
+   "value": 108
+  },
+  "gain": {
+   "kind": "Number",
+   "value": 109
+  },
+  "max_step": {
+   "kind": "Number",
+   "value": 110
+  },
+  "deadzone": {
+   "kind": "Number",
+   "value": 111
+  },
+  "id": "aimstep"
+ },
+ {
+  "type": "AimAtDetection",
+  "results_list": "AimAtDetection.results_list",
+  "index": {
+   "kind": "Number",
+   "value": 112
+  },
+  "gain": {
+   "kind": "Number",
+   "value": 113
+  },
+  "max_step": {
+   "kind": "Number",
+   "value": 114
+  },
+  "deadzone": {
+   "kind": "Number",
+   "value": 115
+  },
+  "timeout": {
+   "kind": "Number",
+   "value": 116
+  },
+  "settle_ms": {
+   "kind": "Number",
+   "value": 117
+  },
+  "status_variable": "AimAtDetection.status_variable",
+  "id": "aimatdetection"
+ },
+ {
+  "type": "BrowserOpen",
+  "url": {
+   "kind": "Number",
+   "value": 118
+  },
+  "new_tab": true,
+  "id": "browseropen"
+ },
+ {
+  "type": "BrowserClick",
+  "selector": {
+   "kind": "Number",
+   "value": 119
+  },
+  "nth": {
+   "kind": "Number",
+   "value": 120
+  },
+  "id": "browserclick"
+ },
+ {
+  "type": "BrowserType",
+  "text": {
+   "kind": "Number",
+   "value": 121
+  },
+  "selector": {
+   "kind": "Number",
+   "value": 122
+  },
+  "nth": {
+   "kind": "Number",
+   "value": 123
+  },
+  "id": "browsertype"
+ },
+ {
+  "type": "BrowserWaitFor",
+  "selector": {
+   "kind": "Number",
+   "value": 124
+  },
+  "appear": true,
+  "timeout": {
+   "kind": "Number",
+   "value": 125
+  },
+  "id": "browserwaitfor"
+ },
+ {
+  "type": "BrowserScript",
+  "code": {
+   "kind": "Number",
+   "value": 126
+  },
+  "variable": "BrowserScript.variable",
+  "id": "browserscript"
+ }
+]
