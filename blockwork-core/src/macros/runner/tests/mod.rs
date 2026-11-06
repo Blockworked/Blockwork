@@ -186,3 +186,25 @@ fn install_test_dialogs() {
         },
     ));
 }
+
+/// `run_instructions` with a list store the test can read back.
+fn run_instructions_with_lists(
+    instructions: Vec<Instruction>,
+    emulator: Arc<Mutex<dyn InputBackend>>,
+    stop_flag: Option<Arc<Mutex<bool>>>,
+    speed_multiplier: f64,
+    variables: VariableStore,
+    lists: ListStore,
+) {
+    run_fired_strand(
+        crate::run_log::Source::default(),
+        instructions,
+        emulator,
+        stop_flag,
+        speed_multiplier,
+        variables,
+        lists,
+        Arc::new(HashMap::new()),
+        0,
+    );
+}

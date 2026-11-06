@@ -166,7 +166,7 @@ pub enum InstructionKind {
     /// Header-only marker (like `WhenRan`/`BlockHeader`) for a strand whose
     /// body should run whenever the system's battery charge drops to (or
     /// below) the given percentage. Unlike `WhenRan`, this is *not* an
-    /// entry point Run/Loop invokes - `runner::run_with_offset` skips these
+    /// entry point Run/Loop invokes - `Macro::run_with` skips these
     /// strands entirely. Instead they're driven independently by a
     /// long-running background watcher outside a macro run altogether (in
     /// the desktop app, `blockwork-app`'s `watch::battery` module), which polls

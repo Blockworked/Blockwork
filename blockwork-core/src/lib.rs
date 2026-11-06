@@ -55,7 +55,7 @@ pub mod updater;
 #[cfg(feature = "system")]
 pub mod window;
 #[cfg(feature = "system")]
-pub mod wire;
+pub mod wine_bridge;
 
 /// Registers Blockwork's own value operators with blockstitch, so a saved
 /// macro using them evaluates. Every entry point calls it; twice is fine.

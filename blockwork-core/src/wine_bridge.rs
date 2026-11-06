@@ -69,7 +69,7 @@ pub enum WireControlCommand {
     /// Run the macro with this id - fire-and-forget, same contract as
     /// `blockwork_run_macro`. The `f64` is `elapsed_overshoot_ms`: real time
     /// already elapsed before this command was sent, since playback was
-    /// supposed to start. Fed into `Macro::run_with_offset` so the first
+    /// supposed to start. Fed into `RunOptions::offset` so the first
     /// `Wait` deadline anchors to the intended start instant, not whenever
     /// this command gets dispatched.
     RunMacro(String, f64),

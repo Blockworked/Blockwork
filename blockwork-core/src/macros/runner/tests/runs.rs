@@ -45,7 +45,7 @@ fn run_executes_all_when_ran_strands_concurrently() {
     );
 }
 
-/// `run_with_offset` should backdate the first `Wait`'s deadline anchor
+/// `RunOptions::offset` should backdate the first `Wait`'s deadline anchor
 /// by `initial_offset` - a macro whose only strand waits 2000ms should
 /// return in roughly (2000ms - offset) wall-clock time, proving the
 /// anchor is `Instant::now() - initial_offset`, not just `Instant::now()`
@@ -73,13 +73,10 @@ fn run_with_offset_backdates_the_first_wait_deadline() {
         settings: crate::macros::MacroSettings::default(),
     };
     let start = Instant::now();
-    mac.run_with_offset(
-        noop_emulator(),
-        None,
-        1.0,
-        empty_vars(),
-        Duration::from_millis(1500),
-    );
+    mac.run_with(RunOptions {
+        offset: Duration::from_millis(1500),
+        ..RunOptions::new(noop_emulator(), empty_vars())
+    });
     let elapsed = start.elapsed();
     assert!(
         elapsed < Duration::from_millis(1200),
@@ -290,13 +287,12 @@ fn run_strand_runs_one_strand_whatever_heads_it() {
     assert!(!mac.can_run_strand("missing"));
     let vars = empty_vars();
     let lists: ListStore = Arc::new(Mutex::new(HashMap::new()));
-    assert!(mac.run_strand_with_lists(
+    assert!(mac.run_one_strand(
         "keyed",
-        noop_emulator(),
-        None,
-        1.0,
-        Arc::clone(&vars),
-        lists
+        RunOptions {
+            lists: Some(lists),
+            ..RunOptions::new(noop_emulator(), Arc::clone(&vars))
+        }
     ));
     let vars = vars.lock().unwrap();
     assert_eq!(vars.get("keyed"), Some(&Evaluated::Number(7.0)));

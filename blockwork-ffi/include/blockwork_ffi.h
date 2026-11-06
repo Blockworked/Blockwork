@@ -49,7 +49,7 @@ int32_t blockwork_stop_recording(void);
  * `elapsed_overshoot_ms` (>= 0, milliseconds): how much real time had
  * already passed, before this call, since playback was supposed to
  * start - pass 0 if not applicable. Backdates the run's first `Wait`
- * deadline to the intended start instant via `Macro::run_with_offset`.
+ * deadline to the intended start instant via `RunOptions::offset`.
  */
 int32_t blockwork_run_macro(const char *id_utf8, double elapsed_overshoot_ms);
 

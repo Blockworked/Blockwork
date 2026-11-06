@@ -1,7 +1,7 @@
 //! Wine detection and launch for `blockwork-linux-bridge`.
 #![cfg(windows)]
 
-use blockwork_core::wire::{self, SharedRegion, WireCapture, WireControlCommand};
+use blockwork_core::wine_bridge::{self, SharedRegion, WireCapture, WireControlCommand};
 use std::ffi::c_void;
 use std::os::windows::ffi::OsStrExt;
 use std::sync::atomic::Ordering;
@@ -120,7 +120,7 @@ pub fn setup_and_launch(linux_bridge_resource_path: &str) -> Option<WineBridge> 
             return None;
         }
 
-        let size = wire::SHARED_REGION_SIZE as i64;
+        let size = wine_bridge::SHARED_REGION_SIZE as i64;
         if SetFilePointerEx(shm_file, size, std::ptr::null_mut(), FILE_BEGIN) == 0
             || SetEndOfFile(shm_file) == 0
         {
@@ -134,7 +134,7 @@ pub fn setup_and_launch(linux_bridge_resource_path: &str) -> Option<WineBridge> 
             std::ptr::null(),
             PAGE_READWRITE,
             0,
-            wire::SHARED_REGION_SIZE as u32,
+            wine_bridge::SHARED_REGION_SIZE as u32,
             std::ptr::null(),
         );
         if shm_mapping.is_null() {
@@ -148,7 +148,7 @@ pub fn setup_and_launch(linux_bridge_resource_path: &str) -> Option<WineBridge> 
             FILE_MAP_ALL_ACCESS,
             0,
             0,
-            wire::SHARED_REGION_SIZE,
+            wine_bridge::SHARED_REGION_SIZE,
         );
         if view.Value.is_null() {
             tracing::warn!("wine_bridge: MapViewOfFile failed");
@@ -157,7 +157,7 @@ pub fn setup_and_launch(linux_bridge_resource_path: &str) -> Option<WineBridge> 
             return None;
         }
         let view = view.Value;
-        std::ptr::write_bytes(view as *mut u8, 0, wire::SHARED_REGION_SIZE);
+        std::ptr::write_bytes(view as *mut u8, 0, wine_bridge::SHARED_REGION_SIZE);
 
         let Some(unix_bin_path) = wine_unix_path(linux_bridge_resource_path) else {
             tracing::warn!("wine_bridge: failed to resolve Unix path for linux-input binary");
@@ -209,14 +209,16 @@ pub fn spawn_capture_forwarder(region: &'static SharedRegion) {
     std::thread::spawn(move || {
         // Catch per event so one bad event can't kill the forwarder thread.
         let mut callback = blockwork_core::recording::build_capture_callback();
-        let mut buf = [0u8; wire::SLOT_SIZE - 4];
+        let mut buf = [0u8; wine_bridge::SLOT_SIZE - 4];
         let mut processed: u64 = 0;
         let mut last_log = std::time::Instant::now();
         loop {
             match region.capture.try_pop(&mut buf) {
                 Some(len) => {
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
-                        if let Some(WireCapture { event, ts }) = wire::decode_capture(&buf[..len]) {
+                        if let Some(WireCapture { event, ts }) =
+                            wine_bridge::decode_capture(&buf[..len])
+                        {
                             let timestamp =
                                 blockwork_core::macros::backend::CaptureTimestamp::Hardware(
                                     ts.to_system_time(),
@@ -244,7 +246,7 @@ pub fn spawn_capture_forwarder(region: &'static SharedRegion) {
 
 /// Pushes a control command to the helper. Retries briefly if the ring is full.
 fn push_control(region: &SharedRegion, cmd: &WireControlCommand) -> Result<(), String> {
-    let bytes = wire::encode_control(cmd);
+    let bytes = wine_bridge::encode_control(cmd);
     for _ in 0..1000 {
         if region.control.try_push(&bytes) {
             return Ok(());

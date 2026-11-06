@@ -5,6 +5,7 @@ use crate::state::{AppState, SharedState};
 use crate::{AppHandle, macros_thread, scheduled_run};
 use blockwork_core::macros::calls::MacroHost;
 use blockwork_core::macros::run_registry;
+use blockwork_core::macros::runner::RunOptions;
 use blockwork_core::run_log;
 use serde::Serialize;
 use std::collections::HashMap;
@@ -96,13 +97,12 @@ pub(crate) fn start(
             let source = run_log::Source::for_macro(&mac.id, &mac.name);
             run_log::run_event(&source, run_log::RunEvent::Started, reason);
             let limit = scheduled_run::limit_run(&source, &run_flag, mac.settings.max_run_secs);
-            mac.run_with_lists(
-                emulator,
-                Some(Arc::clone(&run_flag)),
-                speed,
-                Arc::clone(&variables),
-                Arc::clone(&lists),
-            );
+            mac.run_with(RunOptions {
+                stop_flag: Some(Arc::clone(&run_flag)),
+                speed_multiplier: speed,
+                lists: Some(Arc::clone(&lists)),
+                ..RunOptions::new(emulator, Arc::clone(&variables))
+            });
             limit.store(true, Ordering::Relaxed);
             let stopped = !run_flag.lock().map(|r| *r).unwrap_or(true);
             run_log::run_event(

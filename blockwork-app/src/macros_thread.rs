@@ -4,7 +4,7 @@ use blockstitch_core::graph::ListStore;
 use blockwork_core::macros::Macro;
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::run_registry;
-use blockwork_core::macros::runner::VariableStore;
+use blockwork_core::macros::runner::{RunOptions, VariableStore};
 use blockwork_core::macros::thread_pool::ThreadPool;
 use std::sync::{Arc, Mutex};
 use std::thread;
@@ -72,25 +72,18 @@ pub(crate) fn into_single_run_task(
         // which would spuriously cut a concurrently-started run short.
         let run_flag = run_registry::begin_macro_run(&mac.id);
         let done = crate::scheduled_run::limit_run(&source, &run_flag, mac.settings.max_run_secs);
+        let options = RunOptions {
+            stop_flag: Some(Arc::clone(&run_flag)),
+            speed_multiplier,
+            lists: Some(Arc::clone(&lists)),
+            ..RunOptions::new(emulator, Arc::clone(&variables))
+        };
         match strand {
             // Run strand: just that one, from its top block.
             Some(id) => {
-                mac.run_strand_with_lists(
-                    &id,
-                    emulator,
-                    Some(Arc::clone(&run_flag)),
-                    speed_multiplier,
-                    Arc::clone(&variables),
-                    Arc::clone(&lists),
-                );
+                mac.run_one_strand(&id, options);
             }
-            None => mac.run_with_lists(
-                emulator,
-                Some(Arc::clone(&run_flag)),
-                speed_multiplier,
-                Arc::clone(&variables),
-                Arc::clone(&lists),
-            ),
+            None => mac.run_with(options),
         }
         done.store(true, std::sync::atomic::Ordering::Relaxed);
         let stopped = !run_flag.lock().map(|r| *r).unwrap_or(true);

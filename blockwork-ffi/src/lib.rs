@@ -9,7 +9,7 @@ use blockwork_core::config;
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::host_clock;
 use blockwork_core::macros::run_registry;
-use blockwork_core::macros::runner::{self, VariableStore};
+use blockwork_core::macros::runner::{self, RunOptions, VariableStore};
 use blockwork_core::macros::{Instruction, Macro};
 use blockwork_core::recording;
 use std::ffi::{CStr, CString};
@@ -215,7 +215,7 @@ pub extern "C" fn blockwork_stop_recording() -> i32 {
 /// `elapsed_overshoot_ms` (>= 0, milliseconds): how much real time had
 /// already passed, before this call, since playback was supposed to
 /// start - pass 0 if not applicable. Backdates the run's first `Wait`
-/// deadline to the intended start instant via `Macro::run_with_offset`.
+/// deadline to the intended start instant via `RunOptions::offset`.
 #[no_mangle]
 pub unsafe extern "C" fn blockwork_run_macro(
     id_utf8: *const c_char,
@@ -266,13 +266,12 @@ pub unsafe extern "C" fn blockwork_run_macro(
         let spawned = std::thread::Builder::new()
             .name("macros-run".to_string())
             .spawn(move || {
-                mac.clone().run_with_offset(
-                    Arc::clone(&emulator),
-                    Some(Arc::clone(&flag)),
+                mac.clone().run_with(RunOptions {
+                    stop_flag: Some(Arc::clone(&flag)),
                     speed_multiplier,
-                    Arc::clone(&variables),
-                    initial_offset,
-                );
+                    offset: initial_offset,
+                    ..RunOptions::new(Arc::clone(&emulator), Arc::clone(&variables))
+                });
                 run_registry::end_run(&flag);
                 if let Ok(values) = variables.lock() {
                     let mut mac = mac.clone();
@@ -329,13 +328,11 @@ pub unsafe extern "C" fn blockwork_sync_begin(id_utf8: *const c_char) -> i32 {
         let spawned = std::thread::Builder::new()
             .name("macros-sync-run".to_string())
             .spawn(move || {
-                mac.run_with_offset(
-                    emulator,
-                    Some(Arc::clone(&flag)),
+                mac.run_with(RunOptions {
+                    stop_flag: Some(Arc::clone(&flag)),
                     speed_multiplier,
-                    variables,
-                    std::time::Duration::ZERO,
-                );
+                    ..RunOptions::new(emulator, variables)
+                });
                 run_registry::end_run(&flag);
                 host_clock::finish();
             });

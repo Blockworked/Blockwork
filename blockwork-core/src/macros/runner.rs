@@ -493,7 +493,48 @@ mod system;
 mod vision;
 use apps::*;
 
+/// How a Run plays: what presses the keys, how it is stopped, and the
+/// stores its blocks read and write.
+pub struct RunOptions {
+    pub emulator: Arc<Mutex<dyn InputBackend>>,
+    /// Cleared to stop the run; `None` gives the run a flag of its own.
+    pub stop_flag: Option<Arc<Mutex<bool>>>,
+    /// Scales every `Wait` inversely (2.0 runs twice as fast).
+    pub speed_multiplier: f64,
+    pub variables: VariableStore,
+    /// The run's lists; `None` starts from the macro's saved lists. A host
+    /// passes its own to save what the run changed.
+    pub lists: Option<ListStore>,
+    /// Pretends the run started this long ago, so a run that starts late
+    /// (a synced start) keeps its waits on the intended schedule.
+    pub offset: Duration,
+}
+
+impl RunOptions {
+    /// Full speed, no stop flag, saved lists, no offset.
+    pub fn new(emulator: Arc<Mutex<dyn InputBackend>>, variables: VariableStore) -> Self {
+        Self {
+            emulator,
+            stop_flag: None,
+            speed_multiplier: 1.0,
+            variables,
+            lists: None,
+            offset: Duration::ZERO,
+        }
+    }
+}
+
 impl Macro {
+    /// A fresh list store holding the macro's saved lists.
+    fn list_store(&self) -> ListStore {
+        Arc::new(Mutex::new(
+            self.lists
+                .iter()
+                .map(|list| (list.name.clone(), list.items.clone()))
+                .collect(),
+        ))
+    }
+
     /// Builds the custom block table from this macro's `BlockHeader` strands.
     pub fn block_table(&self) -> BlockTable {
         let mut table = HashMap::new();
@@ -568,10 +609,11 @@ impl Macro {
     }
 
     /// Runs every "When Ran" entry-point strand concurrently on its own
-    /// thread, sharing one `stop_flag`. A custom block's header strand isn't
-    /// run directly - its body is extracted into `block_table` and only
-    /// executes via `CallBlock`/`Value::Call`. Blocks until every strand
-    /// finishes or is stopped.
+    /// thread, sharing one `stop_flag`, from the macro's saved lists. A custom
+    /// block's header strand isn't run directly - its body is extracted into
+    /// `block_table` and only executes via `CallBlock`/`Value::Call`. Blocks
+    /// until every strand finishes or is stopped. [`Macro::run_with`] takes
+    /// the rest of the options.
     pub fn run(
         self,
         emulator: Arc<Mutex<dyn InputBackend>>,
@@ -579,77 +621,16 @@ impl Macro {
         speed_multiplier: f64,
         variables: VariableStore,
     ) {
-        let lists: ListStore = Arc::new(Mutex::new(
-            self.lists
-                .iter()
-                .map(|list| (list.name.clone(), list.items.clone()))
-                .collect(),
-        ));
-        self.run_with_lists(emulator, stop_flag, speed_multiplier, variables, lists);
-    }
-
-    /// `run` with an externally-owned list store, used by the desktop host to
-    /// persist list mutations after a macro finishes.
-    pub fn run_with_lists(
-        self,
-        emulator: Arc<Mutex<dyn InputBackend>>,
-        stop_flag: Option<Arc<Mutex<bool>>>,
-        speed_multiplier: f64,
-        variables: VariableStore,
-        lists: ListStore,
-    ) {
-        self.run_with_lists_offset(
-            emulator,
+        self.run_with(RunOptions {
             stop_flag,
             speed_multiplier,
-            variables,
-            lists,
-            Duration::ZERO,
-        )
+            ..RunOptions::new(emulator, variables)
+        });
     }
 
-    /// Backward-compatible offset variant for callers that do not need to
-    /// retain a live list store after the run.
-    pub fn run_with_offset(
-        self,
-        emulator: Arc<Mutex<dyn InputBackend>>,
-        stop_flag: Option<Arc<Mutex<bool>>>,
-        speed_multiplier: f64,
-        variables: VariableStore,
-        initial_offset: Duration,
-    ) {
-        let lists: ListStore = Arc::new(Mutex::new(
-            self.lists
-                .iter()
-                .map(|list| (list.name.clone(), list.items.clone()))
-                .collect(),
-        ));
-        self.run_with_lists_offset(
-            emulator,
-            stop_flag,
-            speed_multiplier,
-            variables,
-            lists,
-            initial_offset,
-        )
-    }
-
-    /// Same as `run_with_offset`, but with an externally-owned list store,
-    /// used by the desktop host to persist list mutations after a macro
-    /// finishes. Backdates every entry strand's `Wait` deadline anchor by
-    /// `initial_offset` - pretends this run started `initial_offset` ago
-    /// rather than right now.
-    pub fn run_with_lists_offset(
-        self,
-        emulator: Arc<Mutex<dyn InputBackend>>,
-        stop_flag: Option<Arc<Mutex<bool>>>,
-        speed_multiplier: f64,
-        variables: VariableStore,
-        lists: ListStore,
-        initial_offset: Duration,
-    ) {
-        // Trigger strands are fired by the app's watchers via
-        // `run_fired_strand`, never by a manual Run.
+    /// [`Macro::run`] with every option. Trigger strands are fired by the
+    /// app's watchers via `run_fired_strand`, never by a manual Run.
+    pub fn run_with(self, options: RunOptions) {
         self.run_entries(
             |s| {
                 matches!(
@@ -657,43 +638,22 @@ impl Macro {
                     Some(InstructionKind::WhenRan)
                 )
             },
-            emulator,
-            stop_flag,
-            speed_multiplier,
-            variables,
-            lists,
-            initial_offset,
+            options,
         )
     }
 
     /// Runs just the strand `strand_id`, from its top block, whatever event
     /// heads it. False when there's no such strand or it's a custom block's
     /// definition, which only runs when called.
-    pub fn run_strand_with_lists(
-        self,
-        strand_id: &str,
-        emulator: Arc<Mutex<dyn InputBackend>>,
-        stop_flag: Option<Arc<Mutex<bool>>>,
-        speed_multiplier: f64,
-        variables: VariableStore,
-        lists: ListStore,
-    ) -> bool {
+    pub fn run_one_strand(self, strand_id: &str, options: RunOptions) -> bool {
         if !self.can_run_strand(strand_id) {
             return false;
         }
-        self.run_entries(
-            |s| s.id == strand_id,
-            emulator,
-            stop_flag,
-            speed_multiplier,
-            variables,
-            lists,
-            Duration::ZERO,
-        );
+        self.run_entries(|s| s.id == strand_id, options);
         true
     }
 
-    /// Whether `run_strand_with_lists` would run `strand_id`.
+    /// Whether `run_one_strand` would run `strand_id`.
     pub fn can_run_strand(&self, strand_id: &str) -> bool {
         self.graph.strand(strand_id).is_some_and(|s| {
             !s.instructions.is_empty()
@@ -702,16 +662,16 @@ impl Macro {
     }
 
     /// Runs every strand `pick` accepts side by side, each on its own thread.
-    fn run_entries(
-        self,
-        pick: impl Fn(&Strand) -> bool,
-        emulator: Arc<Mutex<dyn InputBackend>>,
-        stop_flag: Option<Arc<Mutex<bool>>>,
-        speed_multiplier: f64,
-        variables: VariableStore,
-        lists: ListStore,
-        initial_offset: Duration,
-    ) {
+    fn run_entries(self, pick: impl Fn(&Strand) -> bool, options: RunOptions) {
+        let RunOptions {
+            emulator,
+            stop_flag,
+            speed_multiplier,
+            variables,
+            lists,
+            offset: initial_offset,
+        } = options;
+        let lists = lists.unwrap_or_else(|| self.list_store());
         let source = Arc::new(crate::run_log::Source::for_macro(&self.id, &self.name));
         let max_loop_iterations = self.settings.max_loop_iterations;
         // StopMacro needs a flag every strand of this run shares.
@@ -858,33 +818,14 @@ fn run_strand(
     }
 }
 
-/// Convenience entry point equivalent to `run_strand` with an empty
-/// `block_table`, for callers/tests that don't need custom blocks.
+/// Runs `instructions` with no custom blocks or lists, for tests and
+/// callers that don't need them.
 pub fn run_instructions(
     instructions: Vec<Instruction>,
     emulator: Arc<Mutex<dyn InputBackend>>,
     stop_flag: Option<Arc<Mutex<bool>>>,
     speed_multiplier: f64,
     variables: VariableStore,
-) {
-    run_instructions_with_lists(
-        instructions,
-        emulator,
-        stop_flag,
-        speed_multiplier,
-        variables,
-        Arc::new(Mutex::new(HashMap::new())),
-    );
-}
-
-/// `run_instructions` with an externally-owned list store for watcher runs.
-pub fn run_instructions_with_lists(
-    instructions: Vec<Instruction>,
-    emulator: Arc<Mutex<dyn InputBackend>>,
-    stop_flag: Option<Arc<Mutex<bool>>>,
-    speed_multiplier: f64,
-    variables: VariableStore,
-    lists: ListStore,
 ) {
     run_fired_strand(
         crate::run_log::Source::default(),
@@ -893,7 +834,7 @@ pub fn run_instructions_with_lists(
         stop_flag,
         speed_multiplier,
         variables,
-        lists,
+        Arc::new(Mutex::new(HashMap::new())),
         Arc::new(HashMap::new()),
         0,
     );
@@ -955,7 +896,7 @@ fn run_block(
     // independently; the caller's deadline re-anchors on its next Wait.
     // `start` is `Instant::now()` at every call site except the outermost
     // one (`run_strand`'s top-level call), backdated by that strand's
-    // `initial_offset` - see `Macro::run_with_offset`.
+    // `initial_offset` - see `RunOptions::offset`.
     let mut deadline = start;
 
     for ins in instructions {
@@ -1001,7 +942,7 @@ fn run_block(
             InstructionKind::WhenRan => {}
             InstructionKind::BlockHeader(_) => {}
             // Header-only markers, same as `WhenRan`/`BlockHeader` - never
-            // actually reached (`run_with_offset` excludes these strands
+            // actually reached (`run_with` excludes these strands
             // from `entry_strands`, and the background watcher that fires
             // them starts from `strand.instructions[1..]`). Handled here
             // defensively so the match stays total.

@@ -10,8 +10,9 @@ use blockwork_core::macros::backend::evdev_mapping::{
 };
 use blockwork_core::macros::priority::raise_current_thread_priority;
 use blockwork_core::macros::run_registry;
+use blockwork_core::macros::runner::RunOptions;
 use blockwork_core::macros::runner::VariableStore;
-use blockwork_core::wire::{
+use blockwork_core::wine_bridge::{
     self, SharedRegion, WireCapture, WireCaptureEvent, WireControlCommand, WireTimestamp,
 };
 use evdev::{AbsoluteAxisCode, EventType, KeyCode, PropType, RelativeAxisCode};
@@ -85,11 +86,11 @@ fn main() {
             std::process::exit(1);
         }
     };
-    if mmap.len() < wire::SHARED_REGION_SIZE {
+    if mmap.len() < wine_bridge::SHARED_REGION_SIZE {
         tracing::error!(
             "shared memory file too small: {} < {}",
             mmap.len(),
-            wire::SHARED_REGION_SIZE
+            wine_bridge::SHARED_REGION_SIZE
         );
         std::process::exit(1);
     }
@@ -267,7 +268,7 @@ fn push_capture(region: &SharedRegion, event: WireCaptureEvent, ts: std::time::S
         event,
         ts: WireTimestamp::from_system_time(ts),
     };
-    let bytes = wire::encode_capture(&msg);
+    let bytes = wine_bridge::encode_capture(&msg);
     if !region.capture.try_push(&bytes) {
         tracing::warn!("capture ring full, dropping event");
     }
@@ -283,11 +284,11 @@ struct RunRequest {
 /// Runs at real-time priority so wake delay doesn't add playback latency.
 fn control_loop(region: &'static SharedRegion, worker_tx: std::sync::mpsc::Sender<RunRequest>) {
     raise_current_thread_priority();
-    let mut buf = [0u8; wire::SLOT_SIZE - 4];
+    let mut buf = [0u8; wine_bridge::SLOT_SIZE - 4];
     loop {
         match region.control.try_pop(&mut buf) {
             Some(len) => {
-                let Some(cmd) = wire::decode_control(&buf[..len]) else {
+                let Some(cmd) = wine_bridge::decode_control(&buf[..len]) else {
                     tracing::warn!("failed to decode WireControlCommand, skipping");
                     continue;
                 };
@@ -367,13 +368,12 @@ fn run_macro_blocking(
 
     let offset = Duration::from_secs_f64(elapsed_overshoot_ms.max(0.0) / 1000.0);
     let flag = run_registry::begin_run();
-    mac.clone().run_with_offset(
-        Arc::clone(&emulator),
-        Some(Arc::clone(&flag)),
+    mac.clone().run_with(RunOptions {
+        stop_flag: Some(Arc::clone(&flag)),
         speed_multiplier,
-        Arc::clone(&variables),
         offset,
-    );
+        ..RunOptions::new(Arc::clone(&emulator), Arc::clone(&variables))
+    });
     run_registry::end_run(&flag);
     if let Ok(values) = variables.lock() {
         let mut mac = mac.clone();
