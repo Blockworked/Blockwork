@@ -565,6 +565,12 @@ Item {
                 }
                 BlockCanvas {
                     id: canvas
+                    runningIds: root.runningIds
+                    breakpointIds: appState.breakpoints || []
+                    pausedIds: debugBar.paused.map(p => p.block_id)
+                    blockMarks: root.blockMarks
+                    onMarkClicked: instructionId => activity.showBlockError(instructionId)
+                    onBreakpointClicked: instructionId => root.invoke("toggle_breakpoint", { blockId: instructionId })
                     // Covered space belongs to the sidebar, including for drag releases.
                     containmentMask: QtObject {
                         function contains(point: point): bool {
@@ -889,7 +895,6 @@ Item {
         }
         return out;
     }
-    Binding { target: BlockRegistry; property: "blockMarks"; value: root.blockMarks }
     // Blocks this macro's running strands are on, outlined live.
     readonly property var runningIds: {
         const id = root.macro ? root.macro.id : "";
@@ -897,19 +902,11 @@ Item {
         try { active = JSON.parse(root.appBridge.activeBlocksJson || "[]"); } catch (e) {}
         return active.filter(b => b.macro_id === id).map(b => b.block_id);
     }
-    Binding { target: BlockRegistry; property: "runningIds"; value: root.runningIds }
     // Every macro with a strand running, for the library.
     readonly property var runningMacroIds: {
         let active = [];
         try { active = JSON.parse(root.appBridge.activeBlocksJson || "[]"); } catch (e) {}
         return active.map(b => b.macro_id).filter((id, i, all) => all.indexOf(id) === i);
-    }
-    Binding { target: BlockRegistry; property: "breakpointIds"; value: appState.breakpoints || [] }
-    Binding { target: BlockRegistry; property: "pausedIds"; value: debugBar.paused.map(p => p.block_id) }
-    Connections {
-        target: BlockRegistry
-        function onMarkClicked(instructionId) { activity.showBlockError(instructionId); }
-        function onBreakpointClicked(instructionId) { root.invoke("toggle_breakpoint", { blockId: instructionId }); }
     }
     // A block's palette name, for the debugger bar.
     function findInstruction(id) {

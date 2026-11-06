@@ -22,7 +22,7 @@ pub(crate) struct Tray {
 
 /// Held only so the tray icon lives as long as `Tray`; dropping it removes
 /// the icon, so its field is never read.
-#[allow(dead_code)]
+#[allow(dead_code)] // the variants' fields are never read
 enum BuiltTray {
     #[cfg(not(target_os = "linux"))]
     Native(TrayIcon),

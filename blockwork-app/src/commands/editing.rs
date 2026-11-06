@@ -105,7 +105,7 @@ pub(crate) fn edit_value_field(
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     // A run of keystrokes into one field coalesces into one undo step; a
-    // location that no longer resolves is quietly ignored, as before.
+    // location that no longer resolves is quietly ignored.
     let _ = run_edit(&mut s, EditCommand::EditFieldText { location, text });
     emit_state_updated(app, &s);
     Ok(())

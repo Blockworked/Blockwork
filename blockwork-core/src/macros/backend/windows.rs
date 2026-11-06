@@ -201,9 +201,9 @@ pub struct WinApiBackend {
 impl WinApiBackend {
     pub fn new() -> Result<Self, String> {
         let settings = Settings {
-            // Matches the old SendInput implementation: raw MOUSEEVENTF_MOVE
-            // deltas (subject to OS pointer speed/acceleration) instead of
-            // enigo's default of converting relative moves to absolute.
+            // Raw MOUSEEVENTF_MOVE deltas (subject to OS pointer speed and
+            // acceleration) instead of enigo's default of converting relative
+            // moves to absolute.
             windows_subject_to_mouse_speed_and_acceleration_level: true,
             // The previous implementation never auto-released held keys on
             // drop; modifier cleanup is handled explicitly in

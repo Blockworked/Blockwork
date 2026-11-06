@@ -1,4 +1,4 @@
-//! One browser tab's macros: what the desktop app's `commands.rs` does to the
+//! One browser tab's macros: what the desktop app's `commands/` modules do to the
 //! open macro, over the same `Macro` and blockstitch calls, without disk,
 //! daemon or runner. Each command keeps the app's undo, buffer and
 //! validation rules; where the page differs it says so.

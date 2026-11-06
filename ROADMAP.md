@@ -123,8 +123,9 @@ The biggest gap versus tools like AutoHotkey, Sikuli, or Power Automate.
 - **Localization (M, done).** Extract strings from QML and block labels.
 - **Mobile/remote companion (L, speculative).** Trigger macros from a phone
   over LAN through the daemon.
-- **Embedding SDK docs (S).** Document `blockwork-ffi` for host apps (games,
-  tools) with a worked example.
+- **Embedding SDK worked example (S).** `blockwork-ffi/README.md` covers
+  building, ownership and call order; add a small host app that records and
+  replays through it.
 - **macOS and Windows parity audit (M).** Per-feature support matrix; every
   new block states what it needs on each OS.
 

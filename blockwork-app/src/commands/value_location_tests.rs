@@ -1159,8 +1159,7 @@ fn delete_tail_is_one_edit() {
     assert!(mac.strand("s1").unwrap().instructions.is_empty());
 }
 
-/// The old frontend walker skipped `catch_body`; the shared clone walks
-/// every body the kind declares.
+/// Cloning walks every body the kind declares, `catch_body` included.
 #[test]
 fn duplicating_a_try_renames_its_on_error_part_and_copies_notes() {
     let mut mac = test_macro();
