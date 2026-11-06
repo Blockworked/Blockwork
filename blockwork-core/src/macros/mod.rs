@@ -237,7 +237,7 @@ pub enum InstructionKind {
     /// No-op if `value` isn't numeric; the variable is coerced to `0` first
     /// if it wasn't already numeric.
     ChangeVariable(String, Value),
-    /// `set clipboard to <value>` — overwrites the system clipboard with the
+    /// `set clipboard to <value>`: overwrites the system clipboard with the
     /// value's text. See `crate::clipboard::set_text`.
     SetClipboard(Value),
     /// Appends a number/text value to a named list. Boolean values are ignored.

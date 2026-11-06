@@ -63,6 +63,13 @@ clean:
 translations blockstitch="../blockstitch":
     #!/bin/sh
     set -eu
+    # The catalogs hold blockstitch's strings too, so read the pinned commit.
+    pin=$(sed -n 's/^blockstitch-core *=.*rev *= *"\([0-9a-f]*\)".*/\1/p' Cargo.toml)
+    head=$(git -C "{{blockstitch}}" rev-parse HEAD 2>/dev/null || echo none)
+    if [ ! -f .cargo/config.toml ] && [ "${BLOCKWORK_ANY_BLOCKSTITCH:-}" != 1 ] && [ "$head" != "$pin" ]; then
+        echo "{{blockstitch}} is at $head, Cargo.toml pins $pin (scripts/fetch-blockstitch.sh, or BLOCKWORK_ANY_BLOCKSTITCH=1)" >&2
+        exit 1
+    fi
     bin=$(qtpaths6 --query QT_HOST_BINS 2>/dev/null || qtpaths --query QT_HOST_BINS 2>/dev/null || echo /usr/lib/qt6/bin)
     "$bin/lupdate" -silent blockwork-qt/qml "{{blockstitch}}/qml/Blockstitch" -extensions qml -no-obsolete -ts $(ls blockwork-qt/i18n/qml_*.ts | grep -v qml_en.ts)
     "$bin/lupdate" -silent -pluralonly blockwork-qt/qml "{{blockstitch}}/qml/Blockstitch" -extensions qml -no-obsolete -ts blockwork-qt/i18n/qml_en.ts

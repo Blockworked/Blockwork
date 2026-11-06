@@ -3,6 +3,7 @@ name: Translations
 # Weblate only commits .ts files, so this compiles the .qm files the build embeds.
 on:
   push:
+    branches: [master]
     paths:
       - 'blockwork-qt/i18n/*.ts'
       - 'scripts/check-translations.py'

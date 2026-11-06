@@ -81,7 +81,8 @@ other. The rest are listed so nothing is missed.
    its line in `value_slot_mut`. Add it to `requires_integer` if it only takes
    whole numbers.
 4. `blockwork-core/src/macros/runner/`: what it does, in its category's file
-   (`control`, `input`, `data`, `dialogs`, `browser`, `vision`, `system`), and
+   (`control`, `input`, `data`, `dialogs`, `browser`, `vision`, `system`;
+   `apps.rs` holds helpers for the system blocks), and
    its variant in that category's arm of `run_block` in `runner.rs`, which
    only routes (`Wait` is the one block it runs itself).
 5. `blockwork-core/src/capabilities.rs`: what it can do (commands, network,
