@@ -208,3 +208,86 @@ fn run_instructions_with_lists(
         0,
     );
 }
+
+/// `run_block` routes each block to its category's file by naming it, and
+/// that file panics on a block it doesn't handle. The compiler can't see the
+/// two lists disagree, so this reads them from the source and compares.
+#[test]
+fn run_block_routes_each_block_to_the_file_that_runs_it() {
+    use std::collections::{BTreeMap, BTreeSet};
+    let variant = |line: &str| {
+        let rest = line.trim().trim_start_matches('|').trim();
+        rest.strip_prefix("InstructionKind::").map(|r| {
+            r.chars()
+                .take_while(|c| c.is_ascii_alphanumeric())
+                .collect::<String>()
+        })
+    };
+    // Each `module::run_*(` arm in `run_block`, and the variants it lists.
+    let runner = include_str!("../../runner.rs");
+    let body = &runner[runner.find("\nfn run_block(").unwrap()..];
+    let body = &body[..body.find("\n}\n").unwrap()];
+    let mut routed: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
+    let mut pending = BTreeSet::new();
+    let mut lines = body.lines();
+    while let Some(line) = lines.next() {
+        if line.starts_with("            ")
+            && !line.starts_with("             ")
+            && let Some(v) = variant(line)
+        {
+            pending.insert(v);
+        }
+        if !pending.is_empty() && line.contains("=>") {
+            // The call sits on this line or within the next couple.
+            let arm: String = std::iter::once(line).chain(lines.clone().take(2)).collect();
+            let module = arm
+                .split("::run_")
+                .next()
+                .filter(|_| arm.contains("::run_"))
+                .and_then(|head| {
+                    head.rsplit(|c: char| !c.is_ascii_alphanumeric() && c != '_')
+                        .next()
+                });
+            if let Some(module) = module {
+                routed
+                    .entry(module.to_string())
+                    .or_default()
+                    .extend(std::mem::take(&mut pending));
+            }
+            pending.clear();
+        }
+    }
+    let sources = [
+        ("control", include_str!("../control.rs")),
+        ("data", include_str!("../data.rs")),
+        ("system", include_str!("../system.rs")),
+        ("browser", include_str!("../browser.rs")),
+        ("dialogs", include_str!("../dialogs.rs")),
+        ("vision", include_str!("../vision.rs")),
+    ];
+    let mut wrong = Vec::new();
+    for (module, source) in sources {
+        let start = source.find("\npub(super) fn run_").unwrap();
+        let handled: BTreeSet<String> = source[start..]
+            .lines()
+            .filter(|l| l.starts_with("        ") && !l.starts_with("         "))
+            .filter_map(variant)
+            .collect();
+        let sent = routed.remove(module).unwrap_or_default();
+        for v in sent.difference(&handled) {
+            wrong.push(format!(
+                "{v}: run_block sends it to {module}.rs, which doesn't run it"
+            ));
+        }
+        for v in handled.difference(&sent) {
+            wrong.push(format!(
+                "{v}: {module}.rs runs it, but run_block doesn't send it there"
+            ));
+        }
+    }
+    assert!(
+        routed.is_empty() || routed.keys().all(|m| m == "input"),
+        "unchecked: {routed:?}"
+    );
+    assert!(wrong.is_empty(), "{}", wrong.join("\n"));
+}
