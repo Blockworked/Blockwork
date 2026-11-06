@@ -23,9 +23,9 @@ edition = "2024"
 [workspace.dependencies]
 # One blockstitch commit for all three; change it with scripts/set-blockstitch-rev.js,
 # or build against a checkout with `just blockstitch-local`.
-blockstitch-qml = { git = "https://github.com/Blockworked/blockstitch", rev = "f845a0e3bc11f32190717eff293ed47eee2085b6" }
-blockstitch-ffi = { git = "https://github.com/Blockworked/blockstitch", rev = "f845a0e3bc11f32190717eff293ed47eee2085b6" }
-blockstitch-core = { git = "https://github.com/Blockworked/blockstitch", rev = "f845a0e3bc11f32190717eff293ed47eee2085b6" }
+blockstitch-qml = { git = "https://github.com/Blockworked/blockstitch", rev = "043df3f325df1b66e15e56e54d09d7d88733fc52" }
+blockstitch-ffi = { git = "https://github.com/Blockworked/blockstitch", rev = "043df3f325df1b66e15e56e54d09d7d88733fc52" }
+blockstitch-core = { git = "https://github.com/Blockworked/blockstitch", rev = "043df3f325df1b66e15e56e54d09d7d88733fc52" }
 tracing = "0.1.44"
 tracing-log = "0.2.0"
 tracing-subscriber = "0.3.23"
