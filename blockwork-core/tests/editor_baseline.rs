@@ -1,7 +1,7 @@
 //! A saved macro that exercises the shared editor model: nested bodies, a
 //! custom reporter, comments, a list and a two-output block. It pins down the
 //! on-disk shape and what a variable rename reaches today.
-//! `BLOCKWORK_BLESS=1` rewrites the fixture in the current format.
+//! `BLESS=1` rewrites the fixture in the current format.
 
 use blockwork_core::input::value::Value;
 use blockwork_core::macros::{Instruction, InstructionKind, Macro, migrate};
@@ -67,7 +67,7 @@ fn saved_macro_loads_without_upgrade_and_saves_back_unchanged() {
     blockwork_core::init();
     let (mac, upgrade) = migrate::parse(&std::fs::read_to_string(fixture()).unwrap()).unwrap();
     let saved = migrate::to_value(&mac).unwrap();
-    if std::env::var_os("BLOCKWORK_BLESS").is_some() {
+    if std::env::var_os("BLESS").is_some() {
         std::fs::write(
             fixture(),
             serde_json::to_string_pretty(&saved).unwrap() + "\n",

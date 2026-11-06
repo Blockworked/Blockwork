@@ -7,20 +7,20 @@ server rules and can trigger anti-cheat.
 
 ## 1. Problem
 
-`FindImage` in `blockwork-core/src/macros/mod.rs:543` finds one PNG template
-with per-pixel tolerance (`blockwork-core/src/screen/find.rs:12`,
-`blockwork-core/src/screen/mod.rs:149`). It is 1:1 scale with no rotation or
+`FindImage` in `blockwork-core/src/macros/mod.rs` finds one PNG template
+with per-pixel tolerance (`blockwork-core/src/screen/find.rs`,
+`blockwork-core/src/screen/mod.rs`). It is 1:1 scale with no rotation or
 scale invariance, searched over the full desktop
-(`blockwork-core/src/screen/mod.rs:98`).
+(`blockwork-core/src/screen/mod.rs`).
 
 A Minecraft player breaks every assumption: different skins, armor, pose,
 distance changes pixel size, lighting and particles change colors, nametags
 move. One template per skin does not scale, and absolute cursor moves do not
 aim an FPS-style view.
 
-Window info in `blockwork-core/src/window.rs:7` has title/app only, no bounds.
+Window info in `blockwork-core/src/window.rs` has title/app only, no bounds.
 Mouse output is one absolute or relative jump
-(`blockwork-core/src/input/types.rs:191`, `blockwork-core/src/macros/runner.rs:1342`).
+(`blockwork-core/src/input/types.rs`, `blockwork-core/src/macros/runner.rs`).
 
 ## 2. Goals
 
@@ -42,7 +42,7 @@ Non-goals:
 
 All new `InstructionKind` cases follow the existing `FindImage` shape:
 `Value` slots for numbers/text, `String` names for variable and list targets
-(see `blockwork-app/src/state.rs:575` and `blockwork-core/src/macros/fields.rs:212`).
+(see `blockwork-app/src/state.rs` and `blockwork-core/src/macros/fields.rs`).
 
 ### 3.1 `DetectObjectsInWindow`
 
@@ -69,7 +69,7 @@ Coordinates are screen coordinates, same space as `MoveMouse Abs` and
 Center is `x + w / 2`, `y + h / 2`.
 
 Failure: follows `FindImage` soft-fail in
-`blockwork-core/src/macros/runner.rs:874`. Capture or inference errors fail
+`blockwork-core/src/macros/runner.rs`. Capture or inference errors fail
 the block for `TryCatch`. Zero detections is success with count 0, not error.
 
 ### 3.2 `WaitForDetection`
@@ -119,7 +119,7 @@ only if caller sets a strict flag; default is status string.
 
 ### 3.5 Value reporters
 
-Reuse the `ExtOperator` pattern in `blockwork-core/src/input/value.rs:10`:
+Reuse the `ExtOperator` pattern in `blockwork-core/src/input/value.rs`:
 
 - `DetectionCount(list)` -> number.
 - `DetectionX(list, i)`, `DetectionY`, `DetectionW`, `DetectionH`,
@@ -148,11 +148,11 @@ struct AimController { gain: f64, max_step: f64, deadzone: f64 }
 Add `window::bounds(pattern, by) -> Rect` per platform:
 
 - Windows: `GetWindowRect` plus client-area mapping (existing `place` code in
-  `blockwork-core/src/window.rs:678` shows the handle lookup to reuse).
-- Linux X11: reuse `x11::X11` in `blockwork-core/src/window.rs:451`, add geometry
+  `blockwork-core/src/window.rs` shows the handle lookup to reuse).
+- Linux X11: reuse `x11::X11` in `blockwork-core/src/window.rs`, add geometry
   query. Wayland compositors need per-compositor paths; same gaps as current
   window control.
-- macOS: extend the `osascript` helper in `blockwork-core/src/window.rs:706`
+- macOS: extend the `osascript` helper in `blockwork-core/src/window.rs`
   with position and size, or use ScreenCaptureKit in native code.
 
 Capture only that rect, then reuse `Shot` origin/scale handling. If the window
@@ -173,7 +173,7 @@ helper class. CPU target is 50-120 ms per frame at 320. GPU is optional.
 
 Model inputs need varied skins, armor, biomes, day/night, rain, particles,
 distances from 3 to 40 blocks, FOV 70-90, and common resource packs.
-Nametag OCR (`ScreenText` in `blockwork-core/src/input/value.rs:160`) stays a
+Nametag OCR (`ScreenText` in `blockwork-core/src/input/value.rs`) stays a
 fallback for known names, not the primary signal.
 
 ### 4.3 Tracking and selection
@@ -196,14 +196,14 @@ tune them live.
 
 Pointer-lock note: when Minecraft captures the pointer, absolute moves do not
 place the cursor on the target. Only small relative steps rotate the view.
-`ClickImage` behavior in `blockwork-core/src/macros/runner.rs:893` (absolute
+`ClickImage` behavior in `blockwork-core/src/macros/runner.rs` (absolute
 move plus click) is the wrong primitive here. `AimStep` plus re-detect is the
 correct loop.
 
 ## 5. Permissions, packaging, privacy
 
 - New capabilities `screen` and `input` already cover these blocks; see
-  `blockwork-app/src/commands.rs:902`. Detection models that download files
+  `blockwork-app/src/commands.rs`. Detection models that download files
   also need `network` on first fetch, shown before import runs.
 - Model files ship out of band, pinned by hash. Flatpak and installer flows
   must include or fetch the default model the same way `cargo-sources.json`
@@ -214,8 +214,8 @@ correct loop.
 ## 6. Frontend and DTO changes
 
 - `blockwork-app/src/state.rs`: `InstructionDto` cases mirroring section 3,
-  plus `FieldId` entries in `blockwork-core/src/macros/fields.rs:12`,
-  `visit_values_mut` coverage in `blockwork-core/src/macros/mod.rs:62`,
+  plus `FieldId` entries in `blockwork-core/src/macros/fields.rs`,
+  `visit_values_mut` coverage in `blockwork-core/src/macros/mod.rs`,
   hash arms, and serde migration entries.
 - QML: window picker reuses the app/window picker, model picker is a dropdown
   of installed models, list/variable pickers reuse existing widgets. Region
@@ -229,7 +229,7 @@ correct loop.
 - Screenshot fixtures: players with different skins at several distances,
   plus negative scenes with no players. Assert box centers within tolerance
   and zero false positives on empty scenes.
-- Live ignored tests follow `blockwork-core/src/screen/mod.rs:237`: real
+- Live ignored tests follow `blockwork-core/src/screen/mod.rs`: real
   capture plus detector timing, run by hand with `--ignored`.
 - Perf budget: capture plus 320px inference under ~150 ms on reference CPU,
   servo loop stable at 5-10 Hz without input starvation.
