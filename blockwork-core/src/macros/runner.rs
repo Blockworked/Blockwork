@@ -401,30 +401,6 @@ fn shell_process(command: &str) -> Command {
     process
 }
 
-/// The abilities a block needs permission for.
-fn guarded_abilities(kind: &InstructionKind) -> &'static [&'static str] {
-    match kind {
-        InstructionKind::Command(_)
-        | InstructionKind::CommandWait(_)
-        | InstructionKind::OpenApp { .. }
-        | InstructionKind::CloseApp { .. } => &["commands"],
-        InstructionKind::HttpRequest { .. } => &["network"],
-        InstructionKind::BrowserOpen { .. }
-        | InstructionKind::BrowserClick { .. }
-        | InstructionKind::BrowserType { .. }
-        | InstructionKind::BrowserWaitFor { .. }
-        | InstructionKind::BrowserScript { .. } => &["browser"],
-        InstructionKind::WriteFile { .. } => &["files_write"],
-        InstructionKind::FindImage { .. } | InstructionKind::WaitForImage { .. } => &["screen"],
-        InstructionKind::DetectObjectsInWindow { .. } | InstructionKind::WaitForDetection { .. } => &["screen"],
-        InstructionKind::ClickImage { .. } | InstructionKind::AimAtDetection { .. } => &["screen", "input"],
-        InstructionKind::Token(_) | InstructionKind::PasteText(_) | InstructionKind::AimStep { .. } => &["input"],
-        InstructionKind::RunMacro { .. } | InstructionKind::StopMacroNamed(_) => &["macros"],
-        InstructionKind::SetGlobal { .. } | InstructionKind::ChangeGlobal { .. } => &["globals"],
-        _ => &[],
-    }
-}
-
 /// Shows a dialog for this strand. `None` when there's no answer to use:
 /// cancelled (which stops the run unless a try block catches it), stopped,
 /// or failed.
@@ -930,7 +906,7 @@ fn run_block(
             }
         }
 
-        if let Some(Err(e)) = guarded_abilities(&ins.kind).iter().map(|a| crate::permissions::require(a)).find(Result::is_err) {
+        if let Some(Err(e)) = crate::capabilities::checked_when_run(&ins.kind).map(crate::permissions::require).find(Result::is_err) {
             soft_fail(ctx, &ins.id, "Permission", e)?;
             continue;
         }

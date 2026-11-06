@@ -60,60 +60,21 @@ pub(crate) fn export_macro(macro_id: String, path: String) -> Result<(), String>
     config::write_macro_file(std::path::Path::new(&path), &mac)
 }
 
-/// What an imported macro can do, shown before it's added: (kind, label,
-/// whether it deserves a warning). Listed in display order.
-pub(super) const CAPABILITIES: [(&str, &str, bool); 13] = [
-    ("commands", "Runs commands and opens or closes apps", true),
-    ("secrets", "Reads your saved secrets", true),
-    ("network", "Goes online", true),
-    ("browser", "Controls your web browser (clicks, types and reads pages)", true),
-    ("files_write", "Writes to files", true),
-    ("files_read", "Reads files and folders", false),
-    ("input", "Presses keys, clicks and moves the mouse", false),
-    ("clipboard", "Reads or changes the clipboard", false),
-    ("windows", "Reads or controls other apps and windows", false),
-    ("triggers", "Starts on its own (schedules, keys, typing, apps, idle, windows, files and more)", false),
-    ("screen", "Reads the screen (colors, images and text)", false),
-    ("macros", "Runs or stops your other macros", false),
-    ("globals", "Reads or changes global variables", false),
-];
-
-/// The capability a reporter needs, by operator name.
-pub(super) fn operator_capability(op: &str) -> Option<&'static str> {
-    Some(match op {
-        "ShellOutput" | "ShellSucceeded" => "commands",
-        "HttpGet" => "network",
-        "ReadFile" | "FileExists" | "ListDirectory" => "files_read",
-        "ClipboardText" | "ClipboardHasImage" | "ClipboardHasFiles" => "clipboard",
-        "ActiveWindowTitle" | "ActiveWindowApp" | "WindowExists" | "WindowInfo" | "AppRunning" => "windows",
-        "MacroRunning" => "macros",
-        "PixelColor" | "AverageColor" | "ScreenText" => "screen",
-        "GlobalVariable" => "globals",
-        "Secret" => "secrets",
-        "PageUrl" | "PageTitle" | "ElementText" | "ElementExists" | "ElementCount" => "browser",
-        _ => return None,
-    })
-}
-
-pub(super) fn value_capabilities(value: &Value, found: &mut std::collections::HashSet<&'static str>) {
-    match value {
-        Value::Op { op, args, .. } => {
-            found.extend(operator_capability(op.name()));
-            args.iter().for_each(|a| value_capabilities(a, found));
-        }
-        Value::Call { args, .. } => args.iter().for_each(|a| value_capabilities(a, found)),
-        _ => {}
-    }
-}
-
-/// Everything `mac` can do anywhere, nested blocks included, for the import
-/// review. `OpenApp`'s command can be any shell string in a hand-edited
-/// file, so it counts as running commands.
-/// Capabilities named by kind (as a library index lists them), in the usual order.
+/// Capabilities named by kind (as a library index lists them), in display order.
 pub(crate) fn capabilities_named(kinds: &[String]) -> Vec<crate::state::CapabilityDto> {
-    CAPABILITIES
+    capability_dtos(|kind| kinds.iter().any(|k| k == kind))
+}
+
+/// Everything `mac` can do anywhere, for the import review, in display order.
+pub(crate) fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
+    let found = blockwork_core::capabilities::macro_capabilities(mac);
+    capability_dtos(|kind| found.contains(kind))
+}
+
+fn capability_dtos(wanted: impl Fn(&str) -> bool) -> Vec<crate::state::CapabilityDto> {
+    blockwork_core::capabilities::CAPABILITIES
         .iter()
-        .filter(|(kind, ..)| kinds.iter().any(|k| k == kind))
+        .filter(|(kind, ..)| wanted(kind))
         .map(|(kind, label, risky)| crate::state::CapabilityDto {
             kind: kind.to_string(),
             label: label.to_string(),
@@ -156,62 +117,6 @@ pub(crate) fn uses_browser(mac: &Macro) -> bool {
         }
     });
     found
-}
-
-pub(crate) fn macro_capabilities(mac: &Macro) -> Vec<crate::state::CapabilityDto> {
-    use blockwork_core::macros::BlockKind;
-    let mut found = std::collections::HashSet::new();
-    mac.graph.walk_instructions(&mut |ins| {
-        let kind = match &ins.kind {
-            InstructionKind::Command(_)
-            | InstructionKind::CommandWait(_)
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. } => Some("commands"),
-            InstructionKind::HttpRequest { .. } => Some("network"),
-            InstructionKind::WriteFile { .. } => Some("files_write"),
-            InstructionKind::Token(_) => Some("input"),
-            InstructionKind::SetClipboard(_) | InstructionKind::WhenClipboardChanged => Some("clipboard"),
-            InstructionKind::WindowAction { .. }
-            | InstructionKind::MoveWindow { .. }
-            | InstructionKind::WhenWindow { .. }
-            | InstructionKind::WhenApp { .. } => Some("windows"),
-            InstructionKind::WhenTyped { .. } => Some("input"),
-            InstructionKind::WhenFileChanged(_) => Some("files_read"),
-            InstructionKind::RunMacro { .. } | InstructionKind::StopMacroNamed(_) => Some("macros"),
-            InstructionKind::FindImage { .. } | InstructionKind::WaitForImage { .. } => Some("screen"),
-            InstructionKind::DetectObjectsInWindow { .. } | InstructionKind::WaitForDetection { .. } => Some("screen"),
-            InstructionKind::ClickImage { .. } | InstructionKind::AimStep { .. } | InstructionKind::AimAtDetection { .. } => Some("input"),
-            InstructionKind::SetGlobal { .. } | InstructionKind::ChangeGlobal { .. } => Some("globals"),
-            InstructionKind::BrowserOpen { .. }
-            | InstructionKind::BrowserClick { .. }
-            | InstructionKind::BrowserType { .. }
-            | InstructionKind::BrowserWaitFor { .. }
-            | InstructionKind::BrowserScript { .. } => Some("browser"),
-            _ => None,
-        };
-        found.extend(kind);
-        if matches!(ins.kind, InstructionKind::ClickImage { .. } | InstructionKind::AimAtDetection { .. }) {
-            found.insert("screen");
-        }
-        if matches!(ins.kind, InstructionKind::PasteText(_)) {
-            found.extend(["input", "clipboard"]);
-        }
-        if ins.kind.is_header() && !matches!(ins.kind, InstructionKind::WhenRan | InstructionKind::BlockHeader(_)) {
-            found.insert("triggers");
-        }
-        let mut kind = ins.kind.clone();
-        kind.visit_values_mut(&mut |value, _| value_capabilities(value, &mut found));
-    });
-    CAPABILITIES
-        .iter()
-        .filter(|(kind, ..)| found.contains(kind))
-        .map(|(kind, label, risky)| crate::state::CapabilityDto {
-            kind: kind.to_string(),
-            label: label.to_string(),
-            risky: *risky,
-            guarded: blockwork_core::permissions::GUARDED.iter().any(|(k, _)| k == kind),
-        })
-        .collect()
 }
 
 /// One (key, label, getter, setter) entry per `MacroSettings` field - the
@@ -337,7 +242,7 @@ pub(crate) fn import_macro(
             }
         }
     }
-    capabilities.sort_by_key(|c| CAPABILITIES.iter().position(|(kind, ..)| *kind == c.kind));
+    capabilities.sort_by_key(|c| blockwork_core::capabilities::CAPABILITIES.iter().position(|(kind, ..)| *kind == c.kind));
     let review = crate::state::ImportReviewDto {
         name: file.name,
         macros: file.macros.iter().map(|m| m.name.clone()).collect(),

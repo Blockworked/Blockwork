@@ -3,6 +3,7 @@ pub mod backoff;
 #[cfg(feature = "system")]
 pub mod battery;
 pub mod block_packs;
+pub mod capabilities;
 #[cfg(feature = "system")]
 pub mod browser;
 #[cfg(feature = "system")]
