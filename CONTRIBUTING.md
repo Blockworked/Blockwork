@@ -113,5 +113,7 @@ other. The rest are listed so nothing is missed.
   `blockwork-web/src/session.rs` (the website demo), and
   `blockwork-app/src/web_parity.rs` checks they agree. Put any check or
   edit both need on `Macro` (`macros/document_rules.rs`, or blockstitch if
-  it isn't Blockwork-specific) and keep the two commands thin.
+  it isn't Blockwork-specific) and keep the two commands thin. A new web
+  command gets a step in the parity script, or a line in its `NOT_REPLAYED`
+  list saying why not; a test fails until it has one.
 - Changelog entries go under the unreleased version in `CHANGELOG.md`.

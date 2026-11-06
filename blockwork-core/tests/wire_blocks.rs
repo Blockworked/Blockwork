@@ -120,3 +120,43 @@ fn the_catalog_covers_every_block() {
     }
     assert!(missing.is_empty(), "{}", missing.join("\n"));
 }
+
+/// Every `When...` trigger is a header, has a run-log label, and is named by
+/// a watcher in `blockwork-app` (adding a block, step 7).
+#[test]
+fn every_trigger_has_a_label_and_a_watcher() {
+    use blockstitch_core::graph::BlockKind;
+    let app = concat!(env!("CARGO_MANIFEST_DIR"), "/../blockwork-app/src");
+    let mut sources = String::new();
+    let mut dirs = vec![std::path::PathBuf::from(app)];
+    while let Some(dir) = dirs.pop() {
+        for entry in std::fs::read_dir(dir).unwrap().flatten() {
+            let path = entry.path();
+            if path.is_dir() {
+                dirs.push(path);
+            } else if path.extension().is_some_and(|e| e == "rs") {
+                sources += &std::fs::read_to_string(path).unwrap();
+            }
+        }
+    }
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/wire_blocks.json");
+    let blocks: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let mut missing = Vec::new();
+    for block in &blocks {
+        let ty = block["type"].as_str().unwrap();
+        if !ty.starts_with("When") || ty == "WhenRan" {
+            continue;
+        }
+        let ins = dto_to_instruction(&serde_json::from_value(block.clone()).unwrap()).unwrap();
+        if !ins.kind.is_header() {
+            missing.push(format!("{ty}: not in is_header"));
+        }
+        if ins.kind.trigger_label().is_none() {
+            missing.push(format!("{ty}: no trigger_label in macros/trigger.rs"));
+        }
+        if !sources.contains(&format!("InstructionKind::{ty}")) {
+            missing.push(format!("{ty}: no watcher in blockwork-app names it"));
+        }
+    }
+    assert!(missing.is_empty(), "{}", missing.join("\n"));
+}

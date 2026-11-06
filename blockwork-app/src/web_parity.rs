@@ -149,11 +149,70 @@ fn script() -> Vec<(&'static str, Value)> {
         /* 57 */ ("set_variable_value", json!({ "name": "speed", "value": " 2.5 " })),
         /* 58 */ ("set_variable_value", json!({ "name": "speed", "value": "fast" })),
         /* 59 */ ("set_variable_value", json!({ "name": "nope", "value": "1" })),
+        /* 60 */ ("set_macro_always_listen", json!({ "enabled": true })),
+        /* 61 */ ("set_macro_catch_up", json!({ "enabled": true })),
+        /* 62 */ ("set_macro_max_run_secs", json!({ "seconds": 30 })),
+        /* 63 */ ("set_macro_max_loop_iterations", json!({ "iterations": 500 })),
+        /* 64 */ ("add_instruction", json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "i6", "type": "Wait", "duration": num(5.0) } })),
+        /* 65 */ ("edit_instruction", json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "i6", "type": "Wait", "duration": num(8.0) } })),
+        /* 66 */ ("put_value", json!({ "location": wait_field("$1", 1), "value": { "kind": "Var", "name": "speed" } })),
+        /* 67 */ ("take_value", json!({ "location": wait_field("$1", 1) })),
+        /* 68 */ ("create_floating_value", json!({ "x": 30, "y": 30, "value": num(4.0), "originBlockId": null })),
+        /* 69 */ ("remove_floating_value", json!({ "floatingId": "$68" })),
+        /* 70 */ ("create_comment", json!({ "x": 5, "y": 5, "text": "moved" })),
+        /* 71 */ ("move_comment", json!({ "commentId": "$70", "x": 90, "y": 120 })),
+        /* 72 */ ("set_list_editor_state", json!({ "name": "things", "visible": true, "x": 40, "y": 50 })),
+        /* 73 */ ("delete_list", json!({ "name": "things" })),
+        /* 74 */ ("delete_signal", json!({ "name": "start" })),
+        /* 75 */ ("create_block", json!({ "pieces": [{ "kind": "Label", "id": "l", "text": "spin" }],
+                   "shape": "Normal", "color": "#00aa88", "icon": "", "identifier": "", "description": "" })),
+        /* 76 */ ("delete_block", json!({ "blockId": "$75" })),
+        /* 77 */ ("undo", json!({})),
+        /* 78 */ ("clear_standalone_key_capture", json!({})),
+        /* 79 */ ("delete_signal", json!({ "name": "nope" })),
+        /* 80 */ ("paste_instructions", json!({ "x": 200, "y": 700, "instructions": [
+                     { "id": "p1", "type": "Wait", "duration": num(1.0) },
+                     { "id": "p2", "type": "Wait", "duration": num(2.0) }] })),
+        /* 81 */ ("merge_tail", json!({ "strandId": "$80", "path": at(1), "targetId": "$1", "targetPath": at(1) })),
+        /* 82 */ ("create_attached_comment", json!({ "instructionId": "i1", "dx": 20, "dy": 0, "text": "start here" })),
+        /* 83 */ ("set_recording_target", json!({ "strandId": "$1" })),
+        /* 84 */ ("create_block", json!({ "pieces": [{ "kind": "Label", "id": "l", "text": "hop" }],
+                   "shape": "Normal", "color": "#3366ff", "icon": "", "identifier": "", "description": "" })),
+        /* 85 */ ("edit_block", json!({ "blockId": "$84", "pieces": [{ "kind": "Label", "id": "l", "text": "hop twice" }],
+                   "shape": "Normal", "color": "#3366ff", "icon": "star", "identifier": "hop", "description": "Hops" })),
+        /* 86 */ ("clear_instructions", json!({})),
+        /* 87 */ ("undo", json!({})),
     ]
 }
 
 /// Steps the script expects to be refused.
-const REFUSED: &[usize] = &[52, 53, 54, 59];
+const REFUSED: &[usize] = &[52, 53, 54, 59, 79];
+
+/// Web commands the script leaves out, and why.
+const NOT_REPLAYED: &[(&str, &str)] = &[
+    ("load", "replaces the whole session; covered by blockwork-web's own tests"),
+    ("state", "read only"),
+    ("commands", "read only"),
+    ("preview_value", "read only: evaluates a value without changing anything"),
+    ("select_macro_by_id", "the web demo's macro list is not the app's library"),
+    ("duplicate_macro", "the web demo's macro list is not the app's library"),
+    ("delete_macro", "the web demo's macro list is not the app's library"),
+    ("remove_macro", "the web demo's macro list is not the app's library"),
+    ("set_macro_folder", "the web demo has no folders on disk"),
+    ("set_palette_layout", "an editor preference, not part of the macro"),
+];
+
+/// A command added to the web build must be replayed here or listed above.
+#[test]
+fn the_script_covers_every_web_command() {
+    let replayed: std::collections::HashSet<&str> = script().iter().map(|(c, _)| *c).collect();
+    let missing: Vec<&str> = blockwork_web::COMMANDS
+        .iter()
+        .copied()
+        .filter(|c| !replayed.contains(c) && !NOT_REPLAYED.iter().any(|(n, _)| n == c))
+        .collect();
+    assert!(missing.is_empty(), "add these to script() or NOT_REPLAYED: {missing:?}");
+}
 
 #[test]
 fn web_editor_replays_like_the_app() {
