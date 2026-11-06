@@ -1039,29 +1039,6 @@ impl Macro {
         }
     }
 
-    /// Renames a branch callback (`RunBranch(old)` blocks) inside the named
-    /// custom block's own body, keeping it working after the prototype's
-    /// branch piece is renamed. No-op if the block has no such body strand.
-    pub fn rename_block_branch_body(&mut self, block_id: &str, old: &str, new: &str) {
-        let Some(strand) = self.graph.strands.iter_mut().find(|s| {
-            matches!(
-                s.instructions.first().map(|i| &i.kind),
-                Some(InstructionKind::BlockHeader(id)) if id == block_id
-            )
-        }) else {
-            return;
-        };
-        for ins in &mut strand.instructions {
-            ins.walk_mut(&mut |child| {
-                if let InstructionKind::RunBranch(name) = &mut child.kind
-                    && name == old
-                {
-                    *name = new.to_string();
-                }
-            });
-        }
-    }
-
     /// Defines a new custom block, with Blockwork's own header instruction
     /// at the top of its body strand.
     pub fn create_block(

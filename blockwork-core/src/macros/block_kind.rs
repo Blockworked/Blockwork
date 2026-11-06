@@ -339,6 +339,13 @@ impl BlockKind for InstructionKind {
         }
     }
 
+    fn branch_ref_mut(&mut self) -> Option<&mut String> {
+        match self {
+            InstructionKind::RunBranch(name) => Some(name),
+            _ => None,
+        }
+    }
+
     fn value_slot_mut(&mut self, field: &str) -> Option<&mut Value> {
         fields::value_slot_mut(self, field.parse().ok()?)
     }

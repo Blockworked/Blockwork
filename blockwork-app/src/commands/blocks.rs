@@ -60,34 +60,10 @@ pub(crate) fn edit_block(
     blockwork_core::block_packs::check_identifier(&identifier)?;
     normalize_block_color(&color)?;
     push_undo(&mut s);
+    // Also renames `RunBranch` blocks for any branch whose name changed.
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
-    if let Some(def) = mac.block_defs.iter().find(|b| b.id == block_id) {
-        let old_pieces = def.pieces.clone();
-        let renames: Vec<(String, String)> = pieces
-            .iter()
-            .filter_map(|new_piece| {
-                let BlockPiece::Branch { id, name: new_name } = new_piece else {
-                    return None;
-                };
-                let old_name = old_pieces.iter().find_map(|p| match p {
-                    BlockPiece::Branch { id: old_id, name } if old_id == id => Some(name),
-                    _ => None,
-                })?;
-                (old_name != new_name).then(|| (old_name.clone(), new_name.clone()))
-            })
-            .collect();
-        for (old_name, new_name) in &renames {
-            mac.rename_block_branch_body(&block_id, old_name, new_name);
-        }
-    }
-    s.current_macro
-        .as_mut()
-        .ok_or("No macro selected")?
-        .update_block(&block_id, pieces, shape, &color)?;
-    s.current_macro
-        .as_mut()
-        .ok_or("No macro selected")?
-        .set_block_details(&block_id, &identifier, &description, &icon)?;
+    mac.update_block(&block_id, pieces, shape, &color)?;
+    mac.set_block_details(&block_id, &identifier, &description, &icon)?;
     auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())

@@ -684,7 +684,6 @@ impl Demo {
                 block_color(&color)?;
                 self.push_undo();
                 let mac = self.open_mut().ok_or("No macro selected")?;
-                rename_branch_bodies(mac, &block_id, &pieces);
                 mac.update_block(&block_id, pieces, shape, &color)?;
                 mac.set_block_details(&block_id, &identifier, &description, &icon)?;
                 Ok(Json::Null)
@@ -741,26 +740,6 @@ impl Demo {
 /// The app's color rule: a six-digit hex color.
 fn block_color(color: &str) -> Result<String, String> {
     normalize_block_color(color).ok_or_else(|| "Choose a valid block color".to_string())
-}
-
-/// Keeps `RunBranch` callbacks working when a branch piece is renamed.
-fn rename_branch_bodies(mac: &mut Macro, block_id: &str, pieces: &[BlockPiece]) {
-    let Some(def) = mac.block_defs.iter().find(|b| b.id == block_id) else { return };
-    let old = def.pieces.clone();
-    let renames: Vec<(String, String)> = pieces
-        .iter()
-        .filter_map(|piece| {
-            let BlockPiece::Branch { id, name } = piece else { return None };
-            let old_name = old.iter().find_map(|p| match p {
-                BlockPiece::Branch { id: old_id, name } if old_id == id => Some(name),
-                _ => None,
-            })?;
-            (old_name != name).then(|| (old_name.clone(), name.clone()))
-        })
-        .collect();
-    for (old_name, new_name) in &renames {
-        mac.rename_block_branch_body(block_id, old_name, new_name);
-    }
 }
 
 /// Whether `value` uses a reporter nothing on the page can answer (a host
