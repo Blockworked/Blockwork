@@ -35,7 +35,6 @@
     "Main.qml",
     "SettingsPage.qml",
     "OnboardingPage.qml",
-    "SectionCard.qml",
     "MacroFiles.qml",
     "PromptWindow.qml",
     "BlockLibrary.qml",
