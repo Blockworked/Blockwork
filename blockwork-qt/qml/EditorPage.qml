@@ -40,6 +40,8 @@ Item {
     function numberValue(n) { return catalog.numberValue(n); }
     function textValue(t) { return catalog.textValue(t); }
     function defaultInstruction(type) { return catalog.defaultInstruction(type); }
+    // Blockstitch's own defaults for the shared control, variable and list blocks.
+    function sharedPrefab(type) { return palette.prefab(type); }
     readonly property var extraOperators: catalog.extraOperators
     function registerBlocks() { catalog.register(); }
     function userVariableNames() {
@@ -601,7 +603,6 @@ Item {
                     lists: root.macroLists
                     blockDefinitions: root.macroBlockDefinitions
                     keyCapture: appState.key_capture
-                    standaloneKey: root.sidebarKey
                     onBlockActivated: (type, instruction) => dragController.addAt({ kind: "instruction", type: type, instruction: instruction }, 120, 120)
                     onCustomBlockActivated: definition => dragController.addAt(root.customEntry(definition), 120, 120)
                     onMakeVariableRequested: variableDialog.openForCreate()
@@ -621,7 +622,6 @@ Item {
                     onBrowseBlocksRequested: root.blockLibrary.browse()
                     onShareBlockRequested: definition => root.blockLibrary.share(definition)
                     onStandaloneKeyCaptureRequested: root.invoke("start_standalone_key_capture")
-                    onAppPickerRequested: instruction => root.openPaletteAppPicker(instruction)
                     onPieceActionRequested: (action, instruction) => { if (action === "pickApp") root.openPaletteAppPicker(instruction); }
                     onDetailsRequested:(name,identifier,explainer)=>root.blockDefById(identifier)||name===identifier?root.showDetails(identifier,explainer):detailsDialog.show(name,identifier,explainer)
                     onValueActivated: value => dragController.addAt({ kind: "value", value: value }, 160, 140)
@@ -682,7 +682,6 @@ Item {
                     }
                     onRecordingTargetRequested: strandId => root.invoke("set_recording_target", { strandId: strandId })
                     onKeyCaptureRequested:(strandId,path)=>root.invoke("start_key_capture",{strandId:strandId,path:path})
-                    onAppPickerRequested:(strandId,path,instruction)=>root.openAppPicker(strandId,path,instruction)
                     onPieceActionRequested:(action,strandId,path,instruction)=>root.onPieceAction(action,strandId,path,instruction)
                     onDetailsRequested:type=>root.showDetails(type)
                     onCanvasNoteRequested: (x, y) => root.invoke("create_comment", { x: x, y: y, text: "" })

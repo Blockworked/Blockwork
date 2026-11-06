@@ -8,7 +8,7 @@ import com.blockworked.Blockstitch 1.0
 // and prefabs handed to BlockRegistry. Help texts live in BlockHelp.qml.
 //
 // Adding a block: put it in a section, give it a row (and an icon) in
-// register(), a default in defaultInstruction or a prefab if it needs one,
+// register(), a prefab in register() if it needs defaults,
 // and a line in BlockHelp. A reporter also goes in extraOperators.
 QtObject {
     id: catalog
@@ -19,38 +19,12 @@ QtObject {
     function numberValue(n) { return { kind: "Number", value: n }; }
     function textValue(t) { return { kind: "Text", value: t }; }
     function firstGlobalName() { return (page.appState.globals || []).length ? page.appState.globals[0].name : ""; }
+    // A fresh block of this type: its prefab from register(), else
+    // blockstitch's defaults for the shared control, variable and list blocks.
     function defaultInstruction(type) {
-        const registered = BlockRegistry.prefab(type);
-        if (registered) { registered.id = BlockRegistry.newId(); return registered; }
-        const i = { id: BlockRegistry.newId(), type: type };
-        if (type === "WhenBatteryDischargedTo") i.threshold = numberValue(20);
-        else if (type === "WhenBatteryChargedTo") i.threshold = numberValue(100);
-        else if (type === "WhenTime") { i.schedule = { kind: "Daily" }; i.time = textValue("09:00"); }
-        else if (type === "Wait") i.duration = numberValue(1000);
-        else if (type === "Text") i.text = textValue("text");
-        else if (type === "Key") { i.key = textValue(page.sidebarKey); i.direction = "Click"; }
-        else if (type === "WhenKey") { i.key = textValue(page.sidebarKey); i.direction = "Press"; }
-        else if (type === "Button") { i.button = "Left"; i.direction = "Click"; }
-        else if (type === "MoveMouse") { i.x = numberValue(0); i.y = numberValue(0); i.coordinate = "Relative"; }
-        else if (type === "Scroll") { i.amount = numberValue(4); i.axis = "Vertical"; }
-        else if (type === "Command" || type === "CommandWait") i.command = "";
-        else if (type === "OpenApp" || type === "CloseApp") { i.command = ""; i.name = ""; i.icon = null; }
-        else if (type === "SetClipboard") i.value = textValue("text");
-        else if (type === "AddToList") { i.name = page.firstListName(); i.value = textValue("thing"); }
-        else if (type === "DeleteOfList") { i.name = page.firstListName(); i.index = numberValue(1); }
-        else if (type === "DeleteAllOfList" || type === "ReverseList") i.name = page.firstListName();
-        else if (type === "ShiftList") { i.name = page.firstListName(); i.amount = numberValue(1); }
-        else if (type === "InsertIntoList") { i.name = page.firstListName(); i.value = textValue("thing"); i.index = numberValue(1); }
-        else if (type === "ReplaceItemOfList") { i.name = page.firstListName(); i.index = numberValue(1); i.value = textValue("thing"); }
-        else if (type === "If") { i.condition = { kind: "Bool" }; i.body = []; }
-        else if (type === "IfElse") { i.condition = { kind: "Bool" }; i.then_body = []; i.else_body = []; }
-        else if (type === "Repeat") { i.count = numberValue(10); i.body = []; }
-        else if (type === "Forever") i.body = [];
-        else if (type === "While") { i.condition = { kind: "Bool" }; i.body = []; }
-        else if (type === "SetVariable") { i.name = page.firstVariableName(); i.value = numberValue(0); }
-        else if (type === "ChangeVariable") { i.name = page.firstVariableName(); i.value = numberValue(1); }
-        else if (type === "Return") i.value = numberValue(0);
-        return i;
+        const fresh = BlockRegistry.prefab(type) || page.sharedPrefab(type);
+        fresh.id = BlockRegistry.newId();
+        return fresh;
     }
     readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList", "SplitIntoList"]
 
@@ -359,7 +333,35 @@ QtObject {
             if (args) return args.length > 28 ? args.slice(0, 27) + "…" : args;
             return l.working_dir || (l.env && l.env.length) || l.new_instance ? qsTr("custom") : "";
         };
+        const direction = (pairs) => ({ kind: "dropdown", key: "direction", options: choices(pairs) });
+        const keyValue = { kind: "value", field: "KeyValue", key: "key", keyCapture: true };
+        const listPiece = { kind: "dropdown", key: "name", options: "lists", placeholder: qsTr("Choose list") };
         BlockRegistry.registerRows({
+            WhenBatteryDischargedTo: { shape: "header", head: [label(qsTr("WHEN BATTERY DISCHARGED TO")),
+                value("BatteryDischargeThreshold", "threshold"), label("%")] },
+            WhenBatteryChargedTo: { shape: "header", head: [label(qsTr("WHEN BATTERY CHARGED TO")),
+                value("BatteryChargeThreshold", "threshold"), label("%")] },
+            WhenPowerPluggedIn: { shape: "header", head: [label(qsTr("WHEN POWER PLUGGED IN"))] },
+            WhenPowerUnplugged: { shape: "header", head: [label(qsTr("WHEN POWER UNPLUGGED"))] },
+            WhenClipboardChanged: { shape: "header", head: [label(qsTr("WHEN CLIPBOARD CHANGES"))] },
+            WhenKey: { shape: "header", head: [label(qsTr("WHEN")), keyValue,
+                direction([["Press", qsTr("Pressed")], ["Release", qsTr("Released")]])] },
+            Wait: { head: [label(qsTr("Wait")), Object.assign(value("WaitDuration", "duration"), { unit: qsTr("ms") })] },
+            Text: { head: [label(qsTr("Text")), value("TextValue", "text")] },
+            Key: { head: [label(qsTr("Key")), keyValue,
+                direction([["Click", qsTr("Click")], ["Press", qsTr("Press")], ["Release", qsTr("Release")]])] },
+            Button: { head: [label(qsTr("Mouse button")),
+                { kind: "dropdown", key: "button", options: choices([["Left", qsTr("Left")], ["Right", qsTr("Right")], ["Middle", qsTr("Middle")],
+                    ["Side", qsTr("Side")], ["Extra", qsTr("Extra")]]) },
+                direction([["Click", qsTr("Click")], ["Press", qsTr("Press")], ["Release", qsTr("Release")]])] },
+            MoveMouse: { head: [label(qsTr("Move mouse")),
+                { kind: "dropdown", key: "coordinate", options: choices([["Relative", qsTr("Relative")], ["Absolute", qsTr("Absolute")]]) },
+                Object.assign(value("MoveMouseX", "x"), { unit: "x" }), Object.assign(value("MoveMouseY", "y"), { unit: "y" })] },
+            Scroll: { head: [label(qsTr("Scroll")), Object.assign(value("ScrollAmount", "amount"), { unit: qsTr("amount") }),
+                { kind: "dropdown", key: "axis", options: choices([["Vertical", qsTr("Vertical")], ["Horizontal", qsTr("Horizontal")]]) }] },
+            CloseApp: { head: [label(qsTr("Close app")),
+                { kind: "button", action: "pickApp", palette: true, image: "icon", icon: "square-x", text: i => i && i.name ? i.name : qsTr("Choose app...") }] },
+            SetClipboard: { head: [label(qsTr("set clipboard to")), value("SetClipboardValue", "value")] },
             SetVariable: { head: [label(qsTr("set")),
                 { kind: "dropdown", key: "name", options: () => page.variableChoices() },
                 label(qsTr("to")), value("SetVariableValue", "value")] },
@@ -517,6 +519,18 @@ QtObject {
         });
         BlockRegistry.registerPrefabs({
             Command: { command: "" },
+            WhenBatteryDischargedTo: { threshold: numberValue(20) },
+            WhenBatteryChargedTo: { threshold: numberValue(100) },
+            Wait: { duration: numberValue(1000) },
+            Text: { text: textValue("text") },
+            Key: () => ({ key: textValue(page.sidebarKey), direction: "Click" }),
+            WhenKey: () => ({ key: textValue(page.sidebarKey), direction: "Press" }),
+            Button: { button: "Left", direction: "Click" },
+            MoveMouse: { x: numberValue(0), y: numberValue(0), coordinate: "Relative" },
+            Scroll: { amount: numberValue(4), axis: "Vertical" },
+            OpenApp: { command: "", name: "", icon: null },
+            CloseApp: { command: "", name: "", icon: null },
+            SetClipboard: { value: textValue("text") },
             CommandWait: { command: "" },
             WhenAt: () => ({ at: textValue(Qt.formatDateTime(new Date(Date.now() + 3600000), "yyyy-MM-dd HH:00")) }),
             WhenSignal: () => ({ name: textValue(page.macro && page.macro.signals.length ? page.macro.signals[0] : "go"), expression: false }),

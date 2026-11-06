@@ -94,7 +94,7 @@ Item {
             mouseMove(scene, scene.width - 2, scene.height - 2, 0, Qt.NoButton);
             const page = createTemporaryObject(editorComponent, scene);
             wait(3000);
-            const palette = all(page).find(o => typeof o.prefab === "function" && o.standaloneKey !== undefined);
+            const palette = all(page).find(o => typeof o.prefab === "function" && o.resolvedSections !== undefined);
             const types = Object.keys(BlockRegistry.rows).filter(t => !BlockRegistry.isHeader(t)
                 && !/^When|Header|CallBlock|BranchCallBlock|^Test/.test(t) && palette.prefab(t));
             const big = strands(palette, types, 400, 25);
@@ -124,7 +124,7 @@ Item {
             const page = createTemporaryObject(editorComponent, scene);
             wait(200);
             tryVerify(() => !all(page).some(o => o.pendingEntries > 0), 20000);
-            const palette = all(page).find(o => typeof o.prefab === "function" && o.standaloneKey !== undefined);
+            const palette = all(page).find(o => typeof o.prefab === "function" && o.resolvedSections !== undefined);
             const types = Object.keys(BlockRegistry.rows).filter(t => !BlockRegistry.isHeader(t)
                 && !/^When|Header|CallBlock|BranchCallBlock|^Test/.test(t) && palette.prefab(t));
             const canvas = all(page).find(o => o.strands !== undefined && typeof o.syncStrands === "function");
@@ -178,7 +178,7 @@ Item {
             wait(200);
             // The palette's later sections build over a few frames; measure after.
             tryVerify(() => !all(page).some(o => o.pendingEntries > 0), 20000);
-            const palette = all(page).find(o => typeof o.prefab === "function" && o.standaloneKey !== undefined);
+            const palette = all(page).find(o => typeof o.prefab === "function" && o.resolvedSections !== undefined);
             verify(!!palette);
             const types = Object.keys(BlockRegistry.rows).filter(t => !BlockRegistry.isHeader(t)
                 && !/^When|Header|CallBlock|BranchCallBlock|^Test/.test(t) && palette.prefab(t));

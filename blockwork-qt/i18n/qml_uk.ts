@@ -1611,6 +1611,154 @@
         <source>something went wrong</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="502"/>
+        <source>WHEN BATTERY DISCHARGED TO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="510"/>
+        <source>WHEN BATTERY CHARGED TO</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="527"/>
+        <source>WHEN POWER PLUGGED IN</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="533"/>
+        <source>WHEN POWER UNPLUGGED</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="539"/>
+        <source>WHEN CLIPBOARD CHANGES</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="545"/>
+        <source>Wait</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="559"/>
+        <source>Text</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="566"/>
+        <source>Key</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="568"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="584"/>
+        <source>Click</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="568"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="584"/>
+        <source>Press</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="568"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="584"/>
+        <source>Release</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="576"/>
+        <source>Pressed</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="576"/>
+        <source>Released</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="582"/>
+        <source>Mouse button</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="583"/>
+        <source>Left</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="583"/>
+        <source>Right</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="583"/>
+        <source>Middle</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="583"/>
+        <source>Side</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="583"/>
+        <source>Extra</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="590"/>
+        <source>Move mouse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="591"/>
+        <source>Relative</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="591"/>
+        <source>Absolute</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="613"/>
+        <source>Scroll</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="619"/>
+        <source>amount</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="622"/>
+        <source>Vertical</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="622"/>
+        <source>Horizontal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="642"/>
+        <source>Close app</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="667"/>
+        <source>set clipboard to</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="711"/>
+        <source>Choose list</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>BlockDefinitionEditor</name>
@@ -3743,6 +3891,88 @@
         <source>Make a List…</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="520"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="731"/>
+        <source>at</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="649"/>
+        <source>set</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="658"/>
+        <source>change</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="660"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="701"/>
+        <source>by</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="674"/>
+        <source>add</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="683"/>
+        <source>delete</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="692"/>
+        <source>delete all of</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="699"/>
+        <source>shift</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="711"/>
+        <source>Choose list</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="729"/>
+        <source>insert</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="740"/>
+        <source>replace item</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="744"/>
+        <source>with</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="751"/>
+        <source>reverse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="758"/>
+        <source>return</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="765"/>
+        <source>break loop</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="771"/>
+        <source>continue loop</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>BwTimePicker</name>
@@ -5393,27 +5623,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="502"/>
-        <source>WHEN BATTERY DISCHARGED TO</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="510"/>
-        <source>WHEN BATTERY CHARGED TO</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="518"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="574"/>
-        <source>WHEN</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="519"/>
-        <source>every day</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="519"/>
         <source>weekly</source>
         <translation type="unfinished"></translation>
@@ -5429,273 +5638,9 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="520"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="731"/>
-        <source>at</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="527"/>
-        <source>WHEN POWER PLUGGED IN</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="533"/>
-        <source>WHEN POWER UNPLUGGED</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="539"/>
-        <source>WHEN CLIPBOARD CHANGES</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="545"/>
-        <source>Wait</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="551"/>
-        <source>ms</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="559"/>
-        <source>Text</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="566"/>
-        <source>Key</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="568"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="584"/>
-        <source>Click</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="568"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="584"/>
-        <source>Press</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="568"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="584"/>
-        <source>Release</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="576"/>
-        <source>Pressed</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="576"/>
-        <source>Released</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="582"/>
-        <source>Mouse button</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="583"/>
-        <source>Left</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="583"/>
-        <source>Right</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="583"/>
-        <source>Middle</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="583"/>
-        <source>Side</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="583"/>
-        <source>Extra</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="590"/>
-        <source>Move mouse</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="591"/>
-        <source>Relative</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="591"/>
-        <source>Absolute</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="597"/>
-        <source>x</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="605"/>
-        <source>y</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="613"/>
-        <source>Scroll</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="619"/>
-        <source>amount</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="622"/>
-        <source>Vertical</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="622"/>
-        <source>Horizontal</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="628"/>
-        <source>Run command</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="629"/>
-        <source>command</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="635"/>
-        <source>Open app</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="636"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="643"/>
-        <source>Choose app...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="642"/>
-        <source>Close app</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="649"/>
-        <source>set</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="650"/>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="659"/>
         <source>Choose variable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="651"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="676"/>
-        <source>to</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="658"/>
-        <source>change</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="660"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="701"/>
-        <source>by</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="667"/>
-        <source>set clipboard to</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="674"/>
-        <source>add</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="683"/>
-        <source>delete</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="685"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="733"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="742"/>
-        <source>of</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="692"/>
-        <source>delete all of</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="699"/>
-        <source>shift</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="711"/>
-        <source>Choose list</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="729"/>
-        <source>insert</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="740"/>
-        <source>replace item</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="744"/>
-        <source>with</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="751"/>
-        <source>reverse</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="758"/>
-        <source>return</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="765"/>
-        <source>break loop</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="771"/>
-        <source>continue loop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
