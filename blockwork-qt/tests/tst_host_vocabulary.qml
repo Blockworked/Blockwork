@@ -10,14 +10,7 @@ Item {
     width: 1200; height: 800
     property var calls: []
     function invoke(command, args) { calls.push({command: command, args: args}); }
-    QtObject {
-        id: bridge
-        property int replySerial: 0
-        property int previewSerial: 0
-        property string activeBlocksJson: "[]"
-        property string installedAppsError: ""
-        function callCommand(key, command, args) {}
-    }
+    MockBridge { id: bridge; silent: true }
     Component {
         id: editorComponent
         EditorPage {

@@ -7,13 +7,7 @@ Item {
     id: scene
     width: 1200; height: 800
     property var calls: []
-    QtObject {
-        id: bridge
-        property int replySerial: 0
-        property int previewSerial: 0
-        property string activeBlocksJson: "[]"
-        property string installedAppsError: ""
-    }
+    MockBridge { id: bridge; silent: true }
     function state() {
         return {current_macro: {id:"macro", name:"Test", speed_multiplier:1, settings:{always_listen:false}, signals:[], variables:[], lists:[], comments:[], floating_values:[], block_defs:[], strands:[]},
             recording_phase:{phase:"Idle"}, key_capture:null, can_undo:false, can_redo:false,

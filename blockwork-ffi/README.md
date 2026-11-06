@@ -58,6 +58,6 @@ reverse: the host stamps each input with its own time.
 
 ## Tests
 
-The crate has no tests of its own yet; CI's `cargo test -p blockwork-core -p
-blockwork-ffi` checks that it builds. The behaviour behind each call is
-tested in `blockwork-core`.
+`cargo test -p blockwork-ffi` runs `tests/abi.rs`, which drives the exported
+functions the way a host does: C strings, return codes, a host-clocked
+recording played back in lockstep through a callback, and the macro library.

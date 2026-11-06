@@ -8,14 +8,7 @@ Item {
     width: 1200; height: 800
     property var calls: []
     function invoke(command, args) { calls.push({command: command, args: args}); }
-    QtObject {
-        id: bridge
-        property int replySerial: 0
-        property int previewSerial: 0
-        property string activeBlocksJson: "[]"
-        property string installedAppsError: ""
-        function callCommand(key, command, args) {}
-    }
+    MockBridge { id: bridge; silent: true }
     readonly property var openApp: ({ id: "open", type: "OpenApp", command: "brave", name: "Brave", icon: null,
         launch: { args: "--incognito", working_dir: "", env: [{ name: "LANG", value: "C" }], new_instance: false } })
     Component {

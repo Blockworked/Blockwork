@@ -9,21 +9,7 @@ Item {
     property var calls: []
     property bool failCalls: false
     function invoke(command, args) { calls.push({command: command, args: args}); }
-    QtObject {
-        id: bridge
-        property int replySerial: 0
-        property int previewSerial: 0
-        property string activeBlocksJson: "[]"
-        property string installedAppsError: ""
-        property string replyKey: ""
-        property string replyJson: "null"
-        property string replyError: ""
-        property string lastError: ""
-        function callCommand(key, command, args) {
-            scene.calls.push({command: command, args: JSON.parse(args)});
-            replyKey = key; replyJson = "null"; replyError = scene.failCalls ? "Can't put that there" : ""; replySerial++;
-        }
-    }
+    MockBridge { id: bridge; calls: scene.calls; failure: scene.failCalls ? "Can't put that there" : "" }
     function macro(id, strands) {
         return {id: id, name: id, speed_multiplier: 1, settings: {always_listen: false}, signals: [], variables: [], lists: [], comments: [],
             floating_values: [], block_defs: [{id: "custom", identifier: "Custom", color: "#51b84b", shape: "Normal", pieces: [{kind: "Label", text: "custom"}]}],

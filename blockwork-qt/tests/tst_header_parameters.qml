@@ -8,22 +8,7 @@ Item {
     width: 1200; height: 800
     property var calls: []
     function invoke(command, args) { calls.push({command: command, args: args}); }
-    QtObject {
-        id: bridge
-        property int replySerial: 0
-        property string replyKey: ""
-        property string replyJson: "null"
-        property string replyError: ""
-        property string lastError: ""
-        property int previewSerial: 0
-        property string activeBlocksJson: "[]"
-        property string installedAppsError: ""
-        // Edits sent for a reply land in the same log, and succeed.
-        function callCommand(key, command, args) {
-            scene.calls.push({command: command, args: JSON.parse(args)});
-            replyKey = key; replyJson = "null"; replyError = ""; replySerial++;
-        }
-    }
+    MockBridge { id: bridge; calls: scene.calls }
     Component {
         id: editorComponent
         EditorPage {

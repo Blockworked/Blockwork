@@ -17,18 +17,7 @@ Item {
         {id: "bool", shape: "ReturnsBool", pieces: [{kind: "Label", text: "aim active"}]},
         {id: "branch", shape: "Normal", pieces: [{kind: "Label", text: "aim while"}, {kind: "Branch", name: "body"}]}
     ]
-    QtObject {
-        id: bridge
-        property int replySerial: 0
-        property string replyKey: ""
-        property string replyError: ""
-        property string replyJson: "null"
-        function callCommand(key, command, args) {
-            replyKey = key;
-            replyJson = JSON.stringify(["player count", "aim status"]);
-            replySerial++;
-        }
-    }
+    MockBridge { id: bridge; answer: ["player count", "aim status"] }
     BlockLibrary {
         id: library
         appState: ({current_macro: {name: "Example", block_defs: scene.definitions, pack_exports: scene.savedExports}})

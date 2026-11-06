@@ -43,12 +43,13 @@ with tempfile.TemporaryDirectory(prefix="blockwork-qml-") as temporary:
             singleton = "singleton " if "pragma Singleton" in file.read_text() else ""
             entries.append(f"{singleton}{file.stem} 1.0 {file.name}")
         (destination / "qmldir").write_text("\n".join(entries) + "\n")
-    # The real PromptBridge is a Rust QObject that exits its process on reply.
-    # A test-only bridge records replies while exercising the actual dialog UI.
-    prompt_module = modules / "com/blockworked/Blockwork"
-    shutil.copyfile(root / "blockwork-qt/tests/mocks/PromptBridge.qml", prompt_module / "PromptBridge.qml")
-    with (prompt_module / "qmldir").open("a") as module_file:
-        module_file.write("PromptBridge 1.0 PromptBridge.qml\n")
+    # Test stand-ins for the Rust QObjects (tests/mocks/): PromptBridge records
+    # replies instead of exiting, MockBridge answers AppBridge's calls.
+    blockwork_module = modules / "com/blockworked/Blockwork"
+    for mock in sorted((root / "blockwork-qt/tests/mocks").glob("*.qml")):
+        shutil.copyfile(mock, blockwork_module / mock.name)
+        with (blockwork_module / "qmldir").open("a") as module_file:
+            module_file.write(f"{mock.stem} 1.0 {mock.name}\n")
     shutil.copytree(root / "blockwork-qt/qml/BlockworkStyle", modules / "BlockworkStyle")
     # Match qt_diagnostics.cpp: the app uses its text-editing style and Basic
     # fallback, not macOS's non-customizable native controls.

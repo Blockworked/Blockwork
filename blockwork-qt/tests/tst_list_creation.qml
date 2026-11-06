@@ -11,20 +11,7 @@ Item {
     property var edits: []
     property string failure: ""
     function invoke(command, args) { calls.push({command: command, args: args}); }
-    QtObject {
-        id: bridge
-        property int replySerial: 0
-        property int previewSerial: 0
-        property string activeBlocksJson: "[]"
-        property string installedAppsError: ""
-        property string replyKey: ""
-        property string replyJson: "null"
-        property string replyError: ""
-        function callCommand(key, command, args) {
-            scene.calls.push({command: command, args: JSON.parse(args)});
-            replyKey = key; replyError = scene.failure; replySerial++;
-        }
-    }
+    MockBridge { id: bridge; calls: scene.calls; failure: scene.failure }
     Component {
         id: editorComponent
         EditorPage {
