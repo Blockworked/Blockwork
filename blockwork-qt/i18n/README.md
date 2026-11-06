@@ -29,6 +29,10 @@ After changing UI text, run `just translations` to update the `.ts` files
 (and compile the `.qm` files locally), then commit both. Merge Weblate's
 open pull request first, since both rewrite the `.ts` files.
 
+Moving QML into a new file moves its strings to a new context (the file's
+name). Run `python scripts/move-translations.py <OldFile> <path/to/New.qml>`
+first so their translations go with them.
+
 Run `python scripts/check-translations.py` from the repository root to check
 catalog keys, placeholders, file filters and English plural forms. New plural
 messages need both English forms filled in `qml_en.ts` before compiling.
