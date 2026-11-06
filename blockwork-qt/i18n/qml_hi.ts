@@ -3594,6 +3594,87 @@
     </message>
 </context>
 <context>
+    <name>BlockMenu</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="14"/>
+        <source>Edit block</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="20"/>
+        <source>Recording Target (current)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="20"/>
+        <source>Set Recording Target</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="26"/>
+        <source>Copy block</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="32"/>
+        <source>Copy all</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="38"/>
+        <source>Duplicate block</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="44"/>
+        <source>Cut block</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="50"/>
+        <source>Add Comment</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="50"/>
+        <source>Comment</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="56"/>
+        <source>Details</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="64"/>
+        <source>Delete block</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>BlockPiece</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockPiece.qml" line="26"/>
+        <source>Component: %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockPiece.qml" line="62"/>
+        <source>choose</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockPiece.qml" line="221"/>
+        <source>Add an option</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockPiece.qml" line="268"/>
+        <source>Remove %1</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>BlockRegistry</name>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="119"/>
@@ -5224,66 +5305,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="437"/>
-        <source>Edit block</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="438"/>
-        <source>Recording Target (current)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="438"/>
-        <source>Set Recording Target</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="439"/>
-        <source>Copy block</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="440"/>
-        <source>Copy all</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="441"/>
-        <source>Duplicate block</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="442"/>
-        <source>Cut block</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="443"/>
-        <source>Comment</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="443"/>
-        <source>Add Comment</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="444"/>
-        <source>Details</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="445"/>
-        <source>Delete block</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="1177"/>
-        <source>Remove %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="496"/>
         <source>WHEN RAN</source>
         <translation type="unfinished"></translation>
@@ -5337,21 +5358,6 @@
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="926"/>
         <source>while</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="1038"/>
-        <source>Component: %1</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="1058"/>
-        <source>choose</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="1144"/>
-        <source>Add an option</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
