@@ -1,4 +1,4 @@
-//! Flow blocks: conditions, loops, error handling, locks and custom block
+//! Flow blocks: waits, conditions, loops, error handling, locks and custom block
 //! calls.
 
 use super::*;
@@ -14,12 +14,15 @@ pub(super) enum Next {
 }
 
 /// Runs one flow block, recursing into `run_block` for its bodies.
+/// `deadline` is the strand's wait schedule (see `run_wait`).
 pub(super) fn run_control_block(
     ins: &Instruction,
     ctx: &mut ExecCtx,
     depth: u32,
+    deadline: &mut Instant,
 ) -> Result<Next, String> {
     match &ins.kind {
+        InstructionKind::Wait(duration) => return run_wait(ins, duration, ctx, depth, deadline),
         InstructionKind::WithLock { name, body } => {
             let name = match ctx.resolve(name, depth).and_then(|v| v.eval_text()) {
                 Ok(name) => name,
@@ -300,6 +303,65 @@ pub(super) fn run_control_block(
             }
         }
         _ => unreachable!("run_block only sends flow blocks here"),
+    }
+    Ok(Next::Go)
+}
+
+/// Runs a `Wait`. `deadline` is the strand's running schedule: each wait adds
+/// to it, so a chain of waits keeps its spacing however long the blocks
+/// between them took.
+fn run_wait(
+    ins: &Instruction,
+    duration: &Value,
+    ctx: &mut ExecCtx,
+    depth: u32,
+    deadline: &mut Instant,
+) -> Result<Next, String> {
+    let duration = match ctx.resolve(duration, depth).and_then(|v| v.eval_number()) {
+        Ok(v) => v,
+        Err(e) => {
+            soft_fail(ctx, &ins.id, "Wait", e)?;
+            return Ok(Next::Go);
+        }
+    };
+    // Clamped since duration may be an Op::Random node with a
+    // negative lower bound; from_secs_f64 panics on negative input.
+    let actual = (duration / ctx.speed_multiplier).max(0.0);
+    if host_clock::enabled() {
+        ctx.host_time_ms += actual;
+        let flag = ctx.stop_flag.clone();
+        let should_stop = move || flag.as_ref().is_some_and(stop_requested);
+        if !host_clock::wait_until(ctx.host_time_ms, &should_stop) {
+            return Ok(Next::Stop);
+        }
+        return Ok(Next::Go);
+    }
+    *deadline += Duration::from_secs_f64(actual / 1000.0);
+
+    if let Some(flag) = &ctx.stop_flag {
+        loop {
+            if stop_requested(flag) {
+                return Ok(Next::Stop);
+            }
+            let now = Instant::now();
+            if now >= *deadline {
+                break;
+            }
+            let remaining = *deadline - now;
+            if remaining > STOP_POLL_INTERVAL {
+                spin_sleeper().sleep(STOP_POLL_INTERVAL);
+            } else {
+                spin_sleeper().sleep_until(*deadline);
+                break;
+            }
+        }
+    } else {
+        let now = Instant::now();
+        if now >= *deadline {
+            *deadline = now; // fell behind; re-anchor instead of catching up
+        } else {
+            spin_sleeper().sleep_until(*deadline);
+        }
     }
     Ok(Next::Go)
 }

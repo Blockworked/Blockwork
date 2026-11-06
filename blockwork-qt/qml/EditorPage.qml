@@ -695,64 +695,7 @@ Item {
             });
         }
     }
-    AppDialog {
-        id: modelDialog; title: qsTr("Choose a detection model"); standardButtons: Dialog.Cancel
-        property var request: null
-        property var models: []
-        property bool busy: false
-        function openFor(req) {
-            request = req; models = []; busy = false; localUrl.text = "";
-            root.daemonCall("list_models", {}, (list, error) => { if (list) models = list; else pickError.show(error); });
-            open();
-        }
-        function use(id) { root.setBlockDetector(request, id); close(); }
-        function download(id) {
-            busy = true;
-            root.daemonCall("download_model", { id: id }, (done, error) => {
-                busy = false;
-                if (done) use(id); else pickError.show(error);
-            });
-        }
-        Column { width: 460; spacing: 10
-            Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                text: qsTr("Models run inside Blockwork. Pick one, add your own .onnx file, or point the block at a detector running on this computer.") }
-            Repeater {
-                model: modelDialog.models
-                delegate: Rectangle {
-                    required property var modelData
-                    width: 460; height: 56; radius: Theme.radius; color: Theme.panelRaised; border.color: Theme.border
-                    RowLayout { anchors.fill: parent; anchors.margins: 10; spacing: 10
-                        Column { Layout.fillWidth: true; spacing: 2
-                            Text { text: modelData.id; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold }
-                            Text { width: parent.width; text: modelData.about; color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideRight }
-                        }
-                        BwButton {
-                            enabled: !modelDialog.busy && (modelData.installed || modelData.downloadable)
-                            text: modelData.installed ? qsTr("Use") : modelData.downloadable ? qsTr("Download %1 MB").arg(modelData.megabytes) : qsTr("Not published yet")
-                            onClicked: modelData.installed ? modelDialog.use(modelData.id) : modelDialog.download(modelData.id)
-                        }
-                    }
-                }
-            }
-            Text { visible: modelDialog.busy; text: qsTr("Downloading..."); color: Theme.textDim; font.pixelSize: 12 }
-            BwButton { text: qsTr("Add a .onnx file..."); iconName: "folder-open"; enabled: !modelDialog.busy; onClicked: modelFile.open() }
-            Text { text: qsTr("Or a detector on this computer"); color: Theme.text; font.pixelSize: 12 }
-            RowLayout { width: parent.width; spacing: 8
-                BwTextField { id: localUrl; Layout.fillWidth: true; placeholderText: root.catalog.defaultDetector; onAccepted: useUrl.clicked() }
-                BwButton { id: useUrl; text: qsTr("Use"); enabled: localUrl.text.trim().length > 0; onClicked: modelDialog.use(localUrl.text.trim()) }
-            }
-        }
-    }
-    FileDialog {
-        id: modelFile; title: qsTr("Add a detection model"); fileMode: FileDialog.OpenFile
-        currentFolder: StandardPaths.writableLocation(StandardPaths.HomeLocation)
-        nameFilters: [qsTr("ONNX models (*.onnx)"), qsTr("All files (*)")]
-        onAccepted: {
-            const text = decodeURIComponent(selectedFile.toString());
-            const path = Qt.platform.os === "windows" ? text.replace(/^file:\/\/\//, "") : text.replace(/^file:\/\//, "");
-            root.daemonCall("import_model", { path: path }, (id, error) => { if (id) modelDialog.use(id); else pickError.show(error); });
-        }
-    }
+    DetectionModelDialog { id: modelDialog; page: root; onFailed: message => pickError.show(message) }
     NamePicker {
         id: signalPicker
         names: root.macro ? root.macro.signals || [] : []
@@ -828,82 +771,8 @@ Item {
             }
         }
     }
-    AppDialog {
-        id: recordingSettings; title: qsTr("Recording settings"); standardButtons: Dialog.Close
-        Column { spacing: 14; width: 390
-            BwSwitch { Accessible.name: qsTr("Record mouse movement"); checked: appState.record_mouse_movement; onToggled: checked => root.invoke("toggle_record_mouse_movement", { enabled: checked }) }
-            BwSwitch { Accessible.name: qsTr("Use relative mouse movement"); checked: appState.record_mouse_relative; onToggled: checked => root.invoke("toggle_record_mouse_relative", { relative: checked }) }
-            Text { width: parent.width; wrapMode: Text.WordWrap; text: appState.absolute_mouse_position_available ? qsTr("Absolute positioning is available on this system.") : qsTr("Absolute positioning is unavailable; relative movement will be used."); color: Theme.textDim; font.pixelSize: 12 }
-            Rectangle { width: parent.width; height: 1; color: Theme.borderSoft }
-            Column { width: parent.width; spacing: 6
-                Text { text: qsTr("Countdown"); color: Theme.text; font.pixelSize: 14 }
-                Text { width: parent.width; wrapMode: Text.WordWrap; text: qsTr("How long Record waits before it starts, so you can switch to the app you want to record."); color: Theme.textDim; font.pixelSize: 12 }
-                Row { spacing: 12
-                    BwSlider {
-                        id: countdownSlider
-                        width: 280; from: 0; to: 10; stepSize: 1; ticks: true
-                        anchors.verticalCenter: parent.verticalCenter
-                        Accessible.name: qsTr("Countdown")
-                        readonly property int savedSeconds: Math.max(from, Math.min(to, appState.recording_countdown_secs ?? 3))
-                        property bool readyForEdits: false
-                        Component.onCompleted: readyForEdits = true
-                        value: savedSeconds
-                        onValueChanged: {
-                            if (readyForEdits && value !== savedSeconds)
-                                root.invoke("set_recording_countdown", { seconds: Math.round(value) });
-                        }
-                    }
-                    Text {
-                        anchors.verticalCenter: parent.verticalCenter
-                        readonly property int secs: Math.round(countdownSlider.value)
-                        text: secs === 0 ? qsTr("Off") : qsTr("%n second(s)", "", secs)
-                        color: Theme.text; font.pixelSize: 13
-                    }
-                }
-            }
-        }
-    }
-    AppDialog {
-        id: variableDialog
-        objectName: "variableDialog"
-        property string renameTarget: ""
-        property var selectCreated: null
-        property string errorText: ""
-        title: renameTarget.length ? qsTr("Rename Variable") : qsTr("Make a Variable")
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        function openForCreate(select) { renameTarget = ""; selectCreated = select || null; errorText = ""; variableName.text = ""; open(); variableName.forceActiveFocus(); }
-        function openForRename(name) { selectCreated = null; errorText = ""; renameTarget = name; variableName.text = name; open(); variableName.forceActiveFocus(); variableName.selectAll(); }
-        Column { width: 340; spacing: 8
-            Text { text: qsTr("Variable name"); color: Theme.text }
-            BwTextField { id: variableName; objectName: "variableName"; width: parent.width; placeholderText: qsTr("score"); onAccepted: variableDialog.accept() }
-            Text { width: parent.width; visible: text.length > 0; text: variableDialog.errorText; color: Theme.text; wrapMode: Text.WordWrap }
-        }
-        onRejected: selectCreated = null
-        onAccepted: {
-            const name = variableName.text.trim();
-            if (!name.length) {
-                errorText = qsTr("Enter a variable name.");
-                Qt.callLater(() => { open(); variableName.forceActiveFocus(); });
-                return;
-            }
-            const select = selectCreated;
-            const macroId = root.macro ? root.macro.id : "";
-            const command = renameTarget.length ? "rename_variable" : "create_variable";
-            const args = renameTarget.length ? { oldName: renameTarget, newName: name } : { name: name };
-            if (renameTarget === name) { selectCreated = null; return; }
-            root.daemonCall(command, args, (result, error) => {
-                if (!root.macro || root.macro.id !== macroId) return;
-                if (error) {
-                    errorText = error;
-                    open(); variableName.forceActiveFocus();
-                    return;
-                }
-                selectCreated = null;
-                renameTarget = ""; variableName.clear();
-                if (select) select(name);
-            });
-        }
-    }
+    RecordingSettingsDialog { id: recordingSettings; page: root }
+    DataNameDialog { id: variableDialog; objectName: "variableDialog"; fieldObjectName: "variableName"; page: root; kind: "variable" }
     AppDialog {
         id: variableValueDialog
         objectName: "variableValueDialog"
@@ -933,116 +802,13 @@ Item {
             });
         }
     }
-    AppDialog {
-        id: signalsDialog
-        title: qsTr("Signals"); standardButtons: Dialog.Close
-        Column {
-            width: 400; spacing: 10
-            Text { width: parent.width; text: qsTr("Named signals in this macro. Expressions can also send and receive names outside this list."); wrapMode: Text.WordWrap; color: Theme.textDim }
-            ScrollView {
-                width: parent.width; height: Math.min(300, signalRows.implicitHeight)
-                clip: true
-                Column {
-                    id: signalRows; width: 380; spacing: 6
-                    Repeater {
-                        model: root.macro ? root.macro.signals || [] : []
-                        delegate: RowLayout {
-                            required property string modelData
-                            width: signalRows.width; spacing: 6
-                            Text { Layout.fillWidth: true; text: modelData; elide: Text.ElideRight; color: Theme.text }
-                            BwButton { text: qsTr("Rename"); onClicked: signalDialog.openForRename(modelData) }
-                            BwButton {
-                                text: qsTr("Delete")
-                                onClicked: root.daemonCall("delete_signal", { name: modelData }, (result, error) => { signalsError.text = error || ""; })
-                            }
-                        }
-                    }
-                }
-            }
-            Text { visible: !root.macro || !(root.macro.signals || []).length; text: qsTr("No named signals yet."); color: Theme.textDim }
-            Text { id: signalsError; width: parent.width; visible: text.length > 0; wrapMode: Text.WordWrap; color: Theme.danger }
-            BwButton { text: qsTr("New signal…"); iconName: "plus"; onClicked: signalPicker.openForCreate(null) }
-        }
-        onOpened: signalsError.text = ""
+    SignalsDialog {
+        id: signalsDialog; page: root
+        onNewSignalRequested: signalPicker.openForCreate(null)
+        onRenameRequested: name => signalDialog.openForRename(name)
     }
-    AppDialog {
-        id: signalDialog
-        property string renameTarget: ""
-        property string macroId: ""
-        property bool busy: false
-        title: qsTr("Rename signal")
-        standardButtons: Dialog.NoButton
-        function openForRename(name) {
-            renameTarget = name; signalName.text = name;
-            macroId = root.macro ? root.macro.id : "";
-            signalError.text = ""; busy = false;
-            open(); signalName.forceActiveFocus(); signalName.selectAll();
-        }
-        function submit() {
-            const name = signalName.text.trim();
-            if (busy || !name.length || !root.macro || root.macro.id !== macroId) return;
-            busy = true;
-            root.daemonCall("rename_signal", { oldName: renameTarget, newName: name }, (result, error) => {
-                busy = false;
-                if (error) signalError.text = error;
-                else close();
-            });
-        }
-        Column {
-            width: 400; spacing: 12
-            Text { text: qsTr("Name"); color: Theme.text; font.pixelSize: 13 }
-            BwTextField { id: signalName; width: parent.width; enabled: !signalDialog.busy; onAccepted: signalDialog.submit() }
-            Text { width: parent.width; wrapMode: Text.WordWrap; text: qsTr("Updates named blocks in this macro. Expressions keep their contents."); color: Theme.textDim; font.pixelSize: 13 }
-            Text { id: signalError; width: parent.width; visible: text.length > 0; wrapMode: Text.WordWrap; color: Theme.danger; font.pixelSize: 13 }
-        }
-        footer: DialogButtonBox {
-            alignment: Qt.AlignRight; spacing: 8; padding: 18; topPadding: 8
-            background: null
-            BwButton { text: qsTr("Cancel"); enabled: !signalDialog.busy; onClicked: signalDialog.reject() }
-            BwButton { text: qsTr("Rename"); primary: true; enabled: !signalDialog.busy && signalName.text.trim().length > 0; onClicked: signalDialog.submit() }
-        }
-    }
-    AppDialog {
-        id: listDialog
-        objectName: "listDialog"
-        property string renameTarget: ""
-        property var selectCreated: null
-        property string errorText: ""
-        title: renameTarget.length ? qsTr("Rename List") : qsTr("Make a List")
-        standardButtons: Dialog.Ok | Dialog.Cancel
-        function openForCreate(select) { renameTarget = ""; selectCreated = select || null; errorText = ""; listName.text = ""; open(); listName.forceActiveFocus(); }
-        function openForRename(name) { selectCreated = null; errorText = ""; renameTarget = name; listName.text = name; open(); listName.forceActiveFocus(); listName.selectAll(); }
-        Column { width: 340; spacing: 8
-            Text { text: qsTr("List name"); color: Theme.text }
-            BwTextField { id: listName; objectName: "listName"; width: parent.width; placeholderText: qsTr("items"); onAccepted: listDialog.accept() }
-            Text { width: parent.width; visible: text.length > 0; text: listDialog.errorText; color: Theme.text; wrapMode: Text.WordWrap }
-        }
-        onRejected: selectCreated = null
-        onAccepted: {
-            const name = listName.text.trim();
-            if (!name.length) {
-                errorText = qsTr("Enter a list name.");
-                Qt.callLater(() => { open(); listName.forceActiveFocus(); });
-                return;
-            }
-            const select = selectCreated;
-            const macroId = root.macro ? root.macro.id : "";
-            const command = renameTarget.length ? "rename_list" : "create_list";
-            const args = renameTarget.length ? { oldName: renameTarget, newName: name } : { name: name };
-            if (renameTarget === name) { selectCreated = null; return; }
-            root.daemonCall(command, args, (result, error) => {
-                if (!root.macro || root.macro.id !== macroId) return;
-                if (error) {
-                    errorText = error;
-                    open(); listName.forceActiveFocus();
-                    return;
-                }
-                selectCreated = null;
-                renameTarget = ""; listName.clear();
-                if (select) select(name);
-            });
-        }
-    }
+    RenameSignalDialog { id: signalDialog; page: root }
+    DataNameDialog { id: listDialog; objectName: "listDialog"; fieldObjectName: "listName"; page: root; kind: "list" }
     AppDialog {
         id: clearInstructionsDialog
         objectName: "clearInstructionsDialog"
@@ -1077,41 +843,7 @@ Item {
         Text { text: qsTr("Delete \"%1\" and its saved items?").arg(deleteListDialog.listName); color: Theme.text }
         onAccepted: root.invoke("delete_list", { name: deleteListDialog.listName })
     }
-    AppDialog {
-        id:detailsDialog;standardButtons:Dialog.NoButton;width:Math.min(430, parent.width - 32);padding:0;topPadding:0;bottomPadding:0;showClose:false
-        property string detailName:"";property string detailIdentifier:"";property string detailExplainer:""
-        function show(name,identifier,explainer){detailName=name;detailIdentifier=identifier;detailExplainer=explainer;open()}
-        contentItem:Column{spacing:12;padding:18
-            Row {
-                width: parent.width - 36
-                spacing: 9
-                LucideIcon { name: "info"; width: 20; height: 20; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
-                Text {
-                    width: parent.width - 29
-                    text: detailsDialog.detailName
-                    color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold
-                    wrapMode: Text.Wrap
-                    anchors.verticalCenter: parent.verticalCenter
-                }
-            }
-            Rectangle {
-                width: parent.width - 36
-                height: Math.max(30, identifierText.implicitHeight + 12)
-                radius: 5; color: Theme.field; border.color: Theme.border
-                Text {
-                    id: identifierText
-                    anchors.centerIn: parent
-                    width: parent.width - 16
-                    text: detailsDialog.detailIdentifier
-                    color: Theme.accent; font.family: "monospace"; font.pixelSize: 12
-                    wrapMode: Text.WrapAnywhere
-                    horizontalAlignment: Text.AlignHCenter
-                }
-            }
-            Text{width:parent.width-36;text:detailsDialog.detailExplainer;color:Theme.textDim;font.pixelSize:13;wrapMode:Text.Wrap}
-            Row{anchors.right:parent.right;anchors.rightMargin:18;BwButton{text:qsTr("Close");onClicked:detailsDialog.close()}}
-        }
-    }
+    BlockDetailsDialog { id: detailsDialog }
     MakeBlockDialog {
         id:blockDialog
         objectName: "blockDialog"

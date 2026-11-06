@@ -1993,6 +1993,14 @@
     </message>
 </context>
 <context>
+    <name>BlockDetailsDialog</name>
+    <message>
+        <location filename="../qml/BlockDetailsDialog.qml" line="48"/>
+        <source>Close</source>
+        <translation type="unfinished">Close</translation>
+    </message>
+</context>
+<context>
     <name>BlockHelp</name>
     <message>
         <location filename="../qml/EditorPage.qml" line="102"/>
@@ -4467,6 +4475,117 @@
     </message>
 </context>
 <context>
+    <name>DataNameDialog</name>
+    <message>
+        <location filename="../qml/DataNameDialog.qml" line="18"/>
+        <source>Rename List</source>
+        <translation>Rechristen List</translation>
+    </message>
+    <message>
+        <location filename="../qml/DataNameDialog.qml" line="18"/>
+        <source>Rename Variable</source>
+        <translation>Rechristen Variable</translation>
+    </message>
+    <message>
+        <location filename="../qml/DataNameDialog.qml" line="19"/>
+        <source>Make a List</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DataNameDialog.qml" line="19"/>
+        <source>Make a Variable</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DataNameDialog.qml" line="24"/>
+        <source>List name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DataNameDialog.qml" line="24"/>
+        <source>Variable name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DataNameDialog.qml" line="27"/>
+        <source>items</source>
+        <translation>cargo</translation>
+    </message>
+    <message>
+        <location filename="../qml/DataNameDialog.qml" line="27"/>
+        <source>score</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DataNameDialog.qml" line="36"/>
+        <source>Enter a list name.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DataNameDialog.qml" line="36"/>
+        <source>Enter a variable name.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>DetectionModelDialog</name>
+    <message>
+        <location filename="../qml/DetectionModelDialog.qml" line="11"/>
+        <source>Choose a detection model</source>
+        <translation>Pick a lookout model</translation>
+    </message>
+    <message>
+        <location filename="../qml/DetectionModelDialog.qml" line="32"/>
+        <source>Models run inside Blockwork. Pick one, add your own .onnx file, or point the block at a detector running on this computer.</source>
+        <translation>Models run aboard Blockwork. Pick one, add yer own .onnx file, or point the block at a lookout runnin&apos; on this computer.</translation>
+    </message>
+    <message>
+        <location filename="../qml/DetectionModelDialog.qml" line="45"/>
+        <source>Download %1 MB</source>
+        <translation>Haul aboard %1 MB</translation>
+    </message>
+    <message>
+        <location filename="../qml/DetectionModelDialog.qml" line="45"/>
+        <source>Not published yet</source>
+        <translation>Not launched yet</translation>
+    </message>
+    <message>
+        <location filename="../qml/DetectionModelDialog.qml" line="45"/>
+        <source>Use</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DetectionModelDialog.qml" line="51"/>
+        <source>Downloading...</source>
+        <translation>Haulin&apos; aboard...</translation>
+    </message>
+    <message>
+        <location filename="../qml/DetectionModelDialog.qml" line="52"/>
+        <source>Add a .onnx file...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/DetectionModelDialog.qml" line="53"/>
+        <source>Or a detector on this computer</source>
+        <translation>Or a lookout on this computer</translation>
+    </message>
+    <message>
+        <location filename="../qml/DetectionModelDialog.qml" line="60"/>
+        <source>Add a detection model</source>
+        <translation>Add a lookout model</translation>
+    </message>
+    <message>
+        <location filename="../qml/DetectionModelDialog.qml" line="62"/>
+        <source>All files (*)</source>
+        <translation>All scrolls (*)</translation>
+    </message>
+    <message>
+        <location filename="../qml/DetectionModelDialog.qml" line="62"/>
+        <source>ONNX models (*.onnx)</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>DictEditorCard</name>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="173"/>
@@ -4881,64 +5000,6 @@
         <translation>Path to a PNG picture</translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1106"/>
-        <source>Choose a detection model</source>
-        <translation>Pick a lookout model</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1125"/>
-        <source>Models run inside Blockwork. Pick one, add your own .onnx file, or point the block at a detector running on this computer.</source>
-        <translation>Models run aboard Blockwork. Pick one, add yer own .onnx file, or point the block at a lookout runnin&apos; on this computer.</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1138"/>
-        <location filename="../qml/EditorPage.qml" line="1149"/>
-        <location filename="../qml/EditorPage.qml" line="1364"/>
-        <location filename="../qml/EditorPage.qml" line="1378"/>
-        <source>Use</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1138"/>
-        <source>Download %1 MB</source>
-        <translation>Haul aboard %1 MB</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1138"/>
-        <source>Not published yet</source>
-        <translation>Not launched yet</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1144"/>
-        <source>Downloading...</source>
-        <translation>Haulin&apos; aboard...</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1145"/>
-        <source>Add a .onnx file...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1146"/>
-        <source>Or a detector on this computer</source>
-        <translation>Or a lookout on this computer</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1154"/>
-        <source>Add a detection model</source>
-        <translation>Add a lookout model</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1156"/>
-        <source>ONNX models (*.onnx)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1156"/>
-        <source>All files (*)</source>
-        <translation>All scrolls (*)</translation>
-    </message>
-    <message>
         <location filename="../qml/EditorPage.qml" line="1166"/>
         <source>Choose a signal</source>
         <translation type="unfinished"></translation>
@@ -4964,42 +5025,6 @@
         <source>Start from a template</source>
         <translation>Start from a chart</translation>
     </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1404"/>
-        <source>Record mouse movement</source>
-        <translation type="unfinished">Record mouse movement</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1405"/>
-        <source>Use relative mouse movement</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1406"/>
-        <source>Absolute positioning is available on this system.</source>
-        <translation>Absolute positionin&apos; be available on this vessel.</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1406"/>
-        <source>Absolute positioning is unavailable; relative movement will be used.</source>
-        <translation>Absolute positionin&apos; ain&apos;t available; relative movement will be used.</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1409"/>
-        <location filename="../qml/EditorPage.qml" line="1416"/>
-        <source>Countdown</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1410"/>
-        <source>How long Record waits before it starts, so you can switch to the app you want to record.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1429"/>
-        <source>Off</source>
-        <translation type="unfinished">Lowered</translation>
-    </message>
     <message numerus="yes">
         <location filename="../qml/EditorPage.qml" line="1429"/>
         <source>%n second(s)</source>
@@ -5009,103 +5034,16 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1442"/>
-        <source>Rename Variable</source>
-        <translation>Rechristen Variable</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1442"/>
-        <source>Make a Variable</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1447"/>
-        <source>Variable name</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1448"/>
-        <location filename="../qml/EditorPage.qml" line="1880"/>
-        <source>score</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1455"/>
-        <source>Enter a variable name.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1479"/>
-        <source>Signals</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1482"/>
-        <source>Named signals in this macro. Expressions can also send and receive names outside this list.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1494"/>
-        <location filename="../qml/EditorPage.qml" line="1543"/>
-        <source>Rename</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../qml/EditorPage.qml" line="1496"/>
         <location filename="../qml/EditorPage.qml" line="1607"/>
         <source>Delete</source>
         <translation type="unfinished">Scuttle</translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="1503"/>
-        <source>No named signals yet.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1514"/>
-        <source>Rename signal</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1534"/>
-        <source>Name</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1536"/>
-        <source>Updates named blocks in this macro. Expressions keep their contents.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../qml/EditorPage.qml" line="1542"/>
         <location filename="../qml/EditorPage.qml" line="1606"/>
         <source>Cancel</source>
         <translation type="unfinished">Belay that</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1552"/>
-        <source>Rename List</source>
-        <translation>Rechristen List</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1552"/>
-        <source>Make a List</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1557"/>
-        <source>List name</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1558"/>
-        <source>items</source>
-        <translation>cargo</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1565"/>
-        <source>Enter a list name.</source>
-        <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1590"/>
@@ -5126,11 +5064,6 @@
         <location filename="../qml/EditorPage.qml" line="1618"/>
         <source>Delete &quot;%1&quot; and its saved items?</source>
         <translation>Scuttle &quot;%1&quot; an&apos; its stowed cargo?</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1653"/>
-        <source>Close</source>
-        <translation type="unfinished">Close</translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="1764"/>
@@ -6489,6 +6422,72 @@
     </message>
 </context>
 <context>
+    <name>RecordingSettingsDialog</name>
+    <message>
+        <location filename="../qml/RecordingSettingsDialog.qml" line="7"/>
+        <source>Recording settings</source>
+        <translation>Recordin&apos; settings</translation>
+    </message>
+    <message>
+        <location filename="../qml/RecordingSettingsDialog.qml" line="10"/>
+        <source>Record mouse movement</source>
+        <translation type="unfinished">Record mouse movement</translation>
+    </message>
+    <message>
+        <location filename="../qml/RecordingSettingsDialog.qml" line="11"/>
+        <source>Use relative mouse movement</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/RecordingSettingsDialog.qml" line="12"/>
+        <source>Absolute positioning is available on this system.</source>
+        <translation>Absolute positionin&apos; be available on this vessel.</translation>
+    </message>
+    <message>
+        <location filename="../qml/RecordingSettingsDialog.qml" line="12"/>
+        <source>Absolute positioning is unavailable; relative movement will be used.</source>
+        <translation>Absolute positionin&apos; ain&apos;t available; relative movement will be used.</translation>
+    </message>
+    <message>
+        <location filename="../qml/RecordingSettingsDialog.qml" line="15"/>
+        <source>Countdown</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/RecordingSettingsDialog.qml" line="16"/>
+        <source>How long Record waits before it starts, so you can switch to the app you want to record.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/RecordingSettingsDialog.qml" line="35"/>
+        <source>Off</source>
+        <translation type="unfinished">Lowered</translation>
+    </message>
+</context>
+<context>
+    <name>RenameSignalDialog</name>
+    <message>
+        <location filename="../qml/RenameSignalDialog.qml" line="12"/>
+        <source>Rename signal</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/RenameSignalDialog.qml" line="32"/>
+        <source>Name</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/RenameSignalDialog.qml" line="34"/>
+        <source>Updates named blocks in this macro. Expressions keep their contents.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/RenameSignalDialog.qml" line="40"/>
+        <source>Cancel</source>
+        <translation type="unfinished">Belay that</translation>
+    </message>
+</context>
+<context>
     <name>SchedulePicker</name>
     <message>
         <location filename="../qml/SchedulePicker.qml" line="11"/>
@@ -7505,6 +7504,39 @@
     <message>
         <location filename="../qml/SettingsPage.qml" line="679"/>
         <source>Completeness counts finished translations. It does not measure translation quality.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>SignalsDialog</name>
+    <message>
+        <location filename="../qml/SignalsDialog.qml" line="9"/>
+        <source>Signals</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/SignalsDialog.qml" line="16"/>
+        <source>Named signals in this macro. Expressions can also send and receive names outside this list.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/SignalsDialog.qml" line="28"/>
+        <source>Rename</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/SignalsDialog.qml" line="30"/>
+        <source>Delete</source>
+        <translation type="unfinished">Scuttle</translation>
+    </message>
+    <message>
+        <location filename="../qml/SignalsDialog.qml" line="37"/>
+        <source>No named signals yet.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/SignalsDialog.qml" line="39"/>
+        <source>New signal…</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

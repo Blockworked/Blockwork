@@ -988,7 +988,8 @@ fn run_block(
             | InstructionKind::OpenApp { .. }
             | InstructionKind::CloseApp { .. }
             | InstructionKind::PasteText(_) => system::run_system_block(ins, ctx, depth)?,
-            InstructionKind::WithLock { .. }
+            InstructionKind::Wait(_)
+            | InstructionKind::WithLock { .. }
             | InstructionKind::Return(_)
             | InstructionKind::EscapeLoop
             | InstructionKind::ContinueLoop
@@ -1003,11 +1004,13 @@ fn run_block(
             | InstructionKind::IfElse { .. }
             | InstructionKind::Repeat { .. }
             | InstructionKind::Forever { .. }
-            | InstructionKind::While { .. } => match control::run_control_block(ins, ctx, depth)? {
-                control::Next::Go => {}
-                control::Next::Stop => break,
-                control::Next::Exit(flow) => return Ok(flow),
-            },
+            | InstructionKind::While { .. } => {
+                match control::run_control_block(ins, ctx, depth, &mut deadline)? {
+                    control::Next::Go => {}
+                    control::Next::Stop => break,
+                    control::Next::Exit(flow) => return Ok(flow),
+                }
+            }
             InstructionKind::FindImage { .. }
             | InstructionKind::ClickImage { .. }
             | InstructionKind::WaitForImage { .. }
@@ -1026,59 +1029,6 @@ fn run_block(
             | InstructionKind::BrowserScript { .. } => {
                 if let Some(flow) = browser::run_browser_block(ins, ctx, depth)? {
                     return Ok(flow);
-                }
-            }
-            InstructionKind::Wait(duration) => {
-                let duration = match ctx.resolve(duration, depth).and_then(|v| v.eval_number()) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        soft_fail(ctx, &ins.id, "Wait", e)?;
-                        continue;
-                    }
-                };
-                // Clamped since duration may be an Op::Random node with a
-                // negative lower bound; from_secs_f64 panics on negative input.
-                let actual = (duration / ctx.speed_multiplier).max(0.0);
-                if host_clock::enabled() {
-                    ctx.host_time_ms += actual;
-                    let flag = ctx.stop_flag.clone();
-                    let should_stop = move || flag.as_ref().is_some_and(stop_requested);
-                    if !host_clock::wait_until(ctx.host_time_ms, &should_stop) {
-                        break;
-                    }
-                    continue;
-                }
-                deadline += Duration::from_secs_f64(actual / 1000.0);
-
-                if let Some(flag) = &ctx.stop_flag {
-                    let mut stopped = false;
-                    loop {
-                        if stop_requested(flag) {
-                            stopped = true;
-                            break;
-                        }
-                        let now = Instant::now();
-                        if now >= deadline {
-                            break;
-                        }
-                        let remaining = deadline - now;
-                        if remaining > STOP_POLL_INTERVAL {
-                            spin_sleeper().sleep(STOP_POLL_INTERVAL);
-                        } else {
-                            spin_sleeper().sleep_until(deadline);
-                            break;
-                        }
-                    }
-                    if stopped {
-                        break;
-                    }
-                } else {
-                    let now = Instant::now();
-                    if now >= deadline {
-                        deadline = now; // fell behind; re-anchor instead of catching up
-                    } else {
-                        spin_sleeper().sleep_until(deadline);
-                    }
                 }
             }
             InstructionKind::Token(_) if ctx.input_unavailable.is_some() => {
