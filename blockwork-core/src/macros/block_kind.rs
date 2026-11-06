@@ -2,9 +2,6 @@
 
 use super::*;
 
-/// Blockwork's half of the block-editor contract: where its instructions
-/// keep values and bodies, which are headers, and how field ids map onto
-/// their slots. Every traversal built on this lives in blockstitch.
 /// Every variable and list name a kind holds as text, for
 /// [`BlockKind::visit_refs_mut`] and [`BlockKind::visit_refs`] alike.
 macro_rules! for_each_ref {
@@ -202,9 +199,12 @@ impl BlockKind for InstructionKind {
             InstructionKind::If { condition, .. }
             | InstructionKind::IfElse { condition, .. }
             | InstructionKind::While { condition, .. } => f(condition, InputValueType::Bool),
-            InstructionKind::AddToList { value, .. } | InstructionKind::InsertIntoList { value, .. } => {
-                f(value, InputValueType::Any)
+            InstructionKind::AddToList { value, .. } => f(value, InputValueType::Any),
+            InstructionKind::InsertIntoList { value, index, .. } => {
+                f(value, InputValueType::Any);
+                f(index, InputValueType::Any);
             }
+            InstructionKind::WhenTime(_, time) => f(time, InputValueType::Any),
             InstructionKind::DeleteOfList { index, .. } => f(index, InputValueType::Any),
             InstructionKind::ShiftList { amount, .. } => f(amount, InputValueType::Any),
             InstructionKind::ReplaceItemOfList { index, value, .. } => {
@@ -220,7 +220,6 @@ impl BlockKind for InstructionKind {
             | InstructionKind::ContinueLoop
             | InstructionKind::StopMacro
             | InstructionKind::TryCatch { .. }
-            | InstructionKind::WhenTime(..)
             | InstructionKind::WhenPowerPluggedIn
             | InstructionKind::WhenPowerUnplugged
             | InstructionKind::WhenClipboardChanged

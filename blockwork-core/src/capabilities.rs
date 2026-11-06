@@ -41,7 +41,20 @@ pub fn block_capabilities(kind: &InstructionKind) -> &'static [&'static str] {
         K::ClickImage { .. } | K::AimAtDetection { .. } => &["screen", "input"],
         K::SetGlobal { .. } | K::ChangeGlobal { .. } => &["globals"],
         K::BrowserOpen { .. } | K::BrowserClick { .. } | K::BrowserType { .. } | K::BrowserWaitFor { .. } | K::BrowserScript { .. } => &["browser"],
-        _ => &[],
+        // Listed rather than `_` so a new block has to be decided here.
+        K::Wait { .. } | K::Comment { .. } | K::WhenRan { .. } | K::WhenBatteryDischargedTo { .. } |
+        K::WhenBatteryChargedTo { .. } | K::WhenTime { .. } | K::WhenPowerPluggedIn { .. } |
+        K::WhenPowerUnplugged { .. } | K::WhenKey { .. } | K::WhenIdle { .. } | K::WhenScreenLock { .. } |
+        K::WhenCron { .. } | K::WhenNetwork { .. } | K::WhenUsb { .. } | K::WhenMouseButton { .. } |
+        K::WhenAt { .. } | K::WhenSignal { .. } | K::WhenWebhook { .. } | K::SetVariable { .. } |
+        K::ChangeVariable { .. } | K::AddToList { .. } | K::DeleteOfList { .. } | K::DeleteAllOfList { .. } |
+        K::ShiftList { .. } | K::InsertIntoList { .. } | K::ReplaceItemOfList { .. } | K::ReverseList { .. } |
+        K::SplitIntoList { .. } | K::BlockHeader { .. } | K::CallBlock { .. } | K::RunBranch { .. } |
+        K::Return { .. } | K::If { .. } | K::IfElse { .. } | K::Repeat { .. } | K::Forever { .. } |
+        K::While { .. } | K::EscapeLoop { .. } | K::ContinueLoop { .. } | K::WaitUntil { .. } |
+        K::WithLock { .. } | K::TryCatch { .. } | K::ThrowError { .. } | K::Retry { .. } | K::StopMacro { .. } |
+        K::Notify { .. } | K::Log { .. } | K::AskText { .. } | K::AskYesNo { .. } | K::AskChoice { .. } |
+        K::ShowMessage { .. } | K::SendSignal { .. } => &[],
     }
 }
 

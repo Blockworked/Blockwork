@@ -31,3 +31,41 @@ fn the_fixture_has_every_block() {
         assert!(fixture.contains(&format!("\"type\": \"{name}\"")), "{name} has no case in wire_blocks.json");
     }
 }
+
+/// `BlockCatalog.qml`'s `registerVariableFields` (the dropdowns the editor
+/// renames with a variable) must match `for_each_ref` in `block_kind.rs`.
+#[test]
+fn variable_dropdowns_match_the_backend_refs() {
+    use blockwork_core::macros::{BlockKind, RefKind};
+    let qml = include_str!("../../blockwork-qt/qml/BlockCatalog.qml");
+    let start = qml.find("registerVariableFields({").unwrap();
+    let table = &qml[start..start + qml[start..].find("});").unwrap()];
+    let mut listed = std::collections::HashMap::new();
+    for entry in table.split(']').filter(|e| e.contains('[')) {
+        let (kind, fields) = entry.split_once('[').unwrap();
+        let kind = kind.trim_matches(|c: char| !c.is_ascii_alphanumeric()).rsplit(|c: char| !c.is_ascii_alphanumeric()).next().unwrap();
+        let fields: Vec<String> = fields.split(',').map(|f| f.trim().trim_matches('"').to_string()).collect();
+        listed.insert(kind.to_string(), fields);
+    }
+    assert!(listed.len() > 5, "parsed {listed:?}");
+
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/wire_blocks.json");
+    let blocks: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    for block in &blocks {
+        let ty = block["type"].as_str().unwrap();
+        let kind = dto_to_instruction(&serde_json::from_value(block.clone()).unwrap()).unwrap().kind;
+        let mut refs = Vec::new();
+        kind.visit_refs(&mut |k, name| if k == RefKind::Variable { refs.push(name.to_string()) });
+        // Blockstitch's own variable blocks register theirs.
+        if refs.is_empty() || matches!(ty, "SetVariable" | "ChangeVariable") {
+            assert!(!listed.contains_key(ty), "{ty} is listed but holds no variable");
+            continue;
+        }
+        let fields = listed.get(ty).unwrap_or_else(|| panic!("{ty} holds a variable but has no registerVariableFields entry"));
+        for field in fields {
+            if let Some(name) = block[field].as_str() {
+                assert!(refs.contains(&name.to_string()), "{ty}.{field} is not a variable the backend renames");
+            }
+        }
+    }
+}

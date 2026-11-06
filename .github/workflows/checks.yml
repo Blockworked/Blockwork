@@ -116,10 +116,7 @@ jobs:
       - uses: actions/checkout@v4
       - name: Checkout pinned Blockstitch QML
         run: |
-          git init ../blockstitch
-          git -C ../blockstitch remote add origin https://github.com/Blockworked/blockstitch.git
-          git -C ../blockstitch fetch --depth 1 origin b2f52bb2314da261f556bbcb7ddb42008f2208fb
-          git -C ../blockstitch checkout --detach FETCH_HEAD
+          scripts/fetch-blockstitch.sh ../blockstitch
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'

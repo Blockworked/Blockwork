@@ -307,4 +307,44 @@ mod tests {
         assert!("Nonsense".parse::<FieldId>().is_err());
         assert!("CallArg:x".parse::<FieldId>().is_err());
     }
+    /// Every unit `FieldId`, read off this file's enum.
+    fn every_field() -> Vec<FieldId> {
+        let source = include_str!("fields.rs");
+        let body = &source[source.find("pub enum FieldId {").unwrap()..];
+        let body = &body[..body.find("\n}").unwrap()];
+        let mut fields: Vec<FieldId> = body
+            .lines()
+            .map(str::trim)
+            .filter_map(|line| line.strip_suffix(','))
+            .filter_map(|name| name.parse().ok())
+            .collect();
+        fields.extend((0..4).map(FieldId::CallArg));
+        fields
+    }
+
+    /// `visit_values_mut` (block_kind.rs) and `value_slot_mut` must name the
+    /// same slots, or a value is drawn but can't be edited (or the reverse).
+    #[test]
+    fn every_visited_value_has_a_field_id() {
+        use blockstitch_core::graph::BlockKind;
+        let fields = every_field();
+        assert!(fields.len() > 40, "only parsed {} field ids", fields.len());
+        let fixtures: serde_json::Value = serde_json::from_str(include_str!("../../tests/fixtures/wire_blocks.json")).unwrap();
+        for block in fixtures.as_array().unwrap() {
+            let dto: crate::frontend::InstructionDto = serde_json::from_value(block.clone()).unwrap();
+            let mut kind = crate::frontend::dto_to_instruction(&dto).unwrap().kind;
+            let mut visited = Vec::new();
+            kind.visit_values_mut(&mut |value, _| visited.push(value as *const Value));
+            let mut named = Vec::new();
+            for field in &fields {
+                if let Some(value) = value_slot_mut(&mut kind, *field) {
+                    named.push(value as *const Value);
+                }
+            }
+            visited.sort();
+            named.sort();
+            named.dedup();
+            assert_eq!(visited, named, "{} visits a different set of values than its field ids reach", block["type"]);
+        }
+    }
 }

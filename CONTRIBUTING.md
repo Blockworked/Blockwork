@@ -29,6 +29,14 @@ in `Cargo.toml`. `just blockstitch-local` builds against a sibling checkout.
 
 ## Build and test
 
+You need Rust (stable), [just](https://github.com/casey/just), Qt 6.10 (CI uses 6.10.3)
+(`qmake6` on PATH or `QMAKE` set; without one the build downloads a minimal
+Qt) and Python 3 for the QML tests. `just` leaves out
+`blockwork-linux-bridge`, which needs a Windows cross toolchain; do the same
+with `--exclude blockwork-linux-bridge` when calling cargo yourself. The QML tests need a
+blockstitch checkout at the pinned commit (`scripts/fetch-blockstitch.sh`) and
+one build first, which stages the Lucide icons.
+
 ```bash
 just                  # build
 just run              # build and launch
@@ -43,29 +51,33 @@ Two tests check generated files and rewrite them with `BLESS=1`:
 
 ## Adding a block
 
-The compiler catches most of these, since the runner and the `BlockKind`
-impl match every kind. The rest are listed so nothing is missed.
+The compiler catches most of these, since the runner, the capability table and
+the `BlockKind` impl match every kind, and the tests in `fields.rs` and
+`tests/wire_blocks.rs` check the slot, variable and fixture lists against each
+other. The rest are listed so nothing is missed.
 
 1. `blockwork-core/src/macros/mod.rs`: add the `InstructionKind` variant with
    a doc comment. A field added to an existing block needs `#[serde(default)]`
    so older files still load.
 2. `blockwork-core/src/macros/block_kind.rs`: list its value slots in
-   `visit_values_mut`, its nested bodies in `body`/`body_mut`, and add it to
-   `is_header` if it is a trigger.
+   `visit_values_mut`, its nested bodies in `body`/`body_mut`, any variable
+   or list names it holds in `for_each_ref`, and add it to `is_header` if it
+   is a trigger.
 3. `blockwork-core/src/macros/fields.rs`: a `FieldId` per value slot, and
    its line in `value_slot_mut`. Add it to `requires_integer` if it only takes
    whole numbers.
 4. `blockwork-core/src/macros/runner.rs`: what it does, in `run_block`.
 5. `blockwork-core/src/capabilities.rs`: what it can do (commands, network,
-   screen, ...), if anything. This drives the import review and the
+   screen, ...), or add it to the list that does nothing guarded. This drives the import review and the
    permission prompts for shared macros.
 6. `blockwork-core/src/frontend/instructions.rs`: its line in `wire_blocks!`,
    and a case in `blockwork-core/tests/fixtures/wire_blocks.json`.
 7. A trigger also needs a watcher in `blockwork-app` (see `system_watch.rs`)
    and a line in `macros/trigger.rs` for the run log.
 8. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry, a row in
-   `register()` (label, value and dropdown pieces, icon) and a prefab if a
-   fresh block needs defaults.
+   `register()` (label, value and dropdown pieces, icon), a prefab if a
+   fresh block needs defaults, and its variable dropdowns in
+   `registerVariableFields`.
 9. `blockwork-qt/qml/BlockHelp.qml`: one sentence on what it does.
 10. `just translations`.
 

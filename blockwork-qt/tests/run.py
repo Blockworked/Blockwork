@@ -14,6 +14,10 @@ root = Path(__file__).resolve().parents[2]
 blockstitch = Path(sys.argv[1]).resolve() if len(sys.argv) > 1 else root.parent / "blockstitch"
 qtpaths = shutil.which("qtpaths6") or shutil.which("qtpaths")
 qtbin = Path(subprocess.check_output([qtpaths, "--query", "QT_HOST_BINS"], text=True).strip()) if qtpaths else Path("/usr/lib/qt6/bin")
+if not (blockstitch / "qml/Blockstitch").is_dir():
+    sys.exit(f"No blockstitch checkout at {blockstitch} (scripts/fetch-blockstitch.sh makes one)")
+if not (root / "blockwork-qt/qml/Lucide").is_dir():
+    sys.exit("blockwork-qt/qml/Lucide is missing; `just` (any build) stages it")
 
 with tempfile.TemporaryDirectory(prefix="blockwork-qml-") as temporary:
     modules = Path(temporary)
