@@ -12,6 +12,7 @@ numbers and compile the .qm files.
 A string the old file still uses is copied rather than moved.
 """
 
+import os
 from pathlib import Path
 import re
 import sys
@@ -31,12 +32,16 @@ def context_block(catalog, name):
 def main(old, new_file):
     new_file = Path(new_file)
     new = new_file.stem
+    # Catalog locations are relative to the catalog folder, as lupdate writes them.
+    location = os.path.relpath(new_file.resolve(), CATALOGS)
     lines = new_file.read_text(encoding="utf-8").split("\n")
     wanted = {}
     for number, line in enumerate(lines, 1):
         for match in QSTR.finditer(line):
             wanted.setdefault(match.group(1).replace('\\"', '"'), number)
-    old_files = list(new_file.parent.glob(old + ".qml"))
+    # The old file may sit in either repo (a string can move from blockstitch to Blockwork).
+    roots = [CATALOGS.parent / "qml", CATALOGS.parents[2] / "blockstitch" / "qml" / "Blockstitch"]
+    old_files = [root / f"{old}.qml" for root in roots if (root / f"{old}.qml").exists()]
     still_used = set()
     for path in old_files:
         still_used |= {m.group(1).replace('\\"', '"') for m in QSTR.finditer(path.read_text(encoding="utf-8"))}
@@ -57,7 +62,7 @@ def main(old, new_file):
                 continue
             if source not in still_used:
                 old_block = old_block.replace(message.group(0), "", 1)
-            text = re.sub(r'(<location filename="[^"]*/)[^/"]+\.qml" line="\d+"/>', rf'\g<1>{new}.qml" line="{number}"/>', message.group(0))
+            text = re.sub(r'<location filename="[^"]*" line="\d+"/>', f'<location filename="{location}" line="{number}"/>', message.group(0))
             moved.append((number, text))
         if not moved:
             continue

@@ -32,6 +32,11 @@ def check():
                 if key in keys:
                     errors.append(f"{prefix}: duplicate message")
                 keys.add(key)
+                for location in message.findall("location"):
+                    target = (CATALOGS / location.get("filename", "")).resolve()
+                    # blockstitch's files are checked when its checkout sits beside this one.
+                    if not target.exists() and (ROOT in target.parents or target.parents[2].exists()):
+                        errors.append(f"{prefix}: points at {location.get('filename')}, which doesn't exist")
                 count += 1
                 if source == "Blockwork" or source.startswith(("https://", "http://", "~/")):
                     errors.append(f"{prefix}: technical literal should not be translated")

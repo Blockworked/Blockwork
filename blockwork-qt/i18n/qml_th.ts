@@ -1754,7 +1754,7 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCatalog.qml" line="556"/>
+        <location filename="../qml/BlockCatalog.qml" line="556"/>
         <source>Recording target</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5254,12 +5254,12 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/EditorPage.qml" line="1204"/>
+        <location filename="../qml/EditorPage.qml" line="1204"/>
         <source>Recording Target (current)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/EditorPage.qml" line="1204"/>
+        <location filename="../qml/EditorPage.qml" line="1204"/>
         <source>Set Recording Target</source>
         <translation type="unfinished"></translation>
     </message>
