@@ -10,6 +10,19 @@ use crate::input::value::Value;
 /// How many steps undo remembers, in the app and the web demo.
 pub const UNDO_LIMIT: usize = 50;
 
+/// What undo restores: the canvas plus the macro's signals and block packs.
+pub type UndoSnapshot = (blockstitch_core::graph::BlockGraph<InstructionKind>, Vec<String>, Vec<crate::block_packs::PackRecord>);
+
+/// How every Blockwork editor applies typed edits: "09" typed into an
+/// operator argument stays text.
+pub const EDIT_CONTEXT: blockstitch_core::editor::EditContext =
+    blockstitch_core::editor::EditContext { numbers: blockstitch_core::editor::NumberSpelling::KeepTypedInOperands };
+
+/// A speed multiplier as stored, inside [`super::SPEED_MULTIPLIER_RANGE`].
+pub fn clamp_speed(multiplier: f64) -> f64 {
+    multiplier.clamp(*super::SPEED_MULTIPLIER_RANGE.start(), *super::SPEED_MULTIPLIER_RANGE.end())
+}
+
 /// A folder name as stored: no surrounding spaces or slashes, empty for the top level.
 pub fn clean_folder(folder: &str) -> String {
     folder.trim().trim_matches('/').trim().to_string()
@@ -46,6 +59,17 @@ impl BlockDraft {
 }
 
 impl Macro {
+    /// The part of the macro undo checkpoints.
+    pub fn undo_snapshot(&self) -> UndoSnapshot {
+        (self.graph.clone(), self.signals.clone(), self.settings.block_packs.clone())
+    }
+
+    /// Puts an undo checkpoint back.
+    pub fn restore_undo_snapshot(&mut self, snapshot: UndoSnapshot) {
+        (self.graph, self.signals, self.settings.block_packs) = snapshot;
+        self.ensure_id();
+    }
+
     /// A copy with a new id, named "<name> copy".
     pub fn duplicate(&self) -> Macro {
         let mut copy = self.clone();

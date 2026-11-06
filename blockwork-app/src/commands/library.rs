@@ -167,10 +167,7 @@ pub(crate) fn set_macro_speed_multiplier(
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
-        mac.speed_multiplier = multiplier.clamp(
-            *SPEED_MULTIPLIER_RANGE.start(),
-            *SPEED_MULTIPLIER_RANGE.end(),
-        );
+        mac.speed_multiplier = clamp_speed(multiplier);
         auto_save(&mut s);
     }
     emit_state_updated(&app, &s);

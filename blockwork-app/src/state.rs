@@ -1,5 +1,4 @@
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
-use blockwork_core::macros::MacroGraph;
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::thread_pool::ThreadPool;
 // Canvas addressing and undo come from blockstitch. Both these groups are
@@ -15,7 +14,7 @@ use std::collections::HashMap;
 use crate::AppHandle;
 use std::sync::{Arc, Mutex};
 
-pub(crate) type EditorSnapshot = (MacroGraph, Vec<String>, Vec<blockwork_core::block_packs::PackRecord>);
+pub(crate) type EditorSnapshot = blockwork_core::macros::UndoSnapshot;
 
 pub(crate) type SharedState = Arc<Mutex<AppState>>;
 

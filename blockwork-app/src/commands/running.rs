@@ -177,10 +177,7 @@ pub(crate) fn set_global_speed_multiplier(
     multiplier: f64,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let clamped = multiplier.clamp(
-        *SPEED_MULTIPLIER_RANGE.start(),
-        *SPEED_MULTIPLIER_RANGE.end(),
-    );
+    let clamped = clamp_speed(multiplier);
     s.global_speed_multiplier = clamped;
     config::update_settings(|settings| settings.global_speed_multiplier = Some(clamped));
     emit_state_updated(&app, &s);

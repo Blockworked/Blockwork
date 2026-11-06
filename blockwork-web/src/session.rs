@@ -6,12 +6,12 @@
 use std::collections::HashMap;
 
 use blockstitch_core::editor::{
-    Created, EditCommand, EditContext, EditOutcome, EditSession, History, NumberSpelling, PathStep,
+    Created, EditCommand, EditOutcome, EditSession, History, PathStep,
     ValueBuffers, ValueDestination, ValueLocation, apply_buffer_effects, drop_strand_buffers,
     prune_value_buffers, retain_live_buffers,
 };
 use blockstitch_core::graph::{BlockKind, ListItem, resolve_list_reporters};
-use blockwork_core::block_packs::{self, PackRecord};
+use blockwork_core::block_packs;
 use blockwork_core::frontend::{
     FragmentDto, InstructionDto, InvalidFieldDto, KeyCaptureDto, ListItemDto, dto_to_fragment,
     dto_to_instruction, dto_to_list_item, fragment_to_dto, macro_to_dto,
@@ -22,19 +22,16 @@ use blockwork_core::input::value::{Evaluated, Op, Value, has_side_effect_operato
 use blockwork_core::key_mapping::{web_code_to_macro_key, web_key_to_macro_key};
 use blockwork_core::macros::conditions::PowerCondition;
 use blockwork_core::macros::{
-    BlockDraft, Instruction, InstructionKind, Macro, MacroGraph,
-    SPEED_MULTIPLIER_RANGE, migrate,
+    BlockDraft, Instruction, InstructionKind, Macro,
+    EDIT_CONTEXT, UndoSnapshot, clamp_speed, migrate,
 };
 use blockstitch_ffi::{Host, arg};
 use serde::de::DeserializeOwned;
 use serde_json::{Value as Json, json};
 
-/// What undo restores: the app's scope, the canvas plus signals and packs.
-type Snapshot = (MacroGraph, Vec<String>, Vec<PackRecord>);
+type Snapshot = UndoSnapshot;
 
 
-/// Blockwork keeps "09" typed into an operator argument as text.
-const EDIT_CONTEXT: EditContext = EditContext { numbers: NumberSpelling::KeepTypedInOperands };
 
 enum KeyCapture {
     Strand(String, Vec<PathStep>),
@@ -190,7 +187,7 @@ impl Demo {
             "set_macro_speed_multiplier" => {
                 let multiplier: f64 = arg(a, "multiplier")?;
                 if let Some(mac) = self.open_mut() {
-                    mac.speed_multiplier = multiplier.clamp(*SPEED_MULTIPLIER_RANGE.start(), *SPEED_MULTIPLIER_RANGE.end());
+                    mac.speed_multiplier = clamp_speed(multiplier);
                 }
                 Ok(Json::Null)
             }
@@ -632,10 +629,8 @@ impl Demo {
                 let step = if command == "undo" { History::undo } else { History::redo };
                 let Some(index) = self.selected else { return Ok(Json::Null) };
                 let mac = &mut self.macros[index];
-                let current = (mac.graph.clone(), mac.signals.clone(), mac.settings.block_packs.clone());
-                if let Some(restored) = step(&mut self.history, current) {
-                    (mac.graph, mac.signals, mac.settings.block_packs) = restored;
-                    mac.ensure_id();
+                if let Some(restored) = step(&mut self.history, mac.undo_snapshot()) {
+                    mac.restore_undo_snapshot(restored);
                     self.buffers.clear();
                 }
                 Ok(Json::Null)
@@ -729,7 +724,7 @@ impl Demo {
     }
 
     fn snapshot(mac: &Macro) -> Snapshot {
-        (mac.graph.clone(), mac.signals.clone(), mac.settings.block_packs.clone())
+        mac.undo_snapshot()
     }
 
     /// Checkpoints the open macro before a structural edit (`push_undo`).

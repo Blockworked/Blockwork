@@ -525,15 +525,11 @@ pub(super) fn apply_history_step(
     ) -> Option<crate::state::EditorSnapshot>,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    if let Some(current) = s
-        .current_macro
-        .as_ref()
-        .map(|mac| (mac.graph.clone(), mac.signals.clone(), mac.settings.block_packs.clone()))
-        && let Some(restored_graph) = step(&mut s.history, current)
+    if let Some(current) = s.current_macro.as_ref().map(Macro::undo_snapshot)
+        && let Some(restored) = step(&mut s.history, current)
     {
         if let Some(mac) = &mut s.current_macro {
-            (mac.graph, mac.signals, mac.settings.block_packs) = restored_graph;
-            mac.ensure_id();
+            mac.restore_undo_snapshot(restored);
         }
         sync_variable_values(&mut s);
         sync_list_values(&mut s);

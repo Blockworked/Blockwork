@@ -77,7 +77,7 @@ const LEGACY_ROOT_STRAND_ID: &str = "root";
 
 mod block_kind;
 mod document_rules;
-pub use document_rules::{BlockDraft, UNDO_LIMIT, checked_block_color, clean_folder};
+pub use document_rules::{BlockDraft, EDIT_CONTEXT, UNDO_LIMIT, UndoSnapshot, checked_block_color, clamp_speed, clean_folder};
 mod saved_shapes;
 
 /// A named choice or an unrestricted expression, both resolved as text at runtime.

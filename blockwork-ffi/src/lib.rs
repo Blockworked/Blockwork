@@ -10,7 +10,7 @@ use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::host_clock;
 use blockwork_core::macros::run_registry;
 use blockwork_core::macros::runner::{self, VariableStore};
-use blockwork_core::macros::{Instruction, Macro, SPEED_MULTIPLIER_RANGE};
+use blockwork_core::macros::{Instruction, Macro};
 use blockwork_core::recording;
 use std::ffi::{CStr, CString};
 use std::os::raw::c_char;
@@ -481,7 +481,7 @@ pub extern "C" fn blockwork_stop_loop() -> i32 {
 #[no_mangle]
 pub extern "C" fn blockwork_set_speed_multiplier(multiplier: f64) -> i32 {
     catch(move || {
-        let clamped = multiplier.clamp(*SPEED_MULTIPLIER_RANGE.start(), *SPEED_MULTIPLIER_RANGE.end());
+        let clamped = blockwork_core::macros::clamp_speed(multiplier);
         config::update_settings(|s| s.global_speed_multiplier = Some(clamped));
         0
     })

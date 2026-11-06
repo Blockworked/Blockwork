@@ -10,7 +10,7 @@ use crate::state::{
     emit_state_updated,
 };
 use blockstitch_core::editor::{
-    Created, EditCommand, EditContext, EditError, EditOutcome, NumberSpelling, ValueDestination,
+    Created, EditCommand, EditError, EditOutcome, ValueDestination,
     apply_buffer_effects, drop_strand_buffers, prune_value_buffers, retain_live_buffers,
 };
 use blockwork_core::config;
@@ -21,7 +21,7 @@ use blockwork_core::macros::runner::VariableStore;
 use blockstitch_core::graph::{ListItem, ListStore, resolve_list_reporters};
 use blockwork_core::macros::{
     BlockPiece, BlockShape, Instruction, InstructionKind, Macro,
-    SPEED_MULTIPLIER_RANGE, loop_control,
+    EDIT_CONTEXT, clamp_speed, loop_control,
 };
 #[cfg(test)]
 use blockwork_core::macros::Strand;
@@ -41,7 +41,7 @@ pub(crate) fn push_undo(s: &mut AppState) {
 /// [`push_undo`] for an edit that coalesces with the keystrokes already in
 /// progress at `session` - only the first one checkpoints.
 fn push_undo_for(s: &mut AppState, session: Option<EditSession>) {
-    let snapshot = s.current_macro.as_ref().map(|mac| (mac.graph.clone(), mac.signals.clone(), mac.settings.block_packs.clone()));
+    let snapshot = s.current_macro.as_ref().map(Macro::undo_snapshot);
     match (snapshot, session) {
         (Some(snapshot), Some(session)) => {
             s.history.push_for_session(snapshot, session);
@@ -50,11 +50,6 @@ fn push_undo_for(s: &mut AppState, session: Option<EditSession>) {
         (None, _) => s.history.end_session(),
     }
 }
-
-/// Blockwork keeps "09" typed into an operator argument as text.
-const EDIT_CONTEXT: EditContext = EditContext {
-    numbers: NumberSpelling::KeepTypedInOperands,
-};
 
 /// Runs one typed edit on the open macro: a rejected or no-op edit costs no
 /// undo step and no save; buffers follow the outcome either way.
