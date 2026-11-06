@@ -23,8 +23,10 @@ pub struct OnnxDetector {
 }
 
 /// Loaded models by path; loading and optimizing takes a while.
-static LOADED: Mutex<Option<HashMap<PathBuf, (Arc<Plan>, usize, Arc<Vec<String>>)>>> =
-    Mutex::new(None);
+static LOADED: Mutex<Option<HashMap<PathBuf, LoadedModel>>> = Mutex::new(None);
+
+/// A loaded model's plan, input size and labels.
+type LoadedModel = (Arc<Plan>, usize, Arc<Vec<String>>);
 
 impl OnnxDetector {
     pub fn load(path: &Path) -> Result<OnnxDetector, String> {

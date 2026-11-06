@@ -39,18 +39,17 @@ pub(super) fn run_system_block(
                     .name(format!("signal_{name}"))
                     .stack_size(STRAND_STACK_SIZE)
                     .spawn(move || {
-                        run_strand(
+                        let run = StrandRun {
                             source,
-                            body,
                             emulator,
                             stop_flag,
-                            speed,
+                            speed_multiplier: speed,
                             variables,
                             lists,
-                            table,
-                            Duration::ZERO,
-                            loops,
-                        )
+                            block_table: table,
+                            max_loop_iterations: loops,
+                        };
+                        run_strand(run, body, Duration::ZERO)
                     });
                 match spawned {
                     Ok(thread) => threads.push(thread),

@@ -5,8 +5,12 @@ macro, hotkey, watcher and run, and the **editor**, a Qt Quick window that
 only draws what the daemon tells it. Closing the window leaves the daemon in
 the tray, so hotkeys and schedules keep working.
 
+The editor starts the daemon if none is running: the `blockwork-daemon`
+binary beside it, or `blockwork --daemon` inside an AppImage, which has one
+executable (`blockwork-qt/src/daemon_client.rs`).
+
 ```text
- blockwork (Qt)                       blockwork --daemon
+ blockwork (Qt)                       blockwork-daemon
  ┌──────────────────────┐   socket    ┌───────────────────────────────┐
  │ QML  ── invoke() ──► │ ──────────► │ server.rs ─► Backend::dispatch│
  │ app_bridge.rs        │  NDJSON     │              commands/*.rs    │

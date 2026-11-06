@@ -141,17 +141,17 @@ pub(super) fn run_open_macro(
     if let (Some(mac), Some(emulator)) = (mac, emulator) {
         let _ = loop_control::set_loop_state(&is_looping, true);
         let mac_name = mac.name.clone();
-        let single_run_task = macros_thread::into_single_run_task(
+        let request = macros_thread::RunRequest {
             mac,
-            Arc::clone(&emulator),
-            Arc::clone(&is_looping),
+            emulator: Arc::clone(&emulator),
+            is_looping: Arc::clone(&is_looping),
             speed_multiplier,
             variables,
             lists,
-            Arc::clone(state),
-            app.clone(),
             strand,
-        );
+        };
+        let single_run_task =
+            macros_thread::into_single_run_task(request, Arc::clone(state), app.clone());
         let mut s = state.lock().map_err(|e| e.to_string())?;
         if let Err(e) = macros_thread::spawn_macro_thread(
             &mut s.thread_pool,

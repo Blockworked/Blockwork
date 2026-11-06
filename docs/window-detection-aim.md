@@ -1,6 +1,6 @@
 # Window-scoped detection and aim control - spec (draft)
 
-Status: M1, M2 and most of M4 implemented (see section 11). Intended for legitimate automation:
+Status: M1 to M4 implemented, with M5 and the Minecraft model's fixture tests left (see section 11). Intended for legitimate automation:
 single-player worlds, local test servers, accessibility, and UI testing.
 Do not use against real players on servers without permission. That violates
 server rules and can trigger anti-cheat.

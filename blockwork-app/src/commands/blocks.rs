@@ -8,23 +8,10 @@ use blockwork_core::macros::BlockDraft;
 pub(crate) fn create_block(
     state: &SharedState,
     app: &AppHandle,
-    pieces: Vec<BlockPiece>,
-    shape: BlockShape,
-    color: String,
-    icon: String,
-    identifier: String,
-    description: String,
+    draft: BlockDraft,
     position: Option<(i32, i32)>,
 ) -> Result<String, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let draft = BlockDraft {
-        pieces,
-        shape,
-        color,
-        icon,
-        identifier,
-        description,
-    };
     draft.check()?;
     push_undo(&mut s);
     let id = s
@@ -44,22 +31,9 @@ pub(crate) fn edit_block(
     state: &SharedState,
     app: &AppHandle,
     block_id: String,
-    pieces: Vec<BlockPiece>,
-    shape: BlockShape,
-    color: String,
-    icon: String,
-    identifier: String,
-    description: String,
+    draft: BlockDraft,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let draft = BlockDraft {
-        pieces,
-        shape,
-        color,
-        icon,
-        identifier,
-        description,
-    };
     // Checked first so a rejected edit leaves no useless undo step.
     s.current_macro
         .as_ref()

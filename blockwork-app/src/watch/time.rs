@@ -63,34 +63,34 @@ fn missed(
     to: DateTime<Local>,
 ) -> bool {
     let from = from.max(to - chrono::Duration::seconds(MAX_CATCH_UP_SECS));
-    let matches: Box<dyn Fn(&DateTime<Local>) -> bool> =
-        match strand.instructions.first().map(|i| &i.kind) {
-            Some(InstructionKind::WhenTime(schedule, time)) => {
-                let Some((hour, minute)) = time_of_day(time, env) else {
-                    return false;
-                };
-                let schedule = *schedule;
-                Box::new(move |t| schedule.matches(t, hour, minute))
-            }
-            Some(InstructionKind::WhenCron(expression)) => {
-                let Ok(cron) = expression
-                    .resolve_vars(env)
-                    .eval_text()
-                    .unwrap_or_default()
-                    .parse::<Cron>()
-                else {
-                    return false;
-                };
-                Box::new(move |t| cron.matches(t))
-            }
-            Some(InstructionKind::WhenAt(at)) => {
-                let Some(at) = at_time(at, env) else {
-                    return false;
-                };
-                return from < at && at <= to;
-            }
-            _ => return false,
-        };
+    type Matcher = Box<dyn Fn(&DateTime<Local>) -> bool>;
+    let matches: Matcher = match strand.instructions.first().map(|i| &i.kind) {
+        Some(InstructionKind::WhenTime(schedule, time)) => {
+            let Some((hour, minute)) = time_of_day(time, env) else {
+                return false;
+            };
+            let schedule = *schedule;
+            Box::new(move |t| schedule.matches(t, hour, minute))
+        }
+        Some(InstructionKind::WhenCron(expression)) => {
+            let Ok(cron) = expression
+                .resolve_vars(env)
+                .eval_text()
+                .unwrap_or_default()
+                .parse::<Cron>()
+            else {
+                return false;
+            };
+            Box::new(move |t| cron.matches(t))
+        }
+        Some(InstructionKind::WhenAt(at)) => {
+            let Some(at) = at_time(at, env) else {
+                return false;
+            };
+            return from < at && at <= to;
+        }
+        _ => return false,
+    };
     let Some(mut minute) = (from + chrono::Duration::minutes(1))
         .with_second(0)
         .and_then(|t| t.with_nanosecond(0))

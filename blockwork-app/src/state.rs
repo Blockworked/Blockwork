@@ -9,7 +9,7 @@ pub(crate) use blockstitch_core::editor::{
 };
 pub(crate) use blockstitch_core::graph::ListItem;
 pub(crate) use blockwork_core::input::value::Evaluated;
-pub(crate) use blockwork_core::macros::{BlockPiece, InstructionKind, Macro};
+pub(crate) use blockwork_core::macros::{InstructionKind, Macro};
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};

@@ -1,14 +1,12 @@
 //! Maps a command name plus its JSON arguments onto the matching function in
-//! `commands.rs`. Argument names retain the original camelCase wire format so
-//! old browser clients and the Qt frontend use the same daemon protocol.
+//! `commands.rs`. Arguments are camelCase, as the Qt editor sends them over
+//! the daemon socket.
 
 use crate::Backend;
 use crate::commands;
-use crate::state::{
-    BlockPiece, FragmentDto, HotkeyActionDto, InstructionDto, PathStep, ValueLocation,
-};
+use crate::state::{FragmentDto, HotkeyActionDto, InstructionDto, PathStep, ValueLocation};
 use blockwork_core::input::value::Value as BlockValue;
-use blockwork_core::macros::BlockShape;
+use blockwork_core::macros::BlockDraft;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
 use std::collections::HashMap;
@@ -16,6 +14,18 @@ use std::collections::HashMap;
 fn arg<T: DeserializeOwned>(args: &Value, name: &str) -> Result<T, String> {
     let value = args.get(name).cloned().unwrap_or(Value::Null);
     serde_json::from_value(value).map_err(|e| format!("invalid argument '{name}': {e}"))
+}
+
+/// A custom block's definition from `create_block`/`edit_block`'s args.
+fn block_draft(args: &Value) -> Result<BlockDraft, String> {
+    Ok(BlockDraft {
+        pieces: arg(args, "pieces")?,
+        shape: arg(args, "shape")?,
+        color: arg(args, "color")?,
+        icon: arg(args, "icon").unwrap_or_default(),
+        identifier: arg(args, "identifier").unwrap_or_default(),
+        description: arg(args, "description").unwrap_or_default(),
+    })
 }
 
 fn to_json<T: serde::Serialize>(value: T) -> Result<Value, String> {
@@ -582,41 +592,18 @@ impl Backend {
                     y,
                 )?)
             }
-            "create_block" => {
-                let pieces: Vec<BlockPiece> = arg(&args, "pieces")?;
-                let shape: BlockShape = arg(&args, "shape")?;
-                let color: String = arg(&args, "color")?;
-                let icon: String = arg(&args, "icon").unwrap_or_default();
-                to_json(commands::create_block(
-                    &self.state,
-                    &self.app,
-                    pieces,
-                    shape,
-                    color,
-                    icon,
-                    arg(&args, "identifier").unwrap_or_default(),
-                    arg(&args, "description").unwrap_or_default(),
-                    arg::<Option<i32>>(&args, "x")?.zip(arg::<Option<i32>>(&args, "y")?),
-                )?)
-            }
-            "edit_block" => {
-                let block_id: String = arg(&args, "blockId")?;
-                let pieces: Vec<BlockPiece> = arg(&args, "pieces")?;
-                let shape: BlockShape = arg(&args, "shape")?;
-                let color: String = arg(&args, "color")?;
-                let icon: String = arg(&args, "icon").unwrap_or_default();
-                to_json(commands::edit_block(
-                    &self.state,
-                    &self.app,
-                    block_id,
-                    pieces,
-                    shape,
-                    color,
-                    icon,
-                    arg(&args, "identifier").unwrap_or_default(),
-                    arg(&args, "description").unwrap_or_default(),
-                )?)
-            }
+            "create_block" => to_json(commands::create_block(
+                &self.state,
+                &self.app,
+                block_draft(&args)?,
+                arg::<Option<i32>>(&args, "x")?.zip(arg::<Option<i32>>(&args, "y")?),
+            )?),
+            "edit_block" => to_json(commands::edit_block(
+                &self.state,
+                &self.app,
+                arg(&args, "blockId")?,
+                block_draft(&args)?,
+            )?),
             "delete_block" => {
                 let block_id: String = arg(&args, "blockId")?;
                 to_json(commands::delete_block(&self.state, &self.app, block_id)?)

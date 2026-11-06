@@ -23,6 +23,9 @@ void blockwork_set_log_callback(void (*callback)(const char*));
  * Null/empty `config_dir_override_utf8` uses the OS config dir.
  * `linux_bridge_resource_path_utf8` only matters under Wine on Linux.
  * Returns 0 on success, -1 if no input backend exists for this platform.
+ *
+ * # Safety
+ * Each pointer argument is null or a valid NUL-terminated string.
  */
 int32_t blockwork_init(const char *config_dir_override_utf8,
                        const char *linux_bridge_resource_path_utf8);
@@ -50,6 +53,9 @@ int32_t blockwork_stop_recording(void);
  * already passed, before this call, since playback was supposed to
  * start - pass 0 if not applicable. Backdates the run's first `Wait`
  * deadline to the intended start instant via `RunOptions::offset`.
+ *
+ * # Safety
+ * Each pointer argument is null or a valid NUL-terminated string.
  */
 int32_t blockwork_run_macro(const char *id_utf8, double elapsed_overshoot_ms);
 
@@ -59,6 +65,9 @@ int32_t blockwork_run_macro(const char *id_utf8, double elapsed_overshoot_ms);
  * at 0, and its input is handed to that call's callback instead of the OS.
  * Returns 0 on success, -1 if no macro is found, -3 if the run thread
  * couldn't start.
+ *
+ * # Safety
+ * Each pointer argument is null or a valid NUL-terminated string.
  */
 int32_t blockwork_sync_begin(const char *id_utf8);
 
@@ -100,6 +109,9 @@ int32_t blockwork_step_record_end(void);
  * macro, saves it and makes it the selected macro. Returns 0 on success,
  * -1 for a bad path, -2 if the file can't be read, -3 if it isn't a valid
  * replay, -4 if the macro couldn't be saved.
+ *
+ * # Safety
+ * Each pointer argument is null or a valid NUL-terminated string.
  */
 int32_t blockwork_import_gdr(const char *path_utf8);
 
@@ -137,6 +149,9 @@ int32_t blockwork_set_speed_multiplier(double multiplier);
  * Creates a new macro (name defaults to `"New Macro"` if `name_utf8` is
  * null/empty), saves it, and marks it the currently-selected macro.
  * Returns 0 on success, -1 if the new macro couldn't be saved.
+ *
+ * # Safety
+ * Each pointer argument is null or a valid NUL-terminated string.
  */
 int32_t blockwork_create_macro(const char *name_utf8);
 
@@ -160,6 +175,9 @@ char *blockwork_get_selected_macro_id(void);
  * target `blockwork_run_macro(NULL)`, `blockwork_stop_recording`, and
  * `blockwork_clear_recording_target_instructions` resolve against. Returns 0
  * on success, -1 if no macro with that id exists.
+ *
+ * # Safety
+ * Each pointer argument is null or a valid NUL-terminated string.
  */
 int32_t blockwork_select_macro(const char *id_utf8);
 
@@ -169,6 +187,9 @@ int32_t blockwork_select_macro(const char *id_utf8);
  * rejected. Returns 0 on success, or a negative error code: -1 no macro
  * currently selected, -2 selected macro couldn't be loaded, -3 the
  * trimmed name was empty, -4 couldn't be saved back to disk.
+ *
+ * # Safety
+ * Each pointer argument is null or a valid NUL-terminated string.
  */
 int32_t blockwork_rename_macro(const char *name_utf8);
 
@@ -195,6 +216,9 @@ int32_t blockwork_clear_recording_target_instructions(void);
 /**
  * Frees a string previously returned by `blockwork_list_macros` or
  * `blockwork_get_selected_macro_id`. Safe to call with null (no-op).
+ *
+ * # Safety
+ * `ptr` is null or a string this library returned that hasn't been freed.
  */
 void blockwork_free_string(char *ptr);
 

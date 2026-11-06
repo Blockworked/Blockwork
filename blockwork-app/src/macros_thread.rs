@@ -47,17 +47,34 @@ pub(crate) fn persist_variables(
     app.emit_state(&dto);
 }
 
+/// One manual or hotkey Run of a macro.
+pub(crate) struct RunRequest {
+    pub(crate) mac: Macro,
+    pub(crate) emulator: Arc<Mutex<dyn InputBackend>>,
+    /// The app's `is_looping` flag, cleared when the run ends. The run stops
+    /// on a flag of its own (see below).
+    pub(crate) is_looping: Arc<Mutex<bool>>,
+    pub(crate) speed_multiplier: f64,
+    pub(crate) variables: VariableStore,
+    pub(crate) lists: ListStore,
+    /// Just this strand, from its top block; `None` runs the whole macro.
+    pub(crate) strand: Option<String>,
+}
+
 pub(crate) fn into_single_run_task(
-    mac: Macro,
-    emulator: Arc<Mutex<dyn InputBackend>>,
-    stop_flag: Arc<Mutex<bool>>,
-    speed_multiplier: f64,
-    variables: VariableStore,
-    lists: ListStore,
+    request: RunRequest,
     shared_state: SharedState,
     app: AppHandle,
-    strand: Option<String>,
 ) -> impl FnOnce() + Send + 'static {
+    let RunRequest {
+        mac,
+        emulator,
+        is_looping: stop_flag,
+        speed_multiplier,
+        variables,
+        lists,
+        strand,
+    } = request;
     move || {
         println!("Running macro: {}", mac.name);
         let macro_id = mac.id.clone();

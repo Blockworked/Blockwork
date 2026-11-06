@@ -473,6 +473,8 @@ fn create_libei() -> Result<Enigo, String> {
     .map_err(|err| err.to_string())
 }
 
+// One per backend, so the size doesn't matter.
+#[allow(clippy::large_enum_variant)]
 enum LibeiState {
     Unrequested,
     Available(Enigo),

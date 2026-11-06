@@ -228,8 +228,7 @@ fn xdbot_stalled_frames(ext: &[u8]) -> Vec<i64> {
     };
     let mut stalled = Vec::new();
     let mut prev_x: Option<u32> = None;
-    let mut expected = 1u64;
-    for _ in 0..count {
+    for expected in (1u64..).take(count as usize) {
         let Some(frame) = varint(ext, &mut pos) else {
             break;
         };
@@ -246,7 +245,6 @@ fn xdbot_stalled_frames(ext: &[u8]) -> Vec<i64> {
         }
         prev_x = Some(x);
         pos += 26;
-        expected += 1;
     }
     stalled
 }

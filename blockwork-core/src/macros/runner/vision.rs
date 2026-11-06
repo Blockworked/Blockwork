@@ -87,6 +87,8 @@ pub(super) fn pick_match(
     })
 }
 
+// One argument per field of the detection block.
+#[allow(clippy::too_many_arguments)]
 pub(super) fn detect_query(
     ctx: &mut ExecCtx,
     depth: u32,

@@ -18,12 +18,11 @@ use blockwork_core::config;
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
 use blockwork_core::input::types::InputToken;
 use blockwork_core::input::value::{Evaluated, Value};
-#[cfg(test)]
-use blockwork_core::macros::Strand;
 use blockwork_core::macros::runner::VariableStore;
+#[cfg(test)]
+use blockwork_core::macros::{BlockPiece, Strand};
 use blockwork_core::macros::{
-    BlockPiece, BlockShape, EDIT_CONTEXT, Instruction, InstructionKind, Macro, clamp_speed,
-    loop_control,
+    EDIT_CONTEXT, Instruction, InstructionKind, Macro, clamp_speed, loop_control,
 };
 use blockwork_core::recording;
 use std::collections::HashMap;

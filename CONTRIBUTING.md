@@ -57,7 +57,11 @@ site copies).
 
 Rust is formatted with `cargo fmt --all` (rustfmt's defaults, as in
 blockstitch), and CI fails on unformatted code. Whole-tree formatting commits
-are listed in `.git-blame-ignore-revs`.
+are listed in `.git-blame-ignore-revs`. CI also runs clippy and fails on any
+warning, so run `cargo clippy --workspace --all-targets` before pushing.
+
+A new `.qml` file goes in `blockwork-qt/qml/module.json` too; the build
+refuses a file that isn't listed there, or a listed one that is missing.
 
 ## Adding a block
 

@@ -241,8 +241,7 @@ pub(crate) fn checkpoint(
     d.next_key += 1;
     d.waiting.push((key, paused));
     changed(d);
-    loop {
-        let Some(d) = guard.as_ref() else { break };
+    while let Some(d) = guard.as_ref() {
         let released = d
             .macros
             .get(macro_id)

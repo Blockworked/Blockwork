@@ -4,9 +4,12 @@ use std::sync::{Arc, Mutex, OnceLock};
 /// abort *any* run, not just loop-mode ones. Loop runs register their shared
 /// `is_looping` flag; single runs register one of their own (see `begin_run`).
 /// Each entry is a run's stop flag and the id of its macro ("" when unknown).
-static ACTIVE_RUNS: OnceLock<Mutex<Vec<(Arc<Mutex<bool>>, String)>>> = OnceLock::new();
+static ACTIVE_RUNS: OnceLock<Mutex<Vec<ActiveRun>>> = OnceLock::new();
 
-fn active_runs() -> &'static Mutex<Vec<(Arc<Mutex<bool>>, String)>> {
+/// A run's stop flag and its macro's id.
+type ActiveRun = (Arc<Mutex<bool>>, String);
+
+fn active_runs() -> &'static Mutex<Vec<ActiveRun>> {
     ACTIVE_RUNS.get_or_init(|| Mutex::new(Vec::new()))
 }
 

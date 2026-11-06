@@ -1,9 +1,10 @@
 name: Checks
 
-# Tests and clippy's deny-level lints on Linux, and core + FFI tests on macOS
-# and Windows. Clippy warnings are reported but don't fail the run.
+# Tests and clippy on Linux (any warning fails), and core + FFI tests on macOS
+# and Windows (Windows clippy warnings are reported only).
 on:
   push:
+  pull_request:
   workflow_dispatch:
     inputs:
       qml_probe:
@@ -116,7 +117,7 @@ jobs:
             libgl-dev
 
       - name: Clippy
-        run: cargo clippy --workspace --all-targets
+        run: cargo clippy --workspace --all-targets -- -D warnings
 
       - name: Tests
         run: cargo test --workspace --exclude blockwork-linux-bridge

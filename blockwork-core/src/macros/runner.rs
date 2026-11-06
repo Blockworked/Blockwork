@@ -671,12 +671,17 @@ impl Macro {
             lists,
             offset: initial_offset,
         } = options;
-        let lists = lists.unwrap_or_else(|| self.list_store());
-        let source = Arc::new(crate::run_log::Source::for_macro(&self.id, &self.name));
-        let max_loop_iterations = self.settings.max_loop_iterations;
-        // StopMacro needs a flag every strand of this run shares.
-        let stop_flag = stop_flag.or_else(|| Some(Arc::new(Mutex::new(true))));
-        let block_table = self.block_table();
+        let run = StrandRun {
+            source: Arc::new(crate::run_log::Source::for_macro(&self.id, &self.name)),
+            emulator,
+            // StopMacro needs a flag every strand of this run shares.
+            stop_flag: stop_flag.or_else(|| Some(Arc::new(Mutex::new(true)))),
+            speed_multiplier,
+            variables,
+            lists: lists.unwrap_or_else(|| self.list_store()),
+            block_table: self.block_table(),
+            max_loop_iterations: self.settings.max_loop_iterations,
+        };
         let entry_strands: Vec<Vec<Instruction>> = self
             .graph
             .strands
@@ -695,28 +700,10 @@ impl Macro {
         // deep recursion errors out on a known stack instead of aborting.
         std::thread::scope(|scope| {
             for instructions in entry_strands {
-                let emulator = Arc::clone(&emulator);
-                let stop_flag = stop_flag.clone();
-                let variables = Arc::clone(&variables);
-                let lists = Arc::clone(&lists);
-                let block_table = Arc::clone(&block_table);
-                let source = Arc::clone(&source);
+                let run = run.clone();
                 let spawned = std::thread::Builder::new()
                     .stack_size(STRAND_STACK_SIZE)
-                    .spawn_scoped(scope, move || {
-                        run_strand(
-                            source,
-                            instructions,
-                            emulator,
-                            stop_flag,
-                            speed_multiplier,
-                            variables,
-                            lists,
-                            block_table,
-                            initial_offset,
-                            max_loop_iterations,
-                        )
-                    });
+                    .spawn_scoped(scope, move || run_strand(run, instructions, initial_offset));
                 if let Err(e) = spawned {
                     warn!("Failed to start a strand thread: {e}");
                 }
@@ -725,11 +712,6 @@ impl Macro {
     }
 }
 
-/// Per-thread entry point for one strand: runs it via `run_block`, then
-/// releases any keys/buttons still held, whether the strand finished,
-/// stopped, or errored. The returned `Result`/`Option` is discarded - a
-/// `Return` reaching strand level has nowhere to hand its value, and resolve
-/// errors are already `warn!`-logged at their source.
 /// Runs a function when dropped.
 struct Defer(Option<fn()>);
 
@@ -741,18 +723,34 @@ impl Drop for Defer {
     }
 }
 
-fn run_strand(
-    source: Arc<crate::run_log::Source>,
-    instructions: Vec<Instruction>,
-    emulator: Arc<Mutex<dyn InputBackend>>,
-    stop_flag: Option<Arc<Mutex<bool>>>,
-    speed_multiplier: f64,
-    variables: VariableStore,
-    lists: ListStore,
-    block_table: BlockTable,
-    initial_offset: Duration,
-    max_loop_iterations: u32,
-) {
+/// What every strand of one run shares.
+#[derive(Clone)]
+pub(super) struct StrandRun {
+    pub(super) source: Arc<crate::run_log::Source>,
+    pub(super) emulator: Arc<Mutex<dyn InputBackend>>,
+    pub(super) stop_flag: Option<Arc<Mutex<bool>>>,
+    pub(super) speed_multiplier: f64,
+    pub(super) variables: VariableStore,
+    pub(super) lists: ListStore,
+    pub(super) block_table: BlockTable,
+    pub(super) max_loop_iterations: u32,
+}
+
+/// Per-thread entry point for one strand: runs it via `run_block`, then
+/// releases any keys/buttons still held, whether the strand finished,
+/// stopped, or errored. A `Return` reaching strand level has nowhere to hand
+/// its value, so it is dropped.
+pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>, initial_offset: Duration) {
+    let StrandRun {
+        source,
+        emulator,
+        stop_flag,
+        speed_multiplier,
+        variables,
+        lists,
+        block_table,
+        max_loop_iterations,
+    } = run;
     let _detach = host_clock::enabled().then(|| Defer(Some(host_clock::detach)));
     raise_current_thread_priority();
     // Priority-raise happens first (its latency shouldn't eat into the
@@ -854,18 +852,17 @@ pub fn run_fired_strand(
     block_table: BlockTable,
     max_loop_iterations: u32,
 ) {
-    run_strand(
-        Arc::new(source),
-        instructions,
+    let run = StrandRun {
+        source: Arc::new(source),
         emulator,
-        stop_flag.or_else(|| Some(Arc::new(Mutex::new(true)))),
+        stop_flag: stop_flag.or_else(|| Some(Arc::new(Mutex::new(true)))),
         speed_multiplier,
         variables,
         lists,
         block_table,
-        Duration::ZERO,
         max_loop_iterations,
-    );
+    };
+    run_strand(run, instructions, Duration::ZERO);
 }
 
 /// Runs `instructions` top to bottom, returning `Ok(Flow::Return(v))` the

@@ -44,16 +44,16 @@ pub(crate) fn handle_hotkey_action(state: &SharedState, app: &AppHandle, action:
                             .map(|list| (list.name.clone(), list.items.clone()))
                             .collect(),
                     ));
-                    run_macro_task(
+                    let request = macros_thread::RunRequest {
                         mac,
                         emulator,
                         is_looping,
                         speed_multiplier,
                         variables,
                         lists,
-                        shared_state,
-                        app.clone(),
-                    );
+                        strand: None,
+                    };
+                    run_macro_task(request, shared_state, app.clone());
                 }
             }
         }
@@ -137,35 +137,19 @@ pub(crate) fn handle_hotkey_action(state: &SharedState, app: &AppHandle, action:
 }
 
 pub(super) fn run_macro_task(
-    mac: Macro,
-    emulator: Arc<std::sync::Mutex<dyn blockwork_core::macros::backend::InputBackend>>,
-    is_looping: Arc<std::sync::Mutex<bool>>,
-    speed_multiplier: f64,
-    variables: VariableStore,
-    lists: ListStore,
+    request: macros_thread::RunRequest,
     state: SharedState,
     app: AppHandle,
 ) {
     // Kept alive past the move into the task so the pre-run focus/modifier
     // cleanup can play its releases through the very backend the run will use.
     #[cfg(windows)]
-    let prep_backend = Arc::clone(&emulator);
+    let prep_backend = Arc::clone(&request.emulator);
 
-    if let Ok(mut st) = is_looping.lock() {
+    if let Ok(mut st) = request.is_looping.lock() {
         *st = true;
     }
-    let stop_flag = Arc::clone(&is_looping);
-    let task = macros_thread::into_single_run_task(
-        mac,
-        emulator,
-        stop_flag,
-        speed_multiplier,
-        variables,
-        lists,
-        state,
-        app,
-        None,
-    );
+    let task = macros_thread::into_single_run_task(request, state, app);
     tokio::task::spawn_blocking(move || {
         // Same pre-registration as the loop branch above.
         let playback_guard = blockwork_core::macros::run_registry::begin_run();

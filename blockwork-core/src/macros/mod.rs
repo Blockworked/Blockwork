@@ -795,6 +795,8 @@ pub struct MacroSettings {
 /// the legacy flat `code: Vec<Instruction>` format from older saves; legacy
 /// macros become a single root strand. The canvas collections are listed out
 /// rather than flattened, so the untagged split stays a field-by-field match.
+// Only lives while a document loads.
+#[allow(clippy::large_enum_variant)]
 #[derive(Deserialize)]
 #[serde(untagged)]
 enum MacroDe {
