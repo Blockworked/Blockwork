@@ -155,6 +155,34 @@
     </message>
 </context>
 <context>
+    <name>BlockAppearancePopup</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockAppearancePopup.qml" line="20"/>
+        <source>Appearance</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockAppearancePopup.qml" line="74"/>
+        <source>Icon</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockAppearancePopup.qml" line="80"/>
+        <source>Default</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockAppearancePopup.qml" line="92"/>
+        <source>Reset</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockAppearancePopup.qml" line="226"/>
+        <source>Done</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>BlockCanvas</name>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="10"/>
@@ -1777,16 +1805,6 @@
 <context>
     <name>BlockDefinitionEditor</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="141"/>
-        <source>Search icons</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="191"/>
-        <source>No icons match</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="460"/>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="479"/>
         <source>block name</source>
@@ -1974,21 +1992,6 @@
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1582"/>
         <source>Label</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="838"/>
-        <source>Icon</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="844"/>
-        <source>Default</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="856"/>
-        <source>Reset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3060,6 +3063,19 @@
     <message>
         <location filename="../qml/EditorPage.qml" line="105"/>
         <source>Runs at a time of day, every day, week, month or year (local time). Click the time to pick it, or drop a reporter there that gives a time like 09:30. A monthly day that a month doesn&apos;t have, like the 31st, skips that month.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>BlockIconPopup</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockIconPopup.qml" line="43"/>
+        <source>Search icons</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockIconPopup.qml" line="93"/>
+        <source>No icons match</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
