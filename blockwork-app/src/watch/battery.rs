@@ -1,6 +1,6 @@
 //! Fires battery/power strands. Edge-triggered with hysteresis.
 
-use blockwork_core::macros::trigger::fired_message;
+use super::{StrandKey, Target};
 use crate::scheduled_run;
 use crate::state::SharedState;
 use blockwork_core::macros::InstructionKind;
@@ -36,7 +36,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
     // (macro_id, strand_id) -> arm state. Rebuilt fresh each tick from
     // whatever strands currently exist, carrying over prior arm state by key
     // - so a deleted strand/macro just quietly drops out instead of leaking.
-    let mut arm_state: HashMap<(String, String), Arm> = HashMap::new();
+    let mut arm_state: HashMap<StrandKey, Arm> = HashMap::new();
 
     loop {
         std::thread::sleep(POLL_INTERVAL);
@@ -47,52 +47,44 @@ fn run(shared_state: SharedState, app: AppHandle) {
         let level = blockwork_core::battery::percentage().ok();
         let plugged_in = blockwork_core::battery::is_plugged_in();
 
-        let (macros, emulator, speed_multiplier, selected_id) = {
+        let (watched, emulator, speed_multiplier) = {
             let Ok(s) = shared_state.lock() else { continue };
             let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
-            let selected_id = s.macro_selected.and_then(|i| s.macros_list.get(i)).map(|m| m.id.clone());
-            (s.macros_list.clone(), emulator, s.global_speed_multiplier, selected_id)
+            let mut watched = Vec::new();
+            for mac in scheduled_run::live_macros(&s) {
+                for strand in &mac.strands {
+                    let holds = match strand.instructions.first().map(|i| &i.kind) {
+                        Some(InstructionKind::WhenBatteryDischargedTo(v)) => {
+                            let Some(level) = level else { continue };
+                            // A threshold that reads a macro variable has no
+                            // live value here (this isn't a real run), so the
+                            // read is 0, as `resolve_vars` makes any missing name.
+                            let Ok(threshold) = v.resolve_vars(&HashMap::new()).eval_number() else { continue };
+                            level <= threshold
+                        }
+                        Some(InstructionKind::WhenBatteryChargedTo(v)) => {
+                            let Some(level) = level else { continue };
+                            let Ok(threshold) = v.resolve_vars(&HashMap::new()).eval_number() else { continue };
+                            level >= threshold
+                        }
+                        Some(InstructionKind::WhenPowerPluggedIn) => plugged_in,
+                        Some(InstructionKind::WhenPowerUnplugged) => !plugged_in,
+                        _ => continue,
+                    };
+                    watched.push((Target::new(mac, strand), holds));
+                }
+            }
+            (watched, emulator, s.global_speed_multiplier)
         };
 
         let mut next_arm_state = HashMap::with_capacity(arm_state.len());
-        for mac in &macros {
-            // By default only the selected macro's event strands are live -
-            // `always_listen` opts a macro into being watched regardless of
-            // what's currently open.
-            if !mac.settings.always_listen && selected_id.as_deref() != Some(mac.id.as_str()) {
-                continue;
+        for (target, holds) in watched {
+            let armed = arm_state.get(&target.key).copied().unwrap_or(Arm::Armed);
+            let (should_fire, next) = tick_decision(armed, holds);
+            if should_fire {
+                target.fire(&emulator, speed_multiplier, &shared_state, &app);
             }
-            for strand in &mac.strands {
-                let holds = match strand.instructions.first().map(|i| &i.kind) {
-                    Some(InstructionKind::WhenBatteryDischargedTo(v)) => {
-                        let Some(level) = level else { continue };
-                        // Only resolves plain numbers/operators - a threshold
-                        // that reads a macro variable has no live value here
-                        // (this isn't a real run) and just defaults that read
-                        // to 0, same as `Value::resolve_vars` does for any
-                        // other missing name.
-                        let Ok(threshold) = v.resolve_vars(&HashMap::new()).eval_number() else { continue };
-                        level <= threshold
-                    }
-                    Some(InstructionKind::WhenBatteryChargedTo(v)) => {
-                        let Some(level) = level else { continue };
-                        let Ok(threshold) = v.resolve_vars(&HashMap::new()).eval_number() else { continue };
-                        level >= threshold
-                    }
-                    Some(InstructionKind::WhenPowerPluggedIn) => plugged_in,
-                    Some(InstructionKind::WhenPowerUnplugged) => !plugged_in,
-                    _ => continue,
-                };
-
-                let key = (mac.id.clone(), strand.id.clone());
-                let armed = arm_state.get(&key).copied().unwrap_or(Arm::Armed);
-                let (should_fire, next) = tick_decision(armed, holds);
-
-                if should_fire {
-                    scheduled_run::fire(mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), Arc::clone(&emulator), speed_multiplier, &mac.variables, &mac.lists, Arc::clone(&shared_state), app.clone());
-                }
-                next_arm_state.insert(key, next);
-            }
+            next_arm_state.insert(target.key, next);
         }
         arm_state = next_arm_state;
     }

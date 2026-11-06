@@ -1,7 +1,7 @@
 //! Text expansion: fires `WhenTyped` strands when what the user just typed
 //! ends with their abbreviation. Scoped like the other watchers.
 
-use blockwork_core::macros::trigger::fired_message;
+use super::{Target, variable_env};
 use crate::scheduled_run;
 use crate::state::SharedState;
 use crate::AppHandle;
@@ -10,7 +10,6 @@ use blockwork_core::input::types::{Direction, InputToken};
 use blockwork_core::input::value::Value;
 use blockwork_core::macros::{Instruction, InstructionKind};
 use blockwork_core::recording;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 /// Lets the key that finished the abbreviation come back up before erasing.
@@ -50,7 +49,7 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
             let Ok(s) = shared_state.lock() else { continue };
             let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
             for mac in scheduled_run::live_macros(&s) {
-                let env: HashMap<_, _> = mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect();
+                let env = variable_env(mac);
                 for strand in &mac.strands {
                     let Some(InstructionKind::WhenTyped { text, erase: erase_it }) = strand.instructions.first().map(|i| &i.kind) else {
                         continue;
@@ -61,7 +60,7 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
                     }
                     let mut body = if *erase_it { erase(text.chars().count()) } else { Vec::new() };
                     body.extend_from_slice(&strand.instructions[1..]);
-                    fires.push((mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), body, mac.variables.clone(), mac.lists.clone()));
+                    fires.push(Target::with_body(mac, strand, body));
                 }
             }
             (emulator, s.global_speed_multiplier)
@@ -71,8 +70,21 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
         }
         // The expansion's own output isn't typing to match again.
         typed.clear();
-        for (macro_id, message, body, variables, lists) in fires {
-            scheduled_run::fire(macro_id, message, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
+        for target in fires {
+            target.fire(&emulator, speed_multiplier, &shared_state, &app);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn erasing_waits_then_backspaces_once_per_character() {
+        let steps = erase("brb".chars().count());
+        assert!(matches!(steps[0].kind, InstructionKind::Wait(_)));
+        assert_eq!(steps.len(), 4);
+        assert!(steps[1..].iter().all(|s| matches!(&s.kind, InstructionKind::Token(InputToken::Key(_, Direction::Click)))));
     }
 }

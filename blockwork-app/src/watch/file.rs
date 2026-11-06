@@ -2,7 +2,7 @@
 //! is created, modified or deleted. Polls the file's modified time and size,
 //! like `watch::clipboard` polls the clipboard.
 
-use blockwork_core::macros::trigger::fired_message;
+use super::{Target, changed, variable_env};
 use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
@@ -33,7 +33,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
             let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
             let mut watched = Vec::new();
             for mac in scheduled_run::live_macros(&s) {
-                let env: HashMap<_, _> = mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect();
+                let env = variable_env(mac);
                 for strand in &mac.strands {
                     let Some(InstructionKind::WhenFileChanged(path)) = strand.instructions.first().map(|i| &i.kind) else {
                         continue;
@@ -42,20 +42,18 @@ fn run(shared_state: SharedState, app: AppHandle) {
                     if path.trim().is_empty() {
                         continue;
                     }
-                    watched.push(((mac.id.clone(), strand.id.clone(), path), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), mac.variables.clone(), mac.lists.clone()));
+                    watched.push((path, Target::new(mac, strand)));
                 }
             }
             (watched, emulator, s.global_speed_multiplier)
         };
 
         let mut next = HashMap::with_capacity(watched.len());
-        for (key, message, body, variables, lists) in watched {
-            let stamp = blockwork_core::files::stamp(&key.2);
-            // The first poll only records a baseline.
-            if let Some(previous) = last_seen.get(&key)
-                && *previous != stamp
-            {
-                scheduled_run::fire(key.0.clone(), message, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
+        for (path, target) in watched {
+            let stamp = blockwork_core::files::stamp(&path);
+            let key = (target.key.0.clone(), target.key.1.clone(), path);
+            if changed(last_seen.get(&key), &stamp) {
+                target.fire(&emulator, speed_multiplier, &shared_state, &app);
             }
             next.insert(key, stamp);
         }

@@ -2,12 +2,11 @@
 //! gains or loses focus. Same shape as `watch::clipboard`: poll, compare with
 //! the last poll, fire the strand body on a change.
 
-use blockwork_core::macros::trigger::fired_message;
+use super::{ReportOnce, StrandKey, Target, fires_on_change, variable_env};
 use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
-use blockwork_core::macros::{Instruction, InstructionKind, VariableDef};
-use blockstitch_core::graph::ListDef;
+use blockwork_core::macros::InstructionKind;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
@@ -15,13 +14,9 @@ use std::time::Duration;
 const POLL_INTERVAL: Duration = Duration::from_millis(500);
 
 struct Watched {
-    key: (String, String),
+    target: Target,
     pattern: String,
     focused: bool,
-    message: String,
-    body: Vec<Instruction>,
-    variables: Vec<VariableDef>,
-    lists: Vec<ListDef>,
 }
 
 pub(crate) fn start(shared_state: SharedState, app: AppHandle) {
@@ -32,8 +27,8 @@ pub(crate) fn start(shared_state: SharedState, app: AppHandle) {
 
 fn run(shared_state: SharedState, app: AppHandle) {
     // (macro_id, strand_id) -> whether the active window matched last poll.
-    let mut last_match: HashMap<(String, String), bool> = HashMap::new();
-    let mut last_error: Option<String> = None;
+    let mut last_match: HashMap<StrandKey, bool> = HashMap::new();
+    let mut errors = ReportOnce::default();
     loop {
         std::thread::sleep(POLL_INTERVAL);
 
@@ -42,19 +37,15 @@ fn run(shared_state: SharedState, app: AppHandle) {
             let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
             let mut watched = Vec::new();
             for mac in scheduled_run::live_macros(&s) {
-                let env: HashMap<_, _> = mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect();
+                let env = variable_env(mac);
                 for strand in &mac.strands {
                     let Some(InstructionKind::WhenWindow { pattern, focused }) = strand.instructions.first().map(|i| &i.kind) else {
                         continue;
                     };
                     watched.push(Watched {
-                        key: (mac.id.clone(), strand.id.clone()),
+                        target: Target::new(mac, strand),
                         pattern: pattern.resolve_vars(&env).eval_text().unwrap_or_default(),
                         focused: *focused,
-                        message: fired_message(strand.instructions.first().map(|i| &i.kind)),
-                        body: strand.instructions[1..].to_vec(),
-                        variables: mac.variables.clone(),
-                        lists: mac.lists.clone(),
                     });
                 }
             }
@@ -65,32 +56,16 @@ fn run(shared_state: SharedState, app: AppHandle) {
             continue;
         }
 
-        let window = match blockwork_core::window::active() {
-            Ok(window) => {
-                last_error = None;
-                window
-            }
-            Err(e) => {
-                // Say once why window triggers can't work here.
-                if last_error.as_ref() != Some(&e) {
-                    blockwork_core::run_log::error(&blockwork_core::run_log::Source::app("Window trigger"), e.clone());
-                    last_error = Some(e);
-                }
-                continue;
-            }
-        };
+        // Says once why window triggers can't work here.
+        let Some(window) = errors.check("Window trigger", blockwork_core::window::active()) else { continue };
 
         let mut next = HashMap::with_capacity(watched.len());
         for w in watched {
             let matched = window.matches(&w.pattern, blockwork_core::window::MatchBy::Any);
-            // The first poll only records a baseline.
-            if let Some(&previous) = last_match.get(&w.key)
-                && previous != matched
-                && matched == w.focused
-            {
-                scheduled_run::fire(w.key.0.clone(), w.message.clone(), w.body, Arc::clone(&emulator), speed_multiplier, &w.variables, &w.lists, Arc::clone(&shared_state), app.clone());
+            if fires_on_change(last_match.get(&w.target.key).copied(), matched, w.focused) {
+                w.target.fire(&emulator, speed_multiplier, &shared_state, &app);
             }
-            next.insert(w.key, matched);
+            next.insert(w.target.key, matched);
         }
         last_match = next;
     }

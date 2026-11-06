@@ -2,10 +2,9 @@
 //! callback's key events and fires a strand's body (skipping its header) when
 //! its combo is pressed or released.
 //!
-//! Scoping matches `watch::battery`: the selected macro, plus any macro with
-//! `MacroSettings::always_listen`.
+//! Watches the live macros (`scheduled_run::live_macros`) like every watcher.
 
-use blockwork_core::macros::trigger::fired_message;
+use super::{Target, variable_env};
 use crate::scheduled_run;
 use crate::state::SharedState;
 use crate::AppHandle;
@@ -13,7 +12,6 @@ use blockwork_core::input::key_names::{match_key, parse_key_combo};
 use blockwork_core::input::types::{Direction, MacroKey};
 use blockwork_core::macros::InstructionKind;
 use blockwork_core::recording;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 pub(crate) fn start(shared_state: SharedState, app: AppHandle) {
@@ -58,13 +56,7 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
             let Some(em) = s.emulator.as_ref().map(Arc::clone) else { continue };
             emulator = em;
             speed_multiplier = s.global_speed_multiplier;
-            // Edits land in `current_macro`; `macros_list` can lag behind them.
-            let selected_id = s.current_macro.as_ref().map(|m| m.id.clone());
-            let others = s.macros_list.iter().filter(|m| selected_id.as_deref() != Some(m.id.as_str()));
-            for mac in s.current_macro.iter().chain(others) {
-                if !mac.settings.always_listen && selected_id.as_deref() != Some(mac.id.as_str()) {
-                    continue;
-                }
+            for mac in scheduled_run::live_macros(&s) {
                 for strand in &mac.strands {
                     let Some(InstructionKind::WhenKey(value, direction)) = strand.instructions.first().map(|i| &i.kind) else {
                         continue;
@@ -73,14 +65,13 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
                     if on_press != event.pressed {
                         continue;
                     }
-                    let env: HashMap<_, _> = mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect();
-                    let Ok(text) = value.resolve_vars(&env).eval_text() else { continue };
+                    let Ok(text) = value.resolve_vars(&variable_env(mac)).eval_text() else { continue };
                     let combo: Vec<MacroKey> = parse_key_combo(&text).iter().map(match_key).collect();
                     if combo.is_empty() || !combo.contains(&key) || !combo_matches(&combo, state_for_match) {
                         continue;
                     }
                     trigger_keys.extend(combo);
-                    fires.push((mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), mac.variables.clone(), mac.lists.clone()));
+                    fires.push(Target::new(mac, strand));
                 }
             }
         }
@@ -88,8 +79,21 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
         if !fires.is_empty() {
             blockwork_core::macros::backend::release_held_keys(&trigger_keys);
         }
-        for (macro_id, message, body, variables, lists) in fires {
-            scheduled_run::fire(macro_id, message, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
+        for target in fires {
+            target.fire(&emulator, speed_multiplier, &shared_state, &app);
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_combo_matches_exactly_the_keys_held() {
+        let ctrl_alt = [MacroKey::LControl, MacroKey::LMenu];
+        assert!(combo_matches(&ctrl_alt, &[MacroKey::LMenu, MacroKey::LControl]), "in any order");
+        assert!(!combo_matches(&ctrl_alt, &[MacroKey::LControl]), "too few");
+        assert!(!combo_matches(&ctrl_alt, &[MacroKey::LControl, MacroKey::LShift, MacroKey::LMenu]), "too many");
     }
 }

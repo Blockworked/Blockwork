@@ -1,14 +1,13 @@
 //! Fires `WhenMouseButton` strands on physical mouse button presses and
 //! releases (and scrolls). Scoped like the other watchers.
 
-use blockwork_core::macros::trigger::fired_message;
+use super::{Target, variable_env};
 use crate::scheduled_run;
 use crate::state::SharedState;
 use crate::AppHandle;
 use blockwork_core::input::key_names::{match_key, parse_key_combo};
 use blockwork_core::macros::InstructionKind;
 use blockwork_core::recording;
-use std::collections::HashMap;
 use std::sync::Arc;
 
 pub(crate) fn start(shared_state: SharedState, app: AppHandle) {
@@ -32,7 +31,7 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
             let Ok(s) = shared_state.lock() else { continue };
             let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
             for mac in scheduled_run::live_macros(&s) {
-                let env: HashMap<_, _> = mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect();
+                let env = variable_env(mac);
                 for strand in &mac.strands {
                     let Some(InstructionKind::WhenMouseButton { button, pressed, modifiers }) =
                         strand.instructions.first().map(|i| &i.kind)
@@ -47,13 +46,13 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
                     if !combo.trim().is_empty() && modifier_bits(&combo) != Some(event.modifiers) {
                         continue;
                     }
-                    fires.push((mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), mac.variables.clone(), mac.lists.clone()));
+                    fires.push(Target::new(mac, strand));
                 }
             }
             (emulator, s.global_speed_multiplier)
         };
-        for (macro_id, message, body, variables, lists) in fires {
-            scheduled_run::fire(macro_id, message, body, Arc::clone(&emulator), speed_multiplier, &variables, &lists, Arc::clone(&shared_state), app.clone());
+        for target in fires {
+            target.fire(&emulator, speed_multiplier, &shared_state, &app);
         }
     }
 }

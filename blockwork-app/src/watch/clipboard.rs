@@ -4,10 +4,6 @@
 //! one). Polls the clipboard on a timer and fires a strand's body directly
 //! (skipping its header) the moment its contents differ from the last poll.
 //!
-//! Only the currently selected macro's strands are watched, plus any macro
-//! whose `MacroSettings::always_listen` is set - see `watch::battery`'s module
-//! doc for the same scoping rule.
-//!
 //! Unlike the battery watcher's threshold-crossing hysteresis, there's no
 //! condition to recover past here - any difference from the previous poll's
 //! fingerprint fires. A strand's very first observation only records a
@@ -15,7 +11,7 @@
 //! clipboard content doesn't immediately fire just because this watcher has
 //! never looked before.
 
-use blockwork_core::macros::trigger::fired_message;
+use super::{StrandKey, Target, changed};
 use crate::scheduled_run;
 use crate::state::SharedState;
 use blockwork_core::macros::InstructionKind;
@@ -60,41 +56,33 @@ fn run(shared_state: SharedState, app: AppHandle) {
     // this strand. Rebuilt fresh each tick from whatever strands currently
     // exist, carrying over the prior value by key - so a deleted
     // strand/macro just quietly drops out instead of leaking.
-    let mut last_seen: HashMap<(String, String), Fingerprint> = HashMap::new();
+    let mut last_seen: HashMap<StrandKey, Fingerprint> = HashMap::new();
 
     loop {
         std::thread::sleep(POLL_INTERVAL);
 
         let current = snapshot();
 
-        let (macros, emulator, speed_multiplier, selected_id) = {
+        let (watched, emulator, speed_multiplier) = {
             let Ok(s) = shared_state.lock() else { continue };
             let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
-            let selected_id = s.macro_selected.and_then(|i| s.macros_list.get(i)).map(|m| m.id.clone());
-            (s.macros_list.clone(), emulator, s.global_speed_multiplier, selected_id)
+            let mut watched = Vec::new();
+            for mac in scheduled_run::live_macros(&s) {
+                for strand in &mac.strands {
+                    if matches!(strand.instructions.first().map(|i| &i.kind), Some(InstructionKind::WhenClipboardChanged)) {
+                        watched.push(Target::new(mac, strand));
+                    }
+                }
+            }
+            (watched, emulator, s.global_speed_multiplier)
         };
 
         let mut next_last_seen = HashMap::with_capacity(last_seen.len());
-        for mac in &macros {
-            // By default only the selected macro's event strands are live -
-            // `always_listen` opts a macro into being watched regardless of
-            // what's currently open.
-            if !mac.settings.always_listen && selected_id.as_deref() != Some(mac.id.as_str()) {
-                continue;
+        for target in watched {
+            if changed(last_seen.get(&target.key), &current) {
+                target.fire(&emulator, speed_multiplier, &shared_state, &app);
             }
-            for strand in &mac.strands {
-                if !matches!(strand.instructions.first().map(|i| &i.kind), Some(InstructionKind::WhenClipboardChanged)) {
-                    continue;
-                }
-
-                let key = (mac.id.clone(), strand.id.clone());
-                if let Some(previous) = last_seen.get(&key) {
-                    if *previous != current {
-                        scheduled_run::fire(mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), Arc::clone(&emulator), speed_multiplier, &mac.variables, &mac.lists, Arc::clone(&shared_state), app.clone());
-                    }
-                }
-                next_last_seen.insert(key, current.clone());
-            }
+            next_last_seen.insert(target.key, current.clone());
         }
         last_seen = next_last_seen;
     }

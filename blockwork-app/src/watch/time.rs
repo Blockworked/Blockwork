@@ -3,13 +3,13 @@
 //! with "catch up" on also get one run for times missed while Blockwork
 //! was closed or the computer slept.
 
-use blockwork_core::macros::trigger::fired_message;
+use super::{StrandKey, Target, variable_env};
 use crate::scheduled_run;
 use crate::state::SharedState;
 use crate::AppHandle;
 use blockwork_core::input::cron::Cron;
 use blockwork_core::input::schedule::parse_time_of_day;
-use blockwork_core::macros::{InstructionKind, Macro, Strand};
+use blockwork_core::macros::{InstructionKind, Strand};
 use blockwork_core::run_log;
 use chrono::{DateTime, Local, NaiveDateTime, TimeZone, Timelike};
 use std::collections::HashMap;
@@ -88,16 +88,12 @@ fn at_time(at: &blockwork_core::input::value::Value, env: &HashMap<String, block
     Local.timestamp_opt(secs.floor() as i64, 0).single()
 }
 
-fn fire(mac: &Macro, strand: &Strand, emulator: &Arc<std::sync::Mutex<dyn blockwork_core::macros::backend::InputBackend>>, speed: f64, shared_state: &SharedState, app: &AppHandle) {
-    scheduled_run::fire(mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), Arc::clone(emulator), speed, &mac.variables, &mac.lists, Arc::clone(shared_state), app.clone());
-}
-
 fn run(shared_state: SharedState, app: AppHandle) {
     // (macro_id, strand_id) -> the minute it last fired. `WhenTime` only
     // compares the date part.
-    let mut last_fired: HashMap<(String, String), NaiveDateTime> = HashMap::new();
+    let mut last_fired: HashMap<StrandKey, NaiveDateTime> = HashMap::new();
     // Cron expressions and "once at" times already reported as broken.
-    let mut reported: HashMap<(String, String), String> = HashMap::new();
+    let mut reported: HashMap<StrandKey, String> = HashMap::new();
     let mut previous_tick = load_last_seen().filter(|t| *t < Local::now()).unwrap_or_else(Local::now);
     let mut ticks = 0u32;
 
@@ -124,7 +120,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
 
         let mut next_last_fired = HashMap::with_capacity(last_fired.len());
         for mac in &macros {
-            let env: HashMap<_, _> = mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect();
+            let env = variable_env(mac);
             for strand in &mac.strands {
                 let key = (mac.id.clone(), strand.id.clone());
                 let previous = last_fired.get(&key).copied();
@@ -176,7 +172,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
                     run_log::info(&run_log::Source::for_macro(&mac.id, &mac.name), "Running a schedule it missed");
                 }
                 if due || caught_up {
-                    fire(mac, strand, &emulator, speed_multiplier, &shared_state, &app);
+                    Target::new(mac, strand).fire(&emulator, speed_multiplier, &shared_state, &app);
                     next_last_fired.insert(key, minute);
                 } else if let Some(previous) = previous {
                     next_last_fired.insert(key, previous);
