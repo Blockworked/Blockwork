@@ -70,7 +70,7 @@ fn variable_dropdowns_match_the_backend_refs() {
     }
 }
 
-/// Every block has a palette entry and help text, and every value piece in
+/// Every block has a palette entry, a row and help text, and every value piece in
 /// `BlockCatalog.qml` names a real `FieldId`.
 #[test]
 fn the_catalog_covers_every_block() {
@@ -93,6 +93,22 @@ fn the_catalog_covers_every_block() {
         }
         if !help.contains(&format!("{ty}: qsTr(")) {
             missing.push(format!("{ty}: no BlockHelp explainer"));
+        }
+    }
+    // Drawn by blockstitch's shared rows (BlockRegistry.defaultRows) or by
+    // the editor itself, so Blockwork registers no row of its own.
+    const SHARED_ROWS: [&str; 20] = [
+        "Comment", "BlockHeader", "CallBlock", "BranchCallBlock", "RunBranch", "Return",
+        "AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList",
+        "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop",
+    ];
+    let start = catalog.find("BlockRegistry.registerRows({").unwrap();
+    let rows = &catalog[start..start + catalog[start..].find("\n        });").unwrap()];
+    for block in &blocks {
+        let ty = block["type"].as_str().unwrap();
+        let has_row = rows.contains(&format!(" {ty}: {{"));
+        if has_row == SHARED_ROWS.contains(&ty) {
+            missing.push(format!("{ty}: {} a row in register()", if has_row { "shared, but also has" } else { "no" }));
         }
     }
     let pieces = catalog.split("value(\"").skip(1).chain(catalog.split("box(\"").skip(1));

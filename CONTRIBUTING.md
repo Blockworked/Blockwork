@@ -34,14 +34,15 @@ You need Rust (stable), [just](https://github.com/casey/just), Qt 6.10 (CI uses 
 Qt) and Python 3 for the QML tests. `just` leaves out
 `blockwork-linux-bridge`, which only builds on Linux; do the same with
 `--exclude blockwork-linux-bridge` when calling cargo yourself. The QML tests need a
-blockstitch checkout at the pinned commit (`scripts/fetch-blockstitch.sh`) and
-one build first, which stages the Lucide icons.
+blockstitch checkout at the pinned commit (`just test-qml` fetches one into
+`../blockstitch` if it is missing) and one build first, which stages the
+Lucide icons.
 
 ```bash
 just                  # build
 just run              # build and launch
 just test             # every Rust test
-python3 blockwork-qt/tests/run.py ../blockstitch   # QML tests (needs Qt 6's qmltestrunner)
+just test-qml         # QML tests (needs Qt 6's qmltestrunner)
 just translations     # refresh blockwork-qt/i18n after changing UI text
 ```
 
@@ -77,7 +78,7 @@ other. The rest are listed so nothing is missed.
 7. A trigger also needs a watcher in `blockwork-app` (see `system_watch.rs`)
    and a line in `macros/trigger.rs` for the run log.
 8. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry, a row in
-   `register()` (label, value and dropdown pieces, icon), a prefab if a
+   `register()` (`tests/wire_blocks.rs` lists any block without one) (label, value and dropdown pieces, icon), a prefab if a
    fresh block needs defaults, and its variable dropdowns in
    `registerVariableFields`.
 9. `blockwork-qt/qml/BlockHelp.qml`: one sentence on what it does.
@@ -98,6 +99,8 @@ other. The rest are listed so nothing is missed.
    label pieces and result type in `operatorRows()`; the palette's
    `extraOperators` list is built from that and the descriptors.
 5. `blockwork-qt/qml/BlockHelp.qml` and `just translations`, as for a block.
+
+`--test operator_descriptors` fails until steps 3 to 5 are done.
 
 ## Rules
 

@@ -15,7 +15,7 @@ fn every_reporter_has_a_slot_per_arg() {
 }
 
 #[test]
-fn editor_page_carries_the_current_table() {
+fn the_catalog_carries_the_current_table() {
     register_blockwork_operators();
     let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../blockwork-qt/qml/BlockCatalog.qml");
     let text = std::fs::read_to_string(path).unwrap();
@@ -30,4 +30,32 @@ fn editor_page_carries_the_current_table() {
     } else {
         assert!(next == text, "BlockCatalog.qml's operator table is stale; rerun with BLESS=1");
     }
+}
+
+/// Every host reporter has its label row, a palette entry and help text.
+#[test]
+fn the_catalog_covers_every_reporter() {
+    register_blockwork_operators();
+    let catalog = include_str!("../../blockwork-qt/qml/BlockCatalog.qml");
+    let help = include_str!("../../blockwork-qt/qml/BlockHelp.qml");
+    let between = |start: &str, end: &str| {
+        let at = catalog.find(start).unwrap();
+        &catalog[at..at + catalog[at..].find(end).unwrap()]
+    };
+    let rows = between("function operatorRows()", "\n    }\n");
+    let sections = between("paletteSections: [", "\n    ]");
+    let mut missing = Vec::new();
+    for d in host_operator_descriptors() {
+        let kind = &d.kind;
+        if !rows.contains(&format!(" {kind}: {{")) {
+            missing.push(format!("{kind}: no operatorRows() entry"));
+        }
+        if !sections.contains(&format!("\"{kind}\"")) {
+            missing.push(format!("{kind}: no paletteSections entry"));
+        }
+        if !help.contains(&format!("{kind}: qsTr(")) {
+            missing.push(format!("{kind}: no BlockHelp explainer"));
+        }
+    }
+    assert!(missing.is_empty(), "{}", missing.join("\n"));
 }

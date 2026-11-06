@@ -3,6 +3,9 @@
 A native Qt 6/QML app, backed by Rust through CXX-Qt, for visually creating
 and running macros on Windows, Linux, and macOS.
 
+Working on the code? [CONTRIBUTING.md](CONTRIBUTING.md) covers the layout,
+tests, and how to add a block or reporter.
+
 ## Building
 
 ### Build
@@ -13,7 +16,7 @@ just
 
 Cargo fetches the Lucide icons (`lucide-qt`) from its tagged release. The Blockstitch core and native QML frontend
 are fetched from the same pinned Git revision, so their APIs stay in sync.
-The build uses an installed Qt 6 when one is available; otherwise CXX-Qt's Qt
+The build uses an installed Qt 6.10 or newer when one is available; otherwise CXX-Qt's Qt
 Minimal integration downloads the required Qt SDK. Release packaging uses
 `windeployqt`/`macdeployqt` to include the dynamic Qt runtime.
 
