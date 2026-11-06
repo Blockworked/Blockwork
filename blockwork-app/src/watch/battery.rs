@@ -1,6 +1,6 @@
 //! Fires battery/power strands. Edge-triggered with hysteresis.
 
-use super::{StrandKey, Target};
+use super::{StrandKey, Target, variable_env};
 use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
@@ -60,10 +60,9 @@ fn run(shared_state: SharedState, app: AppHandle) {
                     let holds = match strand.instructions.first().map(|i| &i.kind) {
                         Some(InstructionKind::WhenBatteryDischargedTo(v)) => {
                             let Some(level) = level else { continue };
-                            // A threshold that reads a macro variable has no
-                            // live value here (this isn't a real run), so the
-                            // read is 0, as `resolve_vars` makes any missing name.
-                            let Ok(threshold) = v.resolve_vars(&HashMap::new()).eval_number()
+                            // A variable in the threshold reads its saved
+                            // value, as every other trigger's header does.
+                            let Ok(threshold) = v.resolve_vars(&variable_env(mac)).eval_number()
                             else {
                                 continue;
                             };
@@ -71,7 +70,7 @@ fn run(shared_state: SharedState, app: AppHandle) {
                         }
                         Some(InstructionKind::WhenBatteryChargedTo(v)) => {
                             let Some(level) = level else { continue };
-                            let Ok(threshold) = v.resolve_vars(&HashMap::new()).eval_number()
+                            let Ok(threshold) = v.resolve_vars(&variable_env(mac)).eval_number()
                             else {
                                 continue;
                             };

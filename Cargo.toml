@@ -19,6 +19,8 @@ default-members = [
 [workspace.package]
 version = "0.6.0"
 edition = "2024"
+# Let-chains need 1.88.
+rust-version = "1.88"
 
 [workspace.dependencies]
 # One blockstitch commit for all three; change it with scripts/set-blockstitch-rev.js,

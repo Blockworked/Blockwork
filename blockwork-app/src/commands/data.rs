@@ -117,13 +117,9 @@ pub(crate) fn rename_signal(
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
-    let name = mac.validate_signal_name(&new_name, Some(&old_name))?;
-    if !mac.signals.contains(&old_name) {
-        return Err("Signal not found".into());
-    }
-    if name == old_name {
+    let Some(name) = mac.check_signal_rename(&old_name, &new_name)? else {
         return Ok(());
-    }
+    };
     push_undo(&mut s);
     s.current_macro
         .as_mut()

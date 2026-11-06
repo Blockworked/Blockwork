@@ -1022,6 +1022,16 @@ impl Macro {
         Ok(name.to_string())
     }
 
+    /// The checked new name when renaming `old` to `new` changes anything,
+    /// `None` when it is the same name. Called before taking an undo step.
+    pub fn check_signal_rename(&self, old: &str, new: &str) -> Result<Option<String>, String> {
+        let name = self.validate_signal_name(new, Some(old))?;
+        if !self.signals.iter().any(|s| s == old) {
+            return Err("Signal not found".into());
+        }
+        Ok((name != old).then_some(name))
+    }
+
     pub fn rename_signal(&mut self, old: &str, new: &str) -> Result<(), String> {
         let new = self.validate_signal_name(new, Some(old))?;
         let index = self

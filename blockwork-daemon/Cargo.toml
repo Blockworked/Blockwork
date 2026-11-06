@@ -2,6 +2,7 @@
 name = "blockwork-daemon"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 blockwork-app = { path = "../blockwork-app" }

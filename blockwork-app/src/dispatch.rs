@@ -978,9 +978,6 @@ impl Backend {
                     seconds,
                 )?)
             }
-            "request_absolute_mouse_support" => {
-                to_json(commands::request_absolute_mouse_support(&self.state, &self.app).await?)
-            }
             "toggle_record_mouse_relative" => {
                 let relative: bool = arg(&args, "relative")?;
                 to_json(

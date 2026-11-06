@@ -688,12 +688,7 @@ impl Demo {
             }
             "rename_signal" => {
                 let (old, new): (String, String) = (arg(a, "oldName")?, arg(a, "newName")?);
-                let mac = self.open()?;
-                let name = mac.validate_signal_name(&new, Some(&old))?;
-                if !mac.signals.contains(&old) {
-                    return Err("Signal not found".into());
-                }
-                if name != old {
+                if let Some(name) = self.open()?.check_signal_rename(&old, &new)? {
                     self.push_undo();
                     self.open_mut()
                         .ok_or("No macro selected")?

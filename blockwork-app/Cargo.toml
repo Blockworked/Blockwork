@@ -2,6 +2,7 @@
 name = "blockwork-app"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 
 [dependencies]
 blockstitch-core.workspace = true

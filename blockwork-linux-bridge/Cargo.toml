@@ -2,6 +2,7 @@
 name = "blockwork-linux-bridge"
 version.workspace = true
 edition.workspace = true
+rust-version.workspace = true
 
 [[bin]]
 name = "blockwork-linux-bridge"
