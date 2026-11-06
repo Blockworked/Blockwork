@@ -218,6 +218,20 @@ fn restore_loaded_macros(
 }
 
 impl Backend {
+    /// A backend with default settings, no input emulator and no background
+    /// services, keeping its config under `dir`. For tests only.
+    #[cfg(any(test, feature = "test-support"))]
+    pub fn for_tests(dir: std::path::PathBuf) -> Backend {
+        config::set_config_dir_override(dir);
+        blockwork_core::init();
+        let state = initial_state(&config::AppSettings::default(), None, true, false);
+        let (events, _) = broadcast::channel(16);
+        Backend {
+            state: Arc::new(Mutex::new(state)),
+            app: AppHandle { events },
+        }
+    }
+
     /// Loads settings and macros and starts every background service
     /// (input grab, hotkeys, IPC auto-start, battery/time watchers, update
     /// check). Must be called from within `runtime`'s context or with a

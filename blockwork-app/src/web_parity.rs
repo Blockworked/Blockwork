@@ -2,25 +2,16 @@
 //! through both, and the open macro, undo state and text buffers compared
 //! after every step with ids renamed in order of appearance.
 
-use crate::{AppHandle, Backend, initial_state};
+use crate::Backend;
 use blockstitch_ffi::Host;
 use blockwork_web::Demo;
 use serde_json::{Value, json};
 use std::collections::HashMap;
-use std::sync::{Arc, Mutex};
-use tokio::sync::broadcast;
 
 fn backend() -> Backend {
-    let dir = std::env::temp_dir().join(format!("blockwork-web-parity-{}", std::process::id()));
-    blockwork_core::config::set_config_dir_override(dir);
-    blockwork_core::init();
-    let settings = blockwork_core::config::AppSettings::default();
-    let state = initial_state(&settings, None, true, false);
-    let (events, _) = broadcast::channel(16);
-    Backend {
-        state: Arc::new(Mutex::new(state)),
-        app: AppHandle { events },
-    }
+    Backend::for_tests(
+        std::env::temp_dir().join(format!("blockwork-web-parity-{}", std::process::id())),
+    )
 }
 
 fn is_id(text: &str) -> bool {

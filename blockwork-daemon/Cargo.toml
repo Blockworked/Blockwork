@@ -15,6 +15,9 @@ dirs.workspace = true
 tao = "0.37"
 png = "0.18"
 
+[dev-dependencies]
+blockwork-app = { path = "../blockwork-app", features = ["test-support"] }
+
 [target.'cfg(not(target_os = "linux"))'.dependencies]
 tray-icon = { version = "0.25", default-features = false }
 

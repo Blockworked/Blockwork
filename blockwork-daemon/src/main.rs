@@ -71,7 +71,8 @@ fn main() {
         Backend::start(runtime.handle().clone())
     };
 
-    #[allow(unused_mut)]
+    // Only macOS changes the loop before running it.
+    #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]
     let mut event_loop = EventLoopBuilder::<MainThreadEvent>::with_user_event().build();
     #[cfg(target_os = "macos")]
     {

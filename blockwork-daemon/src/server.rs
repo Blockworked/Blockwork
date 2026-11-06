@@ -331,4 +331,64 @@ mod tests {
         *clients.ui.lock().unwrap() = None;
         assert!(!clients.close_ui());
     }
+
+    async fn next(reader: &mut BufReader<tokio::io::ReadHalf<tokio::io::DuplexStream>>) -> String {
+        tokio::time::timeout(
+            std::time::Duration::from_secs(10),
+            blockwork_protocol::read_line(reader),
+        )
+        .await
+        .expect("daemon went quiet")
+        .unwrap()
+        .expect("daemon hung up")
+    }
+
+    #[tokio::test]
+    async fn a_ui_gets_hello_state_and_replies_in_order() {
+        let dir =
+            std::env::temp_dir().join(format!("blockwork-daemon-test-{}", std::process::id()));
+        let backend = Backend::for_tests(dir);
+        let clients = Clients::default();
+        let (ours, theirs) = tokio::io::duplex(1 << 20);
+        let server = handle_connection(1, Box::new(theirs), &backend, &clients);
+        let client = async {
+            let (reader, mut writer) = tokio::io::split(ours);
+            let mut reader = BufReader::new(reader);
+            writer
+                .write_all(encode(&ClientMessage::Hello).as_bytes())
+                .await
+                .unwrap();
+            let hello = next(&mut reader).await;
+            let hello: DaemonMessage<'_> = serde_json::from_str(&hello).unwrap();
+            assert_eq!(
+                (hello.kind, hello.accepted),
+                (DaemonMessageKind::Hello, Some(true))
+            );
+            let state = next(&mut reader).await;
+            let state: DaemonMessage<'_> = serde_json::from_str(&state).unwrap();
+            assert_eq!(state.kind, DaemonMessageKind::State);
+
+            for (id, cmd) in [(1, "get_state"), (2, "no_such_command")] {
+                let call = ClientMessage::Call {
+                    id,
+                    cmd: cmd.into(),
+                    args: serde_json::Value::Null,
+                };
+                writer.write_all(encode(&call).as_bytes()).await.unwrap();
+            }
+            let mut replies = Vec::new();
+            while replies.len() < 2 {
+                let line = next(&mut reader).await;
+                let message: DaemonMessage<'_> = serde_json::from_str(&line).unwrap();
+                if message.kind == DaemonMessageKind::Reply {
+                    replies.push((message.id, message.error.is_some()));
+                }
+            }
+            assert_eq!(replies, [(Some(1), false), (Some(2), true)]);
+        };
+        // The client hangs up when done, which ends the server's loop.
+        let (was_ui, ()) = tokio::join!(server, client);
+        assert!(was_ui);
+        assert!(clients.ui.lock().unwrap().is_none());
+    }
 }

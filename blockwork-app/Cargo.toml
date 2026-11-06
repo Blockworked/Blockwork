@@ -17,6 +17,10 @@ dirs.workspace = true
 base64.workspace = true
 sha2 = "0.10.9"
 
+[features]
+# Backend::for_tests, for other crates' tests.
+test-support = []
+
 [dev-dependencies]
 # The website's editor, replayed against this crate's commands.
 blockwork-web = { path = "../blockwork-web" }

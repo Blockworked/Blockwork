@@ -67,7 +67,7 @@ refuses a file that isn't listed there, or a listed one that is missing.
 
 The compiler catches most of these, since the runner, the capability table and
 the `BlockKind` impl match every kind, and the tests in `fields.rs` and
-`tests/wire_blocks.rs` check the slot, variable and fixture lists against each
+`blockwork-core/tests/wire_blocks.rs` check the slot, variable and fixture lists against each
 other. The rest are listed so nothing is missed.
 
 1. `blockwork-core/src/macros/kind.rs`: add the `InstructionKind` variant with
@@ -98,7 +98,7 @@ other. The rest are listed so nothing is missed.
    and a line in `macros/trigger.rs` for the run log.
 8. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry, a row in
    its palette category's function (`eventRows`, `inputRows`, ...: label,
-   value and dropdown pieces, icon; `tests/wire_blocks.rs` lists any block
+   value and dropdown pieces, icon; `blockwork-core/tests/wire_blocks.rs` lists any block
    without one), a prefab if a
    fresh block needs defaults, and its variable dropdowns in
    `registerVariableFields`.
