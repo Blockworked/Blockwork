@@ -5272,6 +5272,11 @@
         <source>Set Recording Target</source>
         <translation>Set Recordin&apos; Target</translation>
     </message>
+    <message>
+        <location filename="../qml/EditorPage.qml" line="518"/>
+        <source>A custom reporter block defined in this macro.</source>
+        <translation>A custom reporter block made in this macro.</translation>
+    </message>
 </context>
 <context>
     <name>GlobalPicker</name>
@@ -6340,18 +6345,6 @@
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="380"/>
         <source>Browse</source>
         <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="357"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="414"/>
-        <source>A custom block defined in this macro.</source>
-        <translation>A custom block made in this macro.</translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="370"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="427"/>
-        <source>A custom reporter block defined in this macro.</source>
-        <translation>A custom reporter block made in this macro.</translation>
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="437"/>

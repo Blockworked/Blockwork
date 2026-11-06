@@ -514,6 +514,8 @@ Item {
                     width: palette.layout === "flyout" && !palette.flyoutShown ? palette.railWidth : root.sidebarWidth
                     visible: sidebarHost.width > 0
                     layout: appState.palette_layout || "rail"
+                    customBlockDetails: qsTr("A custom block defined in this macro.")
+                    customReporterDetails: qsTr("A custom reporter block defined in this macro.")
                     trashActive: canvas.dragging
                     trashArmed: canvas.dragging && palette.contains(palette.mapFromItem(null, canvas.dragSceneX, canvas.dragSceneY))
                     onResizeRequested: width => root.sidebarWidth = Math.max(root.minSidebarWidth, Math.min(root.maxSidebarWidth, width))

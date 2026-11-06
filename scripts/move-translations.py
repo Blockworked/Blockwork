@@ -52,6 +52,7 @@ def main(old, new_file):
         if not found:
             continue
         old_block, moved = found.group(0), []
+        target = context_block(catalog, new)
         for source, number in wanted.items():
             message = re.search(
                 r"    <message>\n(?:(?!    </message>).)*?<source>" + re.escape(escape(source)) + r"</source>.*?    </message>\n",
@@ -62,12 +63,19 @@ def main(old, new_file):
                 continue
             if source not in still_used:
                 old_block = old_block.replace(message.group(0), "", 1)
-            text = re.sub(r'<location filename="[^"]*" line="\d+"/>', f'<location filename="{location}" line="{number}"/>', message.group(0))
+            # Already in the new context: nothing to carry over.
+            if target and f"<source>{escape(source)}</source>" in target.group(0):
+                continue
+            # One location, at the new file's first use.
+            text = re.sub(r'(        <location filename="[^"]*" line="\d+"/>\n)+', f'        <location filename="{location}" line="{number}"/>\n', message.group(0))
             moved.append((number, text))
-        if not moved:
+        if old_block == found.group(0) and not moved:
             continue
         moved_total += len(moved)
         catalog = catalog.replace(found.group(0), old_block, 1)
+        if not moved:
+            path.write_text(catalog, encoding="utf-8")
+            continue
         target = context_block(catalog, new)
         body = "".join(text for _, text in sorted(moved))
         if target:
