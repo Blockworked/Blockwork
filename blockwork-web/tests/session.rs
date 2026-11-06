@@ -178,6 +178,9 @@ fn every_answered_command_is_listed() {
             }
         }
     }
-    assert!(seen > 20, "found only {seen} commands; is the scan still reading run()?");
+    assert!(
+        seen > 20,
+        "found only {seen} commands; is the scan still reading run()?"
+    );
     assert!(missing.is_empty(), "add to COMMANDS: {missing:?}");
 }
