@@ -315,11 +315,17 @@ impl Demo {
                     Some(dto) => vec![instruction(dto)?],
                     None => vec![],
                 };
+                let variable: Option<String> = arg(a, "variableToCreate")?;
                 self.open()?;
                 self.push_undo();
                 let mac = self.open_mut().ok_or("No macro selected")?;
                 let (dx, dy) = mac.next_editor_position();
-                to_json(mac.add_strand(x.unwrap_or(dx), y.unwrap_or(dy), ins))
+                let has_instruction = !ins.is_empty();
+                let added = mac.add_strand(x.unwrap_or(dx), y.unwrap_or(dy), ins);
+                if let Some(name) = variable.filter(|_| has_instruction) {
+                    let _ = mac.create_variable(&name);
+                }
+                to_json(added)
             }
             "remove_strand" => {
                 let strand_id: String = arg(a, "strandId")?;
@@ -398,11 +404,25 @@ impl Demo {
                 let (strand_id, path): (String, Vec<PathStep>) =
                     (arg(a, "strandId")?, arg(a, "path")?);
                 let ins = instruction(arg(a, "instruction")?)?;
+                let target_y: Option<i32> = arg(a, "targetY")?;
+                let variable: Option<String> = arg(a, "variableToCreate")?;
                 self.open()?.check_insert(&strand_id, &path, &ins)?;
                 self.push_undo();
                 if let Some(mac) = self.open_mut()
                     && mac.insert_instruction(&strand_id, &path, ins)?
                 {
+                    // A block prepended to a strand keeps the strand's top where it dropped.
+                    if let Some(y) = target_y
+                        && path.len() == 1
+                        && path[0].index == 0
+                        && let Some(strand) = mac.strand_mut(&strand_id)
+                    {
+                        strand.y = y;
+                    }
+                    // As in the app, a name that can't be made is left alone.
+                    if let Some(name) = variable {
+                        let _ = mac.create_variable(&name);
+                    }
                     self.buffers.clear();
                 }
                 Ok(Json::Null)

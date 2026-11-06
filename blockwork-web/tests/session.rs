@@ -156,6 +156,35 @@ fn blocks_can_be_dropped_into_a_reporters_branch() {
     );
 }
 
+/// A palette drop can ask for its variable to be made, and a block dropped on
+/// a strand's top keeps the strand where it landed, as in the app.
+#[test]
+fn a_drop_makes_its_variable_and_keeps_the_strands_top() {
+    let mut demo = loaded();
+    let wait = |id: &str| json!({ "id": id, "type": "Wait", "duration": { "kind": "Number", "value": 10 } });
+    let strand = demo
+        .dispatch(
+            "add_strand",
+            &json!({ "x": 0, "y": 0, "instruction": wait("first"), "variableToCreate": "made" }),
+        )
+        .unwrap();
+    let strand = strand.as_str().unwrap().to_string();
+    demo.dispatch(
+        "add_instruction",
+        &json!({ "strandId": strand, "path": [{ "index": 0 }], "instruction": wait("top"), "targetY": 432, "variableToCreate": "dropped" }),
+    )
+    .unwrap();
+    let state = demo.state();
+    let strands = state["current_macro"]["strands"].as_array().unwrap();
+    let moved = strands.iter().find(|s| s["id"] == strand.as_str()).unwrap();
+    assert_eq!(moved["y"], 432, "{moved}");
+    let variables = state["current_macro"]["variables"].to_string();
+    assert!(
+        variables.contains("\"made\"") && variables.contains("\"dropped\""),
+        "{variables}"
+    );
+}
+
 /// The other direction: every command `Demo::run` answers is in `COMMANDS`,
 /// so the parity script and the page's contract check see it too.
 #[test]
