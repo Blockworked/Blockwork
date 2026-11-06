@@ -1,4 +1,5 @@
 use super::*;
+use crate::input::types::MacroButton;
 
 #[test]
 fn typed_values_keep_numbers_as_numbers() {

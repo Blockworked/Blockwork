@@ -70,12 +70,12 @@ the `BlockKind` impl match every kind, and the tests in `fields.rs` and
 `tests/wire_blocks.rs` check the slot, variable and fixture lists against each
 other. The rest are listed so nothing is missed.
 
-1. `blockwork-core/src/macros/mod.rs`: add the `InstructionKind` variant with
+1. `blockwork-core/src/macros/kind.rs`: add the `InstructionKind` variant with
    a doc comment. A field added to an existing block needs `#[serde(default)]`
    so older files still load.
 2. `blockwork-core/src/macros/block_kind.rs`: list its value slots in
    `visit_values_mut`, its nested bodies in `body`/`body_mut`, any variable
-   or list names it holds in `for_each_ref`, and add it to `is_header` if it
+   or list names it holds in `visit_refs_mut`, and add it to `is_header` if it
    is a trigger.
 3. `blockwork-core/src/macros/fields.rs`: a `FieldId` per value slot, and
    its line in `value_slot_mut`. Add it to `requires_integer` if it only takes
@@ -83,8 +83,9 @@ other. The rest are listed so nothing is missed.
 4. `blockwork-core/src/macros/runner/`: what it does, in its category's file
    (`control`, `input`, `data`, `dialogs`, `browser`, `vision`, `system`;
    `apps.rs` holds helpers for the system blocks), and
-   its variant in that category's arm of `run_block` in `runner.rs`, which
-   only routes (`Wait` is the one block it runs itself).
+   its variant in that category's arm of `run_block` in `runner.rs`. Besides
+   routing, `run_block` only handles tracing, the debugger, stop flags and
+   call depth; a test fails if the arm and the file disagree.
 5. `blockwork-core/src/capabilities.rs`: what it can do (commands, network,
    screen, ...), or add it to the arm that does nothing guarded. This drives
    the import review and the permission prompts for shared macros. If it
@@ -122,6 +123,30 @@ other. The rest are listed so nothing is missed.
 5. `blockwork-qt/qml/BlockHelp.qml` and `just translations`, as for a block.
 
 `--test operator_descriptors` fails until steps 3 to 5 are done.
+
+## Adding a command
+
+1. `blockwork-app/src/commands/`: the function, in the file for its area
+   (`editing`, `data`, `settings`, ...). It takes `&SharedState` and
+   `&AppHandle`, and calls `emit_state_updated` after changing state.
+2. `blockwork-app/src/dispatch.rs`: its arm, reading arguments with `arg`.
+   QML spells argument names in camelCase.
+3. If it edits the document, the same command in
+   `blockwork-web/src/session.rs`; `tests/web_parity.rs` compares the two.
+4. QML calls it with `invoke("name", {...})`. `tests/qml_commands.rs` fails
+   if QML names a command `dispatch.rs` doesn't have.
+
+## Adding a setting
+
+1. `blockwork-core/src/config/settings.rs`: an `Option<T>` field on
+   `AppSettings`, so older settings files still load.
+2. `blockwork-app/src/state.rs`: the field on `AppState`, on `StateDto`, and
+   its line in `build_state_dto`. `blockwork-app/src/lib.rs` reads its
+   default from the settings file at start.
+3. A `set_...` command (see above) in `commands/settings.rs` that saves it
+   with `config::update_settings`.
+4. `blockwork-qt/qml/Main.qml`: its default in `appState`, then its control
+   in `SettingsPage.qml`, and `just translations`.
 
 ## Rules
 
