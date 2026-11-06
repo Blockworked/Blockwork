@@ -248,18 +248,10 @@ pub(crate) fn set_macro_conditions(
     active_until: &str,
     active_days: u8,
 ) -> Result<(), String> {
-    use blockwork_core::macros::conditions::parse_clock;
-    let active_hours = match (active_from.trim(), active_until.trim()) {
-        ("", "") => None,
-        ("", _) | (_, "") => return Err("set both a start and an end time, or neither".into()),
-        (from, until) => Some((parse_clock(from)?, parse_clock(until)?)),
-    };
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
-        mac.settings.only_in_window = only_in_window.trim().to_string();
-        mac.settings.power = power;
-        mac.settings.active_hours = active_hours;
-        mac.settings.active_days = active_days & 0x7f;
+        mac.settings
+            .set_conditions(&only_in_window, power, active_from, active_until, active_days)?;
         auto_save(&mut s);
         refresh_macro_list(&mut s);
     }

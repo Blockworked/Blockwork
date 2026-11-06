@@ -2,13 +2,6 @@
 
 use super::*;
 
-/// Colors are stored as six-digit CSS hex values. Restricting the persisted
-/// value keeps imported/user-created macros from injecting arbitrary CSS when
-/// the frontend uses it as a custom property on a block row.
-pub(super) fn normalize_block_color(color: &str) -> Result<String, String> {
-    normalize_persisted_block_color(color).ok_or_else(|| "Choose a valid block color".to_string())
-}
-
 /// Defines a new custom block, creating its (initially empty) header strand
 /// at the requested position, or beside existing strands. Pushes undo.
 pub(crate) fn create_block(
@@ -25,7 +18,7 @@ pub(crate) fn create_block(
     let mut s = state.lock().map_err(|e| e.to_string())?;
     BlockDef::validate_pieces(&pieces)?;
     blockwork_core::block_packs::check_identifier(&identifier)?;
-    let color = normalize_block_color(&color)?;
+    let color = blockwork_core::macros::checked_block_color(&color)?;
     push_undo(&mut s);
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let (x, y) = position.unwrap_or_else(|| mac.next_editor_position());
@@ -58,7 +51,7 @@ pub(crate) fn edit_block(
     // from leaving a useless undo step.
     BlockDef::validate_pieces(&pieces)?;
     blockwork_core::block_packs::check_identifier(&identifier)?;
-    normalize_block_color(&color)?;
+    blockwork_core::macros::checked_block_color(&color)?;
     push_undo(&mut s);
     // Also renames `RunBranch` blocks for any branch whose name changed.
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;

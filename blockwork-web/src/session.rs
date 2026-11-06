@@ -20,10 +20,10 @@ use blockwork_core::input::key_names::{format_key_combo, match_key};
 use blockwork_core::input::types::{InputToken, MacroKey};
 use blockwork_core::input::value::{Evaluated, Op, Value, has_side_effect_operator, is_pure_operator};
 use blockwork_core::key_mapping::{web_code_to_macro_key, web_key_to_macro_key};
-use blockwork_core::macros::conditions::{PowerCondition, parse_clock};
+use blockwork_core::macros::conditions::PowerCondition;
 use blockwork_core::macros::{
     BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro, MacroGraph,
-    SPEED_MULTIPLIER_RANGE, migrate, normalize_block_color, placement,
+    SPEED_MULTIPLIER_RANGE, checked_block_color, migrate,
 };
 use blockstitch_ffi::{Host, arg};
 use serde::de::DeserializeOwned;
@@ -214,16 +214,8 @@ impl Demo {
                 let power: PowerCondition = arg(a, "power")?;
                 let (from, until): (String, String) = (arg(a, "activeFrom")?, arg(a, "activeUntil")?);
                 let days: u8 = arg(a, "activeDays")?;
-                let active_hours = match (from.trim(), until.trim()) {
-                    ("", "") => None,
-                    ("", _) | (_, "") => return Err("set both a start and an end time, or neither".into()),
-                    (from, until) => Some((parse_clock(from)?, parse_clock(until)?)),
-                };
                 if let Some(mac) = self.open_mut() {
-                    mac.settings.only_in_window = window.trim().to_string();
-                    mac.settings.power = power;
-                    mac.settings.active_hours = active_hours;
-                    mac.settings.active_days = days & 0x7f;
+                    mac.settings.set_conditions(&window, power, &from, &until, days)?;
                 }
                 Ok(Json::Null)
             }
@@ -328,12 +320,7 @@ impl Demo {
             "add_instruction" => {
                 let (strand_id, path): (String, Vec<PathStep>) = (arg(a, "strandId")?, arg(a, "path")?);
                 let ins = instruction(arg(a, "instruction")?)?;
-                let mac = self.open()?;
-                mac.check_header_placement(&strand_id, &path, &ins)?;
-                if let Some(strand) = mac.strand(&strand_id) {
-                    placement::check_return(mac, strand, &ins)?;
-                    placement::check_loop_control(strand, &path, &ins)?;
-                }
+                self.open()?.check_insert(&strand_id, &path, &ins)?;
                 self.push_undo();
                 if let Some(mac) = self.open_mut()
                     && mac.insert_instruction(&strand_id, &path, ins)?
@@ -574,58 +561,21 @@ impl Demo {
             }
             "delete_signal" => {
                 let name: String = arg(a, "name")?;
-                let mac = self.open()?;
-                if !mac.signals.contains(&name) {
-                    return Err("Signal not found".into());
-                }
-                let mut used = false;
-                mac.graph.walk_instructions(&mut |ins| {
-                    if let InstructionKind::WhenSignal(target) | InstructionKind::SendSignal { name: target, .. } = &ins.kind
-                        && !target.expression
-                        && let Value::Text { value } = &target.value
-                    {
-                        used |= value.trim().eq_ignore_ascii_case(&name);
-                    }
-                });
-                if used {
-                    return Err("This signal is still used by a named signal block. Change or remove those blocks first.".into());
-                }
+                self.open()?.check_signal_deletable(&name)?;
                 self.push_undo();
                 self.open_mut().ok_or("No macro selected")?.signals.retain(|s| s != &name);
                 Ok(Json::Null)
             }
             "create_list" => {
                 let name: String = arg(a, "name")?;
-                let mac = self.open()?;
-                let trimmed = name.trim();
-                if trimmed.is_empty() {
-                    return Err("List name can't be empty".into());
-                }
-                if mac.lists.iter().any(|list| list.name == trimmed) {
-                    return Err(format!("A list named \"{trimmed}\" already exists"));
-                }
+                self.open()?.check_list_name(&name, None)?;
                 self.push_undo();
-                let mac = self.open_mut().ok_or("No macro selected")?;
-                let trimmed = mac.graph.create_list(&name)?;
-                if let Some(list) = mac.graph.lists.iter_mut().find(|list| list.name == trimmed) {
-                    list.editor_x = 36;
-                    list.editor_y = 36;
-                }
+                self.open_mut().ok_or("No macro selected")?.add_list(&name)?;
                 Ok(Json::Null)
             }
             "rename_list" => {
                 let (old, new): (String, String) = (arg(a, "oldName")?, arg(a, "newName")?);
-                let trimmed = new.trim().to_string();
-                let mac = self.open()?;
-                if trimmed.is_empty() {
-                    return Err("List name can't be empty".into());
-                }
-                if trimmed != old && mac.lists.iter().any(|list| list.name == trimmed) {
-                    return Err(format!("A list named \"{trimmed}\" already exists"));
-                }
-                if !mac.lists.iter().any(|list| list.name == old) {
-                    return Err("List not found".into());
-                }
+                let trimmed = self.open()?.check_list_name(&new, Some(&old))?;
                 if trimmed != old {
                     self.push_undo();
                     self.open_mut().ok_or("No macro selected")?.graph.rename_list(&old, &trimmed)?;
@@ -657,7 +607,7 @@ impl Demo {
             "create_block" => {
                 let pieces: Vec<BlockPiece> = arg(a, "pieces")?;
                 let shape: BlockShape = arg(a, "shape")?;
-                let color = block_color(&arg::<String>(a, "color")?)?;
+                let color = checked_block_color(&arg::<String>(a, "color")?)?;
                 let (icon, identifier, description): (String, String, String) =
                     (opt(a, "icon")?, opt(a, "identifier")?, opt(a, "description")?);
                 let position = arg::<Option<i32>>(a, "x")?.zip(arg::<Option<i32>>(a, "y")?);
@@ -681,7 +631,7 @@ impl Demo {
                 block_packs::check_editable(self.open()?, &block_id)?;
                 BlockDef::validate_pieces(&pieces)?;
                 block_packs::check_identifier(&identifier)?;
-                block_color(&color)?;
+                checked_block_color(&color)?;
                 self.push_undo();
                 let mac = self.open_mut().ok_or("No macro selected")?;
                 mac.update_block(&block_id, pieces, shape, &color)?;
@@ -735,11 +685,6 @@ impl Demo {
             other => Err(format!("unsupported command `{other}`")),
         }
     }
-}
-
-/// The app's color rule: a six-digit hex color.
-fn block_color(color: &str) -> Result<String, String> {
-    normalize_block_color(color).ok_or_else(|| "Choose a valid block color".to_string())
 }
 
 /// Whether `value` uses a reporter nothing on the page can answer (a host

@@ -107,4 +107,9 @@ other. The rest are listed so nothing is missed.
 - Keep comments short and plain. No em-dashes.
 - A change to saved files needs a loader for the old shape (see
   `macros/saved_shapes.rs` and `macros/migrate.rs`).
+- An editor command lives twice: in `blockwork-app/src/commands/` and in
+  `blockwork-web/src/session.rs` (the website demo), and
+  `blockwork-app/src/web_parity.rs` checks they agree. Put any check or
+  edit both need on `Macro` (`macros/document_rules.rs`, or blockstitch if
+  it isn't Blockwork-specific) and keep the two commands thin.
 - Changelog entries go under the unreleased version in `CHANGELOG.md`.

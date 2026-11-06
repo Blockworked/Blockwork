@@ -31,11 +31,7 @@ pub(crate) async fn add_instruction(
     let mut s = state.lock().map_err(|e| e.to_string())?;
     // Checked before checkpointing, so a rejected drop costs no undo step.
     if let Some(mac) = &s.current_macro {
-        mac.check_header_placement(&strand_id, &path, &ins)?;
-        if let Some(strand) = mac.strand(&strand_id) {
-            blockwork_core::macros::placement::check_return(mac, strand, &ins)?;
-            blockwork_core::macros::placement::check_loop_control(strand, &path, &ins)?;
-        }
+        mac.check_insert(&strand_id, &path, &ins)?;
     }
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro

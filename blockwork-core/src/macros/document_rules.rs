@@ -1,0 +1,125 @@
+//! Checks and small edits every editor shares (the app and the web demo),
+//! so a rule like "list names are unique" lives in one place.
+
+use blockstitch_core::editor::PathStep;
+
+use super::conditions::{PowerCondition, parse_clock};
+use super::{Instruction, InstructionKind, Macro, MacroSettings, placement};
+use crate::input::value::Value;
+
+/// A custom block's color as stored: six-digit hex, so a shared macro can't
+/// put arbitrary CSS into the editor.
+pub fn checked_block_color(color: &str) -> Result<String, String> {
+    blockstitch_core::graph::normalize_block_color(color).ok_or_else(|| "Choose a valid block color".to_string())
+}
+
+impl Macro {
+    /// Whether `ins` may go at `path` in the strand: headers only on top,
+    /// `Return` only in a reporter body, loop control only inside a loop.
+    pub fn check_insert(&self, strand_id: &str, path: &[PathStep], ins: &Instruction) -> Result<(), String> {
+        self.check_header_placement(strand_id, path, ins)?;
+        if let Some(strand) = self.strand(strand_id) {
+            placement::check_return(self, strand, ins)?;
+            placement::check_loop_control(strand, path, ins)?;
+        }
+        Ok(())
+    }
+
+    /// Refuses to delete a signal that is missing or still named by a
+    /// `When signal`/`Send signal` block.
+    pub fn check_signal_deletable(&self, name: &str) -> Result<(), String> {
+        if !self.signals.iter().any(|s| s == name) {
+            return Err("Signal not found".into());
+        }
+        let mut used = false;
+        self.graph.walk_instructions(&mut |ins| {
+            if let InstructionKind::WhenSignal(target) | InstructionKind::SendSignal { name: target, .. } = &ins.kind
+                && !target.expression
+                && let Value::Text { value } = &target.value
+            {
+                used |= value.trim().eq_ignore_ascii_case(name);
+            }
+        });
+        if used {
+            return Err("This signal is still used by a named signal block. Change or remove those blocks first.".into());
+        }
+        Ok(())
+    }
+
+    /// The trimmed name a list would be created or renamed to (`old` is the
+    /// list being renamed), or why it can't be.
+    pub fn check_list_name(&self, name: &str, old: Option<&str>) -> Result<String, String> {
+        let trimmed = name.trim();
+        if trimmed.is_empty() {
+            return Err("List name can't be empty".into());
+        }
+        if Some(trimmed) != old && self.lists.iter().any(|list| list.name == trimmed) {
+            return Err(format!("A list named \"{trimmed}\" already exists"));
+        }
+        if let Some(old) = old
+            && !self.lists.iter().any(|list| list.name == old)
+        {
+            return Err("List not found".into());
+        }
+        Ok(trimmed.to_string())
+    }
+
+    /// Adds a list with its editor window near the top left; returns its name.
+    pub fn add_list(&mut self, name: &str) -> Result<String, String> {
+        let trimmed = self.graph.create_list(name)?;
+        if let Some(list) = self.graph.lists.iter_mut().find(|list| list.name == trimmed) {
+            list.editor_x = 36;
+            list.editor_y = 36;
+        }
+        Ok(trimmed)
+    }
+}
+
+impl MacroSettings {
+    /// Sets when the macro may run. Times are `HH:MM`; give both or neither.
+    pub fn set_conditions(
+        &mut self,
+        only_in_window: &str,
+        power: PowerCondition,
+        active_from: &str,
+        active_until: &str,
+        active_days: u8,
+    ) -> Result<(), String> {
+        let active_hours = match (active_from.trim(), active_until.trim()) {
+            ("", "") => None,
+            ("", _) | (_, "") => return Err("set both a start and an end time, or neither".into()),
+            (from, until) => Some((parse_clock(from)?, parse_clock(until)?)),
+        };
+        self.only_in_window = only_in_window.trim().to_string();
+        self.power = power;
+        self.active_hours = active_hours;
+        self.active_days = active_days & 0x7f;
+        Ok(())
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn list_names_are_trimmed_unique_and_must_exist_to_rename() {
+        let mut mac = Macro::new("m".into(), String::new(), vec![]);
+        assert_eq!(mac.check_list_name("  todo ", None).unwrap(), "todo");
+        mac.add_list("todo").unwrap();
+        assert!(mac.check_list_name("todo", None).is_err());
+        assert!(mac.check_list_name(" ", None).is_err());
+        assert_eq!(mac.check_list_name("todo", Some("todo")).unwrap(), "todo");
+        assert!(mac.check_list_name("done", Some("missing")).is_err());
+    }
+
+    #[test]
+    fn active_hours_need_both_ends() {
+        let mut settings = Macro::new("m".into(), String::new(), vec![]).settings;
+        assert!(settings.set_conditions("", PowerCondition::default(), "09:00", "", 0).is_err());
+        settings.set_conditions(" Editor ", PowerCondition::default(), "09:00", "17:00", 0xff).unwrap();
+        assert_eq!(settings.only_in_window, "Editor");
+        assert!(settings.active_hours.is_some());
+        assert_eq!(settings.active_days, 0x7f);
+    }
+}

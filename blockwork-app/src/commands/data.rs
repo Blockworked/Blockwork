@@ -140,23 +140,10 @@ pub(crate) fn delete_signal(
     name: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
-    if !mac.signals.contains(&name) {
-        return Err("Signal not found".into());
-    }
-    let mut used = false;
-    mac.graph.walk_instructions(&mut |ins| {
-        if let InstructionKind::WhenSignal(target)
-        | InstructionKind::SendSignal { name: target, .. } = &ins.kind
-            && !target.expression
-            && let Value::Text { value } = &target.value
-        {
-            used |= value.trim().eq_ignore_ascii_case(&name);
-        }
-    });
-    if used {
-        return Err("This signal is still used by a named signal block. Change or remove those blocks first.".into());
-    }
+    s.current_macro
+        .as_ref()
+        .ok_or("No macro selected")?
+        .check_signal_deletable(&name)?;
     push_undo(&mut s);
     s.current_macro
         .as_mut()
@@ -167,15 +154,6 @@ pub(crate) fn delete_signal(
     emit_state_updated(app, &s);
     Ok(())
 }
-pub(super) fn create_list_in(mac: &mut Macro, name: &str) -> Result<String, String> {
-    let trimmed = mac.graph.create_list(name)?;
-    if let Some(list) = mac.graph.lists.iter_mut().find(|list| list.name == trimmed) {
-        list.editor_x = 36;
-        list.editor_y = 36;
-    }
-    Ok(trimmed)
-}
-
 pub(crate) fn create_list(
     state: &SharedState,
     app: &AppHandle,
@@ -184,18 +162,12 @@ pub(crate) fn create_list(
     let mut s = state.lock().map_err(|e| e.to_string())?;
     // Validate before checkpointing so a rejected name never creates a dead
     // undo entry.
-    {
-        let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
-        let trimmed = name.trim();
-        if trimmed.is_empty() {
-            return Err("List name can't be empty".to_string());
-        }
-        if mac.lists.iter().any(|list| list.name == trimmed) {
-            return Err(format!("A list named \"{trimmed}\" already exists"));
-        }
-    }
+    s.current_macro
+        .as_ref()
+        .ok_or("No macro selected")?
+        .check_list_name(&name, None)?;
     push_undo(&mut s);
-    create_list_in(s.current_macro.as_mut().ok_or("No macro selected")?, &name)?;
+    s.current_macro.as_mut().ok_or("No macro selected")?.add_list(&name)?;
     sync_list_values(&mut s);
     auto_save(&mut s);
     emit_state_updated(&app, &s);
@@ -209,19 +181,11 @@ pub(crate) fn rename_list(
     new_name: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let trimmed = new_name.trim().to_string();
-    {
-        let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
-        if trimmed.is_empty() {
-            return Err("List name can't be empty".to_string());
-        }
-        if trimmed != old_name && mac.lists.iter().any(|list| list.name == trimmed) {
-            return Err(format!("A list named \"{trimmed}\" already exists"));
-        }
-        if !mac.lists.iter().any(|list| list.name == old_name) {
-            return Err("List not found".to_string());
-        }
-    }
+    let trimmed = s
+        .current_macro
+        .as_ref()
+        .ok_or("No macro selected")?
+        .check_list_name(&new_name, Some(&old_name))?;
     if trimmed == old_name {
         return Ok(());
     }
