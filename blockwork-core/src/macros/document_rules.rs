@@ -4,7 +4,7 @@
 use blockstitch_core::editor::PathStep;
 
 use super::conditions::{PowerCondition, parse_clock};
-use super::{Instruction, InstructionKind, Macro, MacroSettings, placement};
+use super::{BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro, MacroSettings, placement};
 use crate::input::value::Value;
 
 /// A custom block's color as stored: six-digit hex, so a shared macro can't
@@ -13,7 +13,54 @@ pub fn checked_block_color(color: &str) -> Result<String, String> {
     blockstitch_core::graph::normalize_block_color(color).ok_or_else(|| "Choose a valid block color".to_string())
 }
 
+/// What "Make a Block" sends: a custom block's prototype and details.
+#[derive(Debug, Clone, serde::Deserialize)]
+pub struct BlockDraft {
+    pub pieces: Vec<BlockPiece>,
+    pub shape: BlockShape,
+    pub color: String,
+    #[serde(default)]
+    pub icon: String,
+    #[serde(default)]
+    pub identifier: String,
+    #[serde(default)]
+    pub description: String,
+}
+
+impl BlockDraft {
+    /// Refuses bad pieces, identifier or color before anything changes.
+    pub fn check(&self) -> Result<(), String> {
+        BlockDef::validate_pieces(&self.pieces)?;
+        crate::block_packs::check_identifier(&self.identifier)?;
+        checked_block_color(&self.color)?;
+        Ok(())
+    }
+}
+
 impl Macro {
+    /// Defines a custom block from a checked draft, at `at` or beside the
+    /// existing strands; returns its id.
+    pub fn add_block(&mut self, draft: BlockDraft, at: Option<(i32, i32)>) -> Result<String, String> {
+        let color = checked_block_color(&draft.color)?;
+        let (x, y) = at.unwrap_or_else(|| self.next_editor_position());
+        let id = self.create_block(draft.pieces, draft.shape, color, x, y);
+        self.set_block_details(&id, &draft.identifier, &draft.description, &draft.icon)?;
+        Ok(id)
+    }
+
+    /// Whether `block_id` may be edited into `draft` (a pack's blocks can't be).
+    pub fn check_block_edit(&self, block_id: &str, draft: &BlockDraft) -> Result<(), String> {
+        crate::block_packs::check_editable(self, block_id)?;
+        draft.check()
+    }
+
+    /// Edits a custom block to a checked draft; call sites, body inputs and
+    /// renamed branches follow (blockstitch's `update_block`).
+    pub fn edit_block(&mut self, block_id: &str, draft: BlockDraft) -> Result<(), String> {
+        self.update_block(block_id, draft.pieces, draft.shape, &draft.color)?;
+        self.set_block_details(block_id, &draft.identifier, &draft.description, &draft.icon)
+    }
+
     /// Whether `ins` may go at `path` in the strand: headers only on top,
     /// `Return` only in a reporter body, loop control only inside a loop.
     pub fn check_insert(&self, strand_id: &str, path: &[PathStep], ins: &Instruction) -> Result<(), String> {

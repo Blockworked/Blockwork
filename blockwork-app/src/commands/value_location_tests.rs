@@ -1,4 +1,5 @@
 use super::*;
+use blockwork_core::macros::BlockDef;
 use blockstitch_core::editor::apply_value_kind;
 use blockwork_core::input::types::Coordinate;
 use blockwork_core::input::value::Op;

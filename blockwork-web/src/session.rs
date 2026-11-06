@@ -22,8 +22,8 @@ use blockwork_core::input::value::{Evaluated, Op, Value, has_side_effect_operato
 use blockwork_core::key_mapping::{web_code_to_macro_key, web_key_to_macro_key};
 use blockwork_core::macros::conditions::PowerCondition;
 use blockwork_core::macros::{
-    BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro, MacroGraph,
-    SPEED_MULTIPLIER_RANGE, checked_block_color, migrate,
+    BlockDraft, Instruction, InstructionKind, Macro, MacroGraph,
+    SPEED_MULTIPLIER_RANGE, migrate,
 };
 use blockstitch_ffi::{Host, arg};
 use serde::de::DeserializeOwned;
@@ -605,37 +605,19 @@ impl Demo {
 
             // Custom blocks
             "create_block" => {
-                let pieces: Vec<BlockPiece> = arg(a, "pieces")?;
-                let shape: BlockShape = arg(a, "shape")?;
-                let color = checked_block_color(&arg::<String>(a, "color")?)?;
-                let (icon, identifier, description): (String, String, String) =
-                    (opt(a, "icon")?, opt(a, "identifier")?, opt(a, "description")?);
+                let draft: BlockDraft = serde_json::from_value(a.clone()).map_err(|e| e.to_string())?;
                 let position = arg::<Option<i32>>(a, "x")?.zip(arg::<Option<i32>>(a, "y")?);
-                BlockDef::validate_pieces(&pieces)?;
-                block_packs::check_identifier(&identifier)?;
+                draft.check()?;
                 self.open()?;
                 self.push_undo();
-                let mac = self.open_mut().ok_or("No macro selected")?;
-                let (x, y) = position.unwrap_or_else(|| mac.next_editor_position());
-                let id = mac.create_block(pieces, shape, color, x, y);
-                mac.set_block_details(&id, &identifier, &description, &icon)?;
-                to_json(id)
+                to_json(self.open_mut().ok_or("No macro selected")?.add_block(draft, position)?)
             }
             "edit_block" => {
                 let block_id: String = arg(a, "blockId")?;
-                let pieces: Vec<BlockPiece> = arg(a, "pieces")?;
-                let shape: BlockShape = arg(a, "shape")?;
-                let color: String = arg(a, "color")?;
-                let (icon, identifier, description): (String, String, String) =
-                    (opt(a, "icon")?, opt(a, "identifier")?, opt(a, "description")?);
-                block_packs::check_editable(self.open()?, &block_id)?;
-                BlockDef::validate_pieces(&pieces)?;
-                block_packs::check_identifier(&identifier)?;
-                checked_block_color(&color)?;
+                let draft: BlockDraft = serde_json::from_value(a.clone()).map_err(|e| e.to_string())?;
+                self.open()?.check_block_edit(&block_id, &draft)?;
                 self.push_undo();
-                let mac = self.open_mut().ok_or("No macro selected")?;
-                mac.update_block(&block_id, pieces, shape, &color)?;
-                mac.set_block_details(&block_id, &identifier, &description, &icon)?;
+                self.open_mut().ok_or("No macro selected")?.edit_block(&block_id, draft)?;
                 Ok(Json::Null)
             }
             "delete_block" => {

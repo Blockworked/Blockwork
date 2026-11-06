@@ -20,7 +20,7 @@ use blockwork_core::input::value::{Evaluated, Value};
 use blockwork_core::macros::runner::VariableStore;
 use blockstitch_core::graph::{ListItem, ListStore, resolve_list_reporters};
 use blockwork_core::macros::{
-    BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro,
+    BlockPiece, BlockShape, Instruction, InstructionKind, Macro,
     SPEED_MULTIPLIER_RANGE, loop_control,
 };
 #[cfg(test)]

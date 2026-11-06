@@ -1,6 +1,7 @@
 //! Custom blocks ("My Blocks").
 
 use super::*;
+use blockwork_core::macros::BlockDraft;
 
 /// Defines a new custom block, creating its (initially empty) header strand
 /// at the requested position, or beside existing strands. Pushes undo.
@@ -16,14 +17,10 @@ pub(crate) fn create_block(
     position: Option<(i32, i32)>,
 ) -> Result<String, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    BlockDef::validate_pieces(&pieces)?;
-    blockwork_core::block_packs::check_identifier(&identifier)?;
-    let color = blockwork_core::macros::checked_block_color(&color)?;
+    let draft = BlockDraft { pieces, shape, color, icon, identifier, description };
+    draft.check()?;
     push_undo(&mut s);
-    let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
-    let (x, y) = position.unwrap_or_else(|| mac.next_editor_position());
-    let id = mac.create_block(pieces, shape, color, x, y);
-    mac.set_block_details(&id, &identifier, &description, &icon)?;
+    let id = s.current_macro.as_mut().ok_or("No macro selected")?.add_block(draft, position)?;
     auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(id)
@@ -44,19 +41,11 @@ pub(crate) fn edit_block(
     description: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    blockwork_core::block_packs::check_editable(
-        s.current_macro.as_ref().ok_or("No macro selected")?, &block_id,
-    )?;
-    // `update_block` re-checks both; doing it first keeps a rejected edit
-    // from leaving a useless undo step.
-    BlockDef::validate_pieces(&pieces)?;
-    blockwork_core::block_packs::check_identifier(&identifier)?;
-    blockwork_core::macros::checked_block_color(&color)?;
+    let draft = BlockDraft { pieces, shape, color, icon, identifier, description };
+    // Checked first so a rejected edit leaves no useless undo step.
+    s.current_macro.as_ref().ok_or("No macro selected")?.check_block_edit(&block_id, &draft)?;
     push_undo(&mut s);
-    // Also renames `RunBranch` blocks for any branch whose name changed.
-    let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
-    mac.update_block(&block_id, pieces, shape, &color)?;
-    mac.set_block_details(&block_id, &identifier, &description, &icon)?;
+    s.current_macro.as_mut().ok_or("No macro selected")?.edit_block(&block_id, draft)?;
     auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
