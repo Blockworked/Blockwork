@@ -134,7 +134,8 @@ other. The rest are listed so nothing is missed.
 3. If it edits the document, the same command in
    `blockwork-web/src/session.rs`; `blockwork-app/src/web_parity.rs` compares the two.
 4. QML calls it with `invoke("name", {...})`. `blockwork-app/tests/qml_commands.rs` fails
-   if QML names a command `dispatch.rs` doesn't have.
+   if QML names a command `dispatch.rs` doesn't have, or sends an argument key in
+   a `{...}` literal that the command's arm never reads.
 
 ## Adding a setting
 

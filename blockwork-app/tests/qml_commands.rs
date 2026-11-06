@@ -1,5 +1,6 @@
 //! Every command the editor's QML sends by name has an arm in
-//! `src/dispatch.rs`, so a typo fails here rather than at run time.
+//! `src/dispatch.rs`, and every argument key it sends in an object literal is
+//! one that arm reads, so a typo fails here rather than at run time.
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -129,6 +130,173 @@ fn every_command_the_qml_sends_is_dispatched() {
     assert!(
         sent > 100,
         "found only {sent} commands; is the scan still reading the QML?"
+    );
+    assert!(problems.is_empty(), "{}", problems.join("\n"));
+}
+
+/// Per command, the argument keys its arm reads, or `None` when the arm hands
+/// `args` on whole and the keys can't be listed.
+fn read_keys() -> std::collections::HashMap<String, Option<BTreeSet<String>>> {
+    let source =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/dispatch.rs")).unwrap();
+    let draft = [
+        "pieces",
+        "shape",
+        "color",
+        "icon",
+        "identifier",
+        "description",
+    ];
+    let body_start = source.find("        match cmd {").unwrap();
+    let mut arms: Vec<(Vec<String>, String)> = Vec::new();
+    for line in source[body_start..].lines().skip(1) {
+        let trimmed = line.trim_start();
+        let indent = line.len() - trimmed.len();
+        if indent == 12 && (trimmed.starts_with('"') || trimmed.starts_with('_')) {
+            let pattern = trimmed.split("=>").next().unwrap();
+            let names = pattern.split('"').skip(1).step_by(2).map(str::to_owned);
+            arms.push((names.collect(), String::new()));
+        }
+        if let Some((_, body)) = arms.last_mut() {
+            body.push_str(line);
+        }
+    }
+    let mut keys = std::collections::HashMap::new();
+    for (names, body) in arms {
+        let code: String = body.chars().filter(|c| !c.is_whitespace()).collect();
+        let mut read = Some(BTreeSet::new());
+        let mut at = 0;
+        while let Some(found) = code[at..].find("args") {
+            let start = at + found;
+            at = start + 4;
+            let word = |c: Option<char>| c.is_some_and(|c| c.is_alphanumeric() || c == '_');
+            if word(code[..start].chars().last()) || word(code[at..].chars().next()) {
+                continue;
+            }
+            let (before, after) = (&code[..start], &code[at..]);
+            let quoted = |s: &str| s.split('"').nth(1).map(str::to_owned);
+            let key = if before.ends_with("block_draft(&") {
+                read.iter_mut()
+                    .for_each(|r| r.extend(draft.map(String::from)));
+                continue;
+            } else if before.ends_with('&') && after.starts_with(",\"") {
+                // `arg(&args, "key")` and `arg::<T>(&args, "key")`
+                let call = before.trim_end_matches('&').trim_end_matches('(');
+                (call.ends_with("arg") || call.ends_with('>'))
+                    .then(|| quoted(after))
+                    .flatten()
+            } else if after.starts_with(".get(\"") || after.starts_with("[\"") {
+                quoted(after)
+            } else {
+                None
+            };
+            match (key, read.as_mut()) {
+                (Some(key), Some(set)) => {
+                    set.insert(key);
+                }
+                (None, _) => read = None,
+                _ => {}
+            }
+        }
+        for name in names {
+            keys.insert(name, read.clone());
+        }
+    }
+    keys
+}
+
+/// The top-level keys of a `{ ... }` literal at the start of `code`, or `None`
+/// when it isn't one or spreads another object in.
+fn object_keys(code: &str) -> Option<Vec<String>> {
+    let inner = code.trim_start().strip_prefix('{')?;
+    let (mut depth, mut in_string, mut keys, mut entry) = (0, None, Vec::new(), String::new());
+    for c in inner.chars() {
+        match (in_string, c) {
+            (Some(q), _) if c == q => in_string = None,
+            (Some(_), _) => continue,
+            (None, '"' | '\'') => in_string = Some(c),
+            (None, '(' | '[' | '{') => depth += 1,
+            (None, '}') if depth == 0 => {
+                keys.push(std::mem::take(&mut entry));
+                break;
+            }
+            (None, ')' | ']' | '}') => depth -= 1,
+            (None, ',') if depth == 0 => keys.push(std::mem::take(&mut entry)),
+            _ if depth == 0 => entry.push(c),
+            _ => {}
+        }
+    }
+    let mut out = Vec::new();
+    for entry in keys {
+        let entry = entry.trim();
+        if entry.is_empty() {
+            continue;
+        }
+        if entry.starts_with("...") {
+            return None;
+        }
+        let key = entry.split(':').next().unwrap().trim();
+        if !key.chars().all(|c| c.is_alphanumeric() || c == '_') {
+            return None;
+        }
+        out.push(key.to_owned());
+    }
+    Some(out)
+}
+
+#[test]
+fn every_argument_the_qml_sends_is_read() {
+    let qml = Path::new(env!("CARGO_MANIFEST_DIR")).join("../blockwork-qt/qml");
+    let keys = read_keys();
+    let (mut checked, mut problems) = (0, Vec::new());
+    let mut files: Vec<_> = std::fs::read_dir(&qml)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .filter(|p| p.extension().is_some_and(|e| e == "qml"))
+        .collect();
+    files.sort();
+    for path in files {
+        let file = path.file_name().unwrap().to_string_lossy().into_owned();
+        let code = std::fs::read_to_string(&path).unwrap();
+        for call in CALLS {
+            for (at, _) in code.match_indices(call) {
+                if code[..at]
+                    .chars()
+                    .last()
+                    .is_some_and(|c| c.is_alphanumeric() || c == '_')
+                {
+                    continue;
+                }
+                let rest = &code[at + call.len()..];
+                let first = first_argument(rest);
+                let Some(names) = literal_names(first) else {
+                    continue;
+                };
+                let Some(after) = rest[first.len()..].trim_start().strip_prefix(',') else {
+                    continue;
+                };
+                let Some(sent) = object_keys(after) else {
+                    continue;
+                };
+                let line = code[..at].lines().count();
+                for name in names {
+                    let Some(Some(read)) = keys.get(&name) else {
+                        continue;
+                    };
+                    for key in &sent {
+                        checked += 1;
+                        if !read.contains(key) {
+                            problems.push(format!("{file}:{line}: {name} never reads `{key}`"));
+                        }
+                    }
+                }
+            }
+        }
+    }
+    assert!(
+        checked > 100,
+        "checked only {checked} arguments; is the scan still reading the QML?"
     );
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }

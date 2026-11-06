@@ -259,7 +259,7 @@ AppDialog {
                             visible: card.modelData.comments > 0
                             spacing: 4
                             LucideIcon { name: "message-square"; width: 14; height: 14; color: Theme.textDim; anchors.verticalCenter: parent.verticalCenter }
-                            Text { text: card.modelData.comments; color: Theme.textDim; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
+                            Text { text: card.modelData.comments || 0; color: Theme.textDim; font.pixelSize: 12; anchors.verticalCenter: parent.verticalCenter }
                         }
                     }
                     CommunityParts.Facts {
