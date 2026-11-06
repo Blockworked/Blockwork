@@ -224,42 +224,12 @@
         <source>Delete value</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1706"/>
-        <source>This list is empty.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1745"/>
-        <source>Add item</source>
-        <translation type="unfinished"></translation>
-    </message>
     <message numerus="yes">
         <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1750"/>
         <source>%n item(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
         </translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1827"/>
-        <source>This dict is empty.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1850"/>
-        <source>key</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1857"/>
-        <source>value</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1868"/>
-        <source>Add entry</source>
-        <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
         <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1873"/>
@@ -4543,6 +4513,29 @@
     </message>
 </context>
 <context>
+    <name>DictEditorCard</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="173"/>
+        <source>This dict is empty.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="215"/>
+        <source>key</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="235"/>
+        <source>value</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="274"/>
+        <source>Add entry</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>EditorPage</name>
     <message>
         <location filename="../qml/EditorPage.qml" line="81"/>
@@ -5572,6 +5565,19 @@
     <message>
         <location filename="../qml/LibraryPanel.qml" line="204"/>
         <source>Work</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>ListEditorCard</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/ListEditorCard.qml" line="157"/>
+        <source>This list is empty.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/ListEditorCard.qml" line="244"/>
+        <source>Add item</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

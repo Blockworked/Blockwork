@@ -20,6 +20,8 @@ pub(crate) struct Tray {
     proxy: EventLoopProxy<MainThreadEvent>,
 }
 
+/// Held only so the tray icon lives as long as `Tray`; dropping it removes
+/// the icon, so its field is never read.
 #[allow(dead_code)]
 enum BuiltTray {
     #[cfg(not(target_os = "linux"))]

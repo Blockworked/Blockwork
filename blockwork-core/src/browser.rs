@@ -7,6 +7,9 @@
 //! each answers the other's nonce with HMAC-SHA256(key, "client:"/"server:" +
 //! nonce). Only extension origins may connect, so a web page can't pose as
 //! the extension, and a program squatting on the port can't drive the browser.
+//!
+//! Every message and command is listed in the extension repo's PROTOCOL.md;
+//! change it with this file.
 
 use serde::Serialize;
 use serde_json::{Value, json};

@@ -1,7 +1,7 @@
 name: Checks
 
-# Tests and clippy's deny-level lints on Linux. Clippy warnings are reported
-# but don't fail the run.
+# Tests and clippy's deny-level lints on Linux, and core + FFI tests on macOS
+# and Windows. Clippy warnings are reported but don't fail the run.
 on:
   push:
   workflow_dispatch:
@@ -36,6 +36,22 @@ jobs:
       - run: cargo test -p blockwork-core -p blockwork-ffi
       - name: Test native macOS bundle validation
         run: python3 scripts/macos/test-verify-bundle.py
+
+  windows-core:
+    if: ${{ !inputs.qml_probe }}
+    name: Windows core and FFI
+    runs-on: windows-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: dtolnay/rust-toolchain@stable
+        with:
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+        with:
+          key: windows-core
+      # The Windows input backend and window code, which the Linux job never compiles.
+      - run: cargo clippy -p blockwork-core -p blockwork-ffi --all-targets
+      - run: cargo test -p blockwork-core -p blockwork-ffi
 
   test:
     if: ${{ !inputs.qml_probe }}
