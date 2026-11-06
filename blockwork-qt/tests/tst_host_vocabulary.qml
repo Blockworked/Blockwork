@@ -70,6 +70,7 @@ Item {
                 }
             }
             compare(missing, [], "icons blockstitch's Icons.qml doesn't have (they draw as info)");
+            verify(!!Stitch.Icons.paths["gauge"], "BlockCatalog hands blockstitch Blockwork's own icons");
         }
         function test_palette_reporters_start_from_the_core_defaults() {
             const page = createTemporaryObject(editorComponent, scene);

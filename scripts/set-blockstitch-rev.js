@@ -24,7 +24,7 @@ if (!pinned.has("core") || !pinned.has("qml")) {
 fs.writeFileSync(manifest, updated);
 
 // The flatpak's blockstitch source must match; cargo-sources.json still needs
-// regenerating (`just flatpak`'s generator) after a full commit hash change.
+// regenerating (`just flatpak-sources`) after a full commit hash change.
 const flatpak = path.join(__dirname, "..", "packaging", "flatpak", "com.blockworked.Blockwork.yml");
 if (fs.existsSync(flatpak) && /^[0-9a-f]{40}$/.test(revision)) {
     const yml = fs.readFileSync(flatpak, "utf8");

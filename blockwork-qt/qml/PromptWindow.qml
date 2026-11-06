@@ -38,7 +38,8 @@ ApplicationWindow {
         if (kind === "text") field.forceActiveFocus();
         else if (kind === "choice") choices.forceActiveFocus();
     }
-    onKindChanged: Qt.callLater(focusInput)
+    // Each new question puts the keyboard back in its input.
+    onRequestChanged: Qt.callLater(focusInput)
     Component.onCompleted: {
         raise(); requestActivate(); focusInput();
     }

@@ -102,6 +102,12 @@ jobs:
       - name: Tests
         run: cargo test --workspace --exclude blockwork-linux-bridge
 
+      # After the build, which stages the Lucide icons the QML tests import.
+      - name: QML tests
+        run: |
+          scripts/fetch-blockstitch.sh ../blockstitch
+          PATH="$(dirname "$QMAKE"):$PATH" python3 blockwork-qt/tests/run.py ../blockstitch
+
   macos-qml-probe:
     if: ${{ inputs.qml_probe }}
     name: macOS QML (GC=${{ inputs.gc_limit }}, ${{ matrix.runner }})

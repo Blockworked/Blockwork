@@ -94,9 +94,9 @@ other. The rest are listed so nothing is missed.
    until it is in one of them.
 3. `BLESS=1 cargo test -p blockwork-core --test operator_descriptors` to
    regenerate `hostDescriptors`.
-4. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry, a line in
-   `extraOperators` and its label and result in `registerOperators` (the QML
-   tests check the two agree).
+4. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry and its
+   label pieces and result type in `operatorRows()`; the palette's
+   `extraOperators` list is built from that and the descriptors.
 5. `blockwork-qt/qml/BlockHelp.qml` and `just translations`, as for a block.
 
 ## Rules

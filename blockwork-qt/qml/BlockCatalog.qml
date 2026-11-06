@@ -1,5 +1,7 @@
 import QtQuick
 import com.blockworked.Blockstitch 1.0
+import com.blockworked.Blockstitch 1.0 as Stitch
+import com.blockworked.Blockwork 1.0 as Bw
 
 // Blockwork's block vocabulary, in one place. The palette sections list
 // every block once and give it its category; the rest is what blockstitch
@@ -86,27 +88,81 @@ QtObject {
         {"kind":"LastError","op":"LastError","arity":0,"args":[],"host":true}
     ]
     // END GENERATED operator descriptors
-    // Blockwork's reporters for the palette: [op, result, arity, args?]. A
-    // fresh one takes hostDescriptors' defaults unless it gives its own args.
-    readonly property var extraOperators: [
-        ["PluggedIn", "bool", 0], ["BatteryPercentage", "number", 0],
-        ["ClipboardText", "text", 0], ["ClipboardHasImage", "bool", 0], ["ClipboardHasFiles", "bool", 0],
-        ["ReadFile", "text", 1], ["FileExists", "bool", 1], ["ListDirectory", "text", 1], ["HttpGet", "text", 1], ["JsonGet", "text", 2],
-        ["ShellOutput", "text", 1], ["ShellSucceeded", "bool", 1],
-        ["ActiveWindowTitle", "text", 0], ["ActiveWindowApp", "text", 0], ["WindowExists", "bool", 1],
-        ["LastError", "text", 0], ["MacroRunning", "bool", 1], ["GlobalVariable", "text", 1, [textValue(firstGlobalName())]],
-        ["PixelColor", "text", 2], ["AverageColor", "text", 4], ["ColorsMatch", "bool", 3], ["ScreenText", "text", 4],
-        ["MousePosition", "number", 1], ["ScreenSize", "number", 1], ["MonitorCount", "number", 0], ["MonitorInfo", "number", 2],
-        ["WindowInfo", "number", 2], ["Detection", "text", 2],
-        ["AppRunning", "bool", 1], ["IdleSeconds", "number", 0], ["ScreenLocked", "bool", 0],
-        ["NetworkConnected", "bool", 0], ["UsbConnected", "bool", 1], ["Secret", "text", 1],
-        ["TextCheck", "bool", 3], ["TextReplace", "text", 3], ["RegexReplace", "text", 3], ["RegexFind", "text", 2],
-        ["SplitPart", "text", 3], ["SplitCount", "number", 2], ["Substring", "text", 3],
-        ["Trim", "text", 1], ["FormatNumber", "text", 2],
-        ["Timestamp", "number", 0], ["FormatDate", "text", 2], ["ParseDate", "number", 2], ["DatePart", "number", 2],
-        ["BrowserConnected", "bool", 0], ["PageUrl", "text", 0], ["PageTitle", "text", 0],
-        ["ElementText", "text", 1], ["ElementExists", "bool", 1], ["ElementCount", "number", 1]
-    ]
+    // Blockwork's reporters for the palette: [op, result, arity, args?], from
+    // operatorRows() and the generated descriptors. A fresh one takes
+    // hostDescriptors' defaults unless it gives its own args.
+    readonly property var extraOperators: {
+        const rows = operatorRows();
+        return Object.keys(rows).map(op => {
+            const descriptor = hostDescriptors.find(d => d.op === op);
+            const spec = [op, rows[op].result, descriptor ? descriptor.arity : 0];
+            if (op === "GlobalVariable") spec.push([textValue(firstGlobalName())]);
+            return spec;
+        });
+    }
+    // Blockwork's reporters: label pieces and result type, by operator. The
+    // palette list above and BlockRegistry both come from this one table.
+    function operatorRows() {
+        return {
+            BatteryPercentage: { prefix: qsTr("battery percentage"), result: "number" }, PluggedIn: { prefix: qsTr("plugged in?"), result: "bool" },
+            ClipboardText: { prefix: qsTr("clipboard text"), result: "text" }, ClipboardHasImage: { prefix: qsTr("clipboard has image"), result: "bool" },
+            ClipboardHasFiles: { prefix: qsTr("clipboard has files"), result: "bool" },
+            ReadFile: { prefix: qsTr("contents of file"), result: "text" }, FileExists: { prefix: qsTr("file"), suffix: qsTr("exists?"), result: "bool" },
+            ListDirectory: { prefix: qsTr("files in folder"), result: "text" }, HttpGet: { prefix: qsTr("fetch"), result: "text" },
+            JsonGet: { prefix: qsTr("get"), infix: qsTr("from JSON"), result: "text" },
+            ShellOutput: { prefix: qsTr("output of command"), result: "text" }, ShellSucceeded: { prefix: qsTr("command"), suffix: qsTr("succeeds?"), result: "bool" },
+            ActiveWindowTitle: { prefix: qsTr("active window title"), result: "text" }, ActiveWindowApp: { prefix: qsTr("active app"), result: "text" },
+            WindowExists: { prefix: qsTr("window"), suffix: qsTr("exists?"), result: "bool" },
+            LastError: { prefix: qsTr("error message"), result: "text" },
+            MacroRunning: { prefix: qsTr("macro"), suffix: qsTr("is running?"), result: "bool" },
+            GlobalVariable: { prefix: qsTr("global"), result: "text", enumArg: { index: 0, options: () => page.globalChoices() } },
+            PixelColor: { prefix: qsTr("color at x"), infix: [qsTr("y")], result: "text",
+                pickOp: { action: "pickScreenPoint", icon: "crosshair", tip: qsTr("Click a point on screen") } },
+            AverageColor: { prefix: qsTr("average color at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text",
+                pickOp: { action: "pickScreenRegion", icon: "square-dashed", tip: qsTr("Drag out a region on screen") } },
+            ColorsMatch: { infix: [qsTr("matches"), qsTr("within")], suffix: "%", result: "bool" },
+            ScreenText: { prefix: qsTr("text on screen at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text",
+                pickOp: { action: "pickScreenRegion", icon: "square-dashed", tip: qsTr("Drag out a region on screen") } },
+            MousePosition: { prefix: qsTr("mouse"), result: "number", enumArg: { index: 0, options: [{ value: "x", label: qsTr("x") }, { value: "y", label: qsTr("y") }] } },
+            ScreenSize: { prefix: qsTr("screen"), result: "number", enumArg: { index: 0, options: [{ value: "width", label: qsTr("width") }, { value: "height", label: qsTr("height") }] } },
+            MonitorCount: { prefix: qsTr("number of monitors"), result: "number" },
+            MonitorInfo: { prefix: qsTr("monitor"), result: "number",
+                enumArg: { index: 1, options: choices([["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")]]) } },
+            WindowInfo: { prefix: qsTr("window"), result: "number",
+                enumArg: { index: 1, options: choices([["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")], ["center x", qsTr("center x")], ["center y", qsTr("center y")]]) } },
+            Detection: { infix: qsTr("of detection"), result: "text",
+                enumArg: { index: 0, options: choices([["center x", qsTr("center x")], ["center y", qsTr("center y")], ["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")], ["score", qsTr("score")], ["label", qsTr("label")], ["id", qsTr("id")]]) } },
+            AppRunning: { prefix: qsTr("app"), suffix: qsTr("is running?"), result: "bool" },
+            IdleSeconds: { prefix: qsTr("seconds idle"), result: "number" },
+            ScreenLocked: { prefix: qsTr("screen is locked?"), result: "bool" },
+            NetworkConnected: { prefix: qsTr("online?"), result: "bool" },
+            UsbConnected: { prefix: qsTr("USB device"), suffix: qsTr("plugged in?"), result: "bool", pickArg: { index: 0, action: "pickUsb", icon: "list" } },
+            Secret: { prefix: qsTr("secret"), result: "text", enumArg: { index: 0, options: () => {
+                const names = page.appState.secret_names || [];
+                return names.length ? names.map(n => ({ value: n, label: n })) : [{ value: "", label: qsTr("(add one in Settings)") }];
+            } } },
+            TextCheck: { infix: ["", ""], suffix: "?", result: "bool",
+                enumArg: { index: 1, options: choices([["contains", qsTr("contains")], ["starts with", qsTr("starts with")], ["ends with", qsTr("ends with")], ["matches regex", qsTr("matches regex")]]) } },
+            TextReplace: { prefix: qsTr("replace"), infix: [qsTr("in"), qsTr("with")], result: "text" },
+            RegexReplace: { prefix: qsTr("replace regex"), infix: [qsTr("in"), qsTr("with")], result: "text" },
+            RegexFind: { prefix: qsTr("match of regex"), infix: qsTr("in"), result: "text" },
+            SplitPart: { prefix: qsTr("part"), infix: [qsTr("of"), qsTr("split by")], result: "text" },
+            SplitCount: { prefix: qsTr("number of parts in"), infix: qsTr("split by"), result: "number" },
+            Substring: { prefix: qsTr("letters"), infix: [qsTr("to"), qsTr("of")], result: "text" },
+            Trim: { prefix: qsTr("trim"), result: "text" },
+            FormatNumber: { infix: qsTr("with"), suffix: qsTr("decimals"), result: "text" },
+            Timestamp: { prefix: qsTr("timestamp now"), result: "number" },
+            FormatDate: { prefix: qsTr("date of"), infix: qsTr("as"), result: "text" },
+            ParseDate: { prefix: qsTr("timestamp of"), infix: qsTr("in format"), result: "number" },
+            DatePart: { infix: qsTr("of"), result: "number",
+                enumArg: { index: 0, options: choices([["year", qsTr("year")], ["month", qsTr("month")], ["day", qsTr("day")], ["hour", qsTr("hour")], ["minute", qsTr("minute")], ["second", qsTr("second")], ["weekday", qsTr("weekday")]]) } },
+            BrowserConnected: { prefix: qsTr("browser connected?"), result: "bool" },
+            PageUrl: { prefix: qsTr("page address"), result: "text" }, PageTitle: { prefix: qsTr("page title"), result: "text" },
+            ElementText: { prefix: qsTr("text of element"), result: "text" },
+            ElementExists: { prefix: qsTr("element"), suffix: qsTr("exists?"), result: "bool" },
+            ElementCount: { prefix: qsTr("number of elements matching"), result: "number" }
+        };
+    }
     // The palette's sections, in order. Statements come before reporters,
     // except where a section holds data: there the reporter comes first.
     readonly property var paletteSections: [
@@ -182,6 +238,9 @@ QtObject {
     // Hands every row, operator, icon and prefab to blockstitch's BlockRegistry.
     // Labels are read once, so the page calls this again in a new language.
     function register() {
+        // Blockwork's own icon set covers every icon below; the blocks draw
+        // with blockstitch's, so hand it the ones it lacks.
+        Stitch.Icons.add(Bw.Icons.paths);
         const label = text => ({ kind: "label", text: text });
         const commandField = { kind: "text", key: "command", placeholder: qsTr("command"), minWidth: 92, maxWidth: 480 };
         // The image blocks' picture: click to capture from the screen, or load a file.
@@ -238,65 +297,7 @@ QtObject {
             Text: "text-cursor", Key: "keyboard", Button: "mouse-pointer-click", MoveMouse: "move", Scroll: "mouse", Command: "terminal",
             OpenApp: "app-window", CloseApp: "square-x", SetClipboard: "clipboard"
         });
-        BlockRegistry.registerOperators({
-            BatteryPercentage: { prefix: qsTr("battery percentage"), result: "number" }, PluggedIn: { prefix: qsTr("plugged in?"), result: "bool" },
-            ClipboardText: { prefix: qsTr("clipboard text"), result: "text" }, ClipboardHasImage: { prefix: qsTr("clipboard has image"), result: "bool" },
-            ClipboardHasFiles: { prefix: qsTr("clipboard has files"), result: "bool" },
-            ReadFile: { prefix: qsTr("contents of file"), result: "text" }, FileExists: { prefix: qsTr("file"), suffix: qsTr("exists?"), result: "bool" },
-            ListDirectory: { prefix: qsTr("files in folder"), result: "text" }, HttpGet: { prefix: qsTr("fetch"), result: "text" },
-            JsonGet: { prefix: qsTr("get"), infix: qsTr("from JSON"), result: "text" },
-            ShellOutput: { prefix: qsTr("output of command"), result: "text" }, ShellSucceeded: { prefix: qsTr("command"), suffix: qsTr("succeeds?"), result: "bool" },
-            ActiveWindowTitle: { prefix: qsTr("active window title"), result: "text" }, ActiveWindowApp: { prefix: qsTr("active app"), result: "text" },
-            WindowExists: { prefix: qsTr("window"), suffix: qsTr("exists?"), result: "bool" },
-            LastError: { prefix: qsTr("error message"), result: "text" },
-            MacroRunning: { prefix: qsTr("macro"), suffix: qsTr("is running?"), result: "bool" },
-            GlobalVariable: { prefix: qsTr("global"), result: "text", enumArg: { index: 0, options: () => page.globalChoices() } },
-            PixelColor: { prefix: qsTr("color at x"), infix: [qsTr("y")], result: "text",
-                pickOp: { action: "pickScreenPoint", icon: "crosshair", tip: qsTr("Click a point on screen") } },
-            AverageColor: { prefix: qsTr("average color at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text",
-                pickOp: { action: "pickScreenRegion", icon: "square-dashed", tip: qsTr("Drag out a region on screen") } },
-            ColorsMatch: { infix: [qsTr("matches"), qsTr("within")], suffix: "%", result: "bool" },
-            ScreenText: { prefix: qsTr("text on screen at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text",
-                pickOp: { action: "pickScreenRegion", icon: "square-dashed", tip: qsTr("Drag out a region on screen") } },
-            MousePosition: { prefix: qsTr("mouse"), result: "number", enumArg: { index: 0, options: [{ value: "x", label: qsTr("x") }, { value: "y", label: qsTr("y") }] } },
-            ScreenSize: { prefix: qsTr("screen"), result: "number", enumArg: { index: 0, options: [{ value: "width", label: qsTr("width") }, { value: "height", label: qsTr("height") }] } },
-            MonitorCount: { prefix: qsTr("number of monitors"), result: "number" },
-            MonitorInfo: { prefix: qsTr("monitor"), result: "number",
-                enumArg: { index: 1, options: choices([["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")]]) } },
-            WindowInfo: { prefix: qsTr("window"), result: "number",
-                enumArg: { index: 1, options: choices([["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")], ["center x", qsTr("center x")], ["center y", qsTr("center y")]]) } },
-            Detection: { infix: qsTr("of detection"), result: "text",
-                enumArg: { index: 0, options: choices([["center x", qsTr("center x")], ["center y", qsTr("center y")], ["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")], ["score", qsTr("score")], ["label", qsTr("label")], ["id", qsTr("id")]]) } },
-            AppRunning: { prefix: qsTr("app"), suffix: qsTr("is running?"), result: "bool" },
-            IdleSeconds: { prefix: qsTr("seconds idle"), result: "number" },
-            ScreenLocked: { prefix: qsTr("screen is locked?"), result: "bool" },
-            NetworkConnected: { prefix: qsTr("online?"), result: "bool" },
-            UsbConnected: { prefix: qsTr("USB device"), suffix: qsTr("plugged in?"), result: "bool", pickArg: { index: 0, action: "pickUsb", icon: "list" } },
-            Secret: { prefix: qsTr("secret"), result: "text", enumArg: { index: 0, options: () => {
-                const names = page.appState.secret_names || [];
-                return names.length ? names.map(n => ({ value: n, label: n })) : [{ value: "", label: qsTr("(add one in Settings)") }];
-            } } },
-            TextCheck: { infix: ["", ""], suffix: "?", result: "bool",
-                enumArg: { index: 1, options: choices([["contains", qsTr("contains")], ["starts with", qsTr("starts with")], ["ends with", qsTr("ends with")], ["matches regex", qsTr("matches regex")]]) } },
-            TextReplace: { prefix: qsTr("replace"), infix: [qsTr("in"), qsTr("with")], result: "text" },
-            RegexReplace: { prefix: qsTr("replace regex"), infix: [qsTr("in"), qsTr("with")], result: "text" },
-            RegexFind: { prefix: qsTr("match of regex"), infix: qsTr("in"), result: "text" },
-            SplitPart: { prefix: qsTr("part"), infix: [qsTr("of"), qsTr("split by")], result: "text" },
-            SplitCount: { prefix: qsTr("number of parts in"), infix: qsTr("split by"), result: "number" },
-            Substring: { prefix: qsTr("letters"), infix: [qsTr("to"), qsTr("of")], result: "text" },
-            Trim: { prefix: qsTr("trim"), result: "text" },
-            FormatNumber: { infix: qsTr("with"), suffix: qsTr("decimals"), result: "text" },
-            Timestamp: { prefix: qsTr("timestamp now"), result: "number" },
-            FormatDate: { prefix: qsTr("date of"), infix: qsTr("as"), result: "text" },
-            ParseDate: { prefix: qsTr("timestamp of"), infix: qsTr("in format"), result: "number" },
-            DatePart: { infix: qsTr("of"), result: "number",
-                enumArg: { index: 0, options: choices([["year", qsTr("year")], ["month", qsTr("month")], ["day", qsTr("day")], ["hour", qsTr("hour")], ["minute", qsTr("minute")], ["second", qsTr("second")], ["weekday", qsTr("weekday")]]) } },
-            BrowserConnected: { prefix: qsTr("browser connected?"), result: "bool" },
-            PageUrl: { prefix: qsTr("page address"), result: "text" }, PageTitle: { prefix: qsTr("page title"), result: "text" },
-            ElementText: { prefix: qsTr("text of element"), result: "text" },
-            ElementExists: { prefix: qsTr("element"), suffix: qsTr("exists?"), result: "bool" },
-            ElementCount: { prefix: qsTr("number of elements matching"), result: "number" }
-        });
+        BlockRegistry.registerOperators(operatorRows());
         // "when [every week] [Monday] at [09:00]": the recurrence as drop-downs,
         // the time as a value slot that opens the time picker.
         const scheduleOf = i => (i && i.schedule) || { kind: "Daily" };
