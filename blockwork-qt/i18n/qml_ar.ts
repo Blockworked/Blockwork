@@ -210,16 +210,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1552"/>
-        <source>Comment</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1587"/>
-        <source>Delete comment</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1596"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
@@ -4110,6 +4100,19 @@
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/CollectionPanel.qml" line="46"/>
         <source>Delete list</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>CommentCard</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/CommentCard.qml" line="63"/>
+        <source>Comment</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/CommentCard.qml" line="137"/>
+        <source>Delete comment</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
