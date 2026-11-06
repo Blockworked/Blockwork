@@ -50,7 +50,7 @@ fn components_survive_pack_install_update_and_save() {
     let id = author.create_block(pieces, BlockShape::Normal, "#4C97FF".into(), 0, 0);
     let pack = pack_from_macro(
         &author,
-        &[id.clone()],
+        std::slice::from_ref(&id),
         PackInfo {
             id: "components".into(),
             name: "Components".into(),
@@ -131,7 +131,7 @@ fn input_defaults_survive_pack_updates_without_resetting_calls() {
         name: "Example".into(),
         ..PackInfo::default()
     };
-    let pack = pack_from_macro(&author, &[id.clone()], info).unwrap();
+    let pack = pack_from_macro(&author, std::slice::from_ref(&id), info).unwrap();
     let mut pack = read_pack(&write_pack(&pack).unwrap()).unwrap();
     assert_eq!(
         pack.content
@@ -207,7 +207,7 @@ fn packs_take_dependencies_and_update_in_place() {
         version: "1.0".into(),
         ..Default::default()
     };
-    let pack = pack_from_macro(&author, &[outer.clone()], info).unwrap();
+    let pack = pack_from_macro(&author, std::slice::from_ref(&outer), info).unwrap();
     assert_eq!(pack.info.id, "my-pack");
     assert_eq!(
         pack.content.block_defs.len(),
@@ -256,7 +256,7 @@ fn packs_take_dependencies_and_update_in_place() {
         version: "2.0".into(),
         ..Default::default()
     };
-    let v2 = pack_from_macro(&author, &[outer.clone()], info).unwrap();
+    let v2 = pack_from_macro(&author, std::slice::from_ref(&outer), info).unwrap();
     let report = merge_into(&mut user, &v2, "");
     assert_eq!((report.added.len(), report.updated.len()), (0, 2));
     assert_eq!(user.block_defs.len(), 2);
@@ -330,7 +330,7 @@ fn removing_packs_scrubs_nested_calls_and_preserves_shared_blocks() {
     let outer = make_block(&mut author, "outer", vec![call(&shared)]);
     let pack = pack_from_macro(
         &author,
-        &[outer.clone()],
+        std::slice::from_ref(&outer),
         PackInfo {
             id: "first".into(),
             name: "First".into(),
@@ -340,7 +340,7 @@ fn removing_packs_scrubs_nested_calls_and_preserves_shared_blocks() {
     .unwrap();
     let other = pack_from_macro(
         &author,
-        &[shared.clone()],
+        std::slice::from_ref(&shared),
         PackInfo {
             id: "second".into(),
             name: "Second".into(),
@@ -401,7 +401,7 @@ fn pack_details_survive_export_install_and_save() {
     def.description = "Pauses playback for the given number of seconds.".into();
     let pack = pack_from_macro(
         &author,
-        &[id.clone()],
+        std::slice::from_ref(&id),
         PackInfo {
             name: "Timing".into(),
             ..Default::default()
@@ -431,7 +431,7 @@ fn installed_implementations_stay_outside_editor_and_recording() {
     );
     let pack = pack_from_macro(
         &author,
-        &[id.clone()],
+        std::slice::from_ref(&id),
         PackInfo {
             name: "Timing".into(),
             author: "Example Author".into(),
@@ -443,7 +443,7 @@ fn installed_implementations_stay_outside_editor_and_recording() {
     merge_into(&mut mac, &pack, "checksum");
     assert_eq!(mac.editor_strands().count(), 1);
     assert!(check_editable(&mac, &id).is_err());
-    assert!(pack_from_macro(&mac, &[id.clone()], pack.info.clone()).is_err());
+    assert!(pack_from_macro(&mac, std::slice::from_ref(&id), pack.info.clone()).is_err());
     let local = make_block(&mut mac, "calls community", vec![call(&id)]);
     assert!(check_editable(&mac, &local).is_ok());
     assert!(pack_from_macro(&mac, &[local], pack.info.clone()).is_err());
@@ -495,7 +495,7 @@ fn details_ids_use_author_and_block_name_without_changing_internal_ids() {
     author.graph.block_def_mut(&id).unwrap().description = "Author's description".into();
     let pack = pack_from_macro(
         &author,
-        &[id.clone()],
+        std::slice::from_ref(&id),
         PackInfo {
             name: "Timing".into(),
             author: "Alice".into(),

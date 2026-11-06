@@ -66,12 +66,12 @@ pub fn block_capabilities(kind: &InstructionKind) -> &'static [&'static str] {
         // Listed rather than `_` so a new block has to be decided here.
         K::Wait { .. }
         | K::Comment { .. }
-        | K::WhenRan { .. }
+        | K::WhenRan
         | K::WhenBatteryDischargedTo { .. }
         | K::WhenBatteryChargedTo { .. }
         | K::WhenTime { .. }
-        | K::WhenPowerPluggedIn { .. }
-        | K::WhenPowerUnplugged { .. }
+        | K::WhenPowerPluggedIn
+        | K::WhenPowerUnplugged
         | K::WhenKey { .. }
         | K::WhenIdle { .. }
         | K::WhenScreenLock { .. }
@@ -101,14 +101,14 @@ pub fn block_capabilities(kind: &InstructionKind) -> &'static [&'static str] {
         | K::Repeat { .. }
         | K::Forever { .. }
         | K::While { .. }
-        | K::EscapeLoop { .. }
-        | K::ContinueLoop { .. }
+        | K::EscapeLoop
+        | K::ContinueLoop
         | K::WaitUntil { .. }
         | K::WithLock { .. }
         | K::TryCatch { .. }
         | K::ThrowError { .. }
         | K::Retry { .. }
-        | K::StopMacro { .. }
+        | K::StopMacro
         | K::Notify { .. }
         | K::Log { .. }
         | K::AskText { .. }

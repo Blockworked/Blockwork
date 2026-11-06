@@ -625,7 +625,7 @@ mod tests {
         author.graph.comments.push(note);
         let pack = block_packs::pack_from_macro(
             &author,
-            &[id.clone()],
+            std::slice::from_ref(&id),
             PackInfo {
                 name: "Timing".into(),
                 author: "Alice".into(),

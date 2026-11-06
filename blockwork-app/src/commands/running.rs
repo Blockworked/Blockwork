@@ -10,7 +10,7 @@ pub(crate) fn start_key_capture(
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.key_capture = Some(KeyCaptureTarget::Strand(strand_id, path));
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -23,7 +23,7 @@ pub(crate) fn start_standalone_key_capture(
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.key_capture = Some(KeyCaptureTarget::Standalone);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -39,10 +39,10 @@ pub(crate) fn key_capture_event(
     for (code, key) in &keys {
         let parsed = blockwork_core::key_mapping::web_code_to_macro_key(code)
             .or_else(|| blockwork_core::key_mapping::web_key_to_macro_key(key));
-        if let Some(mk) = parsed {
-            if !combo.iter().any(|k| match_key(k) == match_key(&mk)) {
-                combo.push(mk);
-            }
+        if let Some(mk) = parsed
+            && !combo.iter().any(|k| match_key(k) == match_key(&mk))
+        {
+            combo.push(mk);
         }
     }
     if combo.is_empty() {
@@ -76,7 +76,7 @@ pub(crate) fn key_capture_event(
         }
         KeyCaptureTarget::Standalone => s.pending_standalone_key = Some(text),
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -88,7 +88,7 @@ pub(crate) fn clear_standalone_key_capture(
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.pending_standalone_key = None;
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -148,7 +148,7 @@ pub(super) fn run_open_macro(
             speed_multiplier,
             variables,
             lists,
-            Arc::clone(&*state),
+            Arc::clone(state),
             app.clone(),
             strand,
         );
@@ -164,7 +164,7 @@ pub(super) fn run_open_macro(
     }
 
     let s = state.lock().map_err(|e| e.to_string())?;
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -177,7 +177,7 @@ pub(crate) fn set_global_speed_multiplier(
     let clamped = clamp_speed(multiplier);
     s.global_speed_multiplier = clamped;
     config::update_settings(|settings| settings.global_speed_multiplier = Some(clamped));
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -219,14 +219,14 @@ pub(crate) fn start_recording(state: &SharedState, app: &AppHandle) -> Result<()
     let secs = crate::recording_countdown_secs();
     if secs == 0 {
         begin_recording(&mut s);
-        emit_state_updated(&app, &s);
+        emit_state_updated(app, &s);
         return Ok(());
     }
     s.recording_phase = RecordingPhase::Countdown(secs);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     drop(s);
 
-    let state_clone = Arc::clone(&*state);
+    let state_clone = Arc::clone(state);
     let app_clone = app.clone();
     crate::async_runtime::spawn(async move {
         for n in (0..secs).rev() {
@@ -275,7 +275,7 @@ pub(crate) fn set_recording_countdown(
 pub(crate) fn stop_recording(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     stop_recording_impl(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -339,7 +339,7 @@ pub(crate) async fn toggle_record_mouse_relative(
     s.record_mouse_relative = relative;
     recording::RECORD_MOUSE_RELATIVE.store(relative, Ordering::Relaxed);
     config::update_settings(|settings| settings.record_mouse_relative = Some(relative));
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -352,6 +352,6 @@ pub(crate) fn toggle_record_mouse_movement(
     s.record_mouse_movement = enabled;
     recording::RECORD_MOUSE_MOVEMENT.store(enabled, Ordering::Relaxed);
     config::update_settings(|settings| settings.record_mouse_movement = Some(enabled));
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }

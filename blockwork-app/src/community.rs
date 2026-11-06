@@ -704,17 +704,15 @@ pub(crate) fn my_packs(state: &SharedState, app: &AppHandle, refresh: bool) -> V
             with(|c| {
                 c.mine_loading = false;
                 // The name or picture may have changed on the provider's side.
-                if let (Ok(value), Some(account)) = (&result, c.account.as_mut()) {
-                    if let Some(user) = value
+                if let (Ok(value), Some(account)) = (&result, c.account.as_mut())
+                    && let Some(user) = value
                         .get("user")
                         .cloned()
                         .and_then(|u| serde_json::from_value::<UserDto>(u).ok())
-                    {
-                        if user != account.user {
-                            account.user = user;
-                            save_account(Some(account));
-                        }
-                    }
+                    && user != account.user
+                {
+                    account.user = user;
+                    save_account(Some(account));
                 }
                 c.mine = Some(result);
             });

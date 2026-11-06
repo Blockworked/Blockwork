@@ -124,10 +124,10 @@ pub fn read_macro_by_id(id: &str) -> Option<Macro> {
 
     {
         let cache = macro_cache().lock().unwrap();
-        if let Some((cached_mtime, mac)) = cache.get(id) {
-            if *cached_mtime == mtime {
-                return Some(mac.clone());
-            }
+        if let Some((cached_mtime, mac)) = cache.get(id)
+            && *cached_mtime == mtime
+        {
+            return Some(mac.clone());
         }
     }
 

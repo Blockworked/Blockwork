@@ -27,7 +27,7 @@ pub(crate) fn add_strand(
         ensure_inserted_variable(&mut s, variable_to_create);
     }
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(new_id)
 }
 
@@ -43,7 +43,7 @@ pub(crate) fn remove_strand(
         drop_strand_buffers(&mut s.invalid_field_buffers, &strand_id);
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -62,7 +62,7 @@ pub(crate) fn move_strand(
     {
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -87,7 +87,7 @@ pub(crate) fn split_strand(
         .split_strand(&strand_id, &path, x, y)?;
     s.invalid_field_buffers.clear();
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(new_id)
 }
 
@@ -124,7 +124,7 @@ pub(crate) fn merge_strand(
     }
     drop_strand_buffers(&mut s.invalid_field_buffers, &dragged_id);
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -161,7 +161,7 @@ pub(crate) fn merge_tail(
     }
     s.invalid_field_buffers.clear();
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -194,7 +194,7 @@ pub(crate) fn paste_fragment(
     let fragment = dto_to_fragment(&fragment).ok_or("Unknown instruction type")?;
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let outcome = run_edit(&mut s, EditCommand::PasteFragment { fragment, x, y });
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     outcome?
         .created
         .into_iter()
@@ -233,7 +233,7 @@ pub(crate) fn duplicate_instruction(
         &mut s,
         EditCommand::DuplicateInstruction { strand_id, path },
     );
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     outcome.map(|_| ()).map_err(String::from)
 }
 
@@ -246,12 +246,12 @@ pub(crate) fn set_recording_target(
     strand_id: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    if let Some(mac) = &mut s.current_macro {
-        if mac.strand(&strand_id).is_some() {
-            mac.recording_target = Some(strand_id);
-            auto_save(&mut s);
-        }
+    if let Some(mac) = &mut s.current_macro
+        && mac.strand(&strand_id).is_some()
+    {
+        mac.recording_target = Some(strand_id);
+        auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }

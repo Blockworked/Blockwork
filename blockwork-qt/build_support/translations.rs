@@ -49,16 +49,15 @@ fn messages(xml: &str) -> (BTreeSet<(String, String, String)>, usize) {
             if !keys.insert((context.name.clone(), message.source, message.comment)) {
                 continue;
             }
-            if let Some(t) = translation {
-                if t.kind.is_empty()
-                    && if t.forms.is_empty() {
-                        !t.text.trim().is_empty()
-                    } else {
-                        t.forms.iter().all(|form| !form.trim().is_empty())
-                    }
-                {
-                    finished += 1;
+            if let Some(t) = translation
+                && t.kind.is_empty()
+                && if t.forms.is_empty() {
+                    !t.text.trim().is_empty()
+                } else {
+                    t.forms.iter().all(|form| !form.trim().is_empty())
                 }
+            {
+                finished += 1;
             }
         }
     }

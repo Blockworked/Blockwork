@@ -33,7 +33,7 @@ pub(crate) fn create_block(
         .ok_or("No macro selected")?
         .add_block(draft, position)?;
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(id)
 }
 
@@ -71,7 +71,7 @@ pub(crate) fn edit_block(
         .ok_or("No macro selected")?
         .edit_block(&block_id, draft)?;
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -94,6 +94,6 @@ pub(crate) fn delete_block(
         retain_live_buffers(&mut s.invalid_field_buffers, &surviving);
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }

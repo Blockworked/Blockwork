@@ -118,10 +118,10 @@ pub fn load_settings() -> AppSettings {
 
     {
         let cache = settings_cache().lock().unwrap();
-        if let Some((cached_mtime, settings)) = cache.as_ref() {
-            if *cached_mtime == mtime {
-                return settings.clone();
-            }
+        if let Some((cached_mtime, settings)) = cache.as_ref()
+            && *cached_mtime == mtime
+        {
+            return settings.clone();
         }
     }
 

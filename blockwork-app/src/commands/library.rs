@@ -21,7 +21,7 @@ pub(crate) fn select_macro(
     s.invalid_field_buffers.clear();
     sync_variable_values(&mut s);
     sync_list_values(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -68,7 +68,7 @@ pub(super) fn add_and_select(
     s.invalid_field_buffers.clear();
     sync_variable_values(&mut s);
     sync_list_values(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -156,16 +156,16 @@ pub(crate) fn delete_macro(state: &SharedState, app: &AppHandle, id: &str) -> Re
 /// unconditionally.
 pub(crate) fn remove_macro(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    if let Some(mac) = s.current_macro.take() {
-        if let Err(e) = mac.remove() {
-            warn!("Failed to remove macro: {e}");
-        }
+    if let Some(mac) = s.current_macro.take()
+        && let Err(e) = mac.remove()
+    {
+        warn!("Failed to remove macro: {e}");
     }
     s.macro_selected = None;
     s.invalid_field_buffers.clear();
     refresh_macro_list(&mut s);
     config::set_selected_macro_id(None);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -179,7 +179,7 @@ pub(crate) fn set_title(state: &SharedState, app: &AppHandle, title: String) -> 
         s.macro_strs = macros.iter().map(|m| m.name.clone()).collect();
         s.macros_list = macros;
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -193,7 +193,7 @@ pub(crate) fn set_macro_speed_multiplier(
         mac.speed_multiplier = clamp_speed(multiplier);
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -211,7 +211,7 @@ pub(crate) fn set_macro_always_listen(
         auto_save(&mut s);
         refresh_macro_list(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -302,7 +302,7 @@ pub(crate) fn set_macro_conditions(
         auto_save(&mut s);
         refresh_macro_list(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -318,7 +318,7 @@ pub(crate) fn set_macro_max_run_secs(
         auto_save(&mut s);
         refresh_macro_list(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -358,7 +358,7 @@ pub(crate) fn set_macro_max_loop_iterations(
         auto_save(&mut s);
         refresh_macro_list(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -388,13 +388,13 @@ pub(crate) fn resume_triggers(state: &SharedState, app: &AppHandle) -> Result<()
         &blockwork_core::run_log::Source::app("Blockwork"),
         "Triggers resumed",
     );
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
 pub(crate) fn clear_run_log(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     blockwork_core::run_log::clear();
     let s = state.lock().map_err(|e| e.to_string())?;
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }

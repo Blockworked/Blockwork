@@ -99,7 +99,7 @@ impl<'a> Reader<'a> {
             0xc0 => Mp::Nil,
             0xc2 => Mp::Bool(false),
             0xc3 => Mp::Bool(true),
-            0xc4 | 0xc5 | 0xc6 => {
+            0xc4..=0xc6 => {
                 let n = self.uint(1 << (tag - 0xc4))? as usize;
                 self.take(n)?;
                 Mp::Bin
@@ -111,7 +111,7 @@ impl<'a> Reader<'a> {
             0xd1 => Mp::Int(i64::from(self.uint(2)? as u16 as i16)),
             0xd2 => Mp::Int(i64::from(self.uint(4)? as u32 as i32)),
             0xd3 => Mp::Int(self.uint(8)? as i64),
-            0xd9 | 0xda | 0xdb => {
+            0xd9..=0xdb => {
                 let n = self.uint(1 << (tag - 0xd9))? as usize;
                 Mp::Str(self.str(n)?)
             }

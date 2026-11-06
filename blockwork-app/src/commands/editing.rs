@@ -58,7 +58,7 @@ pub(crate) async fn add_instruction(
         s.invalid_field_buffers.clear();
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -93,7 +93,7 @@ pub(crate) async fn edit_instruction(
     {
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -107,7 +107,7 @@ pub(crate) fn edit_value_field(
     // A run of keystrokes into one field coalesces into one undo step; a
     // location that no longer resolves is quietly ignored, as before.
     let _ = run_edit(&mut s, EditCommand::EditFieldText { location, text });
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -130,7 +130,7 @@ pub(crate) fn set_value_kind(
     };
     prune_value_buffers(&mut s.invalid_field_buffers, &location);
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     result
 }
 
@@ -151,7 +151,7 @@ pub(crate) fn take_value(
         .and_then(|mac| mac.take_value(&location));
     prune_value_buffers(&mut s.invalid_field_buffers, &location);
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     taken.ok_or_else(|| "Nothing to take at that location".to_string())
 }
 
@@ -171,7 +171,7 @@ pub(crate) fn put_value(
     }
     prune_value_buffers(&mut s.invalid_field_buffers, &location);
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -196,7 +196,7 @@ pub(crate) fn move_value(
         },
     };
     let result = run_edit(&mut s, EditCommand::MoveValue { from, to });
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     result.map(|_| ()).map_err(String::from)
 }
 
@@ -263,7 +263,7 @@ pub(crate) fn create_floating_value(
         .ok_or("No macro selected")?
         .add_floating_value(x, y, value, origin_block_id);
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(id)
 }
 
@@ -282,7 +282,7 @@ pub(crate) fn move_floating_value(
     {
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -299,7 +299,7 @@ pub(crate) fn remove_floating_value(
         mac.remove_floating_value(&floating_id);
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -320,7 +320,7 @@ pub(crate) fn create_comment(
         .ok_or("No macro selected")?
         .add_comment(x, y, text, None);
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(id)
 }
 
@@ -344,7 +344,7 @@ pub(crate) fn create_attached_comment(
         .ok_or("No macro selected")?
         .add_comment(dx, dy, text, Some(instruction_id));
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(id)
 }
 
@@ -366,7 +366,7 @@ pub(crate) fn move_comment(
     {
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -382,7 +382,7 @@ pub(crate) fn remove_comment(
         mac.remove_comment(&comment_id);
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -406,7 +406,7 @@ pub(crate) fn edit_comment_text(
     {
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -424,7 +424,7 @@ pub(crate) fn set_comment_collapsed(
     {
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -446,7 +446,7 @@ pub(crate) fn remove_instruction(
             count,
         },
     );
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -466,13 +466,13 @@ pub(crate) fn delete_instruction(
     let mut graph = match &s.current_macro {
         Some(mac) => mac.graph.clone(),
         None => {
-            emit_state_updated(&app, &s);
+            emit_state_updated(app, &s);
             return Ok(None);
         }
     };
     // Out of range isn't worth an error: the block just isn't there.
     let Ok(new_id) = graph.delete_instruction(&strand_id, &path, x, y) else {
-        emit_state_updated(&app, &s);
+        emit_state_updated(app, &s);
         return Ok(None);
     };
     push_undo(&mut s);
@@ -481,7 +481,7 @@ pub(crate) fn delete_instruction(
     }
     s.invalid_field_buffers.clear();
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(new_id)
 }
 
@@ -498,7 +498,7 @@ pub(crate) fn reorder_instruction(
     let mut graph = match &s.current_macro {
         Some(mac) => mac.graph.clone(),
         None => {
-            emit_state_updated(&app, &s);
+            emit_state_updated(app, &s);
             return Ok(());
         }
     };
@@ -510,7 +510,7 @@ pub(crate) fn reorder_instruction(
         s.invalid_field_buffers.clear();
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -522,7 +522,7 @@ pub(crate) fn clear_instructions(state: &SharedState, app: &AppHandle) -> Result
         s.invalid_field_buffers.clear();
         auto_save(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 

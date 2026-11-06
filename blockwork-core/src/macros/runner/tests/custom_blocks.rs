@@ -107,7 +107,7 @@ fn pack_state_is_isolated_persistent_and_available_to_reporters_and_triggers() {
             )));
         let mut pack = block_packs::pack_from_macro(
             &author,
-            &[block.clone()],
+            std::slice::from_ref(&block),
             PackInfo {
                 id: name.into(),
                 name: name.into(),

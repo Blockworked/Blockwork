@@ -51,10 +51,10 @@ pub(super) fn run_data_block(
             match ctx.resolve(value, depth).and_then(|v| v.eval()) {
                 Ok(value) => match ListItem::from_evaluated(value) {
                     Some(item) => {
-                        if let Ok(mut lists) = ctx.lists.lock() {
-                            if let Some(list) = lists.get_mut(name) {
-                                list.push(item);
-                            }
+                        if let Ok(mut lists) = ctx.lists.lock()
+                            && let Some(list) = lists.get_mut(name)
+                        {
+                            list.push(item);
                         }
                     }
                     None => soft_fail(
@@ -70,38 +70,36 @@ pub(super) fn run_data_block(
         InstructionKind::DeleteOfList { index, name } => {
             match ctx.resolve(index, depth).and_then(|v| v.eval_number()) {
                 Ok(index) => {
-                    if let Ok(mut lists) = ctx.lists.lock() {
-                        if let Some(list) = lists.get_mut(name) {
-                            if let Some(index) = list_index(index, list.len(), false) {
-                                list.remove(index);
-                            }
-                        }
+                    if let Ok(mut lists) = ctx.lists.lock()
+                        && let Some(list) = lists.get_mut(name)
+                        && let Some(index) = list_index(index, list.len(), false)
+                    {
+                        list.remove(index);
                     }
                 }
                 Err(e) => soft_fail(ctx, &ins.id, "Delete list item", e)?,
             }
         }
         InstructionKind::DeleteAllOfList { name } => {
-            if let Ok(mut lists) = ctx.lists.lock() {
-                if let Some(list) = lists.get_mut(name) {
-                    list.clear();
-                }
+            if let Ok(mut lists) = ctx.lists.lock()
+                && let Some(list) = lists.get_mut(name)
+            {
+                list.clear();
             }
         }
         InstructionKind::ShiftList { name, amount } => {
             match ctx.resolve(amount, depth).and_then(|v| v.eval_number()) {
                 Ok(amount) => {
-                    if let Ok(mut lists) = ctx.lists.lock() {
-                        if let Some(list) = lists.get_mut(name) {
-                            if !list.is_empty() {
-                                let len = list.len();
-                                let distance = amount.round() as isize;
-                                if distance >= 0 {
-                                    list.rotate_right(distance as usize % len);
-                                } else {
-                                    list.rotate_left(distance.unsigned_abs() % len);
-                                }
-                            }
+                    if let Ok(mut lists) = ctx.lists.lock()
+                        && let Some(list) = lists.get_mut(name)
+                        && !list.is_empty()
+                    {
+                        let len = list.len();
+                        let distance = amount.round() as isize;
+                        if distance >= 0 {
+                            list.rotate_right(distance as usize % len);
+                        } else {
+                            list.rotate_left(distance.unsigned_abs() % len);
                         }
                     }
                 }
@@ -114,12 +112,11 @@ pub(super) fn run_data_block(
             match (value, index) {
                 (Ok(value), Ok(index)) => match ListItem::from_evaluated(value) {
                     Some(item) => {
-                        if let Ok(mut lists) = ctx.lists.lock() {
-                            if let Some(list) = lists.get_mut(name) {
-                                if let Some(index) = list_index(index, list.len(), true) {
-                                    list.insert(index, item);
-                                }
-                            }
+                        if let Ok(mut lists) = ctx.lists.lock()
+                            && let Some(list) = lists.get_mut(name)
+                            && let Some(index) = list_index(index, list.len(), true)
+                        {
+                            list.insert(index, item);
                         }
                     }
                     None => soft_fail(
@@ -138,12 +135,11 @@ pub(super) fn run_data_block(
             match (index, value) {
                 (Ok(index), Ok(value)) => match ListItem::from_evaluated(value) {
                     Some(item) => {
-                        if let Ok(mut lists) = ctx.lists.lock() {
-                            if let Some(list) = lists.get_mut(name) {
-                                if let Some(index) = list_index(index, list.len(), false) {
-                                    list[index] = item;
-                                }
-                            }
+                        if let Ok(mut lists) = ctx.lists.lock()
+                            && let Some(list) = lists.get_mut(name)
+                            && let Some(index) = list_index(index, list.len(), false)
+                        {
+                            list[index] = item;
                         }
                     }
                     None => soft_fail(
@@ -157,10 +153,10 @@ pub(super) fn run_data_block(
             }
         }
         InstructionKind::ReverseList { name } => {
-            if let Ok(mut lists) = ctx.lists.lock() {
-                if let Some(list) = lists.get_mut(name) {
-                    list.reverse();
-                }
+            if let Ok(mut lists) = ctx.lists.lock()
+                && let Some(list) = lists.get_mut(name)
+            {
+                list.reverse();
             }
         }
         _ => unreachable!("run_data_block got another block"),

@@ -314,7 +314,7 @@ mod tests {
         let location = json!({ "kind": "Field", "strand_id": "source", "index": [{"index": 1}], "field_id": "WaitDuration", "path": [] });
         let id = format!("{PREFIX}{}", json!({ "location": location, "slot": 0 }));
         let branches = graph
-            .open_reporter_branches(&[id.clone()], &read_body)
+            .open_reporter_branches(std::slice::from_ref(&id), &read_body)
             .unwrap();
         graph.strands[0].instructions.remove(0);
         graph.strand_mut(&id).unwrap().instructions.push(

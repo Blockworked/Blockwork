@@ -114,10 +114,10 @@ fn refresh_macro_list(s: &mut crate::state::AppState) {
     let macros = config::get_macros_from_config();
     s.macro_strs = macros.iter().map(|m| m.name.clone()).collect();
     // Keep current_macro in sync if it was modified
-    if let Some(ref cur) = s.current_macro.clone() {
-        if let Some(updated) = macros.iter().find(|m| m.id == cur.id) {
-            s.current_macro = Some(updated.clone());
-        }
+    if let Some(ref cur) = s.current_macro.clone()
+        && let Some(updated) = macros.iter().find(|m| m.id == cur.id)
+    {
+        s.current_macro = Some(updated.clone());
     }
     // Update macro_selected index (name may have changed)
     if let Some(ref cur) = s.current_macro {

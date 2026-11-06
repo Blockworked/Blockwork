@@ -8,7 +8,7 @@ pub(crate) fn open_settings(state: &SharedState, app: &AppHandle) -> Result<(), 
     s.hotkey_bindings = config::load_hotkey_bindings();
     s.combo_capture = None;
     s.pending_macro_hotkey = None;
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -17,7 +17,7 @@ pub(crate) fn close_settings(state: &SharedState, app: &AppHandle) -> Result<(),
     s.page = Page::Main;
     s.combo_capture = None;
     s.pending_macro_hotkey = None;
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -30,7 +30,7 @@ pub(crate) fn start_combo_capture(
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.combo_capture = Some(ComboCapture::Named(dto_to_hotkey_action(&action)));
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -43,7 +43,7 @@ pub(crate) fn start_binding_combo_capture(
     if index < s.hotkey_bindings.len() {
         s.combo_capture = Some(ComboCapture::Binding(index));
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -53,7 +53,7 @@ pub(crate) fn start_pending_combo_capture(
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.combo_capture = Some(ComboCapture::Pending);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -105,14 +105,14 @@ pub(crate) fn combo_capture_event(
         }
         None => {}
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
 pub(crate) fn cancel_combo_capture(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.combo_capture = None;
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -124,7 +124,7 @@ pub(crate) fn set_pending_macro_idx(
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let entry = s.pending_macro_hotkey.get_or_insert((None, None));
     entry.0 = index;
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -141,7 +141,7 @@ pub(crate) fn add_macro_hotkey(state: &SharedState, app: &AppHandle) -> Result<(
             save_hotkey_bindings_impl(&mut s);
         }
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -155,7 +155,7 @@ pub(crate) fn remove_hotkey_binding(
         s.hotkey_bindings.remove(index);
         save_hotkey_bindings_impl(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -168,7 +168,7 @@ pub(crate) fn clear_named_hotkey(
     let action = dto_to_hotkey_action(&action);
     s.hotkey_bindings.retain(|b| b.action != action);
     save_hotkey_bindings_impl(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -190,7 +190,7 @@ pub(crate) fn reset_hotkey_to_default(
         }
         save_hotkey_bindings_impl(&mut s);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -217,23 +217,23 @@ pub(crate) fn set_ipc_port_text(
         }
     }
     s.ipc_port_text = text;
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
 pub(crate) async fn start_ipc_server(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    if s.ipc_server.is_none() {
-        if let Ok(port) = s.ipc_port_text.trim().parse::<u16>() {
-            let (tx, rx) = tokio::sync::watch::channel(false);
-            s.ipc_server = Some(crate::async_runtime::spawn(
-                blockwork_core::ipc::run_server(port, rx),
-            ));
-            s.ipc_shutdown_tx = Some(tx);
-            s.ipc_active_port = Some(port);
-        }
+    if s.ipc_server.is_none()
+        && let Ok(port) = s.ipc_port_text.trim().parse::<u16>()
+    {
+        let (tx, rx) = tokio::sync::watch::channel(false);
+        s.ipc_server = Some(crate::async_runtime::spawn(
+            blockwork_core::ipc::run_server(port, rx),
+        ));
+        s.ipc_shutdown_tx = Some(tx);
+        s.ipc_active_port = Some(port);
     }
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -246,7 +246,7 @@ pub(crate) fn stop_ipc_server(state: &SharedState, app: &AppHandle) -> Result<()
         handle.abort();
     }
     s.ipc_active_port = None;
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -258,7 +258,7 @@ pub(crate) fn set_ipc_auto_start(
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.ipc_auto_start = enabled;
     config::update_settings(|settings| settings.ipc_auto_start = Some(enabled));
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -399,9 +399,9 @@ pub(crate) fn check_for_updates(state: &SharedState, app: &AppHandle) -> Result<
     {
         let mut s = state.lock().map_err(|e| e.to_string())?;
         s.update_check_state = UpdateCheckState::Checking;
-        emit_state_updated(&app, &s);
+        emit_state_updated(app, &s);
     }
-    let state_clone = Arc::clone(&*state);
+    let state_clone = Arc::clone(state);
     let app_clone = app.clone();
     crate::async_runtime::spawn(async move {
         check_for_updates_internal(&state_clone, &app_clone).await;
@@ -439,7 +439,7 @@ pub(crate) fn apply_update(state: &SharedState, app: &AppHandle) -> Result<(), S
     {
         let mut s = state.lock().map_err(|e| e.to_string())?;
         s.update_check_state = UpdateCheckState::Applying;
-        emit_state_updated(&app, &s);
+        emit_state_updated(app, &s);
     }
     #[cfg(any(windows, target_os = "macos"))]
     {

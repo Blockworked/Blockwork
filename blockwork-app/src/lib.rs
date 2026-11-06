@@ -281,15 +281,15 @@ impl Backend {
             s.hotkey_bindings = bindings;
 
             // Auto-start IPC server if configured
-            if s.ipc_auto_start {
-                if let Ok(port) = s.ipc_port_text.trim().parse::<u16>() {
-                    let (tx, rx) = tokio::sync::watch::channel(false);
-                    s.ipc_server = Some(async_runtime::spawn(blockwork_core::ipc::run_server(
-                        port, rx,
-                    )));
-                    s.ipc_shutdown_tx = Some(tx);
-                    s.ipc_active_port = Some(port);
-                }
+            if s.ipc_auto_start
+                && let Ok(port) = s.ipc_port_text.trim().parse::<u16>()
+            {
+                let (tx, rx) = tokio::sync::watch::channel(false);
+                s.ipc_server = Some(async_runtime::spawn(blockwork_core::ipc::run_server(
+                    port, rx,
+                )));
+                s.ipc_shutdown_tx = Some(tx);
+                s.ipc_active_port = Some(port);
             }
         }
 

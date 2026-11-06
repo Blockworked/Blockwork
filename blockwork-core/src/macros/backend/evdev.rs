@@ -1136,21 +1136,22 @@ fn spawn_touchpad_reader(mut device: evdev::Device, tx: std::sync::mpsc::SyncSen
                             _ => {}
                         },
                         EventType::SYNCHRONIZATION => {
-                            if finger_down && !multi_finger {
-                                if let (Some(cx), Some(cy)) = (x, y) {
-                                    if let (Some(lx), Some(ly)) = (last_x, last_y) {
-                                        let (dx, dy) = (cx - lx, cy - ly);
-                                        if dx != 0 || dy != 0 {
-                                            let _ = tx.send(DeviceMsg::TouchpadMove {
-                                                dx,
-                                                dy,
-                                                ts: event.timestamp(),
-                                            });
-                                        }
+                            if finger_down
+                                && !multi_finger
+                                && let (Some(cx), Some(cy)) = (x, y)
+                            {
+                                if let (Some(lx), Some(ly)) = (last_x, last_y) {
+                                    let (dx, dy) = (cx - lx, cy - ly);
+                                    if dx != 0 || dy != 0 {
+                                        let _ = tx.send(DeviceMsg::TouchpadMove {
+                                            dx,
+                                            dy,
+                                            ts: event.timestamp(),
+                                        });
                                     }
-                                    last_x = Some(cx);
-                                    last_y = Some(cy);
                                 }
+                                last_x = Some(cx);
+                                last_y = Some(cy);
                             }
                         }
                         _ => {}

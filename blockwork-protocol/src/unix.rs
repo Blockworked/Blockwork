@@ -43,7 +43,7 @@ fn validate_dir(dir: &Path) -> io::Result<()> {
         }
         if !m.file_type().is_symlink()
             && m.mode() & 0o022 != 0
-            && !(m.uid() == 0 && m.mode() & (libc::S_ISVTX as u32) != 0)
+            && !(m.uid() == 0 && m.mode() & libc::S_ISVTX != 0)
         {
             return Err(denied());
         }
@@ -54,7 +54,7 @@ fn validate_dir(dir: &Path) -> io::Result<()> {
         if m.uid() != 0 && m.uid() != uid() {
             return Err(denied());
         }
-        if m.mode() & 0o022 != 0 && !(m.uid() == 0 && m.mode() & (libc::S_ISVTX as u32) != 0) {
+        if m.mode() & 0o022 != 0 && !(m.uid() == 0 && m.mode() & libc::S_ISVTX != 0) {
             return Err(denied());
         }
     }

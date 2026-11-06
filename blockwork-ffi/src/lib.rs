@@ -434,7 +434,7 @@ pub extern "C" fn blockwork_step_record_end() -> i32 {
         let keep = if strand
             .instructions
             .first()
-            .map_or(false, Instruction::is_header)
+            .is_some_and(Instruction::is_header)
         {
             1
         } else {
@@ -718,7 +718,7 @@ pub extern "C" fn blockwork_clear_recording_target_instructions() -> i32 {
         let keep = if strand
             .instructions
             .first()
-            .map_or(false, Instruction::is_header)
+            .is_some_and(Instruction::is_header)
         {
             1
         } else {

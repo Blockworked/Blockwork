@@ -72,56 +72,55 @@ pub(crate) fn handle_hotkey_action(state: &SharedState, app: &AppHandle, action:
         }
         HotkeyAction::NextMacro => {
             let macros = config::get_macros_from_config();
-            if !macros.is_empty() {
-                if let Ok(mut s) = state.lock() {
-                    let current_id = config::get_selected_macro_id();
-                    let current_idx = current_id
-                        .and_then(|id| macros.iter().position(|m| m.id == id))
-                        .unwrap_or(0);
-                    let next = (current_idx + 1) % macros.len();
-                    s.macro_selected = Some(next);
-                    s.current_macro = macros.get(next).cloned();
-                    if let Some(mac) = &s.current_macro {
-                        config::set_selected_macro_id(Some(&mac.id));
-                    }
-                    sync_variable_values(&mut s);
-                    sync_list_values(&mut s);
-                    emit_state_updated(app, &s);
+            if !macros.is_empty()
+                && let Ok(mut s) = state.lock()
+            {
+                let current_id = config::get_selected_macro_id();
+                let current_idx = current_id
+                    .and_then(|id| macros.iter().position(|m| m.id == id))
+                    .unwrap_or(0);
+                let next = (current_idx + 1) % macros.len();
+                s.macro_selected = Some(next);
+                s.current_macro = macros.get(next).cloned();
+                if let Some(mac) = &s.current_macro {
+                    config::set_selected_macro_id(Some(&mac.id));
                 }
+                sync_variable_values(&mut s);
+                sync_list_values(&mut s);
+                emit_state_updated(app, &s);
             }
         }
         HotkeyAction::PrevMacro => {
             let macros = config::get_macros_from_config();
-            if !macros.is_empty() {
-                if let Ok(mut s) = state.lock() {
-                    let current_id = config::get_selected_macro_id();
-                    let current_idx = current_id
-                        .and_then(|id| macros.iter().position(|m| m.id == id))
-                        .unwrap_or(0);
-                    let prev = if current_idx == 0 {
-                        macros.len() - 1
-                    } else {
-                        current_idx - 1
-                    };
-                    s.macro_selected = Some(prev);
-                    s.current_macro = macros.get(prev).cloned();
-                    if let Some(mac) = &s.current_macro {
-                        config::set_selected_macro_id(Some(&mac.id));
-                    }
-                    sync_variable_values(&mut s);
-                    sync_list_values(&mut s);
-                    emit_state_updated(app, &s);
+            if !macros.is_empty()
+                && let Ok(mut s) = state.lock()
+            {
+                let current_id = config::get_selected_macro_id();
+                let current_idx = current_id
+                    .and_then(|id| macros.iter().position(|m| m.id == id))
+                    .unwrap_or(0);
+                let prev = if current_idx == 0 {
+                    macros.len() - 1
+                } else {
+                    current_idx - 1
+                };
+                s.macro_selected = Some(prev);
+                s.current_macro = macros.get(prev).cloned();
+                if let Some(mac) = &s.current_macro {
+                    config::set_selected_macro_id(Some(&mac.id));
                 }
+                sync_variable_values(&mut s);
+                sync_list_values(&mut s);
+                emit_state_updated(app, &s);
             }
         }
         HotkeyAction::StartRecordingImmediate => {
-            if let Ok(mut s) = state.lock() {
-                if s.current_macro.is_some() {
-                    s.recording_countdown_generation =
-                        s.recording_countdown_generation.wrapping_add(1);
-                    begin_recording(&mut s);
-                    emit_state_updated(app, &s);
-                }
+            if let Ok(mut s) = state.lock()
+                && s.current_macro.is_some()
+            {
+                s.recording_countdown_generation = s.recording_countdown_generation.wrapping_add(1);
+                begin_recording(&mut s);
+                emit_state_updated(app, &s);
             }
         }
         HotkeyAction::StopRecording => {

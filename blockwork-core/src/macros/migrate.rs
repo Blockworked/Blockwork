@@ -245,11 +245,12 @@ fn v0_old_window_blocks(value: &mut Value, notes: &mut Vec<String>) {
 fn v1_run_command_waits(value: &mut Value, notes: &mut Vec<String>) {
     let mut converted = 0;
     walk_objects(value, &mut |obj| {
-        if obj.len() == 1 && obj.get("Command").is_some_and(Value::is_string) {
-            if let Some(command) = obj.remove("Command") {
-                obj.insert("CommandWait".into(), command);
-                converted += 1;
-            }
+        if obj.len() == 1
+            && obj.get("Command").is_some_and(Value::is_string)
+            && let Some(command) = obj.remove("Command")
+        {
+            obj.insert("CommandWait".into(), command);
+            converted += 1;
         }
     });
     if converted > 0 {

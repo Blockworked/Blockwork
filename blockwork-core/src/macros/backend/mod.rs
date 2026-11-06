@@ -183,7 +183,7 @@ pub fn absolute_mouse_position_available() -> bool {
 pub fn absolute_mouse_position() -> Option<(i32, i32)> {
     #[cfg(target_os = "linux")]
     {
-        return cursor_track::current();
+        cursor_track::current()
     }
 
     #[cfg(target_os = "macos")]
@@ -236,11 +236,11 @@ pub fn create_backend() -> Option<Arc<Mutex<dyn InputBackend>>> {
         match evdev::EvdevBackend::new() {
             Ok(b) => {
                 let arc: Arc<Mutex<dyn InputBackend>> = Arc::new(Mutex::new(b));
-                return Some(arc);
+                Some(arc)
             }
             Err(e) => {
                 tracing::warn!("Failed to create evdev backend: {}", e);
-                return None;
+                None
             }
         }
     }

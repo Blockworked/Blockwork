@@ -50,7 +50,7 @@ fn clock() -> &'static Clock {
 
 /// Whether a lockstep run is active.
 pub fn enabled() -> bool {
-    clock().state.lock().map_or(false, |s| s.enabled)
+    clock().state.lock().is_ok_and(|s| s.enabled)
 }
 
 /// Resets to virtual time 0 and arms lockstep mode for the next run.

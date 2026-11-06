@@ -551,7 +551,7 @@ pub fn build_capture_callback()
                                 .ok()
                                 .and_then(|last| last.map(|last| elapsed.saturating_sub(last)));
                             let append = elapsed_since_last
-                                .map_or(true, |delta| delta >= MOUSE_SAMPLE_INTERVAL)
+                                .is_none_or(|delta| delta >= MOUSE_SAMPLE_INTERVAL)
                                 || !matches!(
                                     q.back(),
                                     Some(last)
@@ -609,22 +609,21 @@ pub fn build_capture_callback()
 
         // Hotkey detection (only when not recording), against the physical
         // keys the backend reports - no OS-level hotkey registration involved.
-        if let CaptureEvent::KeyPress(key) = &event {
-            if !key.is_modifier() {
-                if let Some(name) = key.hotkey_name() {
-                    let mods = HELD_MODS.load(Ordering::Relaxed);
-                    if let Some(action) = check_hotkey(mods, &name) {
-                        backend::note_hotkey_matched();
-                        if matches!(action, HotkeyAction::StartRecordingImmediate) {
-                            arm_pending_record_start(mods, key.clone());
-                        } else {
-                            push_queue_signal(QueueSignal::Hotkey(action));
-                        }
-                        // Swallow the trigger so the combo doesn't also reach
-                        // whatever has focus; backends suppress the key-up too.
-                        return CaptureDecision::Suppress;
-                    }
+        if let CaptureEvent::KeyPress(key) = &event
+            && !key.is_modifier()
+            && let Some(name) = key.hotkey_name()
+        {
+            let mods = HELD_MODS.load(Ordering::Relaxed);
+            if let Some(action) = check_hotkey(mods, &name) {
+                backend::note_hotkey_matched();
+                if matches!(action, HotkeyAction::StartRecordingImmediate) {
+                    arm_pending_record_start(mods, key.clone());
+                } else {
+                    push_queue_signal(QueueSignal::Hotkey(action));
                 }
+                // Swallow the trigger so the combo doesn't also reach
+                // whatever has focus; backends suppress the key-up too.
+                return CaptureDecision::Suppress;
             }
         }
 

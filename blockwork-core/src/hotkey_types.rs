@@ -32,10 +32,10 @@ impl KeyCombo {
 }
 
 fn rdev_key_name_to_display(name: &str) -> String {
-    if let Some(letter) = name.strip_prefix("Key") {
-        if letter.len() == 1 {
-            return letter.to_uppercase();
-        }
+    if let Some(letter) = name.strip_prefix("Key")
+        && letter.len() == 1
+    {
+        return letter.to_uppercase();
     }
     if let Some(digit) = name.strip_prefix("Num") {
         return digit.to_string();

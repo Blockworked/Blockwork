@@ -765,7 +765,7 @@ mod linux {
                         v.split(|b| *b == 0)
                             .filter(|p| !p.is_empty())
                             .map(|p| String::from_utf8_lossy(p).into_owned())
-                            .last()
+                            .next_back()
                     })
                     .unwrap_or_default();
                 ActiveWindow { title, app }

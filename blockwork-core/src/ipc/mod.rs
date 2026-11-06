@@ -133,40 +133,6 @@ async fn handle_connection(socket: TcpStream, mut shutdown: watch::Receiver<bool
     }
 }
 
-#[cfg(test)]
-mod tests {
-    use super::*;
-    use tokio::io::AsyncReadExt;
-
-    /// Regression test: "Stop Server" used to leave already-connected clients
-    /// running forever, since aborting the accept loop doesn't touch the
-    /// separately spawned per-connection tasks.
-    #[tokio::test]
-    async fn shutdown_closes_already_connected_clients() {
-        let port = 58231;
-        let (tx, rx) = watch::channel(false);
-        let server = tokio::spawn(run_server(port, rx));
-        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
-
-        let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
-        stream.write_all(b"{\"cmd\":\"ping\"}\n").await.unwrap();
-        let mut buf = [0u8; 64];
-        let n = stream.read(&mut buf).await.unwrap();
-        assert!(n > 0, "expected a pong response before shutdown");
-
-        tx.send(true).unwrap();
-
-        let mut buf2 = [0u8; 64];
-        let read = tokio::time::timeout(std::time::Duration::from_secs(2), stream.read(&mut buf2))
-            .await
-            .expect("connection was not closed after shutdown")
-            .unwrap();
-        assert_eq!(read, 0, "connection should be closed (EOF) after shutdown");
-
-        server.abort();
-    }
-}
-
 fn handle_request(line: &str) -> IpcResponse {
     let request: IpcRequest = match serde_json::from_str(line) {
         Ok(request) => request,
@@ -198,5 +164,39 @@ fn handle_request(line: &str) -> IpcResponse {
         }
         "ping" => IpcResponse::pong(),
         other => IpcResponse::error(format!("unknown command: {other}")),
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tokio::io::AsyncReadExt;
+
+    /// Regression test: "Stop Server" used to leave already-connected clients
+    /// running forever, since aborting the accept loop doesn't touch the
+    /// separately spawned per-connection tasks.
+    #[tokio::test]
+    async fn shutdown_closes_already_connected_clients() {
+        let port = 58231;
+        let (tx, rx) = watch::channel(false);
+        let server = tokio::spawn(run_server(port, rx));
+        tokio::time::sleep(std::time::Duration::from_millis(100)).await;
+
+        let mut stream = TcpStream::connect(("127.0.0.1", port)).await.unwrap();
+        stream.write_all(b"{\"cmd\":\"ping\"}\n").await.unwrap();
+        let mut buf = [0u8; 64];
+        let n = stream.read(&mut buf).await.unwrap();
+        assert!(n > 0, "expected a pong response before shutdown");
+
+        tx.send(true).unwrap();
+
+        let mut buf2 = [0u8; 64];
+        let read = tokio::time::timeout(std::time::Duration::from_secs(2), stream.read(&mut buf2))
+            .await
+            .expect("connection was not closed after shutdown")
+            .unwrap();
+        assert_eq!(read, 0, "connection should be closed (EOF) after shutdown");
+
+        server.abort();
     }
 }

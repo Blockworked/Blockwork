@@ -959,10 +959,10 @@ fn run_block(
     let mut deadline = start;
 
     for ins in instructions {
-        if let Some(flag) = &ctx.stop_flag {
-            if stop_requested(flag) {
-                break;
-            }
+        if let Some(flag) = &ctx.stop_flag
+            && stop_requested(flag)
+        {
+            break;
         }
         if let Some(trace) = &ctx.trace
             && !ins.kind.is_header()
@@ -1332,10 +1332,10 @@ fn run_block(
                 let n = n.max(0.0).round() as u64;
                 let mut iterations = 0;
                 for _ in 0..n {
-                    if let Some(flag) = &ctx.stop_flag {
-                        if stop_requested(flag) {
-                            break;
-                        }
+                    if let Some(flag) = &ctx.stop_flag
+                        && stop_requested(flag)
+                    {
+                        break;
                     }
                     if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
                         break;
@@ -1350,10 +1350,10 @@ fn run_block(
             InstructionKind::Forever { body } => {
                 let mut iterations = 0;
                 loop {
-                    if let Some(flag) = &ctx.stop_flag {
-                        if stop_requested(flag) {
-                            break;
-                        }
+                    if let Some(flag) = &ctx.stop_flag
+                        && stop_requested(flag)
+                    {
+                        break;
                     }
                     if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
                         break;
@@ -1368,10 +1368,10 @@ fn run_block(
             InstructionKind::While { condition, body } => {
                 let mut iterations = 0;
                 loop {
-                    if let Some(flag) = &ctx.stop_flag {
-                        if stop_requested(flag) {
-                            break;
-                        }
+                    if let Some(flag) = &ctx.stop_flag
+                        && stop_requested(flag)
+                    {
+                        break;
                     }
                     match ctx.resolve(condition, depth).and_then(|v| v.eval()) {
                         Ok(cond) => {
@@ -1408,7 +1408,7 @@ fn run_block(
                 if host_clock::enabled() {
                     ctx.host_time_ms += actual;
                     let flag = ctx.stop_flag.clone();
-                    let should_stop = move || flag.as_ref().is_some_and(|f| stop_requested(f));
+                    let should_stop = move || flag.as_ref().is_some_and(stop_requested);
                     if !host_clock::wait_until(ctx.host_time_ms, &should_stop) {
                         break;
                     }

@@ -4,6 +4,12 @@ pub struct ThreadPool {
     pub workers: Vec<JoinHandle<()>>,
 }
 
+impl Default for ThreadPool {
+    fn default() -> Self {
+        Self::new()
+    }
+}
+
 impl ThreadPool {
     pub fn new() -> Self {
         ThreadPool {

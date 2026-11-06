@@ -16,7 +16,7 @@ pub(crate) fn create_variable(
         store.insert(trimmed, Evaluated::Number(0.0));
     }
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -43,13 +43,13 @@ pub(crate) fn rename_variable(
     if let Some(mac) = &mut s.current_macro {
         mac.graph = graph;
     }
-    if let Ok(mut store) = s.variable_values.lock() {
-        if let Some(v) = store.remove(&old_name) {
-            store.insert(trimmed, v);
-        }
+    if let Ok(mut store) = s.variable_values.lock()
+        && let Some(v) = store.remove(&old_name)
+    {
+        store.insert(trimmed, v);
     }
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -69,7 +69,7 @@ pub(crate) fn set_variable_value(
         store.insert(name, value);
     }
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -87,7 +87,7 @@ pub(crate) fn delete_variable(
         store.remove(&name);
     }
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -173,7 +173,7 @@ pub(crate) fn create_list(
         .add_list(&name)?;
     sync_list_values(&mut s);
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -201,7 +201,7 @@ pub(crate) fn rename_list(
         .rename_list(&old_name, &trimmed)?;
     sync_list_values(&mut s);
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -228,7 +228,7 @@ pub(crate) fn delete_list(
     }
     sync_list_values(&mut s);
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -249,7 +249,7 @@ pub(crate) fn set_list_items(
         .set_list_items(&name, items)?;
     sync_list_values(&mut s);
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
@@ -270,6 +270,6 @@ pub(crate) fn set_list_editor_state(
         .graph
         .set_list_editor_state(&name, visible, x, y)?;
     auto_save(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }

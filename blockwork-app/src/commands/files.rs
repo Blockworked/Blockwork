@@ -4,13 +4,13 @@ use super::*;
 
 pub(crate) fn save_macro(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    if let Some(mac) = &s.current_macro {
-        if let Err(e) = mac.save() {
-            return Err(format!("Failed to save macro: {e}"));
-        }
+    if let Some(mac) = &s.current_macro
+        && let Err(e) = mac.save()
+    {
+        return Err(format!("Failed to save macro: {e}"));
     }
     refresh_macro_list(&mut s);
-    emit_state_updated(&app, &s);
+    emit_state_updated(app, &s);
     Ok(())
 }
 
