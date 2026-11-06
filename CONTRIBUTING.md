@@ -13,6 +13,9 @@
 | `blockwork-ffi` | A C ABI for recording and playback inside another process (the Geometry Dash mod). |
 | `blockwork-linux-bridge` | A native Linux input helper that the FFI starts when it runs under Proton/Wine. `blockwork-ffi/build-windows.sh` builds it, and the Geometry Dash mod ships it as `linux-input.so`. |
 
+[docs/architecture.md](docs/architecture.md) follows one command from the
+editor to the daemon and back.
+
 The block canvas, palette and document model come from
 [blockstitch](https://github.com/Blockworked/blockstitch), pinned to one commit
 in `Cargo.toml`. `just blockstitch-local` builds against a sibling checkout.
