@@ -75,7 +75,10 @@ other. The rest are listed so nothing is missed.
    `browser`, `vision`, `apps`, `system`) with one arm in `run_block` that calls it.
 5. `blockwork-core/src/capabilities.rs`: what it can do (commands, network,
    screen, ...), or add it to the arm that does nothing guarded. This drives
-   the import review and the permission prompts for shared macros.
+   the import review and the permission prompts for shared macros. If it
+   can do something, rerun `BLESS=1 cargo test -p blockwork-core capabilities`
+   to refresh `blockwork-core/capabilities.json`, then copy that into the
+   community site (`node scripts/sync-capabilities.js` there).
 6. `blockwork-core/src/frontend/instructions.rs`: its line in `wire_blocks!`,
    and a case in `blockwork-core/tests/fixtures/wire_blocks.json`.
 7. A trigger also needs a watcher in `blockwork-app` (see `watch/system.rs`)
@@ -97,7 +100,8 @@ other. The rest are listed so nothing is missed.
    `SIDE_EFFECT_OPERATORS`.
 2. `blockwork-core/src/capabilities.rs`: its capability in
    `operator_capability`, or its name in `UNGUARDED_OPERATORS`. A test fails
-   until it is in one of them.
+   until it is in one of them. A guarded one also needs the
+   `capabilities.json` refresh from step 5 above.
 3. `BLESS=1 cargo test -p blockwork-core --test operator_descriptors` to
    regenerate `hostDescriptors`.
 4. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry and its

@@ -1,0 +1,247 @@
+{
+  "blocks": {
+    "AimAtDetection": [
+      "screen",
+      "input"
+    ],
+    "AimStep": [
+      "input"
+    ],
+    "BrowserClick": [
+      "browser"
+    ],
+    "BrowserOpen": [
+      "browser"
+    ],
+    "BrowserScript": [
+      "browser"
+    ],
+    "BrowserType": [
+      "browser"
+    ],
+    "BrowserWaitFor": [
+      "browser"
+    ],
+    "ChangeGlobal": [
+      "globals"
+    ],
+    "ClickImage": [
+      "screen",
+      "input"
+    ],
+    "CloseApp": [
+      "commands"
+    ],
+    "Command": [
+      "commands"
+    ],
+    "CommandWait": [
+      "commands"
+    ],
+    "DetectObjectsInWindow": [
+      "screen"
+    ],
+    "FindImage": [
+      "screen"
+    ],
+    "HttpRequest": [
+      "network"
+    ],
+    "MoveWindow": [
+      "windows"
+    ],
+    "OpenApp": [
+      "commands"
+    ],
+    "PasteText": [
+      "input",
+      "clipboard"
+    ],
+    "RunMacro": [
+      "macros"
+    ],
+    "SetClipboard": [
+      "clipboard"
+    ],
+    "SetGlobal": [
+      "globals"
+    ],
+    "StopMacroNamed": [
+      "macros"
+    ],
+    "Token": [
+      "input"
+    ],
+    "WaitForDetection": [
+      "screen"
+    ],
+    "WaitForImage": [
+      "screen"
+    ],
+    "WhenApp": [
+      "windows",
+      "triggers"
+    ],
+    "WhenAt": [
+      "triggers"
+    ],
+    "WhenBatteryChargedTo": [
+      "triggers"
+    ],
+    "WhenBatteryDischargedTo": [
+      "triggers"
+    ],
+    "WhenClipboardChanged": [
+      "clipboard",
+      "triggers"
+    ],
+    "WhenCron": [
+      "triggers"
+    ],
+    "WhenFileChanged": [
+      "files_read",
+      "triggers"
+    ],
+    "WhenIdle": [
+      "triggers"
+    ],
+    "WhenKey": [
+      "triggers"
+    ],
+    "WhenMouseButton": [
+      "triggers"
+    ],
+    "WhenNetwork": [
+      "triggers"
+    ],
+    "WhenPowerPluggedIn": [
+      "triggers"
+    ],
+    "WhenPowerUnplugged": [
+      "triggers"
+    ],
+    "WhenScreenLock": [
+      "triggers"
+    ],
+    "WhenSignal": [
+      "triggers"
+    ],
+    "WhenTime": [
+      "triggers"
+    ],
+    "WhenTyped": [
+      "input",
+      "triggers"
+    ],
+    "WhenUsb": [
+      "triggers"
+    ],
+    "WhenWebhook": [
+      "triggers"
+    ],
+    "WhenWindow": [
+      "windows",
+      "triggers"
+    ],
+    "WindowAction": [
+      "windows"
+    ],
+    "WriteFile": [
+      "files_write"
+    ]
+  },
+  "capabilities": [
+    [
+      "commands",
+      "Runs commands and opens or closes apps",
+      true
+    ],
+    [
+      "secrets",
+      "Reads your saved secrets",
+      true
+    ],
+    [
+      "network",
+      "Goes online",
+      true
+    ],
+    [
+      "browser",
+      "Controls your web browser (clicks, types and reads pages)",
+      true
+    ],
+    [
+      "files_write",
+      "Writes to files",
+      true
+    ],
+    [
+      "files_read",
+      "Reads files and folders",
+      false
+    ],
+    [
+      "input",
+      "Presses keys, clicks and moves the mouse",
+      false
+    ],
+    [
+      "clipboard",
+      "Reads or changes the clipboard",
+      false
+    ],
+    [
+      "windows",
+      "Reads or controls other apps and windows",
+      false
+    ],
+    [
+      "triggers",
+      "Starts on its own (schedules, keys, typing, apps, idle, windows, files and more)",
+      false
+    ],
+    [
+      "screen",
+      "Reads the screen (colors, images and text)",
+      false
+    ],
+    [
+      "macros",
+      "Runs or stops your other macros",
+      false
+    ],
+    [
+      "globals",
+      "Reads or changes global variables",
+      false
+    ]
+  ],
+  "operators": {
+    "ActiveWindowApp": "windows",
+    "ActiveWindowTitle": "windows",
+    "AppRunning": "windows",
+    "AverageColor": "screen",
+    "ClipboardHasFiles": "clipboard",
+    "ClipboardHasImage": "clipboard",
+    "ClipboardText": "clipboard",
+    "ElementCount": "browser",
+    "ElementExists": "browser",
+    "ElementText": "browser",
+    "FileExists": "files_read",
+    "GlobalVariable": "globals",
+    "HttpGet": "network",
+    "ListDirectory": "files_read",
+    "MacroRunning": "macros",
+    "PageTitle": "browser",
+    "PageUrl": "browser",
+    "PixelColor": "screen",
+    "ReadFile": "files_read",
+    "ScreenText": "screen",
+    "Secret": "secrets",
+    "ShellOutput": "commands",
+    "ShellSucceeded": "commands",
+    "WindowExists": "windows",
+    "WindowInfo": "windows"
+  }
+}
