@@ -78,7 +78,9 @@ other. The rest are listed so nothing is missed.
 7. A trigger also needs a watcher in `blockwork-app` (see `system_watch.rs`)
    and a line in `macros/trigger.rs` for the run log.
 8. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry, a row in
-   `register()` (`tests/wire_blocks.rs` lists any block without one) (label, value and dropdown pieces, icon), a prefab if a
+   its palette category's function (`eventRows`, `inputRows`, ...: label,
+   value and dropdown pieces, icon; `tests/wire_blocks.rs` lists any block
+   without one), a prefab if a
    fresh block needs defaults, and its variable dropdowns in
    `registerVariableFields`.
 9. `blockwork-qt/qml/BlockHelp.qml`: one sentence on what it does.

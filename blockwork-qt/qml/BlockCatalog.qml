@@ -235,12 +235,9 @@ QtObject {
         const mine = page.macro ? page.macro.name : "";
         return names.find(n => n && n !== mine) || "";
     }
-    // Hands every row, operator, icon and prefab to blockstitch's BlockRegistry.
-    // Labels are read once, so the page calls this again in a new language.
-    function register() {
-        // Blockwork's own icon set covers every icon below; the blocks draw
-        // with blockstitch's, so hand it the ones it lacks.
-        Stitch.Icons.add(Bw.Icons.paths);
+    // BEGIN block rows: one function per palette category.
+    // Pieces several rows share, handed to each row function below.
+    function rowPieces() {
         const label = text => ({ kind: "label", text: text });
         const commandField = { kind: "text", key: "command", placeholder: qsTr("command"), minWidth: 92, maxWidth: 480 };
         // The image blocks' picture: click to capture from the screen, or load a file.
@@ -288,16 +285,6 @@ QtObject {
             fresh: () => page.firstVariableName(), pieces: [
             label(qsTr("count in")), { kind: "dropdown", key: "count_variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }
         ] };
-        // Blockwork's own features and vocabulary; a neutral blockstitch host has none of these.
-        BlockRegistry.recordingTargets = true;
-        BlockRegistry.registerDescriptors(hostDescriptors);
-        BlockRegistry.registerIcons({
-            WhenRan: "play", WhenBatteryDischargedTo: "battery-warning", WhenBatteryChargedTo: "battery-charging", WhenTime: "clock",
-            WhenPowerPluggedIn: "plug-zap", WhenPowerUnplugged: "unplug", WhenClipboardChanged: "clipboard-check", WhenKey: "keyboard",
-            Text: "text-cursor", Key: "keyboard", Button: "mouse-pointer-click", MoveMouse: "move", Scroll: "mouse", Command: "terminal",
-            OpenApp: "app-window", CloseApp: "square-x", SetClipboard: "clipboard"
-        });
-        BlockRegistry.registerOperators(operatorRows());
         // "when [every week] [Monday] at [09:00]": the recurrence as drop-downs,
         // the time as a value slot that opens the time picker.
         const scheduleOf = i => (i && i.schedule) || { kind: "Daily" };
@@ -335,8 +322,12 @@ QtObject {
         };
         const direction = (pairs) => ({ kind: "dropdown", key: "direction", options: choices(pairs) });
         const keyValue = { kind: "value", field: "KeyValue", key: "key", keyCapture: true };
-        const listPiece = { kind: "dropdown", key: "name", options: "lists", placeholder: qsTr("Choose list") };
-        BlockRegistry.registerRows({
+        return { label, commandField, imagePieces, value, box, signalPieces, regionPieces, timeoutComponent, errorTimeoutComponent, toleranceComponent, regionComponent, pickComponent, browserMatchComponent, countComponent, whenTimeHead, launchSummary, direction, keyValue };
+    }
+    // Triggers (the When... headers).
+    function eventRows(p) {
+        const { label, value, signalPieces, whenTimeHead, direction, keyValue } = p;
+        return {
             WhenBatteryDischargedTo: { shape: "header", head: [label(qsTr("WHEN BATTERY DISCHARGED TO")),
                 value("BatteryDischargeThreshold", "threshold"), label("%")] },
             WhenBatteryChargedTo: { shape: "header", head: [label(qsTr("WHEN BATTERY CHARGED TO")),
@@ -346,44 +337,12 @@ QtObject {
             WhenClipboardChanged: { shape: "header", head: [label(qsTr("WHEN CLIPBOARD CHANGES"))] },
             WhenKey: { shape: "header", head: [label(qsTr("WHEN")), keyValue,
                 direction([["Press", qsTr("Pressed")], ["Release", qsTr("Released")]])] },
-            Wait: { head: [label(qsTr("Wait")), Object.assign(value("WaitDuration", "duration"), { unit: qsTr("ms") })] },
-            Text: { head: [label(qsTr("Text")), value("TextValue", "text")] },
-            Key: { head: [label(qsTr("Key")), keyValue,
-                direction([["Click", qsTr("Click")], ["Press", qsTr("Press")], ["Release", qsTr("Release")]])] },
-            Button: { head: [label(qsTr("Mouse button")),
-                { kind: "dropdown", key: "button", options: choices([["Left", qsTr("Left")], ["Right", qsTr("Right")], ["Middle", qsTr("Middle")],
-                    ["Side", qsTr("Side")], ["Extra", qsTr("Extra")]]) },
-                direction([["Click", qsTr("Click")], ["Press", qsTr("Press")], ["Release", qsTr("Release")]])] },
-            MoveMouse: { head: [label(qsTr("Move mouse")),
-                { kind: "dropdown", key: "coordinate", options: choices([["Relative", qsTr("Relative")], ["Absolute", qsTr("Absolute")]]) },
-                Object.assign(value("MoveMouseX", "x"), { unit: "x" }), Object.assign(value("MoveMouseY", "y"), { unit: "y" })] },
-            Scroll: { head: [label(qsTr("Scroll")), Object.assign(value("ScrollAmount", "amount"), { unit: qsTr("amount") }),
-                { kind: "dropdown", key: "axis", options: choices([["Vertical", qsTr("Vertical")], ["Horizontal", qsTr("Horizontal")]]) }] },
-            CloseApp: { head: [label(qsTr("Close app")),
-                { kind: "button", action: "pickApp", palette: true, image: "icon", icon: "square-x", text: i => i && i.name ? i.name : qsTr("Choose app...") }] },
-            SetClipboard: { head: [label(qsTr("set clipboard to")), value("SetClipboardValue", "value")] },
-            SetVariable: { head: [label(qsTr("set")),
-                { kind: "dropdown", key: "name", options: () => page.variableChoices() },
-                label(qsTr("to")), value("SetVariableValue", "value")] },
-            ChangeVariable: { head: [label(qsTr("change")),
-                { kind: "dropdown", key: "name", options: () => page.variableChoices() },
-                label(qsTr("by")), value("ChangeVariableValue", "value")] },
             WhenRan: { shape: "header", icon: "play", head: [label(qsTr("WHEN RUN"))] },
             WhenAt: { shape: "header", icon: "clock", head: [label(qsTr("ONCE AT")),
                 Object.assign(value("AtTime", "at"), { pick: { action: "pickDateTime", icon: "calendar", display: t => Schedules.dateTimeLabel(t), tip: qsTr("Click to pick a date and time, or drop a reporter here") } })] },
             WhenSignal: { shape: "header", icon: "corner-down-right", head: [label(qsTr("WHEN I RECEIVE")), ...signalPieces] },
             WhenWebhook: { shape: "header", icon: "link", head: [label(qsTr("WHEN WEBHOOK")), value("WebhookPath", "path"), label(qsTr("IS CALLED, BODY IN")),
                 { kind: "dropdown", key: "variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
-            SendSignal: { icon: "navigation", head: [label(qsTr("send signal")), ...signalPieces,
-                { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
-                  encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
-            AskText: { icon: "text-cursor-input", head: [label(qsTr("ask")), value("AskPrompt", "prompt"), label(qsTr("default")), value("AskDefault", "default"),
-                label(qsTr("into")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
-            AskYesNo: { icon: "circle-check", head: [label(qsTr("ask yes or no")), value("AskPrompt", "prompt"),
-                label(qsTr("into")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
-            AskChoice: { icon: "list-checks", head: [label(qsTr("choose from")), { kind: "dropdown", key: "list", options: "lists" }, label(qsTr("asking")),
-                value("AskPrompt", "prompt"), label(qsTr("into")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
-            ShowMessage: { icon: "message-square", head: [label(qsTr("show message")), value("MessageText", "message")] },
             WhenWindow: { shape: "header", icon: "app-window", head: [label(qsTr("WHEN WINDOW")), value("WindowPattern", "pattern"), label(qsTr("IS")),
                 { kind: "dropdown", key: "focused", options: [{ value: "focused", label: qsTr("focused") }, { value: "unfocused", label: qsTr("unfocused") }],
                   encode: v => v === "focused", decode: v => v ? "focused" : "unfocused" }] },
@@ -415,10 +374,84 @@ QtObject {
             ], head: [label(qsTr("WHEN")),
                 { kind: "dropdown", key: "button", options: mouseButtonOptions },
                 { kind: "dropdown", key: "pressed", options: [{ value: "down", label: qsTr("is pressed") }, { value: "up", label: qsTr("is released") }],
-                  encode: v => v === "down", decode: v => v ? "down" : "up" }] },
+                  encode: v => v === "down", decode: v => v ? "down" : "up" }] }
+        };
+    }
+
+    // Keyboard and mouse.
+    function inputRows(p) {
+        const { label, value, direction, keyValue } = p;
+        return {
+            Text: { head: [label(qsTr("Text")), value("TextValue", "text")] },
+            Key: { head: [label(qsTr("Key")), keyValue,
+                direction([["Click", qsTr("Click")], ["Press", qsTr("Press")], ["Release", qsTr("Release")]])] },
+            Button: { head: [label(qsTr("Mouse button")),
+                { kind: "dropdown", key: "button", options: choices([["Left", qsTr("Left")], ["Right", qsTr("Right")], ["Middle", qsTr("Middle")],
+                    ["Side", qsTr("Side")], ["Extra", qsTr("Extra")]]) },
+                direction([["Click", qsTr("Click")], ["Press", qsTr("Press")], ["Release", qsTr("Release")]])] },
+            MoveMouse: { head: [label(qsTr("Move mouse")),
+                { kind: "dropdown", key: "coordinate", options: choices([["Relative", qsTr("Relative")], ["Absolute", qsTr("Absolute")]]) },
+                Object.assign(value("MoveMouseX", "x"), { unit: "x" }), Object.assign(value("MoveMouseY", "y"), { unit: "y" })] },
+            Scroll: { head: [label(qsTr("Scroll")), Object.assign(value("ScrollAmount", "amount"), { unit: qsTr("amount") }),
+                { kind: "dropdown", key: "axis", options: choices([["Vertical", qsTr("Vertical")], ["Horizontal", qsTr("Horizontal")]]) }] },
+            PasteText: { icon: "clipboard-paste", head: [label(qsTr("paste")), value("PasteValue", "text")] }
+        };
+    }
+
+    // Waiting, errors, other macros, signals and locks.
+    function controlRows(p) {
+        const { label, value, signalPieces, timeoutComponent, errorTimeoutComponent } = p;
+        return {
+            Wait: { head: [label(qsTr("Wait")), Object.assign(value("WaitDuration", "duration"), { unit: qsTr("ms") })] },
+            SendSignal: { icon: "navigation", head: [label(qsTr("send signal")), ...signalPieces,
+                { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
+                  encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
+            WithLock: { icon: "lock", mouths: ["body"], head: [label(qsTr("with lock")), value("LockName", "name")] },
+            TryCatch: { icon: "circle-alert", mouths: ["body", "catch_body"], separators: [qsTr("on error")], head: [label(qsTr("try"))] },
+            ThrowError: { shape: "cap", icon: "triangle-alert", head: [label(qsTr("throw error")), value("ErrorMessage", "message")] },
+            StopMacro: { shape: "cap", icon: "octagon", head: [label(qsTr("stop macro"))] },
+            Retry: { icon: "refresh-cw", mouths: ["body"], head: [label(qsTr("try up to")), value("RetryCount", "count"), label(qsTr("times,")),
+                value("RetryDelay", "delay"), label(qsTr("ms apart"))] },
+            RunMacro: { icon: "play", head: [label(qsTr("run macro")), value("MacroTarget", "target"),
+                { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
+                  encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
+            StopMacroNamed: { icon: "square", head: [label(qsTr("stop macro")), value("MacroTarget", "target")] },
+            WaitUntil: { icon: "loader", components: [timeoutComponent, errorTimeoutComponent],
+                head: [label(qsTr("wait until")), { kind: "value", field: "Condition", key: "condition", bool: true }] }
+        };
+    }
+
+    // Variables, globals and lists.
+    function dataRows(p) {
+        const { label, value } = p;
+        return {
+            SetVariable: { head: [label(qsTr("set")),
+                { kind: "dropdown", key: "name", options: () => page.variableChoices() },
+                label(qsTr("to")), value("SetVariableValue", "value")] },
+            ChangeVariable: { head: [label(qsTr("change")),
+                { kind: "dropdown", key: "name", options: () => page.variableChoices() },
+                label(qsTr("by")), value("ChangeVariableValue", "value")] },
             SplitIntoList: { icon: "scissors", head: [label(qsTr("split")), value("SplitText", "text"), label(qsTr("by")), value("SplitSeparator", "separator"),
                 label(qsTr("into")), { kind: "dropdown", key: "name", options: "lists" }] },
-            PasteText: { icon: "clipboard-paste", head: [label(qsTr("paste")), value("PasteValue", "text")] },
+            SetGlobal: { icon: "variable", head: [label(qsTr("set global")), { kind: "value", field: "GlobalName", key: "name", options: () => page.globalChoices(), placeholder: qsTr("(no global variable)") }, label(qsTr("to")), value("GlobalValue", "value")] },
+            ChangeGlobal: { icon: "variable", head: [label(qsTr("change global")), { kind: "value", field: "GlobalName", key: "name", options: () => page.globalChoices(), placeholder: qsTr("(no global variable)") }, label(qsTr("by")), value("GlobalValue", "by")] }
+        };
+    }
+
+    // Apps, windows, clipboard, files, web and dialogs.
+    function systemRows(p) {
+        const { label, commandField, value, box, launchSummary } = p;
+        return {
+            CloseApp: { head: [label(qsTr("Close app")),
+                { kind: "button", action: "pickApp", palette: true, image: "icon", icon: "square-x", text: i => i && i.name ? i.name : qsTr("Choose app...") }] },
+            SetClipboard: { head: [label(qsTr("set clipboard to")), value("SetClipboardValue", "value")] },
+            AskText: { icon: "text-cursor-input", head: [label(qsTr("ask")), value("AskPrompt", "prompt"), label(qsTr("default")), value("AskDefault", "default"),
+                label(qsTr("into")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            AskYesNo: { icon: "circle-check", head: [label(qsTr("ask yes or no")), value("AskPrompt", "prompt"),
+                label(qsTr("into")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            AskChoice: { icon: "list-checks", head: [label(qsTr("choose from")), { kind: "dropdown", key: "list", options: "lists" }, label(qsTr("asking")),
+                value("AskPrompt", "prompt"), label(qsTr("into")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            ShowMessage: { icon: "message-square", head: [label(qsTr("show message")), value("MessageText", "message")] },
             // The app, then a gear for its launch options, labelled with the
             // arguments or just that something else is set.
             OpenApp: { icon: "app-window", head: [label(qsTr("Open app")),
@@ -426,7 +459,6 @@ QtObject {
                 { kind: "button", action: "launchOptions", icon: "settings", text: launchSummary }] },
             Command: { icon: "terminal", head: [label(qsTr("Run command")), commandField] },
             CommandWait: { icon: "terminal", head: [label(qsTr("Run command")), commandField, label(qsTr("and wait"))] },
-            WithLock: { icon: "lock", mouths: ["body"], head: [label(qsTr("with lock")), value("LockName", "name")] },
             WriteFile: { icon: "file-text", head: [
                 { kind: "dropdown", key: "append", options: [{ value: "write", label: qsTr("write") }, { value: "append", label: qsTr("append") }],
                   encode: v => v === "append", decode: v => v ? "append" : "write" },
@@ -440,11 +472,6 @@ QtObject {
                 box("HttpHeaders", "headers", qsTr("headers"))] },
             Notify: { icon: "message-square", head: [label(qsTr("notify")), value("NotifyTitle", "title"), box("NotifyMessage", "message", qsTr("saying"))] },
             Log: { icon: "list", head: [label(qsTr("log")), value("LogValue", "value")] },
-            TryCatch: { icon: "circle-alert", mouths: ["body", "catch_body"], separators: [qsTr("on error")], head: [label(qsTr("try"))] },
-            ThrowError: { shape: "cap", icon: "triangle-alert", head: [label(qsTr("throw error")), value("ErrorMessage", "message")] },
-            StopMacro: { shape: "cap", icon: "octagon", head: [label(qsTr("stop macro"))] },
-            Retry: { icon: "refresh-cw", mouths: ["body"], head: [label(qsTr("try up to")), value("RetryCount", "count"), label(qsTr("times,")),
-                value("RetryDelay", "delay"), label(qsTr("ms apart"))] },
             WindowAction: { icon: "app-window", head: [
                 { kind: "dropdown", key: "action", options: choices([["Focus", qsTr("focus")], ["Minimize", qsTr("minimize")], ["Maximize", qsTr("maximize")], ["Restore", qsTr("restore")], ["Close", qsTr("close")]]) },
                 { kind: "dropdown", key: "by", options: windowMatchOptions }, value("WindowPattern", "pattern")] },
@@ -455,15 +482,14 @@ QtObject {
                 Object.assign(label(qsTr("to x")), { when: i => !i || !i.resize }), Object.assign(label(qsTr("to width")), { when: i => !!i && i.resize }),
                 value("WindowX", "x"),
                 Object.assign(label(qsTr("y")), { when: i => !i || !i.resize }), Object.assign(label(qsTr("height")), { when: i => !!i && i.resize }),
-                value("WindowY", "y")] },
-            RunMacro: { icon: "play", head: [label(qsTr("run macro")), value("MacroTarget", "target"),
-                { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
-                  encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
-            StopMacroNamed: { icon: "square", head: [label(qsTr("stop macro")), value("MacroTarget", "target")] },
-            SetGlobal: { icon: "variable", head: [label(qsTr("set global")), { kind: "value", field: "GlobalName", key: "name", options: () => page.globalChoices(), placeholder: qsTr("(no global variable)") }, label(qsTr("to")), value("GlobalValue", "value")] },
-            ChangeGlobal: { icon: "variable", head: [label(qsTr("change global")), { kind: "value", field: "GlobalName", key: "name", options: () => page.globalChoices(), placeholder: qsTr("(no global variable)") }, label(qsTr("by")), value("GlobalValue", "by")] },
-            WaitUntil: { icon: "loader", components: [timeoutComponent, errorTimeoutComponent],
-                head: [label(qsTr("wait until")), { kind: "value", field: "Condition", key: "condition", bool: true }] },
+                value("WindowY", "y")] }
+        };
+    }
+
+    // Images and object detection.
+    function screenRows(p) {
+        const { label, imagePieces, value, box, regionPieces, timeoutComponent, errorTimeoutComponent, toleranceComponent, regionComponent, pickComponent, countComponent } = p;
+        return {
             FindImage: { icon: "search", head: [label(qsTr("find")), ...imagePieces, label(qsTr("put x in")),
                 { kind: "dropdown", key: "x_variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") },
                 label(qsTr("y in")), { kind: "dropdown", key: "y_variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }],
@@ -496,7 +522,14 @@ QtObject {
                 label(qsTr("gain")), value("AimGain", "gain"), label(qsTr("max step")), value("AimMaxStep", "max_step"),
                 label(qsTr("deadzone")), value("AimDeadzone", "deadzone"), label(qsTr("hold")), value("AimSettle", "settle_ms"),
                 label(qsTr("ms, up to")), value("WaitTimeout", "timeout"), label(qsTr("ms, result in")),
-                { kind: "dropdown", key: "status_variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
+                { kind: "dropdown", key: "status_variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] }
+        };
+    }
+
+    // The browser extension.
+    function browserRows(p) {
+        const { label, value, box, browserMatchComponent } = p;
+        return {
             BrowserOpen: { icon: "external-link", head: [label(qsTr("open")), value("BrowserUrl", "url"),
                 { kind: "dropdown", key: "new_tab", options: [{ value: "here", label: qsTr("in this tab") }, { value: "new", label: qsTr("in a new tab") }],
                   encode: v => v === "new", decode: v => v ? "new" : "here" }] },
@@ -510,7 +543,27 @@ QtObject {
                 label(qsTr("for up to")), value("WaitTimeout", "timeout"), label(qsTr("ms"))] },
             BrowserScript: { icon: "square-code", head: [label(qsTr("set")), { kind: "dropdown", key: "variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") },
                 label(qsTr("to result of JavaScript")), Object.assign(box("BrowserCode", "code", ""), { monospace: true })] }
+        };
+    }
+    // END block rows
+    // Hands every row, operator, icon and prefab to blockstitch's BlockRegistry.
+    // Labels are read once, so the page calls this again in a new language.
+    function register() {
+        // Blockwork's own icon set covers every icon below; the blocks draw
+        // with blockstitch's, so hand it the ones it lacks.
+        Stitch.Icons.add(Bw.Icons.paths);
+        // Blockwork's own features and vocabulary; a neutral blockstitch host has none of these.
+        BlockRegistry.recordingTargets = true;
+        BlockRegistry.registerDescriptors(hostDescriptors);
+        BlockRegistry.registerIcons({
+            WhenRan: "play", WhenBatteryDischargedTo: "battery-warning", WhenBatteryChargedTo: "battery-charging", WhenTime: "clock",
+            WhenPowerPluggedIn: "plug-zap", WhenPowerUnplugged: "unplug", WhenClipboardChanged: "clipboard-check", WhenKey: "keyboard",
+            Text: "text-cursor", Key: "keyboard", Button: "mouse-pointer-click", MoveMouse: "move", Scroll: "mouse", Command: "terminal",
+            OpenApp: "app-window", CloseApp: "square-x", SetClipboard: "clipboard"
         });
+        BlockRegistry.registerOperators(operatorRows());
+        const p = rowPieces();
+        BlockRegistry.registerRows(Object.assign({}, eventRows(p), inputRows(p), controlRows(p), dataRows(p), systemRows(p), screenRows(p), browserRows(p)));
         BlockRegistry.registerVariableFields({
             WhenWebhook: ["variable"], AskText: ["name"], AskYesNo: ["name"], AskChoice: ["name"],
             HttpRequest: ["variable"], BrowserScript: ["variable"],

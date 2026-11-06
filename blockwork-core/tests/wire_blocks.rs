@@ -102,13 +102,13 @@ fn the_catalog_covers_every_block() {
         "AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList",
         "If", "IfElse", "Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop",
     ];
-    let start = catalog.find("BlockRegistry.registerRows({").unwrap();
-    let rows = &catalog[start..start + catalog[start..].find("\n        });").unwrap()];
+    let start = catalog.find("// BEGIN block rows").unwrap();
+    let rows = &catalog[start..start + catalog[start..].find("// END block rows").unwrap()];
     for block in &blocks {
         let ty = block["type"].as_str().unwrap();
         let has_row = rows.contains(&format!(" {ty}: {{"));
         if has_row == SHARED_ROWS.contains(&ty) {
-            missing.push(format!("{ty}: {} a row in register()", if has_row { "shared, but also has" } else { "no" }));
+            missing.push(format!("{ty}: {} a row in the block rows", if has_row { "shared, but also has" } else { "no" }));
         }
     }
     let pieces = catalog.split("value(\"").skip(1).chain(catalog.split("box(\"").skip(1));
