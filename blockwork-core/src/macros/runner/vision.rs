@@ -311,3 +311,161 @@ impl AimStats {
         );
     }
 }
+
+/// Runs one image, detection or aim block. `Some(flow)` ends the strand with it; `None` goes on to the next block.
+pub(super) fn run_screen_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32) -> Result<Option<Flow>, String> {
+    match &ins.kind {
+        InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable } => {
+            let search = ImageSearch { image, tolerance: tolerance.as_ref(), pick: pick.as_ref(), region: region.as_deref() };
+            let count_variable = count_variable.as_deref().unwrap_or("");
+            match find_picked_image(ctx, depth, &search, !count_variable.is_empty()) {
+                Ok((at, count)) => {
+                    let (x, y) = at.map_or((-1.0, -1.0), |(x, y)| (x.round(), y.round()));
+                    set_variable(ctx, x_variable, Evaluated::Number(x));
+                    set_variable(ctx, y_variable, Evaluated::Number(y));
+                    set_variable(ctx, count_variable, Evaluated::Number(count as f64));
+                }
+                Err(e) => soft_fail(ctx, &ins.id, "Find image", e)?,
+            }
+        }
+        InstructionKind::ClickImage { image, tolerance, button, pick, region } => {
+            let clicked = (|| {
+                let search = ImageSearch { image, tolerance: tolerance.as_ref(), pick: pick.as_ref(), region: region.as_deref() };
+                let mode = pick.as_ref().map(|m| m.mode);
+                let (at, count) = find_picked_image(ctx, depth, &search, mode == Some(ImagePick::Nth))?;
+                let (x, y) = at.ok_or_else(|| match (mode, count) {
+                    (_, 0) => "the image isn't on screen".to_string(),
+                    (Some(ImagePick::Nth), 1) => "the image is on screen only once".to_string(),
+                    (Some(ImagePick::Nth), n) => format!("the image is on screen only {n} times"),
+                    _ => "the image isn't on screen".to_string(),
+                })?;
+                let mut em = ctx.emulator.lock().map_err(|e| e.to_string())?;
+                em.click_mouse_abs(x.round() as i32, y.round() as i32, button.clone())
+            })();
+            if let Err(e) = clicked {
+                soft_fail(ctx, &ins.id, "Click image", e)?;
+            }
+        }
+        InstructionKind::WaitForImage { image, tolerance, appear, timeout, region, error_timeout } => {
+            let setup = (|| {
+                let tolerance = optional_number(ctx, depth, tolerance.as_ref(), 10.0)?;
+                let timeout = optional_number(ctx, depth, timeout.as_ref(), 0.0)?;
+                let error_timeout = optional_number(ctx, depth, error_timeout.as_ref(), 0.0)?;
+                let region = crate::detect::parse_region(region.as_deref().unwrap_or(""))?;
+                Ok::<_, String>((crate::screen::image::load_cached(image)?, tolerance, timeout, region, error_timeout))
+            })();
+            let (needle, tolerance, timeout, region, error_timeout) = match setup {
+                Ok(setup) => setup,
+                Err(e) => {
+                    soft_fail(ctx, &ins.id, "Wait for image", e)?;
+                    return Ok(Some(Flow::Normal));
+                }
+            };
+            let started = Instant::now();
+            loop {
+                match crate::screen::find_image_in(&needle, tolerance, region) {
+                    Ok(at) if at.is_some() == *appear => break,
+                    Ok(_) => {}
+                    Err(e) => {
+                        soft_fail(ctx, &ins.id, "Wait for image", e)?;
+                        break;
+                    }
+                }
+                let what = if *appear { "Wait for image: the image didn't appear" } else { "Wait for image: the image didn't go away" };
+                if wait_limit_reached(ctx, &ins.id, started, timeout, error_timeout, what)? {
+                    break;
+                }
+                if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
+                    break;
+                }
+            }
+        }
+        InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable, region } => {
+            let found = detect_query(ctx, depth, pattern, by, detector, label, confidence, sort, region)
+                .and_then(|query| detect_into_list(ctx, &query, results_list, &crate::detect::Screen));
+            match found {
+                Ok(frame) => set_variable(ctx, count_variable, Evaluated::Number(frame.detections.len() as f64)),
+                Err(e) => soft_fail(ctx, &ins.id, "Detect objects", e)?,
+            }
+        }
+        InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout, region } => {
+            let setup = detect_query(ctx, depth, pattern, by, detector, label, confidence, "Score", region)
+                .and_then(|query| Ok((query, ctx.resolve(timeout, depth)?.eval_number()?.max(0.0))));
+            let (query, timeout) = match setup {
+                Ok(setup) => setup,
+                Err(e) => {
+                    soft_fail(ctx, &ins.id, "Wait for detection", e)?;
+                    return Ok(None);
+                }
+            };
+            let started = Instant::now();
+            loop {
+                match crate::detect::detect_on_screen(&query) {
+                    Ok(frame) if frame.detections.is_empty() != *appear => break,
+                    Ok(_) => {}
+                    Err(e) => {
+                        soft_fail(ctx, &ins.id, "Wait for detection", e)?;
+                        break;
+                    }
+                }
+                if timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout {
+                    let what = if *appear { "didn't appear" } else { "didn't go away" };
+                    soft_fail(ctx, &ins.id, "Wait for detection", format!("it {what} within {timeout} ms"))?;
+                    break;
+                }
+                if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
+                    break;
+                }
+            }
+        }
+        InstructionKind::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => {
+            if !confirm_aim(ctx, &ins.id)? {
+                return Ok(None);
+            }
+            let done = (|| {
+                let pattern = ctx.resolve(pattern, depth)?.eval_text()?;
+                let target = (ctx.resolve(target_x, depth)?.eval_number()?, ctx.resolve(target_y, depth)?.eval_number()?);
+                let aim = aim_controller(ctx, depth, gain, max_step, deadzone)?;
+                let window = crate::window::bounds(&pattern, by.parse()?)?;
+                let crosshair = (window.x + window.width / 2.0, window.y + window.height / 2.0);
+                if let Some((dx, dy)) = aim.for_window(window.height).step(target, crosshair) {
+                    ctx.emulator.lock().map_err(|e| e.to_string())?.move_mouse_rel(dx, dy)?;
+                }
+                Ok::<_, String>(())
+            })();
+            if let Err(e) = done {
+                soft_fail(ctx, &ins.id, "Aim", e)?;
+            }
+        }
+        InstructionKind::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => {
+            if !confirm_aim(ctx, &ins.id)? {
+                return Ok(None);
+            }
+            let setup = (|| {
+                let query = crate::detect::track::query_for(&ctx.source.macro_id, results_list)
+                    .ok_or_else(|| format!("detect objects into the list \"{results_list}\" first"))?;
+                let n = ctx.resolve(index, depth)?.eval_number()?;
+                let item = ctx
+                    .lists
+                    .lock()
+                    .ok()
+                    .and_then(|lists| Some(lists.get(results_list)?.get((n.round() as usize).wrapping_sub(1))?.evaluated().as_text()))
+                    .ok_or_else(|| format!("the list \"{results_list}\" has no item {n}"))?;
+                let target = crate::detect::Detection::from_item(&item)?
+                    .id
+                    .ok_or("that item has no tracking id; fill the list with a detect block")?;
+                let aim = aim_controller(ctx, depth, gain, max_step, deadzone)?;
+                let timeout = ctx.resolve(timeout, depth)?.eval_number()?.max(0.0);
+                let settle = ctx.resolve(settle_ms, depth)?.eval_number()?.max(0.0);
+                Ok::<_, String>((query, target, aim, timeout, settle))
+            })();
+            let result = setup.and_then(|(query, target, aim, timeout, settle)| aim_at(ctx, &query, results_list, target, aim, timeout, settle));
+            match result {
+                Ok(status) => set_variable(ctx, status_variable, Evaluated::Text(status.to_string())),
+                Err(e) => soft_fail(ctx, &ins.id, "Aim at detection", e)?,
+            }
+        }
+        _ => unreachable!("run_screen_block got another block"),
+    }
+    Ok(None)
+}

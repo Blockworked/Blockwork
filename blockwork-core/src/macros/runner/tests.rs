@@ -1,4 +1,5 @@
 use super::*;
+use super::vision::*;
 use crate::input::types::{Axis, Direction, MacroButton, MacroKey};
 use crate::macros::{
     BlockDef, BlockPiece, BlockShape, InputValueType, MacroGraph, Strand,

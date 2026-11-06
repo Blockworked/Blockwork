@@ -441,7 +441,10 @@ fn set_variable(ctx: &ExecCtx, name: &str, value: Evaluated) {
 
 mod vision;
 mod apps;
-use vision::*;
+mod input;
+mod browser;
+mod data;
+mod dialogs;
 use apps::*;
 
 impl Macro {
@@ -871,18 +874,6 @@ fn run_block(
     // `initial_offset` - see `Macro::run_with_offset`.
     let mut deadline = start;
 
-    let normalize_modifier_key = |key: MacroKey| -> MacroKey {
-        match key {
-            MacroKey::Shift => MacroKey::LShift,
-            _ => key,
-        }
-    };
-
-    let shift_is_pressed = |keys: &[MacroKey]| -> bool {
-        keys.iter()
-            .any(|k| matches!(k, MacroKey::Shift | MacroKey::LShift | MacroKey::RShift))
-    };
-
     for ins in instructions {
         if let Some(flag) = &ctx.stop_flag {
             if stop_requested(flag) {
@@ -940,65 +931,14 @@ fn run_block(
             InstructionKind::WhenAt(_) => {}
             InstructionKind::WhenSignal(_) => {}
             InstructionKind::WhenWebhook { .. } => {}
-            InstructionKind::AskText { prompt, default, name } => {
-                let request = (|| {
-                    let message = ctx.resolve(prompt, depth)?.eval_text()?;
-                    let mut request = crate::prompt::Request::new(crate::prompt::Kind::Text, &ctx.source.name, message);
-                    request.default = ctx.resolve(default, depth)?.eval_text()?;
-                    Ok::<_, String>(request)
-                })();
-                match request {
-                    Ok(request) => {
-                        if let Some(reply) = ask(ctx, &ins.id, "Ask", request)? {
-                            set_variable(ctx, name, Evaluated::Text(reply.text));
-                        }
-                    }
-                    Err(e) => soft_fail(ctx, &ins.id, "Ask", e)?,
+            InstructionKind::AskText { .. }
+            | InstructionKind::AskYesNo { .. }
+            | InstructionKind::AskChoice { .. }
+            | InstructionKind::ShowMessage { .. } => {
+                if let Some(flow) = dialogs::run_dialog_block(ins, ctx, depth)? {
+                    return Ok(flow);
                 }
             }
-            InstructionKind::AskYesNo { prompt, name } => match ctx.resolve(prompt, depth).and_then(|v| v.eval_text()) {
-                Ok(message) => {
-                    let request = crate::prompt::Request::new(crate::prompt::Kind::Confirm, &ctx.source.name, message);
-                    if let Some(reply) = ask(ctx, &ins.id, "Ask yes or no", request)? {
-                        set_variable(ctx, name, Evaluated::Bool(reply.answer == "yes"));
-                    }
-                }
-                Err(e) => soft_fail(ctx, &ins.id, "Ask yes or no", e)?,
-            },
-            InstructionKind::AskChoice { prompt, list, name } => {
-                let options: Vec<String> = ctx
-                    .lists
-                    .lock()
-                    .ok()
-                    .and_then(|lists| lists.get(list).map(|items| items.iter().map(|i| i.evaluated().as_text()).collect()))
-                    .unwrap_or_default();
-                let message = ctx.resolve(prompt, depth).and_then(|v| v.eval_text());
-                match message {
-                    Ok(_) if options.is_empty() => soft_fail(ctx, &ins.id, "Choose", format!("the list \"{list}\" is empty"))?,
-                    Ok(message) => {
-                        let mut request = crate::prompt::Request::new(crate::prompt::Kind::Choice, &ctx.source.name, message);
-                        request.options = options;
-                        if let Some(reply) = ask(ctx, &ins.id, "Choose", request)? {
-                            set_variable(ctx, name, Evaluated::Text(reply.text));
-                        }
-                    }
-                    Err(e) => soft_fail(ctx, &ins.id, "Choose", e)?,
-                }
-            }
-            InstructionKind::ShowMessage(message) => match ctx.resolve(message, depth).and_then(|v| v.eval_text()) {
-                Ok(message) => {
-                    let request = crate::prompt::Request::new(crate::prompt::Kind::Message, &ctx.source.name, message);
-                    // Closing a message is the same as OK.
-                    let flag = ctx.stop_flag.clone();
-                    let stopped = || flag.as_ref().is_some_and(stop_requested);
-                    if let Err(e) = crate::prompt::ask(&request, &stopped)
-                        && !stopped()
-                    {
-                        soft_fail(ctx, &ins.id, "Show message", e)?;
-                    }
-                }
-                Err(e) => soft_fail(ctx, &ins.id, "Show message", e)?,
-            },
             InstructionKind::SendSignal { name, wait } => {
                 let name = match ctx.resolve(&name.value, depth).and_then(|v| v.eval_text()) {
                     Ok(name) => name,
@@ -1200,154 +1140,15 @@ fn run_block(
                     }
                 }
             }
-            InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable } => {
-                let search = ImageSearch { image, tolerance: tolerance.as_ref(), pick: pick.as_ref(), region: region.as_deref() };
-                let count_variable = count_variable.as_deref().unwrap_or("");
-                match find_picked_image(ctx, depth, &search, !count_variable.is_empty()) {
-                    Ok((at, count)) => {
-                        let (x, y) = at.map_or((-1.0, -1.0), |(x, y)| (x.round(), y.round()));
-                        set_variable(ctx, x_variable, Evaluated::Number(x));
-                        set_variable(ctx, y_variable, Evaluated::Number(y));
-                        set_variable(ctx, count_variable, Evaluated::Number(count as f64));
-                    }
-                    Err(e) => soft_fail(ctx, &ins.id, "Find image", e)?,
-                }
-            }
-            InstructionKind::ClickImage { image, tolerance, button, pick, region } => {
-                let clicked = (|| {
-                    let search = ImageSearch { image, tolerance: tolerance.as_ref(), pick: pick.as_ref(), region: region.as_deref() };
-                    let mode = pick.as_ref().map(|m| m.mode);
-                    let (at, count) = find_picked_image(ctx, depth, &search, mode == Some(ImagePick::Nth))?;
-                    let (x, y) = at.ok_or_else(|| match (mode, count) {
-                        (_, 0) => "the image isn't on screen".to_string(),
-                        (Some(ImagePick::Nth), 1) => "the image is on screen only once".to_string(),
-                        (Some(ImagePick::Nth), n) => format!("the image is on screen only {n} times"),
-                        _ => "the image isn't on screen".to_string(),
-                    })?;
-                    let mut em = ctx.emulator.lock().map_err(|e| e.to_string())?;
-                    em.click_mouse_abs(x.round() as i32, y.round() as i32, button.clone())
-                })();
-                if let Err(e) = clicked {
-                    soft_fail(ctx, &ins.id, "Click image", e)?;
-                }
-            }
-            InstructionKind::WaitForImage { image, tolerance, appear, timeout, region, error_timeout } => {
-                let setup = (|| {
-                    let tolerance = optional_number(ctx, depth, tolerance.as_ref(), 10.0)?;
-                    let timeout = optional_number(ctx, depth, timeout.as_ref(), 0.0)?;
-                    let error_timeout = optional_number(ctx, depth, error_timeout.as_ref(), 0.0)?;
-                    let region = crate::detect::parse_region(region.as_deref().unwrap_or(""))?;
-                    Ok::<_, String>((crate::screen::image::load_cached(image)?, tolerance, timeout, region, error_timeout))
-                })();
-                let (needle, tolerance, timeout, region, error_timeout) = match setup {
-                    Ok(setup) => setup,
-                    Err(e) => {
-                        soft_fail(ctx, &ins.id, "Wait for image", e)?;
-                        return Ok(Flow::Normal);
-                    }
-                };
-                let started = Instant::now();
-                loop {
-                    match crate::screen::find_image_in(&needle, tolerance, region) {
-                        Ok(at) if at.is_some() == *appear => break,
-                        Ok(_) => {}
-                        Err(e) => {
-                            soft_fail(ctx, &ins.id, "Wait for image", e)?;
-                            break;
-                        }
-                    }
-                    let what = if *appear { "Wait for image: the image didn't appear" } else { "Wait for image: the image didn't go away" };
-                    if wait_limit_reached(ctx, &ins.id, started, timeout, error_timeout, what)? {
-                        break;
-                    }
-                    if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
-                        break;
-                    }
-                }
-            }
-            InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable, region } => {
-                let found = detect_query(ctx, depth, pattern, by, detector, label, confidence, sort, region)
-                    .and_then(|query| detect_into_list(ctx, &query, results_list, &crate::detect::Screen));
-                match found {
-                    Ok(frame) => set_variable(ctx, count_variable, Evaluated::Number(frame.detections.len() as f64)),
-                    Err(e) => soft_fail(ctx, &ins.id, "Detect objects", e)?,
-                }
-            }
-            InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout, region } => {
-                let setup = detect_query(ctx, depth, pattern, by, detector, label, confidence, "Score", region)
-                    .and_then(|query| Ok((query, ctx.resolve(timeout, depth)?.eval_number()?.max(0.0))));
-                let (query, timeout) = match setup {
-                    Ok(setup) => setup,
-                    Err(e) => {
-                        soft_fail(ctx, &ins.id, "Wait for detection", e)?;
-                        continue;
-                    }
-                };
-                let started = Instant::now();
-                loop {
-                    match crate::detect::detect_on_screen(&query) {
-                        Ok(frame) if frame.detections.is_empty() != *appear => break,
-                        Ok(_) => {}
-                        Err(e) => {
-                            soft_fail(ctx, &ins.id, "Wait for detection", e)?;
-                            break;
-                        }
-                    }
-                    if timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout {
-                        let what = if *appear { "didn't appear" } else { "didn't go away" };
-                        soft_fail(ctx, &ins.id, "Wait for detection", format!("it {what} within {timeout} ms"))?;
-                        break;
-                    }
-                    if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
-                        break;
-                    }
-                }
-            }
-            InstructionKind::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => {
-                if !confirm_aim(ctx, &ins.id)? {
-                    continue;
-                }
-                let done = (|| {
-                    let pattern = ctx.resolve(pattern, depth)?.eval_text()?;
-                    let target = (ctx.resolve(target_x, depth)?.eval_number()?, ctx.resolve(target_y, depth)?.eval_number()?);
-                    let aim = aim_controller(ctx, depth, gain, max_step, deadzone)?;
-                    let window = crate::window::bounds(&pattern, by.parse()?)?;
-                    let crosshair = (window.x + window.width / 2.0, window.y + window.height / 2.0);
-                    if let Some((dx, dy)) = aim.for_window(window.height).step(target, crosshair) {
-                        ctx.emulator.lock().map_err(|e| e.to_string())?.move_mouse_rel(dx, dy)?;
-                    }
-                    Ok::<_, String>(())
-                })();
-                if let Err(e) = done {
-                    soft_fail(ctx, &ins.id, "Aim", e)?;
-                }
-            }
-            InstructionKind::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => {
-                if !confirm_aim(ctx, &ins.id)? {
-                    continue;
-                }
-                let setup = (|| {
-                    let query = crate::detect::track::query_for(&ctx.source.macro_id, results_list)
-                        .ok_or_else(|| format!("detect objects into the list \"{results_list}\" first"))?;
-                    let n = ctx.resolve(index, depth)?.eval_number()?;
-                    let item = ctx
-                        .lists
-                        .lock()
-                        .ok()
-                        .and_then(|lists| Some(lists.get(results_list)?.get((n.round() as usize).wrapping_sub(1))?.evaluated().as_text()))
-                        .ok_or_else(|| format!("the list \"{results_list}\" has no item {n}"))?;
-                    let target = crate::detect::Detection::from_item(&item)?
-                        .id
-                        .ok_or("that item has no tracking id; fill the list with a detect block")?;
-                    let aim = aim_controller(ctx, depth, gain, max_step, deadzone)?;
-                    let timeout = ctx.resolve(timeout, depth)?.eval_number()?.max(0.0);
-                    let settle = ctx.resolve(settle_ms, depth)?.eval_number()?.max(0.0);
-                    Ok::<_, String>((query, target, aim, timeout, settle))
-                })();
-                let result = setup.and_then(|(query, target, aim, timeout, settle)| aim_at(ctx, &query, results_list, target, aim, timeout, settle));
-                match result {
-                    Ok(status) => set_variable(ctx, status_variable, Evaluated::Text(status.to_string())),
-                    Err(e) => soft_fail(ctx, &ins.id, "Aim at detection", e)?,
+            InstructionKind::FindImage { .. }
+            | InstructionKind::ClickImage { .. }
+            | InstructionKind::WaitForImage { .. }
+            | InstructionKind::DetectObjectsInWindow { .. }
+            | InstructionKind::WaitForDetection { .. }
+            | InstructionKind::AimStep { .. }
+            | InstructionKind::AimAtDetection { .. } => {
+                if let Some(flow) = vision::run_screen_block(ins, ctx, depth)? {
+                    return Ok(flow);
                 }
             }
             InstructionKind::RunMacro { target, wait } => {
@@ -1407,86 +1208,13 @@ fn run_block(
                     soft_fail(ctx, &ins.id, if *append { "Append to file" } else { "Write file" }, e)?;
                 }
             }
-            InstructionKind::BrowserOpen { url, new_tab } => {
-                let opened = ctx
-                    .resolve(url, depth)
-                    .and_then(|u| u.eval_text())
-                    .and_then(|url| crate::browser::request("open", serde_json::json!({ "url": url, "newTab": new_tab }), BROWSER_LOAD_LIMIT));
-                if let Err(e) = opened {
-                    soft_fail(ctx, &ins.id, "Open in browser", e)?;
-                }
-            }
-            InstructionKind::BrowserClick { selector, nth } => {
-                let clicked = (|| {
-                    let selector = ctx.resolve(selector, depth)?.eval_text()?;
-                    let nth = match nth {
-                        Some(nth) => ctx.resolve(nth, depth)?.eval_number()?,
-                        None => 1.0,
-                    };
-                    crate::browser::request("click", serde_json::json!({ "selector": selector, "nth": nth }), BROWSER_LIMIT)
-                })();
-                if let Err(e) = clicked {
-                    soft_fail(ctx, &ins.id, "Click in browser", e)?;
-                }
-            }
-            InstructionKind::BrowserType { text, selector, nth } => {
-                let typed = (|| {
-                    let text = ctx.resolve(text, depth)?.eval_text()?;
-                    let selector = ctx.resolve(selector, depth)?.eval_text()?;
-                    let nth = match nth {
-                        Some(nth) => ctx.resolve(nth, depth)?.eval_number()?,
-                        None => 1.0,
-                    };
-                    crate::browser::request("type", serde_json::json!({ "selector": selector, "nth": nth, "text": text }), BROWSER_LIMIT)
-                })();
-                if let Err(e) = typed {
-                    soft_fail(ctx, &ins.id, "Type in browser", e)?;
-                }
-            }
-            InstructionKind::BrowserWaitFor { selector, appear, timeout } => {
-                let setup = (|| {
-                    let selector = ctx.resolve(selector, depth)?.eval_text()?;
-                    let timeout = ctx.resolve(timeout, depth)?.eval_number()?.max(0.0);
-                    Ok::<_, String>((selector, timeout))
-                })();
-                let (selector, timeout) = match setup {
-                    Ok(setup) => setup,
-                    Err(e) => {
-                        soft_fail(ctx, &ins.id, "Wait for element", e)?;
-                        return Ok(Flow::Normal);
-                    }
-                };
-                let started = Instant::now();
-                loop {
-                    match crate::browser::request("count", serde_json::json!({ "selector": selector }), BROWSER_LIMIT) {
-                        Ok(found) if (found["count"].as_u64().unwrap_or(0) > 0) == *appear => break,
-                        Ok(_) => {}
-                        Err(e) => {
-                            soft_fail(ctx, &ins.id, "Wait for element", e)?;
-                            break;
-                        }
-                    }
-                    if timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout {
-                        let what = if *appear { "didn't appear" } else { "didn't go away" };
-                        soft_fail(ctx, &ins.id, "Wait for element", format!("{selector} {what} within {timeout} ms"))?;
-                        break;
-                    }
-                    if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
-                        break;
-                    }
-                }
-            }
-            InstructionKind::BrowserScript { code, variable } => {
-                let ran = ctx
-                    .resolve(code, depth)
-                    .and_then(|c| c.eval_text())
-                    .and_then(|code| {
-                        let stopped = || ctx.stop_flag.as_ref().is_some_and(stop_requested);
-                        crate::browser::request_until("script", serde_json::json!({ "code": code }), BROWSER_SCRIPT_LIMIT, stopped)
-                    });
-                match ran {
-                    Ok(result) => set_variable(ctx, variable, Evaluated::Text(crate::browser::text_field(&result, "value"))),
-                    Err(e) => soft_fail(ctx, &ins.id, "Run JavaScript", e)?,
+            InstructionKind::BrowserOpen { .. }
+            | InstructionKind::BrowserClick { .. }
+            | InstructionKind::BrowserType { .. }
+            | InstructionKind::BrowserWaitFor { .. }
+            | InstructionKind::BrowserScript { .. } => {
+                if let Some(flow) = browser::run_browser_block(ins, ctx, depth)? {
+                    return Ok(flow);
                 }
             }
             InstructionKind::HttpRequest {
@@ -1717,335 +1445,23 @@ fn run_block(
                     soft_fail(ctx, &ins.id, "Input", reason)?;
                 }
             }
-            InstructionKind::Token(token) => match token {
-                InputToken::Text(value) => {
-                    let text = match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {
-                        Ok(t) => t,
-                        Err(e) => {
-                            soft_fail(ctx, &ins.id, "Type text", e)?;
-                            continue;
-                        }
-                    };
-                    let mut em = match ctx.emulator.lock() {
-                        Ok(guard) => guard,
-                        Err(err) => {
-                            warn!("Failed to lock emulator mutex: {}", err);
-                            return Ok(Flow::Normal);
-                        }
-                    };
-                    if let Err(err) = em.text(&text) {
-                        warn!("Failed to type text '{}': {}", text, err);
-                    }
-                }
-                InputToken::Key(key, direction) => {
-                    let text = match ctx.resolve(key, depth).and_then(|v| v.eval_text()) {
-                        Ok(t) => t,
-                        Err(e) => {
-                            soft_fail(ctx, &ins.id, "Key", e)?;
-                            continue;
-                        }
-                    };
-                    let mut keys: Vec<MacroKey> = crate::input::key_names::parse_key_combo(&text)
-                        .into_iter()
-                        .map(normalize_modifier_key)
-                        .collect();
-                    // In a combo, `Control+A` means the A key; Shift is
-                    // added only when the combo names it.
-                    if keys.len() > 1 {
-                        for key in &mut keys {
-                            if let MacroKey::Unicode(c) = key {
-                                *c = c.to_ascii_lowercase();
-                            }
-                        }
-                    }
-                    if keys.is_empty() {
-                        soft_fail(ctx, &ins.id, "Key", format!("no key in '{text}'"))?;
-                        continue;
-                    }
-                    let mut em = match ctx.emulator.lock() {
-                        Ok(guard) => guard,
-                        Err(err) => {
-                            warn!("Failed to lock emulator mutex: {}", err);
-                            return Ok(Flow::Normal);
-                        }
-                    };
-                    // Press in order, release in reverse, like a typed chord.
-                    let press = !matches!(direction, Direction::Release);
-                    let release = !matches!(direction, Direction::Press);
-                    let mut errors = Vec::new();
-                    let mut emit = |key: &MacroKey, dir: Direction, pressed_keys: &mut Vec<MacroKey>| {
-                        let key_for_event = match (key, &dir) {
-                            (MacroKey::Unicode(c), Direction::Click)
-                                if shift_is_pressed(pressed_keys) && c.is_ascii_lowercase() =>
-                            {
-                                MacroKey::Unicode(c.to_ascii_uppercase())
-                            }
-                            _ => key.clone(),
-                        };
-                        match em.key(key_for_event, dir.clone()) {
-                            Ok(()) => match dir {
-                                Direction::Press => {
-                                    if !pressed_keys.contains(key) {
-                                        pressed_keys.push(key.clone());
-                                    }
-                                }
-                                Direction::Release => pressed_keys.retain(|k| k != key),
-                                Direction::Click => {}
-                            },
-                            Err(err) => errors.push(format!("{key:?} ({dir:?}): {err}")),
-                        }
-                    };
-                    if keys.len() == 1 {
-                        emit(&keys[0], direction.clone(), ctx.pressed_keys);
-                    } else {
-                        if press {
-                            for key in &keys {
-                                emit(key, Direction::Press, ctx.pressed_keys);
-                            }
-                        }
-                        if release {
-                            for key in keys.iter().rev() {
-                                emit(key, Direction::Release, ctx.pressed_keys);
-                            }
-                        }
-                    }
-                    // Finish the release sequence before reporting a failed
-                    // key; Try/Catch may leave this block immediately.
-                    drop(em);
-                    if !errors.is_empty() {
-                        soft_fail(ctx, &ins.id, "Key", errors.join("; "))?;
-                    }
-                }
-                InputToken::Raw(keycode, direction) => {
-                    let mut em = match ctx.emulator.lock() {
-                        Ok(guard) => guard,
-                        Err(err) => {
-                            warn!("Failed to lock emulator mutex: {}", err);
-                            return Ok(Flow::Normal);
-                        }
-                    };
-                    if let Err(err) = em.raw_keycode(*keycode, direction.clone()) {
-                        warn!("Failed to emit raw keycode {}: {}", keycode, err);
-                    }
-                }
-                InputToken::Button(button, direction) => {
-                    let mut em = match ctx.emulator.lock() {
-                        Ok(guard) => guard,
-                        Err(err) => {
-                            warn!("Failed to lock emulator mutex: {}", err);
-                            return Ok(Flow::Normal);
-                        }
-                    };
-                    match em.button(button.clone(), direction.clone()) {
-                        Ok(()) => match direction {
-                            Direction::Press => {
-                                if !ctx.pressed_buttons.contains(button) {
-                                    ctx.pressed_buttons.push(button.clone());
-                                }
-                            }
-                            Direction::Release => ctx.pressed_buttons.retain(|b| b != button),
-                            // Press+release in one call - nothing left held.
-                            Direction::Click => {}
-                        },
-                        Err(err) => {
-                            warn!(
-                                "Failed to click button {:?} ({:?}): {}",
-                                button, direction, err
-                            );
-                        }
-                    }
-                }
-                InputToken::MoveMouse(x, y, coordinate) => {
-                    let x = match ctx.resolve(x, depth).and_then(|v| v.eval_number()) {
-                        Ok(v) => v.round() as i32,
-                        Err(e) => {
-                            soft_fail(ctx, &ins.id, "Move mouse", e)?;
-                            continue;
-                        }
-                    };
-                    let y = match ctx.resolve(y, depth).and_then(|v| v.eval_number()) {
-                        Ok(v) => v.round() as i32,
-                        Err(e) => {
-                            soft_fail(ctx, &ins.id, "Move mouse", e)?;
-                            continue;
-                        }
-                    };
-                    let mut em = match ctx.emulator.lock() {
-                        Ok(guard) => guard,
-                        Err(err) => {
-                            warn!("Failed to lock emulator mutex: {}", err);
-                            return Ok(Flow::Normal);
-                        }
-                    };
-                    let result = match coordinate {
-                        Coordinate::Rel => em.move_mouse_rel(x, y),
-                        Coordinate::Abs => em.move_mouse_abs(x, y),
-                    };
-                    if let Err(err) = result {
-                        warn!("Failed to move mouse ({}, {}): {}", x, y, err);
-                    }
-                }
-                InputToken::Scroll(amount, axis) => {
-                    let amount = match ctx.resolve(amount, depth).and_then(|v| v.eval_number()) {
-                        Ok(v) => v.round() as i32,
-                        Err(e) => {
-                            soft_fail(ctx, &ins.id, "Scroll", e)?;
-                            continue;
-                        }
-                    };
-                    let mut em = match ctx.emulator.lock() {
-                        Ok(guard) => guard,
-                        Err(err) => {
-                            warn!("Failed to lock emulator mutex: {}", err);
-                            return Ok(Flow::Normal);
-                        }
-                    };
-                    if let Err(err) = em.scroll(amount, axis.clone()) {
-                        warn!("Failed to scroll by {}: {}", amount, err);
-                    }
-                }
-            },
-            InstructionKind::SetVariable(name, value) => {
-                match ctx.resolve(value, depth).and_then(|v| v.eval()) {
-                    Ok(result) => {
-                        if let Ok(mut vars) = ctx.variables.lock() {
-                            vars.insert(name.clone(), result);
-                        }
-                    }
-                    Err(e) => soft_fail(ctx, &ins.id, "Set variable", e)?,
+            InstructionKind::Token(token) => {
+                if let Some(flow) = input::run_token(token, ins, ctx, depth)? {
+                    return Ok(flow);
                 }
             }
-            InstructionKind::ChangeVariable(name, value) => {
-                match ctx.resolve(value, depth).and_then(|v| v.eval()) {
-                    // The delta must be numeric - text/bool are a deliberate no-op.
-                    Ok(Evaluated::Text(_) | Evaluated::Bool(_)) => {}
-                    Ok(Evaluated::Number(delta)) => {
-                        if let Ok(mut vars) = ctx.variables.lock() {
-                            // Non-numeric (or missing) current value coerces
-                            // to 0 before adding, same leniency Scratch uses.
-                            let current = vars
-                                .get(name)
-                                .and_then(|e| e.as_number().ok())
-                                .unwrap_or(0.0);
-                            vars.insert(name.clone(), Evaluated::Number(current + delta));
-                        }
-                    }
-                    Err(e) => soft_fail(ctx, &ins.id, "Change variable", e)?,
-                }
-            }
-            InstructionKind::SetClipboard(value) => {
-                match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {
-                    Ok(text) => {
-                        if let Err(e) = crate::clipboard::set_text(text) {
-                            soft_fail(ctx, &ins.id, "Set clipboard", e)?;
-                        }
-                    }
-                    Err(e) => soft_fail(ctx, &ins.id, "Set clipboard", e)?,
-                }
-            }
-            InstructionKind::AddToList { value, name } => {
-                match ctx.resolve(value, depth).and_then(|v| v.eval()) {
-                    Ok(value) => match ListItem::from_evaluated(value) {
-                        Some(item) => {
-                            if let Ok(mut lists) = ctx.lists.lock() {
-                                if let Some(list) = lists.get_mut(name) {
-                                    list.push(item);
-                                }
-                            }
-                        }
-                        None => soft_fail(ctx, &ins.id, "Add to list", "list items must be number or text")?,
-                    },
-                    Err(e) => soft_fail(ctx, &ins.id, "Add to list", e)?,
-                }
-            }
-            InstructionKind::DeleteOfList { index, name } => {
-                match ctx.resolve(index, depth).and_then(|v| v.eval_number()) {
-                    Ok(index) => {
-                        if let Ok(mut lists) = ctx.lists.lock() {
-                            if let Some(list) = lists.get_mut(name) {
-                                if let Some(index) = list_index(index, list.len(), false) {
-                                    list.remove(index);
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => soft_fail(ctx, &ins.id, "Delete list item", e)?,
-                }
-            }
-            InstructionKind::DeleteAllOfList { name } => {
-                if let Ok(mut lists) = ctx.lists.lock() {
-                    if let Some(list) = lists.get_mut(name) {
-                        list.clear();
-                    }
-                }
-            }
-            InstructionKind::ShiftList { name, amount } => {
-                match ctx.resolve(amount, depth).and_then(|v| v.eval_number()) {
-                    Ok(amount) => {
-                        if let Ok(mut lists) = ctx.lists.lock() {
-                            if let Some(list) = lists.get_mut(name) {
-                                if !list.is_empty() {
-                                    let len = list.len();
-                                    let distance = amount.round() as isize;
-                                    if distance >= 0 {
-                                        list.rotate_right(distance as usize % len);
-                                    } else {
-                                        list.rotate_left(distance.unsigned_abs() % len);
-                                    }
-                                }
-                            }
-                        }
-                    }
-                    Err(e) => soft_fail(ctx, &ins.id, "Shift list", e)?,
-                }
-            }
-            InstructionKind::InsertIntoList { value, index, name } => {
-                let value = ctx.resolve(value, depth).and_then(|v| v.eval());
-                let index = ctx.resolve(index, depth).and_then(|v| v.eval_number());
-                match (value, index) {
-                    (Ok(value), Ok(index)) => match ListItem::from_evaluated(value) {
-                        Some(item) => {
-                            if let Ok(mut lists) = ctx.lists.lock() {
-                                if let Some(list) = lists.get_mut(name) {
-                                    if let Some(index) = list_index(index, list.len(), true) {
-                                        list.insert(index, item);
-                                    }
-                                }
-                            }
-                        }
-                        None => {
-                            soft_fail(ctx, &ins.id, "Insert into list", "list items must be number or text")?
-                        }
-                    },
-                    (Err(e), _) | (_, Err(e)) => soft_fail(ctx, &ins.id, "Insert into list", e)?,
-                }
-            }
-            InstructionKind::ReplaceItemOfList { index, name, value } => {
-                let index = ctx.resolve(index, depth).and_then(|v| v.eval_number());
-                let value = ctx.resolve(value, depth).and_then(|v| v.eval());
-                match (index, value) {
-                    (Ok(index), Ok(value)) => match ListItem::from_evaluated(value) {
-                        Some(item) => {
-                            if let Ok(mut lists) = ctx.lists.lock() {
-                                if let Some(list) = lists.get_mut(name) {
-                                    if let Some(index) = list_index(index, list.len(), false) {
-                                        list[index] = item;
-                                    }
-                                }
-                            }
-                        }
-                        None => {
-                            soft_fail(ctx, &ins.id, "Replace list item", "list items must be number or text")?
-                        }
-                    },
-                    (Err(e), _) | (_, Err(e)) => soft_fail(ctx, &ins.id, "Replace list item", e)?,
-                }
-            }
-            InstructionKind::ReverseList { name } => {
-                if let Ok(mut lists) = ctx.lists.lock() {
-                    if let Some(list) = lists.get_mut(name) {
-                        list.reverse();
-                    }
+            InstructionKind::SetVariable { .. }
+            | InstructionKind::ChangeVariable { .. }
+            | InstructionKind::SetClipboard { .. }
+            | InstructionKind::AddToList { .. }
+            | InstructionKind::DeleteOfList { .. }
+            | InstructionKind::DeleteAllOfList { .. }
+            | InstructionKind::ShiftList { .. }
+            | InstructionKind::InsertIntoList { .. }
+            | InstructionKind::ReplaceItemOfList { .. }
+            | InstructionKind::ReverseList { .. } => {
+                if let Some(flow) = data::run_data_block(ins, ctx, depth)? {
+                    return Ok(flow);
                 }
             }
         }

@@ -66,7 +66,9 @@ other. The rest are listed so nothing is missed.
 3. `blockwork-core/src/macros/fields.rs`: a `FieldId` per value slot, and
    its line in `value_slot_mut`. Add it to `requires_integer` if it only takes
    whole numbers.
-4. `blockwork-core/src/macros/runner.rs`: what it does, in `run_block`.
+4. `blockwork-core/src/macros/runner.rs`: what it does, in `run_block`, or in
+   the category's own file under `runner/` (`input`, `data`, `dialogs`,
+   `browser`, `vision`, `apps`) with one arm in `run_block` that calls it.
 5. `blockwork-core/src/capabilities.rs`: what it can do (commands, network,
    screen, ...), or add it to the arm that does nothing guarded. This drives
    the import review and the permission prompts for shared macros.
