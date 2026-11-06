@@ -101,7 +101,7 @@ other. The rest are listed so nothing is missed.
 2. `blockwork-core/src/capabilities.rs`: its capability in
    `operator_capability`, or its name in `UNGUARDED_OPERATORS`. A test fails
    until it is in one of them. A guarded one also needs the
-   `capabilities.json` refresh from step 5 above.
+   `capabilities.json` refresh described under adding a block.
 3. `BLESS=1 cargo test -p blockwork-core --test operator_descriptors` to
    regenerate `hostDescriptors`.
 4. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry and its
