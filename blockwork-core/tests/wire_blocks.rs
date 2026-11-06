@@ -243,3 +243,60 @@ fn every_trigger_has_a_label_and_a_watcher() {
     }
     assert!(missing.is_empty(), "{}", missing.join("\n"));
 }
+
+/// `block_kind.rs` matches with `_` arms, so the compiler won't flag a new
+/// block whose body or variable it forgets. This holds every fixture block's
+/// instruction lists to `body` and its variable and list names to `visit_refs`.
+#[test]
+fn block_kind_walks_every_body_and_name() {
+    use blockstitch_core::graph::BlockKind;
+    // Name-shaped fields that aren't a variable or list.
+    const NOT_REFS: [&str; 3] = ["OpenApp.name", "CloseApp.name", "RunBranch.name"];
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/tests/fixtures/wire_blocks.json"
+    );
+    let blocks: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let mut missing = Vec::new();
+    for block in &blocks {
+        let ty = block["type"].as_str().unwrap();
+        let kind = dto_to_instruction(&serde_json::from_value(block.clone()).unwrap())
+            .unwrap()
+            .kind;
+        let fields = block.as_object().unwrap();
+        // An instruction list, or a call's list of branch lists.
+        let is_body = |v: &Value| {
+            v.as_array()
+                .is_some_and(|a| a.iter().any(|i| i.get("type").is_some()))
+        };
+        let bodies: usize = fields
+            .values()
+            .map(|v| match v.as_array() {
+                _ if is_body(v) => 1,
+                Some(a) if a.iter().any(is_body) && a.iter().all(Value::is_array) => a.len(),
+                _ => 0,
+            })
+            .sum();
+        for slot in 0..bodies {
+            if kind.body(slot as u8).is_none() {
+                missing.push(format!("{ty}: body slot {slot} not in BlockKind::body"));
+            }
+        }
+        if kind.body(bodies as u8).is_some() {
+            missing.push(format!("{ty}: body has a slot past its {bodies} lists"));
+        }
+        let mut refs = Vec::new();
+        kind.visit_refs(&mut |_, name| refs.push(name.to_string()));
+        for (key, value) in fields {
+            let named = key == "name" || key.ends_with("variable") || key.ends_with("list");
+            let qualified = format!("{ty}.{key}");
+            if let Some(name) = value.as_str().filter(|_| named)
+                && !NOT_REFS.contains(&qualified.as_str())
+                && !refs.iter().any(|r| r == name)
+            {
+                missing.push(format!("{qualified}: not visited by for_each_ref"));
+            }
+        }
+    }
+    assert!(missing.is_empty(), "{}", missing.join("\n"));
+}

@@ -3,7 +3,8 @@
 use super::*;
 
 /// Every variable and list name a kind holds as text, for
-/// [`BlockKind::visit_refs_mut`] and [`BlockKind::visit_refs`] alike.
+/// [`BlockKind::visit_refs_mut`] and [`BlockKind::visit_refs`] alike. A new
+/// block's names and bodies are checked by `block_kind_walks_every_body_and_name`.
 macro_rules! for_each_ref {
     ($kind:expr, $f:expr) => {
         match $kind {
