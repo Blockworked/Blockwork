@@ -32,8 +32,6 @@ use serde_json::{Value as Json, json};
 /// What undo restores: the app's scope, the canvas plus signals and packs.
 type Snapshot = (MacroGraph, Vec<String>, Vec<PackRecord>);
 
-/// Same depth as the app's `UNDO_STACK_LIMIT`.
-const UNDO_LIMIT: usize = 50;
 
 /// Blockwork keeps "09" typed into an operator argument as text.
 const EDIT_CONTEXT: EditContext = EditContext { numbers: NumberSpelling::KeepTypedInOperands };
@@ -61,7 +59,7 @@ impl Default for Demo {
         Demo {
             macros: Vec::new(),
             selected: None,
-            history: History::new(UNDO_LIMIT),
+            history: History::new(blockwork_core::macros::UNDO_LIMIT),
             buffers: ValueBuffers::new(),
             key_capture: None,
             standalone_key: None,
@@ -160,9 +158,7 @@ impl Demo {
             }
             "duplicate_macro" => {
                 let id: String = arg(a, "id")?;
-                let mut copy = self.find(&id)?.clone();
-                copy.id = uuid::Uuid::new_v4().simple().to_string();
-                copy.name = format!("{} copy", copy.name);
+                let copy = self.find(&id)?.duplicate();
                 self.add_and_select(copy);
                 Ok(Json::Null)
             }
@@ -181,7 +177,7 @@ impl Demo {
             "set_macro_folder" => {
                 let (id, folder): (String, String) = (arg(a, "id")?, arg(a, "folder")?);
                 let index = self.macros.iter().position(|m| m.id == id).ok_or("Macro not found")?;
-                self.macros[index].settings.folder = folder.trim().trim_matches('/').trim().to_string();
+                self.macros[index].settings.folder = blockwork_core::macros::clean_folder(&folder);
                 Ok(Json::Null)
             }
             "set_title" => {

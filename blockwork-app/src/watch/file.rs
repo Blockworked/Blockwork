@@ -1,6 +1,6 @@
 //! Background service that fires `WhenFileChanged` strands when their file
 //! is created, modified or deleted. Polls the file's modified time and size,
-//! like `clipboard_watch` polls the clipboard.
+//! like `watch::clipboard` polls the clipboard.
 
 use blockwork_core::macros::trigger::fired_message;
 use crate::AppHandle;

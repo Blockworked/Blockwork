@@ -5,7 +5,7 @@
 | Crate | What it is |
 | --- | --- |
 | `blockwork-core` | The engine: the macro document (`macros/`), the block runner (`macros/runner.rs`), input, screen, browser and system helpers, and the wire shapes the editor speaks (`frontend/`). |
-| `blockwork-app` | Every command the editor can issue and the background watchers that fire trigger blocks (`*_watch.rs`). No UI toolkit. |
+| `blockwork-app` | Every command the editor can issue and the background watchers that fire trigger blocks (`watch/`). No UI toolkit. |
 | `blockwork-daemon` | The long-lived process that owns `blockwork-app`'s state, hotkeys and playback. |
 | `blockwork-protocol` | Messages between the daemon and the Qt UI. |
 | `blockwork-qt` | The Qt Quick editor (`qml/`) and its Rust/C++ glue (`src/`). |
@@ -78,7 +78,7 @@ other. The rest are listed so nothing is missed.
    the import review and the permission prompts for shared macros.
 6. `blockwork-core/src/frontend/instructions.rs`: its line in `wire_blocks!`,
    and a case in `blockwork-core/tests/fixtures/wire_blocks.json`.
-7. A trigger also needs a watcher in `blockwork-app` (see `system_watch.rs`)
+7. A trigger also needs a watcher in `blockwork-app` (see `watch/system.rs`)
    and a line in `macros/trigger.rs` for the run log.
 8. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry, a row in
    its palette category's function (`eventRows`, `inputRows`, ...: label,

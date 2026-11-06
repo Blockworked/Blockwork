@@ -102,6 +102,13 @@ jobs:
       - name: Tests
         run: cargo test --workspace --exclude blockwork-linux-bridge
 
+      # The workspace build turns core's `system` feature on for everyone;
+      # the website's editor core builds without it.
+      - name: Web editor core without system features
+        run: |
+          cargo check -p blockwork-core --no-default-features
+          cargo test -p blockwork-web
+
       # After the build, which stages the Lucide icons the QML tests import.
       - name: QML tests
         run: |

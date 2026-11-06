@@ -2,7 +2,7 @@
 //! callback's key events and fires a strand's body (skipping its header) when
 //! its combo is pressed or released.
 //!
-//! Scoping matches `battery_watch`: the selected macro, plus any macro with
+//! Scoping matches `watch::battery`: the selected macro, plus any macro with
 //! `MacroSettings::always_listen`.
 
 use blockwork_core::macros::trigger::fired_message;

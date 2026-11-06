@@ -7,6 +7,14 @@ use super::conditions::{PowerCondition, parse_clock};
 use super::{BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro, MacroSettings, placement};
 use crate::input::value::Value;
 
+/// How many steps undo remembers, in the app and the web demo.
+pub const UNDO_LIMIT: usize = 50;
+
+/// A folder name as stored: no surrounding spaces or slashes, empty for the top level.
+pub fn clean_folder(folder: &str) -> String {
+    folder.trim().trim_matches('/').trim().to_string()
+}
+
 /// A custom block's color as stored: six-digit hex, so a shared macro can't
 /// put arbitrary CSS into the editor.
 pub fn checked_block_color(color: &str) -> Result<String, String> {
@@ -38,6 +46,14 @@ impl BlockDraft {
 }
 
 impl Macro {
+    /// A copy with a new id, named "<name> copy".
+    pub fn duplicate(&self) -> Macro {
+        let mut copy = self.clone();
+        copy.id = uuid::Uuid::new_v4().simple().to_string();
+        copy.name = format!("{} copy", copy.name);
+        copy
+    }
+
     /// Defines a custom block from a checked draft, at `at` or beside the
     /// existing strands; returns its id.
     pub fn add_block(&mut self, draft: BlockDraft, at: Option<(i32, i32)>) -> Result<String, String> {

@@ -77,7 +77,7 @@ const LEGACY_ROOT_STRAND_ID: &str = "root";
 
 mod block_kind;
 mod document_rules;
-pub use document_rules::{BlockDraft, checked_block_color};
+pub use document_rules::{BlockDraft, UNDO_LIMIT, checked_block_color, clean_folder};
 mod saved_shapes;
 
 /// A named choice or an unrestricted expression, both resolved as text at runtime.
@@ -166,7 +166,7 @@ pub enum InstructionKind {
     /// entry point Run/Loop invokes - `runner::run_with_offset` skips these
     /// strands entirely. Instead they're driven independently by a
     /// long-running background watcher outside a macro run altogether (in
-    /// the desktop app, `blockwork-app`'s `battery_watch` module), which polls
+    /// the desktop app, `blockwork-app`'s `watch::battery` module), which polls
     /// the battery, fires the strand's body (everything after this marker)
     /// the moment the condition holds, and won't fire it again until the
     /// battery recovers past the threshold and crosses it again.
@@ -175,7 +175,7 @@ pub enum InstructionKind {
     /// rises to (or above) the given percentage instead.
     WhenBatteryChargedTo(Value),
     /// Header-only marker, same shape/semantics as `WhenBatteryDischargedTo`
-    /// (excluded from Run/Loop, driven by a background watcher - `time_watch`
+    /// (excluded from Run/Loop, driven by a background watcher - `watch::time`
     /// in the desktop app) but for a recurring point in local time instead
     /// of a battery level. See `TimeSchedule` for the recurrence shapes; the
     /// value is the time of day, like `09:30` (see `parse_time_of_day`).
@@ -183,7 +183,7 @@ pub enum InstructionKind {
     WhenTime(TimeSchedule, Value),
     /// Header-only marker, no payload (like `WhenRan`) - excluded from
     /// Run/Loop and driven by the same background watcher as
-    /// `WhenBattery*To` (`battery_watch` in the desktop app), which fires
+    /// `WhenBattery*To` (`watch::battery` in the desktop app), which fires
     /// this strand's body the moment the system starts receiving external
     /// power. See `crate::battery::is_plugged_in`.
     WhenPowerPluggedIn,
@@ -192,12 +192,12 @@ pub enum InstructionKind {
     /// `is_plugged_in` is always `true` there.
     WhenPowerUnplugged,
     /// Header-only marker, no payload (like `WhenPowerPluggedIn`) - excluded
-    /// from Run/Loop and driven by a background watcher (`clipboard_watch`
+    /// from Run/Loop and driven by a background watcher (`watch::clipboard`
     /// in the desktop app), which fires this strand's body whenever the
     /// clipboard's contents change. Edge-triggered like the other watcher
     /// headers, but with no threshold to recover past - any change fires it.
     WhenClipboardChanged,
-    /// Header-only marker driven by the key watcher (`key_watch` in the
+    /// Header-only marker driven by the key watcher (`watch::key` in the
     /// desktop app): fires the body when the key combo in the value is
     /// pressed or released. `Click` is treated as `Press`.
     WhenKey(Value, Direction),
@@ -458,18 +458,18 @@ pub enum InstructionKind {
         error_timeout: Option<Value>,
     },
     /// Header for a strand fired when a window whose title or app contains
-    /// `pattern` gains (`focused`) or loses focus. Driven by `window_watch`
+    /// `pattern` gains (`focused`) or loses focus. Driven by `watch::window`
     /// in the desktop app, like the other `When*` watcher headers.
     WhenWindow {
         pattern: Value,
         focused: bool,
     },
     /// Header for a strand fired when the file at the path is created,
-    /// changed or deleted. Driven by `file_watch` in the desktop app.
+    /// changed or deleted. Driven by `watch::file` in the desktop app.
     WhenFileChanged(Value),
     /// Header for a strand fired when the user types `text` (text
     /// expansion); with `erase` the typed text is backspaced away first.
-    /// Driven by `type_watch` in the desktop app.
+    /// Driven by `watch::typed` in the desktop app.
     WhenTyped {
         text: Value,
         erase: bool,
@@ -743,8 +743,8 @@ pub const SPEED_MULTIPLIER_RANGE: std::ops::RangeInclusive<f64> = 0.1..=10.0;
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize, Default)]
 pub struct MacroSettings {
     /// When `true`, this macro's `WhenBattery*`/`WhenTime`/`WhenPower*`
-    /// strands are watched by the background watchers (`battery_watch`/
-    /// `time_watch` in the desktop app) even while a different macro is
+    /// strands are watched by the background watchers (`watch::battery`/
+    /// `watch::time` in the desktop app) even while a different macro is
     /// selected. By default only the currently selected macro's event
     /// strands are live.
     #[serde(default)]

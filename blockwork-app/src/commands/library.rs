@@ -84,12 +84,10 @@ pub(super) fn find_macro(s: &crate::state::AppState, id: &str) -> Result<Macro, 
 
 /// Saves a copy of macro `id` next to it and opens the copy.
 pub(crate) fn duplicate_macro(state: &SharedState, app: &AppHandle, id: &str) -> Result<(), String> {
-    let mut copy = {
+    let copy = {
         let s = state.lock().map_err(|e| e.to_string())?;
-        find_macro(&s, id)?
+        find_macro(&s, id)?.duplicate()
     };
-    copy.id = uuid::Uuid::new_v4().simple().to_string();
-    copy.name = format!("{} copy", copy.name);
     blockwork_core::permissions::copy(id, &copy.id);
     add_and_select(state, app, copy)
 }
@@ -98,7 +96,7 @@ pub(crate) fn duplicate_macro(state: &SharedState, app: &AppHandle, id: &str) ->
 pub(crate) fn set_macro_folder(state: &SharedState, app: &AppHandle, id: &str, folder: &str) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let mut mac = find_macro(&s, id)?;
-    mac.settings.folder = folder.trim().trim_matches('/').trim().to_string();
+    mac.settings.folder = blockwork_core::macros::clean_folder(folder);
     mac.save()?;
     if let Some(open) = s.current_macro.as_mut().filter(|m| m.id == id) {
         open.settings.folder = mac.settings.folder.clone();

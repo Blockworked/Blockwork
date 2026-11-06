@@ -19,9 +19,6 @@ pub(crate) type EditorSnapshot = (MacroGraph, Vec<String>, Vec<blockwork_core::b
 
 pub(crate) type SharedState = Arc<Mutex<AppState>>;
 
-/// How many undo steps the editor keeps.
-pub(crate) const UNDO_STACK_LIMIT: usize = 50;
-
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum RecordingPhase {
     Idle,

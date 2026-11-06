@@ -1,5 +1,5 @@
 //! Shared "fire a strand outside the normal Run/Loop system" plumbing, used
-//! by every background watcher (`battery_watch`, `time_watch`, etc.) that fires a
+//! by every background watcher (`watch::battery`, `watch::time`, etc.) that fires a
 //! strand's body on its own trigger rather than the user pressing Run.
 
 use crate::state::{build_state_dto, SharedState};

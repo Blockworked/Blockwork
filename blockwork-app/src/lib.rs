@@ -6,25 +6,19 @@
 //! local socket (see `blockwork-protocol`).
 
 pub mod autostart;
-pub(crate) mod battery_watch;
-pub(crate) mod clipboard_watch;
-pub(crate) mod key_watch;
+pub(crate) mod watch;
 pub(crate) mod commands;
-pub(crate) mod file_watch;
 mod dispatch;
 pub(crate) mod installed_apps;
 pub(crate) mod macro_runs;
 pub(crate) mod macros_thread;
-pub(crate) mod mouse_watch;
 pub(crate) mod razer;
 pub(crate) mod scheduled_run;
 pub(crate) mod screen_pick;
 pub(crate) mod state;
-pub(crate) mod system_watch;
 pub(crate) mod block_library;
 pub(crate) mod community;
 pub(crate) mod templates;
-pub(crate) mod time_watch;
 pub(crate) mod webhook;
 pub(crate) mod browser_bridge;
 #[cfg(test)]
@@ -57,10 +51,8 @@ pub(crate) fn recording_countdown_secs() -> u8 {
         .unwrap_or(3)
         .min(MAX_RECORDING_COUNTDOWN)
 }
-pub(crate) mod type_watch;
-pub(crate) mod window_watch;
 
-use crate::state::{AppState, History, UNDO_STACK_LIMIT, Page, RecordingPhase, SharedState, UpdateCheckState};
+use crate::state::{AppState, History, Page, RecordingPhase, SharedState, UpdateCheckState};
 use blockwork_core::macros::runner::make_backend_or_unavailable;
 use blockwork_core::macros::thread_pool::ThreadPool;
 use blockwork_core::recording::QueueSignal;
@@ -166,7 +158,7 @@ fn initial_state(
         palette_layout: settings.palette_layout.clone().unwrap_or_else(|| "rail".into()),
         key_capture: None,
         pending_standalone_key: None,
-        history: History::new(UNDO_STACK_LIMIT),
+        history: History::new(blockwork_core::macros::UNDO_LIMIT),
         recording_phase: RecordingPhase::Idle,
         recording_countdown_generation: 0,
         // Linux absolute recording needs libei, both to replay absolute
@@ -282,24 +274,24 @@ impl Backend {
 
         blockwork_core::macros::calls::set_host(Arc::new(macro_runs::Host { state: Arc::clone(&shared), app: app.clone() }));
 
-        // ── Background battery-event watcher (see battery_watch.rs) ──────
-        battery_watch::start(Arc::clone(&shared), app.clone());
+        // ── Background battery-event watcher (see watch/battery.rs) ──────
+        watch::battery::start(Arc::clone(&shared), app.clone());
 
-        // ── Background time-event watcher (see time_watch.rs) ────────────
-        time_watch::start(Arc::clone(&shared), app.clone());
+        // ── Background time-event watcher (see watch/time.rs) ────────────
+        watch::time::start(Arc::clone(&shared), app.clone());
 
-        // ── Background clipboard-event watcher (see clipboard_watch.rs) ───
-        clipboard_watch::start(Arc::clone(&shared), app.clone());
+        // ── Background clipboard-event watcher (see watch/clipboard.rs) ───
+        watch::clipboard::start(Arc::clone(&shared), app.clone());
 
-        // ── Background key-event watcher (see key_watch.rs) ──────────────
-        key_watch::start(Arc::clone(&shared), app.clone());
+        // ── Background key-event watcher (see watch/key.rs) ──────────────
+        watch::key::start(Arc::clone(&shared), app.clone());
 
-        window_watch::start(Arc::clone(&shared), app.clone());
+        watch::window::start(Arc::clone(&shared), app.clone());
 
-        file_watch::start(Arc::clone(&shared), app.clone());
-        type_watch::start(Arc::clone(&shared), app.clone());
-        system_watch::start(Arc::clone(&shared), app.clone());
-        mouse_watch::start(Arc::clone(&shared), app.clone());
+        watch::file::start(Arc::clone(&shared), app.clone());
+        watch::typed::start(Arc::clone(&shared), app.clone());
+        watch::system::start(Arc::clone(&shared), app.clone());
+        watch::mouse::start(Arc::clone(&shared), app.clone());
         webhook::start(Arc::clone(&shared), app.clone());
         browser_bridge::start(Arc::clone(&shared), app.clone());
 

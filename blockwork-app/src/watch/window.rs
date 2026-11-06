@@ -1,5 +1,5 @@
 //! Background service that fires `WhenWindow` strands when a matching window
-//! gains or loses focus. Same shape as `clipboard_watch`: poll, compare with
+//! gains or loses focus. Same shape as `watch::clipboard`: poll, compare with
 //! the last poll, fire the strand body on a change.
 
 use blockwork_core::macros::trigger::fired_message;

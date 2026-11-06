@@ -1,6 +1,6 @@
 //! `TimeSchedule` - the recurrence of `InstructionKind::WhenTime`: daily,
 //! weekly, monthly, or yearly, beside a time-of-day value. Backs the
-//! background time watcher (e.g. blockwork-app's `time_watch` module), the same way `InstructionKind::WhenBatteryDischargedTo`/
+//! background time watcher (e.g. blockwork-app's `watch::time` module), the same way `InstructionKind::WhenBatteryDischargedTo`/
 //! `WhenBatteryChargedTo` back the battery watcher.
 
 use chrono::{DateTime, Datelike, Local, Timelike};

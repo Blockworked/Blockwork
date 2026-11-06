@@ -1,5 +1,5 @@
 //! Fires `WhenApp`, `WhenIdle`, `WhenScreenLock`, `WhenNetwork` and
-//! `WhenUsb` strands. Polls like `window_watch`: compare each condition with
+//! `WhenUsb` strands. Polls like `watch::window`: compare each condition with
 //! the last poll and fire the strand when it becomes what the header waits
 //! for. USB fires once per matching device that comes or goes.
 

@@ -1,11 +1,11 @@
 //! Background service that fires `WhenClipboardChanged` strands on their own,
-//! independent of Run/Loop - see `battery_watch` for why (same mechanism,
+//! independent of Run/Loop - see `watch::battery` for why (same mechanism,
 //! same reasoning, just a clipboard-content condition instead of a battery
 //! one). Polls the clipboard on a timer and fires a strand's body directly
 //! (skipping its header) the moment its contents differ from the last poll.
 //!
 //! Only the currently selected macro's strands are watched, plus any macro
-//! whose `MacroSettings::always_listen` is set - see `battery_watch`'s module
+//! whose `MacroSettings::always_listen` is set - see `watch::battery`'s module
 //! doc for the same scoping rule.
 //!
 //! Unlike the battery watcher's threshold-crossing hysteresis, there's no

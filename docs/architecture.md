@@ -56,19 +56,21 @@ which blocks are running in `macros/trace.rs`. A `trace-watch` thread in
 run highlight.
 
 Trigger blocks (`When...`) are started by watchers in `blockwork-app`, one
-file each (`key_watch.rs`, `time_watch.rs`, `window_watch.rs`, ...). Each
+file each (`watch/key.rs`, `watch/time.rs`, `watch/window.rs`, ...). Each
 watcher is started from `Backend::start` in `blockwork-app/src/lib.rs`, looks
 for its `InstructionKind` in every macro, and starts the strand when its
 condition happens.
 
 ## The web build
 
-`blockwork-web` is the same editor without the daemon, for the website's
-demo. It compiles to WebAssembly and keeps one in-memory session per tab
-(`session.rs`, `Demo`). The page's canvas is blockstitch's web build, which
-calls the session through blockstitch's C ABI (`blockstitch_ffi::export_abi!`),
-so a command goes straight from the canvas to `Demo::dispatch` and the new
-state comes back as the call's answer. Nothing is saved and nothing runs.
+`blockwork-web` is the same editor without the daemon, for the home page demo
+on blockworked.com. The page runs Blockwork's own `EditorPage.qml`, built with
+Qt for WebAssembly (`blockworked.com/qt-demo`). In place of the daemon,
+`DemoBackend.qml` sends each command to a `Core` object that links
+`blockwork-web` as a static library and calls it through blockstitch's C ABI
+(`blockstitch_ffi::export_abi!`). `Demo::dispatch` (`session.rs`) keeps one
+in-memory session and answers with the new state. Nothing is saved and
+nothing runs.
 
 Most commands therefore exist twice: in `blockwork-app/src/commands/` and in
 `blockwork-web/src/session.rs`. Keep both thin by putting shared rules on
