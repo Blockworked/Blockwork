@@ -1,168 +1,35 @@
-//! Exposes a reporter's serialized branch bodies to the instruction editor.
+//! Runs instruction edits inside a reporter's branches: blockstitch opens
+//! them as temporary strands (`open_reporter_branches`), this runs the edit,
+//! and blockstitch writes them back.
 
 use blockstitch_core::editor::{EditCommand, EditContext, ValueDestination, ValueLocation};
-use blockstitch_core::graph::{BlockGraph, BlockKind, Strand};
-use blockwork_core::input::value::Value;
+use blockstitch_core::graph::BlockGraph;
 use blockwork_core::macros::InstructionKind;
-use serde::Deserialize;
 use serde::de::DeserializeOwned;
 use serde_json::{Value as Json, json};
 
-const PREFIX: &str = "@reporter-branch:";
 type Graph = BlockGraph<InstructionKind>;
-
-#[derive(Deserialize)]
-struct BranchAddress {
-    location: ValueLocation,
-    slot: usize,
-}
-
-struct Branch {
-    id: String,
-    address: BranchAddress,
-    owner: Option<String>,
-}
 
 fn arg<T: DeserializeOwned>(args: &Json, name: &str) -> Result<T, String> {
     serde_json::from_value(args.get(name).cloned().unwrap_or(Json::Null)).map_err(|e| e.to_string())
 }
 
 pub(crate) fn targets_branch(args: &Json) -> bool {
-    match args {
-        Json::Object(fields) => fields.iter().any(|(key, value)| {
-            if ["strandId", "targetId", "draggedId", "strand_id"].contains(&key.as_str()) {
-                value.as_str().is_some_and(|id| id.starts_with(PREFIX))
-            } else if ["location", "from", "to"].contains(&key.as_str()) {
-                targets_branch(value)
-            } else {
-                false
-            }
-        }),
-        _ => false,
-    }
+    blockstitch_core::editor::targets_reporter_branch(args)
 }
 
-fn materialize(graph: &mut Graph, id: &str, branches: &mut Vec<Branch>) -> Result<(), String> {
-    let Some(encoded) = id.strip_prefix(PREFIX) else {
-        return Ok(());
-    };
-    if branches.iter().any(|branch| branch.id == id) {
-        return Ok(());
-    }
-    if branches.len() >= 32 {
-        return Err("Reporter branches are nested too deeply".into());
-    }
-    let address: BranchAddress = serde_json::from_str(encoded).map_err(|e| e.to_string())?;
-    let owner = if let ValueLocation::Field {
-        strand_id, index, ..
-    } = &address.location
-    {
-        materialize(graph, strand_id, branches)?;
-        Some(
-            graph
-                .instruction_at(strand_id, index)
-                .ok_or("Reporter owner is missing")?
-                .id
-                .clone(),
-        )
-    } else {
-        None
-    };
-    let Value::Call {
-        branches: bodies, ..
-    } = graph
-        .value_at_mut(&address.location)
-        .ok_or("Reporter is missing")?
-    else {
-        return Err("The value is not a custom reporter".into());
-    };
-    if address.slot >= 255 {
-        return Err("Invalid reporter branch".into());
-    }
-    bodies.resize_with(bodies.len().max(address.slot + 1), Vec::new);
-    let instructions =
-        blockwork_core::frontend::reporter_branch_to_instructions(&bodies[address.slot])?;
-    graph.strands.push(Strand {
-        id: id.into(),
-        x: 0,
-        y: 0,
-        instructions,
-    });
-    branches.push(Branch {
-        id: id.into(),
-        address,
-        owner,
-    });
-    Ok(())
+fn read_body(body: &[Json]) -> Result<Vec<blockwork_core::macros::Instruction>, String> {
+    blockwork_core::frontend::reporter_branch_to_instructions(body)
 }
 
-fn collect(graph: &mut Graph, args: &Json, branches: &mut Vec<Branch>) -> Result<(), String> {
-    if let Json::Object(fields) = args {
-        for (key, value) in fields {
-            if ["strandId", "targetId", "draggedId", "strand_id"].contains(&key.as_str()) {
-                if let Some(id) = value.as_str() {
-                    materialize(graph, id, branches)?;
-                }
-            } else if ["location", "from", "to"].contains(&key.as_str()) {
-                collect(graph, value, branches)?;
-            }
-        }
-    }
-    Ok(())
-}
-
-fn restore(graph: &mut Graph, branch: Branch) -> Result<(), String> {
-    let instructions = if let Some(index) = graph.strands.iter().position(|s| s.id == branch.id) {
-        graph.strands.remove(index).instructions
-    } else {
-        Vec::new()
-    };
-    if instructions
-        .iter()
-        .any(|instruction| instruction.is_header())
-    {
-        return Err("A header block can't be placed in a reporter branch".into());
-    }
-    let body = instructions
-        .iter()
-        .map(|instruction| {
-            serde_json::to_value(blockwork_core::frontend::instruction_to_dto(instruction))
-                .map_err(|e| e.to_string())
-        })
-        .collect::<Result<Vec<_>, _>>()?;
-    let mut restored = false;
-    if let (Some(owner), ValueLocation::Field { field_id, path, .. }) =
-        (branch.owner, &branch.address.location)
-    {
-        graph.walk_instructions_mut(&mut |instruction| {
-            if instruction.id == owner
-                && let Some(Value::Call { branches, .. }) = instruction
-                    .kind
-                    .value_slot_mut(field_id)
-                    .and_then(|v| v.get_mut(path))
-                && let Some(slot) = branches.get_mut(branch.address.slot)
-            {
-                *slot = body.clone();
-                restored = true;
-            }
-        });
-    } else if let Some(Value::Call { branches, .. }) = graph.value_at_mut(&branch.address.location)
-        && let Some(slot) = branches.get_mut(branch.address.slot)
-    {
-        *slot = body;
-        restored = true;
-    }
-    if restored {
-        Ok(())
-    } else {
-        Err("Can't move a reporter into its own branch".into())
-    }
+fn write_instruction(instruction: &blockwork_core::macros::Instruction) -> Result<Json, String> {
+    serde_json::to_value(blockwork_core::frontend::instruction_to_dto(instruction)).map_err(|e| e.to_string())
 }
 
 /// Edits a clone; only a completely restored graph can be committed.
 pub(crate) fn edit(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, String> {
-    let mut branches = Vec::new();
-    collect(graph, args, &mut branches)?;
+    let ids = blockstitch_core::editor::reporter_branch_ids(args);
+    let branches = graph.open_reporter_branches(&ids, &read_body)?;
     let strand = || arg::<String>(args, "strandId");
     let path = || arg(args, "path");
     let result = match cmd {
@@ -320,15 +187,16 @@ pub(crate) fn edit(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, St
             target.y = y;
         }
     }
-    for branch in branches.into_iter().rev() {
-        restore(graph, branch)?;
-    }
+    graph.close_reporter_branches(branches, &write_instruction)?;
     Ok(result)
 }
 
 #[cfg(test)]
 mod tests {
     use super::*;
+    use blockstitch_core::editor::REPORTER_BRANCH_PREFIX as PREFIX;
+    use blockstitch_core::graph::Strand;
+    use blockwork_core::input::value::Value;
     use blockstitch_core::graph::{FloatingValue, Instruction};
 
     fn fixture() -> (Graph, String, ValueLocation) {
@@ -441,14 +309,13 @@ mod tests {
         });
         let location = json!({ "kind": "Field", "strand_id": "source", "index": [{"index": 1}], "field_id": "WaitDuration", "path": [] });
         let id = format!("{PREFIX}{}", json!({ "location": location, "slot": 0 }));
-        let mut branches = Vec::new();
-        materialize(&mut graph, &id, &mut branches).unwrap();
+        let branches = graph.open_reporter_branches(&[id.clone()], &read_body).unwrap();
         graph.strands[0].instructions.remove(0);
         graph.strand_mut(&id).unwrap().instructions.push(
             crate::state::dto_to_instruction(&serde_json::from_value(wait("nested")).unwrap())
                 .unwrap(),
         );
-        restore(&mut graph, branches.pop().unwrap()).unwrap();
+        graph.close_reporter_branches(branches, &write_instruction).unwrap();
         assert_eq!(graph.strands.len(), 1);
         let InstructionKind::Wait(Value::Call { branches, .. }) =
             &graph.strands[0].instructions[0].kind
