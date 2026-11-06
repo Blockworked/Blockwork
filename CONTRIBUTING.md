@@ -145,8 +145,8 @@ other. The rest are listed so nothing is missed.
    settings file there (like `animation_speed`); one the backend checks
    often also lives on `AppState`, loaded in `lib.rs` at start (like
    `close_to_tray`).
-3. A `set_...` command (see above) in `commands/settings.rs` that saves it
-   with `config::update_settings`.
+3. A `set_...` command (see above) in `commands/settings.rs` that checks the
+   value and calls `save_setting`, which saves it and publishes the state.
 4. QML reads it from `appState` until the first state snapshot arrives, so
    give it a fallback where it is read (`appState.x ?? default`), as
    `animation_speed` does in `Main.qml`. Then its control in

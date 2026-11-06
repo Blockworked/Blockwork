@@ -1,5 +1,5 @@
 //! Maps a command name plus its JSON arguments onto the matching function in
-//! `commands.rs`. Arguments are camelCase, as the Qt editor sends them over
+//! `commands/`. Arguments are camelCase, as the Qt editor sends them over
 //! the daemon socket.
 
 use crate::Backend;

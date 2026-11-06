@@ -1,6 +1,22 @@
 //! Navigation, hotkey bindings, the IPC server, tray, appearance and updates.
 
 use super::*;
+use blockwork_core::config::AppSettings;
+
+/// Saves one setting and publishes the new state: `apply` updates the app's
+/// own copy (if it keeps one), `save` the settings file.
+fn save_setting(
+    state: &SharedState,
+    app: &AppHandle,
+    apply: impl FnOnce(&mut crate::state::AppState),
+    save: impl FnOnce(&mut AppSettings),
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    apply(&mut s);
+    config::update_settings(save);
+    emit_state_updated(app, &s);
+    Ok(())
+}
 
 pub(crate) fn open_settings(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
@@ -255,11 +271,12 @@ pub(crate) fn set_ipc_auto_start(
     app: &AppHandle,
     enabled: bool,
 ) -> Result<(), String> {
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.ipc_auto_start = enabled;
-    config::update_settings(|settings| settings.ipc_auto_start = Some(enabled));
-    emit_state_updated(app, &s);
-    Ok(())
+    save_setting(
+        state,
+        app,
+        |s| s.ipc_auto_start = enabled,
+        |settings| settings.ipc_auto_start = Some(enabled),
+    )
 }
 
 // ─── System tray ────────────────────────────────────────────────────────────
@@ -269,12 +286,13 @@ pub(crate) fn set_close_to_tray(
     app: &AppHandle,
     enabled: bool,
 ) -> Result<(), String> {
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.close_to_tray = enabled;
-    config::update_settings(|settings| settings.close_to_tray = Some(enabled));
     app.send(crate::Event::CloseToTray(enabled));
-    emit_state_updated(app, &s);
-    Ok(())
+    save_setting(
+        state,
+        app,
+        |s| s.close_to_tray = enabled,
+        |settings| settings.close_to_tray = Some(enabled),
+    )
 }
 
 pub(super) const PALETTE_LAYOUTS: [&str; 5] = ["rail", "chips", "accordion", "flyout", "tiles"];
@@ -287,11 +305,12 @@ pub(crate) fn set_palette_layout(
     if !PALETTE_LAYOUTS.contains(&layout.as_str()) {
         return Err(format!("Unknown palette layout: {layout}"));
     }
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.palette_layout = layout.clone();
-    config::update_settings(|settings| settings.palette_layout = Some(layout));
-    emit_state_updated(app, &s);
-    Ok(())
+    save_setting(
+        state,
+        app,
+        |s| s.palette_layout = layout.clone(),
+        |settings| settings.palette_layout = Some(layout.clone()),
+    )
 }
 
 /// The UI language, like "de"; empty follows the system.
@@ -308,12 +327,12 @@ pub(crate) fn set_language(
     {
         return Err(format!("Unknown language: {language}"));
     }
-    config::update_settings(|settings| {
-        settings.language = (!language.is_empty()).then_some(language)
-    });
-    let s = state.lock().map_err(|e| e.to_string())?;
-    emit_state_updated(app, &s);
-    Ok(())
+    save_setting(
+        state,
+        app,
+        |_| {},
+        |settings| settings.language = (!language.is_empty()).then_some(language),
+    )
 }
 
 /// How times show: "12h", "24h", or empty to follow the system locale.
@@ -325,12 +344,12 @@ pub(crate) fn set_clock_format(
     if !matches!(format.as_str(), "" | "12h" | "24h") {
         return Err(format!("Unknown clock format: {format}"));
     }
-    config::update_settings(|settings| {
-        settings.clock_format = (!format.is_empty()).then_some(format)
-    });
-    let s = state.lock().map_err(|e| e.to_string())?;
-    emit_state_updated(app, &s);
-    Ok(())
+    save_setting(
+        state,
+        app,
+        |_| {},
+        |settings| settings.clock_format = (!format.is_empty()).then_some(format),
+    )
 }
 
 /// Empty follows the system appearance.
@@ -342,12 +361,12 @@ pub(crate) fn set_color_scheme(
     if !matches!(scheme.as_str(), "" | "light" | "dark") {
         return Err(format!("Unknown color scheme: {scheme}"));
     }
-    config::update_settings(|settings| {
-        settings.color_scheme = (!scheme.is_empty()).then_some(scheme)
-    });
-    let s = state.lock().map_err(|e| e.to_string())?;
-    emit_state_updated(app, &s);
-    Ok(())
+    save_setting(
+        state,
+        app,
+        |_| {},
+        |settings| settings.color_scheme = (!scheme.is_empty()).then_some(scheme),
+    )
 }
 
 /// How long UI animations take, as a duration multiplier: 0 is instant, 1 normal.
@@ -359,10 +378,12 @@ pub(crate) fn set_animation_speed(
     if !speed.is_finite() || !(0.0..=crate::MAX_ANIMATION_SPEED).contains(&speed) {
         return Err(format!("Animation speed out of range: {speed}"));
     }
-    config::update_settings(|settings| settings.animation_speed = Some(speed));
-    let s = state.lock().map_err(|e| e.to_string())?;
-    emit_state_updated(app, &s);
-    Ok(())
+    save_setting(
+        state,
+        app,
+        |_| {},
+        |settings| settings.animation_speed = Some(speed),
+    )
 }
 
 pub(crate) fn set_start_at_startup(
@@ -371,11 +392,12 @@ pub(crate) fn set_start_at_startup(
     enabled: bool,
 ) -> Result<(), String> {
     crate::autostart::set_enabled(enabled)?;
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.start_at_startup = enabled;
-    config::update_settings(|settings| settings.start_at_startup = Some(enabled));
-    emit_state_updated(app, &s);
-    Ok(())
+    save_setting(
+        state,
+        app,
+        |s| s.start_at_startup = enabled,
+        |settings| settings.start_at_startup = Some(enabled),
+    )
 }
 
 pub(crate) fn set_onboarding_done(
@@ -383,14 +405,17 @@ pub(crate) fn set_onboarding_done(
     app: &AppHandle,
     done: bool,
 ) -> Result<(), String> {
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.onboarding_done = done;
-    if !done {
-        s.page = Page::Main;
-    }
-    config::update_settings(|settings| settings.onboarding_done = Some(done));
-    emit_state_updated(app, &s);
-    Ok(())
+    save_setting(
+        state,
+        app,
+        |s| {
+            s.onboarding_done = done;
+            if !done {
+                s.page = Page::Main;
+            }
+        },
+        |settings| settings.onboarding_done = Some(done),
+    )
 }
 
 // ─── Updates (Windows/macOS) ───────────────────────────────────────────────
