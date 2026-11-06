@@ -159,6 +159,32 @@ pub(super) fn run_data_block(
                 list.reverse();
             }
         }
+        InstructionKind::SplitIntoList {
+            text,
+            separator,
+            name,
+        } => {
+            let parts = ctx
+                .resolve(text, depth)
+                .and_then(|v| v.eval_text())
+                .and_then(|text| {
+                    Ok(crate::text::split(
+                        &text,
+                        &ctx.resolve(separator, depth)?.eval_text()?,
+                    ))
+                });
+            match parts {
+                Ok(parts) => {
+                    if let Ok(mut lists) = ctx.lists.lock() {
+                        lists.insert(
+                            name.clone(),
+                            parts.into_iter().map(ListItem::Text).collect(),
+                        );
+                    }
+                }
+                Err(e) => soft_fail(ctx, &ins.id, "Split", e)?,
+            }
+        }
         _ => unreachable!("run_data_block got another block"),
     }
     Ok(None)

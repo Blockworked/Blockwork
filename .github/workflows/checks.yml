@@ -122,6 +122,11 @@ jobs:
       - name: Tests
         run: cargo test --workspace --exclude blockwork-linux-bridge
 
+      # blockwork-ffi's build regenerates the C header the Geometry Dash mod
+      # compiles against; a stale committed copy fails here.
+      - name: FFI header is current
+        run: git diff --exit-code blockwork-ffi/include
+
       # The workspace build turns core's `system` feature on for everyone;
       # the website's editor core builds without it.
       - name: Web editor core without system features

@@ -105,7 +105,7 @@ AppDialog {
         signal changed(int h, int m)
         iconName: "clock"; text: Schedules.clock(h, m); implicitHeight: 32
         onClicked: picker.openAt(timeButton, h, m)
-        BwTimePicker { id: picker; use12h: Schedules.use12h; amText: Schedules.amText; pmText: Schedules.pmText; onPicked: (h, m) => timeButton.changed(h, m) }
+        TimePicker { id: picker; use12h: Schedules.use12h; amText: Schedules.amText; pmText: Schedules.pmText; onPicked: (h, m) => timeButton.changed(h, m) }
     }
     component Choice: BwComboBox {
         id: choice

@@ -486,6 +486,7 @@ fn set_variable(ctx: &ExecCtx, name: &str, value: Evaluated) {
 
 mod apps;
 mod browser;
+mod control;
 mod data;
 mod dialogs;
 mod input;
@@ -983,207 +984,30 @@ fn run_block(
             | InstructionKind::WriteFile { .. }
             | InstructionKind::HttpRequest { .. }
             | InstructionKind::Command(_)
-            | InstructionKind::CommandWait(_) => system::run_system_block(ins, ctx, depth)?,
-            InstructionKind::SplitIntoList {
-                text,
-                separator,
-                name,
-            } => {
-                let parts = ctx
-                    .resolve(text, depth)
-                    .and_then(|v| v.eval_text())
-                    .and_then(|text| {
-                        Ok(crate::text::split(
-                            &text,
-                            &ctx.resolve(separator, depth)?.eval_text()?,
-                        ))
-                    });
-                match parts {
-                    Ok(parts) => {
-                        if let Ok(mut lists) = ctx.lists.lock() {
-                            lists.insert(
-                                name.clone(),
-                                parts.into_iter().map(ListItem::Text).collect(),
-                            );
-                        }
-                    }
-                    Err(e) => soft_fail(ctx, &ins.id, "Split", e)?,
-                }
-            }
-            InstructionKind::PasteText(text) => {
-                let pasted = ctx
-                    .resolve(text, depth)
-                    .and_then(|v| v.eval_text())
-                    .and_then(|text| paste_text(ctx, text));
-                if let Err(e) = pasted {
-                    soft_fail(ctx, &ins.id, "Paste", e)?;
-                }
-            }
-            InstructionKind::WithLock { name, body } => {
-                let name = match ctx.resolve(name, depth).and_then(|v| v.eval_text()) {
-                    Ok(name) => name,
-                    Err(e) => {
-                        soft_fail(ctx, &ins.id, "Lock", e)?;
-                        continue;
-                    }
-                };
-                let stop = ctx.stop_flag.clone();
-                let Some(_guard) =
-                    crate::macros::locks::acquire(&name, Duration::from_millis(50), || {
-                        stop.as_ref().is_some_and(stop_requested)
-                    })
-                else {
-                    break;
-                };
-                let flow = run_block(body, ctx, depth, Instant::now())?;
-                if flow != Flow::Normal {
-                    return Ok(flow);
-                }
-            }
-            InstructionKind::OpenApp {
-                command, launch, ..
-            } => {
-                println!("Opening app: {command}");
-                if let Err(e) = open_app(command, launch) {
-                    soft_fail(ctx, &ins.id, "Open app", e)?;
-                }
-            }
-            InstructionKind::CloseApp { command, name, .. } => {
-                println!("Closing app: {name}");
-                if let Err(e) = close_app(command, name) {
-                    soft_fail(ctx, &ins.id, "Close app", e)?;
-                }
-            }
-            InstructionKind::Return(value) => {
-                let resolved = ctx.resolve(value, depth)?;
-                return Ok(Flow::Return(resolved.eval()?));
-            }
-            InstructionKind::EscapeLoop => return Ok(Flow::Break),
-            InstructionKind::ContinueLoop => return Ok(Flow::Continue),
-            InstructionKind::StopMacro => {
-                crate::run_log::info(&ctx.source, "Stopped by a stop macro block");
-                if let Some(flag) = &ctx.stop_flag
-                    && let Ok(mut running) = flag.lock()
-                {
-                    *running = false;
-                }
-                break;
-            }
-            InstructionKind::ThrowError(message) => {
-                let message = ctx
-                    .resolve(message, depth)
-                    .and_then(|v| v.eval_text())
-                    .unwrap_or_else(|e| e);
-                ctx.error_block = ins.id.clone();
-                return Err(if message.is_empty() {
-                    "error".to_string()
-                } else {
-                    message
-                });
-            }
-            InstructionKind::TryCatch { body, catch_body } => {
-                ctx.try_depth += 1;
-                let result = run_block(body, ctx, depth, Instant::now());
-                ctx.try_depth -= 1;
-                match result {
-                    Ok(Flow::Normal) => {}
-                    Ok(flow) => return Ok(flow),
-                    Err(message) => {
-                        crate::run_log::info(&ctx.source, format!("Handled error: {message}"));
-                        ctx.error_block.clear();
-                        LAST_ERROR.with(|e| *e.borrow_mut() = message);
-                        let flow = run_block(catch_body, ctx, depth, Instant::now())?;
-                        if flow != Flow::Normal {
-                            return Ok(flow);
-                        }
-                    }
-                }
-            }
-            InstructionKind::Retry { count, delay, body } => {
-                let attempts = ctx.resolve(count, depth).and_then(|v| v.eval_number());
-                let delay_ms = ctx.resolve(delay, depth).and_then(|v| v.eval_number());
-                let (attempts, delay_ms) = match (attempts, delay_ms) {
-                    (Ok(a), Ok(d)) => (a.max(1.0).round() as u64, d),
-                    (Err(e), _) | (_, Err(e)) => {
-                        soft_fail(ctx, &ins.id, "Retry", e)?;
-                        continue;
-                    }
-                };
-                for attempt in 1..=attempts {
-                    ctx.try_depth += 1;
-                    let result = run_block(body, ctx, depth, Instant::now());
-                    ctx.try_depth -= 1;
-                    let message = match result {
-                        Ok(Flow::Normal) => break,
-                        Ok(flow) => return Ok(flow),
-                        Err(message) => message,
-                    };
-                    ctx.error_block.clear();
-                    LAST_ERROR.with(|e| *e.borrow_mut() = message.clone());
-                    if attempt == attempts {
-                        soft_fail(
-                            ctx,
-                            &ins.id,
-                            "Retry",
-                            format!("gave up after {attempts} attempts: {message}"),
-                        )?;
-                        break;
-                    }
-                    crate::run_log::info(
-                        &ctx.source,
-                        format!("Attempt {attempt} of {attempts} failed: {message}"),
-                    );
-                    if sleep_unless_stopped(ctx, delay_ms) {
-                        break;
-                    }
-                }
-            }
-            InstructionKind::WaitUntil {
-                condition,
-                timeout,
-                error_timeout,
-            } => {
-                let (timeout, error_timeout) = match (|| {
-                    Ok::<_, String>((
-                        optional_number(ctx, depth, timeout.as_ref(), 0.0)?,
-                        optional_number(ctx, depth, error_timeout.as_ref(), 0.0)?,
-                    ))
-                })() {
-                    Ok(limits) => limits,
-                    Err(e) => {
-                        soft_fail(ctx, &ins.id, "Wait until", e)?;
-                        continue;
-                    }
-                };
-                let started = Instant::now();
-                loop {
-                    match ctx
-                        .resolve(condition, depth)
-                        .and_then(|v| v.eval())
-                        .map(|v| v.as_bool())
-                    {
-                        Ok(true) => break,
-                        Ok(false) => {}
-                        Err(e) => {
-                            soft_fail(ctx, &ins.id, "Wait until", e)?;
-                            break;
-                        }
-                    }
-                    if wait_limit_reached(
-                        ctx,
-                        &ins.id,
-                        started,
-                        timeout,
-                        error_timeout,
-                        "Wait until: still false",
-                    )? {
-                        break;
-                    }
-                    if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
-                        break;
-                    }
-                }
-            }
+            | InstructionKind::CommandWait(_)
+            | InstructionKind::OpenApp { .. }
+            | InstructionKind::CloseApp { .. }
+            | InstructionKind::PasteText(_) => system::run_system_block(ins, ctx, depth)?,
+            InstructionKind::WithLock { .. }
+            | InstructionKind::Return(_)
+            | InstructionKind::EscapeLoop
+            | InstructionKind::ContinueLoop
+            | InstructionKind::StopMacro
+            | InstructionKind::ThrowError(_)
+            | InstructionKind::TryCatch { .. }
+            | InstructionKind::Retry { .. }
+            | InstructionKind::WaitUntil { .. }
+            | InstructionKind::CallBlock { .. }
+            | InstructionKind::RunBranch(_)
+            | InstructionKind::If { .. }
+            | InstructionKind::IfElse { .. }
+            | InstructionKind::Repeat { .. }
+            | InstructionKind::Forever { .. }
+            | InstructionKind::While { .. } => match control::run_control_block(ins, ctx, depth)? {
+                control::Next::Go => {}
+                control::Next::Stop => break,
+                control::Next::Exit(flow) => return Ok(flow),
+            },
             InstructionKind::FindImage { .. }
             | InstructionKind::ClickImage { .. }
             | InstructionKind::WaitForImage { .. }
@@ -1202,134 +1026,6 @@ fn run_block(
             | InstructionKind::BrowserScript { .. } => {
                 if let Some(flow) = browser::run_browser_block(ins, ctx, depth)? {
                     return Ok(flow);
-                }
-            }
-            InstructionKind::CallBlock {
-                block_id,
-                args,
-                branches,
-            } => {
-                let mut evaluated_args = Vec::with_capacity(args.len());
-                for a in args {
-                    match ctx.resolve(a, depth).and_then(|v| v.eval()) {
-                        Ok(v) => evaluated_args.push(v),
-                        Err(e) => {
-                            soft_fail(ctx, &ins.id, &format!("Call to '{block_id}'"), e)?;
-                            continue;
-                        }
-                    }
-                }
-                // A non-reporter (`Normal`/`Ending`) block's body normally
-                // has no `Return`; if one sneaks in, it just ends the call
-                // early.
-                let _ = call_block(block_id, evaluated_args, branches.clone(), ctx, depth + 1)?;
-            }
-            InstructionKind::RunBranch(name) => {
-                if let Some(body) = ctx.branch_env.get(name).cloned() {
-                    let flow = run_block(&body, ctx, depth, Instant::now())?;
-                    if flow != Flow::Normal {
-                        return Ok(flow);
-                    }
-                }
-            }
-            InstructionKind::If { condition, body } => {
-                match ctx.resolve(condition, depth).and_then(|v| v.eval()) {
-                    Ok(cond) => {
-                        if cond.as_bool() {
-                            let flow = run_block(body, ctx, depth, Instant::now())?;
-                            if flow != Flow::Normal {
-                                return Ok(flow);
-                            }
-                        }
-                    }
-                    Err(e) => soft_fail(ctx, &ins.id, "If", e)?,
-                }
-            }
-            InstructionKind::IfElse {
-                condition,
-                then_body,
-                else_body,
-            } => match ctx.resolve(condition, depth).and_then(|v| v.eval()) {
-                Ok(cond) => {
-                    let branch = if cond.as_bool() { then_body } else { else_body };
-                    let flow = run_block(branch, ctx, depth, Instant::now())?;
-                    if flow != Flow::Normal {
-                        return Ok(flow);
-                    }
-                }
-                Err(e) => soft_fail(ctx, &ins.id, "If else", e)?,
-            },
-            InstructionKind::Repeat { count, body } => {
-                let n = match ctx.resolve(count, depth).and_then(|v| v.eval_number()) {
-                    Ok(v) => v,
-                    Err(e) => {
-                        soft_fail(ctx, &ins.id, "Repeat", e)?;
-                        continue;
-                    }
-                };
-                let n = n.max(0.0).round() as u64;
-                let mut iterations = 0;
-                for _ in 0..n {
-                    if let Some(flag) = &ctx.stop_flag
-                        && stop_requested(flag)
-                    {
-                        break;
-                    }
-                    if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
-                        break;
-                    }
-                    match run_block(body, ctx, depth, Instant::now())? {
-                        Flow::Normal | Flow::Continue => {}
-                        Flow::Break => break,
-                        flow @ Flow::Return(_) => return Ok(flow),
-                    }
-                }
-            }
-            InstructionKind::Forever { body } => {
-                let mut iterations = 0;
-                loop {
-                    if let Some(flag) = &ctx.stop_flag
-                        && stop_requested(flag)
-                    {
-                        break;
-                    }
-                    if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
-                        break;
-                    }
-                    match run_block(body, ctx, depth, Instant::now())? {
-                        Flow::Normal | Flow::Continue => {}
-                        Flow::Break => break,
-                        flow @ Flow::Return(_) => return Ok(flow),
-                    }
-                }
-            }
-            InstructionKind::While { condition, body } => {
-                let mut iterations = 0;
-                loop {
-                    if let Some(flag) = &ctx.stop_flag
-                        && stop_requested(flag)
-                    {
-                        break;
-                    }
-                    match ctx.resolve(condition, depth).and_then(|v| v.eval()) {
-                        Ok(cond) => {
-                            if !cond.as_bool() {
-                                break;
-                            }
-                        }
-                        Err(e) => {
-                            soft_fail(ctx, &ins.id, "While", e)?;
-                            break;
-                        }
-                    }
-                    if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
-                        break;
-                    }
-                    match run_block(body, ctx, depth, Instant::now())? {
-                        Flow::Normal | Flow::Continue => {}
-                        Flow::Break => break,
-                        flow @ Flow::Return(_) => return Ok(flow),
-                    }
                 }
             }
             InstructionKind::Wait(duration) => {
@@ -1406,7 +1102,8 @@ fn run_block(
             | InstructionKind::ShiftList { .. }
             | InstructionKind::InsertIntoList { .. }
             | InstructionKind::ReplaceItemOfList { .. }
-            | InstructionKind::ReverseList { .. } => {
+            | InstructionKind::ReverseList { .. }
+            | InstructionKind::SplitIntoList { .. } => {
                 if let Some(flow) = data::run_data_block(ins, ctx, depth)? {
                     return Ok(flow);
                 }

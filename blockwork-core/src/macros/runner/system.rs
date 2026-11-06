@@ -224,6 +224,29 @@ pub(super) fn run_system_block(
                 soft_fail(ctx, &ins.id, "Command", e)?;
             }
         }
+        InstructionKind::OpenApp {
+            command, launch, ..
+        } => {
+            println!("Opening app: {command}");
+            if let Err(e) = open_app(command, launch) {
+                soft_fail(ctx, &ins.id, "Open app", e)?;
+            }
+        }
+        InstructionKind::CloseApp { command, name, .. } => {
+            println!("Closing app: {name}");
+            if let Err(e) = close_app(command, name) {
+                soft_fail(ctx, &ins.id, "Close app", e)?;
+            }
+        }
+        InstructionKind::PasteText(text) => {
+            let pasted = ctx
+                .resolve(text, depth)
+                .and_then(|v| v.eval_text())
+                .and_then(|text| paste_text(ctx, text));
+            if let Err(e) = pasted {
+                soft_fail(ctx, &ins.id, "Paste", e)?;
+            }
+        }
         _ => unreachable!("run_block only sends system blocks here"),
     }
     Ok(())

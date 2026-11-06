@@ -4034,66 +4034,6 @@
 </context>
 <context>
     <name>BwTimePicker</name>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="13"/>
-        <source>Time</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="237"/>
-        <source>Later</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="237"/>
-        <source>Earlier</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="237"/>
-        <source>hour</source>
-        <translation type="unfinished">bell</translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="237"/>
-        <source>minute</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="387"/>
-        <source>Next month</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="387"/>
-        <source>Previous month</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="189"/>
-        <source>Hour</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="197"/>
-        <source>Minute</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="210"/>
-        <source>Now</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="212"/>
-        <source>Cancel</source>
-        <translation type="unfinished">Belay that</translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BwTimePicker.qml" line="213"/>
-        <source>Set</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>CollectionPanel</name>
@@ -5286,6 +5226,16 @@
         <source>A custom reporter block defined in this macro.</source>
         <translation>A custom reporter block made in this macro.</translation>
     </message>
+    <message>
+        <location filename="../qml/EditorPage.qml" line="531"/>
+        <source>Input</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/EditorPage.qml" line="532"/>
+        <source>System</source>
+        <translation>Ship</translation>
+    </message>
 </context>
 <context>
     <name>GlobalPicker</name>
@@ -6232,11 +6182,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="183"/>
-        <source>Input</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="184"/>
         <source>Flow</source>
         <translation>Course</translation>
@@ -6250,11 +6195,6 @@
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="184"/>
         <source>Operators</source>
         <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="185"/>
-        <source>System</source>
-        <translation>Ship</translation>
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="186"/>
@@ -7595,6 +7535,69 @@
     <message>
         <location filename="../qml/BlockworkStyle/TextEditingMenu.qml" line="63"/>
         <source>Select All</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>TimePicker</name>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="14"/>
+        <source>Time</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="190"/>
+        <source>Hour</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="198"/>
+        <source>Minute</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="211"/>
+        <source>Now</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="213"/>
+        <source>Cancel</source>
+        <translation type="unfinished">Belay that</translation>
+    </message>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="214"/>
+        <source>Set</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="238"/>
+        <source>Earlier</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="238"/>
+        <source>Later</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="238"/>
+        <source>hour</source>
+        <translation type="unfinished">bell</translation>
+    </message>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="238"/>
+        <source>minute</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="388"/>
+        <source>Next month</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/TimePicker.qml" line="388"/>
+        <source>Previous month</source>
         <translation type="unfinished"></translation>
     </message>
 </context>

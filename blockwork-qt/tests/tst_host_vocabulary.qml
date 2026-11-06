@@ -66,6 +66,28 @@ Item {
             compare(missing, [], "icons blockstitch's Icons.qml doesn't have (they draw as info)");
             verify(!!Stitch.Icons.paths["gauge"], "BlockCatalog hands blockstitch Blockwork's own icons");
         }
+        // Each palette block is drawn one way: a Blockwork row, a blockstitch
+        // row or by blockstitch itself.
+        function test_every_block_has_exactly_one_row() {
+            const page = createTemporaryObject(editorComponent, scene);
+            wait(50);
+            // Blockwork's own variable dropdown replaces blockstitch's row.
+            const overrides = ["SetVariable", "ChangeVariable"];
+            const wrong = [];
+            for (const section of page.catalog.paletteSections) {
+                for (const type of section.items) {
+                    if (type[0] === "@" || BlockRegistry.operator(type) || BlockRegistry.descriptor(type)) continue;
+                    if (overrides.indexOf(type) >= 0) {
+                        if (!BlockRegistry.rows[type] || !BlockRegistry.builtinRows[type]) wrong.push(type + ": no longer an override");
+                        continue;
+                    }
+                    const ways = [!!BlockRegistry.rows[type], !!BlockRegistry.builtinRows[type],
+                                  BlockRegistry.selfDrawnTypes.indexOf(type) >= 0].filter(w => w).length;
+                    if (ways !== 1) wrong.push(type + ": drawn " + ways + " ways");
+                }
+            }
+            compare(wrong, []);
+        }
         function test_palette_reporters_start_from_the_core_defaults() {
             const page = createTemporaryObject(editorComponent, scene);
             wait(50);

@@ -527,7 +527,12 @@ Item {
                     listInstructionTypes: root.catalog.listInstructionTypes
                     extraOperators: root.browserShown ? root.catalog.extraOperators : root.catalog.extraOperators.filter(o => root.catalog.categoryOf(o[0]) !== "browser")
                     sections: root.browserShown ? root.catalog.paletteSections : root.catalog.paletteSections.filter(s => s.category !== "browser")
-                    appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "monitor" }].concat(root.browserShown ? [{ id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }] : [])
+                    appCategories: [
+                        { id: "input", name: qsTr("Input"), icon: "keyboard", after: "events" },
+                        { id: "system", name: qsTr("System"), icon: "settings" },
+                        { id: "screen", name: qsTr("Screen"), icon: "monitor" }
+                    ].concat(root.browserShown ? [{ id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }] : [])
+                    accordionCategory: "input"
                     // Leaves the Browser category when switching to a macro that hides it.
                     onAppCategoriesChanged: if (category === "browser" && !root.browserShown) category = layout === "accordion" ? "input" : "all"
                     variables: root.userVariables
@@ -766,7 +771,7 @@ Item {
         callCommand: (command, args, done) => root.daemonCall(command, args, done)
     }
     // The time and schedule pickers behind the time blocks' slots.
-    BwTimePicker {
+    TimePicker {
         id: timePicker
         use12h: Schedules.use12h; amText: Schedules.amText; pmText: Schedules.pmText
         property var location: null
@@ -778,7 +783,7 @@ Item {
         }
         onPicked: (h, m) => root.invoke("edit_value_field", { location: location, text: Schedules.stamp(h, m) })
     }
-    BwTimePicker {
+    TimePicker {
         id: dateTimePicker
         withDate: true
         use12h: Schedules.use12h; amText: Schedules.amText; pmText: Schedules.pmText

@@ -21,6 +21,7 @@
     "GlobalPicker.qml",
     "NamePicker.qml",
     "SchedulePicker.qml",
+    "TimePicker.qml",
     "Schedules.qml"
   ],
   "host_provided": ["TitleBarDrag.qml", "WindowControls.qml", "ScreenOverlay.qml"],
