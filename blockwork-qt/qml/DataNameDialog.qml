@@ -2,7 +2,9 @@ import QtQuick
 import QtQuick.Controls
 import com.blockworked.Blockstitch 1.0
 
-// Makes or renames a variable or a list in the current macro.
+// Makes or renames a variable or a list in the current macro. Not built on
+// blockstitch's NameDialog because it needs AppDialog's translated buttons and
+// window-shaped dimming.
 AppDialog {
     id: dialog
     required property Item page

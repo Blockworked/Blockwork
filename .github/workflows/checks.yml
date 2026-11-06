@@ -113,6 +113,13 @@ jobs:
       - name: Tests
         run: cargo test --workspace --exclude blockwork-linux-bridge
 
+      # The workspace's declared rust-version must really build it.
+      - name: Minimum Rust version
+        run: |
+          msrv=$(sed -n 's/^rust-version = "\(.*\)"/\1/p' Cargo.toml)
+          rustup toolchain install "$msrv" --profile minimal
+          cargo "+$msrv" check --workspace --exclude blockwork-linux-bridge
+
       # blockwork-ffi's build regenerates the C header the Geometry Dash mod
       # compiles against; a stale committed copy fails here.
       - name: FFI header is current
