@@ -128,61 +128,8 @@ Item {
     }
 
     // ---- screen picker: images for image blocks, points/regions for reporters ----
-    // { kind: "image" | "region", strandId, path, instruction }, { kind: "value", location, value, point }
-    property var pickRequest: null
-    property int savedVisibility: Window.Windowed
-    // Gives the compositor a moment to take a window off screen.
-    function afterUnmap(action) { unmapDelay.action = action; unmapDelay.restart(); }
-    Timer { id: unmapDelay; interval: 300; property var action: null; onTriggered: if (action) action() }
-    // Blocks whose region is in screen coordinates rather than a window's.
-    readonly property var screenRegionTypes: ["FindImage", "ClickImage", "WaitForImage"]
-    function startScreenPick(request) {
-        const win = Window.window;
-        if (pickRequest || !win) return;
-        pickRequest = request;
-        // Out of the way, so whatever is behind the editor can be picked.
-        savedVisibility = win.visibility;
-        win.hide();
-        const onScreen = request.kind === "region" && root.screenRegionTypes.indexOf((request.instruction || {}).type) >= 0;
-        const hint = onScreen ? qsTr("Drag out the part of the screen to search")
-            : request.kind === "value" ? (request.point ? qsTr("Click the point to read") : qsTr("Drag out the part of the screen to read"))
-            : { image: qsTr("Drag around the image to look for"), region: qsTr("Drag out the part of the window to search") }[request.kind];
-        const regionOnly = request.kind === "value" ? !request.point : true;
-        root.afterUnmap(() => screenOverlay.begin(regionOnly, hint));
-    }
-    function restoreWindow() {
-        const win = Window.window;
-        if (!win) return;
-        // show*() rather than assigning `visibility`, which fights the window's `visible` binding.
-        if (savedVisibility === Window.Maximized) win.showMaximized();
-        else if (savedVisibility === Window.FullScreen) win.showFullScreen();
-        else win.showNormal();
-        win.raise(); win.requestActivate();
-    }
-    ScreenOverlay {
-        id: screenOverlay
-        onCanceled: { root.pickRequest = null; root.restoreWindow(); }
-        onPicked: (x, y, width, height) => {
-            const request = root.pickRequest;
-            root.pickRequest = null;
-            if (request && request.kind === "region") { root.setBlockRegion(request, x, y, width, height); return; }
-            if (request && request.kind === "value") { root.setValueRegion(request, x, y, width, height); return; }
-            // Capture once the overlay itself is gone.
-            root.afterUnmap(() => root.daemonCall("screen_grab", { x: x, y: y, width: width, height: height }, (result, error) => {
-                root.restoreWindow();
-                if (!result) { pickError.show(error); return; }
-                if (request) root.setBlockImage(request, result.image);
-            }));
-        }
-    }
-    // A screen reporter's x, y (and width, height) from a pick, in screen coordinates.
-    function setValueRegion(request, x, y, width, height) {
-        root.restoreWindow();
-        const n = v => numberValue(Math.round(v));
-        const updated = JSON.parse(JSON.stringify(request.value));
-        updated.args = request.point ? [n(x), n(y)] : [n(x), n(y), n(width), n(height)];
-        root.invoke("put_value", { location: request.location, value: updated });
-    }
+    ScreenPicker { id: screenPicker; page: root; onFailed: message => pickError.show(message) }
+    function startScreenPick(request) { screenPicker.startScreenPick(request); }
     function setBlockDetector(request, detector) {
         const updated = JSON.parse(JSON.stringify(request.instruction || {}));
         updated.detector = textValue(detector);
@@ -197,27 +144,6 @@ Item {
         const updated = JSON.parse(JSON.stringify(request.instruction || {}));
         updated.image = image;
         root.invoke("edit_instruction", { strandId: request.strandId, path: request.path, instruction: updated });
-    }
-    // A detect block's region is stored relative to its window, so look the window up.
-    // An image block's is plain screen coordinates.
-    function setBlockRegion(request, x, y, width, height) {
-        root.restoreWindow();
-        const ins = request.instruction || {};
-        if (root.screenRegionTypes.indexOf(ins.type) >= 0) {
-            const updated = JSON.parse(JSON.stringify(ins));
-            updated.region = [x, y, width, height].map(Math.round).join(",");
-            root.invoke("edit_instruction", { strandId: request.strandId, path: request.path, instruction: updated });
-            return;
-        }
-        const pattern = ins.pattern && ins.pattern.kind === "Text" ? ins.pattern.value : null;
-        if (pattern === null) { pickError.show(qsTr("Type the window's name into the block to pick a region of it.")); return; }
-        root.daemonCall("window_bounds", { pattern: pattern, by: ins.by || "Title" }, (bounds, error) => {
-            if (!bounds) { pickError.show(error); return; }
-            const r = v => Math.round(v);
-            const updated = JSON.parse(JSON.stringify(ins));
-            updated.region = [r(x - bounds.x), r(y - bounds.y), r(width), r(height)].join(",");
-            root.invoke("edit_instruction", { strandId: request.strandId, path: request.path, instruction: updated });
-        });
     }
     function pickSignal(location, value) {
         const strand = canvas.strandById(location.strand_id);

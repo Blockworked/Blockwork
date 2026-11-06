@@ -8,6 +8,7 @@
     "MacroSettingsDialog.qml",
     "LaunchOptionsDialog.qml",
     "UsbDeviceDialog.qml",
+    "ScreenPicker.qml",
     "BlockCatalog.qml",
     "BlockHelp.qml",
     "MakeBlockDialog.qml",

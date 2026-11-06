@@ -4475,24 +4475,9 @@
         <translation>The color o&apos; the screen at a point, as #rrggbb. Use the spyglass in the toolbar to find coordinates.</translation>
     </message>
     <message>
-        <location filename="../qml/EditorPage.qml" line="259"/>
-        <source>Drag around the image to look for</source>
-        <translation>Drag around the treasure ye be lookin&apos; fer</translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="259"/>
-        <source>Drag out the part of the window to search</source>
-        <translation>Drag out the part o&apos; the window to search</translation>
-    </message>
-    <message>
         <location filename="../qml/EditorPage.qml" line="261"/>
         <source>Click a point or drag out a region</source>
         <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="324"/>
-        <source>Type the window&apos;s name into the block to pick a region of it.</source>
-        <translation>Type the window&apos;s name into the block to pick a region o&apos; it.</translation>
     </message>
     <message>
         <location filename="../qml/EditorPage.qml" line="391"/>
@@ -4762,21 +4747,6 @@
     <message>
         <location filename="../qml/EditorPage.qml" line="204"/>
         <source>A Blockwork block.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="257"/>
-        <source>Drag out the part of the screen to search</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="258"/>
-        <source>Click the point to read</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="258"/>
-        <source>Drag out the part of the screen to read</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -6906,6 +6876,39 @@
         <location filename="../qml/ScreenOverlay.qml" line="164"/>
         <source>Use selection</source>
         <translation>Use what ye spied</translation>
+    </message>
+</context>
+<context>
+    <name>ScreenPicker</name>
+    <message>
+        <location filename="../qml/ScreenPicker.qml" line="31"/>
+        <source>Drag out the part of the screen to search</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/ScreenPicker.qml" line="32"/>
+        <source>Click the point to read</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/ScreenPicker.qml" line="32"/>
+        <source>Drag out the part of the screen to read</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/ScreenPicker.qml" line="33"/>
+        <source>Drag around the image to look for</source>
+        <translation>Drag around the treasure ye be lookin&apos; fer</translation>
+    </message>
+    <message>
+        <location filename="../qml/ScreenPicker.qml" line="33"/>
+        <source>Drag out the part of the window to search</source>
+        <translation>Drag out the part o&apos; the window to search</translation>
+    </message>
+    <message>
+        <location filename="../qml/ScreenPicker.qml" line="82"/>
+        <source>Type the window&apos;s name into the block to pick a region of it.</source>
+        <translation>Type the window&apos;s name into the block to pick a region o&apos; it.</translation>
     </message>
 </context>
 <context>
