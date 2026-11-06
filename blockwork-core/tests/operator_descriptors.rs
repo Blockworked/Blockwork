@@ -2,7 +2,10 @@
 //! Blockwork's reporters as blockstitch describes them, and the copy the
 //! editor's QML carries (`BLESS=1` rewrites it).
 
-use blockwork_core::input::value::{host_operator_descriptors, register_blockwork_operators, render_descriptors_qml, replace_generated};
+use blockwork_core::input::value::{
+    host_operator_descriptors, register_blockwork_operators, render_descriptors_qml,
+    replace_generated,
+};
 
 #[test]
 fn every_reporter_has_a_slot_per_arg() {
@@ -17,18 +20,29 @@ fn every_reporter_has_a_slot_per_arg() {
 #[test]
 fn the_catalog_carries_the_current_table() {
     register_blockwork_operators();
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../blockwork-qt/qml/BlockCatalog.qml");
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../blockwork-qt/qml/BlockCatalog.qml"
+    );
     let text = std::fs::read_to_string(path).unwrap();
     let block = format!(
         "    readonly property var hostDescriptors: {}",
         render_descriptors_qml(&host_operator_descriptors(), "    ")
     );
-    let next = replace_generated(&text, "// BEGIN GENERATED operator descriptors", "// END GENERATED operator descriptors", &block)
-        .expect("markers in BlockCatalog.qml");
+    let next = replace_generated(
+        &text,
+        "// BEGIN GENERATED operator descriptors",
+        "// END GENERATED operator descriptors",
+        &block,
+    )
+    .expect("markers in BlockCatalog.qml");
     if std::env::var_os("BLESS").is_some() {
         std::fs::write(path, &next).unwrap();
     } else {
-        assert!(next == text, "BlockCatalog.qml's operator table is stale; rerun with BLESS=1");
+        assert!(
+            next == text,
+            "BlockCatalog.qml's operator table is stale; rerun with BLESS=1"
+        );
     }
 }
 

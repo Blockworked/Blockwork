@@ -9,8 +9,8 @@ fn typed_values_keep_numbers_as_numbers() {
     assert_eq!(typed_value("inf"), Evaluated::Text("inf".into()));
     assert_eq!(typed_value(""), Evaluated::Text(String::new()));
 }
-use crate::input::value::Evaluated;
 use crate::input::types::Coordinate;
+use crate::input::value::Evaluated;
 
 #[test]
 fn signal_names_migrate_and_unused_names_survive_round_trip() {
@@ -116,7 +116,9 @@ fn block_def_reads_current_shape_field() {
 fn open_app_launch_options_are_optional_and_round_trip() {
     let old = r#"{"OpenApp":{"command":"brave","name":"Brave","icon":null}}"#;
     let kind: InstructionKind = serde_json::from_str(old).unwrap();
-    let InstructionKind::OpenApp { launch, .. } = &kind else { panic!() };
+    let InstructionKind::OpenApp { launch, .. } = &kind else {
+        panic!()
+    };
     assert!(launch.is_empty());
     // Untouched blocks save the same shape as before.
     assert_eq!(serde_json::to_string(&kind).unwrap(), old);
@@ -124,11 +126,20 @@ fn open_app_launch_options_are_optional_and_round_trip() {
     let launch = LaunchOptions {
         args: "--incognito".into(),
         working_dir: "~/Downloads".into(),
-        env: vec![EnvVar { name: "LANG".into(), value: "C".into() }],
+        env: vec![EnvVar {
+            name: "LANG".into(),
+            value: "C".into(),
+        }],
         new_instance: true,
     };
-    let kind = InstructionKind::OpenApp { command: "brave".into(), name: "Brave".into(), icon: None, launch };
-    let back: InstructionKind = serde_json::from_str(&serde_json::to_string(&kind).unwrap()).unwrap();
+    let kind = InstructionKind::OpenApp {
+        command: "brave".into(),
+        name: "Brave".into(),
+        icon: None,
+        launch,
+    };
+    let back: InstructionKind =
+        serde_json::from_str(&serde_json::to_string(&kind).unwrap()).unwrap();
     assert_eq!(back, kind);
 }
 
@@ -140,8 +151,8 @@ fn block_def_round_trips_shape_through_serialize() {
         shape: BlockShape::Ending,
         color: default_block_color(),
         icon: String::new(),
-                identifier: String::new(),
-                description: String::new(),
+        identifier: String::new(),
+        description: String::new(),
     };
     let json = serde_json::to_string(&def).unwrap();
     assert!(
@@ -165,37 +176,66 @@ fn image_blocks_from_older_files_pick_the_best_match_anywhere() {
         r#"{"FindImage":{"image":"","tolerance":{"kind":"Number","value":10.0},"x_variable":"a","y_variable":"b"}}"#,
     )
     .unwrap();
-    let InstructionKind::FindImage { pick, region, count_variable, .. } = kind else { panic!("{kind:?}") };
+    let InstructionKind::FindImage {
+        pick,
+        region,
+        count_variable,
+        ..
+    } = kind
+    else {
+        panic!("{kind:?}")
+    };
     assert_eq!((pick, region, count_variable), (None, None, None));
     let kind: InstructionKind = serde_json::from_str(
         r#"{"WaitForImage":{"image":"","tolerance":{"kind":"Number","value":10.0},"appear":true,"timeout":{"kind":"Number","value":0.0}}}"#,
     )
     .unwrap();
-    assert!(matches!(kind, InstructionKind::WaitForImage { region: None, .. }));
+    assert!(matches!(
+        kind,
+        InstructionKind::WaitForImage { region: None, .. }
+    ));
 }
 
 #[test]
 fn browser_match_is_saved_only_once_added() {
-    let plain = InstructionKind::BrowserClick { selector: Value::text("button"), nth: None };
+    let plain = InstructionKind::BrowserClick {
+        selector: Value::text("button"),
+        nth: None,
+    };
     let text = serde_json::to_string(&plain).unwrap();
     assert!(!text.contains("nth"), "{text}");
-    let added = InstructionKind::BrowserType { text: Value::text("x"), selector: Value::text("focused"), nth: Some(Value::number(-1.0)) };
-    let back: InstructionKind = serde_json::from_str(&serde_json::to_string(&added).unwrap()).unwrap();
+    let added = InstructionKind::BrowserType {
+        text: Value::text("x"),
+        selector: Value::text("focused"),
+        nth: Some(Value::number(-1.0)),
+    };
+    let back: InstructionKind =
+        serde_json::from_str(&serde_json::to_string(&added).unwrap()).unwrap();
     assert_eq!(back, added);
     let dto = crate::frontend::instruction_to_dto(&Instruction::new(added.clone()));
-    assert_eq!(crate::frontend::dto_to_instruction(&dto).unwrap().kind, added);
+    assert_eq!(
+        crate::frontend::dto_to_instruction(&dto).unwrap().kind,
+        added
+    );
 }
 
 #[test]
 fn mouse_modifier_component_is_optional_and_preserves_saved_combos() {
-    for modifiers in [None, Some(Value::text("")), Some(Value::text("Control+Shift"))] {
+    for modifiers in [
+        None,
+        Some(Value::text("")),
+        Some(Value::text("Control+Shift")),
+    ] {
         let ins = Instruction::new(InstructionKind::WhenMouseButton {
             button: MacroButton::Back,
             pressed: true,
             modifiers: modifiers.clone(),
         });
         let json = serde_json::to_value(&ins.kind).unwrap();
-        assert_eq!(json["WhenMouseButton"].get("modifiers").is_some(), modifiers.is_some());
+        assert_eq!(
+            json["WhenMouseButton"].get("modifiers").is_some(),
+            modifiers.is_some()
+        );
         let loaded: InstructionKind = serde_json::from_value(json).unwrap();
         assert_eq!(loaded, ins.kind);
         let dto = crate::frontend::instruction_to_dto(&ins);
@@ -204,13 +244,16 @@ fn mouse_modifier_component_is_optional_and_preserves_saved_combos() {
         let dto = serde_json::from_value(json).unwrap();
         let mut loaded = crate::frontend::dto_to_instruction(&dto).unwrap();
         assert_eq!(loaded.kind, ins.kind);
-        assert_eq!(fields::value_slot_mut(&mut loaded.kind, fields::FieldId::MouseModifiers).is_some(), modifiers.is_some());
+        assert_eq!(
+            fields::value_slot_mut(&mut loaded.kind, fields::FieldId::MouseModifiers).is_some(),
+            modifiers.is_some()
+        );
     }
 }
 
 #[test]
 fn optional_wait_and_tolerance_components_round_trip() {
-    use crate::frontend::{dto_to_instruction, instruction_to_dto, InstructionDto};
+    use crate::frontend::{InstructionDto, dto_to_instruction, instruction_to_dto};
     for json in [
         r#"{"type":"WaitUntil","id":"wait","condition":{"kind":"Bool"}}"#,
         r#"{"type":"WaitForImage","id":"image","image":"","appear":true}"#,
@@ -220,38 +263,70 @@ fn optional_wait_and_tolerance_components_round_trip() {
         let dto: InstructionDto = serde_json::from_str(json).unwrap();
         let mut ins = dto_to_instruction(&dto).unwrap();
         let plain = serde_json::to_value(instruction_to_dto(&ins)).unwrap();
-        for key in ["timeout", "error_timeout", "tolerance"] { assert!(plain.get(key).is_none()); }
-        if let InstructionKind::WaitUntil { timeout, error_timeout, .. } | InstructionKind::WaitForImage { timeout, error_timeout, .. } = &mut ins.kind {
+        for key in ["timeout", "error_timeout", "tolerance"] {
+            assert!(plain.get(key).is_none());
+        }
+        if let InstructionKind::WaitUntil {
+            timeout,
+            error_timeout,
+            ..
+        }
+        | InstructionKind::WaitForImage {
+            timeout,
+            error_timeout,
+            ..
+        } = &mut ins.kind
+        {
             *timeout = Some(Value::number(10.0));
             *error_timeout = Some(Value::number(20.0));
         }
-        if let InstructionKind::FindImage { tolerance, .. } | InstructionKind::ClickImage { tolerance, .. } | InstructionKind::WaitForImage { tolerance, .. } = &mut ins.kind {
+        if let InstructionKind::FindImage { tolerance, .. }
+        | InstructionKind::ClickImage { tolerance, .. }
+        | InstructionKind::WaitForImage { tolerance, .. } = &mut ins.kind
+        {
             *tolerance = Some(Value::number(0.0));
         }
-        let loaded: InstructionKind = serde_json::from_str(&serde_json::to_string(&ins.kind).unwrap()).unwrap();
+        let loaded: InstructionKind =
+            serde_json::from_str(&serde_json::to_string(&ins.kind).unwrap()).unwrap();
         assert_eq!(loaded, ins.kind);
         let dto = instruction_to_dto(&ins);
-        let loaded: InstructionDto = serde_json::from_str(&serde_json::to_string(&dto).unwrap()).unwrap();
+        let loaded: InstructionDto =
+            serde_json::from_str(&serde_json::to_string(&dto).unwrap()).unwrap();
         assert_eq!(dto_to_instruction(&loaded).unwrap().kind, ins.kind);
     }
 }
 
 #[test]
 fn image_block_components_are_saved_only_once_added() {
-    let plain = InstructionKind::ClickImage { image: String::new(), tolerance: Some(Value::number(10.0)), button: MacroButton::Left, pick: None, region: None };
+    let plain = InstructionKind::ClickImage {
+        image: String::new(),
+        tolerance: Some(Value::number(10.0)),
+        button: MacroButton::Left,
+        pick: None,
+        region: None,
+    };
     let text = serde_json::to_string(&plain).unwrap();
     assert!(!text.contains("pick") && !text.contains("region"), "{text}");
     let added = InstructionKind::ClickImage {
         image: String::new(),
         tolerance: Some(Value::number(10.0)),
         button: MacroButton::Left,
-        pick: Some(ImageMatch { mode: ImagePick::NearPoint, index: Value::number(1.0), near_x: Value::number(5.0), near_y: Value::number(6.0) }),
+        pick: Some(ImageMatch {
+            mode: ImagePick::NearPoint,
+            index: Value::number(1.0),
+            near_x: Value::number(5.0),
+            near_y: Value::number(6.0),
+        }),
         region: Some("0,0,10,10".into()),
     };
-    let back: InstructionKind = serde_json::from_str(&serde_json::to_string(&added).unwrap()).unwrap();
+    let back: InstructionKind =
+        serde_json::from_str(&serde_json::to_string(&added).unwrap()).unwrap();
     assert_eq!(back, added);
     let dto = crate::frontend::instruction_to_dto(&Instruction::new(added.clone()));
-    assert_eq!(crate::frontend::dto_to_instruction(&dto).unwrap().kind, added);
+    assert_eq!(
+        crate::frontend::dto_to_instruction(&dto).unwrap().kind,
+        added
+    );
 }
 
 #[test]
@@ -298,11 +373,7 @@ fn detects_absolute_mouse_moves_in_nested_bodies() {
         .push(Instruction::new(InstructionKind::If {
             condition: Value::Bool,
             body: vec![Instruction::new(InstructionKind::Token(
-                InputToken::MoveMouse(
-                    Value::number(10.0),
-                    Value::number(20.0),
-                    Coordinate::Abs,
-                ),
+                InputToken::MoveMouse(Value::number(10.0), Value::number(20.0), Coordinate::Abs),
             ))],
         }));
 
@@ -584,8 +655,16 @@ fn legacy_wait_with_zero_randomness_migrates_to_plain_duration() {
 #[test]
 fn legacy_when_time_moves_its_clock_into_a_time_value() {
     use crate::input::schedule::Weekday;
-    let ins: Instruction = serde_json::from_str(r#"{"WhenTime":{"kind":"Weekly","weekday":"Monday","hour":7,"minute":5}}"#).unwrap();
-    let expected = InstructionKind::WhenTime(TimeSchedule::Weekly { weekday: Weekday::Monday }, Value::text("07:05"));
+    let ins: Instruction = serde_json::from_str(
+        r#"{"WhenTime":{"kind":"Weekly","weekday":"Monday","hour":7,"minute":5}}"#,
+    )
+    .unwrap();
+    let expected = InstructionKind::WhenTime(
+        TimeSchedule::Weekly {
+            weekday: Weekday::Monday,
+        },
+        Value::text("07:05"),
+    );
     assert_eq!(ins, Instruction::new(expected.clone()));
     // And the new shape reads back as itself.
     let round: Instruction = serde_json::from_str(&serde_json::to_string(&ins).unwrap()).unwrap();

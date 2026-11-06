@@ -6,11 +6,12 @@
 use std::collections::HashMap;
 
 use blockstitch_core::editor::{
-    Created, EditCommand, EditOutcome, EditSession, History, PathStep,
-    ValueBuffers, ValueDestination, ValueLocation, apply_buffer_effects, drop_strand_buffers,
+    Created, EditCommand, EditOutcome, EditSession, History, PathStep, ValueBuffers,
+    ValueDestination, ValueLocation, apply_buffer_effects, drop_strand_buffers,
     prune_value_buffers, retain_live_buffers,
 };
 use blockstitch_core::graph::{BlockKind, ListItem, resolve_list_reporters};
+use blockstitch_ffi::{Host, arg};
 use blockwork_core::block_packs;
 use blockwork_core::frontend::{
     FragmentDto, InstructionDto, InvalidFieldDto, KeyCaptureDto, ListItemDto, dto_to_fragment,
@@ -18,20 +19,19 @@ use blockwork_core::frontend::{
 };
 use blockwork_core::input::key_names::{format_key_combo, match_key};
 use blockwork_core::input::types::{InputToken, MacroKey};
-use blockwork_core::input::value::{Evaluated, Op, Value, has_side_effect_operator, is_pure_operator};
+use blockwork_core::input::value::{
+    Evaluated, Op, Value, has_side_effect_operator, is_pure_operator,
+};
 use blockwork_core::key_mapping::{web_code_to_macro_key, web_key_to_macro_key};
 use blockwork_core::macros::conditions::PowerCondition;
 use blockwork_core::macros::{
-    BlockDraft, Instruction, InstructionKind, Macro,
-    EDIT_CONTEXT, UndoSnapshot, clamp_speed, migrate,
+    BlockDraft, EDIT_CONTEXT, Instruction, InstructionKind, Macro, UndoSnapshot, clamp_speed,
+    migrate,
 };
-use blockstitch_ffi::{Host, arg};
 use serde::de::DeserializeOwned;
 use serde_json::{Value as Json, json};
 
 type Snapshot = UndoSnapshot;
-
-
 
 enum KeyCapture {
     Strand(String, Vec<PathStep>),
@@ -67,24 +67,76 @@ impl Default for Demo {
 
 /// Every command `dispatch` answers, for the page's contract check.
 pub const COMMANDS: &[&str] = &[
-    "load", "state", "commands", "preview_value",
-    "new_macro", "select_macro_by_id", "duplicate_macro", "delete_macro", "remove_macro", "set_macro_folder",
-    "set_title", "set_macro_speed_multiplier", "set_macro_always_listen", "set_macro_catch_up",
-    "set_macro_conditions", "set_macro_max_run_secs", "set_macro_max_loop_iterations", "set_palette_layout",
-    "add_strand", "remove_strand", "move_strand", "split_strand", "merge_strand", "merge_tail",
-    "clear_instructions", "set_recording_target",
-    "add_instruction", "edit_instruction", "remove_instruction", "delete_instruction", "reorder_instruction",
-    "copy_instructions", "paste_fragment", "paste_instructions", "duplicate_instruction",
-    "edit_value_field", "set_value_kind", "take_value", "put_value", "move_value",
-    "create_floating_value", "move_floating_value", "remove_floating_value",
-    "create_comment", "create_attached_comment", "move_comment", "edit_comment_text", "set_comment_collapsed",
+    "load",
+    "state",
+    "commands",
+    "preview_value",
+    "new_macro",
+    "select_macro_by_id",
+    "duplicate_macro",
+    "delete_macro",
+    "remove_macro",
+    "set_macro_folder",
+    "set_title",
+    "set_macro_speed_multiplier",
+    "set_macro_always_listen",
+    "set_macro_catch_up",
+    "set_macro_conditions",
+    "set_macro_max_run_secs",
+    "set_macro_max_loop_iterations",
+    "set_palette_layout",
+    "add_strand",
+    "remove_strand",
+    "move_strand",
+    "split_strand",
+    "merge_strand",
+    "merge_tail",
+    "clear_instructions",
+    "set_recording_target",
+    "add_instruction",
+    "edit_instruction",
+    "remove_instruction",
+    "delete_instruction",
+    "reorder_instruction",
+    "copy_instructions",
+    "paste_fragment",
+    "paste_instructions",
+    "duplicate_instruction",
+    "edit_value_field",
+    "set_value_kind",
+    "take_value",
+    "put_value",
+    "move_value",
+    "create_floating_value",
+    "move_floating_value",
+    "remove_floating_value",
+    "create_comment",
+    "create_attached_comment",
+    "move_comment",
+    "edit_comment_text",
+    "set_comment_collapsed",
     "remove_comment",
-    "create_variable", "rename_variable", "set_variable_value", "delete_variable",
-    "create_signal", "rename_signal", "delete_signal",
-    "create_list", "rename_list", "delete_list", "set_list_items", "set_list_editor_state",
-    "create_block", "edit_block", "delete_block",
-    "undo", "redo",
-    "start_key_capture", "start_standalone_key_capture", "key_capture_event", "clear_standalone_key_capture",
+    "create_variable",
+    "rename_variable",
+    "set_variable_value",
+    "delete_variable",
+    "create_signal",
+    "rename_signal",
+    "delete_signal",
+    "create_list",
+    "rename_list",
+    "delete_list",
+    "set_list_items",
+    "set_list_editor_state",
+    "create_block",
+    "edit_block",
+    "delete_block",
+    "undo",
+    "redo",
+    "start_key_capture",
+    "start_standalone_key_capture",
+    "key_capture_event",
+    "clear_standalone_key_capture",
 ];
 
 fn to_json<T: serde::Serialize>(value: T) -> Result<Json, String> {
@@ -101,7 +153,13 @@ fn instruction(dto: InstructionDto) -> Result<Instruction, String> {
 }
 
 /// Commands that only read; everything else saves like the app's `auto_save`.
-const READS: &[&str] = &["state", "commands", "preview_value", "copy_instructions", "select_macro_by_id"];
+const READS: &[&str] = &[
+    "state",
+    "commands",
+    "preview_value",
+    "copy_instructions",
+    "select_macro_by_id",
+];
 
 impl Host for Demo {
     fn dispatch(&mut self, command: &str, args: &Json) -> Result<Json, String> {
@@ -149,7 +207,11 @@ impl Demo {
             }
             "select_macro_by_id" => {
                 let id: String = arg(a, "id")?;
-                let index = self.macros.iter().position(|m| m.id == id).ok_or("Macro not found")?;
+                let index = self
+                    .macros
+                    .iter()
+                    .position(|m| m.id == id)
+                    .ok_or("Macro not found")?;
                 self.select(Some(index));
                 Ok(Json::Null)
             }
@@ -161,7 +223,11 @@ impl Demo {
             }
             "delete_macro" => {
                 let id: String = arg(a, "id")?;
-                let index = self.macros.iter().position(|m| m.id == id).ok_or("Macro not found")?;
+                let index = self
+                    .macros
+                    .iter()
+                    .position(|m| m.id == id)
+                    .ok_or("Macro not found")?;
                 self.delete(index);
                 Ok(Json::Null)
             }
@@ -173,7 +239,11 @@ impl Demo {
             }
             "set_macro_folder" => {
                 let (id, folder): (String, String) = (arg(a, "id")?, arg(a, "folder")?);
-                let index = self.macros.iter().position(|m| m.id == id).ok_or("Macro not found")?;
+                let index = self
+                    .macros
+                    .iter()
+                    .position(|m| m.id == id)
+                    .ok_or("Macro not found")?;
                 self.macros[index].settings.folder = blockwork_core::macros::clean_folder(&folder);
                 Ok(Json::Null)
             }
@@ -205,10 +275,12 @@ impl Demo {
             "set_macro_conditions" => {
                 let window: String = arg(a, "onlyInWindow")?;
                 let power: PowerCondition = arg(a, "power")?;
-                let (from, until): (String, String) = (arg(a, "activeFrom")?, arg(a, "activeUntil")?);
+                let (from, until): (String, String) =
+                    (arg(a, "activeFrom")?, arg(a, "activeUntil")?);
                 let days: u8 = arg(a, "activeDays")?;
                 if let Some(mac) = self.open_mut() {
-                    mac.settings.set_conditions(&window, power, &from, &until, days)?;
+                    mac.settings
+                        .set_conditions(&window, power, &from, &until, days)?;
                 }
                 Ok(Json::Null)
             }
@@ -228,7 +300,11 @@ impl Demo {
             }
             "set_palette_layout" => {
                 let layout: String = arg(a, "layout")?;
-                self.palette_layout = if layout == "drawer" { layout } else { "rail".into() };
+                self.palette_layout = if layout == "drawer" {
+                    layout
+                } else {
+                    "rail".into()
+                };
                 Ok(Json::Null)
             }
 
@@ -255,23 +331,29 @@ impl Demo {
                 Ok(Json::Null)
             }
             "move_strand" => {
-                let (strand_id, x, y): (String, i32, i32) = (arg(a, "strandId")?, arg(a, "x")?, arg(a, "y")?);
+                let (strand_id, x, y): (String, i32, i32) =
+                    (arg(a, "strandId")?, arg(a, "x")?, arg(a, "y")?);
                 if let Some(mac) = self.open_mut() {
                     mac.move_strand(&strand_id, x, y);
                 }
                 Ok(Json::Null)
             }
             "split_strand" => {
-                let (strand_id, path): (String, Vec<PathStep>) = (arg(a, "strandId")?, arg(a, "path")?);
+                let (strand_id, path): (String, Vec<PathStep>) =
+                    (arg(a, "strandId")?, arg(a, "path")?);
                 let (x, y): (i32, i32) = (arg(a, "x")?, arg(a, "y")?);
                 self.open()?;
                 self.push_undo();
-                let id = self.open_mut().ok_or("No macro selected")?.split_strand(&strand_id, &path, x, y)?;
+                let id = self
+                    .open_mut()
+                    .ok_or("No macro selected")?
+                    .split_strand(&strand_id, &path, x, y)?;
                 self.buffers.clear();
                 to_json(id)
             }
             "merge_strand" => {
-                let (dragged, target): (String, String) = (arg(a, "draggedId")?, arg(a, "targetId")?);
+                let (dragged, target): (String, String) =
+                    (arg(a, "draggedId")?, arg(a, "targetId")?);
                 let path: Vec<PathStep> = arg(a, "path")?;
                 // Validated on a copy, so a rejected drop costs no undo step.
                 let mut graph = self.open()?.graph.clone();
@@ -282,8 +364,10 @@ impl Demo {
                 Ok(Json::Null)
             }
             "merge_tail" => {
-                let (strand_id, path): (String, Vec<PathStep>) = (arg(a, "strandId")?, arg(a, "path")?);
-                let (target_id, target_path): (String, Vec<PathStep>) = (arg(a, "targetId")?, arg(a, "targetPath")?);
+                let (strand_id, path): (String, Vec<PathStep>) =
+                    (arg(a, "strandId")?, arg(a, "path")?);
+                let (target_id, target_path): (String, Vec<PathStep>) =
+                    (arg(a, "targetId")?, arg(a, "targetPath")?);
                 let mut graph = self.open()?.graph.clone();
                 graph.merge_tail(&strand_id, &path, &target_id, &target_path)?;
                 self.push_undo();
@@ -311,7 +395,8 @@ impl Demo {
 
             // Instructions
             "add_instruction" => {
-                let (strand_id, path): (String, Vec<PathStep>) = (arg(a, "strandId")?, arg(a, "path")?);
+                let (strand_id, path): (String, Vec<PathStep>) =
+                    (arg(a, "strandId")?, arg(a, "path")?);
                 let ins = instruction(arg(a, "instruction")?)?;
                 self.open()?.check_insert(&strand_id, &path, &ins)?;
                 self.push_undo();
@@ -323,11 +408,14 @@ impl Demo {
                 Ok(Json::Null)
             }
             "edit_instruction" => {
-                let (strand_id, path): (String, Vec<PathStep>) = (arg(a, "strandId")?, arg(a, "path")?);
+                let (strand_id, path): (String, Vec<PathStep>) =
+                    (arg(a, "strandId")?, arg(a, "path")?);
                 let ins = instruction(arg(a, "instruction")?)?;
                 // Freeform text coalesces keystrokes into one step, as in the app.
-                let session = ins.kind.edits_as_text()
-                    .then(|| EditSession::Instruction { strand_id: strand_id.clone(), index: path.clone() });
+                let session = ins.kind.edits_as_text().then(|| EditSession::Instruction {
+                    strand_id: strand_id.clone(),
+                    index: path.clone(),
+                });
                 self.push_undo_for(session);
                 if let Some(mac) = self.open_mut() {
                     mac.replace_instruction(&strand_id, &path, ins);
@@ -335,14 +423,20 @@ impl Demo {
                 Ok(Json::Null)
             }
             "remove_instruction" => {
-                let (strand_id, path): (String, Vec<PathStep>) = (arg(a, "strandId")?, arg(a, "path")?);
+                let (strand_id, path): (String, Vec<PathStep>) =
+                    (arg(a, "strandId")?, arg(a, "path")?);
                 let count: Option<usize> = arg(a, "count")?;
                 // A path addressing nothing is no step and no error.
-                let _ = self.run_edit(EditCommand::RemoveInstructions { strand_id, path, count: count.unwrap_or(1) });
+                let _ = self.run_edit(EditCommand::RemoveInstructions {
+                    strand_id,
+                    path,
+                    count: count.unwrap_or(1),
+                });
                 Ok(Json::Null)
             }
             "delete_instruction" => {
-                let (strand_id, path): (String, Vec<PathStep>) = (arg(a, "strandId")?, arg(a, "path")?);
+                let (strand_id, path): (String, Vec<PathStep>) =
+                    (arg(a, "strandId")?, arg(a, "path")?);
                 let (x, y): (i32, i32) = (arg(a, "x")?, arg(a, "y")?);
                 let mut graph = self.open()?.graph.clone();
                 let Ok(new_id) = graph.delete_instruction(&strand_id, &path, x, y) else {
@@ -354,7 +448,8 @@ impl Demo {
                 to_json(new_id)
             }
             "reorder_instruction" => {
-                let (strand_id, path): (String, Vec<PathStep>) = (arg(a, "strandId")?, arg(a, "path")?);
+                let (strand_id, path): (String, Vec<PathStep>) =
+                    (arg(a, "strandId")?, arg(a, "path")?);
                 let direction: i32 = arg(a, "direction")?;
                 let mut graph = self.open()?.graph.clone();
                 if graph.reorder_instruction(&strand_id, &path, direction) {
@@ -365,16 +460,22 @@ impl Demo {
                 Ok(Json::Null)
             }
             "copy_instructions" => {
-                let (strand_id, path): (String, Vec<PathStep>) = (arg(a, "strandId")?, arg(a, "path")?);
+                let (strand_id, path): (String, Vec<PathStep>) =
+                    (arg(a, "strandId")?, arg(a, "path")?);
                 let count: Option<usize> = arg(a, "count")?;
-                to_json(fragment_to_dto(&self.open()?.copy_fragment(&strand_id, &path, count)?))
+                to_json(fragment_to_dto(
+                    &self.open()?.copy_fragment(&strand_id, &path, count)?,
+                ))
             }
             "paste_fragment" | "paste_instructions" => {
                 let (x, y): (i32, i32) = (arg(a, "x")?, arg(a, "y")?);
                 let fragment: FragmentDto = if command == "paste_fragment" {
                     arg(a, "fragment")?
                 } else {
-                    FragmentDto { instructions: arg(a, "instructions")?, comments: Vec::new() }
+                    FragmentDto {
+                        instructions: arg(a, "instructions")?,
+                        comments: Vec::new(),
+                    }
                 };
                 let fragment = dto_to_fragment(&fragment).ok_or("Unknown instruction type")?;
                 let outcome = self.run_edit(EditCommand::PasteFragment { fragment, x, y })?;
@@ -388,14 +489,16 @@ impl Demo {
                     .ok_or_else(|| "Nothing was pasted".to_string())
             }
             "duplicate_instruction" => {
-                let (strand_id, path): (String, Vec<PathStep>) = (arg(a, "strandId")?, arg(a, "path")?);
+                let (strand_id, path): (String, Vec<PathStep>) =
+                    (arg(a, "strandId")?, arg(a, "path")?);
                 self.run_edit(EditCommand::DuplicateInstruction { strand_id, path })?;
                 Ok(Json::Null)
             }
 
             // Values
             "edit_value_field" => {
-                let (location, text): (ValueLocation, String) = (arg(a, "location")?, arg(a, "text")?);
+                let (location, text): (ValueLocation, String) =
+                    (arg(a, "location")?, arg(a, "text")?);
                 // A location that no longer resolves is quietly ignored, as in the app.
                 let _ = self.run_edit(EditCommand::EditFieldText { location, text });
                 Ok(Json::Null)
@@ -414,7 +517,8 @@ impl Demo {
                 Ok(Json::Null)
             }
             "set_value_kind" => {
-                let (location, kind): (ValueLocation, String) = (arg(a, "location")?, arg(a, "kind")?);
+                let (location, kind): (ValueLocation, String) =
+                    (arg(a, "location")?, arg(a, "kind")?);
                 self.push_undo();
                 let env = self.variable_values();
                 let result = match self.open_mut() {
@@ -432,7 +536,8 @@ impl Demo {
                 to_json(taken.ok_or("Nothing to take at that location")?)
             }
             "put_value" => {
-                let (location, value): (ValueLocation, Value) = (arg(a, "location")?, arg(a, "value")?);
+                let (location, value): (ValueLocation, Value) =
+                    (arg(a, "location")?, arg(a, "value")?);
                 self.push_undo();
                 if let Some(mac) = self.open_mut() {
                     mac.put_value(&location, value);
@@ -441,14 +546,20 @@ impl Demo {
                 Ok(Json::Null)
             }
             "create_floating_value" => {
-                let (x, y, value): (i32, i32, Value) = (arg(a, "x")?, arg(a, "y")?, arg(a, "value")?);
+                let (x, y, value): (i32, i32, Value) =
+                    (arg(a, "x")?, arg(a, "y")?, arg(a, "value")?);
                 let origin: Option<String> = arg(a, "originBlockId")?;
                 self.open()?;
                 self.push_undo();
-                to_json(self.open_mut().ok_or("No macro selected")?.add_floating_value(x, y, value, origin))
+                to_json(
+                    self.open_mut()
+                        .ok_or("No macro selected")?
+                        .add_floating_value(x, y, value, origin),
+                )
             }
             "move_floating_value" => {
-                let (id, x, y): (String, i32, i32) = (arg(a, "floatingId")?, arg(a, "x")?, arg(a, "y")?);
+                let (id, x, y): (String, i32, i32) =
+                    (arg(a, "floatingId")?, arg(a, "x")?, arg(a, "y")?);
                 if let Some(mac) = self.open_mut() {
                     mac.move_floating_value(&id, x, y);
                 }
@@ -473,10 +584,15 @@ impl Demo {
                 };
                 self.open()?;
                 self.push_undo();
-                to_json(self.open_mut().ok_or("No macro selected")?.add_comment(x, y, text, attached))
+                to_json(
+                    self.open_mut()
+                        .ok_or("No macro selected")?
+                        .add_comment(x, y, text, attached),
+                )
             }
             "move_comment" => {
-                let (id, x, y): (String, i32, i32) = (arg(a, "commentId")?, arg(a, "x")?, arg(a, "y")?);
+                let (id, x, y): (String, i32, i32) =
+                    (arg(a, "commentId")?, arg(a, "x")?, arg(a, "y")?);
                 if let Some(mac) = self.open_mut() {
                     mac.move_comment(&id, x, y);
                 }
@@ -484,7 +600,9 @@ impl Demo {
             }
             "edit_comment_text" => {
                 let (id, text): (String, String) = (arg(a, "commentId")?, arg(a, "text")?);
-                self.push_undo_for(Some(EditSession::Comment { comment_id: id.clone() }));
+                self.push_undo_for(Some(EditSession::Comment {
+                    comment_id: id.clone(),
+                }));
                 if let Some(mac) = self.open_mut() {
                     mac.set_comment_text(&id, text);
                 }
@@ -509,7 +627,9 @@ impl Demo {
             // Variables, signals and lists
             "create_variable" => {
                 let name: String = arg(a, "name")?;
-                self.open_mut().ok_or("No macro selected")?.create_variable(&name)?;
+                self.open_mut()
+                    .ok_or("No macro selected")?
+                    .create_variable(&name)?;
                 Ok(Json::Null)
             }
             "rename_variable" => {
@@ -524,19 +644,26 @@ impl Demo {
             "set_variable_value" => {
                 let (name, value): (String, String) = (arg(a, "name")?, arg(a, "value")?);
                 let value = blockwork_core::macros::typed_value(&value);
-                self.open_mut().ok_or("No macro selected")?.set_variable_value(&name, value)?;
+                self.open_mut()
+                    .ok_or("No macro selected")?
+                    .set_variable_value(&name, value)?;
                 Ok(Json::Null)
             }
             "delete_variable" => {
                 let name: String = arg(a, "name")?;
-                self.open_mut().ok_or("No macro selected")?.remove_variable(&name);
+                self.open_mut()
+                    .ok_or("No macro selected")?
+                    .remove_variable(&name);
                 Ok(Json::Null)
             }
             "create_signal" => {
                 let name: String = arg(a, "name")?;
                 let name = self.open()?.validate_signal_name(&name, None)?;
                 self.push_undo();
-                self.open_mut().ok_or("No macro selected")?.signals.push(name);
+                self.open_mut()
+                    .ok_or("No macro selected")?
+                    .signals
+                    .push(name);
                 Ok(Json::Null)
             }
             "rename_signal" => {
@@ -548,7 +675,9 @@ impl Demo {
                 }
                 if name != old {
                     self.push_undo();
-                    self.open_mut().ok_or("No macro selected")?.rename_signal(&old, &name)?;
+                    self.open_mut()
+                        .ok_or("No macro selected")?
+                        .rename_signal(&old, &name)?;
                 }
                 Ok(Json::Null)
             }
@@ -556,14 +685,19 @@ impl Demo {
                 let name: String = arg(a, "name")?;
                 self.open()?.check_signal_deletable(&name)?;
                 self.push_undo();
-                self.open_mut().ok_or("No macro selected")?.signals.retain(|s| s != &name);
+                self.open_mut()
+                    .ok_or("No macro selected")?
+                    .signals
+                    .retain(|s| s != &name);
                 Ok(Json::Null)
             }
             "create_list" => {
                 let name: String = arg(a, "name")?;
                 self.open()?.check_list_name(&name, None)?;
                 self.push_undo();
-                self.open_mut().ok_or("No macro selected")?.add_list(&name)?;
+                self.open_mut()
+                    .ok_or("No macro selected")?
+                    .add_list(&name)?;
                 Ok(Json::Null)
             }
             "rename_list" => {
@@ -571,7 +705,10 @@ impl Demo {
                 let trimmed = self.open()?.check_list_name(&new, Some(&old))?;
                 if trimmed != old {
                     self.push_undo();
-                    self.open_mut().ok_or("No macro selected")?.graph.rename_list(&old, &trimmed)?;
+                    self.open_mut()
+                        .ok_or("No macro selected")?
+                        .graph
+                        .rename_list(&old, &trimmed)?;
                 }
                 Ok(Json::Null)
             }
@@ -579,38 +716,55 @@ impl Demo {
                 let name: String = arg(a, "name")?;
                 if self.open()?.lists.iter().any(|list| list.name == name) {
                     self.push_undo();
-                    self.open_mut().ok_or("No macro selected")?.graph.remove_list(&name);
+                    self.open_mut()
+                        .ok_or("No macro selected")?
+                        .graph
+                        .remove_list(&name);
                 }
                 Ok(Json::Null)
             }
             "set_list_items" => {
                 let (name, items): (String, Vec<ListItemDto>) = (arg(a, "name")?, arg(a, "items")?);
                 let items: Vec<ListItem> = items.iter().map(dto_to_list_item).collect();
-                self.open_mut().ok_or("No macro selected")?.graph.set_list_items(&name, items)?;
+                self.open_mut()
+                    .ok_or("No macro selected")?
+                    .graph
+                    .set_list_items(&name, items)?;
                 Ok(Json::Null)
             }
             "set_list_editor_state" => {
                 let (name, visible): (String, bool) = (arg(a, "name")?, arg(a, "visible")?);
                 let (x, y): (i32, i32) = (arg(a, "x")?, arg(a, "y")?);
-                self.open_mut().ok_or("No macro selected")?.graph.set_list_editor_state(&name, visible, x, y)?;
+                self.open_mut()
+                    .ok_or("No macro selected")?
+                    .graph
+                    .set_list_editor_state(&name, visible, x, y)?;
                 Ok(Json::Null)
             }
 
             // Custom blocks
             "create_block" => {
-                let draft: BlockDraft = serde_json::from_value(a.clone()).map_err(|e| e.to_string())?;
+                let draft: BlockDraft =
+                    serde_json::from_value(a.clone()).map_err(|e| e.to_string())?;
                 let position = arg::<Option<i32>>(a, "x")?.zip(arg::<Option<i32>>(a, "y")?);
                 draft.check()?;
                 self.open()?;
                 self.push_undo();
-                to_json(self.open_mut().ok_or("No macro selected")?.add_block(draft, position)?)
+                to_json(
+                    self.open_mut()
+                        .ok_or("No macro selected")?
+                        .add_block(draft, position)?,
+                )
             }
             "edit_block" => {
                 let block_id: String = arg(a, "blockId")?;
-                let draft: BlockDraft = serde_json::from_value(a.clone()).map_err(|e| e.to_string())?;
+                let draft: BlockDraft =
+                    serde_json::from_value(a.clone()).map_err(|e| e.to_string())?;
                 self.open()?.check_block_edit(&block_id, &draft)?;
                 self.push_undo();
-                self.open_mut().ok_or("No macro selected")?.edit_block(&block_id, draft)?;
+                self.open_mut()
+                    .ok_or("No macro selected")?
+                    .edit_block(&block_id, draft)?;
                 Ok(Json::Null)
             }
             "delete_block" => {
@@ -619,15 +773,22 @@ impl Demo {
                 self.push_undo();
                 if let Some(mac) = self.open_mut() {
                     mac.remove_block(&block_id);
-                    let surviving: Vec<String> = mac.strands.iter().map(|st| st.id.clone()).collect();
+                    let surviving: Vec<String> =
+                        mac.strands.iter().map(|st| st.id.clone()).collect();
                     retain_live_buffers(&mut self.buffers, &surviving);
                 }
                 Ok(Json::Null)
             }
 
             "undo" | "redo" => {
-                let step = if command == "undo" { History::undo } else { History::redo };
-                let Some(index) = self.selected else { return Ok(Json::Null) };
+                let step = if command == "undo" {
+                    History::undo
+                } else {
+                    History::redo
+                };
+                let Some(index) = self.selected else {
+                    return Ok(Json::Null);
+                };
                 let mac = &mut self.macros[index];
                 if let Some(restored) = step(&mut self.history, mac.undo_snapshot()) {
                     mac.restore_undo_snapshot(restored);
@@ -676,7 +837,9 @@ fn needs_app(value: &Value) -> bool {
 
 impl Demo {
     fn open(&self) -> Result<&Macro, String> {
-        self.selected.and_then(|i| self.macros.get(i)).ok_or_else(|| "No macro selected".to_string())
+        self.selected
+            .and_then(|i| self.macros.get(i))
+            .ok_or_else(|| "No macro selected".to_string())
     }
 
     fn open_mut(&mut self) -> Option<&mut Macro> {
@@ -684,7 +847,10 @@ impl Demo {
     }
 
     fn find(&self, id: &str) -> Result<&Macro, String> {
-        self.macros.iter().find(|m| m.id == id).ok_or_else(|| "Macro not found".to_string())
+        self.macros
+            .iter()
+            .find(|m| m.id == id)
+            .ok_or_else(|| "Macro not found".to_string())
     }
 
     fn select(&mut self, index: Option<usize>) {
@@ -733,7 +899,10 @@ impl Demo {
     }
 
     fn push_undo_for(&mut self, session: Option<EditSession>) {
-        let snapshot = self.selected.and_then(|i| self.macros.get(i)).map(Self::snapshot);
+        let snapshot = self
+            .selected
+            .and_then(|i| self.macros.get(i))
+            .map(Self::snapshot);
         match (snapshot, session) {
             (Some(snapshot), Some(session)) => {
                 self.history.push_for_session(snapshot, session);
@@ -746,9 +915,18 @@ impl Demo {
     /// One typed edit: a rejected or no-op edit costs no undo step;
     /// buffers follow the outcome either way.
     fn run_edit(&mut self, command: EditCommand<InstructionKind>) -> Result<EditOutcome, String> {
-        let index = self.selected.filter(|&i| i < self.macros.len()).ok_or("No macro selected")?;
-        let outcome = blockstitch_ffi::run_edit(&mut self.macros[index], &mut self.history, Self::snapshot, command, &EDIT_CONTEXT)
-            .map_err(String::from)?;
+        let index = self
+            .selected
+            .filter(|&i| i < self.macros.len())
+            .ok_or("No macro selected")?;
+        let outcome = blockstitch_ffi::run_edit(
+            &mut self.macros[index],
+            &mut self.history,
+            Self::snapshot,
+            command,
+            &EDIT_CONTEXT,
+        )
+        .map_err(String::from)?;
         apply_buffer_effects(&mut self.buffers, &outcome.buffers);
         Ok(outcome)
     }
@@ -756,7 +934,14 @@ impl Demo {
     /// Variables at their declared values, which is what the app's preview
     /// reads while nothing runs.
     fn variable_values(&self) -> HashMap<String, Evaluated> {
-        self.open().map(|mac| mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect()).unwrap_or_default()
+        self.open()
+            .map(|mac| {
+                mac.variables
+                    .iter()
+                    .map(|v| (v.name.clone(), v.value.clone()))
+                    .collect()
+            })
+            .unwrap_or_default()
     }
 
     /// The app's click-to-preview over the shared evaluator. Host reporters
@@ -768,8 +953,15 @@ impl Demo {
         if needs_app(&value) {
             return Err("This reporter needs the Blockwork app to show a value".into());
         }
-        let lists: HashMap<String, Vec<ListItem>> =
-            self.open().map(|mac| mac.lists.iter().map(|l| (l.name.clone(), l.items.clone())).collect()).unwrap_or_default();
+        let lists: HashMap<String, Vec<ListItem>> = self
+            .open()
+            .map(|mac| {
+                mac.lists
+                    .iter()
+                    .map(|l| (l.name.clone(), l.items.clone()))
+                    .collect()
+            })
+            .unwrap_or_default();
         resolve_list_reporters(&value.resolve_vars(&self.variable_values()), &lists)?.eval_text()
     }
 
@@ -790,7 +982,9 @@ impl Demo {
             Some(KeyCapture::Strand(strand_id, path)) => {
                 if let Some(mac) = self.open_mut()
                     && let Some(Instruction {
-                        kind: InstructionKind::Token(InputToken::Key(value, _)) | InstructionKind::WhenKey(value, _),
+                        kind:
+                            InstructionKind::Token(InputToken::Key(value, _))
+                            | InstructionKind::WhenKey(value, _),
                         ..
                     }) = mac.instruction_at_mut(&strand_id, &path)
                 {
@@ -809,7 +1003,10 @@ impl Demo {
         let buffers: Vec<InvalidFieldDto> = self
             .buffers
             .iter()
-            .map(|(location, text)| InvalidFieldDto { location: location.clone(), text: text.clone() })
+            .map(|(location, text)| InvalidFieldDto {
+                location: location.clone(),
+                text: text.clone(),
+            })
             .collect();
         let key_capture = self.key_capture.as_ref().map(|target| match target {
             KeyCapture::Strand(strand_id, index) => KeyCaptureDto {
@@ -817,7 +1014,11 @@ impl Demo {
                 strand_id: Some(strand_id.clone()),
                 index: Some(index.clone()),
             },
-            KeyCapture::Standalone => KeyCaptureDto { kind: "Standalone".into(), strand_id: None, index: None },
+            KeyCapture::Standalone => KeyCaptureDto {
+                kind: "Standalone".into(),
+                strand_id: None,
+                index: None,
+            },
         });
         let library: Vec<Json> = self
             .macros

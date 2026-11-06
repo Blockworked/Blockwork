@@ -92,7 +92,9 @@ pub(crate) fn key_names_match(configured: &str, captured: &str) -> bool {
         }
     }
     #[cfg(not(target_os = "macos"))]
-    fn canonical(name: &str) -> &str { name }
+    fn canonical(name: &str) -> &str {
+        name
+    }
     canonical(configured) == canonical(captured)
 }
 
@@ -102,7 +104,11 @@ mod keyboard_alias_tests {
 
     #[test]
     fn pc_key_hotkeys_follow_the_platform_keyboard_translation() {
-        for (pc, native) in [("PrintScreen", "F13"), ("ScrollLock", "F14"), ("Pause", "F15")] {
+        for (pc, native) in [
+            ("PrintScreen", "F13"),
+            ("ScrollLock", "F14"),
+            ("Pause", "F15"),
+        ] {
             assert!(key_names_match(pc, pc));
             assert_eq!(key_names_match(pc, native), cfg!(target_os = "macos"));
             assert_eq!(key_names_match(native, pc), cfg!(target_os = "macos"));

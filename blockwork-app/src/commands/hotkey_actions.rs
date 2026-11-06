@@ -2,11 +2,7 @@
 
 use super::*;
 
-pub(crate) fn handle_hotkey_action(
-    state: &SharedState,
-    app: &AppHandle,
-    action: HotkeyAction,
-) {
+pub(crate) fn handle_hotkey_action(state: &SharedState, app: &AppHandle, action: HotkeyAction) {
     match &action {
         HotkeyAction::RunMacro | HotkeyAction::RunSpecificMacro(_) => {
             let s = match state.lock() {

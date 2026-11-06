@@ -3,7 +3,11 @@
 use super::*;
 
 /// Runs one variable or list block. `Some(flow)` ends the strand with it; `None` goes on to the next block.
-pub(super) fn run_data_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32) -> Result<Option<Flow>, String> {
+pub(super) fn run_data_block(
+    ins: &Instruction,
+    ctx: &mut ExecCtx,
+    depth: u32,
+) -> Result<Option<Flow>, String> {
     match &ins.kind {
         InstructionKind::SetVariable(name, value) => {
             match ctx.resolve(value, depth).and_then(|v| v.eval()) {
@@ -53,7 +57,12 @@ pub(super) fn run_data_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32) -
                             }
                         }
                     }
-                    None => soft_fail(ctx, &ins.id, "Add to list", "list items must be number or text")?,
+                    None => soft_fail(
+                        ctx,
+                        &ins.id,
+                        "Add to list",
+                        "list items must be number or text",
+                    )?,
                 },
                 Err(e) => soft_fail(ctx, &ins.id, "Add to list", e)?,
             }
@@ -113,9 +122,12 @@ pub(super) fn run_data_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32) -
                             }
                         }
                     }
-                    None => {
-                        soft_fail(ctx, &ins.id, "Insert into list", "list items must be number or text")?
-                    }
+                    None => soft_fail(
+                        ctx,
+                        &ins.id,
+                        "Insert into list",
+                        "list items must be number or text",
+                    )?,
                 },
                 (Err(e), _) | (_, Err(e)) => soft_fail(ctx, &ins.id, "Insert into list", e)?,
             }
@@ -134,9 +146,12 @@ pub(super) fn run_data_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32) -
                             }
                         }
                     }
-                    None => {
-                        soft_fail(ctx, &ins.id, "Replace list item", "list items must be number or text")?
-                    }
+                    None => soft_fail(
+                        ctx,
+                        &ins.id,
+                        "Replace list item",
+                        "list items must be number or text",
+                    )?,
                 },
                 (Err(e), _) | (_, Err(e)) => soft_fail(ctx, &ins.id, "Replace list item", e)?,
             }

@@ -26,7 +26,11 @@ pub(crate) fn grab(x: f64, y: f64, width: f64, height: f64) -> Result<PickDto, S
 fn pick_from(shot: &Shot, x: f64, y: f64, width: f64, height: f64) -> Result<PickDto, String> {
     let (width, height) = (width.max(0.0), height.max(0.0));
     let region = width > 0.0 && height > 0.0;
-    let image = if region { shot.region(x, y, width, height)?.to_data_uri()? } else { String::new() };
+    let image = if region {
+        shot.region(x, y, width, height)?.to_data_uri()?
+    } else {
+        String::new()
+    };
     let (px, py) = shot.to_image(x + width / 2.0, y + height / 2.0);
     if px < 0 || py < 0 || px >= shot.image.width as i64 || py >= shot.image.height as i64 {
         return Err(format!("{x},{y} is off screen"));
@@ -57,10 +61,17 @@ mod tests {
         let mut image = Image::new(400, 200);
         let i = (21 * 400 + 30) * 4;
         image.rgba[i..i + 3].copy_from_slice(&[255, 0, 0]);
-        let shot = Shot { image, origin: (-100.0, 0.0), scale: 2.0 };
+        let shot = Shot {
+            image,
+            origin: (-100.0, 0.0),
+            scale: 2.0,
+        };
 
         let point = pick_from(&shot, -85.0, 10.5, 0.0, 0.0).unwrap();
-        assert_eq!((point.x, point.y, point.width, point.height), (-85, 11, 0, 0));
+        assert_eq!(
+            (point.x, point.y, point.width, point.height),
+            (-85, 11, 0, 0)
+        );
         assert_eq!(point.color, "#ff0000");
         assert!(point.image.is_empty());
 

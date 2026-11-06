@@ -3,22 +3,24 @@ pub mod backoff;
 #[cfg(feature = "system")]
 pub mod battery;
 pub mod block_packs;
-pub mod capabilities;
 #[cfg(feature = "system")]
 pub mod browser;
+pub mod capabilities;
 #[cfg(feature = "system")]
 pub mod clipboard;
 #[cfg(feature = "system")]
 pub mod config;
+#[cfg(all(feature = "system", target_os = "linux"))]
+pub mod dbus;
 #[cfg(feature = "system")]
 pub mod detect;
 #[cfg(feature = "system")]
 pub mod files;
 #[cfg(feature = "system")]
-pub mod globals;
-#[cfg(feature = "system")]
 pub mod flatpak;
 pub mod frontend;
+#[cfg(feature = "system")]
+pub mod globals;
 pub mod hotkey_types;
 #[cfg(feature = "system")]
 pub mod http;
@@ -26,8 +28,6 @@ pub mod input;
 #[cfg(feature = "ipc")]
 pub mod ipc;
 pub mod key_mapping;
-#[cfg(all(feature = "system", target_os = "linux"))]
-pub mod dbus;
 #[cfg(all(feature = "system", target_os = "linux"))]
 pub mod kwin;
 pub mod macros;

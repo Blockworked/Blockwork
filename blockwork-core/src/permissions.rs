@@ -40,7 +40,10 @@ static ASKING: Mutex<()> = Mutex::new(());
 const FILE_NAME: &str = "permissions.json";
 
 fn label(kind: &str) -> &'static str {
-    GUARDED.iter().find(|(k, _)| *k == kind).map_or("do that", |(_, l)| l)
+    GUARDED
+        .iter()
+        .find(|(k, _)| *k == kind)
+        .map_or("do that", |(_, l)| l)
 }
 
 #[cfg(not(test))]
@@ -59,7 +62,9 @@ fn load() -> HashMap<String, Grants> {
 
 #[cfg(not(test))]
 fn save(store: &HashMap<String, Grants>) {
-    let Ok(root) = crate::config::config_root() else { return };
+    let Ok(root) = crate::config::config_root() else {
+        return;
+    };
     let _ = std::fs::create_dir_all(&root);
     match serde_json::to_string_pretty(store) {
         Ok(text) => {
@@ -101,7 +106,9 @@ pub fn trust(macro_id: &str) {
 
 pub fn set_allowed(macro_id: &str, kind: &str, allowed: bool) {
     with_store(|s| {
-        let Some(grants) = s.get_mut(macro_id) else { return ((), false) };
+        let Some(grants) = s.get_mut(macro_id) else {
+            return ((), false);
+        };
         grants.allowed.retain(|k| k != kind);
         if allowed {
             grants.allowed.push(kind.to_string());
@@ -125,7 +132,12 @@ pub(crate) fn run_ended(macro_id: &str) {
 }
 
 fn session_answer(macro_id: &str, kind: &str) -> Option<bool> {
-    SESSION.lock().ok()?.iter().find(|(id, k, _)| id == macro_id && k == kind).map(|(.., ok)| *ok)
+    SESSION
+        .lock()
+        .ok()?
+        .iter()
+        .find(|(id, k, _)| id == macro_id && k == kind)
+        .map(|(.., ok)| *ok)
 }
 
 fn remember(macro_id: &str, kind: &str, ok: bool) {
@@ -145,7 +157,10 @@ fn decided(macro_id: &str, kind: &str) -> Option<Result<(), String>> {
 }
 
 fn denied(kind: &str) -> String {
-    format!("not allowed to {}. Change it in Macro settings > Permissions", label(kind))
+    format!(
+        "not allowed to {}. Change it in Macro settings > Permissions",
+        label(kind)
+    )
 }
 
 /// Asks the user unless `source`'s macro already may do `kind`.
@@ -161,8 +176,16 @@ pub fn check(source: &Source, kind: &str, stopped: &dyn Fn() -> bool) -> Result<
     if let Some(done) = decided(&source.macro_id, kind) {
         return done;
     }
-    let name = if source.name.is_empty() { "A macro" } else { source.name.as_str() };
-    let mut request = Request::new(Kind::Permission, "Allow this macro?", format!("“{name}” wants to {}.", label(kind)));
+    let name = if source.name.is_empty() {
+        "A macro"
+    } else {
+        source.name.as_str()
+    };
+    let mut request = Request::new(
+        Kind::Permission,
+        "Allow this macro?",
+        format!("“{name}” wants to {}.", label(kind)),
+    );
     request.subject = name.to_string();
     request.ability = kind.to_string();
     let answer = prompt::ask(&request, stopped).map(|r| r.answer);
@@ -206,8 +229,13 @@ impl Drop for Scope {
 
 /// [`check`] for the macro running on this thread; outside a run (previews) it's allowed.
 pub fn require(kind: &str) -> Result<(), String> {
-    let Some((source, flag)) = CURRENT.with(|c| c.borrow().clone()) else { return Ok(()) };
-    let stopped = || flag.as_ref().is_some_and(|f| f.lock().map(|r| !*r).unwrap_or(true));
+    let Some((source, flag)) = CURRENT.with(|c| c.borrow().clone()) else {
+        return Ok(());
+    };
+    let stopped = || {
+        flag.as_ref()
+            .is_some_and(|f| f.lock().map(|r| !*r).unwrap_or(true))
+    };
     check(&source, kind, &stopped)
 }
 
@@ -218,7 +246,10 @@ mod tests {
     #[test]
     fn restricted_macros_ask_and_remember_the_answer() {
         let source = Source::for_macro("perm-test", "Test");
-        assert!(check(&source, "network", &|| false).is_ok(), "trusted by default");
+        assert!(
+            check(&source, "network", &|| false).is_ok(),
+            "trusted by default"
+        );
 
         restrict("perm-test", vec!["screen".into()]);
         assert!(check(&source, "screen", &|| false).is_ok());

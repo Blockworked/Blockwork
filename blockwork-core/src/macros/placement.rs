@@ -79,15 +79,17 @@ mod tests {
     #[test]
     fn non_loop_control_instructions_are_always_allowed() {
         let strand = strand_with(vec![Instruction::new(InstructionKind::WhenRan)]);
-        assert!(check_loop_control(
-            &strand,
-            &[PathStep {
-                index: 1,
-                slot: None
-            }],
-            &Instruction::new(InstructionKind::Comment("x".into()))
-        )
-        .is_ok());
+        assert!(
+            check_loop_control(
+                &strand,
+                &[PathStep {
+                    index: 1,
+                    slot: None
+                }],
+                &Instruction::new(InstructionKind::Comment("x".into()))
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -97,12 +99,14 @@ mod tests {
             index: 1,
             slot: None,
         }];
-        assert!(check_loop_control(
-            &strand,
-            &path,
-            &Instruction::new(InstructionKind::EscapeLoop)
-        )
-        .is_err());
+        assert!(
+            check_loop_control(
+                &strand,
+                &path,
+                &Instruction::new(InstructionKind::EscapeLoop)
+            )
+            .is_err()
+        );
     }
 
     #[test]
@@ -125,12 +129,14 @@ mod tests {
                 slot: None,
             },
         ];
-        assert!(check_loop_control(
-            &strand,
-            &path,
-            &Instruction::new(InstructionKind::ContinueLoop)
-        )
-        .is_ok());
+        assert!(
+            check_loop_control(
+                &strand,
+                &path,
+                &Instruction::new(InstructionKind::ContinueLoop)
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -160,12 +166,14 @@ mod tests {
                 slot: None,
             },
         ];
-        assert!(check_loop_control(
-            &strand,
-            &path,
-            &Instruction::new(InstructionKind::EscapeLoop)
-        )
-        .is_ok());
+        assert!(
+            check_loop_control(
+                &strand,
+                &path,
+                &Instruction::new(InstructionKind::EscapeLoop)
+            )
+            .is_ok()
+        );
     }
 
     #[test]
@@ -187,11 +195,13 @@ mod tests {
                 slot: None,
             },
         ];
-        assert!(check_loop_control(
-            &strand,
-            &path,
-            &Instruction::new(InstructionKind::EscapeLoop)
-        )
-        .is_err());
+        assert!(
+            check_loop_control(
+                &strand,
+                &path,
+                &Instruction::new(InstructionKind::EscapeLoop)
+            )
+            .is_err()
+        );
     }
 }

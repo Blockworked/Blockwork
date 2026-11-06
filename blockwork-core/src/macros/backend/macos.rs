@@ -523,8 +523,13 @@ impl InputBackend for MacosBackend {
     }
 
     fn key(&mut self, key: MacroKey, dir: Direction) -> Result<(), String> {
-        if matches!(key, MacroKey::F21 | MacroKey::F22 | MacroKey::F23 | MacroKey::F24 | MacroKey::Select) {
-            return Err(format!("macOS cannot synthesize {key:?}: this key has no native macOS virtual-key code; choose a supported key such as F13–F20"));
+        if matches!(
+            key,
+            MacroKey::F21 | MacroKey::F22 | MacroKey::F23 | MacroKey::F24 | MacroKey::Select
+        ) {
+            return Err(format!(
+                "macOS cannot synthesize {key:?}: this key has no native macOS virtual-key code; choose a supported key such as F13–F20"
+            ));
         }
         if let Some(code) = system_keys::code(&key) {
             let virtual_code = macro_key_to_cgkeycode(&key).unwrap().0;

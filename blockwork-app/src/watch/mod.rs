@@ -61,7 +61,13 @@ impl Target {
     }
 
     /// Runs the body on its own thread (`scheduled_run::fire`).
-    pub(crate) fn fire(&self, emulator: &Arc<Mutex<dyn InputBackend>>, speed: f64, shared_state: &SharedState, app: &AppHandle) {
+    pub(crate) fn fire(
+        &self,
+        emulator: &Arc<Mutex<dyn InputBackend>>,
+        speed: f64,
+        shared_state: &SharedState,
+        app: &AppHandle,
+    ) {
         scheduled_run::fire(
             self.key.0.clone(),
             self.message.clone(),
@@ -78,7 +84,10 @@ impl Target {
 
 /// The macro's saved variable values, for resolving a header's slots.
 pub(crate) fn variable_env(mac: &Macro) -> HashMap<String, Evaluated> {
-    mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect()
+    mac.variables
+        .iter()
+        .map(|v| (v.name.clone(), v.value.clone()))
+        .collect()
 }
 
 /// Whether a polled yes/no condition fires: it changed since the last poll
@@ -153,11 +162,21 @@ mod tests {
     #[test]
     fn a_failure_is_reported_once_until_it_recovers() {
         let mut report = ReportOnce::default();
-        assert_eq!(report.check("Idle trigger", Err::<u8, _>("no idle service".into())), None);
+        assert_eq!(
+            report.check("Idle trigger", Err::<u8, _>("no idle service".into())),
+            None
+        );
         assert_eq!(report.reported("Idle trigger"), Some("no idle service"));
-        assert_eq!(report.check("Idle trigger", Err::<u8, _>("no idle service".into())), None);
+        assert_eq!(
+            report.check("Idle trigger", Err::<u8, _>("no idle service".into())),
+            None
+        );
         assert_eq!(report.check("Idle trigger", Ok(4)), Some(4));
-        assert_eq!(report.reported("Idle trigger"), None, "recovering forgets it, so a later failure logs again");
+        assert_eq!(
+            report.reported("Idle trigger"),
+            None,
+            "recovering forgets it, so a later failure logs again"
+        );
     }
 
     #[test]
@@ -168,7 +187,10 @@ mod tests {
         let mut strand = Strand::with_instructions(
             0,
             0,
-            vec![Instruction::new(InstructionKind::WhenClipboardChanged), Instruction::new(InstructionKind::EscapeLoop)],
+            vec![
+                Instruction::new(InstructionKind::WhenClipboardChanged),
+                Instruction::new(InstructionKind::EscapeLoop),
+            ],
         );
         strand.id = "s".into();
         let target = Target::new(&mac, &strand);

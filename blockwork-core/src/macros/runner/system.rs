@@ -5,7 +5,11 @@ use super::*;
 
 /// Runs one of these blocks. A failure is soft (see `soft_fail`) unless the
 /// strand is inside a `try`.
-pub(super) fn run_system_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32) -> Result<(), String> {
+pub(super) fn run_system_block(
+    ins: &Instruction,
+    ctx: &mut ExecCtx,
+    depth: u32,
+) -> Result<(), String> {
     match &ins.kind {
         InstructionKind::SendSignal { name, wait } => {
             let name = match ctx.resolve(&name.value, depth).and_then(|v| v.eval_text()) {
@@ -17,12 +21,37 @@ pub(super) fn run_system_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
             };
             let mut threads = Vec::new();
             for body in signal_bodies(ctx, &name, depth) {
-                let (source, emulator, stop_flag) = (Arc::clone(&ctx.source), Arc::clone(&ctx.emulator), ctx.stop_flag.clone());
-                let (variables, lists, table) = (Arc::clone(&ctx.variables), Arc::clone(&ctx.lists), Arc::clone(&ctx.block_table));
-                let (speed, loops) = (ctx.speed_multiplier, u32::try_from(ctx.max_loop_iterations).unwrap_or(u32::MAX));
-                let spawned = std::thread::Builder::new().name(format!("signal_{name}")).stack_size(STRAND_STACK_SIZE).spawn(move || {
-                    run_strand(source, body, emulator, stop_flag, speed, variables, lists, table, Duration::ZERO, loops)
-                });
+                let (source, emulator, stop_flag) = (
+                    Arc::clone(&ctx.source),
+                    Arc::clone(&ctx.emulator),
+                    ctx.stop_flag.clone(),
+                );
+                let (variables, lists, table) = (
+                    Arc::clone(&ctx.variables),
+                    Arc::clone(&ctx.lists),
+                    Arc::clone(&ctx.block_table),
+                );
+                let (speed, loops) = (
+                    ctx.speed_multiplier,
+                    u32::try_from(ctx.max_loop_iterations).unwrap_or(u32::MAX),
+                );
+                let spawned = std::thread::Builder::new()
+                    .name(format!("signal_{name}"))
+                    .stack_size(STRAND_STACK_SIZE)
+                    .spawn(move || {
+                        run_strand(
+                            source,
+                            body,
+                            emulator,
+                            stop_flag,
+                            speed,
+                            variables,
+                            lists,
+                            table,
+                            Duration::ZERO,
+                            loops,
+                        )
+                    });
                 match spawned {
                     Ok(thread) => threads.push(thread),
                     Err(e) => warn!("Failed to start a signal strand: {e}"),
@@ -36,7 +65,11 @@ pub(super) fn run_system_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
                 ctx.signal_threads.extend(threads);
             }
         }
-        InstructionKind::WindowAction { action, pattern, by } => {
+        InstructionKind::WindowAction {
+            action,
+            pattern,
+            by,
+        } => {
             let done = (|| {
                 let pattern = ctx.resolve(pattern, depth)?.eval_text()?;
                 crate::window::act(action.parse()?, &pattern, by.parse()?)
@@ -45,7 +78,13 @@ pub(super) fn run_system_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
                 soft_fail(ctx, &ins.id, "Window", e)?;
             }
         }
-        InstructionKind::MoveWindow { pattern, by, resize, x, y } => {
+        InstructionKind::MoveWindow {
+            pattern,
+            by,
+            resize,
+            x,
+            y,
+        } => {
             let done = (|| {
                 let pattern = ctx.resolve(pattern, depth)?.eval_text()?;
                 let x = ctx.resolve(x, depth)?.eval_number()?.round() as i32;
@@ -53,11 +92,24 @@ pub(super) fn run_system_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
                 crate::window::place(&pattern, by.parse()?, *resize, x, y)
             })();
             if let Err(e) = done {
-                soft_fail(ctx, &ins.id, if *resize { "Resize window" } else { "Move window" }, e)?;
+                soft_fail(
+                    ctx,
+                    &ins.id,
+                    if *resize {
+                        "Resize window"
+                    } else {
+                        "Move window"
+                    },
+                    e,
+                )?;
             }
         }
         InstructionKind::RunMacro { target, wait } => {
-            match ctx.resolve(target, depth).and_then(|v| v.eval_text()).and_then(|name| crate::macros::calls::start(&name)) {
+            match ctx
+                .resolve(target, depth)
+                .and_then(|v| v.eval_text())
+                .and_then(|name| crate::macros::calls::start(&name))
+            {
                 Ok((id, done)) if *wait => {
                     // Stopping this run stops the one it's waiting on too.
                     while !done.load(Ordering::Relaxed) {
@@ -73,30 +125,40 @@ pub(super) fn run_system_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
             }
         }
         InstructionKind::StopMacroNamed(target) => {
-            if let Err(e) = ctx.resolve(target, depth).and_then(|v| v.eval_text()).and_then(|name| crate::macros::calls::stop(&name)) {
+            if let Err(e) = ctx
+                .resolve(target, depth)
+                .and_then(|v| v.eval_text())
+                .and_then(|name| crate::macros::calls::stop(&name))
+            {
                 soft_fail(ctx, &ins.id, "Stop macro", e)?;
             }
         }
         InstructionKind::SetGlobal { name, value } => {
-            let set = ctx.resolve(name, depth).and_then(|n| n.eval_text()).and_then(|name| {
-                crate::globals::set(&name, ctx.resolve(value, depth)?.eval()?)
-            });
+            let set = ctx
+                .resolve(name, depth)
+                .and_then(|n| n.eval_text())
+                .and_then(|name| crate::globals::set(&name, ctx.resolve(value, depth)?.eval()?));
             if let Err(e) = set {
                 soft_fail(ctx, &ins.id, "Set global", e)?;
             }
         }
         InstructionKind::ChangeGlobal { name, by } => {
-            let changed = ctx.resolve(name, depth).and_then(|n| n.eval_text()).and_then(|name| {
-                crate::globals::change(&name, ctx.resolve(by, depth)?.eval_number()?)
-            });
+            let changed = ctx
+                .resolve(name, depth)
+                .and_then(|n| n.eval_text())
+                .and_then(|name| {
+                    crate::globals::change(&name, ctx.resolve(by, depth)?.eval_number()?)
+                });
             if let Err(e) = changed {
                 soft_fail(ctx, &ins.id, "Change global", e)?;
             }
         }
-        InstructionKind::Log(value) => match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {
-            Ok(text) => crate::run_log::info(&ctx.source, text),
-            Err(e) => soft_fail(ctx, &ins.id, "Log", e)?,
-        },
+        InstructionKind::Log(value) => {
+            match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {
+                Ok(text) => crate::run_log::info(&ctx.source, text),
+                Err(e) => soft_fail(ctx, &ins.id, "Log", e)?,
+            }
+        }
         InstructionKind::Notify { title, message } => {
             let title = ctx.resolve(title, depth).and_then(|v| v.eval_text());
             let message = ctx.resolve(message, depth).and_then(|v| v.eval_text());
@@ -108,9 +170,19 @@ pub(super) fn run_system_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
         InstructionKind::WriteFile { path, text, append } => {
             let path = ctx.resolve(path, depth).and_then(|v| v.eval_text());
             let text = ctx.resolve(text, depth).and_then(|v| v.eval_text());
-            let written = path.and_then(|p| text.and_then(|t| crate::files::write_text(&p, &t, *append)));
+            let written =
+                path.and_then(|p| text.and_then(|t| crate::files::write_text(&p, &t, *append)));
             if let Err(e) = written {
-                soft_fail(ctx, &ins.id, if *append { "Append to file" } else { "Write file" }, e)?;
+                soft_fail(
+                    ctx,
+                    &ins.id,
+                    if *append {
+                        "Append to file"
+                    } else {
+                        "Write file"
+                    },
+                    e,
+                )?;
             }
         }
         InstructionKind::HttpRequest {

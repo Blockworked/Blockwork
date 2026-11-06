@@ -54,7 +54,9 @@ static OPERATORS: &[ExtOperator] = &[
         default_args: || vec![Value::text("~/notes.txt")],
         eval: |args| {
             crate::permissions::require("files_read")?;
-            Ok(Evaluated::Text(crate::files::read_text(&args[0].as_text())?))
+            Ok(Evaluated::Text(crate::files::read_text(
+                &args[0].as_text(),
+            )?))
         },
     },
     ExtOperator {
@@ -90,7 +92,10 @@ static OPERATORS: &[ExtOperator] = &[
         arity: 2,
         default_args: || vec![Value::text("name"), Value::text(r#"{"name": "Blockwork"}"#)],
         eval: |args| {
-            Ok(Evaluated::Text(crate::http::json_get(&args[1].as_text(), &args[0].as_text())?))
+            Ok(Evaluated::Text(crate::http::json_get(
+                &args[1].as_text(),
+                &args[0].as_text(),
+            )?))
         },
     },
     ExtOperator {
@@ -100,7 +105,9 @@ static OPERATORS: &[ExtOperator] = &[
         default_args: || vec![Value::text("echo hello")],
         eval: |args| {
             crate::permissions::require("commands")?;
-            Ok(Evaluated::Text(crate::shell::run(&args[0].as_text())?.stdout))
+            Ok(Evaluated::Text(
+                crate::shell::run(&args[0].as_text())?.stdout,
+            ))
         },
     },
     ExtOperator {
@@ -110,7 +117,9 @@ static OPERATORS: &[ExtOperator] = &[
         default_args: || vec![Value::text("true")],
         eval: |args| {
             crate::permissions::require("commands")?;
-            Ok(Evaluated::Bool(crate::shell::run(&args[0].as_text())?.success))
+            Ok(Evaluated::Bool(
+                crate::shell::run(&args[0].as_text())?.success,
+            ))
         },
     },
     ExtOperator {
@@ -156,17 +165,26 @@ static OPERATORS: &[ExtOperator] = &[
         op: "Detection",
         arity: 2,
         default_args: || {
-            let item = Value::op(Op::from_name("ListItem"), vec![Value::number(1.0), Value::text("detections")]);
+            let item = Value::op(
+                Op::from_name("ListItem"),
+                vec![Value::number(1.0), Value::text("detections")],
+            );
             vec![Value::text("center x"), item]
         },
-        eval: |args| crate::detect::Detection::from_item(&args[1].as_text())?.field(&args[0].as_text()),
+        eval: |args| {
+            crate::detect::Detection::from_item(&args[1].as_text())?.field(&args[0].as_text())
+        },
     },
     ExtOperator {
         kind: "MacroRunning",
         op: "MacroRunning",
         arity: 1,
         default_args: one_text,
-        eval: |args| Ok(Evaluated::Bool(crate::macros::calls::is_running(&args[0].as_text())?)),
+        eval: |args| {
+            Ok(Evaluated::Bool(crate::macros::calls::is_running(
+                &args[0].as_text(),
+            )?))
+        },
     },
     ExtOperator {
         kind: "GlobalVariable",
@@ -185,7 +203,10 @@ static OPERATORS: &[ExtOperator] = &[
         default_args: || numbers(&[100.0, 100.0]),
         eval: |args| {
             crate::permissions::require("screen")?;
-            Ok(Evaluated::Text(crate::screen::pixel_color(args[0].as_number()?, args[1].as_number()?)?))
+            Ok(Evaluated::Text(crate::screen::pixel_color(
+                args[0].as_number()?,
+                args[1].as_number()?,
+            )?))
         },
     },
     ExtOperator {
@@ -196,18 +217,31 @@ static OPERATORS: &[ExtOperator] = &[
         eval: |args| {
             crate::permissions::require("screen")?;
             let n = |i: usize| args[i].as_number();
-            Ok(Evaluated::Text(crate::screen::average_color(n(0)?, n(1)?, n(2)?, n(3)?)?))
+            Ok(Evaluated::Text(crate::screen::average_color(
+                n(0)?,
+                n(1)?,
+                n(2)?,
+                n(3)?,
+            )?))
         },
     },
     ExtOperator {
         kind: "ColorsMatch",
         op: "ColorsMatch",
         arity: 3,
-        default_args: || vec![Value::text("#ffffff"), Value::text("#fafafa"), Value::number(10.0)],
+        default_args: || {
+            vec![
+                Value::text("#ffffff"),
+                Value::text("#fafafa"),
+                Value::number(10.0),
+            ]
+        },
         eval: |args| {
             let a = crate::screen::parse_color(&args[0].as_text())?;
             let b = crate::screen::parse_color(&args[1].as_text())?;
-            Ok(Evaluated::Bool(crate::screen::color_distance(a, b) <= args[2].as_number()?))
+            Ok(Evaluated::Bool(
+                crate::screen::color_distance(a, b) <= args[2].as_number()?,
+            ))
         },
     },
     ExtOperator {
@@ -218,7 +252,12 @@ static OPERATORS: &[ExtOperator] = &[
         eval: |args| {
             crate::permissions::require("screen")?;
             let n = |i: usize| args[i].as_number();
-            Ok(Evaluated::Text(crate::screen::read_text(n(0)?, n(1)?, n(2)?, n(3)?)?))
+            Ok(Evaluated::Text(crate::screen::read_text(
+                n(0)?,
+                n(1)?,
+                n(2)?,
+                n(3)?,
+            )?))
         },
     },
     ExtOperator {
@@ -228,7 +267,9 @@ static OPERATORS: &[ExtOperator] = &[
         default_args: || vec![Value::text("x")],
         eval: |args| {
             let (x, y) = crate::screen::cursor()?;
-            Ok(Evaluated::Number(if args[0].as_text() == "y" { y } else { x } as f64))
+            Ok(Evaluated::Number(
+                if args[0].as_text() == "y" { y } else { x } as f64,
+            ))
         },
     },
     ExtOperator {
@@ -238,7 +279,11 @@ static OPERATORS: &[ExtOperator] = &[
         default_args: || vec![Value::text("width")],
         eval: |args| {
             let desktop = crate::screen::desktop()?;
-            Ok(Evaluated::Number(if args[0].as_text() == "height" { desktop.height } else { desktop.width }))
+            Ok(Evaluated::Number(if args[0].as_text() == "height" {
+                desktop.height
+            } else {
+                desktop.width
+            }))
         },
     },
     ExtOperator {
@@ -272,14 +317,22 @@ static OPERATORS: &[ExtOperator] = &[
         op: "AppRunning",
         arity: 1,
         default_args: || vec![Value::text("firefox")],
-        eval: |args| Ok(Evaluated::Bool(crate::system::app_running(&args[0].as_text())?)),
+        eval: |args| {
+            Ok(Evaluated::Bool(crate::system::app_running(
+                &args[0].as_text(),
+            )?))
+        },
     },
     ExtOperator {
         kind: "IdleSeconds",
         op: "IdleSeconds",
         arity: 0,
         default_args: Vec::new,
-        eval: |_| Ok(Evaluated::Number(crate::system::idle_time()?.as_secs_f64().floor())),
+        eval: |_| {
+            Ok(Evaluated::Number(
+                crate::system::idle_time()?.as_secs_f64().floor(),
+            ))
+        },
     },
     ExtOperator {
         kind: "ScreenLocked",
@@ -302,7 +355,11 @@ static OPERATORS: &[ExtOperator] = &[
         default_args: one_text,
         eval: |args| {
             let pattern = args[0].as_text();
-            Ok(Evaluated::Bool(crate::system::usb_devices()?.iter().any(|d| d.matches(&pattern))))
+            Ok(Evaluated::Bool(
+                crate::system::usb_devices()?
+                    .iter()
+                    .any(|d| d.matches(&pattern)),
+            ))
         },
     },
     ExtOperator {
@@ -327,14 +384,24 @@ static OPERATORS: &[ExtOperator] = &[
         op: "PageUrl",
         arity: 0,
         default_args: Vec::new,
-        eval: |_| Ok(Evaluated::Text(crate::browser::text_field(&browser("info", serde_json::json!({}))?, "url"))),
+        eval: |_| {
+            Ok(Evaluated::Text(crate::browser::text_field(
+                &browser("info", serde_json::json!({}))?,
+                "url",
+            )))
+        },
     },
     ExtOperator {
         kind: "PageTitle",
         op: "PageTitle",
         arity: 0,
         default_args: Vec::new,
-        eval: |_| Ok(Evaluated::Text(crate::browser::text_field(&browser("info", serde_json::json!({}))?, "title"))),
+        eval: |_| {
+            Ok(Evaluated::Text(crate::browser::text_field(
+                &browser("info", serde_json::json!({}))?,
+                "title",
+            )))
+        },
     },
     ExtOperator {
         kind: "ElementText",
@@ -342,7 +409,10 @@ static OPERATORS: &[ExtOperator] = &[
         arity: 1,
         default_args: || vec![Value::text("h1")],
         eval: |args| {
-            let read = browser("read", serde_json::json!({ "selector": args[0].as_text(), "wait": 0 }))?;
+            let read = browser(
+                "read",
+                serde_json::json!({ "selector": args[0].as_text(), "wait": 0 }),
+            )?;
             Ok(Evaluated::Text(crate::browser::text_field(&read, "value")))
         },
     },
@@ -371,7 +441,11 @@ fn browser(cmd: &str, args: serde_json::Value) -> Result<serde_json::Value, Stri
 
 #[cfg(feature = "system")]
 fn element_count(selector: &str) -> Result<f64, String> {
-    Ok(browser("count", serde_json::json!({ "selector": selector }))?["count"].as_f64().unwrap_or(0.0))
+    Ok(
+        browser("count", serde_json::json!({ "selector": selector }))?["count"]
+            .as_f64()
+            .unwrap_or(0.0),
+    )
 }
 
 /// Pure text and date reporters: no machine state, so the website's
@@ -381,23 +455,57 @@ static TEXT_OPERATORS: &[ExtOperator] = &[
         kind: "TextCheck",
         op: "TextCheck",
         arity: 3,
-        default_args: || vec![Value::text("hello world"), Value::text("contains"), Value::text("world")],
-        eval: |args| Ok(Evaluated::Bool(crate::text::check(&args[0].as_text(), &args[1].as_text(), &args[2].as_text())?)),
+        default_args: || {
+            vec![
+                Value::text("hello world"),
+                Value::text("contains"),
+                Value::text("world"),
+            ]
+        },
+        eval: |args| {
+            Ok(Evaluated::Bool(crate::text::check(
+                &args[0].as_text(),
+                &args[1].as_text(),
+                &args[2].as_text(),
+            )?))
+        },
     },
     ExtOperator {
         kind: "TextReplace",
         op: "TextReplace",
         arity: 3,
-        default_args: || vec![Value::text("world"), Value::text("hello world"), Value::text("there")],
-        eval: |args| Ok(Evaluated::Text(args[1].as_text().replace(&args[0].as_text(), &args[2].as_text()))),
+        default_args: || {
+            vec![
+                Value::text("world"),
+                Value::text("hello world"),
+                Value::text("there"),
+            ]
+        },
+        eval: |args| {
+            Ok(Evaluated::Text(
+                args[1]
+                    .as_text()
+                    .replace(&args[0].as_text(), &args[2].as_text()),
+            ))
+        },
     },
     ExtOperator {
         kind: "RegexReplace",
         op: "RegexReplace",
         arity: 3,
-        default_args: || vec![Value::text("[0-9]+"), Value::text("order 1234"), Value::text("#")],
+        default_args: || {
+            vec![
+                Value::text("[0-9]+"),
+                Value::text("order 1234"),
+                Value::text("#"),
+            ]
+        },
         eval: |args| {
-            Ok(Evaluated::Text(crate::text::regex_replace(&args[0].as_text(), &args[1].as_text(), &args[2].as_text())?))
+            Ok(Evaluated::Text(crate::text::regex_replace(
+                &args[0].as_text(),
+                &args[1].as_text(),
+                &args[2].as_text(),
+            )?))
         },
     },
     ExtOperator {
@@ -405,7 +513,12 @@ static TEXT_OPERATORS: &[ExtOperator] = &[
         op: "RegexFind",
         arity: 2,
         default_args: || vec![Value::text("[0-9]+"), Value::text("order 1234")],
-        eval: |args| Ok(Evaluated::Text(crate::text::regex_find(&args[0].as_text(), &args[1].as_text())?)),
+        eval: |args| {
+            Ok(Evaluated::Text(crate::text::regex_find(
+                &args[0].as_text(),
+                &args[1].as_text(),
+            )?))
+        },
     },
     ExtOperator {
         kind: "SplitPart",
@@ -413,7 +526,11 @@ static TEXT_OPERATORS: &[ExtOperator] = &[
         arity: 3,
         default_args: || vec![Value::number(1.0), Value::text("a,b,c"), Value::text(",")],
         eval: |args| {
-            Ok(Evaluated::Text(crate::text::split_part(&args[1].as_text(), &args[2].as_text(), args[0].as_number()?)?))
+            Ok(Evaluated::Text(crate::text::split_part(
+                &args[1].as_text(),
+                &args[2].as_text(),
+                args[0].as_number()?,
+            )?))
         },
     },
     ExtOperator {
@@ -421,7 +538,11 @@ static TEXT_OPERATORS: &[ExtOperator] = &[
         op: "SplitCount",
         arity: 2,
         default_args: || vec![Value::text("a,b,c"), Value::text(",")],
-        eval: |args| Ok(Evaluated::Number(crate::text::split(&args[0].as_text(), &args[1].as_text()).len() as f64)),
+        eval: |args| {
+            Ok(Evaluated::Number(
+                crate::text::split(&args[0].as_text(), &args[1].as_text()).len() as f64,
+            ))
+        },
     },
     ExtOperator {
         kind: "Substring",
@@ -429,7 +550,11 @@ static TEXT_OPERATORS: &[ExtOperator] = &[
         arity: 3,
         default_args: || vec![Value::number(1.0), Value::number(3.0), Value::text("hello")],
         eval: |args| {
-            Ok(Evaluated::Text(crate::text::substring(&args[2].as_text(), args[0].as_number()?, args[1].as_number()?)))
+            Ok(Evaluated::Text(crate::text::substring(
+                &args[2].as_text(),
+                args[0].as_number()?,
+                args[1].as_number()?,
+            )))
         },
     },
     ExtOperator {
@@ -444,7 +569,12 @@ static TEXT_OPERATORS: &[ExtOperator] = &[
         op: "FormatNumber",
         arity: 2,
         default_args: || numbers(&[12.3456, 2.0]),
-        eval: |args| Ok(Evaluated::Text(crate::text::format_number(args[0].as_number()?, args[1].as_number()?))),
+        eval: |args| {
+            Ok(Evaluated::Text(crate::text::format_number(
+                args[0].as_number()?,
+                args[1].as_number()?,
+            )))
+        },
     },
     ExtOperator {
         kind: "Timestamp",
@@ -457,35 +587,58 @@ static TEXT_OPERATORS: &[ExtOperator] = &[
         kind: "FormatDate",
         op: "FormatDate",
         arity: 2,
-        default_args: || vec![Value::op(Op::from_name("Timestamp"), vec![]), Value::text("%Y-%m-%d %H:%M")],
-        eval: |args| Ok(Evaluated::Text(crate::text::format_date(args[0].as_number()?, &args[1].as_text())?)),
+        default_args: || {
+            vec![
+                Value::op(Op::from_name("Timestamp"), vec![]),
+                Value::text("%Y-%m-%d %H:%M"),
+            ]
+        },
+        eval: |args| {
+            Ok(Evaluated::Text(crate::text::format_date(
+                args[0].as_number()?,
+                &args[1].as_text(),
+            )?))
+        },
     },
     ExtOperator {
         kind: "ParseDate",
         op: "ParseDate",
         arity: 2,
         default_args: || vec![Value::text("2026-01-31 09:00"), Value::text("")],
-        eval: |args| Ok(Evaluated::Number(crate::text::parse_date(&args[0].as_text(), &args[1].as_text())?)),
+        eval: |args| {
+            Ok(Evaluated::Number(crate::text::parse_date(
+                &args[0].as_text(),
+                &args[1].as_text(),
+            )?))
+        },
     },
     ExtOperator {
         kind: "DatePart",
         op: "DatePart",
         arity: 2,
-        default_args: || vec![Value::text("day"), Value::op(Op::from_name("Timestamp"), vec![])],
-        eval: |args| Ok(Evaluated::Number(crate::text::date_part(args[1].as_number()?, &args[0].as_text())?)),
+        default_args: || {
+            vec![
+                Value::text("day"),
+                Value::op(Op::from_name("Timestamp"), vec![]),
+            ]
+        },
+        eval: |args| {
+            Ok(Evaluated::Number(crate::text::date_part(
+                args[1].as_number()?,
+                &args[0].as_text(),
+            )?))
+        },
     },
 ];
 
 #[cfg(feature = "system")]
-static LATE_OPERATORS: &[ExtOperator] = &[
-    ExtOperator {
-        kind: "LastError",
-        op: "LastError",
-        arity: 0,
-        default_args: Vec::new,
-        eval: |_| Ok(Evaluated::Text(crate::macros::runner::last_error())),
-    },
-];
+static LATE_OPERATORS: &[ExtOperator] = &[ExtOperator {
+    kind: "LastError",
+    op: "LastError",
+    arity: 0,
+    default_args: Vec::new,
+    eval: |_| Ok(Evaluated::Text(crate::macros::runner::last_error())),
+}];
 
 fn numbers(values: &[f64]) -> Vec<Value> {
     values.iter().map(|&v| Value::number(v)).collect()
@@ -539,12 +692,39 @@ mod tests {
         register_blockwork_operators();
         let op = |name: &str, args: Vec<Value>| Value::op(Op::from_name(name), args).eval();
         let text = Value::text;
-        assert_eq!(op("SplitPart", vec![Value::number(2.0), text("a-b-c"), text("-")]), Ok(Evaluated::Text("b".into())));
-        assert_eq!(op("TextCheck", vec![text("hello"), text("ends with"), text("llo")]), Ok(Evaluated::Bool(true)));
-        assert_eq!(op("RegexReplace", vec![text("o"), text("foo"), text("0")]), Ok(Evaluated::Text("f00".into())));
-        assert_eq!(op("Substring", vec![Value::number(2.0), Value::number(3.0), text("abcd")]), Ok(Evaluated::Text("bc".into())));
-        assert_eq!(op("FormatNumber", vec![Value::number(2.5), Value::number(2.0)]), Ok(Evaluated::Text("2.50".into())));
-        let year = op("DatePart", vec![text("year"), Value::op(Op::from_name("Timestamp"), vec![])]);
+        assert_eq!(
+            op(
+                "SplitPart",
+                vec![Value::number(2.0), text("a-b-c"), text("-")]
+            ),
+            Ok(Evaluated::Text("b".into()))
+        );
+        assert_eq!(
+            op(
+                "TextCheck",
+                vec![text("hello"), text("ends with"), text("llo")]
+            ),
+            Ok(Evaluated::Bool(true))
+        );
+        assert_eq!(
+            op("RegexReplace", vec![text("o"), text("foo"), text("0")]),
+            Ok(Evaluated::Text("f00".into()))
+        );
+        assert_eq!(
+            op(
+                "Substring",
+                vec![Value::number(2.0), Value::number(3.0), text("abcd")]
+            ),
+            Ok(Evaluated::Text("bc".into()))
+        );
+        assert_eq!(
+            op("FormatNumber", vec![Value::number(2.5), Value::number(2.0)]),
+            Ok(Evaluated::Text("2.50".into()))
+        );
+        let year = op(
+            "DatePart",
+            vec![text("year"), Value::op(Op::from_name("Timestamp"), vec![])],
+        );
         assert!(matches!(year, Ok(Evaluated::Number(y)) if y >= 2026.0));
     }
 
@@ -553,10 +733,19 @@ mod tests {
     fn detection_reporter_reads_list_items() {
         register_blockwork_operators();
         let item = r#"{"x":10,"y":20,"w":30,"h":40,"label":"player","score":0.5,"id":7}"#;
-        let op = |field: &str, item: &str| Value::op(Op::from_name("Detection"), vec![Value::text(field), Value::text(item)]).eval();
+        let op = |field: &str, item: &str| {
+            Value::op(
+                Op::from_name("Detection"),
+                vec![Value::text(field), Value::text(item)],
+            )
+            .eval()
+        };
         assert_eq!(op("center x", item), Ok(Evaluated::Number(25.0)));
         assert_eq!(op("label", item), Ok(Evaluated::Text("player".into())));
-        assert!(op("x", "").is_err(), "an empty item (list index out of range) is an error");
+        assert!(
+            op("x", "").is_err(),
+            "an empty item (list index out of range) is an error"
+        );
     }
 
     #[cfg(feature = "system")]

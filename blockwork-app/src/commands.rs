@@ -1,35 +1,34 @@
 //! Every command the frontend can send. `dispatch.rs` maps command names onto
 //! these; each area of the app has a submodule, re-exported here.
 
+use crate::AppHandle;
 use crate::macros_thread;
 use crate::state::{
-    AppState, ComboCapture, EditSession, FragmentDto, HotkeyActionDto, InstructionDto, KeyCaptureTarget,
-    ListItemDto, Page, PathStep, RecordingPhase, SharedState, StateDto, UpdateCheckState,
-    ValueLocation, build_state_dto, dto_to_fragment, dto_to_hotkey_action, dto_to_instruction,
-    fragment_to_dto,
-    emit_state_updated,
+    AppState, ComboCapture, EditSession, FragmentDto, HotkeyActionDto, InstructionDto,
+    KeyCaptureTarget, ListItemDto, Page, PathStep, RecordingPhase, SharedState, StateDto,
+    UpdateCheckState, ValueLocation, build_state_dto, dto_to_fragment, dto_to_hotkey_action,
+    dto_to_instruction, emit_state_updated, fragment_to_dto,
 };
 use blockstitch_core::editor::{
-    Created, EditCommand, EditError, EditOutcome, ValueDestination,
-    apply_buffer_effects, drop_strand_buffers, prune_value_buffers, retain_live_buffers,
+    Created, EditCommand, EditError, EditOutcome, ValueDestination, apply_buffer_effects,
+    drop_strand_buffers, prune_value_buffers, retain_live_buffers,
 };
+use blockstitch_core::graph::{ListItem, ListStore, resolve_list_reporters};
 use blockwork_core::config;
 use blockwork_core::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo};
 use blockwork_core::input::types::InputToken;
 use blockwork_core::input::value::{Evaluated, Value};
-use blockwork_core::macros::runner::VariableStore;
-use blockstitch_core::graph::{ListItem, ListStore, resolve_list_reporters};
-use blockwork_core::macros::{
-    BlockPiece, BlockShape, Instruction, InstructionKind, Macro,
-    EDIT_CONTEXT, clamp_speed, loop_control,
-};
 #[cfg(test)]
 use blockwork_core::macros::Strand;
+use blockwork_core::macros::runner::VariableStore;
+use blockwork_core::macros::{
+    BlockPiece, BlockShape, EDIT_CONTEXT, Instruction, InstructionKind, Macro, clamp_speed,
+    loop_control,
+};
 use blockwork_core::recording;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
-use crate::AppHandle;
 use tracing::warn;
 
 /// Checkpoints the canvas before a structural edit, and ends the current
@@ -105,8 +104,8 @@ pub(crate) async fn request_absolute_mouse_support(
         Err(_) => Err("timed out waiting for the permission dialog".to_string()),
     };
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.absolute_mouse_position_available = result.is_ok()
-        && blockwork_core::macros::backend::absolute_mouse_position_available();
+    s.absolute_mouse_position_available =
+        result.is_ok() && blockwork_core::macros::backend::absolute_mouse_position_available();
     emit_state_updated(app, &s);
     result
 }
@@ -186,26 +185,26 @@ pub(crate) fn get_state(state: &SharedState) -> Result<StateDto, String> {
     Ok(build_state_dto(&s))
 }
 
-mod library;
-mod data;
 mod blocks;
-mod files;
+mod data;
 mod debugging;
 mod editing;
-mod strands;
+mod files;
+mod hotkey_actions;
+mod library;
 mod running;
 mod settings;
-mod hotkey_actions;
-pub(crate) use library::*;
-pub(crate) use data::*;
+mod strands;
 pub(crate) use blocks::*;
-pub(crate) use files::*;
+pub(crate) use data::*;
 pub(crate) use debugging::*;
 pub(crate) use editing::*;
-pub(crate) use strands::*;
+pub(crate) use files::*;
+pub(crate) use hotkey_actions::*;
+pub(crate) use library::*;
 pub(crate) use running::*;
 pub(crate) use settings::*;
-pub(crate) use hotkey_actions::*;
+pub(crate) use strands::*;
 
 // ─── Open App picker ────────────────────────────────────────────────────────
 
@@ -239,15 +238,27 @@ pub(crate) async fn edit_reporter_branch(
     args: &serde_json::Value,
 ) -> Result<serde_json::Value, String> {
     if matches!(cmd, "add_instruction" | "edit_instruction") {
-        let dto: InstructionDto = serde_json::from_value(args["instruction"].clone())
-            .map_err(|e| e.to_string())?;
+        let dto: InstructionDto =
+            serde_json::from_value(args["instruction"].clone()).map_err(|e| e.to_string())?;
         let instruction = dto_to_instruction(&dto).ok_or("Unknown instruction type")?;
-        if matches!(instruction.kind, InstructionKind::Token(InputToken::MoveMouse(_, _, blockwork_core::input::types::Coordinate::Abs))) {
+        if matches!(
+            instruction.kind,
+            InstructionKind::Token(InputToken::MoveMouse(
+                _,
+                _,
+                blockwork_core::input::types::Coordinate::Abs
+            ))
+        ) {
             request_absolute_mouse_support(state, app).await?;
         }
     }
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let mut graph = s.current_macro.as_ref().ok_or("No macro selected")?.graph.clone();
+    let mut graph = s
+        .current_macro
+        .as_ref()
+        .ok_or("No macro selected")?
+        .graph
+        .clone();
     let result = blockwork_core::frontend::edit_reporter_branch(&mut graph, cmd, args)?;
     if cmd != "copy_instructions" {
         push_undo(&mut s);

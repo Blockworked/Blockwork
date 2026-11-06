@@ -4,9 +4,15 @@ use super::*;
 
 // Declare a palette default only after its block was successfully inserted.
 pub(super) fn ensure_inserted_variable(s: &mut AppState, name: Option<String>) {
-    let Some(name) = name else { return; };
-    let Some(mac) = s.current_macro.as_mut() else { return; };
-    let Ok(name) = mac.create_variable(&name) else { return; };
+    let Some(name) = name else {
+        return;
+    };
+    let Some(mac) = s.current_macro.as_mut() else {
+        return;
+    };
+    let Ok(name) = mac.create_variable(&name) else {
+        return;
+    };
     if let Ok(mut store) = s.variable_values.lock() {
         store.insert(name, Evaluated::Number(0.0));
     }
@@ -24,7 +30,11 @@ pub(crate) async fn add_instruction(
     let ins = dto_to_instruction(&instruction).ok_or("Unknown instruction type")?;
     if matches!(
         &ins.kind,
-        InstructionKind::Token(InputToken::MoveMouse(_, _, blockwork_core::input::types::Coordinate::Abs))
+        InstructionKind::Token(InputToken::MoveMouse(
+            _,
+            _,
+            blockwork_core::input::types::Coordinate::Abs
+        ))
     ) {
         request_absolute_mouse_support(state, app).await?;
     }
@@ -62,7 +72,11 @@ pub(crate) async fn edit_instruction(
     let ins = dto_to_instruction(&instruction).ok_or("Unknown instruction type")?;
     if matches!(
         &ins.kind,
-        InstructionKind::Token(InputToken::MoveMouse(_, _, blockwork_core::input::types::Coordinate::Abs))
+        InstructionKind::Token(InputToken::MoveMouse(
+            _,
+            _,
+            blockwork_core::input::types::Coordinate::Abs
+        ))
     ) {
         request_absolute_mouse_support(state, app).await?;
     }
@@ -205,7 +219,8 @@ pub(crate) fn preview_value(state: &SharedState, value: Value) -> Result<String,
         (env, lists)
     };
     // Evaluated unlocked: a file or window read may be slow.
-    preview_value_with_env_and_lists(&value, &env, &lists).map(|text| blockwork_core::secrets::redact(&text))
+    preview_value_with_env_and_lists(&value, &env, &lists)
+        .map(|text| blockwork_core::secrets::redact(&text))
 }
 
 /// The actual evaluation logic behind `preview_value`, factored out so it's
@@ -499,10 +514,7 @@ pub(crate) fn reorder_instruction(
     Ok(())
 }
 
-pub(crate) fn clear_instructions(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn clear_instructions(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {

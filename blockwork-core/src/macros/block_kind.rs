@@ -14,7 +14,12 @@ macro_rules! for_each_ref {
             | InstructionKind::AskText { name, .. }
             | InstructionKind::AskYesNo { name, .. }
             | InstructionKind::WhenWebhook { variable: name, .. } => $f(RefKind::Variable, name),
-            InstructionKind::FindImage { x_variable, y_variable, count_variable, .. } => {
+            InstructionKind::FindImage {
+                x_variable,
+                y_variable,
+                count_variable,
+                ..
+            } => {
                 $f(RefKind::Variable, x_variable);
                 $f(RefKind::Variable, y_variable);
                 if let Some(count_variable) = count_variable {
@@ -25,11 +30,19 @@ macro_rules! for_each_ref {
                 $f(RefKind::List, list);
                 $f(RefKind::Variable, name);
             }
-            InstructionKind::DetectObjectsInWindow { results_list, count_variable, .. } => {
+            InstructionKind::DetectObjectsInWindow {
+                results_list,
+                count_variable,
+                ..
+            } => {
                 $f(RefKind::List, results_list);
                 $f(RefKind::Variable, count_variable);
             }
-            InstructionKind::AimAtDetection { results_list, status_variable, .. } => {
+            InstructionKind::AimAtDetection {
+                results_list,
+                status_variable,
+                ..
+            } => {
                 $f(RefKind::List, results_list);
                 $f(RefKind::Variable, status_variable);
             }
@@ -90,23 +103,35 @@ impl BlockKind for InstructionKind {
                     f(nth, InputValueType::Any);
                 }
             }
-            InstructionKind::BrowserType { text, selector, nth } => {
+            InstructionKind::BrowserType {
+                text,
+                selector,
+                nth,
+            } => {
                 f(text, InputValueType::Any);
                 f(selector, InputValueType::Any);
                 if let Some(nth) = nth {
                     f(nth, InputValueType::Any);
                 }
             }
-            InstructionKind::BrowserWaitFor { selector, timeout, .. } => {
+            InstructionKind::BrowserWaitFor {
+                selector, timeout, ..
+            } => {
                 f(selector, InputValueType::Any);
                 f(timeout, InputValueType::Any);
             }
-            InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } => f(&mut name.value, InputValueType::Any),
-            InstructionKind::AskText { prompt, default, .. } => {
+            InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } => {
+                f(&mut name.value, InputValueType::Any)
+            }
+            InstructionKind::AskText {
+                prompt, default, ..
+            } => {
                 f(prompt, InputValueType::Any);
                 f(default, InputValueType::Any);
             }
-            InstructionKind::SplitIntoList { text, separator, .. } => {
+            InstructionKind::SplitIntoList {
+                text, separator, ..
+            } => {
                 f(text, InputValueType::Any);
                 f(separator, InputValueType::Any);
             }
@@ -114,7 +139,9 @@ impl BlockKind for InstructionKind {
                 f(path, InputValueType::Any);
                 f(text, InputValueType::Any);
             }
-            InstructionKind::HttpRequest { url, body, headers, .. } => {
+            InstructionKind::HttpRequest {
+                url, body, headers, ..
+            } => {
                 f(url, InputValueType::Any);
                 f(body, InputValueType::Any);
                 f(headers, InputValueType::Any);
@@ -136,7 +163,8 @@ impl BlockKind for InstructionKind {
             InstructionKind::RunMacro { target, .. } | InstructionKind::StopMacroNamed(target) => {
                 f(target, InputValueType::Any)
             }
-            InstructionKind::SetGlobal { name, value: other } | InstructionKind::ChangeGlobal { name, by: other } => {
+            InstructionKind::SetGlobal { name, value: other }
+            | InstructionKind::ChangeGlobal { name, by: other } => {
                 f(name, InputValueType::Any);
                 f(other, InputValueType::Any);
             }
@@ -145,23 +173,43 @@ impl BlockKind for InstructionKind {
                     f(value, InputValueType::Any);
                 }
             }
-            InstructionKind::WaitUntil { condition, timeout, error_timeout } => {
+            InstructionKind::WaitUntil {
+                condition,
+                timeout,
+                error_timeout,
+            } => {
                 f(condition, InputValueType::Bool);
                 for v in timeout.iter_mut().chain(error_timeout.iter_mut()) {
                     f(v, InputValueType::Any);
                 }
             }
-            InstructionKind::FindImage { tolerance, pick, .. } | InstructionKind::ClickImage { tolerance, pick, .. } => {
+            InstructionKind::FindImage {
+                tolerance, pick, ..
+            }
+            | InstructionKind::ClickImage {
+                tolerance, pick, ..
+            } => {
                 if let Some(v) = tolerance {
                     f(v, InputValueType::Any);
                 }
-                if let Some(ImageMatch { index, near_x, near_y, .. }) = pick {
+                if let Some(ImageMatch {
+                    index,
+                    near_x,
+                    near_y,
+                    ..
+                }) = pick
+                {
                     for v in [index, near_x, near_y] {
                         f(v, InputValueType::Any);
                     }
                 }
             }
-            InstructionKind::WaitForImage { tolerance, timeout, error_timeout, .. } => {
+            InstructionKind::WaitForImage {
+                tolerance,
+                timeout,
+                error_timeout,
+                ..
+            } => {
                 if let Some(v) = tolerance {
                     f(v, InputValueType::Any);
                 }
@@ -169,22 +217,51 @@ impl BlockKind for InstructionKind {
                     f(v, InputValueType::Any);
                 }
             }
-            InstructionKind::DetectObjectsInWindow { pattern, detector, label, confidence, .. } => {
+            InstructionKind::DetectObjectsInWindow {
+                pattern,
+                detector,
+                label,
+                confidence,
+                ..
+            } => {
                 for v in [pattern, detector, label, confidence] {
                     f(v, InputValueType::Any);
                 }
             }
-            InstructionKind::WaitForDetection { pattern, detector, label, confidence, timeout, .. } => {
+            InstructionKind::WaitForDetection {
+                pattern,
+                detector,
+                label,
+                confidence,
+                timeout,
+                ..
+            } => {
                 for v in [pattern, detector, label, confidence, timeout] {
                     f(v, InputValueType::Any);
                 }
             }
-            InstructionKind::AimStep { pattern, target_x, target_y, gain, max_step, deadzone, .. } => {
+            InstructionKind::AimStep {
+                pattern,
+                target_x,
+                target_y,
+                gain,
+                max_step,
+                deadzone,
+                ..
+            } => {
                 for v in [pattern, target_x, target_y, gain, max_step, deadzone] {
                     f(v, InputValueType::Any);
                 }
             }
-            InstructionKind::AimAtDetection { index, gain, max_step, deadzone, timeout, settle_ms, .. } => {
+            InstructionKind::AimAtDetection {
+                index,
+                gain,
+                max_step,
+                deadzone,
+                timeout,
+                settle_ms,
+                ..
+            } => {
                 for v in [index, gain, max_step, deadzone, timeout, settle_ms] {
                     f(v, InputValueType::Any);
                 }
@@ -320,14 +397,20 @@ impl BlockKind for InstructionKind {
 
     fn call_args_mut(&mut self, block_id: &str) -> Option<&mut Vec<Value>> {
         match self {
-            InstructionKind::CallBlock { block_id: id, args, .. } if id == block_id => Some(args),
+            InstructionKind::CallBlock {
+                block_id: id, args, ..
+            } if id == block_id => Some(args),
             _ => None,
         }
     }
 
     fn call_branches_mut(&mut self, block_id: &str) -> Option<&mut Vec<Vec<Instruction>>> {
         match self {
-            InstructionKind::CallBlock { block_id: id, branches, .. } if id == block_id => Some(branches),
+            InstructionKind::CallBlock {
+                block_id: id,
+                branches,
+                ..
+            } if id == block_id => Some(branches),
             _ => None,
         }
     }

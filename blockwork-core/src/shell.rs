@@ -14,7 +14,9 @@ fn shell(script: &str) -> Command {
     use std::os::windows::process::CommandExt;
     const CREATE_NO_WINDOW: u32 = 0x0800_0000;
     let mut command = Command::new("cmd");
-    command.args(["/C", script]).creation_flags(CREATE_NO_WINDOW);
+    command
+        .args(["/C", script])
+        .creation_flags(CREATE_NO_WINDOW);
     command
 }
 

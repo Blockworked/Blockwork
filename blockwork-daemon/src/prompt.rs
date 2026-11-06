@@ -4,7 +4,7 @@
 use blockwork_app::prompt::{Reply, Request};
 use std::io::{Read, Write};
 use std::process::{Command, Stdio};
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 use std::time::Duration;
 
 pub(crate) fn install() {
@@ -15,7 +15,10 @@ fn show(request: &Request, stopped: &dyn Fn() -> bool) -> Result<Reply, String> 
     let program = crate::server::ui_program().ok_or("can't find the Blockwork window program")?;
     let mut child = Command::new(&program)
         .arg("--prompt")
-        .env("BLOCKWORK_PROMPT_PARENT_PID", std::process::id().to_string())
+        .env(
+            "BLOCKWORK_PROMPT_PARENT_PID",
+            std::process::id().to_string(),
+        )
         .stdin(Stdio::piped())
         .stdout(Stdio::piped())
         .stderr(Stdio::null())
@@ -40,8 +43,13 @@ fn show(request: &Request, stopped: &dyn Fn() -> bool) -> Result<Reply, String> 
         match rx.recv_timeout(Duration::from_millis(100)) {
             Ok(text) => {
                 let _ = child.wait();
-                let line = text.lines().rev().find(|l| l.trim_start().starts_with('{')).unwrap_or_default();
-                return serde_json::from_str(line).map_err(|_| "the dialog closed without an answer".to_string());
+                let line = text
+                    .lines()
+                    .rev()
+                    .find(|l| l.trim_start().starts_with('{'))
+                    .unwrap_or_default();
+                return serde_json::from_str(line)
+                    .map_err(|_| "the dialog closed without an answer".to_string());
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 let _ = child.wait();

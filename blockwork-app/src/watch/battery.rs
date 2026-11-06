@@ -1,13 +1,13 @@
 //! Fires battery/power strands. Edge-triggered with hysteresis.
 
 use super::{StrandKey, Target};
+use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
 use blockwork_core::macros::InstructionKind;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::AppHandle;
 
 /// Poll interval.
 const POLL_INTERVAL: Duration = Duration::from_secs(5);
@@ -29,7 +29,9 @@ fn tick_decision(armed: Arm, holds: bool) -> (bool, Arm) {
 
 /// Spawns the watcher thread.
 pub(crate) fn start(shared_state: SharedState, app: AppHandle) {
-    let _ = std::thread::Builder::new().name("battery-watch".into()).spawn(move || run(shared_state, app));
+    let _ = std::thread::Builder::new()
+        .name("battery-watch".into())
+        .spawn(move || run(shared_state, app));
 }
 
 fn run(shared_state: SharedState, app: AppHandle) {
@@ -49,7 +51,9 @@ fn run(shared_state: SharedState, app: AppHandle) {
 
         let (watched, emulator, speed_multiplier) = {
             let Ok(s) = shared_state.lock() else { continue };
-            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
+            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else {
+                continue;
+            };
             let mut watched = Vec::new();
             for mac in scheduled_run::live_macros(&s) {
                 for strand in &mac.strands {
@@ -59,12 +63,18 @@ fn run(shared_state: SharedState, app: AppHandle) {
                             // A threshold that reads a macro variable has no
                             // live value here (this isn't a real run), so the
                             // read is 0, as `resolve_vars` makes any missing name.
-                            let Ok(threshold) = v.resolve_vars(&HashMap::new()).eval_number() else { continue };
+                            let Ok(threshold) = v.resolve_vars(&HashMap::new()).eval_number()
+                            else {
+                                continue;
+                            };
                             level <= threshold
                         }
                         Some(InstructionKind::WhenBatteryChargedTo(v)) => {
                             let Some(level) = level else { continue };
-                            let Ok(threshold) = v.resolve_vars(&HashMap::new()).eval_number() else { continue };
+                            let Ok(threshold) = v.resolve_vars(&HashMap::new()).eval_number()
+                            else {
+                                continue;
+                            };
                             level >= threshold
                         }
                         Some(InstructionKind::WhenPowerPluggedIn) => plugged_in,

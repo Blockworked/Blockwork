@@ -29,14 +29,19 @@ impl Tracker {
             return None;
         }
         let key = NEXT_KEY.fetch_add(1, Ordering::Relaxed);
-        let block = ActiveBlock { macro_id: macro_id.to_string(), block_id: String::new() };
+        let block = ActiveBlock {
+            macro_id: macro_id.to_string(),
+            block_id: String::new(),
+        };
         ACTIVE.lock().ok()?.push((key, block));
         Some(Tracker { key })
     }
 
     /// The strand is now running `block_id`.
     pub(crate) fn at(&self, block_id: &str) {
-        let Ok(mut active) = ACTIVE.lock() else { return };
+        let Ok(mut active) = ACTIVE.lock() else {
+            return;
+        };
         self.at_locked(&mut active, block_id);
     }
 
@@ -53,8 +58,12 @@ impl Tracker {
 
 impl Drop for Tracker {
     fn drop(&mut self) {
-        let Ok(mut active) = ACTIVE.lock() else { return };
-        let Some(pos) = active.iter().position(|(k, _)| *k == self.key) else { return };
+        let Ok(mut active) = ACTIVE.lock() else {
+            return;
+        };
+        let Some(pos) = active.iter().position(|(k, _)| *k == self.key) else {
+            return;
+        };
         let (_, block) = active.remove(pos);
         REVISION.fetch_add(1, Ordering::Relaxed);
         let last = !active.iter().any(|(_, b)| b.macro_id == block.macro_id);
@@ -72,7 +81,9 @@ pub fn revision() -> u64 {
 
 /// Every block some strand is on, without duplicates.
 pub fn snapshot() -> Vec<ActiveBlock> {
-    let Ok(active) = ACTIVE.lock() else { return Vec::new() };
+    let Ok(active) = ACTIVE.lock() else {
+        return Vec::new();
+    };
     let mut out: Vec<ActiveBlock> = Vec::new();
     for (_, block) in active.iter() {
         if !block.block_id.is_empty() && !out.contains(block) {
@@ -103,8 +114,18 @@ mod tests {
                 "moving to another block is a change"
             );
         }
-        let mine = |s: Vec<ActiveBlock>| s.into_iter().filter(|b| b.macro_id == "trace-test").collect::<Vec<_>>();
-        assert_eq!(mine(snapshot()), vec![ActiveBlock { macro_id: "trace-test".into(), block_id: "b2".into() }]);
+        let mine = |s: Vec<ActiveBlock>| {
+            s.into_iter()
+                .filter(|b| b.macro_id == "trace-test")
+                .collect::<Vec<_>>()
+        };
+        assert_eq!(
+            mine(snapshot()),
+            vec![ActiveBlock {
+                macro_id: "trace-test".into(),
+                block_id: "b2".into()
+            }]
+        );
         drop(tracker);
         assert!(mine(snapshot()).is_empty());
         assert!(Tracker::new("").is_none());

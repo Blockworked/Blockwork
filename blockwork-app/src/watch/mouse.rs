@@ -2,9 +2,9 @@
 //! releases (and scrolls). Scoped like the other watchers.
 
 use super::{Target, variable_env};
+use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
-use crate::AppHandle;
 use blockwork_core::input::key_names::{match_key, parse_key_combo};
 use blockwork_core::macros::InstructionKind;
 use blockwork_core::recording;
@@ -12,29 +12,43 @@ use std::sync::Arc;
 
 pub(crate) fn start(shared_state: SharedState, app: AppHandle) {
     let rx = recording::subscribe_button_events();
-    let _ = std::thread::Builder::new().name("mouse-watch".into()).spawn(move || run(shared_state, app, rx));
+    let _ = std::thread::Builder::new()
+        .name("mouse-watch".into())
+        .spawn(move || run(shared_state, app, rx));
 }
 
 /// Modifier bits of a combo like `Control+Shift`; `None` when it names a
 /// key that isn't a modifier.
 fn modifier_bits(combo: &str) -> Option<u8> {
-    parse_key_combo(combo).iter().map(match_key).try_fold(0, |bits, key| {
-        let bit = key.modifier_bit();
-        (bit != 0).then_some(bits | bit)
-    })
+    parse_key_combo(combo)
+        .iter()
+        .map(match_key)
+        .try_fold(0, |bits, key| {
+            let bit = key.modifier_bit();
+            (bit != 0).then_some(bits | bit)
+        })
 }
 
-fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<recording::ButtonEvent>) {
+fn run(
+    shared_state: SharedState,
+    app: AppHandle,
+    rx: std::sync::mpsc::Receiver<recording::ButtonEvent>,
+) {
     while let Ok(event) = rx.recv() {
         let mut fires = Vec::new();
         let (emulator, speed_multiplier) = {
             let Ok(s) = shared_state.lock() else { continue };
-            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
+            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else {
+                continue;
+            };
             for mac in scheduled_run::live_macros(&s) {
                 let env = variable_env(mac);
                 for strand in &mac.strands {
-                    let Some(InstructionKind::WhenMouseButton { button, pressed, modifiers }) =
-                        strand.instructions.first().map(|i| &i.kind)
+                    let Some(InstructionKind::WhenMouseButton {
+                        button,
+                        pressed,
+                        modifiers,
+                    }) = strand.instructions.first().map(|i| &i.kind)
                     else {
                         continue;
                     };
@@ -42,7 +56,10 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
                         continue;
                     }
                     // Empty means "whatever is held"; otherwise exactly these modifiers.
-                    let combo = modifiers.as_ref().and_then(|v| v.resolve_vars(&env).eval_text().ok()).unwrap_or_default();
+                    let combo = modifiers
+                        .as_ref()
+                        .and_then(|v| v.resolve_vars(&env).eval_text().ok())
+                        .unwrap_or_default();
                     if !combo.trim().is_empty() && modifier_bits(&combo) != Some(event.modifiers) {
                         continue;
                     }

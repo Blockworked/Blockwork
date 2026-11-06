@@ -4,13 +4,34 @@ use super::*;
 fn swallowed_hotkeys_swallow_their_repeats_and_release() {
     let mut keys = SuppressedKeys::default();
     assert!(keys.filter(10, 1, false).is_none());
-    assert!(matches!(keys.decide(10, 1, CaptureDecision::Suppress), CaptureDecision::Suppress));
-    assert!(matches!(keys.filter(10, 1, true), Some(CaptureDecision::Suppress)));
-    assert!(matches!(keys.filter(10, 2, true), Some(CaptureDecision::Passthrough)));
-    assert!(matches!(keys.decide(11, 1, CaptureDecision::Passthrough), CaptureDecision::Suppress));
-    assert!(matches!(keys.decide(11, 1, CaptureDecision::Passthrough), CaptureDecision::Passthrough));
-    assert!(matches!(keys.decide(10, 1, CaptureDecision::Passthrough), CaptureDecision::Passthrough));
-    assert!(matches!(keys.filter(10, 1, true), Some(CaptureDecision::Passthrough)));
+    assert!(matches!(
+        keys.decide(10, 1, CaptureDecision::Suppress),
+        CaptureDecision::Suppress
+    ));
+    assert!(matches!(
+        keys.filter(10, 1, true),
+        Some(CaptureDecision::Suppress)
+    ));
+    assert!(matches!(
+        keys.filter(10, 2, true),
+        Some(CaptureDecision::Passthrough)
+    ));
+    assert!(matches!(
+        keys.decide(11, 1, CaptureDecision::Passthrough),
+        CaptureDecision::Suppress
+    ));
+    assert!(matches!(
+        keys.decide(11, 1, CaptureDecision::Passthrough),
+        CaptureDecision::Passthrough
+    ));
+    assert!(matches!(
+        keys.decide(10, 1, CaptureDecision::Passthrough),
+        CaptureDecision::Passthrough
+    ));
+    assert!(matches!(
+        keys.filter(10, 1, true),
+        Some(CaptureDecision::Passthrough)
+    ));
 }
 
 #[test]
@@ -97,10 +118,19 @@ fn live_media_keys_are_dispatched_and_captured() {
 #[test]
 fn unavailable_native_keys_fail_clearly_for_every_direction() {
     let mut backend = MacosBackend::new().unwrap();
-    for key in [MacroKey::F21, MacroKey::F22, MacroKey::F23, MacroKey::F24, MacroKey::Select] {
+    for key in [
+        MacroKey::F21,
+        MacroKey::F22,
+        MacroKey::F23,
+        MacroKey::F24,
+        MacroKey::Select,
+    ] {
         for direction in [Direction::Press, Direction::Release, Direction::Click] {
             let error = backend.key(key.clone(), direction).unwrap_err();
-            assert!(error.contains(&format!("{key:?}")) && error.contains("no native macOS virtual-key code"));
+            assert!(
+                error.contains(&format!("{key:?}"))
+                    && error.contains("no native macOS virtual-key code")
+            );
         }
     }
 }
@@ -119,7 +149,11 @@ fn pc_navigation_keys_follow_apples_usb_keyboard_translation() {
         let mut backend = MacosBackend::new().unwrap();
         for down in [true, false] {
             let event = backend.keyboard_event(code, down).unwrap();
-            assert!(event.get_flags().contains(CGEventFlags::CGEventFlagSecondaryFn));
+            assert!(
+                event
+                    .get_flags()
+                    .contains(CGEventFlags::CGEventFlagSecondaryFn)
+            );
         }
     }
 }
@@ -127,8 +161,8 @@ fn pc_navigation_keys_follow_apples_usb_keyboard_translation() {
 #[test]
 fn extended_keys_round_trip_without_becoming_unknown_codes() {
     for code in [
-        64, 65, 67, 69, 71, 72, 73, 74, 75, 78, 79, 80, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91,
-        92, 105, 106, 107, 113, 114,
+        64, 65, 67, 69, 71, 72, 73, 74, 75, 78, 79, 80, 82, 83, 84, 85, 86, 87, 88, 89, 90, 91, 92,
+        105, 106, 107, 113, 114,
     ] {
         let key = cg_keycode_to_macro_key(code).unwrap();
         assert!(!matches!(key, MacroKey::Other(_)), "code {code}");
@@ -587,11 +621,13 @@ fn live_pc_key_aliases_deliver_matching_native_pairs() {
     let captured = Arc::clone(&received);
     let tap = system_keys::KeyTap::new(move |kind, event| {
         if matches!(kind, 10 | 11)
-            && event.get_integer_value_field(EventField::EVENT_SOURCE_USER_DATA) == SYNTHETIC_EVENT_TAG
+            && event.get_integer_value_field(EventField::EVENT_SOURCE_USER_DATA)
+                == SYNTHETIC_EVENT_TAG
         {
             captured.lock().unwrap().push((
                 event.get_integer_value_field(EventField::KEYBOARD_EVENT_KEYCODE),
-                kind, event.get_flags().bits(),
+                kind,
+                event.get_flags().bits(),
             ));
             // F14/F15 are system brightness shortcuts on macOS. Observe
             // their native pairs before the OS consumes them, and prevent
@@ -599,7 +635,8 @@ fn live_pc_key_aliases_deliver_matching_native_pairs() {
             return CaptureDecision::Suppress;
         }
         CaptureDecision::Passthrough
-    }).expect("native-key test requires Accessibility access");
+    })
+    .expect("native-key test requires Accessibility access");
     let source = tap.mach_port().create_runloop_source(0).unwrap();
     let run_loop = CFRunLoop::get_current();
     run_loop.add_source(&source, unsafe { kCFRunLoopDefaultMode });
@@ -608,10 +645,18 @@ fn live_pc_key_aliases_deliver_matching_native_pairs() {
     for key in [MacroKey::PrintScr, MacroKey::ScrollLock, MacroKey::Pause] {
         backend.key(key, Direction::Click).unwrap();
     }
-    CFRunLoop::run_in_mode(unsafe { kCFRunLoopDefaultMode }, std::time::Duration::from_millis(500), false);
+    CFRunLoop::run_in_mode(
+        unsafe { kCFRunLoopDefaultMode },
+        std::time::Duration::from_millis(500),
+        false,
+    );
     run_loop.remove_source(&source, unsafe { kCFRunLoopDefaultMode });
     let received = received.lock().unwrap();
-    assert_eq!(received.len(), 6, "each alias needs one native down and up: {received:?}");
+    assert_eq!(
+        received.len(),
+        6,
+        "each alias needs one native down and up: {received:?}"
+    );
     for (pair, code) in received.chunks_exact(2).zip([105, 107, 113]) {
         assert_eq!((pair[0].0, pair[0].1), (code, 10));
         assert_eq!((pair[1].0, pair[1].1), (code, 11));
@@ -624,8 +669,8 @@ fn live_pc_key_aliases_deliver_matching_native_pairs() {
 #[test]
 #[ignore = "posts input to scripts/macos/test-window.swift"]
 fn live_keyboard_playback_preserves_text_and_modifier_order() {
-    let title = std::env::var("BW_LIVE_WINDOW")
-        .expect("set BW_LIVE_WINDOW to the native fixture title");
+    let title =
+        std::env::var("BW_LIVE_WINDOW").expect("set BW_LIVE_WINDOW to the native fixture title");
     let path = std::env::var("BLOCKWORK_TEST_EVENT_LOG")
         .expect("set BLOCKWORK_TEST_EVENT_LOG to the fixture log");
     crate::window::act(
@@ -693,8 +738,7 @@ fn live_keyboard_playback_preserves_text_and_modifier_order() {
             );
             if rows.iter().any(|row| {
                 row["type"] == 12
-                    && row["flags"].as_u64().unwrap()
-                        & CGEventFlags::CGEventFlagAlternate.bits()
+                    && row["flags"].as_u64().unwrap() & CGEventFlags::CGEventFlagAlternate.bits()
                         == 0
             }) {
                 break;

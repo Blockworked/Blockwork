@@ -46,7 +46,12 @@ fn process_names() -> Result<Vec<String>, String> {
     let mut names = Vec::new();
     for entry in dir.flatten() {
         let path = entry.path();
-        if !entry.file_name().to_string_lossy().bytes().all(|b| b.is_ascii_digit()) {
+        if !entry
+            .file_name()
+            .to_string_lossy()
+            .bytes()
+            .all(|b| b.is_ascii_digit())
+        {
             continue;
         }
         if let Ok(comm) = std::fs::read_to_string(path.join("comm")) {
@@ -85,23 +90,32 @@ fn process_names() -> Result<Vec<String>, String> {
 /// than merely accepting that an `open` child process was created.
 #[cfg(target_os = "macos")]
 pub fn open_application(command: &str) -> std::io::Result<()> {
-    let output = std::process::Command::new("/usr/bin/open").arg(command).output()?;
+    let output = std::process::Command::new("/usr/bin/open")
+        .arg(command)
+        .output()?;
     if output.status.success() {
         Ok(())
     } else {
-        Err(std::io::Error::other(format!("couldn't open the application: {}", String::from_utf8_lossy(&output.stderr).trim())))
+        Err(std::io::Error::other(format!(
+            "couldn't open the application: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )))
     }
 }
 
 #[cfg(target_os = "macos")]
 fn app_target_matches(command: &str, name: &str, bundle: Option<&str>, running_name: &str) -> bool {
     let command = command.trim();
-    let command = command.strip_prefix('"').and_then(|value| value.strip_suffix('"')).unwrap_or(command);
+    let command = command
+        .strip_prefix('"')
+        .and_then(|value| value.strip_suffix('"'))
+        .unwrap_or(command);
     let target = std::path::Path::new(command);
     if target.extension().is_some_and(|ext| ext == "app") {
         // Two installed copies can share both their name and bundle id.
         let Some(bundle) = bundle else { return false };
-        let canonical = |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
+        let canonical =
+            |path: &std::path::Path| path.canonicalize().unwrap_or_else(|_| path.to_path_buf());
         return canonical(target) == canonical(std::path::Path::new(bundle));
     }
     !name.trim().is_empty() && name.trim().eq_ignore_ascii_case(running_name)
@@ -118,8 +132,14 @@ pub fn close_application(command: &str, name: &str) -> std::io::Result<()> {
     let targets = objc2::rc::autoreleasepool(|_| {
         let mut targets = Vec::new();
         for app in NSWorkspace::sharedWorkspace().runningApplications().iter() {
-            let path = app.bundleURL().and_then(|url| url.path()).map(|path| path.to_string());
-            let running_name = app.localizedName().map(|name| name.to_string()).unwrap_or_default();
+            let path = app
+                .bundleURL()
+                .and_then(|url| url.path())
+                .map(|path| path.to_string());
+            let running_name = app
+                .localizedName()
+                .map(|name| name.to_string())
+                .unwrap_or_default();
             if app_target_matches(command, name, path.as_deref(), &running_name) {
                 app.terminate();
                 targets.push((app.processIdentifier(), app, running_name));
@@ -135,7 +155,9 @@ pub fn close_application(command: &str, name: &str) -> std::io::Result<()> {
     }
     for (pid, app, running_name) in &targets {
         if alive(*pid) && !app.forceTerminate() && alive(*pid) {
-            return Err(std::io::Error::other(format!("couldn't close {running_name}")));
+            return Err(std::io::Error::other(format!(
+                "couldn't close {running_name}"
+            )));
         }
     }
     Ok(())
@@ -145,7 +167,8 @@ pub fn close_application(command: &str, name: &str) -> std::io::Result<()> {
 fn process_names() -> Result<Vec<String>, String> {
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
-        CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW, TH32CS_SNAPPROCESS,
+        CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
+        TH32CS_SNAPPROCESS,
     };
     let mut names = Vec::new();
     unsafe {
@@ -157,7 +180,11 @@ fn process_names() -> Result<Vec<String>, String> {
         entry.dwSize = std::mem::size_of::<PROCESSENTRY32W>() as u32;
         let mut more = Process32FirstW(snapshot, &mut entry) != 0;
         while more {
-            let len = entry.szExeFile.iter().position(|&c| c == 0).unwrap_or(entry.szExeFile.len());
+            let len = entry
+                .szExeFile
+                .iter()
+                .position(|&c| c == 0)
+                .unwrap_or(entry.szExeFile.len());
             let name = String::from_utf16_lossy(&entry.szExeFile[..len]);
             names.push(strip_exe(&name).to_string());
             more = Process32NextW(snapshot, &mut entry) != 0;
@@ -179,7 +206,9 @@ fn basename(path: &str) -> String {
 }
 
 fn strip_exe(name: &str) -> &str {
-    name.strip_suffix(".exe").or_else(|| name.strip_suffix(".EXE")).unwrap_or(name)
+    name.strip_suffix(".exe")
+        .or_else(|| name.strip_suffix(".EXE"))
+        .unwrap_or(name)
 }
 
 /// How long since the last keyboard or mouse input.
@@ -197,11 +226,16 @@ pub fn idle_time() -> Result<Duration, String> {
 fn os_idle_time() -> Option<Duration> {
     use windows_sys::Win32::System::SystemInformation::GetTickCount;
     use windows_sys::Win32::UI::Input::KeyboardAndMouse::{GetLastInputInfo, LASTINPUTINFO};
-    let mut info = LASTINPUTINFO { cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32, dwTime: 0 };
+    let mut info = LASTINPUTINFO {
+        cbSize: std::mem::size_of::<LASTINPUTINFO>() as u32,
+        dwTime: 0,
+    };
     if unsafe { GetLastInputInfo(&mut info) } == 0 {
         return None;
     }
-    Some(Duration::from_millis(unsafe { GetTickCount() }.wrapping_sub(info.dwTime) as u64))
+    Some(Duration::from_millis(
+        unsafe { GetTickCount() }.wrapping_sub(info.dwTime) as u64,
+    ))
 }
 
 #[cfg(target_os = "macos")]
@@ -230,7 +264,10 @@ pub fn screen_locked() -> Result<bool, String> {
     let session = SESSION.get_or_init(|| zbus::blocking::Connection::session().ok());
     // KDE and most others, then GNOME.
     for (service, path) in [
-        ("org.freedesktop.ScreenSaver", "/org/freedesktop/ScreenSaver"),
+        (
+            "org.freedesktop.ScreenSaver",
+            "/org/freedesktop/ScreenSaver",
+        ),
         ("org.gnome.ScreenSaver", "/org/gnome/ScreenSaver"),
     ] {
         if let Some(bus) = session
@@ -261,7 +298,9 @@ pub fn screen_locked() -> Result<bool, String> {
 #[cfg(windows)]
 pub fn screen_locked() -> Result<bool, String> {
     // The lock screen runs as LogonUI.
-    Ok(process_names()?.iter().any(|n| n.eq_ignore_ascii_case("LogonUI")))
+    Ok(process_names()?
+        .iter()
+        .any(|n| n.eq_ignore_ascii_case("LogonUI")))
 }
 
 #[cfg(target_os = "macos")]
@@ -278,9 +317,13 @@ pub fn screen_locked() -> Result<bool, String> {
     if raw.is_null() {
         return Err("no login session".into());
     }
-    let session: CFDictionary<CFString, CFType> = unsafe { CFDictionary::wrap_under_create_rule(raw) };
+    let session: CFDictionary<CFString, CFType> =
+        unsafe { CFDictionary::wrap_under_create_rule(raw) };
     let key = CFString::from_static_string("CGSSessionScreenIsLocked");
-    Ok(session.find(&key).and_then(|v| v.downcast::<CFBoolean>()).is_some_and(bool::from))
+    Ok(session
+        .find(&key)
+        .and_then(|v| v.downcast::<CFBoolean>())
+        .is_some_and(bool::from))
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
@@ -292,17 +335,25 @@ pub fn screen_locked() -> Result<bool, String> {
 /// interface other than loopback). Doesn't check that a site answers.
 #[cfg(target_os = "linux")]
 pub fn network_connected() -> Result<bool, String> {
-    let v4 = std::fs::read_to_string("/proc/net/route").map_err(|e| format!("can't read the routing table: {e}"))?;
+    let v4 = std::fs::read_to_string("/proc/net/route")
+        .map_err(|e| format!("can't read the routing table: {e}"))?;
     // Iface Destination Gateway Flags ...; flag 1 is "up".
     let default_v4 = v4.lines().skip(1).any(|line| {
         let f: Vec<&str> = line.split_whitespace().collect();
-        f.len() > 3 && f[0] != "lo" && f[1] == "00000000" && u32::from_str_radix(f[3], 16).is_ok_and(|flags| flags & 1 != 0)
+        f.len() > 3
+            && f[0] != "lo"
+            && f[1] == "00000000"
+            && u32::from_str_radix(f[3], 16).is_ok_and(|flags| flags & 1 != 0)
     });
     // Destination, prefix length, ..., interface last.
     let default_v6 = std::fs::read_to_string("/proc/net/ipv6_route").is_ok_and(|v6| {
         v6.lines().any(|line| {
             let f: Vec<&str> = line.split_whitespace().collect();
-            f.len() >= 10 && f[0].bytes().all(|b| b == b'0') && f[1] == "00" && f[9] != "lo" && f[4].bytes().any(|b| b != b'0')
+            f.len() >= 10
+                && f[0].bytes().all(|b| b == b'0')
+                && f[1] == "00"
+                && f[9] != "lo"
+                && f[4].bytes().any(|b| b != b'0')
         })
     });
     Ok(default_v4 || default_v6)
@@ -325,7 +376,9 @@ pub fn network_connected() -> Result<bool, String> {
             .args(family)
             .arg("default")
             .output()
-            .is_ok_and(|out| out.status.success() && String::from_utf8_lossy(&out.stdout).contains("interface:"))
+            .is_ok_and(|out| {
+                out.status.success() && String::from_utf8_lossy(&out.stdout).contains("interface:")
+            })
     };
     Ok(has_route(&[]) || has_route(&["-inet6"]))
 }
@@ -352,7 +405,9 @@ impl UsbDevice {
     /// Matches name or ids, ignoring case; an empty pattern matches any device.
     pub fn matches(&self, pattern: &str) -> bool {
         let pattern = pattern.trim().to_lowercase();
-        pattern.is_empty() || self.name.to_lowercase().contains(&pattern) || self.ids.contains(&pattern)
+        pattern.is_empty()
+            || self.name.to_lowercase().contains(&pattern)
+            || self.ids.contains(&pattern)
     }
 
     fn named(id: String, maker: &str, product: &str, vendor: u32, product_id: u32) -> UsbDevice {
@@ -364,26 +419,47 @@ impl UsbDevice {
             ("", p) => p.to_string(),
             (m, p) => format!("{m} {p}"),
         };
-        UsbDevice { id, name, maker: maker.trim().to_string(), ids }
+        UsbDevice {
+            id,
+            name,
+            maker: maker.trim().to_string(),
+            ids,
+        }
     }
 }
 
 /// USB devices plugged in right now, not counting hubs.
 #[cfg(target_os = "linux")]
 pub fn usb_devices() -> Result<Vec<UsbDevice>, String> {
-    let dir = std::fs::read_dir("/sys/bus/usb/devices").map_err(|e| format!("can't list USB devices: {e}"))?;
+    let dir = std::fs::read_dir("/sys/bus/usb/devices")
+        .map_err(|e| format!("can't list USB devices: {e}"))?;
     let mut devices = Vec::new();
     for entry in dir.flatten() {
         let path = entry.path();
-        let read = |file: &str| std::fs::read_to_string(path.join(file)).map(|s| s.trim().to_string()).unwrap_or_default();
+        let read = |file: &str| {
+            std::fs::read_to_string(path.join(file))
+                .map(|s| s.trim().to_string())
+                .unwrap_or_default()
+        };
         let hex = |file: &str| u32::from_str_radix(&read(file), 16).ok();
-        let (Some(vendor), Some(product)) = (hex("idVendor"), hex("idProduct")) else { continue };
+        let (Some(vendor), Some(product)) = (hex("idVendor"), hex("idProduct")) else {
+            continue;
+        };
         // Class 09 is a hub, root hubs included.
         if read("bDeviceClass") == "09" {
             continue;
         }
-        let id = format!("{}/{vendor:04x}:{product:04x}", entry.file_name().to_string_lossy());
-        devices.push(UsbDevice::named(id, &read("manufacturer"), &read("product"), vendor, product));
+        let id = format!(
+            "{}/{vendor:04x}:{product:04x}",
+            entry.file_name().to_string_lossy()
+        );
+        devices.push(UsbDevice::named(
+            id,
+            &read("manufacturer"),
+            &read("product"),
+            vendor,
+            product,
+        ));
     }
     devices.sort_by(|a, b| a.id.cmp(&b.id));
     Ok(devices)
@@ -392,18 +468,26 @@ pub fn usb_devices() -> Result<Vec<UsbDevice>, String> {
 #[cfg(windows)]
 pub fn usb_devices() -> Result<Vec<UsbDevice>, String> {
     use windows_sys::Win32::Devices::DeviceAndDriverInstallation::{
-        DIGCF_ALLCLASSES, DIGCF_PRESENT, SP_DEVINFO_DATA, SPDRP_COMPATIBLEIDS, SPDRP_DEVICEDESC, SPDRP_FRIENDLYNAME,
-        SPDRP_MFG, SPDRP_SERVICE, SetupDiDestroyDeviceInfoList, SetupDiEnumDeviceInfo, SetupDiGetClassDevsW,
-        SetupDiGetDeviceInstanceIdW, SetupDiGetDevicePropertyW, SetupDiGetDeviceRegistryPropertyW,
+        DIGCF_ALLCLASSES, DIGCF_PRESENT, SP_DEVINFO_DATA, SPDRP_COMPATIBLEIDS, SPDRP_DEVICEDESC,
+        SPDRP_FRIENDLYNAME, SPDRP_MFG, SPDRP_SERVICE, SetupDiDestroyDeviceInfoList,
+        SetupDiEnumDeviceInfo, SetupDiGetClassDevsW, SetupDiGetDeviceInstanceIdW,
+        SetupDiGetDevicePropertyW, SetupDiGetDeviceRegistryPropertyW,
     };
     use windows_sys::Win32::Devices::Properties::DEVPKEY_Device_BusReportedDeviceDesc;
     use windows_sys::Win32::Foundation::INVALID_HANDLE_VALUE;
 
-    let from_wide = |buf: &[u16]| String::from_utf16_lossy(&buf[..buf.iter().position(|&c| c == 0).unwrap_or(buf.len())]);
+    let from_wide = |buf: &[u16]| {
+        String::from_utf16_lossy(&buf[..buf.iter().position(|&c| c == 0).unwrap_or(buf.len())])
+    };
     let enumerator: Vec<u16> = "USB\0".encode_utf16().collect();
     // SAFETY: the list is destroyed below; every buffer outlives its call.
     unsafe {
-        let list = SetupDiGetClassDevsW(std::ptr::null(), enumerator.as_ptr(), std::ptr::null_mut(), DIGCF_ALLCLASSES | DIGCF_PRESENT);
+        let list = SetupDiGetClassDevsW(
+            std::ptr::null(),
+            enumerator.as_ptr(),
+            std::ptr::null_mut(),
+            DIGCF_ALLCLASSES | DIGCF_PRESENT,
+        );
         if list as isize == INVALID_HANDLE_VALUE as isize {
             return Err("can't list USB devices".into());
         }
@@ -417,7 +501,14 @@ pub fn usb_devices() -> Result<Vec<UsbDevice>, String> {
             }
             index += 1;
             let mut id_buf = [0u16; 512];
-            if SetupDiGetDeviceInstanceIdW(list, &info, id_buf.as_mut_ptr(), id_buf.len() as u32, std::ptr::null_mut()) == 0 {
+            if SetupDiGetDeviceInstanceIdW(
+                list,
+                &info,
+                id_buf.as_mut_ptr(),
+                id_buf.len() as u32,
+                std::ptr::null_mut(),
+            ) == 0
+            {
                 continue;
             }
             let instance = from_wide(&id_buf);
@@ -427,14 +518,29 @@ pub fn usb_devices() -> Result<Vec<UsbDevice>, String> {
             }
             let raw_property = |key| {
                 let mut buf = [0u16; 1024];
-                let ok = SetupDiGetDeviceRegistryPropertyW(list, &info, key, std::ptr::null_mut(), buf.as_mut_ptr().cast(), (buf.len() * 2) as u32, std::ptr::null_mut());
+                let ok = SetupDiGetDeviceRegistryPropertyW(
+                    list,
+                    &info,
+                    key,
+                    std::ptr::null_mut(),
+                    buf.as_mut_ptr().cast(),
+                    (buf.len() * 2) as u32,
+                    std::ptr::null_mut(),
+                );
                 (ok != 0).then_some(buf)
             };
-            let property = |key| raw_property(key).map(|buf| from_wide(&buf)).unwrap_or_default();
+            let property = |key| {
+                raw_property(key)
+                    .map(|buf| from_wide(&buf))
+                    .unwrap_or_default()
+            };
             // Hubs: class 09, or USB\USB20_HUB style ids on the USB 3 stack,
             // or the hub driver. Compatible ids are a list of strings.
             let is_hub = raw_property(SPDRP_COMPATIBLEIDS).is_some_and(|buf| {
-                String::from_utf16_lossy(&buf).split('\0').map(str::to_uppercase).any(|id| id == "USB\\CLASS_09" || id.ends_with("_HUB"))
+                String::from_utf16_lossy(&buf)
+                    .split('\0')
+                    .map(str::to_uppercase)
+                    .any(|id| id == "USB\\CLASS_09" || id.ends_with("_HUB"))
             }) || property(SPDRP_SERVICE).to_lowercase().starts_with("usbhub");
             if is_hub {
                 continue;
@@ -444,20 +550,52 @@ pub fn usb_devices() -> Result<Vec<UsbDevice>, String> {
             let reported = {
                 let mut buf = [0u16; 512];
                 let mut kind = 0u32;
-                let ok = SetupDiGetDevicePropertyW(list, &info, &DEVPKEY_Device_BusReportedDeviceDesc, &mut kind, buf.as_mut_ptr().cast(), (buf.len() * 2) as u32, std::ptr::null_mut(), 0);
-                if ok == 0 { String::new() } else { from_wide(&buf) }
+                let ok = SetupDiGetDevicePropertyW(
+                    list,
+                    &info,
+                    &DEVPKEY_Device_BusReportedDeviceDesc,
+                    &mut kind,
+                    buf.as_mut_ptr().cast(),
+                    (buf.len() * 2) as u32,
+                    std::ptr::null_mut(),
+                    0,
+                );
+                if ok == 0 {
+                    String::new()
+                } else {
+                    from_wide(&buf)
+                }
             };
             let hex_after = |tag: &str| {
-                upper.find(tag).and_then(|at| u32::from_str_radix(upper.get(at + tag.len()..at + tag.len() + 4)?, 16).ok()).unwrap_or(0)
+                upper
+                    .find(tag)
+                    .and_then(|at| {
+                        u32::from_str_radix(upper.get(at + tag.len()..at + tag.len() + 4)?, 16).ok()
+                    })
+                    .unwrap_or(0)
             };
-            let product = [reported, property(SPDRP_FRIENDLYNAME), property(SPDRP_DEVICEDESC)]
-                .into_iter()
-                .find(|p| !p.trim().is_empty())
-                .unwrap_or_default();
+            let product = [
+                reported,
+                property(SPDRP_FRIENDLYNAME),
+                property(SPDRP_DEVICEDESC),
+            ]
+            .into_iter()
+            .find(|p| !p.trim().is_empty())
+            .unwrap_or_default();
             let maker = property(SPDRP_MFG);
             // "(Standard USB Host Controller)" style makers say nothing.
-            let maker = if maker.starts_with('(') { String::new() } else { maker };
-            devices.push(UsbDevice::named(instance, &maker, &product, hex_after("VID_"), hex_after("PID_")));
+            let maker = if maker.starts_with('(') {
+                String::new()
+            } else {
+                maker
+            };
+            devices.push(UsbDevice::named(
+                instance,
+                &maker,
+                &product,
+                hex_after("VID_"),
+                hex_after("PID_"),
+            ));
         }
         SetupDiDestroyDeviceInfoList(list);
         devices.sort_by(|a, b| a.id.cmp(&b.id));
@@ -501,15 +639,28 @@ fn parse_ioreg(text: &str) -> Vec<UsbDevice> {
                 finish(done, &mut devices);
             }
             let rest = &line[at + 4..];
-            let is_device = rest.contains("<class IOUSBHostDevice") || rest.contains("<class IOUSBDevice");
+            let is_device =
+                rest.contains("<class IOUSBHostDevice") || rest.contains("<class IOUSBDevice");
             if let (true, Some((name, after))) = (is_device, rest.split_once('@')) {
-                let location = after.split_whitespace().next().unwrap_or_default().to_string();
-                current = Some(Pending { name: name.trim().to_string(), location, maker: String::new(), vendor: 0, product: 0 });
+                let location = after
+                    .split_whitespace()
+                    .next()
+                    .unwrap_or_default()
+                    .to_string();
+                current = Some(Pending {
+                    name: name.trim().to_string(),
+                    location,
+                    maker: String::new(),
+                    vendor: 0,
+                    product: 0,
+                });
             }
             continue;
         }
         let Some(p) = current.as_mut() else { continue };
-        let Some((key, value)) = line.split_once(" = ") else { continue };
+        let Some((key, value)) = line.split_once(" = ") else {
+            continue;
+        };
         let key = key.trim_start_matches(['|', ' ']).trim().trim_matches('"');
         let value = value.trim();
         match key {
@@ -532,10 +683,30 @@ mod tests {
     #[cfg(target_os = "macos")]
     #[test]
     fn close_app_prefers_the_selected_bundle_over_another_copy_with_the_same_name() {
-        assert!(app_target_matches("/Applications/Example.app", "Example", Some("/Applications/Example.app"), "Example"));
-        assert!(!app_target_matches("/Applications/Example.app", "Example", Some("/Users/test/Example.app"), "Example"));
-        assert!(app_target_matches("\"/Applications/Example.app\"", "Example", Some("/Applications/Example.app"), "Example"));
-        assert!(!app_target_matches("/Applications/Example.app", "Example", None, "Example"));
+        assert!(app_target_matches(
+            "/Applications/Example.app",
+            "Example",
+            Some("/Applications/Example.app"),
+            "Example"
+        ));
+        assert!(!app_target_matches(
+            "/Applications/Example.app",
+            "Example",
+            Some("/Users/test/Example.app"),
+            "Example"
+        ));
+        assert!(app_target_matches(
+            "\"/Applications/Example.app\"",
+            "Example",
+            Some("/Applications/Example.app"),
+            "Example"
+        ));
+        assert!(!app_target_matches(
+            "/Applications/Example.app",
+            "Example",
+            None,
+            "Example"
+        ));
         assert!(app_target_matches("", "Example", None, "example"));
         assert!(!app_target_matches("", "", None, "Example"));
     }
@@ -564,10 +735,24 @@ mod tests {
     #[test]
     fn names_usb_devices_and_reads_ioreg() {
         let d = UsbDevice::named("3-2".into(), "Logitech", "USB Receiver", 0x046d, 0xc52b);
-        assert_eq!((d.name.as_str(), d.maker.as_str(), d.ids.as_str()), ("Logitech USB Receiver", "Logitech", "046d:c52b"));
-        assert!(d.matches("receiver") && d.matches("046D:C52B") && d.matches("") && !d.matches("keyboard"));
-        assert_eq!(UsbDevice::named("x".into(), "Lenovo", "Lenovo Camera", 1, 2).name, "Lenovo Camera");
-        assert_eq!(UsbDevice::named("x".into(), "", "", 1, 2).name, "USB device 0001:0002");
+        assert_eq!(
+            (d.name.as_str(), d.maker.as_str(), d.ids.as_str()),
+            ("Logitech USB Receiver", "Logitech", "046d:c52b")
+        );
+        assert!(
+            d.matches("receiver")
+                && d.matches("046D:C52B")
+                && d.matches("")
+                && !d.matches("keyboard")
+        );
+        assert_eq!(
+            UsbDevice::named("x".into(), "Lenovo", "Lenovo Camera", 1, 2).name,
+            "Lenovo Camera"
+        );
+        assert_eq!(
+            UsbDevice::named("x".into(), "", "", 1, 2).name,
+            "USB device 0001:0002"
+        );
         let ioreg = r#"+-o Root  <class IORegistryEntry, id 0x100000100, retain 26>
   +-o AppleT8103USBXHCI@00000000  <class AppleT8103USBXHCI, id 0x1000002c5>
   | +-o USB Receiver@00100000  <class IOUSBHostDevice, id 0x100000a1b, registered>

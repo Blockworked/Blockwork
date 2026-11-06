@@ -11,7 +11,8 @@ pub fn set_enabled(enabled: bool) -> Result<(), String> {
     if !enabled {
         return remove();
     }
-    let exe = std::env::current_exe().map_err(|e| format!("Can't locate the daemon binary: {e}"))?;
+    let exe =
+        std::env::current_exe().map_err(|e| format!("Can't locate the daemon binary: {e}"))?;
     install(&exe)
 }
 
@@ -79,11 +80,16 @@ fn portal_request(autostart: bool, exe: &Path) -> Result<(), String> {
     );
     let status = std::process::Command::new("gdbus")
         .args([
-            "call", "--session",
-            "--dest", "org.freedesktop.portal.Desktop",
-            "--object-path", "/org/freedesktop/portal/desktop",
-            "--method", "org.freedesktop.portal.Background.RequestBackground",
-            "", &options,
+            "call",
+            "--session",
+            "--dest",
+            "org.freedesktop.portal.Desktop",
+            "--object-path",
+            "/org/freedesktop/portal/desktop",
+            "--method",
+            "org.freedesktop.portal.Background.RequestBackground",
+            "",
+            &options,
         ])
         .output()
         .map_err(|e| format!("Background portal unavailable: {e}"))?;
@@ -100,14 +106,19 @@ const LABEL: &str = "com.blockworked.Blockwork";
 #[cfg(target_os = "macos")]
 fn plist_path() -> Result<PathBuf, String> {
     let home = dirs::home_dir().ok_or("No home directory")?;
-    Ok(home.join("Library/LaunchAgents").join(format!("{LABEL}.plist")))
+    Ok(home
+        .join("Library/LaunchAgents")
+        .join(format!("{LABEL}.plist")))
 }
 
 #[cfg(target_os = "macos")]
 fn install(exe: &Path) -> Result<(), String> {
     let path = plist_path()?;
     std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
-    let exe = exe.to_string_lossy().replace('&', "&amp;").replace('<', "&lt;");
+    let exe = exe
+        .to_string_lossy()
+        .replace('&', "&amp;")
+        .replace('<', "&lt;");
     let plist = format!(
         "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n\
          <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
@@ -150,7 +161,9 @@ fn reg(args: &[&str]) -> Result<(), String> {
 #[cfg(windows)]
 fn install(exe: &Path) -> Result<(), String> {
     let value = format!("\"{}\" --background", exe.display());
-    reg(&["add", RUN_KEY, "/v", ENTRY_NAME, "/t", "REG_SZ", "/d", &value, "/f"])
+    reg(&[
+        "add", RUN_KEY, "/v", ENTRY_NAME, "/t", "REG_SZ", "/d", &value, "/f",
+    ])
 }
 
 #[cfg(windows)]

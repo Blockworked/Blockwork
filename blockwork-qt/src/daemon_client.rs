@@ -9,12 +9,22 @@ const SPAWN_TIMEOUT: Duration = Duration::from_secs(10);
 const DAEMON_ARG: &str = "--daemon";
 
 pub enum Request {
-    Invoke { command: String, args: Value },
+    Invoke {
+        command: String,
+        args: Value,
+    },
     FetchApps,
     /// Sample-evaluates a value block; answered by [`Event::Preview`] with the same `key`.
-    Preview { key: String, value: Value },
+    Preview {
+        key: String,
+        value: Value,
+    },
     /// Runs a command and answers with [`Event::Reply`] tagged with `key`.
-    Call { key: String, command: String, args: Value },
+    Call {
+        key: String,
+        command: String,
+        args: Value,
+    },
 }
 
 pub enum Event {
@@ -25,11 +35,19 @@ pub enum Event {
     Quit,
     Apps(String),
     AppsError(String),
-    Preview { key: String, text: String, error: bool },
+    Preview {
+        key: String,
+        text: String,
+        error: bool,
+    },
     /// JSON list of the blocks running right now.
     Trace(String),
     /// A [`Request::Call`]'s result: JSON data, or an error message.
-    Reply { key: String, json: String, error: String },
+    Reply {
+        key: String,
+        json: String,
+        error: String,
+    },
 }
 
 /// Wakes the UI thread to read new events.
@@ -216,7 +234,9 @@ async fn run(
 
 /// Connects to the daemon, starting it first if needed. `background` starts
 /// it like a login autostart, so it stays up with no window open.
-pub(crate) async fn connect_or_spawn(background: bool) -> io::Result<blockwork_protocol::Connection> {
+pub(crate) async fn connect_or_spawn(
+    background: bool,
+) -> io::Result<blockwork_protocol::Connection> {
     match blockwork_protocol::connect().await {
         Ok(connection) => Ok(connection),
         Err(error)

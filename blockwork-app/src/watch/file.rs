@@ -30,15 +30,21 @@ fn run(shared_state: SharedState, app: AppHandle) {
 
         let (watched, emulator, speed_multiplier) = {
             let Ok(s) = shared_state.lock() else { continue };
-            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
+            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else {
+                continue;
+            };
             let mut watched = Vec::new();
             for mac in scheduled_run::live_macros(&s) {
                 let env = variable_env(mac);
                 for strand in &mac.strands {
-                    let Some(InstructionKind::WhenFileChanged(path)) = strand.instructions.first().map(|i| &i.kind) else {
+                    let Some(InstructionKind::WhenFileChanged(path)) =
+                        strand.instructions.first().map(|i| &i.kind)
+                    else {
                         continue;
                     };
-                    let Ok(path) = path.resolve_vars(&env).eval_text() else { continue };
+                    let Ok(path) = path.resolve_vars(&env).eval_text() else {
+                        continue;
+                    };
                     if path.trim().is_empty() {
                         continue;
                     }

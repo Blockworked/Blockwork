@@ -6,8 +6,10 @@
 //! local socket (see `blockwork-protocol`).
 
 pub mod autostart;
-pub(crate) mod watch;
+pub(crate) mod block_library;
+pub(crate) mod browser_bridge;
 pub(crate) mod commands;
+pub(crate) mod community;
 mod dispatch;
 pub(crate) mod installed_apps;
 pub(crate) mod macro_runs;
@@ -16,20 +18,20 @@ pub(crate) mod razer;
 pub(crate) mod scheduled_run;
 pub(crate) mod screen_pick;
 pub(crate) mod state;
-pub(crate) mod block_library;
-pub(crate) mod community;
 pub(crate) mod templates;
-pub(crate) mod webhook;
-pub(crate) mod browser_bridge;
+pub(crate) mod watch;
 #[cfg(test)]
 mod web_parity;
+pub(crate) mod webhook;
 
 /// For the daemon, which draws macro dialogs.
 pub use blockwork_core::prompt;
 
 /// The UI language from Settings, like "de"; empty follows the system.
 pub fn ui_language() -> String {
-    blockwork_core::config::load_settings().language.unwrap_or_default()
+    blockwork_core::config::load_settings()
+        .language
+        .unwrap_or_default()
 }
 
 /// The slowest animation speed Settings offers.
@@ -37,8 +39,14 @@ pub(crate) const MAX_ANIMATION_SPEED: f64 = 3.0;
 
 /// The UI animation duration multiplier from Settings: 0 is instant, 1 normal.
 pub fn animation_speed() -> f64 {
-    let speed = blockwork_core::config::load_settings().animation_speed.unwrap_or(1.0);
-    if speed.is_finite() { speed.clamp(0.0, MAX_ANIMATION_SPEED) } else { 1.0 }
+    let speed = blockwork_core::config::load_settings()
+        .animation_speed
+        .unwrap_or(1.0);
+    if speed.is_finite() {
+        speed.clamp(0.0, MAX_ANIMATION_SPEED)
+    } else {
+        1.0
+    }
 }
 
 /// The longest recording countdown Recording settings offers, in seconds.
@@ -117,7 +125,10 @@ pub(crate) mod async_runtime {
         F: Future + Send + 'static,
         F::Output: Send + 'static,
     {
-        HANDLE.get().expect("async_runtime::init was not called").spawn(future)
+        HANDLE
+            .get()
+            .expect("async_runtime::init was not called")
+            .spawn(future)
     }
 }
 
@@ -155,7 +166,10 @@ fn initial_state(
         close_to_tray: settings.close_to_tray.unwrap_or(false),
         start_at_startup: settings.start_at_startup.unwrap_or(false),
         onboarding_done: settings.onboarding_done.unwrap_or(true),
-        palette_layout: settings.palette_layout.clone().unwrap_or_else(|| "rail".into()),
+        palette_layout: settings
+            .palette_layout
+            .clone()
+            .unwrap_or_else(|| "rail".into()),
         key_capture: None,
         pending_standalone_key: None,
         history: History::new(blockwork_core::macros::UNDO_LIMIT),
@@ -190,7 +204,11 @@ fn initial_state(
 /// Restore the selected document and the live stores used by both execution
 /// and reporter previews. Lists must be restored alongside variables, even
 /// when a background/CLI run happens before the editor ever opens.
-fn restore_loaded_macros(s: &mut AppState, macros: Vec<blockwork_core::macros::Macro>, selected: Option<&str>) {
+fn restore_loaded_macros(
+    s: &mut AppState,
+    macros: Vec<blockwork_core::macros::Macro>,
+    selected: Option<&str>,
+) {
     s.macro_strs = macros.iter().map(|mac| mac.name.clone()).collect();
     s.macro_selected = selected.and_then(|id| macros.iter().position(|mac| mac.id == id));
     s.current_macro = s.macro_selected.map(|index| macros[index].clone());
@@ -239,7 +257,8 @@ impl Backend {
                     s.onboarding_done = false;
                     config::update_settings(|st| st.onboarding_done = Some(false));
                 }
-                let _ = blockwork_core::macros::Macro::new("New Macro".into(), "".into(), vec![]).add();
+                let _ =
+                    blockwork_core::macros::Macro::new("New Macro".into(), "".into(), vec![]).add();
             }
             let macros = config::get_macros_from_config();
             restore_loaded_macros(&mut s, macros, settings.selected_macro_id.as_deref());
@@ -265,14 +284,19 @@ impl Backend {
             if s.ipc_auto_start {
                 if let Ok(port) = s.ipc_port_text.trim().parse::<u16>() {
                     let (tx, rx) = tokio::sync::watch::channel(false);
-                    s.ipc_server = Some(async_runtime::spawn(blockwork_core::ipc::run_server(port, rx)));
+                    s.ipc_server = Some(async_runtime::spawn(blockwork_core::ipc::run_server(
+                        port, rx,
+                    )));
                     s.ipc_shutdown_tx = Some(tx);
                     s.ipc_active_port = Some(port);
                 }
             }
         }
 
-        blockwork_core::macros::calls::set_host(Arc::new(macro_runs::Host { state: Arc::clone(&shared), app: app.clone() }));
+        blockwork_core::macros::calls::set_host(Arc::new(macro_runs::Host {
+            state: Arc::clone(&shared),
+            app: app.clone(),
+        }));
 
         // ── Background battery-event watcher (see watch/battery.rs) ──────
         watch::battery::start(Arc::clone(&shared), app.clone());
@@ -299,60 +323,68 @@ impl Backend {
         {
             let state = Arc::clone(&shared);
             let app = app.clone();
-            let _ = std::thread::Builder::new().name("run-log-watch".into()).spawn(move || {
-                let mut seen = blockwork_core::run_log::revision();
-                loop {
-                    std::thread::sleep(std::time::Duration::from_millis(250));
-                    let revision = blockwork_core::run_log::revision();
-                    if revision != seen {
-                        seen = revision;
-                        if let Ok(s) = state.lock() {
-                            state::emit_state_updated(&app, &s);
+            let _ = std::thread::Builder::new()
+                .name("run-log-watch".into())
+                .spawn(move || {
+                    let mut seen = blockwork_core::run_log::revision();
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_millis(250));
+                        let revision = blockwork_core::run_log::revision();
+                        if revision != seen {
+                            seen = revision;
+                            if let Ok(s) = state.lock() {
+                                state::emit_state_updated(&app, &s);
+                            }
                         }
                     }
-                }
-            });
+                });
         }
 
         // Republishes state when breakpoints, pauses or waiting strands change.
         {
             let (state, app) = (Arc::clone(&shared), app.clone());
-            let _ = std::thread::Builder::new().name("debug-watch".into()).spawn(move || {
-                use blockwork_core::macros::debug;
-                let mut seen = debug::revision();
-                loop {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    let revision = debug::revision();
-                    if revision != seen {
-                        seen = revision;
-                        if let Ok(s) = state.lock() {
-                            state::emit_state_updated(&app, &s);
+            let _ = std::thread::Builder::new()
+                .name("debug-watch".into())
+                .spawn(move || {
+                    use blockwork_core::macros::debug;
+                    let mut seen = debug::revision();
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        let revision = debug::revision();
+                        if revision != seen {
+                            seen = revision;
+                            if let Ok(s) = state.lock() {
+                                state::emit_state_updated(&app, &s);
+                            }
                         }
                     }
-                }
-            });
+                });
         }
 
         // Pushes which blocks are running, for the editor's live highlight.
         {
             let app = app.clone();
-            let _ = std::thread::Builder::new().name("trace-watch".into()).spawn(move || {
-                use blockwork_core::macros::trace;
-                let (mut seen, mut sent) = (trace::revision(), Vec::new());
-                loop {
-                    std::thread::sleep(std::time::Duration::from_millis(100));
-                    let revision = trace::revision();
-                    if revision == seen {
-                        continue;
+            let _ = std::thread::Builder::new()
+                .name("trace-watch".into())
+                .spawn(move || {
+                    use blockwork_core::macros::trace;
+                    let (mut seen, mut sent) = (trace::revision(), Vec::new());
+                    loop {
+                        std::thread::sleep(std::time::Duration::from_millis(100));
+                        let revision = trace::revision();
+                        if revision == seen {
+                            continue;
+                        }
+                        seen = revision;
+                        let active = trace::snapshot();
+                        if active != sent {
+                            app.send(Event::Trace(
+                                serde_json::to_value(&active).unwrap_or_default(),
+                            ));
+                            sent = active;
+                        }
                     }
-                    seen = revision;
-                    let active = trace::snapshot();
-                    if active != sent {
-                        app.send(Event::Trace(serde_json::to_value(&active).unwrap_or_default()));
-                        sent = active;
-                    }
-                }
-            });
+                });
         }
 
         // ── QueueSignal consumer (hotkeys and the recording stop key) ────
@@ -363,7 +395,9 @@ impl Backend {
                 let mut rx = recording::take_queue_receiver();
                 while let Some(signal) = rx.recv().await {
                     match signal {
-                        QueueSignal::Hotkey(action) => commands::handle_hotkey_action(&state, &app, action),
+                        QueueSignal::Hotkey(action) => {
+                            commands::handle_hotkey_action(&state, &app, action)
+                        }
                         QueueSignal::Stop => commands::stop_recording_internal(&state, &app),
                     }
                 }
@@ -415,12 +449,33 @@ mod startup_tests {
     fn restored_selection_has_saved_lists_and_variables_before_any_ui_selection() {
         let mut mac = Macro::new("Saved choices".into(), "".into(), vec![]);
         let id = mac.id.clone();
-        mac.variables.push(VariableDef { name: "answer".into(), value: Evaluated::Text("saved".into()) });
-        mac.lists.push(ListDef { name: "choices".into(), items: vec![ListItem::Text("First".into()), ListItem::Text("Second".into())], editor_visible: false, editor_x: 0, editor_y: 0 });
+        mac.variables.push(VariableDef {
+            name: "answer".into(),
+            value: Evaluated::Text("saved".into()),
+        });
+        mac.lists.push(ListDef {
+            name: "choices".into(),
+            items: vec![
+                ListItem::Text("First".into()),
+                ListItem::Text("Second".into()),
+            ],
+            editor_visible: false,
+            editor_x: 0,
+            editor_y: 0,
+        });
         let mut state = initial_state(&config::AppSettings::default(), None, false, false);
         restore_loaded_macros(&mut state, vec![mac], Some(&id));
-        assert_eq!(state.variable_values.lock().unwrap().get("answer"), Some(&Evaluated::Text("saved".into())));
-        assert_eq!(state.list_values.lock().unwrap().get("choices"), Some(&vec![ListItem::Text("First".into()), ListItem::Text("Second".into())]));
+        assert_eq!(
+            state.variable_values.lock().unwrap().get("answer"),
+            Some(&Evaluated::Text("saved".into()))
+        );
+        assert_eq!(
+            state.list_values.lock().unwrap().get("choices"),
+            Some(&vec![
+                ListItem::Text("First".into()),
+                ListItem::Text("Second".into())
+            ])
+        );
         // A missing selection must not retain the old document's live data.
         restore_loaded_macros(&mut state, vec![], Some("missing"));
         assert!(state.current_macro.is_none());

@@ -31,7 +31,10 @@ pub struct WireTimestamp {
 impl WireTimestamp {
     pub fn from_system_time(t: std::time::SystemTime) -> Self {
         let d = t.duration_since(std::time::UNIX_EPOCH).unwrap_or_default();
-        Self { secs: d.as_secs(), nanos: d.subsec_nanos() }
+        Self {
+            secs: d.as_secs(),
+            nanos: d.subsec_nanos(),
+        }
     }
 
     pub fn to_system_time(self) -> std::time::SystemTime {
@@ -100,9 +103,16 @@ impl RingBuffer {
     /// `false` if the ring is full (caller's responsibility to retry/back
     /// off).
     pub fn try_push(&self, bytes: &[u8]) -> bool {
-        assert!(bytes.len() <= SLOT_SIZE - 4, "encoded message exceeds SLOT_SIZE");
+        assert!(
+            bytes.len() <= SLOT_SIZE - 4,
+            "encoded message exceeds SLOT_SIZE"
+        );
 
-        while self.push_lock.compare_exchange_weak(0, 1, Ordering::Acquire, Ordering::Relaxed).is_err() {
+        while self
+            .push_lock
+            .compare_exchange_weak(0, 1, Ordering::Acquire, Ordering::Relaxed)
+            .is_err()
+        {
             std::hint::spin_loop();
         }
 
@@ -165,15 +175,20 @@ pub fn encode_capture(msg: &WireCapture) -> Vec<u8> {
 }
 
 pub fn decode_capture(bytes: &[u8]) -> Option<WireCapture> {
-    bincode::serde::decode_from_slice(bytes, bincode::config::standard()).ok().map(|(v, _)| v)
+    bincode::serde::decode_from_slice(bytes, bincode::config::standard())
+        .ok()
+        .map(|(v, _)| v)
 }
 
 pub fn encode_control(msg: &WireControlCommand) -> Vec<u8> {
-    bincode::serde::encode_to_vec(msg, bincode::config::standard()).expect("WireControlCommand encode")
+    bincode::serde::encode_to_vec(msg, bincode::config::standard())
+        .expect("WireControlCommand encode")
 }
 
 pub fn decode_control(bytes: &[u8]) -> Option<WireControlCommand> {
-    bincode::serde::decode_from_slice(bytes, bincode::config::standard()).ok().map(|(v, _)| v)
+    bincode::serde::decode_from_slice(bytes, bincode::config::standard())
+        .ok()
+        .map(|(v, _)| v)
 }
 
 #[cfg(test)]
@@ -188,7 +203,11 @@ mod tests {
             ts: WireTimestamp::from_system_time(std::time::SystemTime::now()),
         };
         let bytes = encode_capture(&msg);
-        assert!(bytes.len() <= SLOT_SIZE - 4, "encoded WireCapture ({} bytes) exceeds slot capacity", bytes.len());
+        assert!(
+            bytes.len() <= SLOT_SIZE - 4,
+            "encoded WireCapture ({} bytes) exceeds slot capacity",
+            bytes.len()
+        );
         let decoded = decode_capture(&bytes).unwrap();
         match decoded.event {
             WireCaptureEvent::KeyPress(MacroKey::Unicode('x')) => {}
@@ -203,10 +222,15 @@ mod tests {
         let id = "0123456789abcdef0123456789abcdef".to_string();
         let msg = WireControlCommand::RunMacro(id.clone(), 37.5);
         let bytes = encode_control(&msg);
-        assert!(bytes.len() <= SLOT_SIZE - 4, "encoded WireControlCommand ({} bytes) exceeds slot capacity", bytes.len());
+        assert!(
+            bytes.len() <= SLOT_SIZE - 4,
+            "encoded WireControlCommand ({} bytes) exceeds slot capacity",
+            bytes.len()
+        );
         let decoded = decode_control(&bytes).unwrap();
         match decoded {
-            WireControlCommand::RunMacro(decoded_id, overshoot_ms) if decoded_id == id && overshoot_ms == 37.5 => {}
+            WireControlCommand::RunMacro(decoded_id, overshoot_ms)
+                if decoded_id == id && overshoot_ms == 37.5 => {}
             other => panic!("roundtrip mismatch: {other:?}"),
         }
     }
@@ -259,11 +283,19 @@ mod tests {
         let mut seen = std::collections::HashSet::new();
         let mut buf = [0u8; SLOT_SIZE - 4];
         for _ in 0..(PRODUCERS * PER_PRODUCER) {
-            let len = ring.try_pop(&mut buf).expect("ring should have exactly PRODUCERS*PER_PRODUCER items, got fewer");
+            let len = ring
+                .try_pop(&mut buf)
+                .expect("ring should have exactly PRODUCERS*PER_PRODUCER items, got fewer");
             let s = std::str::from_utf8(&buf[..len]).unwrap().to_string();
-            assert!(seen.insert(s.clone()), "duplicate/corrupted entry popped: {s}");
+            assert!(
+                seen.insert(s.clone()),
+                "duplicate/corrupted entry popped: {s}"
+            );
         }
-        assert!(ring.try_pop(&mut buf).is_none(), "ring had extra items beyond what was pushed");
+        assert!(
+            ring.try_pop(&mut buf).is_none(),
+            "ring had extra items beyond what was pushed"
+        );
         assert_eq!(seen.len(), PRODUCERS * PER_PRODUCER);
     }
 }

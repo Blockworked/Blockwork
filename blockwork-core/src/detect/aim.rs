@@ -23,7 +23,10 @@ pub struct AimController {
 impl AimController {
     /// This controller with its gain scaled to a window `height` tall.
     pub fn for_window(self, height: f64) -> AimController {
-        AimController { gain: self.gain * REFERENCE_HEIGHT / height.max(1.0), ..self }
+        AimController {
+            gain: self.gain * REFERENCE_HEIGHT / height.max(1.0),
+            ..self
+        }
     }
 
     /// The relative move toward `target`, or `None` when it's already
@@ -38,7 +41,11 @@ impl AimController {
         let (dx, dy) = (axis(ex), axis(ey));
         // A tiny gain would round to nothing and never arrive; nudge one unit.
         if dx == 0 && dy == 0 && limit >= 1.0 && self.gain > 0.0 {
-            return Some(if ex.abs() >= ey.abs() { (ex.signum() as i32, 0) } else { (0, ey.signum() as i32) });
+            return Some(if ex.abs() >= ey.abs() {
+                (ex.signum() as i32, 0)
+            } else {
+                (0, ey.signum() as i32)
+            });
         }
         Some((dx, dy))
     }
@@ -80,7 +87,15 @@ struct Goal {
 
 impl Glide {
     pub fn new(aim: AimController, seed: u64) -> Glide {
-        Glide { aim, pos: (0.0, 0.0), vel: (0.0, 0.0), sent: (0, 0), goal: None, history: VecDeque::new(), rng: seed | 1 }
+        Glide {
+            aim,
+            pos: (0.0, 0.0),
+            vel: (0.0, 0.0),
+            sent: (0, 0),
+            goal: None,
+            history: VecDeque::new(),
+            rng: seed | 1,
+        }
     }
 
     /// Follows a window resize; see [`AimController::for_window`].
@@ -102,11 +117,17 @@ impl Glide {
     /// way, so the goal is where the pointer was plus the error.
     pub fn observe(&mut self, t: f64, error: (f64, f64)) {
         let base = self.emitted_at(t);
-        let pos = (base.0 as f64 + error.0 * self.aim.gain, base.1 as f64 + error.1 * self.aim.gain);
+        let pos = (
+            base.0 as f64 + error.0 * self.aim.gain,
+            base.1 as f64 + error.1 * self.aim.gain,
+        );
         // A moving target shows up as a goal that keeps shifting: lead it.
         let vel = match self.goal {
             Some(g) if t > g.at && t - g.at < 0.3 => {
-                let raw = ((pos.0 - g.pos.0) / (t - g.at), (pos.1 - g.pos.1) / (t - g.at));
+                let raw = (
+                    (pos.0 - g.pos.0) / (t - g.at),
+                    (pos.1 - g.pos.1) / (t - g.at),
+                );
                 let limit = self.max_speed() * 0.5;
                 let blend = |old: f64, new: f64| (old * 0.6 + new * 0.4).clamp(-limit, limit);
                 (blend(g.vel.0, raw.0), blend(g.vel.1, raw.1))
@@ -120,7 +141,11 @@ impl Glide {
     pub fn hold(&mut self, t: f64) {
         let pos = self.goal_at(t);
         if let Some(g) = &mut self.goal {
-            *g = Goal { at: t, pos, vel: (0.0, 0.0) };
+            *g = Goal {
+                at: t,
+                pos,
+                vel: (0.0, 0.0),
+            };
         }
     }
 
@@ -151,12 +176,20 @@ impl Glide {
     pub fn tick(&mut self, t: f64, dt: f64) -> (i32, i32) {
         if self.goal.is_some() {
             let goal = self.goal_at(t);
-            let goal_vel = self.goal.map_or((0.0, 0.0), |g| if t - g.at <= MAX_LEAD { g.vel } else { (0.0, 0.0) });
+            let goal_vel = self.goal.map_or((0.0, 0.0), |g| {
+                if t - g.at <= MAX_LEAD {
+                    g.vel
+                } else {
+                    (0.0, 0.0)
+                }
+            });
             let speed = self.vel.0.hypot(self.vel.1);
             let limit = self.max_speed();
             let noise = (self.noise(), self.noise());
             let axis = |p: f64, v: f64, g: f64, gv: f64, n: f64| {
-                let acc = OMEGA * OMEGA * (g - p) + 2.0 * ZETA * OMEGA * (gv - v) + speed * SPEED_NOISE * OMEGA * n;
+                let acc = OMEGA * OMEGA * (g - p)
+                    + 2.0 * ZETA * OMEGA * (gv - v)
+                    + speed * SPEED_NOISE * OMEGA * n;
                 (v + acc * dt).clamp(-limit, limit)
             };
             self.vel = (
@@ -188,7 +221,10 @@ impl Glide {
         self.goal?;
         let g = self.goal_at(t);
         let gain = self.aim.gain.abs().max(1e-6);
-        Some(((g.0 - self.sent.0 as f64) / gain, (g.1 - self.sent.1 as f64) / gain))
+        Some((
+            (g.0 - self.sent.0 as f64) / gain,
+            (g.1 - self.sent.1 as f64) / gain,
+        ))
     }
 }
 
@@ -196,7 +232,11 @@ impl Glide {
 mod tests {
     use super::*;
 
-    const AIM: AimController = AimController { gain: 0.5, max_step: 30.0, deadzone: 4.0 };
+    const AIM: AimController = AimController {
+        gain: 0.5,
+        max_step: 30.0,
+        deadzone: 4.0,
+    };
 
     #[test]
     fn steps_are_proportional_to_the_error() {
@@ -230,8 +270,18 @@ mod tests {
 
     /// A simulated view: the target's error shrinks by what's been sent,
     /// seen through frames that arrive `latency` late, every `frame` s.
-    fn simulate(gain: f64, true_gain: f64, latency: f64, frame: f64, target_speed: f64) -> (f64, f64, i32) {
-        let aim = AimController { gain, max_step: 60.0, deadzone: 2.0 };
+    fn simulate(
+        gain: f64,
+        true_gain: f64,
+        latency: f64,
+        frame: f64,
+        target_speed: f64,
+    ) -> (f64, f64, i32) {
+        let aim = AimController {
+            gain,
+            max_step: 60.0,
+            deadzone: 2.0,
+        };
         let mut glide = Glide::new(aim, 7);
         let (dt, mut t, mut next_frame) = (0.002, 0.0, 0.0);
         let start = (300.0, -120.0);
@@ -240,7 +290,10 @@ mod tests {
         while t < 1.5 {
             // What the screen shows now: the target, minus how far the view turned.
             let target = (start.0 + target_speed * t, start.1);
-            let error = (target.0 - glide.sent.0 as f64 / true_gain, target.1 - glide.sent.1 as f64 / true_gain);
+            let error = (
+                target.0 - glide.sent.0 as f64 / true_gain,
+                target.1 - glide.sent.1 as f64 / true_gain,
+            );
             if t >= next_frame {
                 pending.push((t + latency, t, error));
                 next_frame += frame;
@@ -254,7 +307,10 @@ mod tests {
             t += dt;
         }
         let target = (start.0 + target_speed * t, start.1);
-        let error = (target.0 - glide.sent.0 as f64 / true_gain, target.1 - glide.sent.1 as f64 / true_gain);
+        let error = (
+            target.0 - glide.sent.0 as f64 / true_gain,
+            target.1 - glide.sent.1 as f64 / true_gain,
+        );
         (error.0, error.1, worst_step)
     }
 
@@ -288,7 +344,11 @@ mod tests {
             glide.tick(i as f64 * 0.002, 0.002);
         }
         let mid = glide.emitted_at(0.05);
-        assert!(mid.0 > 0 && mid.0 < glide.sent.0, "{mid:?} vs {:?}", glide.sent);
+        assert!(
+            mid.0 > 0 && mid.0 < glide.sent.0,
+            "{mid:?} vs {:?}",
+            glide.sent
+        );
         assert_eq!(glide.emitted_at(-1.0), glide.history.front().unwrap().1);
     }
 }

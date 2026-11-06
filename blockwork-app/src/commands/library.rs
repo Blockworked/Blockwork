@@ -25,19 +25,28 @@ pub(crate) fn select_macro(
     Ok(())
 }
 
-pub(crate) fn new_macro(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
-    add_and_select(state, app, Macro::new("New Macro".into(), "".into(), vec![]))
+pub(crate) fn new_macro(state: &SharedState, app: &AppHandle) -> Result<(), String> {
+    add_and_select(
+        state,
+        app,
+        Macro::new("New Macro".into(), "".into(), vec![]),
+    )
 }
 
 /// Adds a starter macro from `templates` and opens it.
-pub(crate) fn new_macro_from_template(state: &SharedState, app: &AppHandle, template: &str) -> Result<(), String> {
+pub(crate) fn new_macro_from_template(
+    state: &SharedState,
+    app: &AppHandle,
+    template: &str,
+) -> Result<(), String> {
     add_and_select(state, app, crate::templates::build(template)?)
 }
 
-pub(super) fn add_and_select(state: &SharedState, app: &AppHandle, new_macro: Macro) -> Result<(), String> {
+pub(super) fn add_and_select(
+    state: &SharedState,
+    app: &AppHandle,
+    new_macro: Macro,
+) -> Result<(), String> {
     let new_id = new_macro.id.clone();
     if let Err(e) = new_macro.add() {
         return Err(format!("Failed to create macro: {e}"));
@@ -64,10 +73,17 @@ pub(super) fn add_and_select(state: &SharedState, app: &AppHandle, new_macro: Ma
 }
 
 /// Opens the macro with id `id`.
-pub(crate) fn select_macro_by_id(state: &SharedState, app: &AppHandle, id: &str) -> Result<(), String> {
+pub(crate) fn select_macro_by_id(
+    state: &SharedState,
+    app: &AppHandle,
+    id: &str,
+) -> Result<(), String> {
     let index = {
         let s = state.lock().map_err(|e| e.to_string())?;
-        s.macros_list.iter().position(|m| m.id == id).ok_or("Macro not found")?
+        s.macros_list
+            .iter()
+            .position(|m| m.id == id)
+            .ok_or("Macro not found")?
     };
     select_macro(state, app, index)
 }
@@ -83,7 +99,11 @@ pub(super) fn find_macro(s: &crate::state::AppState, id: &str) -> Result<Macro, 
 }
 
 /// Saves a copy of macro `id` next to it and opens the copy.
-pub(crate) fn duplicate_macro(state: &SharedState, app: &AppHandle, id: &str) -> Result<(), String> {
+pub(crate) fn duplicate_macro(
+    state: &SharedState,
+    app: &AppHandle,
+    id: &str,
+) -> Result<(), String> {
     let copy = {
         let s = state.lock().map_err(|e| e.to_string())?;
         find_macro(&s, id)?.duplicate()
@@ -93,7 +113,12 @@ pub(crate) fn duplicate_macro(state: &SharedState, app: &AppHandle, id: &str) ->
 }
 
 /// Moves macro `id` into `folder` (empty for the top level).
-pub(crate) fn set_macro_folder(state: &SharedState, app: &AppHandle, id: &str, folder: &str) -> Result<(), String> {
+pub(crate) fn set_macro_folder(
+    state: &SharedState,
+    app: &AppHandle,
+    id: &str,
+    folder: &str,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let mut mac = find_macro(&s, id)?;
     mac.settings.folder = blockwork_core::macros::clean_folder(folder);
@@ -108,7 +133,12 @@ pub(crate) fn set_macro_folder(state: &SharedState, app: &AppHandle, id: &str, f
 
 /// Deletes macro `id`, closing it if it's open. The UI confirms first.
 pub(crate) fn delete_macro(state: &SharedState, app: &AppHandle, id: &str) -> Result<(), String> {
-    let is_open = state.lock().map_err(|e| e.to_string())?.current_macro.as_ref().is_some_and(|m| m.id == id);
+    let is_open = state
+        .lock()
+        .map_err(|e| e.to_string())?
+        .current_macro
+        .as_ref()
+        .is_some_and(|m| m.id == id);
     if is_open {
         return remove_macro(state, app);
     }
@@ -124,10 +154,7 @@ pub(crate) fn delete_macro(state: &SharedState, app: &AppHandle, id: &str) -> Re
 /// Deletes the current macro. The frontend confirms with the user via a
 /// confirmation dialog before ever calling this, so it deletes
 /// unconditionally.
-pub(crate) fn remove_macro(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn remove_macro(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = s.current_macro.take() {
         if let Err(e) = mac.remove() {
@@ -142,11 +169,7 @@ pub(crate) fn remove_macro(
     Ok(())
 }
 
-pub(crate) fn set_title(
-    state: &SharedState,
-    app: &AppHandle,
-    title: String,
-) -> Result<(), String> {
+pub(crate) fn set_title(state: &SharedState, app: &AppHandle, title: String) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         mac.name = title;
@@ -194,7 +217,11 @@ pub(crate) fn set_macro_always_listen(
 
 /// Sets whether the open macro runs schedules it missed - see
 /// `MacroSettings::catch_up_missed`.
-pub(crate) fn set_macro_catch_up(state: &SharedState, app: &AppHandle, enabled: bool) -> Result<(), String> {
+pub(crate) fn set_macro_catch_up(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
         mac.settings.catch_up_missed = enabled;
@@ -206,9 +233,17 @@ pub(crate) fn set_macro_catch_up(state: &SharedState, app: &AppHandle, enabled: 
 }
 
 /// Makes the open macro ask before risky abilities, or trusts it fully.
-pub(crate) fn set_macro_restricted(state: &SharedState, app: &AppHandle, restricted: bool) -> Result<(), String> {
+pub(crate) fn set_macro_restricted(
+    state: &SharedState,
+    app: &AppHandle,
+    restricted: bool,
+) -> Result<(), String> {
     let s = state.lock().map_err(|e| e.to_string())?;
-    let id = s.current_macro.as_ref().map(|m| m.id.clone()).ok_or("No macro selected")?;
+    let id = s
+        .current_macro
+        .as_ref()
+        .map(|m| m.id.clone())
+        .ok_or("No macro selected")?;
     if restricted {
         if blockwork_core::permissions::grants(&id).is_none() {
             blockwork_core::permissions::restrict(&id, Vec::new());
@@ -221,12 +256,24 @@ pub(crate) fn set_macro_restricted(state: &SharedState, app: &AppHandle, restric
 }
 
 /// Lets the open, restricted macro use `kind` without asking, or not.
-pub(crate) fn set_macro_permission(state: &SharedState, app: &AppHandle, kind: &str, allowed: bool) -> Result<(), String> {
-    if !blockwork_core::permissions::GUARDED.iter().any(|(k, _)| *k == kind) {
+pub(crate) fn set_macro_permission(
+    state: &SharedState,
+    app: &AppHandle,
+    kind: &str,
+    allowed: bool,
+) -> Result<(), String> {
+    if !blockwork_core::permissions::GUARDED
+        .iter()
+        .any(|(k, _)| *k == kind)
+    {
         return Err(format!("unknown permission {kind}"));
     }
     let s = state.lock().map_err(|e| e.to_string())?;
-    let id = s.current_macro.as_ref().map(|m| m.id.clone()).ok_or("No macro selected")?;
+    let id = s
+        .current_macro
+        .as_ref()
+        .map(|m| m.id.clone())
+        .ok_or("No macro selected")?;
     blockwork_core::permissions::set_allowed(&id, kind, allowed);
     emit_state_updated(app, &s);
     Ok(())
@@ -245,8 +292,13 @@ pub(crate) fn set_macro_conditions(
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &mut s.current_macro {
-        mac.settings
-            .set_conditions(&only_in_window, power, active_from, active_until, active_days)?;
+        mac.settings.set_conditions(
+            &only_in_window,
+            power,
+            active_from,
+            active_until,
+            active_days,
+        )?;
         auto_save(&mut s);
         refresh_macro_list(&mut s);
     }
@@ -271,14 +323,22 @@ pub(crate) fn set_macro_max_run_secs(
 }
 
 /// Creates an empty global for every macro's name picker.
-pub(crate) fn create_global(state: &SharedState, app: &AppHandle, name: &str) -> Result<(), String> {
+pub(crate) fn create_global(
+    state: &SharedState,
+    app: &AppHandle,
+    name: &str,
+) -> Result<(), String> {
     blockwork_core::globals::create(name)?;
     let s = state.lock().map_err(|e| e.to_string())?;
     emit_state_updated(app, &s);
     Ok(())
 }
 
-pub(crate) fn delete_global(state: &SharedState, app: &AppHandle, name: &str) -> Result<(), String> {
+pub(crate) fn delete_global(
+    state: &SharedState,
+    app: &AppHandle,
+    name: &str,
+) -> Result<(), String> {
     blockwork_core::globals::remove(name);
     let s = state.lock().map_err(|e| e.to_string())?;
     emit_state_updated(app, &s);
@@ -324,7 +384,10 @@ pub(crate) fn emergency_stop(state: &SharedState, app: &AppHandle) {
 pub(crate) fn resume_triggers(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.triggers_paused = false;
-    blockwork_core::run_log::info(&blockwork_core::run_log::Source::app("Blockwork"), "Triggers resumed");
+    blockwork_core::run_log::info(
+        &blockwork_core::run_log::Source::app("Blockwork"),
+        "Triggers resumed",
+    );
     emit_state_updated(&app, &s);
     Ok(())
 }

@@ -12,7 +12,10 @@ pub struct Backoff {
 
 impl Backoff {
     pub const fn new(wait: Duration) -> Self {
-        Backoff { retry_at: Mutex::new(None), wait }
+        Backoff {
+            retry_at: Mutex::new(None),
+            wait,
+        }
     }
 
     /// Whether a failure was recent enough that the path should be skipped.

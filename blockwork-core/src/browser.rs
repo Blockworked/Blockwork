@@ -25,7 +25,11 @@ const MAX_MESSAGE: usize = 16 << 20;
 /// The extension pings every 20 s, so a minute of silence is a dead peer.
 const IDLE_LIMIT: Duration = Duration::from_secs(60);
 const HANDSHAKE_LIMIT: Duration = Duration::from_secs(10);
-const ORIGINS: [&str; 3] = ["chrome-extension://", "moz-extension://", "safari-web-extension://"];
+const ORIGINS: [&str; 3] = [
+    "chrome-extension://",
+    "moz-extension://",
+    "safari-web-extension://",
+];
 
 /// Bumped on every settings change so the server rebinds.
 static GENERATION: AtomicU64 = AtomicU64::new(0);
@@ -76,7 +80,9 @@ pub fn fresh_key() -> String {
 
 /// The pairing key, made on first use.
 pub fn key() -> String {
-    let mut key = crate::config::load_settings().browser_key.unwrap_or_default();
+    let mut key = crate::config::load_settings()
+        .browser_key
+        .unwrap_or_default();
     if key.is_empty() {
         key = fresh_key();
         let saved = key.clone();
@@ -93,7 +99,9 @@ pub fn restart() {
 /// Starts the server thread; `on_change` runs whenever `status()` changes.
 pub fn start(on_change: impl Fn() + Send + Sync + 'static) {
     let _ = ON_CHANGE.set(Box::new(on_change));
-    let _ = std::thread::Builder::new().name("browser-bridge".into()).spawn(serve);
+    let _ = std::thread::Builder::new()
+        .name("browser-bridge".into())
+        .spawn(serve);
 }
 
 fn changed() {
@@ -131,7 +139,9 @@ fn serve() {
         let is_current = || GENERATION.load(Ordering::SeqCst) == generation;
         if settings.browser_enabled.unwrap_or(false) {
             let port = settings.browser_port.unwrap_or(DEFAULT_PORT);
-            match TcpListener::bind(("127.0.0.1", port)).and_then(|l| l.set_nonblocking(true).map(|_| l)) {
+            match TcpListener::bind(("127.0.0.1", port))
+                .and_then(|l| l.set_nonblocking(true).map(|_| l))
+            {
                 Ok(listener) => {
                     set_problem(String::new());
                     accept_while(&listener, &key(), &is_current);
@@ -154,9 +164,13 @@ fn accept_while(listener: &TcpListener, key: &str, keep_going: &dyn Fn() -> bool
         match listener.accept() {
             Ok((stream, _)) => {
                 let key = key.to_string();
-                let _ = std::thread::Builder::new().name("browser-client".into()).spawn(move || connection(stream, &key));
+                let _ = std::thread::Builder::new()
+                    .name("browser-client".into())
+                    .spawn(move || connection(stream, &key));
             }
-            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(Duration::from_millis(100)),
+            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                std::thread::sleep(Duration::from_millis(100))
+            }
             Err(e) => warn!("Browser bridge accept failed: {e}"),
         }
     }
@@ -192,17 +206,28 @@ pub fn request(cmd: &str, args: Value, timeout: Duration) -> Result<Value, Strin
 
 /// `request`, giving up early once `stop` says so (checked a few times a
 /// second), for waits as long as someone approving a script in the browser.
-pub fn request_until(cmd: &str, args: Value, timeout: Duration, stop: impl Fn() -> bool) -> Result<Value, String> {
+pub fn request_until(
+    cmd: &str,
+    args: Value,
+    timeout: Duration,
+    stop: impl Fn() -> bool,
+) -> Result<Value, String> {
     let client = target()?;
     let id = NEXT_ID.fetch_add(1, Ordering::Relaxed);
     let (tx, rx) = mpsc::channel();
-    client.pending.lock().map_err(|e| e.to_string())?.insert(id, tx);
+    client
+        .pending
+        .lock()
+        .map_err(|e| e.to_string())?
+        .insert(id, tx);
     let message = json!({ "type": "request", "id": id, "cmd": cmd, "args": args });
     let sent = client
         .stream
         .lock()
         .map_err(|e| e.to_string())
-        .and_then(|mut s| write_frame(&mut *s, OP_TEXT, message.to_string().as_bytes()).map_err(|e| e.to_string()));
+        .and_then(|mut s| {
+            write_frame(&mut *s, OP_TEXT, message.to_string().as_bytes()).map_err(|e| e.to_string())
+        });
     let answer = match sent {
         Ok(()) => {
             let end = std::time::Instant::now() + timeout;
@@ -210,9 +235,14 @@ pub fn request_until(cmd: &str, args: Value, timeout: Duration, stop: impl Fn() 
                 let left = end.saturating_duration_since(std::time::Instant::now());
                 match rx.recv_timeout(left.min(Duration::from_millis(200))) {
                     Ok(answer) => break answer,
-                    Err(mpsc::RecvTimeoutError::Disconnected) => break Err("the browser disconnected".into()),
+                    Err(mpsc::RecvTimeoutError::Disconnected) => {
+                        break Err("the browser disconnected".into());
+                    }
                     Err(mpsc::RecvTimeoutError::Timeout) if left.is_zero() => {
-                        break Err(format!("the browser didn't answer within {} s", timeout.as_secs()))
+                        break Err(format!(
+                            "the browser didn't answer within {} s",
+                            timeout.as_secs()
+                        ));
                     }
                     Err(mpsc::RecvTimeoutError::Timeout) if stop() => break Err("stopped".into()),
                     Err(mpsc::RecvTimeoutError::Timeout) => {}
@@ -243,7 +273,9 @@ fn connection(stream: TcpStream, key: &str) {
     let _ = stream.set_nonblocking(false);
     let _ = stream.set_read_timeout(Some(HANDSHAKE_LIMIT));
     let _ = stream.set_nodelay(true);
-    let Ok(writer) = stream.try_clone() else { return };
+    let Ok(writer) = stream.try_clone() else {
+        return;
+    };
     let mut reader = BufReader::new(stream);
     let browser = match handshake(&mut reader, &writer, key) {
         Ok(browser) => browser,
@@ -265,14 +297,19 @@ fn connection(stream: TcpStream, key: &str) {
     }
     changed();
     while let Ok(Some(message)) = read_message(&mut reader, &client.stream) {
-        let Ok(message) = serde_json::from_slice::<Value>(&message) else { continue };
+        let Ok(message) = serde_json::from_slice::<Value>(&message) else {
+            continue;
+        };
         match message["type"].as_str() {
             Some("response") => {
                 let id = message["id"].as_u64().unwrap_or(0);
                 let reply = if message["ok"].as_bool() == Some(true) {
                     Ok(message["result"].clone())
                 } else {
-                    Err(message["error"].as_str().unwrap_or("the browser couldn't do it").to_string())
+                    Err(message["error"]
+                        .as_str()
+                        .unwrap_or("the browser couldn't do it")
+                        .to_string())
                 };
                 if let Some(tx) = client.pending.lock().ok().and_then(|mut p| p.remove(&id)) {
                     let _ = tx.send(reply);
@@ -298,7 +335,11 @@ fn connection(stream: TcpStream, key: &str) {
 }
 
 /// The WebSocket upgrade, then the pairing proof. Returns the browser's name.
-fn handshake(reader: &mut BufReader<TcpStream>, mut writer: &TcpStream, key: &str) -> Result<String, String> {
+fn handshake(
+    reader: &mut BufReader<TcpStream>,
+    mut writer: &TcpStream,
+    key: &str,
+) -> Result<String, String> {
     let mut headers = HashMap::new();
     let mut line = String::new();
     reader.read_line(&mut line).map_err(|e| e.to_string())?;
@@ -318,11 +359,14 @@ fn handshake(reader: &mut BufReader<TcpStream>, mut writer: &TcpStream, key: &st
     }
     let origin = headers.get("origin").map(String::as_str).unwrap_or("");
     if !ORIGINS.iter().any(|o| origin.starts_with(o)) {
-        let _ = writer.write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        let _ = writer
+            .write_all(b"HTTP/1.1 403 Forbidden\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
         return Err(format!("origin {origin:?} isn't a browser extension"));
     }
     let Some(ws_key) = headers.get("sec-websocket-key") else {
-        let _ = writer.write_all(b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n");
+        let _ = writer.write_all(
+            b"HTTP/1.1 400 Bad Request\r\nContent-Length: 0\r\nConnection: close\r\n\r\n",
+        );
         return Err("no Sec-WebSocket-Key".into());
     };
     write!(
@@ -388,7 +432,10 @@ fn write_frame(out: &mut impl Write, opcode: u8, payload: &[u8]) -> std::io::Res
 
 /// The next whole text or binary message, answering pings on the way.
 /// `None` once the peer closes.
-fn read_message(reader: &mut impl Read, writer: &Mutex<TcpStream>) -> Result<Option<Vec<u8>>, String> {
+fn read_message(
+    reader: &mut impl Read,
+    writer: &Mutex<TcpStream>,
+) -> Result<Option<Vec<u8>>, String> {
     let mut message = Vec::new();
     loop {
         let mut head = [0u8; 2];
@@ -465,7 +512,12 @@ fn sha1(data: &[u8]) -> [u8; 20] {
     for chunk in padded.chunks(64) {
         let mut w = [0u32; 80];
         for i in 0..16 {
-            w[i] = u32::from_be_bytes([chunk[i * 4], chunk[i * 4 + 1], chunk[i * 4 + 2], chunk[i * 4 + 3]]);
+            w[i] = u32::from_be_bytes([
+                chunk[i * 4],
+                chunk[i * 4 + 1],
+                chunk[i * 4 + 2],
+                chunk[i * 4 + 3],
+            ]);
         }
         for i in 16..80 {
             w[i] = (w[i - 3] ^ w[i - 8] ^ w[i - 14] ^ w[i - 16]).rotate_left(1);
@@ -478,7 +530,12 @@ fn sha1(data: &[u8]) -> [u8; 20] {
                 40..=59 => ((b & c) | (b & d) | (c & d), 0x8F1BBCDC),
                 _ => (b ^ c ^ d, 0xCA62C1D6),
             };
-            let t = a.rotate_left(5).wrapping_add(f).wrapping_add(e).wrapping_add(k).wrapping_add(*wi);
+            let t = a
+                .rotate_left(5)
+                .wrapping_add(f)
+                .wrapping_add(e)
+                .wrapping_add(k)
+                .wrapping_add(*wi);
             e = d;
             d = c;
             c = b.rotate_left(30);
@@ -504,8 +561,14 @@ fn hmac_hex(key: &str, message: &str) -> String {
         block[..key.len()].copy_from_slice(key.as_bytes());
     }
     let pad = |byte: u8| block.iter().map(|b| b ^ byte).collect::<Vec<_>>();
-    let inner = Sha256::new().chain_update(pad(0x36)).chain_update(message.as_bytes()).finalize();
-    let outer = Sha256::new().chain_update(pad(0x5c)).chain_update(inner).finalize();
+    let inner = Sha256::new()
+        .chain_update(pad(0x36))
+        .chain_update(message.as_bytes())
+        .finalize();
+    let outer = Sha256::new()
+        .chain_update(pad(0x5c))
+        .chain_update(inner)
+        .finalize();
     outer.iter().map(|b| format!("{b:02x}")).collect()
 }
 
@@ -516,10 +579,22 @@ mod tests {
     #[test]
     fn hashes_match_published_vectors() {
         let hex = |b: &[u8]| b.iter().map(|b| format!("{b:02x}")).collect::<String>();
-        assert_eq!(hex(&sha1(b"abc")), "a9993e364706816aba3e25717850c26c9cd0d89d");
-        assert_eq!(hex(&sha1(&[b'a'; 1000])), "291e9a6c66994949b57ba5e650361e98fc36b1ba");
-        assert_eq!(accept_key("dGhlIHNhbXBsZSBub25jZQ=="), "s3pPLMBiTxaQ9kYGzzhZRbK+xOo=");
-        assert_eq!(hmac_hex("Jefe", "what do ya want for nothing?"), "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843");
+        assert_eq!(
+            hex(&sha1(b"abc")),
+            "a9993e364706816aba3e25717850c26c9cd0d89d"
+        );
+        assert_eq!(
+            hex(&sha1(&[b'a'; 1000])),
+            "291e9a6c66994949b57ba5e650361e98fc36b1ba"
+        );
+        assert_eq!(
+            accept_key("dGhlIHNhbXBsZSBub25jZQ=="),
+            "s3pPLMBiTxaQ9kYGzzhZRbK+xOo="
+        );
+        assert_eq!(
+            hmac_hex("Jefe", "what do ya want for nothing?"),
+            "5bdcc146bf60754e6a042426089575c75a003f089d2739839dec58b964ec3843"
+        );
     }
 
     fn masked(opcode: u8, payload: &[u8]) -> Vec<u8> {
@@ -553,7 +628,11 @@ mod tests {
     }
 
     /// A fake extension: upgrades, pairs with `key`, then answers one request.
-    fn fake_extension(port: u16, origin: &str, key: &str) -> Result<(TcpStream, BufReader<TcpStream>), String> {
+    fn fake_extension(
+        port: u16,
+        origin: &str,
+        key: &str,
+    ) -> Result<(TcpStream, BufReader<TcpStream>), String> {
         let mut stream = TcpStream::connect(("127.0.0.1", port)).unwrap();
         write!(stream, "GET /blockwork HTTP/1.1\r\nHost: x\r\nUpgrade: websocket\r\nConnection: Upgrade\r\nOrigin: {origin}\r\nSec-WebSocket-Key: dGhlIHNhbXBsZSBub25jZQ==\r\nSec-WebSocket-Version: 13\r\n\r\n").unwrap();
         let mut reader = BufReader::new(stream.try_clone().unwrap());
@@ -572,7 +651,9 @@ mod tests {
         let hello = unmasked(&mut reader);
         let nonce = hello["nonce"].as_str().unwrap();
         let auth = json!({ "type": "auth", "nonce": "ours", "mac": hmac_hex(key, &format!("client:{nonce}")), "browser": "Test 1" });
-        stream.write_all(&masked(OP_TEXT, auth.to_string().as_bytes())).unwrap();
+        stream
+            .write_all(&masked(OP_TEXT, auth.to_string().as_bytes()))
+            .unwrap();
         let answer = unmasked(&mut reader);
         if answer["type"] != "welcome" {
             return Err(answer.to_string());
@@ -589,30 +670,57 @@ mod tests {
         let stop = Arc::new(std::sync::atomic::AtomicBool::new(false));
         let server = {
             let stop = Arc::clone(&stop);
-            std::thread::spawn(move || accept_while(&listener, "k3y", &|| !stop.load(Ordering::SeqCst)))
+            std::thread::spawn(move || {
+                accept_while(&listener, "k3y", &|| !stop.load(Ordering::SeqCst))
+            })
         };
 
-        assert!(fake_extension(port, "https://evil.example", "k3y").unwrap_err().contains("403"));
-        assert!(fake_extension(port, "moz-extension://abc", "wrong").unwrap_err().contains("denied"));
+        assert!(
+            fake_extension(port, "https://evil.example", "k3y")
+                .unwrap_err()
+                .contains("403")
+        );
+        assert!(
+            fake_extension(port, "moz-extension://abc", "wrong")
+                .unwrap_err()
+                .contains("denied")
+        );
 
-        let (mut stream, mut reader) = fake_extension(port, "chrome-extension://abc", "k3y").unwrap();
+        let (mut stream, mut reader) =
+            fake_extension(port, "chrome-extension://abc", "k3y").unwrap();
         let deadline = Instant::now() + Duration::from_secs(5);
         while !clients().iter().any(|c| c.browser == "Test 1") {
             assert!(Instant::now() < deadline, "the client never registered");
             std::thread::sleep(Duration::from_millis(10));
         }
-        let asker = std::thread::spawn(|| request("click", json!({ "selector": "text=More" }), Duration::from_secs(5)));
+        let asker = std::thread::spawn(|| {
+            request(
+                "click",
+                json!({ "selector": "text=More" }),
+                Duration::from_secs(5),
+            )
+        });
         let asked = unmasked(&mut reader);
-        assert_eq!((asked["cmd"].as_str(), asked["args"]["selector"].as_str()), (Some("click"), Some("text=More")));
+        assert_eq!(
+            (asked["cmd"].as_str(), asked["args"]["selector"].as_str()),
+            (Some("click"), Some("text=More"))
+        );
         let reply = json!({ "type": "response", "id": asked["id"], "ok": true, "result": { "done": "<button> More" } });
-        stream.write_all(&masked(OP_TEXT, reply.to_string().as_bytes())).unwrap();
+        stream
+            .write_all(&masked(OP_TEXT, reply.to_string().as_bytes()))
+            .unwrap();
         assert_eq!(asker.join().unwrap().unwrap()["done"], "<button> More");
 
         let failing = std::thread::spawn(|| request("read", json!({}), Duration::from_secs(5)));
         let asked = unmasked(&mut reader);
         let reply = json!({ "type": "response", "id": asked["id"], "ok": false, "error": "nothing on the page matches x" });
-        stream.write_all(&masked(OP_TEXT, reply.to_string().as_bytes())).unwrap();
-        assert_eq!(failing.join().unwrap().unwrap_err(), "nothing on the page matches x");
+        stream
+            .write_all(&masked(OP_TEXT, reply.to_string().as_bytes()))
+            .unwrap();
+        assert_eq!(
+            failing.join().unwrap().unwrap_err(),
+            "nothing on the page matches x"
+        );
 
         stream.write_all(&masked(OP_CLOSE, &[])).unwrap();
         while clients().iter().any(|c| c.browser == "Test 1") {

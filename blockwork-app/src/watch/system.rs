@@ -4,9 +4,9 @@
 //! for. USB fires once per matching device that comes or goes.
 
 use super::{ReportOnce, StrandKey, Target, fires_on_change, variable_env};
+use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
-use crate::AppHandle;
 use blockwork_core::macros::InstructionKind;
 use blockwork_core::system;
 use std::collections::HashMap;
@@ -35,9 +35,20 @@ pub(crate) fn start(shared_state: SharedState, app: AppHandle) {
 }
 
 /// Devices in `now` that weren't in `before`, and the other way round.
-fn device_changes(now: &[system::UsbDevice], before: &[system::UsbDevice]) -> (Vec<system::UsbDevice>, Vec<system::UsbDevice>) {
-    let added = now.iter().filter(|d| !before.iter().any(|b| b.id == d.id)).cloned().collect();
-    let removed = before.iter().filter(|b| !now.iter().any(|d| d.id == b.id)).cloned().collect();
+fn device_changes(
+    now: &[system::UsbDevice],
+    before: &[system::UsbDevice],
+) -> (Vec<system::UsbDevice>, Vec<system::UsbDevice>) {
+    let added = now
+        .iter()
+        .filter(|d| !before.iter().any(|b| b.id == d.id))
+        .cloned()
+        .collect();
+    let removed = before
+        .iter()
+        .filter(|b| !now.iter().any(|d| d.id == b.id))
+        .cloned()
+        .collect();
     (added, removed)
 }
 
@@ -52,7 +63,9 @@ fn run(shared_state: SharedState, app: AppHandle) {
 
         let (watched, emulator, speed_multiplier) = {
             let Ok(s) = shared_state.lock() else { continue };
-            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
+            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else {
+                continue;
+            };
             let mut watched = Vec::new();
             for mac in scheduled_run::live_macros(&s) {
                 let env = variable_env(mac);
@@ -62,19 +75,28 @@ fn run(shared_state: SharedState, app: AppHandle) {
                             pattern: pattern.resolve_vars(&env).eval_text().unwrap_or_default(),
                             started: *started,
                         },
-                        Some(InstructionKind::WhenIdle(minutes)) => match minutes.resolve_vars(&env).eval_number() {
-                            Ok(m) if m > 0.0 => Condition::Idle { secs: m * 60.0 },
-                            _ => continue,
-                        },
-                        Some(InstructionKind::WhenScreenLock { locked }) => Condition::Locked(*locked),
-                        Some(InstructionKind::WhenNetwork { connected }) => Condition::Network(*connected),
+                        Some(InstructionKind::WhenIdle(minutes)) => {
+                            match minutes.resolve_vars(&env).eval_number() {
+                                Ok(m) if m > 0.0 => Condition::Idle { secs: m * 60.0 },
+                                _ => continue,
+                            }
+                        }
+                        Some(InstructionKind::WhenScreenLock { locked }) => {
+                            Condition::Locked(*locked)
+                        }
+                        Some(InstructionKind::WhenNetwork { connected }) => {
+                            Condition::Network(*connected)
+                        }
                         Some(InstructionKind::WhenUsb { pattern, connected }) => Condition::Usb {
                             pattern: pattern.resolve_vars(&env).eval_text().unwrap_or_default(),
                             connected: *connected,
                         },
                         _ => continue,
                     };
-                    watched.push(Watched { target: Target::new(mac, strand), condition });
+                    watched.push(Watched {
+                        target: Target::new(mac, strand),
+                        condition,
+                    });
                 }
             }
             (watched, emulator, s.global_speed_multiplier)
@@ -87,11 +109,31 @@ fn run(shared_state: SharedState, app: AppHandle) {
 
         // Only ask the system for what some trigger needs.
         let wants = |f: fn(&Condition) -> bool| watched.iter().any(|w| f(&w.condition));
-        let apps = if wants(|c| matches!(c, Condition::App { .. })) { errors.check("App trigger", system::running_apps()) } else { None };
-        let idle = if wants(|c| matches!(c, Condition::Idle { .. })) { errors.check("Idle trigger", system::idle_time()) } else { None };
-        let locked = if wants(|c| matches!(c, Condition::Locked(_))) { errors.check("Screen lock trigger", system::screen_locked()) } else { None };
-        let online = if wants(|c| matches!(c, Condition::Network(_))) { errors.check("Network trigger", system::network_connected()) } else { None };
-        let usb = if wants(|c| matches!(c, Condition::Usb { .. })) { errors.check("USB trigger", system::usb_devices()) } else { None };
+        let apps = if wants(|c| matches!(c, Condition::App { .. })) {
+            errors.check("App trigger", system::running_apps())
+        } else {
+            None
+        };
+        let idle = if wants(|c| matches!(c, Condition::Idle { .. })) {
+            errors.check("Idle trigger", system::idle_time())
+        } else {
+            None
+        };
+        let locked = if wants(|c| matches!(c, Condition::Locked(_))) {
+            errors.check("Screen lock trigger", system::screen_locked())
+        } else {
+            None
+        };
+        let online = if wants(|c| matches!(c, Condition::Network(_))) {
+            errors.check("Network trigger", system::network_connected())
+        } else {
+            None
+        };
+        let usb = if wants(|c| matches!(c, Condition::Usb { .. })) {
+            errors.check("USB trigger", system::usb_devices())
+        } else {
+            None
+        };
         // Devices that came and went since the last poll.
         let (added, removed) = match (&usb, &last_usb) {
             (Some(now), Some(before)) => device_changes(now, before),
@@ -121,15 +163,18 @@ fn run(shared_state: SharedState, app: AppHandle) {
                     None => continue,
                 },
                 Condition::Usb { pattern, connected } => {
-                    let changed: &Vec<system::UsbDevice> = if *connected { &added } else { &removed };
+                    let changed: &Vec<system::UsbDevice> =
+                        if *connected { &added } else { &removed };
                     for _ in changed.iter().filter(|d| d.matches(pattern)) {
-                        w.target.fire(&emulator, speed_multiplier, &shared_state, &app);
+                        w.target
+                            .fire(&emulator, speed_multiplier, &shared_state, &app);
                     }
                     continue;
                 }
             };
             if fires_on_change(last.get(&w.target.key).copied(), now, fire_on) {
-                w.target.fire(&emulator, speed_multiplier, &shared_state, &app);
+                w.target
+                    .fire(&emulator, speed_multiplier, &shared_state, &app);
             }
             next.insert(w.target.key, now);
         }
@@ -142,14 +187,26 @@ mod tests {
     use super::*;
 
     fn device(id: &str) -> system::UsbDevice {
-        system::UsbDevice { id: id.into(), name: String::new(), maker: String::new(), ids: String::new() }
+        system::UsbDevice {
+            id: id.into(),
+            name: String::new(),
+            maker: String::new(),
+            ids: String::new(),
+        }
     }
 
     #[test]
     fn usb_changes_are_counted_by_device_id() {
-        let (added, removed) = device_changes(&[device("a"), device("c")], &[device("a"), device("b")]);
-        assert_eq!(added.iter().map(|d| d.id.as_str()).collect::<Vec<_>>(), ["c"]);
-        assert_eq!(removed.iter().map(|d| d.id.as_str()).collect::<Vec<_>>(), ["b"]);
+        let (added, removed) =
+            device_changes(&[device("a"), device("c")], &[device("a"), device("b")]);
+        assert_eq!(
+            added.iter().map(|d| d.id.as_str()).collect::<Vec<_>>(),
+            ["c"]
+        );
+        assert_eq!(
+            removed.iter().map(|d| d.id.as_str()).collect::<Vec<_>>(),
+            ["b"]
+        );
         let (added, removed) = device_changes(&[device("a")], &[device("a")]);
         assert!(added.is_empty() && removed.is_empty());
     }

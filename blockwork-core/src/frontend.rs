@@ -9,7 +9,8 @@ use crate::input::types::{Axis, Coordinate, Direction, InputToken};
 use crate::input::value::Value;
 use crate::input::{get_mouse_button_names, mouse_button_to_index};
 use crate::macros::{
-    BlockDef, Comment, FloatingValue, Instruction, InstructionKind, LaunchOptions, Macro, MacroSettings, Strand,
+    BlockDef, Comment, FloatingValue, Instruction, InstructionKind, LaunchOptions, Macro,
+    MacroSettings, Strand,
 };
 use blockstitch_core::editor::{InstrPath, ValueLocation};
 use blockstitch_core::graph::{Fragment, ListDef, ListItem};
@@ -129,7 +130,10 @@ pub struct MacroSettingsDto {
 
 pub fn macro_settings_to_dto(settings: &MacroSettings) -> MacroSettingsDto {
     use crate::macros::conditions::clock;
-    let (active_from, active_until) = settings.active_hours.map(|(a, b)| (clock(a), clock(b))).unwrap_or_default();
+    let (active_from, active_until) = settings
+        .active_hours
+        .map(|(a, b)| (clock(a), clock(b)))
+        .unwrap_or_default();
     MacroSettingsDto {
         always_listen: settings.always_listen,
         max_run_secs: settings.max_run_secs,
@@ -170,7 +174,11 @@ pub struct FragmentDto {
 
 pub fn fragment_to_dto(fragment: &Fragment<InstructionKind>) -> FragmentDto {
     FragmentDto {
-        instructions: fragment.instructions.iter().map(instruction_to_dto).collect(),
+        instructions: fragment
+            .instructions
+            .iter()
+            .map(instruction_to_dto)
+            .collect(),
         comments: fragment.comments.clone(),
     }
 }
@@ -187,8 +195,8 @@ pub fn dto_to_fragment(dto: &FragmentDto) -> Option<Fragment<InstructionKind>> {
 }
 mod instructions;
 mod reporter_branches;
-pub use reporter_branches::edit_reporter_branch;
 pub use instructions::*;
+pub use reporter_branches::edit_reporter_branch;
 
 pub fn strand_to_dto(strand: &Strand) -> StrandDto {
     StrandDto {
@@ -201,66 +209,114 @@ pub fn strand_to_dto(strand: &Strand) -> StrandDto {
 
 pub fn macro_to_dto(mac: &Macro) -> MacroDto {
     let mut hidden_instruction_ids = HashSet::new();
-    for strand in mac.strands.iter().filter(|strand| block_packs::is_pack_strand(mac, strand)) {
+    for strand in mac
+        .strands
+        .iter()
+        .filter(|strand| block_packs::is_pack_strand(mac, strand))
+    {
         for ins in &strand.instructions {
-            ins.walk(&mut |ins| { hidden_instruction_ids.insert(ins.id.clone()); });
+            ins.walk(&mut |ins| {
+                hidden_instruction_ids.insert(ins.id.clone());
+            });
         }
     }
     MacroDto {
         id: mac.id.clone(),
         name: mac.name.clone(),
         description: mac.description.clone(),
-        strands: mac.editor_strands()
-            .map(strand_to_dto).collect(),
+        strands: mac.editor_strands().map(strand_to_dto).collect(),
         recording_target_strand_id: mac.recording_target_id(),
         speed_multiplier: mac.speed_multiplier,
         floating_values: mac.floating_values.clone(),
-        comments: mac.comments.iter().filter(|comment| {
-            comment.attached_to.as_ref().is_none_or(|id| !hidden_instruction_ids.contains(id))
-        }).cloned().collect(),
+        comments: mac
+            .comments
+            .iter()
+            .filter(|comment| {
+                comment
+                    .attached_to
+                    .as_ref()
+                    .is_none_or(|id| !hidden_instruction_ids.contains(id))
+            })
+            .cloned()
+            .collect(),
         variables: mac.variables.iter().map(|v| v.name.clone()).collect(),
         pack_exports: mac.settings.pack_exports.clone(),
-        pack_data: mac.settings.block_packs.iter().map(|pack| PackDataDto {
-            id: pack.id.clone(), name: pack.name.clone(),
-            variables: pack.variables.iter().map(|var| PackVariableDto {
-                name: var.name.clone(), label: block_packs::variable_label(&var.name).into(),
-                value: match &var.value {
-                    #[cfg(feature = "system")]
-                    crate::input::value::Evaluated::Text(text) => crate::input::value::Evaluated::Text(crate::secrets::redact(text)),
-                    _ => var.value.clone(),
-                }, role: var.role,
-            }).collect(),
-        }).collect(),
+        pack_data: mac
+            .settings
+            .block_packs
+            .iter()
+            .map(|pack| PackDataDto {
+                id: pack.id.clone(),
+                name: pack.name.clone(),
+                variables: pack
+                    .variables
+                    .iter()
+                    .map(|var| PackVariableDto {
+                        name: var.name.clone(),
+                        label: block_packs::variable_label(&var.name).into(),
+                        value: match &var.value {
+                            #[cfg(feature = "system")]
+                            crate::input::value::Evaluated::Text(text) => {
+                                crate::input::value::Evaluated::Text(crate::secrets::redact(text))
+                            }
+                            _ => var.value.clone(),
+                        },
+                        role: var.role,
+                    })
+                    .collect(),
+            })
+            .collect(),
         lists: mac.lists.iter().map(list_to_dto).collect(),
         signals: mac.signals.clone(),
-        block_defs: mac.block_defs.iter().map(|def| {
-            let pack = block_packs::owner(mac, &def.id);
-            let mut definition = def.clone();
-            if let Some(pack) = pack {
-                let name = if definition.identifier.is_empty() {
-                    block_packs::block_name(def)
-                } else { definition.identifier.clone() };
-                definition.identifier = block_packs::details_identifier(&pack.author, &name);
-                if definition.description.is_empty() { definition.description = pack.description.clone(); }
-            }
-            BlockDefinitionDto {
-                definition,
-                read_only: pack.is_some(),
-                pack_name: pack.map(|p| p.name.clone()).unwrap_or_default(),
-                packs: mac.settings.block_packs.iter().filter(|pack| pack.blocks.contains(&def.id))
-                    .map(|pack| BlockPackMembershipDto { id: pack.id.clone(), name: pack.name.clone() }).collect(),
-            }
-        }).collect(),
+        block_defs: mac
+            .block_defs
+            .iter()
+            .map(|def| {
+                let pack = block_packs::owner(mac, &def.id);
+                let mut definition = def.clone();
+                if let Some(pack) = pack {
+                    let name = if definition.identifier.is_empty() {
+                        block_packs::block_name(def)
+                    } else {
+                        definition.identifier.clone()
+                    };
+                    definition.identifier = block_packs::details_identifier(&pack.author, &name);
+                    if definition.description.is_empty() {
+                        definition.description = pack.description.clone();
+                    }
+                }
+                BlockDefinitionDto {
+                    definition,
+                    read_only: pack.is_some(),
+                    pack_name: pack.map(|p| p.name.clone()).unwrap_or_default(),
+                    packs: mac
+                        .settings
+                        .block_packs
+                        .iter()
+                        .filter(|pack| pack.blocks.contains(&def.id))
+                        .map(|pack| BlockPackMembershipDto {
+                            id: pack.id.clone(),
+                            name: pack.name.clone(),
+                        })
+                        .collect(),
+                }
+            })
+            .collect(),
         settings: macro_settings_to_dto(&mac.settings),
     }
 }
 
 /// Decodes reporter bodies stored as frontend instructions or older native records.
-pub fn reporter_branch_to_instructions(body: &[serde_json::Value]) -> Result<Vec<Instruction>, String> {
-    body.iter().map(|value| {
-        serde_json::from_value::<InstructionDto>(value.clone()).ok()
-            .and_then(|dto| dto_to_instruction(&dto))
-            .or_else(|| serde_json::from_value::<Instruction>(value.clone()).ok())
-            .ok_or_else(|| "Invalid instruction in a custom reporter branch".to_string())
-    }).collect()
+pub fn reporter_branch_to_instructions(
+    body: &[serde_json::Value],
+) -> Result<Vec<Instruction>, String> {
+    body.iter()
+        .map(|value| {
+            serde_json::from_value::<InstructionDto>(value.clone())
+                .ok()
+                .and_then(|dto| dto_to_instruction(&dto))
+                .or_else(|| serde_json::from_value::<Instruction>(value.clone()).ok())
+                .ok_or_else(|| "Invalid instruction in a custom reporter branch".to_string())
+        })
+        .collect()
 }

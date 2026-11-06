@@ -1,29 +1,41 @@
-use crate::state::{build_state_dto, SharedState};
+use crate::AppHandle;
+use crate::state::{SharedState, build_state_dto};
+use blockstitch_core::graph::ListStore;
+use blockwork_core::macros::Macro;
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::run_registry;
 use blockwork_core::macros::runner::VariableStore;
-use blockstitch_core::graph::ListStore;
 use blockwork_core::macros::thread_pool::ThreadPool;
-use blockwork_core::macros::Macro;
 use std::sync::{Arc, Mutex};
 use std::thread;
-use crate::AppHandle;
 use tracing::warn;
 
 /// Writes the run's final variable values back into the (still-selected)
 /// macro and saves it to disk. Called once per run/loop finish rather than
 /// per-instruction, and a no-op if the macro was switched away mid-run.
-pub(crate) fn persist_variables(shared_state: &SharedState, app: &AppHandle, macro_id: &str, variables: &VariableStore, lists: &ListStore) {
+pub(crate) fn persist_variables(
+    shared_state: &SharedState,
+    app: &AppHandle,
+    macro_id: &str,
+    variables: &VariableStore,
+    lists: &ListStore,
+) {
     let (mac_to_save, dto) = {
-        let Ok(mut s) = shared_state.lock() else { return };
-        let Some(mac) = s.current_macro.as_mut() else { return };
+        let Ok(mut s) = shared_state.lock() else {
+            return;
+        };
+        let Some(mac) = s.current_macro.as_mut() else {
+            return;
+        };
         if mac.id != macro_id {
             return;
         }
         if let Ok(values) = variables.lock() {
             mac.sync_variables_from(&values);
         }
-        if let Ok(values) = lists.lock() { mac.sync_lists_from(&values); }
+        if let Ok(values) = lists.lock() {
+            mac.sync_lists_from(&values);
+        }
         (mac.clone(), build_state_dto(&s))
     };
     // Saved after the state lock is released: this runs right when an IPC
@@ -50,7 +62,11 @@ pub(crate) fn into_single_run_task(
         println!("Running macro: {}", mac.name);
         let macro_id = mac.id.clone();
         let source = blockwork_core::run_log::Source::for_macro(&mac.id, &mac.name);
-        blockwork_core::run_log::run_event(&source, blockwork_core::run_log::RunEvent::Started, "Run started");
+        blockwork_core::run_log::run_event(
+            &source,
+            blockwork_core::run_log::RunEvent::Started,
+            "Run started",
+        );
         // A stop flag of this run's own, not the shared `is_looping` `stop_flag`
         // refers to - that one gets cleared by whichever run finishes first,
         // which would spuriously cut a concurrently-started run short.
@@ -59,13 +75,34 @@ pub(crate) fn into_single_run_task(
         match strand {
             // Run strand: just that one, from its top block.
             Some(id) => {
-                mac.run_strand_with_lists(&id, emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists));
+                mac.run_strand_with_lists(
+                    &id,
+                    emulator,
+                    Some(Arc::clone(&run_flag)),
+                    speed_multiplier,
+                    Arc::clone(&variables),
+                    Arc::clone(&lists),
+                );
             }
-            None => mac.run_with_lists(emulator, Some(Arc::clone(&run_flag)), speed_multiplier, Arc::clone(&variables), Arc::clone(&lists)),
+            None => mac.run_with_lists(
+                emulator,
+                Some(Arc::clone(&run_flag)),
+                speed_multiplier,
+                Arc::clone(&variables),
+                Arc::clone(&lists),
+            ),
         }
         done.store(true, std::sync::atomic::Ordering::Relaxed);
         let stopped = !run_flag.lock().map(|r| *r).unwrap_or(true);
-        blockwork_core::run_log::run_event(&source, blockwork_core::run_log::RunEvent::Ended, if stopped { "Run stopped" } else { "Run finished" });
+        blockwork_core::run_log::run_event(
+            &source,
+            blockwork_core::run_log::RunEvent::Ended,
+            if stopped {
+                "Run stopped"
+            } else {
+                "Run finished"
+            },
+        );
         run_registry::end_run(&run_flag);
         persist_variables(&shared_state, &app, &macro_id, &variables, &lists);
         if let Ok(mut stopped) = stop_flag.lock() {

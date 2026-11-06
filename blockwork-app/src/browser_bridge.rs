@@ -1,15 +1,17 @@
 //! Settings for the browser bridge in blockwork-core: where the Blockwork
 //! browser extension connects to run the browser blocks.
 
-use crate::state::{SharedState, emit_state_updated};
 use crate::AppHandle;
+use crate::state::{SharedState, emit_state_updated};
 use blockwork_core::browser;
 use blockwork_core::config::update_settings;
 
 pub(crate) fn start(state: SharedState, app: AppHandle) {
     browser::start(move || {
         // The first pairing shows the Browser palette category for good.
-        if browser::connected() && blockwork_core::config::load_settings().browser_unlocked != Some(true) {
+        if browser::connected()
+            && blockwork_core::config::load_settings().browser_unlocked != Some(true)
+        {
             update_settings(|s| s.browser_unlocked = Some(true));
         }
         if let Ok(s) = state.lock() {
@@ -18,7 +20,12 @@ pub(crate) fn start(state: SharedState, app: AppHandle) {
     });
 }
 
-pub(crate) fn configure(state: &SharedState, app: &AppHandle, enabled: bool, port: u16) -> Result<(), String> {
+pub(crate) fn configure(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+    port: u16,
+) -> Result<(), String> {
     if port == 0 {
         return Err("pick a port from 1 to 65535".into());
     }

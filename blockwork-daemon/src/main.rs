@@ -156,7 +156,8 @@ async fn forward_backend_events(
                 blockwork_app::flush_saves();
                 std::process::exit(0);
             }
-            Ok(Event::State(_) | Event::Trace(_)) | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
+            Ok(Event::State(_) | Event::Trace(_))
+            | Err(tokio::sync::broadcast::error::RecvError::Lagged(_)) => {}
             Err(tokio::sync::broadcast::error::RecvError::Closed) => return,
         }
     }

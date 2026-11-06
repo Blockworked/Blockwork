@@ -426,7 +426,8 @@ mod tests {
                 fs::read(rebuilt.join(&relative)).unwrap()
             );
         }
-        let verifier = Path::new(env!("CARGO_MANIFEST_DIR")).join("../scripts/macos/verify-bundle.py");
+        let verifier =
+            Path::new(env!("CARGO_MANIFEST_DIR")).join("../scripts/macos/verify-bundle.py");
         let validation = Command::new("python3")
             .arg(verifier)
             .arg(&installed)

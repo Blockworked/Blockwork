@@ -2,10 +2,7 @@
 
 use super::*;
 
-pub(crate) fn save_macro(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn save_macro(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(mac) = &s.current_macro {
         if let Err(e) = mac.save() {
@@ -79,7 +76,9 @@ fn capability_dtos(wanted: impl Fn(&str) -> bool) -> Vec<crate::state::Capabilit
             kind: kind.to_string(),
             label: label.to_string(),
             risky: *risky,
-            guarded: blockwork_core::permissions::GUARDED.iter().any(|(k, _)| k == kind),
+            guarded: blockwork_core::permissions::GUARDED
+                .iter()
+                .any(|(k, _)| k == kind),
         })
         .collect()
 }
@@ -91,8 +90,15 @@ pub(crate) fn uses_browser(mac: &Macro) -> bool {
     fn in_value(value: &Value) -> bool {
         match value {
             Value::Op { op, args, .. } => {
-                matches!(op.name(), "BrowserConnected" | "PageUrl" | "PageTitle" | "ElementText" | "ElementExists" | "ElementCount")
-                    || args.iter().any(in_value)
+                matches!(
+                    op.name(),
+                    "BrowserConnected"
+                        | "PageUrl"
+                        | "PageTitle"
+                        | "ElementText"
+                        | "ElementExists"
+                        | "ElementCount"
+                ) || args.iter().any(in_value)
             }
             Value::Call { args, .. } => args.iter().any(in_value),
             _ => false,
@@ -242,7 +248,11 @@ pub(crate) fn import_macro(
             }
         }
     }
-    capabilities.sort_by_key(|c| blockwork_core::capabilities::CAPABILITIES.iter().position(|(kind, ..)| *kind == c.kind));
+    capabilities.sort_by_key(|c| {
+        blockwork_core::capabilities::CAPABILITIES
+            .iter()
+            .position(|(kind, ..)| *kind == c.kind)
+    });
     let review = crate::state::ImportReviewDto {
         name: file.name,
         macros: file.macros.iter().map(|m| m.name.clone()).collect(),
@@ -283,23 +293,38 @@ pub(crate) async fn confirm_import_macro(
     }
     let allow: Vec<String> = allow
         .into_iter()
-        .filter(|kind| blockwork_core::permissions::GUARDED.iter().any(|(k, _)| k == kind))
+        .filter(|kind| {
+            blockwork_core::permissions::GUARDED
+                .iter()
+                .any(|(k, _)| k == kind)
+        })
         .collect();
     commit_imported_macros(macros, &allow, state, app)
 }
 
 pub(super) fn bundle_macros(all: &[Macro], macro_ids: &[String]) -> Vec<Macro> {
-    let mut picked: Vec<Macro> = macro_ids.iter().filter_map(|id| all.iter().find(|m| &m.id == id).cloned()).collect();
+    let mut picked: Vec<Macro> = macro_ids
+        .iter()
+        .filter_map(|id| all.iter().find(|m| &m.id == id).cloned())
+        .collect();
     let mut i = 0;
     while i < picked.len() {
         let mut targets = Vec::new();
         picked[i].graph.walk_instructions(&mut |ins| {
-            if let InstructionKind::RunMacro { target: Value::Text { value }, .. } | InstructionKind::StopMacroNamed(Value::Text { value }) = &ins.kind {
+            if let InstructionKind::RunMacro {
+                target: Value::Text { value },
+                ..
+            }
+            | InstructionKind::StopMacroNamed(Value::Text { value }) = &ins.kind
+            {
                 targets.push(value.trim().to_string());
             }
         });
         for target in targets {
-            let found = all.iter().find(|m| m.name == target).or_else(|| all.iter().find(|m| m.name.eq_ignore_ascii_case(&target)));
+            let found = all
+                .iter()
+                .find(|m| m.name == target)
+                .or_else(|| all.iter().find(|m| m.name.eq_ignore_ascii_case(&target)));
             if let Some(found) = found
                 && !picked.iter().any(|m| m.id == found.id)
             {
@@ -312,11 +337,18 @@ pub(super) fn bundle_macros(all: &[Macro], macro_ids: &[String]) -> Vec<Macro> {
 }
 
 pub(crate) fn bundle_macro_ids(macro_ids: Vec<String>) -> Vec<String> {
-    bundle_macros(&config::get_macros_from_config(), &macro_ids).into_iter().map(|m| m.id).collect()
+    bundle_macros(&config::get_macros_from_config(), &macro_ids)
+        .into_iter()
+        .map(|m| m.id)
+        .collect()
 }
 
 /// Exports macros and their dependencies together. Returns how many it wrote.
-pub(crate) fn export_bundle(macro_ids: Vec<String>, name: String, path: String) -> Result<usize, String> {
+pub(crate) fn export_bundle(
+    macro_ids: Vec<String>,
+    name: String,
+    path: String,
+) -> Result<usize, String> {
     let picked = bundle_macros(&config::get_macros_from_config(), &macro_ids);
     if picked.is_empty() {
         return Err("No macros to export".into());

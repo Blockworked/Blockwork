@@ -18,17 +18,17 @@ pub mod conditions;
 pub mod debug;
 pub mod fields;
 #[cfg(feature = "system")]
-pub mod locks;
-pub mod migrate;
-pub mod placement;
-#[cfg(feature = "system")]
-pub mod loop_control;
-#[cfg(feature = "system")]
-pub mod priority;
-#[cfg(feature = "system")]
 pub mod gdr_import;
 #[cfg(feature = "system")]
 pub mod host_clock;
+#[cfg(feature = "system")]
+pub mod locks;
+#[cfg(feature = "system")]
+pub mod loop_control;
+pub mod migrate;
+pub mod placement;
+#[cfg(feature = "system")]
+pub mod priority;
 #[cfg(feature = "system")]
 pub mod run_registry;
 #[cfg(feature = "system")]
@@ -77,7 +77,10 @@ const LEGACY_ROOT_STRAND_ID: &str = "root";
 
 mod block_kind;
 mod document_rules;
-pub use document_rules::{BlockDraft, EDIT_CONTEXT, UNDO_LIMIT, UndoSnapshot, checked_block_color, clamp_speed, clean_folder};
+pub use document_rules::{
+    BlockDraft, EDIT_CONTEXT, UNDO_LIMIT, UndoSnapshot, checked_block_color, clamp_speed,
+    clean_folder,
+};
 mod saved_shapes;
 
 /// A named choice or an unrestricted expression, both resolved as text at runtime.
@@ -649,7 +652,12 @@ pub enum InstructionKind {
 impl InstructionKind {
     /// Blocks edited as free text, whose keystrokes make one undo step.
     pub fn edits_as_text(&self) -> bool {
-        matches!(self, InstructionKind::Command(_) | InstructionKind::CommandWait(_) | InstructionKind::Comment(_))
+        matches!(
+            self,
+            InstructionKind::Command(_)
+                | InstructionKind::CommandWait(_)
+                | InstructionKind::Comment(_)
+        )
     }
 }
 
@@ -774,7 +782,8 @@ pub struct MacroSettings {
     /// Runs schedules and "once at" triggers it missed while Blockwork was
     /// closed or the computer slept, once, when it gets the chance.
     #[serde(default)]
-    pub catch_up_missed: bool,    /// Block packs this macro's blocks came from.
+    pub catch_up_missed: bool,
+    /// Block packs this macro's blocks came from.
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub block_packs: Vec<crate::block_packs::PackRecord>,
     /// Metadata for packs authored here, restored on the next export.
@@ -931,17 +940,31 @@ impl Macro {
 
     /// Pack implementation strands stay available to playback, outside the editor.
     pub fn editor_strands(&self) -> impl Iterator<Item = &Strand> {
-        self.strands.iter().filter(|strand| !crate::block_packs::is_pack_strand(self, strand))
+        self.strands
+            .iter()
+            .filter(|strand| !crate::block_packs::is_pack_strand(self, strand))
     }
 
     pub fn clear_editor(&mut self) {
-        let ids: Vec<_> = self.editor_strands().map(|strand| strand.id.clone()).collect();
-        self.graph.strands.retain(|strand| !ids.contains(&strand.id));
+        let ids: Vec<_> = self
+            .editor_strands()
+            .map(|strand| strand.id.clone())
+            .collect();
+        self.graph
+            .strands
+            .retain(|strand| !ids.contains(&strand.id));
         self.graph.prune_orphaned_comments();
     }
 
     pub fn next_editor_position(&self) -> (i32, i32) {
-        (self.editor_strands().map(|strand| strand.x).max().unwrap_or(0) + 260, 0)
+        (
+            self.editor_strands()
+                .map(|strand| strand.x)
+                .max()
+                .unwrap_or(0)
+                + 260,
+            0,
+        )
     }
 
     /// Keep named references registered when importing or adding blocks.
@@ -1096,7 +1119,12 @@ impl Macro {
     /// strand, else the first strand (creating one if the macro is empty).
     pub fn recording_target_mut(&mut self) -> &mut Strand {
         if let Some(id) = self.recording_target_id() {
-            let pos = self.graph.strands.iter().position(|strand| strand.id == id).unwrap();
+            let pos = self
+                .graph
+                .strands
+                .iter()
+                .position(|strand| strand.id == id)
+                .unwrap();
             return &mut self.graph.strands[pos];
         }
         self.graph.strands.push(Strand::new(0, 0));
@@ -1110,8 +1138,10 @@ impl Macro {
         {
             return Some(id.clone());
         }
-        self.editor_strands().find(|strand| strand.starts_with_header())
-            .or_else(|| self.editor_strands().next()).map(|strand| strand.id.clone())
+        self.editor_strands()
+            .find(|strand| strand.starts_with_header())
+            .or_else(|| self.editor_strands().next())
+            .map(|strand| strand.id.clone())
     }
 }
 
@@ -1130,4 +1160,3 @@ impl std::hash::Hash for Macro {
 
 #[cfg(test)]
 mod tests;
-

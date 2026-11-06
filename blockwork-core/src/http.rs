@@ -44,12 +44,17 @@ pub fn request(method: &str, url: &str, body: &str, headers: &str) -> Result<Str
     if url.is_empty() {
         return Err("no URL given".into());
     }
-    let mut builder = ureq::http::Request::builder().method(method.as_str()).uri(url);
+    let mut builder = ureq::http::Request::builder()
+        .method(method.as_str())
+        .uri(url);
     for (name, value) in parse_headers(headers) {
         builder = builder.header(name, value);
     }
     let response = if body.is_empty() {
-        builder.body(()).map_err(|e| e.to_string()).and_then(|r| agent().run(r).map_err(|e| e.to_string()))
+        builder
+            .body(())
+            .map_err(|e| e.to_string())
+            .and_then(|r| agent().run(r).map_err(|e| e.to_string()))
     } else {
         builder
             .body(body.to_string())
@@ -78,7 +83,9 @@ pub fn post_bytes(url: &str, content_type: &str, body: Vec<u8>) -> Result<String
         .header("Content-Type", content_type)
         .body(body)
         .map_err(|e| e.to_string())?;
-    let mut response = agent().run(request).map_err(|e| format!("POST {url} failed: {e}"))?;
+    let mut response = agent()
+        .run(request)
+        .map_err(|e| format!("POST {url} failed: {e}"))?;
     let status = response.status();
     let text = response
         .body_mut()
@@ -93,7 +100,10 @@ pub fn post_bytes(url: &str, content_type: &str, body: Vec<u8>) -> Result<String
 
 /// Downloads a file's bytes, refusing anything over `limit` bytes.
 pub fn get_bytes(url: &str, limit: u64) -> Result<Vec<u8>, String> {
-    let mut response = agent().get(url).call().map_err(|e| format!("GET {url} failed: {e}"))?;
+    let mut response = agent()
+        .get(url)
+        .call()
+        .map_err(|e| format!("GET {url} failed: {e}"))?;
     let status = response.status();
     if status.as_u16() >= 400 {
         return Err(format!("HTTP {status} from {url}"));
@@ -108,13 +118,23 @@ pub fn get_bytes(url: &str, limit: u64) -> Result<Vec<u8>, String> {
 
 /// Sends a request and returns the status and body, whatever the status, so
 /// a caller can read an API's own error. The body is cut off past `limit`.
-pub fn send(method: &str, url: &str, headers: &[(&str, &str)], body: Option<Vec<u8>>, limit: u64) -> Result<(u16, Vec<u8>), String> {
+pub fn send(
+    method: &str,
+    url: &str,
+    headers: &[(&str, &str)],
+    body: Option<Vec<u8>>,
+    limit: u64,
+) -> Result<(u16, Vec<u8>), String> {
     let mut builder = ureq::http::Request::builder().method(method).uri(url);
     for (name, value) in headers {
         builder = builder.header(*name, *value);
     }
-    let request = builder.body(body.unwrap_or_default()).map_err(|e| e.to_string())?;
-    let mut response = agent().run(request).map_err(|e| format!("{method} {url} failed: {e}"))?;
+    let request = builder
+        .body(body.unwrap_or_default())
+        .map_err(|e| e.to_string())?;
+    let mut response = agent()
+        .run(request)
+        .map_err(|e| format!("{method} {url} failed: {e}"))?;
     let status = response.status().as_u16();
     let bytes = response
         .body_mut()
@@ -162,7 +182,8 @@ mod tests {
         assert_eq!(json_get(doc, "items.0.n").unwrap(), "2");
         assert_eq!(json_get(doc, "ok").unwrap(), "true");
         assert_eq!(json_get(doc, "none").unwrap(), "");
-        let item: serde_json::Value = serde_json::from_str(&json_get(doc, "items.0").unwrap()).unwrap();
+        let item: serde_json::Value =
+            serde_json::from_str(&json_get(doc, "items.0").unwrap()).unwrap();
         assert_eq!(item, serde_json::json!({"name": "a", "n": 2}));
         assert!(json_get(doc, "items.5").is_err());
         assert!(json_get("nope", "a").is_err());

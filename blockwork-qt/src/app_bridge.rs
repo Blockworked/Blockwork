@@ -4,7 +4,7 @@ use cxx_qt_lib::QString;
 use std::collections::HashMap;
 use std::pin::Pin;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{mpsc, Arc};
+use std::sync::{Arc, mpsc};
 
 #[cxx_qt::bridge]
 pub mod qobject {
@@ -57,7 +57,12 @@ pub mod qobject {
         /// `reply*` properties, tagged with `key`.
         #[qinvokable]
         #[cxx_name = "callCommand"]
-        fn call_command(self: Pin<&mut AppBridge>, key: &QString, command: &QString, arguments: &QString);
+        fn call_command(
+            self: Pin<&mut AppBridge>,
+            key: &QString,
+            command: &QString,
+            arguments: &QString,
+        );
 
         #[qinvokable]
         #[cxx_name = "refreshInstalledApps"]
@@ -192,8 +197,12 @@ impl qobject::AppBridge {
             .unwrap_or_default();
         // Only the newest state and trace of a burst matter: each one is a
         // whole snapshot, and QML re-parses every state it is given.
-        let last_state = events.iter().rposition(|e| matches!(e, daemon_client::Event::State(_)));
-        let last_trace = events.iter().rposition(|e| matches!(e, daemon_client::Event::Trace(_)));
+        let last_state = events
+            .iter()
+            .rposition(|e| matches!(e, daemon_client::Event::State(_)));
+        let last_trace = events
+            .iter()
+            .rposition(|e| matches!(e, daemon_client::Event::Trace(_)));
         for (index, event) in events.into_iter().enumerate() {
             match &event {
                 daemon_client::Event::State(_) if Some(index) != last_state => continue,
@@ -214,11 +223,9 @@ impl qobject::AppBridge {
                 }
                 daemon_client::Event::Quit => self.as_mut().set_should_quit(true),
                 daemon_client::Event::Apps(json) => {
-                    self.as_mut()
-                        .set_installed_apps_json(QString::from(&json));
+                    self.as_mut().set_installed_apps_json(QString::from(&json));
                     self.as_mut().set_installed_apps_loading(false);
-                    self.as_mut()
-                        .set_installed_apps_error(QString::default());
+                    self.as_mut().set_installed_apps_error(QString::default());
                     let next = self.installed_apps_serial().saturating_add(1);
                     self.as_mut().set_installed_apps_serial(next);
                 }
@@ -276,11 +283,10 @@ impl qobject::AppBridge {
             return;
         };
         let key = key.to_string();
-        let sent = self
-            .rust()
-            .request_tx
-            .as_ref()
-            .is_some_and(|tx| tx.send(daemon_client::Request::Preview { key, value }).is_ok());
+        let sent = self.rust().request_tx.as_ref().is_some_and(|tx| {
+            tx.send(daemon_client::Request::Preview { key, value })
+                .is_ok()
+        });
         if !sent {
             self.as_mut().set_last_error(QString::from(
                 "Blockwork is not connected to its background service",
@@ -288,15 +294,30 @@ impl qobject::AppBridge {
         }
     }
 
-    pub fn call_command(mut self: Pin<&mut Self>, key: &QString, command: &QString, arguments: &QString) {
+    pub fn call_command(
+        mut self: Pin<&mut Self>,
+        key: &QString,
+        command: &QString,
+        arguments: &QString,
+    ) {
         let key = key.to_string();
         let args = serde_json::from_str(&arguments.to_string()).unwrap_or(serde_json::Value::Null);
-        let request = daemon_client::Request::Call { key: key.clone(), command: command.to_string(), args };
-        let sent = self.rust().request_tx.as_ref().is_some_and(|tx| tx.send(request).is_ok());
+        let request = daemon_client::Request::Call {
+            key: key.clone(),
+            command: command.to_string(),
+            args,
+        };
+        let sent = self
+            .rust()
+            .request_tx
+            .as_ref()
+            .is_some_and(|tx| tx.send(request).is_ok());
         if !sent {
             self.as_mut().set_reply_key(QString::from(&key));
             self.as_mut().set_reply_json(QString::from("null"));
-            self.as_mut().set_reply_error(QString::from("Blockwork is not connected to its background service"));
+            self.as_mut().set_reply_error(QString::from(
+                "Blockwork is not connected to its background service",
+            ));
             let next = self.reply_serial().saturating_add(1);
             self.as_mut().set_reply_serial(next);
         }
@@ -304,8 +325,7 @@ impl qobject::AppBridge {
 
     pub fn refresh_installed_apps(mut self: Pin<&mut Self>) {
         self.as_mut().set_installed_apps_loading(true);
-        self.as_mut()
-            .set_installed_apps_error(QString::default());
+        self.as_mut().set_installed_apps_error(QString::default());
         let sent = self
             .rust()
             .request_tx
@@ -378,13 +398,20 @@ impl qobject::AppBridge {
                 }
             })
             .expect("failed to start icon thread");
-        IconWorker { jobs, done, pending: Default::default(), wake_pending }
+        IconWorker {
+            jobs,
+            done,
+            pending: Default::default(),
+            wake_pending,
+        }
     }
 
     fn take_icons(mut self: Pin<&mut Self>) {
         let ready: Vec<(String, String)> = {
             let mut rust = self.as_mut().rust_mut();
-            let Some(worker) = rust.icon_worker.as_mut() else { return };
+            let Some(worker) = rust.icon_worker.as_mut() else {
+                return;
+            };
             worker.wake_pending.store(false, Ordering::Release);
             let ready = std::mem::take(&mut *worker.done.lock().unwrap());
             for (key, _) in &ready {
@@ -396,7 +423,10 @@ impl qobject::AppBridge {
             return;
         }
         for (key, icon) in ready {
-            self.as_mut().rust_mut().native_icon_cache.insert(key, QString::from(&icon));
+            self.as_mut()
+                .rust_mut()
+                .native_icon_cache
+                .insert(key, QString::from(&icon));
         }
         let next = self.native_icons_serial().saturating_add(1);
         self.as_mut().set_native_icons_serial(next);

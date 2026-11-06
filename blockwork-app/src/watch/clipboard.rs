@@ -12,13 +12,13 @@
 //! never looked before.
 
 use super::{StrandKey, Target, changed};
+use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
 use blockwork_core::macros::InstructionKind;
 use std::collections::HashMap;
 use std::sync::Arc;
 use std::time::Duration;
-use crate::AppHandle;
 
 /// How often the watcher re-reads the clipboard and re-checks every macro's
 /// strands. Fast enough to feel immediate after a copy, still cheap - unlike
@@ -48,7 +48,9 @@ fn snapshot() -> Fingerprint {
 /// handle to stop it since it only ever does anything when a macro actually
 /// declares a `WhenClipboardChanged` block.
 pub(crate) fn start(shared_state: SharedState, app: AppHandle) {
-    let _ = std::thread::Builder::new().name("clipboard-watch".into()).spawn(move || run(shared_state, app));
+    let _ = std::thread::Builder::new()
+        .name("clipboard-watch".into())
+        .spawn(move || run(shared_state, app));
 }
 
 fn run(shared_state: SharedState, app: AppHandle) {
@@ -65,11 +67,16 @@ fn run(shared_state: SharedState, app: AppHandle) {
 
         let (watched, emulator, speed_multiplier) = {
             let Ok(s) = shared_state.lock() else { continue };
-            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
+            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else {
+                continue;
+            };
             let mut watched = Vec::new();
             for mac in scheduled_run::live_macros(&s) {
                 for strand in &mac.strands {
-                    if matches!(strand.instructions.first().map(|i| &i.kind), Some(InstructionKind::WhenClipboardChanged)) {
+                    if matches!(
+                        strand.instructions.first().map(|i| &i.kind),
+                        Some(InstructionKind::WhenClipboardChanged)
+                    ) {
                         watched.push(Target::new(mac, strand));
                     }
                 }

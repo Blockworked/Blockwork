@@ -2,8 +2,8 @@
 //! downloaded in the background, checked against the index's hash and added
 //! to the open macro after a review.
 
-use crate::state::{emit_state_updated, AppState, CapabilityDto, SharedState};
 use crate::AppHandle;
+use crate::state::{AppState, CapabilityDto, SharedState, emit_state_updated};
 use blockwork_core::block_packs::{self, BlockPack, IndexEntry};
 use blockwork_core::config::{load_settings, update_settings};
 use serde::Serialize;
@@ -150,19 +150,38 @@ fn upgrade_sources(list: Vec<String>) -> Vec<String> {
     out
 }
 
-fn pack_entries(mac: Option<&blockwork_core::macros::Macro>, entries: &[(String, String, IndexEntry)]) -> Vec<PackDto> {
-    let records = mac.map(|m| m.settings.block_packs.as_slice()).unwrap_or_default();
+fn pack_entries(
+    mac: Option<&blockwork_core::macros::Macro>,
+    entries: &[(String, String, IndexEntry)],
+) -> Vec<PackDto> {
+    let records = mac
+        .map(|m| m.settings.block_packs.as_slice())
+        .unwrap_or_default();
     let mut packs = Vec::new();
     for (url, source, entry) in entries {
-        if packs.iter().any(|p: &PackDto| p.id == entry.info.id) { continue; }
+        if packs.iter().any(|p: &PackDto| p.id == entry.info.id) {
+            continue;
+        }
         let installed = records.iter().find(|r| r.id == entry.info.id);
         packs.push(PackDto {
             key: format!("{url}#{}", entry.info.id),
-            id: entry.info.id.clone(), name: entry.info.name.clone(),
-            description: entry.info.description.clone(), author: entry.info.author.clone(),
-            version: entry.info.version.clone(), blocks: entry.blocks.clone(),
-            source: source.clone(), official: entry.official,
-            installed: installed.map(|r| if r.version.is_empty() { "?".into() } else { r.version.clone() }).unwrap_or_default(),
+            id: entry.info.id.clone(),
+            name: entry.info.name.clone(),
+            description: entry.info.description.clone(),
+            author: entry.info.author.clone(),
+            version: entry.info.version.clone(),
+            blocks: entry.blocks.clone(),
+            source: source.clone(),
+            official: entry.official,
+            installed: installed
+                .map(|r| {
+                    if r.version.is_empty() {
+                        "?".into()
+                    } else {
+                        r.version.clone()
+                    }
+                })
+                .unwrap_or_default(),
             update: installed.is_some_and(|r| r.sha256 != entry.sha256),
             available: true,
             sha256: entry.sha256.clone(),
@@ -183,10 +202,15 @@ fn pack_entries(mac: Option<&blockwork_core::macros::Macro>, entries: &[(String,
         });
     }
     for record in records {
-        if packs.iter().any(|p| p.id == record.id) { continue; }
+        if packs.iter().any(|p| p.id == record.id) {
+            continue;
+        }
         packs.push(PackDto {
-            key: String::new(), id: record.id.clone(), name: record.name.clone(),
-            description: record.description.clone(), author: record.author.clone(),
+            key: String::new(),
+            id: record.id.clone(),
+            name: record.name.clone(),
+            description: record.description.clone(),
+            author: record.author.clone(),
             version: record.version.clone(),
             blocks: mac
                 .into_iter()
@@ -212,8 +236,12 @@ fn pack_entries(mac: Option<&blockwork_core::macros::Macro>, entries: &[(String,
             page: String::new(),
         });
     }
-    packs.sort_by(|a, b| a.installed.is_empty().cmp(&b.installed.is_empty())
-        .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase())));
+    packs.sort_by(|a, b| {
+        a.installed
+            .is_empty()
+            .cmp(&b.installed.is_empty())
+            .then_with(|| a.name.to_lowercase().cmp(&b.name.to_lowercase()))
+    });
     packs
 }
 
@@ -260,7 +288,9 @@ fn is_local(url: &str) -> bool {
 fn fetch(url: &str, allow_local: bool) -> Result<Vec<u8>, String> {
     if is_local(url) {
         if !allow_local {
-            return Err(format!("A library on the web can't point at a file on this computer ({url})"));
+            return Err(format!(
+                "A library on the web can't point at a file on this computer ({url})"
+            ));
         }
         let path = url.strip_prefix("file://").unwrap_or(url);
         let bytes = std::fs::read(path).map_err(|e| format!("Couldn't read {path}: {e}"))?;
@@ -279,7 +309,9 @@ fn fetch(url: &str, allow_local: bool) -> Result<Vec<u8>, String> {
 /// so `http://localhost:1@example.com` (user info, then another host) and
 /// `http://localhost.example.com` don't count.
 fn is_loopback_http(url: &str) -> bool {
-    let Some(rest) = url.strip_prefix("http://") else { return false };
+    let Some(rest) = url.strip_prefix("http://") else {
+        return false;
+    };
     let authority = rest.split(['/', '?', '#']).next().unwrap_or_default();
     if authority.contains('@') {
         return false;
@@ -291,7 +323,10 @@ fn is_loopback_http(url: &str) -> bool {
         },
         None => authority.split(':').next().unwrap_or_default(),
     };
-    matches!(host.to_ascii_lowercase().as_str(), "127.0.0.1" | "localhost" | "::1")
+    matches!(
+        host.to_ascii_lowercase().as_str(),
+        "127.0.0.1" | "localhost" | "::1"
+    )
 }
 
 /// Fetches every index in the background.
@@ -311,7 +346,8 @@ pub(crate) fn refresh(state: &SharedState, app: &AppHandle) -> Result<(), String
         let mut packs = Vec::new();
         for url in self::sources() {
             let result = fetch(&url, true).and_then(|bytes| {
-                let text = String::from_utf8(bytes).map_err(|_| "The library isn't text".to_string())?;
+                let text =
+                    String::from_utf8(bytes).map_err(|_| "The library isn't text".to_string())?;
                 block_packs::read_index(&text, &url)
             });
             match result {
@@ -384,9 +420,18 @@ pub(crate) fn remove_source(
 }
 
 /// Stages `pack` for review against the open macro.
-fn stage(state: &SharedState, pack: BlockPack, sha256: String, source: String, verified: bool) -> Result<(), String> {
+fn stage(
+    state: &SharedState,
+    pack: BlockPack,
+    sha256: String,
+    source: String,
+    verified: bool,
+) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let mac = s.current_macro.as_ref().ok_or("Open a macro to add blocks to")?;
+    let mac = s
+        .current_macro
+        .as_ref()
+        .ok_or("Open a macro to add blocks to")?;
     let review = PackReviewDto {
         name: pack.info.name.clone(),
         description: pack.info.description.clone(),
@@ -394,13 +439,23 @@ fn stage(state: &SharedState, pack: BlockPack, sha256: String, source: String, v
         version: pack.info.version.clone(),
         source,
         verified,
-        blocks: pack.content.block_defs.iter().map(block_packs::block_name).collect(),
+        blocks: pack
+            .content
+            .block_defs
+            .iter()
+            .map(block_packs::block_name)
+            .collect(),
         replaces: block_packs::existing_blocks(mac, &pack),
         capabilities: crate::commands::macro_capabilities(&pack.content),
         notes: pack.notes.clone(),
         macro_name: mac.name.clone(),
     };
-    s.pending_pack = Some(PendingPack { macro_id: mac.id.clone(), pack, sha256, review });
+    s.pending_pack = Some(PendingPack {
+        macro_id: mac.id.clone(),
+        pack,
+        sha256,
+        review,
+    });
     Ok(())
 }
 
@@ -597,12 +652,19 @@ fn pretty(text: &str) -> String {
 }
 
 /// Opens the review for a pack file the user picked.
-pub(crate) fn review_file(state: &SharedState, app: &AppHandle, path: String) -> Result<(), String> {
+pub(crate) fn review_file(
+    state: &SharedState,
+    app: &AppHandle,
+    path: String,
+) -> Result<(), String> {
     let bytes = fetch(&path, true)?;
     let sha256 = block_packs::sha256_hex(&bytes);
     let text = String::from_utf8(bytes).map_err(|_| "This isn't a block pack".to_string())?;
     let pack = block_packs::read_pack(&text)?;
-    let name = std::path::Path::new(&path).file_name().map(|n| n.to_string_lossy().into_owned()).unwrap_or(path);
+    let name = std::path::Path::new(&path)
+        .file_name()
+        .map(|n| n.to_string_lossy().into_owned())
+        .unwrap_or(path);
     stage(state, pack, sha256, name, false)?;
     emit(state, app);
     Ok(())
@@ -611,7 +673,9 @@ pub(crate) fn review_file(state: &SharedState, app: &AppHandle, path: String) ->
 /// Adds the reviewed pack's blocks to the macro it was reviewed for.
 pub(crate) fn confirm(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let Some(pending) = s.pending_pack.take() else { return Ok(()) };
+    let Some(pending) = s.pending_pack.take() else {
+        return Ok(());
+    };
     if s.current_macro.as_ref().map(|m| &m.id) != Some(&pending.macro_id) {
         emit_state_updated(app, &s);
         return Err("The macro changed before the blocks were added. Try again".into());
@@ -650,21 +714,49 @@ pub(crate) fn cancel(state: &SharedState, app: &AppHandle) -> Result<(), String>
     Ok(())
 }
 
-pub(crate) fn set_setting(state: &SharedState, app: &AppHandle, pack_id: String, name: String,
-    value: blockwork_core::input::value::Evaluated) -> Result<(), String> {
+pub(crate) fn set_setting(
+    state: &SharedState,
+    app: &AppHandle,
+    pack_id: String,
+    name: String,
+    value: blockwork_core::input::value::Evaluated,
+) -> Result<(), String> {
     use blockwork_core::input::value::Evaluated;
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let pack = s.current_macro.as_ref().and_then(|mac| mac.settings.block_packs.iter().find(|p| p.id == pack_id))
+    let pack = s
+        .current_macro
+        .as_ref()
+        .and_then(|mac| mac.settings.block_packs.iter().find(|p| p.id == pack_id))
         .ok_or("That pack isn't installed")?;
-    let var = pack.variables.iter().find(|v| v.name == name && v.role == block_packs::VariableRole::Setting)
+    let var = pack
+        .variables
+        .iter()
+        .find(|v| v.name == name && v.role == block_packs::VariableRole::Setting)
         .ok_or("That variable isn't a pack setting")?;
     if std::mem::discriminant(&var.value) != std::mem::discriminant(&value)
-        || matches!(&value, Evaluated::Number(n) if !n.is_finite()) { return Err("Invalid setting value".into()); }
+        || matches!(&value, Evaluated::Number(n) if !n.is_finite())
+    {
+        return Err("Invalid setting value".into());
+    }
     let key = pack.variable_key(&name);
     crate::commands::push_undo(&mut s);
-    let pack = s.current_macro.as_mut().unwrap().settings.block_packs.iter_mut().find(|p| p.id == pack_id).unwrap();
-    pack.variables.iter_mut().find(|v| v.name == name).unwrap().value = value.clone();
-    if let Ok(mut values) = s.variable_values.lock() { values.insert(key, value); }
+    let pack = s
+        .current_macro
+        .as_mut()
+        .unwrap()
+        .settings
+        .block_packs
+        .iter_mut()
+        .find(|p| p.id == pack_id)
+        .unwrap();
+    pack.variables
+        .iter_mut()
+        .find(|v| v.name == name)
+        .unwrap()
+        .value = value.clone();
+    if let Ok(mut values) = s.variable_values.lock() {
+        values.insert(key, value);
+    }
     crate::commands::auto_save(&mut s);
     emit_state_updated(app, &s);
     Ok(())
@@ -672,7 +764,14 @@ pub(crate) fn set_setting(state: &SharedState, app: &AppHandle, pack_id: String,
 
 /// Writes the chosen blocks of the open macro, and the blocks they call,
 /// to a pack file. Returns how many blocks it holds.
-pub(crate) fn export(state: &SharedState, app: &AppHandle, block_ids: Vec<String>, info: block_packs::PackInfo, path: String, variable_roles: Vec<block_packs::VariableInterface>) -> Result<usize, String> {
+pub(crate) fn export(
+    state: &SharedState,
+    app: &AppHandle,
+    block_ids: Vec<String>,
+    info: block_packs::PackInfo,
+    path: String,
+    variable_roles: Vec<block_packs::VariableInterface>,
+) -> Result<usize, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     let mac = s.current_macro.as_mut().ok_or("No macro selected")?;
     let count = export_to_file(mac, block_ids, info, &path, variable_roles)?;
@@ -681,17 +780,29 @@ pub(crate) fn export(state: &SharedState, app: &AppHandle, block_ids: Vec<String
     Ok(count)
 }
 
-fn export_to_file(mac: &mut blockwork_core::macros::Macro, mut block_ids: Vec<String>, info: block_packs::PackInfo,
-    path: &str, variable_roles: Vec<block_packs::VariableInterface>) -> Result<usize, String> {
+fn export_to_file(
+    mac: &mut blockwork_core::macros::Macro,
+    mut block_ids: Vec<String>,
+    info: block_packs::PackInfo,
+    path: &str,
+    variable_roles: Vec<block_packs::VariableInterface>,
+) -> Result<usize, String> {
     let mut pack = block_packs::pack_from_macro(mac, &block_ids, info)?;
-    pack.variable_roles = variable_roles.into_iter().filter(|r| pack.content.variables.iter().any(|v| v.name == r.name)).collect();
+    pack.variable_roles = variable_roles
+        .into_iter()
+        .filter(|r| pack.content.variables.iter().any(|v| v.name == r.name))
+        .collect();
     let text = block_packs::write_pack(&pack)?;
     std::fs::write(path, text).map_err(|e| format!("Couldn't write '{path}': {e}"))?;
     block_ids.sort();
     block_ids.dedup();
-    mac.settings.pack_exports.retain(|saved| saved.info.id != pack.info.id && saved.block_ids != block_ids);
+    mac.settings
+        .pack_exports
+        .retain(|saved| saved.info.id != pack.info.id && saved.block_ids != block_ids);
     mac.settings.pack_exports.push(block_packs::PackExport {
-        info: pack.info.clone(), block_ids, variable_roles: pack.variable_roles.clone(),
+        info: pack.info.clone(),
+        block_ids,
+        variable_roles: pack.variable_roles.clone(),
     });
     Ok(pack.content.block_defs.len())
 }
@@ -706,20 +817,45 @@ mod tests {
         let mut mac = Macro::new("Author".into(), String::new(), vec![]);
         let first = mac.create_block(vec![], BlockShape::Normal, "#4C97FF".into(), 0, 0);
         let second = mac.create_block(vec![], BlockShape::Normal, "#4C97FF".into(), 0, 0);
-        let path = std::env::temp_dir().join(format!("blockwork-pack-{}.blockpack", uuid::Uuid::new_v4()));
+        let path =
+            std::env::temp_dir().join(format!("blockwork-pack-{}.blockpack", uuid::Uuid::new_v4()));
         let info = block_packs::PackInfo {
-            name: "Aim helpers".into(), description: "Aim at the nearest player.".into(),
-            author: "Alice".into(), version: "1.2.0".into(), ..Default::default()
+            name: "Aim helpers".into(),
+            description: "Aim at the nearest player.".into(),
+            author: "Alice".into(),
+            version: "1.2.0".into(),
+            ..Default::default()
         };
-        export_to_file(&mut mac, vec![first.clone(), second.clone()], info.clone(), path.to_str().unwrap(), vec![]).unwrap();
-        let mut reloaded: Macro = serde_json::from_str(&serde_json::to_string(&mac).unwrap()).unwrap();
+        export_to_file(
+            &mut mac,
+            vec![first.clone(), second.clone()],
+            info.clone(),
+            path.to_str().unwrap(),
+            vec![],
+        )
+        .unwrap();
+        let mut reloaded: Macro =
+            serde_json::from_str(&serde_json::to_string(&mac).unwrap()).unwrap();
         let saved = &reloaded.settings.pack_exports[0];
         assert_eq!(saved.info.description, info.description);
         assert_eq!(saved.info.version, "1.2.0");
         assert_eq!(saved.info.author, "Alice");
-        assert_eq!(blockwork_core::frontend::macro_to_dto(&reloaded).pack_exports, reloaded.settings.pack_exports);
-        let next = block_packs::PackInfo { version: "1.3.0".into(), ..info };
-        export_to_file(&mut reloaded, vec![second, first], next, path.to_str().unwrap(), vec![]).unwrap();
+        assert_eq!(
+            blockwork_core::frontend::macro_to_dto(&reloaded).pack_exports,
+            reloaded.settings.pack_exports
+        );
+        let next = block_packs::PackInfo {
+            version: "1.3.0".into(),
+            ..info
+        };
+        export_to_file(
+            &mut reloaded,
+            vec![second, first],
+            next,
+            path.to_str().unwrap(),
+            vec![],
+        )
+        .unwrap();
         assert_eq!(reloaded.settings.pack_exports.len(), 1);
         assert_eq!(reloaded.settings.pack_exports[0].info.version, "1.3.0");
         let written = block_packs::read_pack(&std::fs::read_to_string(&path).unwrap()).unwrap();
@@ -729,7 +865,14 @@ mod tests {
         let mut expanded = reloaded.settings.pack_exports[0].block_ids.clone();
         expanded.push(third);
         let info = reloaded.settings.pack_exports[0].info.clone();
-        export_to_file(&mut reloaded, expanded, info, path.to_str().unwrap(), vec![]).unwrap();
+        export_to_file(
+            &mut reloaded,
+            expanded,
+            info,
+            path.to_str().unwrap(),
+            vec![],
+        )
+        .unwrap();
         assert_eq!(reloaded.settings.pack_exports.len(), 1);
         assert_eq!(reloaded.settings.pack_exports[0].block_ids.len(), 3);
         std::fs::remove_file(path).unwrap();
@@ -741,22 +884,49 @@ mod tests {
         let mut mac = Macro::new("Author".into(), String::new(), vec![]);
         let block = mac.create_block(vec![], BlockShape::Normal, "#4C97FF".into(), 0, 0);
         let saved = block_packs::PackExport {
-            info: block_packs::PackInfo { name: "Helpers".into(), version: "1.0.0".into(), ..Default::default() },
-            block_ids: vec![block.clone()], variable_roles: vec![],
+            info: block_packs::PackInfo {
+                name: "Helpers".into(),
+                version: "1.0.0".into(),
+                ..Default::default()
+            },
+            block_ids: vec![block.clone()],
+            variable_roles: vec![],
         };
         mac.settings.pack_exports.push(saved.clone());
-        let path = std::env::temp_dir().join(format!("blockwork-missing-{}", uuid::Uuid::new_v4())).join("pack.blockpack");
-        let next = block_packs::PackInfo { version: "2.0.0".into(), ..saved.info.clone() };
-        assert!(export_to_file(&mut mac, vec![block], next, path.to_str().unwrap(), vec![]).is_err());
+        let path = std::env::temp_dir()
+            .join(format!("blockwork-missing-{}", uuid::Uuid::new_v4()))
+            .join("pack.blockpack");
+        let next = block_packs::PackInfo {
+            version: "2.0.0".into(),
+            ..saved.info.clone()
+        };
+        assert!(
+            export_to_file(&mut mac, vec![block], next, path.to_str().unwrap(), vec![]).is_err()
+        );
         assert_eq!(mac.settings.pack_exports, vec![saved]);
     }
 
     #[test]
     fn installed_packs_stay_in_one_sorted_list_when_the_source_disappears() {
         use blockwork_core::macros::Macro;
-        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../blockwork-core/tests/fixtures/blocks");
-        let index = block_packs::read_index(&std::fs::read_to_string(root.join("index.json")).unwrap(), "https://example.com/index.json").unwrap();
-        let entries: Vec<_> = index.packs.into_iter().map(|entry| ("https://example.com/index.json".into(), "Library".into(), entry)).collect();
+        let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
+            .join("../blockwork-core/tests/fixtures/blocks");
+        let index = block_packs::read_index(
+            &std::fs::read_to_string(root.join("index.json")).unwrap(),
+            "https://example.com/index.json",
+        )
+        .unwrap();
+        let entries: Vec<_> = index
+            .packs
+            .into_iter()
+            .map(|entry| {
+                (
+                    "https://example.com/index.json".into(),
+                    "Library".into(),
+                    entry,
+                )
+            })
+            .collect();
         let mut mac = Macro::new("User".into(), String::new(), vec![]);
         let text = std::fs::read_to_string(root.join("packs/timing.json")).unwrap();
         let pack = block_packs::read_pack(&text).unwrap();
@@ -778,7 +948,12 @@ mod tests {
 
     #[test]
     fn only_this_computer_may_use_plain_http() {
-        for ok in ["http://127.0.0.1", "http://localhost:8080/index.json", "http://[::1]:9/x", "http://LOCALHOST/?a"] {
+        for ok in [
+            "http://127.0.0.1",
+            "http://localhost:8080/index.json",
+            "http://[::1]:9/x",
+            "http://LOCALHOST/?a",
+        ] {
             assert!(is_loopback_http(ok), "{ok}");
         }
         for bad in [
@@ -796,11 +971,17 @@ mod tests {
 
     #[test]
     fn old_built_in_addresses_move_to_the_new_one() {
-        let mut list: Vec<String> = block_packs::OLD_DEFAULT_INDEXES.iter().map(|u| u.to_string()).collect();
+        let mut list: Vec<String> = block_packs::OLD_DEFAULT_INDEXES
+            .iter()
+            .map(|u| u.to_string())
+            .collect();
         list.push("https://example.com/index.json".into());
         assert_eq!(
             upgrade_sources(list),
-            [block_packs::DEFAULT_INDEX.to_string(), "https://example.com/index.json".into()]
+            [
+                block_packs::DEFAULT_INDEX.to_string(),
+                "https://example.com/index.json".into()
+            ]
         );
     }
 
@@ -808,14 +989,20 @@ mod tests {
     fn the_built_in_library_always_comes_first() {
         assert_eq!(upgrade_sources(Vec::new()), [block_packs::DEFAULT_INDEX]);
         assert_eq!(
-            upgrade_sources(vec!["https://example.com/index.json".into(), block_packs::DEFAULT_INDEX.into()]),
+            upgrade_sources(vec![
+                "https://example.com/index.json".into(),
+                block_packs::DEFAULT_INDEX.into()
+            ]),
             [block_packs::DEFAULT_INDEX, "https://example.com/index.json"]
         );
     }
 
     #[test]
     fn downloads_follow_the_url_rules() {
-        let index = concat!(env!("CARGO_MANIFEST_DIR"), "/../blockwork-core/tests/fixtures/blocks/index.json");
+        let index = concat!(
+            env!("CARGO_MANIFEST_DIR"),
+            "/../blockwork-core/tests/fixtures/blocks/index.json"
+        );
         assert!(fetch(index, true).is_ok(), "a local library the user added");
         assert!(fetch(&format!("file://{index}"), true).is_ok());
         let refused = fetch(index, false).unwrap_err();
@@ -823,7 +1010,10 @@ mod tests {
         let refused = fetch("http://example.com/index.json", true).unwrap_err();
         assert!(refused.contains("https"), "{refused}");
         let refused = fetch("http://localhost.example.com/index.json", true).unwrap_err();
-        assert!(refused.contains("https"), "loopback means this computer only: {refused}");
+        assert!(
+            refused.contains("https"),
+            "loopback means this computer only: {refused}"
+        );
         assert!(fetch("ftp://example.com/index.json", true).is_err());
         assert!(is_local("/home/me/index.json") && is_local("file:///x") && !is_local("https://x"));
     }

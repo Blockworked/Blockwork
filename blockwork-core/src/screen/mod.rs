@@ -18,7 +18,7 @@ mod macos;
 #[cfg(windows)]
 mod windows;
 
-pub use find::{find, find_all, Match};
+pub use find::{Match, find, find_all};
 pub use image::Image;
 
 use std::sync::{Arc, Mutex};
@@ -234,7 +234,11 @@ pub fn find_image(needle: &Image, tolerance: f64) -> Result<Option<(f64, f64)>, 
 }
 
 /// [`find_image`] within a screen rectangle (`None` for the whole screen).
-pub fn find_image_in(needle: &Image, tolerance: f64, region: Option<Rect>) -> Result<Option<(f64, f64)>, String> {
+pub fn find_image_in(
+    needle: &Image,
+    tolerance: f64,
+    region: Option<Rect>,
+) -> Result<Option<(f64, f64)>, String> {
     let shot = search_area(region)?;
     Ok(find(&shot.image, needle, tolerance).map(|(px, py)| middle(&shot, needle, px, py)))
 }
@@ -250,14 +254,21 @@ pub struct ScreenMatch {
 
 /// Every place `needle` is on screen, or in `region` of it, in reading
 /// order: rows top to bottom, each left to right.
-pub fn find_image_all(needle: &Image, tolerance: f64, region: Option<Rect>) -> Result<Vec<ScreenMatch>, String> {
+pub fn find_image_all(
+    needle: &Image,
+    tolerance: f64,
+    region: Option<Rect>,
+) -> Result<Vec<ScreenMatch>, String> {
     let shot = search_area(region)?;
     let mut matches = find_all(&shot.image, needle, tolerance);
     find::reading_order(&mut matches, needle.height);
-    Ok(matches.into_iter().map(|m| {
-        let (x, y) = middle(&shot, needle, m.x, m.y);
-        ScreenMatch { x, y, diff: m.diff }
-    }).collect())
+    Ok(matches
+        .into_iter()
+        .map(|m| {
+            let (x, y) = middle(&shot, needle, m.x, m.y);
+            ScreenMatch { x, y, diff: m.diff }
+        })
+        .collect())
 }
 
 fn search_area(region: Option<Rect>) -> Result<Arc<Shot>, String> {
@@ -269,7 +280,10 @@ fn search_area(region: Option<Rect>) -> Result<Arc<Shot>, String> {
 
 /// The screen point at the middle of `needle` placed at image pixel (`px`, `py`).
 fn middle(shot: &Shot, needle: &Image, px: u32, py: u32) -> (f64, f64) {
-    shot.to_screen(px as f64 + needle.width as f64 / 2.0, py as f64 + needle.height as f64 / 2.0)
+    shot.to_screen(
+        px as f64 + needle.width as f64 / 2.0,
+        py as f64 + needle.height as f64 / 2.0,
+    )
 }
 
 /// What's inside a matching window right now (the active window when
@@ -450,7 +464,14 @@ mod live {
         eprintln!("cursor {:?}", super::cursor());
         eprintln!("pixel {:?}", super::pixel_color(10.0, 10.0));
         if let Ok(path) = std::env::var("BLOCKWORK_TEST_OCR_CROP") {
-            std::fs::write(path, shot.region(0.0, 0.0, 600.0, 120.0).unwrap().to_png().unwrap()).unwrap();
+            std::fs::write(
+                path,
+                shot.region(0.0, 0.0, 600.0, 120.0)
+                    .unwrap()
+                    .to_png()
+                    .unwrap(),
+            )
+            .unwrap();
         }
         let needle = shot.region(20.0, 4.0, 90.0, 24.0).unwrap();
         let started = std::time::Instant::now();

@@ -2,17 +2,19 @@
 //! and runs macros over the shared-memory region at `argv[1]`.
 //! Exits when the Windows-side heartbeat goes stale.
 
-use evdev::{AbsoluteAxisCode, EventType, KeyCode, PropType, RelativeAxisCode};
 use blockwork_core::config;
-use blockwork_core::macros::backend::evdev::EvdevBackend;
-use blockwork_core::macros::backend::evdev_mapping::{evdev_button_from_code, evdev_key_to_macro_key};
 use blockwork_core::macros::backend::InputBackend;
+use blockwork_core::macros::backend::evdev::EvdevBackend;
+use blockwork_core::macros::backend::evdev_mapping::{
+    evdev_button_from_code, evdev_key_to_macro_key,
+};
 use blockwork_core::macros::priority::raise_current_thread_priority;
-use blockwork_core::macros::runner::VariableStore;
 use blockwork_core::macros::run_registry;
+use blockwork_core::macros::runner::VariableStore;
 use blockwork_core::wire::{
     self, SharedRegion, WireCapture, WireCaptureEvent, WireControlCommand, WireTimestamp,
 };
+use evdev::{AbsoluteAxisCode, EventType, KeyCode, PropType, RelativeAxisCode};
 use std::fs::OpenOptions;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
@@ -51,12 +53,17 @@ fn main() {
     match OpenOptions::new().create(true).append(true).open(&log_path) {
         Ok(f) => {
             let writer = FileLogWriter(Arc::new(Mutex::new(f)));
-            tracing_subscriber::fmt().with_writer(move || writer.clone()).with_ansi(false).init();
+            tracing_subscriber::fmt()
+                .with_writer(move || writer.clone())
+                .with_ansi(false)
+                .init();
         }
         Err(_) => {
             // Last resort if the log file can't be created, even though
             // nothing may be watching stderr.
-            tracing_subscriber::fmt().with_writer(std::io::stderr).init();
+            tracing_subscriber::fmt()
+                .with_writer(std::io::stderr)
+                .init();
         }
     }
     tracing::info!("log file: {log_path}");
@@ -79,7 +86,11 @@ fn main() {
         }
     };
     if mmap.len() < wire::SHARED_REGION_SIZE {
-        tracing::error!("shared memory file too small: {} < {}", mmap.len(), wire::SHARED_REGION_SIZE);
+        tracing::error!(
+            "shared memory file too small: {} < {}",
+            mmap.len(),
+            wire::SHARED_REGION_SIZE
+        );
         std::process::exit(1);
     }
 
@@ -191,11 +202,19 @@ fn spawn_capture_threads(region: &'static SharedRegion) {
                             let pressed = value == 1;
                             let wire_event = if is_btn {
                                 evdev_button_from_code(key.0).map(|b| {
-                                    if pressed { WireCaptureEvent::ButtonPress(b) } else { WireCaptureEvent::ButtonRelease(b) }
+                                    if pressed {
+                                        WireCaptureEvent::ButtonPress(b)
+                                    } else {
+                                        WireCaptureEvent::ButtonRelease(b)
+                                    }
                                 })
                             } else {
                                 evdev_key_to_macro_key(key).map(|k| {
-                                    if pressed { WireCaptureEvent::KeyPress(k) } else { WireCaptureEvent::KeyRelease(k) }
+                                    if pressed {
+                                        WireCaptureEvent::KeyPress(k)
+                                    } else {
+                                        WireCaptureEvent::KeyRelease(k)
+                                    }
                                 })
                             };
                             if let Some(wire_event) = wire_event {
@@ -221,10 +240,18 @@ fn spawn_capture_threads(region: &'static SharedRegion) {
                                 );
                             }
                             if pending_wv != 0 {
-                                push_capture(region, WireCaptureEvent::Scroll(0, std::mem::take(&mut pending_wv)), last_ts);
+                                push_capture(
+                                    region,
+                                    WireCaptureEvent::Scroll(0, std::mem::take(&mut pending_wv)),
+                                    last_ts,
+                                );
                             }
                             if pending_wh != 0 {
-                                push_capture(region, WireCaptureEvent::Scroll(std::mem::take(&mut pending_wh), 0), last_ts);
+                                push_capture(
+                                    region,
+                                    WireCaptureEvent::Scroll(std::mem::take(&mut pending_wh), 0),
+                                    last_ts,
+                                );
                             }
                         }
                         _ => {}
@@ -236,7 +263,10 @@ fn spawn_capture_threads(region: &'static SharedRegion) {
 }
 
 fn push_capture(region: &SharedRegion, event: WireCaptureEvent, ts: std::time::SystemTime) {
-    let msg = WireCapture { event, ts: WireTimestamp::from_system_time(ts) };
+    let msg = WireCapture {
+        event,
+        ts: WireTimestamp::from_system_time(ts),
+    };
     let bytes = wire::encode_capture(&msg);
     if !region.capture.try_push(&bytes) {
         tracing::warn!("capture ring full, dropping event");
@@ -263,7 +293,13 @@ fn control_loop(region: &'static SharedRegion, worker_tx: std::sync::mpsc::Sende
                 };
                 match cmd {
                     WireControlCommand::RunMacro(id, elapsed_overshoot_ms) => {
-                        if worker_tx.send(RunRequest { id, elapsed_overshoot_ms }).is_err() {
+                        if worker_tx
+                            .send(RunRequest {
+                                id,
+                                elapsed_overshoot_ms,
+                            })
+                            .is_err()
+                        {
                             tracing::error!("macro worker thread is gone, dropping RunMacro");
                         }
                     }
@@ -281,32 +317,46 @@ fn control_loop(region: &'static SharedRegion, worker_tx: std::sync::mpsc::Sende
 /// Single persistent macro worker. Avoids spawning a thread per RunMacro
 /// (that cost sits ahead of the run's timing anchor) and keeps
 /// consecutive runs sequential instead of racing on the backend lock.
-fn spawn_macro_worker(backend: Arc<Mutex<dyn InputBackend>>) -> std::sync::mpsc::Sender<RunRequest> {
+fn spawn_macro_worker(
+    backend: Arc<Mutex<dyn InputBackend>>,
+) -> std::sync::mpsc::Sender<RunRequest> {
     let (tx, rx) = std::sync::mpsc::channel::<RunRequest>();
-    let spawned = std::thread::Builder::new().name("macros-run".to_string()).spawn(move || {
-        while let Ok(req) = rx.recv() {
-            run_macro_blocking(req.id, req.elapsed_overshoot_ms, Arc::clone(&backend));
-        }
-    });
+    let spawned = std::thread::Builder::new()
+        .name("macros-run".to_string())
+        .spawn(move || {
+            while let Ok(req) = rx.recv() {
+                run_macro_blocking(req.id, req.elapsed_overshoot_ms, Arc::clone(&backend));
+            }
+        });
     if let Err(e) = spawned {
         // Without this thread, every future RunMacro hits the `send`
         // failure branch in `control_loop` and gets logged there too.
-        tracing::error!("blockwork-linux-bridge: failed to spawn persistent macro worker thread: {e}");
+        tracing::error!(
+            "blockwork-linux-bridge: failed to spawn persistent macro worker thread: {e}"
+        );
     }
     tx
 }
 
 /// Runs one macro to completion, same snapshotting as `blockwork_run_macro`
 /// but natively here so it gets real `SCHED_FIFO`. Runs on the worker thread.
-fn run_macro_blocking(id: String, elapsed_overshoot_ms: f64, backend: Arc<Mutex<dyn InputBackend>>) {
+fn run_macro_blocking(
+    id: String,
+    elapsed_overshoot_ms: f64,
+    backend: Arc<Mutex<dyn InputBackend>>,
+) {
     let Some(mac) = config::get_macro_by_id(&id) else {
         tracing::warn!("run_macro: macro '{id}' not found");
         return;
     };
 
     let emulator = backend;
-    let variables: VariableStore =
-        Arc::new(Mutex::new(mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect()));
+    let variables: VariableStore = Arc::new(Mutex::new(
+        mac.variables
+            .iter()
+            .map(|v| (v.name.clone(), v.value.clone()))
+            .collect(),
+    ));
     let settings = config::load_settings();
     let speed_multiplier = mac.speed_multiplier * settings.global_speed_multiplier.unwrap_or(1.0);
     // Log accept so a missing playback attempt is distinguishable from a lost command.
@@ -317,7 +367,13 @@ fn run_macro_blocking(id: String, elapsed_overshoot_ms: f64, backend: Arc<Mutex<
 
     let offset = Duration::from_secs_f64(elapsed_overshoot_ms.max(0.0) / 1000.0);
     let flag = run_registry::begin_run();
-    mac.clone().run_with_offset(Arc::clone(&emulator), Some(Arc::clone(&flag)), speed_multiplier, Arc::clone(&variables), offset);
+    mac.clone().run_with_offset(
+        Arc::clone(&emulator),
+        Some(Arc::clone(&flag)),
+        speed_multiplier,
+        Arc::clone(&variables),
+        offset,
+    );
     run_registry::end_run(&flag);
     if let Ok(values) = variables.lock() {
         let mut mac = mac.clone();

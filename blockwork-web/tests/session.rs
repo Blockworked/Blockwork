@@ -11,7 +11,8 @@ const SAVED: &str = include_str!("../../blockwork-core/tests/fixtures/editor-bas
 fn loaded() -> Demo {
     let mut demo = Demo::default();
     let saved: Value = serde_json::from_str(SAVED).unwrap();
-    demo.dispatch("load", &json!({ "macros": [saved.clone(), saved] })).unwrap();
+    demo.dispatch("load", &json!({ "macros": [saved.clone(), saved] }))
+        .unwrap();
     demo
 }
 
@@ -21,14 +22,22 @@ fn loads_saved_macros_through_the_apps_migrations() {
     let state = demo.state();
     assert_eq!(state["macro_selected"], 0);
     assert_eq!(state["macro_names"].as_array().unwrap().len(), 2);
-    assert!(!state["current_macro"]["strands"].as_array().unwrap().is_empty());
+    assert!(
+        !state["current_macro"]["strands"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
     assert_eq!(state["can_undo"], false);
 }
 
 #[test]
 fn a_bad_file_fails_the_load_and_keeps_what_was_open() {
     let mut demo = loaded();
-    assert!(demo.dispatch("load", &json!({ "macros": ["not a macro"] })).is_err());
+    assert!(
+        demo.dispatch("load", &json!({ "macros": ["not a macro"] }))
+            .is_err()
+    );
     assert_eq!(demo.state()["macro_names"].as_array().unwrap().len(), 2);
 }
 
@@ -51,7 +60,10 @@ fn unknown_commands_are_refused_by_name() {
     assert!(error.contains("run_macro"));
     for command in blockwork_web::COMMANDS {
         let answer = demo.dispatch(command, &json!({}));
-        assert!(!matches!(&answer, Err(e) if e.starts_with("unsupported command")), "{command}");
+        assert!(
+            !matches!(&answer, Err(e) if e.starts_with("unsupported command")),
+            "{command}"
+        );
     }
 }
 
@@ -79,7 +91,10 @@ fn the_c_abi_answers_in_the_shared_envelope() {
         assert_eq!(bs_abi_version(), blockstitch_ffi::ABI_VERSION);
         let handle = bs_session_new();
         let created = call(handle, r#"{"command":"new_macro"}"#);
-        assert_eq!(created, json!({ "ok": true, "result": null, "error": null }));
+        assert_eq!(
+            created,
+            json!({ "ok": true, "result": null, "error": null })
+        );
         let strand = call(handle, r#"{"command":"add_strand","args":{"x":1,"y":2}}"#);
         assert!(strand["result"].is_string());
         let state = call(handle, r#"{"command":"state"}"#);
@@ -88,7 +103,10 @@ fn the_c_abi_answers_in_the_shared_envelope() {
         assert_eq!(refused["ok"], false);
         assert_eq!(call(handle, "not json")["ok"], false);
         bs_session_free(handle);
-        assert_eq!(call(handle, r#"{"command":"state"}"#)["error"], "no such session");
+        assert_eq!(
+            call(handle, r#"{"command":"state"}"#)["error"],
+            "no such session"
+        );
     }
 }
 
@@ -102,29 +120,54 @@ fn blocks_can_be_dropped_into_a_reporters_branch() {
         branches: vec![],
         saved: Box::new(BlockValue::number(0.0)),
     };
-    demo.dispatch("create_floating_value", &json!({ "x": 0, "y": 0, "value": call })).unwrap();
-    let floating = |demo: &Demo| demo.state()["current_macro"]["floating_values"].as_array().unwrap().last().unwrap().clone();
+    demo.dispatch(
+        "create_floating_value",
+        &json!({ "x": 0, "y": 0, "value": call }),
+    )
+    .unwrap();
+    let floating = |demo: &Demo| {
+        demo.state()["current_macro"]["floating_values"]
+            .as_array()
+            .unwrap()
+            .last()
+            .unwrap()
+            .clone()
+    };
     let id = floating(&demo)["id"].as_str().unwrap().to_string();
     let location = json!({ "kind": "Floating", "floating_id": id, "path": [] });
-    let strand = format!("@reporter-branch:{}", json!({ "location": location, "slot": 0 }));
-    let wait = json!({ "id": "nested", "type": "Wait", "duration": { "kind": "Number", "value": 10 } });
-    demo.dispatch("add_instruction", &json!({ "strandId": strand, "path": [{ "index": 0 }], "instruction": wait }))
-        .unwrap();
+    let strand = format!(
+        "@reporter-branch:{}",
+        json!({ "location": location, "slot": 0 })
+    );
+    let wait =
+        json!({ "id": "nested", "type": "Wait", "duration": { "kind": "Number", "value": 10 } });
+    demo.dispatch(
+        "add_instruction",
+        &json!({ "strandId": strand, "path": [{ "index": 0 }], "instruction": wait }),
+    )
+    .unwrap();
     assert_eq!(floating(&demo)["value"]["branches"][0][0]["id"], "nested");
     demo.dispatch("undo", &json!({})).unwrap();
-    assert!(floating(&demo)["value"]["branches"].as_array().unwrap().is_empty());
+    assert!(
+        floating(&demo)["value"]["branches"]
+            .as_array()
+            .unwrap()
+            .is_empty()
+    );
 }
 
 /// The other direction: every command `Demo::run` answers is in `COMMANDS`,
 /// so the parity script and the page's contract check see it too.
 #[test]
 fn every_answered_command_is_listed() {
-    let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/session.rs")).unwrap();
+    let source =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/session.rs")).unwrap();
     let body = &source[source.find("fn run(&mut self").unwrap()..];
     let mut missing = Vec::new();
     for line in body.lines() {
         let trimmed = line.trim_start();
-        if line.len() - trimmed.len() != 12 || !trimmed.starts_with('"') || !trimmed.contains("=>") {
+        if line.len() - trimmed.len() != 12 || !trimmed.starts_with('"') || !trimmed.contains("=>")
+        {
             continue;
         }
         let pattern = trimmed.split("=>").next().unwrap();

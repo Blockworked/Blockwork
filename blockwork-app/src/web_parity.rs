@@ -17,13 +17,18 @@ fn backend() -> Backend {
     let settings = blockwork_core::config::AppSettings::default();
     let state = initial_state(&settings, None, true, false);
     let (events, _) = broadcast::channel(16);
-    Backend { state: Arc::new(Mutex::new(state)), app: AppHandle { events } }
+    Backend {
+        state: Arc::new(Mutex::new(state)),
+        app: AppHandle { events },
+    }
 }
 
 fn is_id(text: &str) -> bool {
     let hex = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_hexdigit());
     (text.len() == 32 && hex(text))
-        || (text.len() == 36 && text.split('-').map(str::len).eq([8, 4, 4, 4, 12]) && text.split('-').all(hex))
+        || (text.len() == 36
+            && text.split('-').map(str::len).eq([8, 4, 4, 4, 12])
+            && text.split('-').all(hex))
 }
 
 /// Renames every id to `#n` by first appearance (serde_json orders keys).
@@ -34,7 +39,11 @@ fn normalize(value: &Value, ids: &mut HashMap<String, usize>) -> Value {
             Value::String(format!("#{}", ids.entry(s.clone()).or_insert(next)))
         }
         Value::Array(items) => Value::Array(items.iter().map(|v| normalize(v, ids)).collect()),
-        Value::Object(map) => Value::Object(map.iter().map(|(k, v)| (k.clone(), normalize(v, ids))).collect()),
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .map(|(k, v)| (k.clone(), normalize(v, ids)))
+                .collect(),
+        ),
         other => other.clone(),
     }
 }
@@ -62,10 +71,18 @@ fn bind(args: &Value, answers: &[(Value, Value)]) -> Value {
         Value::String(s) if s.starts_with('$') => {
             let (step, field) = s[1..].split_once('.').unwrap_or((&s[1..], ""));
             let (app, _) = &answers[step.parse::<usize>().unwrap()];
-            if field.is_empty() { app.clone() } else { app[field].clone() }
+            if field.is_empty() {
+                app.clone()
+            } else {
+                app[field].clone()
+            }
         }
         Value::Array(items) => Value::Array(items.iter().map(|v| bind(v, answers)).collect()),
-        Value::Object(map) => Value::Object(map.iter().map(|(k, v)| (k.clone(), bind(v, answers))).collect()),
+        Value::Object(map) => Value::Object(
+            map.iter()
+                .map(|(k, v)| (k.clone(), bind(v, answers)))
+                .collect(),
+        ),
         other => other.clone(),
     }
 }
@@ -85,101 +102,318 @@ fn wait_field(strand: &str, index: usize) -> Value {
 fn script() -> Vec<(&'static str, Value)> {
     vec![
         /* 0 */ ("new_macro", json!({})),
-        /* 1 */ ("add_strand", json!({ "x": 10, "y": 20, "instruction": { "id": "i1", "type": "WhenRan" } })),
-        /* 2 */ ("add_instruction", json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "i2", "type": "Wait", "duration": num(100.0) } })),
-        /* 3 */ ("add_instruction", json!({ "strandId": "$1", "path": at(2), "instruction": { "id": "i3", "type": "Repeat", "count": num(3.0), "body": [] } })),
-        /* 4 */ ("add_instruction", json!({ "strandId": "$1", "path": [{ "index": 2, "slot": 0 }, { "index": 0, "slot": null }],
-                   "instruction": { "id": "i4", "type": "Text", "text": { "kind": "Text", "value": "hi" } } })),
-        /* 5 */ ("edit_value_field", json!({ "location": wait_field("$1", 1), "text": "2" })),
-        /* 6 */ ("edit_value_field", json!({ "location": wait_field("$1", 1), "text": "25" })),
-        /* 7 */ ("edit_value_field", json!({ "location": wait_field("$1", 1), "text": "2x" })),
-        /* 8 */ ("edit_value_field", json!({ "location": wait_field("$1", 1), "text": "09" })),
-        /* 9 */ ("set_value_kind", json!({ "location": wait_field("$1", 1), "kind": "Add" })),
-        /* 10 */ ("edit_value_field", json!({ "location": { "kind": "Field", "strand_id": "$1", "index": at(1), "field_id": "WaitDuration", "path": [1] }, "text": "07" })),
+        /* 1 */
+        (
+            "add_strand",
+            json!({ "x": 10, "y": 20, "instruction": { "id": "i1", "type": "WhenRan" } }),
+        ),
+        /* 2 */
+        (
+            "add_instruction",
+            json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "i2", "type": "Wait", "duration": num(100.0) } }),
+        ),
+        /* 3 */
+        (
+            "add_instruction",
+            json!({ "strandId": "$1", "path": at(2), "instruction": { "id": "i3", "type": "Repeat", "count": num(3.0), "body": [] } }),
+        ),
+        /* 4 */
+        (
+            "add_instruction",
+            json!({ "strandId": "$1", "path": [{ "index": 2, "slot": 0 }, { "index": 0, "slot": null }],
+                   "instruction": { "id": "i4", "type": "Text", "text": { "kind": "Text", "value": "hi" } } }),
+        ),
+        /* 5 */
+        (
+            "edit_value_field",
+            json!({ "location": wait_field("$1", 1), "text": "2" }),
+        ),
+        /* 6 */
+        (
+            "edit_value_field",
+            json!({ "location": wait_field("$1", 1), "text": "25" }),
+        ),
+        /* 7 */
+        (
+            "edit_value_field",
+            json!({ "location": wait_field("$1", 1), "text": "2x" }),
+        ),
+        /* 8 */
+        (
+            "edit_value_field",
+            json!({ "location": wait_field("$1", 1), "text": "09" }),
+        ),
+        /* 9 */
+        (
+            "set_value_kind",
+            json!({ "location": wait_field("$1", 1), "kind": "Add" }),
+        ),
+        /* 10 */
+        (
+            "edit_value_field",
+            json!({ "location": { "kind": "Field", "strand_id": "$1", "index": at(1), "field_id": "WaitDuration", "path": [1] }, "text": "07" }),
+        ),
         /* 11 */ ("create_variable", json!({ "name": "n" })),
-        /* 12 */ ("rename_variable", json!({ "oldName": "n", "newName": "count" })),
+        /* 12 */
+        (
+            "rename_variable",
+            json!({ "oldName": "n", "newName": "count" }),
+        ),
         /* 13 */ ("create_signal", json!({ "name": "go" })),
-        /* 14 */ ("rename_signal", json!({ "oldName": "go", "newName": "start" })),
-        /* 15 */ ("create_floating_value", json!({ "x": 300, "y": 40, "value": { "kind": "Var", "name": "count" }, "originBlockId": null })),
-        /* 16 */ ("move_floating_value", json!({ "floatingId": "$15", "x": 320, "y": 60 })),
-        /* 17 */ ("move_value", json!({ "from": wait_field("$1", 1), "x": 500, "y": 90, "originBlockId": null })),
-        /* 18 */ ("move_value", json!({ "from": { "kind": "Floating", "floating_id": "$15", "path": [] }, "to": wait_field("$1", 1) })),
-        /* 19 */ ("create_comment", json!({ "x": 10, "y": 300, "text": "note" })),
-        /* 20 */ ("edit_comment_text", json!({ "commentId": "$19", "text": "note 1" })),
-        /* 21 */ ("edit_comment_text", json!({ "commentId": "$19", "text": "note 12" })),
-        /* 22 */ ("set_comment_collapsed", json!({ "commentId": "$19", "collapsed": true })),
-        /* 23 */ ("copy_instructions", json!({ "strandId": "$1", "path": at(1), "count": 2 })),
-        /* 24 */ ("paste_fragment", json!({ "x": 400, "y": 400, "fragment": "$23" })),
-        /* 25 */ ("duplicate_instruction", json!({ "strandId": "$1", "path": at(1) })),
-        /* 26 */ ("reorder_instruction", json!({ "strandId": "$1", "path": at(2), "direction": 1 })),
-        /* 27 */ ("remove_instruction", json!({ "strandId": "$1", "path": at(3) })),
-        /* 28 */ ("split_strand", json!({ "strandId": "$1", "path": at(2), "x": 50, "y": 600 })),
-        /* 29 */ ("merge_strand", json!({ "draggedId": "$28", "targetId": "$1", "path": at(2) })),
-        /* 30 */ ("move_strand", json!({ "strandId": "$24", "x": 700, "y": 10 })),
+        /* 14 */
+        (
+            "rename_signal",
+            json!({ "oldName": "go", "newName": "start" }),
+        ),
+        /* 15 */
+        (
+            "create_floating_value",
+            json!({ "x": 300, "y": 40, "value": { "kind": "Var", "name": "count" }, "originBlockId": null }),
+        ),
+        /* 16 */
+        (
+            "move_floating_value",
+            json!({ "floatingId": "$15", "x": 320, "y": 60 }),
+        ),
+        /* 17 */
+        (
+            "move_value",
+            json!({ "from": wait_field("$1", 1), "x": 500, "y": 90, "originBlockId": null }),
+        ),
+        /* 18 */
+        (
+            "move_value",
+            json!({ "from": { "kind": "Floating", "floating_id": "$15", "path": [] }, "to": wait_field("$1", 1) }),
+        ),
+        /* 19 */
+        (
+            "create_comment",
+            json!({ "x": 10, "y": 300, "text": "note" }),
+        ),
+        /* 20 */
+        (
+            "edit_comment_text",
+            json!({ "commentId": "$19", "text": "note 1" }),
+        ),
+        /* 21 */
+        (
+            "edit_comment_text",
+            json!({ "commentId": "$19", "text": "note 12" }),
+        ),
+        /* 22 */
+        (
+            "set_comment_collapsed",
+            json!({ "commentId": "$19", "collapsed": true }),
+        ),
+        /* 23 */
+        (
+            "copy_instructions",
+            json!({ "strandId": "$1", "path": at(1), "count": 2 }),
+        ),
+        /* 24 */
+        (
+            "paste_fragment",
+            json!({ "x": 400, "y": 400, "fragment": "$23" }),
+        ),
+        /* 25 */
+        (
+            "duplicate_instruction",
+            json!({ "strandId": "$1", "path": at(1) }),
+        ),
+        /* 26 */
+        (
+            "reorder_instruction",
+            json!({ "strandId": "$1", "path": at(2), "direction": 1 }),
+        ),
+        /* 27 */
+        (
+            "remove_instruction",
+            json!({ "strandId": "$1", "path": at(3) }),
+        ),
+        /* 28 */
+        (
+            "split_strand",
+            json!({ "strandId": "$1", "path": at(2), "x": 50, "y": 600 }),
+        ),
+        /* 29 */
+        (
+            "merge_strand",
+            json!({ "draggedId": "$28", "targetId": "$1", "path": at(2) }),
+        ),
+        /* 30 */
+        (
+            "move_strand",
+            json!({ "strandId": "$24", "x": 700, "y": 10 }),
+        ),
         /* 31 */ ("create_list", json!({ "name": "items" })),
-        /* 32 */ ("set_list_items", json!({ "name": "items", "items": [{ "kind": "Number", "value": 1.0 }, { "kind": "Text", "value": "b" }] })),
-        /* 33 */ ("rename_list", json!({ "oldName": "items", "newName": "things" })),
-        /* 34 */ ("create_block", json!({ "pieces": [{ "kind": "Label", "id": "l", "text": "jump" },
+        /* 32 */
+        (
+            "set_list_items",
+            json!({ "name": "items", "items": [{ "kind": "Number", "value": 1.0 }, { "kind": "Text", "value": "b" }] }),
+        ),
+        /* 33 */
+        (
+            "rename_list",
+            json!({ "oldName": "items", "newName": "things" }),
+        ),
+        /* 34 */
+        (
+            "create_block",
+            json!({ "pieces": [{ "kind": "Label", "id": "l", "text": "jump" },
                      { "kind": "Input", "id": "i", "name": "height", "value_type": "Any" }],
-                   "shape": "Normal", "color": "#ff8800", "icon": "star", "identifier": "jump", "description": "Jumps" })),
+                   "shape": "Normal", "color": "#ff8800", "icon": "star", "identifier": "jump", "description": "Jumps" }),
+        ),
         /* 35 */ ("undo", json!({})),
         /* 36 */ ("undo", json!({})),
         /* 37 */ ("redo", json!({})),
         /* 38 */ ("remove_comment", json!({ "commentId": "$19" })),
-        /* 39 */ ("delete_instruction", json!({ "strandId": "$1", "path": at(1), "x": 80, "y": 500 })),
+        /* 39 */
+        (
+            "delete_instruction",
+            json!({ "strandId": "$1", "path": at(1), "x": 80, "y": 500 }),
+        ),
         /* 40 */ ("remove_strand", json!({ "strandId": "$24" })),
         /* 41 */ ("set_title", json!({ "title": "Parity" })),
         /* 42 */ ("set_macro_speed_multiplier", json!({ "multiplier": 99.0 })),
-        /* 43 */ ("set_macro_conditions", json!({ "onlyInWindow": " Firefox ", "power": "OnBattery",
-                   "activeFrom": "9:00", "activeUntil": "17:30", "activeDays": 255 })),
+        /* 43 */
+        (
+            "set_macro_conditions",
+            json!({ "onlyInWindow": " Firefox ", "power": "OnBattery",
+                   "activeFrom": "9:00", "activeUntil": "17:30", "activeDays": 255 }),
+        ),
         /* 44 */ ("start_standalone_key_capture", json!({})),
-        /* 45 */ ("key_capture_event", json!({ "keys": [["ControlLeft", "Control"], ["KeyA", "a"]] })),
-        /* 46 */ ("add_instruction", json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "i5", "type": "Key", "key": { "kind": "Text", "value": "a" }, "direction": "Click" } })),
-        /* 47 */ ("start_key_capture", json!({ "strandId": "$1", "path": at(1) })),
-        /* 48 */ ("key_capture_event", json!({ "keys": [["ShiftLeft", "Shift"], ["F5", "F5"]] })),
+        /* 45 */
+        (
+            "key_capture_event",
+            json!({ "keys": [["ControlLeft", "Control"], ["KeyA", "a"]] }),
+        ),
+        /* 46 */
+        (
+            "add_instruction",
+            json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "i5", "type": "Key", "key": { "kind": "Text", "value": "a" }, "direction": "Click" } }),
+        ),
+        /* 47 */
+        (
+            "start_key_capture",
+            json!({ "strandId": "$1", "path": at(1) }),
+        ),
+        /* 48 */
+        (
+            "key_capture_event",
+            json!({ "keys": [["ShiftLeft", "Shift"], ["F5", "F5"]] }),
+        ),
         /* 49 */ ("delete_variable", json!({ "name": "count" })),
         /* 50 */ ("undo", json!({})),
         /* 51 */ ("redo", json!({})),
         // Refusals: both sides must refuse, and change nothing.
-        /* 52 */ ("create_signal", json!({ "name": "START" })),
-        /* 53 */ ("add_instruction", json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "h", "type": "WhenRan" } })),
+        /* 52 */
+        ("create_signal", json!({ "name": "START" })),
+        /* 53 */
+        (
+            "add_instruction",
+            json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "h", "type": "WhenRan" } }),
+        ),
         /* 54 */ ("rename_list", json!({ "oldName": "nope", "newName": "x" })),
         /* 55 */ ("undo", json!({})),
         /* 56 */ ("create_variable", json!({ "name": "speed" })),
-        /* 57 */ ("set_variable_value", json!({ "name": "speed", "value": " 2.5 " })),
-        /* 58 */ ("set_variable_value", json!({ "name": "speed", "value": "fast" })),
-        /* 59 */ ("set_variable_value", json!({ "name": "nope", "value": "1" })),
+        /* 57 */
+        (
+            "set_variable_value",
+            json!({ "name": "speed", "value": " 2.5 " }),
+        ),
+        /* 58 */
+        (
+            "set_variable_value",
+            json!({ "name": "speed", "value": "fast" }),
+        ),
+        /* 59 */
+        (
+            "set_variable_value",
+            json!({ "name": "nope", "value": "1" }),
+        ),
         /* 60 */ ("set_macro_always_listen", json!({ "enabled": true })),
         /* 61 */ ("set_macro_catch_up", json!({ "enabled": true })),
         /* 62 */ ("set_macro_max_run_secs", json!({ "seconds": 30 })),
-        /* 63 */ ("set_macro_max_loop_iterations", json!({ "iterations": 500 })),
-        /* 64 */ ("add_instruction", json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "i6", "type": "Wait", "duration": num(5.0) } })),
-        /* 65 */ ("edit_instruction", json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "i6", "type": "Wait", "duration": num(8.0) } })),
-        /* 66 */ ("put_value", json!({ "location": wait_field("$1", 1), "value": { "kind": "Var", "name": "speed" } })),
+        /* 63 */
+        (
+            "set_macro_max_loop_iterations",
+            json!({ "iterations": 500 }),
+        ),
+        /* 64 */
+        (
+            "add_instruction",
+            json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "i6", "type": "Wait", "duration": num(5.0) } }),
+        ),
+        /* 65 */
+        (
+            "edit_instruction",
+            json!({ "strandId": "$1", "path": at(1), "instruction": { "id": "i6", "type": "Wait", "duration": num(8.0) } }),
+        ),
+        /* 66 */
+        (
+            "put_value",
+            json!({ "location": wait_field("$1", 1), "value": { "kind": "Var", "name": "speed" } }),
+        ),
         /* 67 */ ("take_value", json!({ "location": wait_field("$1", 1) })),
-        /* 68 */ ("create_floating_value", json!({ "x": 30, "y": 30, "value": num(4.0), "originBlockId": null })),
+        /* 68 */
+        (
+            "create_floating_value",
+            json!({ "x": 30, "y": 30, "value": num(4.0), "originBlockId": null }),
+        ),
         /* 69 */ ("remove_floating_value", json!({ "floatingId": "$68" })),
         /* 70 */ ("create_comment", json!({ "x": 5, "y": 5, "text": "moved" })),
-        /* 71 */ ("move_comment", json!({ "commentId": "$70", "x": 90, "y": 120 })),
-        /* 72 */ ("set_list_editor_state", json!({ "name": "things", "visible": true, "x": 40, "y": 50 })),
+        /* 71 */
+        (
+            "move_comment",
+            json!({ "commentId": "$70", "x": 90, "y": 120 }),
+        ),
+        /* 72 */
+        (
+            "set_list_editor_state",
+            json!({ "name": "things", "visible": true, "x": 40, "y": 50 }),
+        ),
         /* 73 */ ("delete_list", json!({ "name": "things" })),
         /* 74 */ ("delete_signal", json!({ "name": "start" })),
-        /* 75 */ ("create_block", json!({ "pieces": [{ "kind": "Label", "id": "l", "text": "spin" }],
-                   "shape": "Normal", "color": "#00aa88", "icon": "", "identifier": "", "description": "" })),
+        /* 75 */
+        (
+            "create_block",
+            json!({ "pieces": [{ "kind": "Label", "id": "l", "text": "spin" }],
+                   "shape": "Normal", "color": "#00aa88", "icon": "", "identifier": "", "description": "" }),
+        ),
         /* 76 */ ("delete_block", json!({ "blockId": "$75" })),
         /* 77 */ ("undo", json!({})),
         /* 78 */ ("clear_standalone_key_capture", json!({})),
         /* 79 */ ("delete_signal", json!({ "name": "nope" })),
-        /* 80 */ ("paste_instructions", json!({ "x": 200, "y": 700, "instructions": [
+        /* 80 */
+        (
+            "paste_instructions",
+            json!({ "x": 200, "y": 700, "instructions": [
                      { "id": "p1", "type": "Wait", "duration": num(1.0) },
-                     { "id": "p2", "type": "Wait", "duration": num(2.0) }] })),
-        /* 81 */ ("merge_tail", json!({ "strandId": "$80", "path": at(1), "targetId": "$1", "targetPath": at(1) })),
-        /* 82 */ ("create_attached_comment", json!({ "instructionId": "i1", "dx": 20, "dy": 0, "text": "start here" })),
+                     { "id": "p2", "type": "Wait", "duration": num(2.0) }] }),
+        ),
+        /* 81 */
+        (
+            "merge_tail",
+            json!({ "strandId": "$80", "path": at(1), "targetId": "$1", "targetPath": at(1) }),
+        ),
+        /* 82 */
+        (
+            "create_attached_comment",
+            json!({ "instructionId": "i1", "dx": 20, "dy": 0, "text": "start here" }),
+        ),
         /* 83 */ ("set_recording_target", json!({ "strandId": "$1" })),
-        /* 84 */ ("create_block", json!({ "pieces": [{ "kind": "Label", "id": "l", "text": "hop" }],
-                   "shape": "Normal", "color": "#3366ff", "icon": "", "identifier": "", "description": "" })),
-        /* 85 */ ("edit_block", json!({ "blockId": "$84", "pieces": [{ "kind": "Label", "id": "l", "text": "hop twice" }],
-                   "shape": "Normal", "color": "#3366ff", "icon": "star", "identifier": "hop", "description": "Hops" })),
+        /* 84 */
+        (
+            "create_block",
+            json!({ "pieces": [{ "kind": "Label", "id": "l", "text": "hop" }],
+                   "shape": "Normal", "color": "#3366ff", "icon": "", "identifier": "", "description": "" }),
+        ),
+        /* 85 */
+        (
+            "edit_block",
+            json!({ "blockId": "$84", "pieces": [{ "kind": "Label", "id": "l", "text": "hop twice" }],
+                   "shape": "Normal", "color": "#3366ff", "icon": "star", "identifier": "hop", "description": "Hops" }),
+        ),
         /* 86 */ ("clear_instructions", json!({})),
         /* 87 */ ("undo", json!({})),
     ]
@@ -190,16 +424,37 @@ const REFUSED: &[usize] = &[52, 53, 54, 59, 79];
 
 /// Web commands the script leaves out, and why.
 const NOT_REPLAYED: &[(&str, &str)] = &[
-    ("load", "replaces the whole session; covered by blockwork-web's own tests"),
+    (
+        "load",
+        "replaces the whole session; covered by blockwork-web's own tests",
+    ),
     ("state", "read only"),
     ("commands", "read only"),
-    ("preview_value", "read only: evaluates a value without changing anything"),
-    ("select_macro_by_id", "the web demo's macro list is not the app's library"),
-    ("duplicate_macro", "the web demo's macro list is not the app's library"),
-    ("delete_macro", "the web demo's macro list is not the app's library"),
-    ("remove_macro", "the web demo's macro list is not the app's library"),
+    (
+        "preview_value",
+        "read only: evaluates a value without changing anything",
+    ),
+    (
+        "select_macro_by_id",
+        "the web demo's macro list is not the app's library",
+    ),
+    (
+        "duplicate_macro",
+        "the web demo's macro list is not the app's library",
+    ),
+    (
+        "delete_macro",
+        "the web demo's macro list is not the app's library",
+    ),
+    (
+        "remove_macro",
+        "the web demo's macro list is not the app's library",
+    ),
     ("set_macro_folder", "the web demo has no folders on disk"),
-    ("set_palette_layout", "an editor preference, not part of the macro"),
+    (
+        "set_palette_layout",
+        "an editor preference, not part of the macro",
+    ),
 ];
 
 /// A command added to the web build must be replayed here or listed above.
@@ -211,28 +466,49 @@ fn the_script_covers_every_web_command() {
         .copied()
         .filter(|c| !replayed.contains(c) && !NOT_REPLAYED.iter().any(|(n, _)| n == c))
         .collect();
-    assert!(missing.is_empty(), "add these to script() or NOT_REPLAYED: {missing:?}");
+    assert!(
+        missing.is_empty(),
+        "add these to script() or NOT_REPLAYED: {missing:?}"
+    );
 }
 
 #[test]
 fn web_editor_replays_like_the_app() {
     let app = backend();
     let mut web = Demo::default();
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
     let mut answers: Vec<(Value, Value)> = Vec::new();
     for (step, (command, args)) in script().into_iter().enumerate() {
         let app_args = bind(&args, &answers);
         // The web side gets its own ids for the same steps.
-        let web_answers: Vec<(Value, Value)> = answers.iter().map(|(_, w)| (w.clone(), Value::Null)).collect();
+        let web_answers: Vec<(Value, Value)> = answers
+            .iter()
+            .map(|(_, w)| (w.clone(), Value::Null))
+            .collect();
         let web_args = bind(&args, &web_answers);
         let from_app = runtime.block_on(app.dispatch(command, app_args));
         let from_web = web.dispatch(command, &web_args);
-        assert_eq!(from_app.is_ok(), from_web.is_ok(), "step {step} {command}: app {from_app:?} web {from_web:?}");
-        let app_state = serde_json::to_value(crate::commands::get_state(&app.state).unwrap()).unwrap();
+        assert_eq!(
+            from_app.is_ok(),
+            from_web.is_ok(),
+            "step {step} {command}: app {from_app:?} web {from_web:?}"
+        );
+        let app_state =
+            serde_json::to_value(crate::commands::get_state(&app.state).unwrap()).unwrap();
         let (a, w) = (view(&app_state), view(&web.state()));
         assert_eq!(a, w, "step {step} {command} differs\napp {a:#}\nweb {w:#}");
-        assert_eq!(from_app.is_err(), REFUSED.contains(&step), "step {step} {command}: {from_app:?}");
-        answers.push((from_app.unwrap_or(Value::Null), from_web.unwrap_or(Value::Null)));
+        assert_eq!(
+            from_app.is_err(),
+            REFUSED.contains(&step),
+            "step {step} {command}: {from_app:?}"
+        );
+        answers.push((
+            from_app.unwrap_or(Value::Null),
+            from_web.unwrap_or(Value::Null),
+        ));
     }
 }
 
@@ -249,15 +525,23 @@ fn text(t: &str) -> Value {
 fn web_preview_matches_the_app_for_pure_reporters() {
     let app = backend();
     let mut web = Demo::default();
-    let runtime = tokio::runtime::Builder::new_current_thread().enable_all().build().unwrap();
+    let runtime = tokio::runtime::Builder::new_current_thread()
+        .enable_all()
+        .build()
+        .unwrap();
     let setup = [
         ("new_macro", json!({})),
         ("create_variable", json!({ "name": "count" })),
         ("create_list", json!({ "name": "items" })),
-        ("set_list_items", json!({ "name": "items", "items": [num(4.0), text("b")] })),
+        (
+            "set_list_items",
+            json!({ "name": "items", "items": [num(4.0), text("b")] }),
+        ),
     ];
     for (command, args) in setup {
-        runtime.block_on(app.dispatch(command, args.clone())).unwrap();
+        runtime
+            .block_on(app.dispatch(command, args.clone()))
+            .unwrap();
         web.dispatch(command, &args).unwrap();
     }
     let values = [
@@ -265,14 +549,20 @@ fn web_preview_matches_the_app_for_pure_reporters() {
         op("Div", vec![num(1.0), num(0.0)]),
         op("Mod", vec![num(-7.0), num(3.0)]),
         op("Round", vec![num(2.5)]),
-        op("Join", vec![text("clicked "), json!({ "kind": "Var", "name": "count" })]),
+        op(
+            "Join",
+            vec![text("clicked "), json!({ "kind": "Var", "name": "count" })],
+        ),
         op("Gt", vec![text("10"), text("9")]),
         op("Eq", vec![text("Hello"), text("hello")]),
         op("Length", vec![text("blocks")]),
         op("LetterOf", vec![num(2.0), text("blocks")]),
         op("Case", vec![text("upper"), text("abc")]),
         op("Math", vec![text("sqrt"), num(16.0)]),
-        op("TextCheck", vec![text("order 1234"), text("matches regex"), text(r"\d{4}$")]),
+        op(
+            "TextCheck",
+            vec![text("order 1234"), text("matches regex"), text(r"\d{4}$")],
+        ),
         op("SplitPart", vec![text("a,b,c"), text(","), num(2.0)]),
         op("FormatNumber", vec![num(12.3456), num(2.0)]),
         op("FormatDate", vec![num(0.0), text("%Y")]),
@@ -280,7 +570,8 @@ fn web_preview_matches_the_app_for_pure_reporters() {
         op("Add", vec![text("x"), num(1.0)]),
     ];
     for value in values {
-        let from_app = runtime.block_on(app.dispatch("preview_value", json!({ "value": value.clone() })));
+        let from_app =
+            runtime.block_on(app.dispatch("preview_value", json!({ "value": value.clone() })));
         let from_web = web.dispatch("preview_value", &json!({ "value": value.clone() }));
         assert_eq!(from_app, from_web, "{value}");
     }

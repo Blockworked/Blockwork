@@ -3,7 +3,7 @@
 //! that doesn't match is refused.
 
 use crate::input::value::Value;
-use crate::macros::{migrate, BlockKind, InstructionKind, Macro, MacroGraph, Strand};
+use crate::macros::{BlockKind, InstructionKind, Macro, MacroGraph, Strand, migrate};
 use serde::{Deserialize, Serialize};
 use sha2::{Digest, Sha256};
 use std::collections::HashSet;
@@ -118,16 +118,23 @@ pub struct PackRecord {
 
 /// The installed pack that owns a definition, including older imported packs.
 pub fn owner<'a>(mac: &'a Macro, block_id: &str) -> Option<&'a PackRecord> {
-    mac.settings.block_packs.iter().find(|pack| pack.blocks.iter().any(|id| id == block_id))
+    mac.settings
+        .block_packs
+        .iter()
+        .find(|pack| pack.blocks.iter().any(|id| id == block_id))
 }
 
 pub fn is_pack_strand(mac: &Macro, strand: &Strand) -> bool {
-    strand.block_header_id().is_some_and(|id| owner(mac, id).is_some())
+    strand
+        .block_header_id()
+        .is_some_and(|id| owner(mac, id).is_some())
 }
 
 pub fn check_editable(mac: &Macro, block_id: &str) -> Result<(), String> {
     if owner(mac, block_id).is_some() {
-        return Err("Community blocks are managed as packs. Remove the pack in the block library".into());
+        return Err(
+            "Community blocks are managed as packs. Remove the pack in the block library".into(),
+        );
     }
     Ok(())
 }
@@ -139,7 +146,9 @@ pub const ID_SEPARATOR: char = ':';
 /// Refuses a block identifier with the author separator in it.
 pub fn check_identifier(identifier: &str) -> Result<(), String> {
     if identifier.contains(ID_SEPARATOR) {
-        return Err(format!("Block IDs can't contain \"{ID_SEPARATOR}\". Your name is added in front when the block is shared"));
+        return Err(format!(
+            "Block IDs can't contain \"{ID_SEPARATOR}\". Your name is added in front when the block is shared"
+        ));
     }
     Ok(())
 }
@@ -153,21 +162,37 @@ fn id_part(text: &str) -> String {
 pub fn bare_identifier(author: &str, name: &str) -> String {
     let name = name.rsplit(ID_SEPARATOR).next().unwrap_or(name);
     let author = id_part(author);
-    let name = if author.is_empty() { name } else { name.strip_prefix(&format!("{author}_")).unwrap_or(name) };
+    let name = if author.is_empty() {
+        name
+    } else {
+        name.strip_prefix(&format!("{author}_")).unwrap_or(name)
+    };
     let name = id_part(name);
-    if name.is_empty() { "Block".into() } else { name }
+    if name.is_empty() {
+        "Block".into()
+    } else {
+        name
+    }
 }
 
 /// Public Details ids are "Author:BlockName".
 pub fn details_identifier(author: &str, name: &str) -> String {
     let bare = bare_identifier(author, name);
     let author = id_part(author);
-    let author = if author.is_empty() { "Community" } else { &author };
+    let author = if author.is_empty() {
+        "Community"
+    } else {
+        &author
+    };
     format!("{author}{ID_SEPARATOR}{bare}")
 }
 
 fn def_name(def: &blockstitch_core::graph::BlockDef) -> String {
-    if def.identifier.is_empty() { block_name(def) } else { def.identifier.clone() }
+    if def.identifier.is_empty() {
+        block_name(def)
+    } else {
+        def.identifier.clone()
+    }
 }
 
 /// Installed blocks show their author in front of their id.
@@ -192,7 +217,10 @@ fn export_details(content: &mut Macro, info: &PackInfo) {
 }
 
 pub fn sha256_hex(bytes: &[u8]) -> String {
-    Sha256::digest(bytes).iter().map(|b| format!("{b:02x}")).collect()
+    Sha256::digest(bytes)
+        .iter()
+        .map(|b| format!("{b:02x}"))
+        .collect()
 }
 
 /// Ids of `roots` and every custom block their bodies call, in `mac`.
@@ -217,7 +245,11 @@ fn with_dependencies(mac: &Macro, roots: &[String]) -> Vec<String> {
         out.push(id);
     }
     // Keep the macro's own order.
-    mac.block_defs.iter().map(|b| b.id.clone()).filter(|id| out.contains(id)).collect()
+    mac.block_defs
+        .iter()
+        .map(|b| b.id.clone())
+        .filter(|id| out.contains(id))
+        .collect()
 }
 
 fn called_blocks(value: &Value, out: &mut Vec<String>) {
@@ -270,7 +302,11 @@ fn names_used(strands: &[Strand]) -> HashSet<String> {
 }
 
 /// A pack of `block_ids` from `mac`, with every block they call.
-pub fn pack_from_macro(mac: &Macro, block_ids: &[String], info: PackInfo) -> Result<BlockPack, String> {
+pub fn pack_from_macro(
+    mac: &Macro,
+    block_ids: &[String],
+    info: PackInfo,
+) -> Result<BlockPack, String> {
     let ids = with_dependencies(mac, block_ids);
     if ids.is_empty() {
         return Err("Pick at least one of this macro's blocks".into());
@@ -278,7 +314,10 @@ pub fn pack_from_macro(mac: &Macro, block_ids: &[String], info: PackInfo) -> Res
     for id in &ids {
         check_editable(mac, id)?;
     }
-    let strands: Vec<Strand> = ids.iter().filter_map(|id| mac.block_body(id).cloned()).collect();
+    let strands: Vec<Strand> = ids
+        .iter()
+        .filter_map(|id| mac.block_body(id).cloned())
+        .collect();
     let used = names_used(&strands);
     let used_variables = variable_names_used(&strands);
     let instruction_ids: HashSet<String> = {
@@ -295,21 +334,46 @@ pub fn pack_from_macro(mac: &Macro, block_ids: &[String], info: PackInfo) -> Res
     let mut content = Macro::new(info.name.clone(), info.description.clone(), Vec::new());
     content.id = String::new();
     content.graph = MacroGraph {
-        block_defs: mac.block_defs.iter().filter(|b| ids.contains(&b.id)).cloned().collect(),
+        block_defs: mac
+            .block_defs
+            .iter()
+            .filter(|b| ids.contains(&b.id))
+            .cloned()
+            .collect(),
         strands,
         // Their starting values travel too, minus anything secret.
         variables: {
-            let mut vars: Vec<_> = mac.variables.iter().filter(|v| used_variables.contains(&v.name)).cloned().collect();
-            let mut missing: Vec<_> = used_variables.into_iter().filter(|name| !vars.iter().any(|v| &v.name == name)).collect();
+            let mut vars: Vec<_> = mac
+                .variables
+                .iter()
+                .filter(|v| used_variables.contains(&v.name))
+                .cloned()
+                .collect();
+            let mut missing: Vec<_> = used_variables
+                .into_iter()
+                .filter(|name| !vars.iter().any(|v| &v.name == name))
+                .collect();
             missing.sort();
-            vars.extend(missing.into_iter().map(|name| crate::macros::VariableDef { name, value: crate::input::value::Evaluated::Number(0.0) }));
+            vars.extend(missing.into_iter().map(|name| crate::macros::VariableDef {
+                name,
+                value: crate::input::value::Evaluated::Number(0.0),
+            }));
             vars
         },
-        lists: mac.lists.iter().filter(|l| used.contains(&l.name)).cloned().collect(),
+        lists: mac
+            .lists
+            .iter()
+            .filter(|l| used.contains(&l.name))
+            .cloned()
+            .collect(),
         comments: mac
             .comments
             .iter()
-            .filter(|c| c.attached_to.as_ref().is_some_and(|id| instruction_ids.contains(id)))
+            .filter(|c| {
+                c.attached_to
+                    .as_ref()
+                    .is_some_and(|id| instruction_ids.contains(id))
+            })
             .cloned()
             .collect(),
         ..MacroGraph::new()
@@ -319,7 +383,12 @@ pub fn pack_from_macro(mac: &Macro, block_ids: &[String], info: PackInfo) -> Res
         crate::macros::BlockDef::validate_input_defaults(&def.pieces)?;
     }
     export_details(&mut content, &info);
-    Ok(BlockPack { info, content, notes: Vec::new(), variable_roles: Vec::new() })
+    Ok(BlockPack {
+        info,
+        content,
+        notes: Vec::new(),
+        variable_roles: Vec::new(),
+    })
 }
 
 fn clean_info(mut info: PackInfo) -> Result<PackInfo, String> {
@@ -364,23 +433,35 @@ pub fn write_pack(pack: &BlockPack) -> Result<String, String> {
     let mut value = serde_json::to_value(&pack.info).map_err(|e| e.to_string())?;
     let object = value.as_object_mut().ok_or("bad pack info")?;
     object.insert(PACK_KEY.into(), 1.into());
-    object.insert("variable_roles".into(), serde_json::to_value(&pack.variable_roles).map_err(|e| e.to_string())?);
+    object.insert(
+        "variable_roles".into(),
+        serde_json::to_value(&pack.variable_roles).map_err(|e| e.to_string())?,
+    );
     object.insert("blocks".into(), migrate::to_value(&content)?);
     serde_json::to_string_pretty(&value).map_err(|e| e.to_string())
 }
 
 pub fn read_pack(text: &str) -> Result<BlockPack, String> {
-    let value: serde_json::Value = serde_json::from_str(text).map_err(|e| format!("This isn't a block pack: {e}"))?;
+    let value: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| format!("This isn't a block pack: {e}"))?;
     let Some(version) = value.get(PACK_KEY) else {
         return Err("This isn't a block pack".into());
     };
     if version.as_u64().is_none_or(|v| v > 1) {
-        return Err("This block pack was made by a newer version of Blockwork. Update Blockwork to use it".into());
+        return Err(
+            "This block pack was made by a newer version of Blockwork. Update Blockwork to use it"
+                .into(),
+        );
     }
-    let info: PackInfo = serde_json::from_value(value.clone()).map_err(|e| format!("The block pack is broken: {e}"))?;
+    let info: PackInfo = serde_json::from_value(value.clone())
+        .map_err(|e| format!("The block pack is broken: {e}"))?;
     let info = clean_info(info)?;
-    let blocks = value.get("blocks").cloned().ok_or("The block pack has no blocks")?;
-    let (mut content, upgrade) = migrate::from_value(blocks).map_err(|e| format!("The block pack is broken: {e}"))?;
+    let blocks = value
+        .get("blocks")
+        .cloned()
+        .ok_or("The block pack has no blocks")?;
+    let (mut content, upgrade) =
+        migrate::from_value(blocks).map_err(|e| format!("The block pack is broken: {e}"))?;
     // Only blocks and what they use; any other strand is dropped.
     let defs: HashSet<String> = content.block_defs.iter().map(|b| b.id.clone()).collect();
     content
@@ -395,24 +476,46 @@ pub fn read_pack(text: &str) -> Result<BlockPack, String> {
         crate::macros::BlockDef::validate_input_defaults(&def.pieces)?;
     }
     apply_details(&mut content, &info);
-    let variable_roles: Vec<VariableInterface> = value.get("variable_roles").cloned()
-        .map(serde_json::from_value).transpose().map_err(|e| format!("Invalid pack variable interface: {e}"))?.unwrap_or_default();
-    Ok(BlockPack { info, content, notes: upgrade.notes, variable_roles })
+    let variable_roles: Vec<VariableInterface> = value
+        .get("variable_roles")
+        .cloned()
+        .map(serde_json::from_value)
+        .transpose()
+        .map_err(|e| format!("Invalid pack variable interface: {e}"))?
+        .unwrap_or_default();
+    Ok(BlockPack {
+        info,
+        content,
+        notes: upgrade.notes,
+        variable_roles,
+    })
 }
 
 pub fn read_index(text: &str, base_url: &str) -> Result<Index, String> {
-    let value: serde_json::Value = serde_json::from_str(text).map_err(|e| format!("This isn't a block library: {e}"))?;
+    let value: serde_json::Value =
+        serde_json::from_str(text).map_err(|e| format!("This isn't a block library: {e}"))?;
     let Some(version) = value.get(INDEX_KEY) else {
         return Err("This isn't a block library".into());
     };
     if version.as_u64().is_none_or(|v| v > 1) {
         return Err("This block library needs a newer version of Blockwork".into());
     }
-    let name = value.get("name").and_then(|n| n.as_str()).unwrap_or("Block library").to_string();
+    let name = value
+        .get("name")
+        .and_then(|n| n.as_str())
+        .unwrap_or("Block library")
+        .to_string();
     let mut packs = Vec::new();
-    for entry in value.get("packs").and_then(|p| p.as_array()).into_iter().flatten() {
+    for entry in value
+        .get("packs")
+        .and_then(|p| p.as_array())
+        .into_iter()
+        .flatten()
+    {
         // A broken entry is skipped rather than hiding the whole library.
-        let Ok(mut entry) = serde_json::from_value::<IndexEntry>(entry.clone()) else { continue };
+        let Ok(mut entry) = serde_json::from_value::<IndexEntry>(entry.clone()) else {
+            continue;
+        };
         entry.url = resolve_url(base_url, &entry.url);
         entry.sha256 = entry.sha256.trim().to_ascii_lowercase();
         if entry.sha256.len() != 64 || entry.info.id.is_empty() {
@@ -432,11 +535,18 @@ pub fn resolve_url(base: &str, url: &str) -> String {
     }
     if let Some(rest) = url.strip_prefix('/') {
         // Root-relative: keep the scheme and host.
-        let origin_end = base.find("://").map(|i| i + 3).and_then(|start| base[start..].find('/').map(|j| start + j));
+        let origin_end = base
+            .find("://")
+            .map(|i| i + 3)
+            .and_then(|start| base[start..].find('/').map(|j| start + j));
         return format!("{}/{rest}", origin_end.map_or(base, |end| &base[..end]));
     }
     // Local Windows paths use backslashes too.
-    let separators: &[char] = if base.contains("://") { &['/'] } else { &['/', '\\'] };
+    let separators: &[char] = if base.contains("://") {
+        &['/']
+    } else {
+        &['/', '\\']
+    };
     let dir = base.rfind(separators).map_or(base, |i| &base[..i]);
     format!("{dir}/{}", url.trim_start_matches("./"))
 }
@@ -444,7 +554,9 @@ pub fn resolve_url(base: &str, url: &str) -> String {
 /// Checks a download against the hash its index pins.
 pub fn verify(bytes: &[u8], sha256: &str) -> Result<(), String> {
     if sha256_hex(bytes) != sha256.trim().to_ascii_lowercase() {
-        return Err("The download doesn't match the checksum the library lists, so it wasn't used".into());
+        return Err(
+            "The download doesn't match the checksum the library lists, so it wasn't used".into(),
+        );
     }
     Ok(())
 }
@@ -485,14 +597,28 @@ pub fn existing_blocks(mac: &Macro, pack: &BlockPack) -> Vec<String> {
 /// version are replaced in place, keeping their call sites.
 pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeReport {
     migrate_variables(mac);
-    let previous = mac.settings.block_packs.iter().find(|p| p.id == pack.info.id).cloned();
+    let previous = mac
+        .settings
+        .block_packs
+        .iter()
+        .find(|p| p.id == pack.info.id)
+        .cloned();
     // Names the installed bodies read, before the new bodies replace them.
-    let old_names = previous.as_ref().map(|p| {
-        let strands: Vec<_> = mac.strands.iter()
-            .filter(|s| s.block_header_id().is_some_and(|id| p.blocks.iter().any(|b| b == id)))
-            .cloned().collect();
-        variable_names_used(&strands)
-    }).unwrap_or_default();
+    let old_names = previous
+        .as_ref()
+        .map(|p| {
+            let strands: Vec<_> = mac
+                .strands
+                .iter()
+                .filter(|s| {
+                    s.block_header_id()
+                        .is_some_and(|id| p.blocks.iter().any(|b| b == id))
+                })
+                .cloned()
+                .collect();
+            variable_names_used(&strands)
+        })
+        .unwrap_or_default();
     let mut report = MergeReport::default();
     // New bodies go to the right of everything on the canvas.
     let right = mac.strands.iter().map(|s| s.x).max().map_or(0, |x| x + 420);
@@ -500,14 +626,24 @@ pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeRepor
     for def in &pack.content.block_defs {
         let body = pack.content.block_body(&def.id).cloned();
         if let Some(old) = mac.block_def(&def.id).cloned() {
-            mac.graph.reconcile_block_call_args(&def.id, &old.pieces, &def.pieces);
+            mac.graph
+                .reconcile_block_call_args(&def.id, &old.pieces, &def.pieces);
             if let Some(slot) = mac.graph.block_def_mut(&def.id) {
                 *slot = def.clone();
             }
             if let Some(body) = body {
-                match mac.graph.strands.iter_mut().find(|s| s.block_header_id() == Some(def.id.as_str())) {
+                match mac
+                    .graph
+                    .strands
+                    .iter_mut()
+                    .find(|s| s.block_header_id() == Some(def.id.as_str()))
+                {
                     Some(strand) => strand.instructions = body.instructions,
-                    None => mac.graph.strands.push(Strand { x: right, y, ..body }),
+                    None => mac.graph.strands.push(Strand {
+                        x: right,
+                        y,
+                        ..body
+                    }),
                 }
             }
             report.updated.push(block_name(def));
@@ -515,46 +651,82 @@ pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeRepor
             mac.graph.block_defs.push(def.clone());
             if let Some(body) = body {
                 let height = 60 + 44 * body.instructions.len() as i32;
-                mac.graph.strands.push(Strand { id: blockstitch_core::graph::new_id(), x: right, y, ..body });
+                mac.graph.strands.push(Strand {
+                    id: blockstitch_core::graph::new_id(),
+                    x: right,
+                    y,
+                    ..body
+                });
                 y += height;
             }
             report.added.push(block_name(def));
         }
     }
-    let mut variables = previous.as_ref().map(|p| p.variables.clone()).unwrap_or_default();
+    let mut variables = previous
+        .as_ref()
+        .map(|p| p.variables.clone())
+        .unwrap_or_default();
     let mut declared = pack.content.variables.clone();
-    let mut used_names: Vec<_> = variable_names_used(&pack.content.strands).into_iter().collect();
+    let mut used_names: Vec<_> = variable_names_used(&pack.content.strands)
+        .into_iter()
+        .collect();
     used_names.sort();
     for name in used_names {
         if !declared.iter().any(|v| v.name == name) {
-            declared.push(crate::macros::VariableDef { name, value: crate::input::value::Evaluated::Number(0.0) });
+            declared.push(crate::macros::VariableDef {
+                name,
+                value: crate::input::value::Evaluated::Number(0.0),
+            });
         }
     }
     for var in &declared {
         // Existing shared variables remain shared when updating an old install.
         // A name the old bodies never read is new and stays private, even if
         // the user has a variable called that.
-        let shared = old_names.contains(&var.name) && !variables.iter().any(|v| v.name == var.name)
+        let shared = old_names.contains(&var.name)
+            && !variables.iter().any(|v| v.name == var.name)
             && mac.variables.iter().any(|v| v.name == var.name);
-        if shared { continue; }
-        let role = pack.variable_roles.iter().find(|r| r.name == var.name).map(|r| r.role).unwrap_or_default();
+        if shared {
+            continue;
+        }
+        let role = pack
+            .variable_roles
+            .iter()
+            .find(|r| r.name == var.name)
+            .map(|r| r.role)
+            .unwrap_or_default();
         if let Some(old) = variables.iter_mut().find(|v| v.name == var.name) {
             // Keep old outputs callable even when a newer pack hides them.
-            if old.role != VariableRole::Output { old.role = role; }
+            if old.role != VariableRole::Output {
+                old.role = role;
+            }
         } else {
-            variables.push(PackVariable { name: var.name.clone(), value: var.value.clone(), role });
+            variables.push(PackVariable {
+                name: var.name.clone(),
+                value: var.value.clone(),
+                role,
+            });
         }
     }
     // Private scratch the new version no longer uses, e.g. renamed variables.
-    variables.retain(|v| v.role != VariableRole::Internal || declared.iter().any(|d| d.name == v.name));
+    variables
+        .retain(|v| v.role != VariableRole::Internal || declared.iter().any(|d| d.name == v.name));
     for list in &pack.content.lists {
         if !mac.lists.iter().any(|l| l.name == list.name) {
-            mac.graph.lists.push(blockstitch_core::graph::ListDef { editor_visible: false, ..list.clone() });
+            mac.graph.lists.push(blockstitch_core::graph::ListDef {
+                editor_visible: false,
+                ..list.clone()
+            });
         }
     }
     let live = mac.graph.instruction_ids();
     for comment in &pack.content.comments {
-        if comment.attached_to.as_ref().is_some_and(|id| live.contains(id)) && !mac.comments.iter().any(|c| c.id == comment.id) {
+        if comment
+            .attached_to
+            .as_ref()
+            .is_some_and(|id| live.contains(id))
+            && !mac.comments.iter().any(|c| c.id == comment.id)
+        {
             mac.graph.comments.push(comment.clone());
         }
     }
@@ -566,7 +738,12 @@ pub fn merge_into(mac: &mut Macro, pack: &BlockPack, sha256: &str) -> MergeRepor
         sha256: sha256.to_string(),
         author: pack.info.author.clone(),
         description: pack.info.description.clone(),
-        blocks: pack.content.block_defs.iter().map(|b| b.id.clone()).collect(),
+        blocks: pack
+            .content
+            .block_defs
+            .iter()
+            .map(|b| b.id.clone())
+            .collect(),
         variables,
         variables_scoped: true,
     });

@@ -132,10 +132,14 @@ pub fn web_code_to_rdev_name(code: &str) -> Option<String> {
 pub fn is_modifier_code(code: &str) -> bool {
     matches!(
         code,
-        "ShiftLeft" | "ShiftRight"
-        | "ControlLeft" | "ControlRight"
-        | "AltLeft" | "AltRight"
-        | "MetaLeft" | "MetaRight"
-        | "CapsLock"
+        "ShiftLeft"
+            | "ShiftRight"
+            | "ControlLeft"
+            | "ControlRight"
+            | "AltLeft"
+            | "AltRight"
+            | "MetaLeft"
+            | "MetaRight"
+            | "CapsLock"
     )
 }

@@ -5,14 +5,14 @@ use std::sync::{Condvar, Mutex, OnceLock};
 
 use enigo::{Coordinate as EnigoCoordinate, Enigo, Mouse, Settings};
 use evdev::{
-    uinput::VirtualDevice, AbsoluteAxisCode, AttributeSet, EventType,
-    InputEvent, KeyCode, PropType, RelativeAxisCode,
+    AbsoluteAxisCode, AttributeSet, EventType, InputEvent, KeyCode, PropType, RelativeAxisCode,
+    uinput::VirtualDevice,
 };
 use tracing::warn;
 
 use crate::input::types::{Axis, Direction, MacroButton, MacroKey};
 use crate::macros::backend::{
-    cursor_track, wayland_display, CaptureDecision, CaptureEvent, CaptureTimestamp, InputBackend,
+    CaptureDecision, CaptureEvent, CaptureTimestamp, InputBackend, cursor_track, wayland_display,
 };
 
 use super::evdev_mapping::{
@@ -46,7 +46,11 @@ const MODIFIERS: [KeyCode; 8] = [
 /// See `super::release_held_keys`. The physical release still gets
 /// re-emitted later; the kernel drops a release for a key that isn't down.
 pub(super) fn release_held_keys(keys: &[MacroKey]) {
-    let extra: Vec<u16> = keys.iter().filter_map(macro_key_to_evdev).map(|(code, _)| code.0).collect();
+    let extra: Vec<u16> = keys
+        .iter()
+        .filter_map(macro_key_to_evdev)
+        .map(|(code, _)| code.0)
+        .collect();
     let release = |c: &u16| MODIFIERS.iter().any(|m| m.0 == *c) || extra.contains(c);
     let held: Vec<u16> = match PASSED_DOWN.lock() {
         Ok(mut down) => {
@@ -305,7 +309,12 @@ fn move_mouse_abs_libei(x: i32, y: i32) -> Result<(), String> {
     Ok(())
 }
 
-fn click_mouse_abs_portal(mouse: &mut impl Mouse, x: i32, y: i32, button: MacroButton) -> Result<(), String> {
+fn click_mouse_abs_portal(
+    mouse: &mut impl Mouse,
+    x: i32,
+    y: i32,
+    button: MacroButton,
+) -> Result<(), String> {
     let button = match button {
         MacroButton::Left => enigo::Button::Left,
         MacroButton::Right => enigo::Button::Right,
@@ -316,11 +325,17 @@ fn click_mouse_abs_portal(mouse: &mut impl Mouse, x: i32, y: i32, button: MacroB
         MacroButton::ScrollDown => enigo::Button::ScrollDown,
         MacroButton::ScrollLeft => enigo::Button::ScrollLeft,
         MacroButton::ScrollRight => enigo::Button::ScrollRight,
-        MacroButton::Other(code) => return Err(format!("no portal mapping for mouse button {code}")),
+        MacroButton::Other(code) => {
+            return Err(format!("no portal mapping for mouse button {code}"));
+        }
     };
-    mouse.move_mouse(x, y, EnigoCoordinate::Abs).map_err(|err| err.to_string())?;
+    mouse
+        .move_mouse(x, y, EnigoCoordinate::Abs)
+        .map_err(|err| err.to_string())?;
     cursor_track::set_exact(f64::from(x), f64::from(y));
-    mouse.button(button, enigo::Direction::Click).map_err(|err| err.to_string())
+    mouse
+        .button(button, enigo::Direction::Click)
+        .map_err(|err| err.to_string())
 }
 
 /// Opens the libei connection (and so the portal permission dialog) if it
@@ -962,9 +977,8 @@ fn spawn_reader(mut device: evdev::Device, tx: std::sync::mpsc::SyncSender<Devic
                     match event.event_type() {
                         EventType::KEY => {
                             if !other_batch.is_empty() {
-                                let _ = tx.send(DeviceMsg::OtherBatch(
-                                    std::mem::take(&mut other_batch),
-                                ));
+                                let _ = tx
+                                    .send(DeviceMsg::OtherBatch(std::mem::take(&mut other_batch)));
                             }
                             let key = KeyCode(event.code());
                             let value = event.value();
@@ -988,32 +1002,29 @@ fn spawn_reader(mut device: evdev::Device, tx: std::sync::mpsc::SyncSender<Devic
                             };
                             let _ = tx.send(msg);
                         }
-                        EventType::RELATIVE => {
-                            match RelativeAxisCode(event.code()) {
-                                RelativeAxisCode::REL_X => {
-                                    pending_dx += event.value();
-                                    raw_x = Some(event);
-                                }
-                                RelativeAxisCode::REL_Y => {
-                                    pending_dy += event.value();
-                                    raw_y = Some(event);
-                                }
-                                RelativeAxisCode::REL_WHEEL => {
-                                    pending_wv += event.value();
-                                    raw_wv = Some(event);
-                                }
-                                RelativeAxisCode::REL_HWHEEL => {
-                                    pending_wh += event.value();
-                                    raw_wh = Some(event);
-                                }
-                                _ => other_batch.push(event),
+                        EventType::RELATIVE => match RelativeAxisCode(event.code()) {
+                            RelativeAxisCode::REL_X => {
+                                pending_dx += event.value();
+                                raw_x = Some(event);
                             }
-                        }
+                            RelativeAxisCode::REL_Y => {
+                                pending_dy += event.value();
+                                raw_y = Some(event);
+                            }
+                            RelativeAxisCode::REL_WHEEL => {
+                                pending_wv += event.value();
+                                raw_wv = Some(event);
+                            }
+                            RelativeAxisCode::REL_HWHEEL => {
+                                pending_wh += event.value();
+                                raw_wh = Some(event);
+                            }
+                            _ => other_batch.push(event),
+                        },
                         EventType::SYNCHRONIZATION => {
                             if !other_batch.is_empty() {
-                                let _ = tx.send(DeviceMsg::OtherBatch(
-                                    std::mem::take(&mut other_batch),
-                                ));
+                                let _ = tx
+                                    .send(DeviceMsg::OtherBatch(std::mem::take(&mut other_batch)));
                             }
                             if pending_dx != 0 || pending_dy != 0 {
                                 let _ = tx.send(DeviceMsg::MouseMove {
@@ -1044,7 +1055,9 @@ fn spawn_reader(mut device: evdev::Device, tx: std::sync::mpsc::SyncSender<Devic
 /// are held and nothing was grabbed.
 fn try_grab(device: &mut evdev::Device) -> io::Result<bool> {
     let held = |d: &evdev::Device| {
-        d.get_key_state().map(|s| s.iter().next().is_some()).unwrap_or(false)
+        d.get_key_state()
+            .map(|s| s.iter().next().is_some())
+            .unwrap_or(false)
     };
     if held(device) {
         return Ok(false);
@@ -1185,19 +1198,45 @@ mod tests {
     }
 
     impl Mouse for PortalMouse {
-        fn move_mouse(&mut self, x: i32, y: i32, coordinate: EnigoCoordinate) -> enigo::InputResult<()> {
+        fn move_mouse(
+            &mut self,
+            x: i32,
+            y: i32,
+            coordinate: EnigoCoordinate,
+        ) -> enigo::InputResult<()> {
             assert_eq!((x, y, coordinate), (120, 240, EnigoCoordinate::Abs));
             self.events.push("move");
-            if self.fail_move { Err(enigo::InputError::Simulate("move failed")) } else { Ok(()) }
+            if self.fail_move {
+                Err(enigo::InputError::Simulate("move failed"))
+            } else {
+                Ok(())
+            }
         }
-        fn button(&mut self, button: enigo::Button, direction: enigo::Direction) -> enigo::InputResult<()> {
-            assert_eq!((button, direction), (enigo::Button::Right, enigo::Direction::Click));
+        fn button(
+            &mut self,
+            button: enigo::Button,
+            direction: enigo::Direction,
+        ) -> enigo::InputResult<()> {
+            assert_eq!(
+                (button, direction),
+                (enigo::Button::Right, enigo::Direction::Click)
+            );
             self.events.push("click");
-            if self.fail_click { Err(enigo::InputError::Simulate("click failed")) } else { Ok(()) }
+            if self.fail_click {
+                Err(enigo::InputError::Simulate("click failed"))
+            } else {
+                Ok(())
+            }
         }
-        fn scroll(&mut self, _: i32, _: enigo::Axis) -> enigo::InputResult<()> { unreachable!() }
-        fn main_display(&self) -> enigo::InputResult<(i32, i32)> { unreachable!() }
-        fn location(&self) -> enigo::InputResult<(i32, i32)> { unreachable!() }
+        fn scroll(&mut self, _: i32, _: enigo::Axis) -> enigo::InputResult<()> {
+            unreachable!()
+        }
+        fn main_display(&self) -> enigo::InputResult<(i32, i32)> {
+            unreachable!()
+        }
+        fn location(&self) -> enigo::InputResult<(i32, i32)> {
+            unreachable!()
+        }
     }
 
     #[test]
@@ -1209,14 +1248,20 @@ mod tests {
 
     #[test]
     fn image_click_stops_if_portal_move_fails() {
-        let mut mouse = PortalMouse { fail_move: true, ..Default::default() };
+        let mut mouse = PortalMouse {
+            fail_move: true,
+            ..Default::default()
+        };
         assert!(click_mouse_abs_portal(&mut mouse, 120, 240, MacroButton::Right).is_err());
         assert_eq!(mouse.events, ["move"]);
     }
 
     #[test]
     fn image_click_reports_portal_click_failure() {
-        let mut mouse = PortalMouse { fail_click: true, ..Default::default() };
+        let mut mouse = PortalMouse {
+            fail_click: true,
+            ..Default::default()
+        };
         let err = click_mouse_abs_portal(&mut mouse, 120, 240, MacroButton::Right).unwrap_err();
         assert!(err.contains("click failed"));
         assert_eq!(mouse.events, ["move", "click"]);

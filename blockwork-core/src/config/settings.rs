@@ -24,7 +24,11 @@ where
     D: serde::Deserializer<'de>,
 {
     let raw: Option<Vec<serde_json::Value>> = Option::deserialize(d)?;
-    Ok(raw.map(|v| v.into_iter().filter_map(|b| serde_json::from_value(b).ok()).collect()))
+    Ok(raw.map(|v| {
+        v.into_iter()
+            .filter_map(|b| serde_json::from_value(b).ok())
+            .collect()
+    }))
 }
 
 #[derive(Serialize, Deserialize, Default, Clone)]
@@ -99,14 +103,15 @@ pub struct AppSettings {
 
 fn settings_path() -> Result<PathBuf, String> {
     let mut p = super::config_root()?;
-    std::fs::create_dir_all(&p)
-        .map_err(|e| format!("Failed to create config dir: {e}"))?;
+    std::fs::create_dir_all(&p).map_err(|e| format!("Failed to create config dir: {e}"))?;
     p.push("settings.json");
     Ok(p)
 }
 
 pub fn load_settings() -> AppSettings {
-    let Some(path) = settings_path().ok() else { return AppSettings::default() };
+    let Some(path) = settings_path().ok() else {
+        return AppSettings::default();
+    };
     let Ok(mtime) = std::fs::metadata(&path).and_then(|m| m.modified()) else {
         return AppSettings::default();
     };
@@ -133,10 +138,8 @@ pub fn save_settings(settings: &AppSettings) -> Result<(), String> {
     let tmp = path.with_extension("json.tmp");
     let json = serde_json::to_string_pretty(settings)
         .map_err(|e| format!("Failed to serialize settings: {e}"))?;
-    std::fs::write(&tmp, json)
-        .map_err(|e| format!("Failed to write settings: {e}"))?;
-    std::fs::rename(&tmp, &path)
-        .map_err(|e| format!("Failed to finalize settings: {e}"))?;
+    std::fs::write(&tmp, json).map_err(|e| format!("Failed to write settings: {e}"))?;
+    std::fs::rename(&tmp, &path).map_err(|e| format!("Failed to finalize settings: {e}"))?;
     // Same belt-and-suspenders as `Macro::save` - avoids a stale read if a
     // save and reload land within the same mtime tick.
     *settings_cache().lock().unwrap() = None;

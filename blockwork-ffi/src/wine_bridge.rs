@@ -33,7 +33,8 @@ pub fn detect_wine_linux() -> bool {
             tracing::info!("wine_bridge: wine_get_host_version not found in ntdll.dll (native Windows, not Wine)");
             return false;
         };
-        let f: unsafe extern "system" fn(*mut *const u8, *mut *const u8) = std::mem::transmute(proc);
+        let f: unsafe extern "system" fn(*mut *const u8, *mut *const u8) =
+            std::mem::transmute(proc);
         let mut sysname: *const u8 = std::ptr::null();
         let mut release: *const u8 = std::ptr::null();
         f(&mut sysname, &mut release);
@@ -41,7 +42,9 @@ pub fn detect_wine_linux() -> bool {
             tracing::info!("wine_bridge: wine_get_host_version returned null sysname");
             return false;
         }
-        let sysname_str = std::ffi::CStr::from_ptr(sysname as *const i8).to_string_lossy().into_owned();
+        let sysname_str = std::ffi::CStr::from_ptr(sysname as *const i8)
+            .to_string_lossy()
+            .into_owned();
         tracing::info!("wine_bridge: wine_get_host_version reports sysname='{sysname_str}'");
         sysname_str == "Linux"
     }
@@ -57,12 +60,17 @@ fn wine_unix_path(windows_path: &str) -> Option<String> {
         let proc = GetProcAddress(kernel32, b"wine_get_unix_file_name\0".as_ptr())?;
         let f: unsafe extern "C" fn(*const u16) -> *mut i8 = std::mem::transmute(proc);
 
-        let wide: Vec<u16> = std::ffi::OsStr::new(windows_path).encode_wide().chain(std::iter::once(0)).collect();
+        let wide: Vec<u16> = std::ffi::OsStr::new(windows_path)
+            .encode_wide()
+            .chain(std::iter::once(0))
+            .collect();
         let result = f(wide.as_ptr());
         if result.is_null() {
             return None;
         }
-        let unix_path = std::ffi::CStr::from_ptr(result).to_string_lossy().into_owned();
+        let unix_path = std::ffi::CStr::from_ptr(result)
+            .to_string_lossy()
+            .into_owned();
         HeapFree(GetProcessHeap(), 0, result as *const c_void);
         Some(unix_path)
     }
@@ -135,7 +143,13 @@ pub fn setup_and_launch(linux_bridge_resource_path: &str) -> Option<WineBridge> 
             return None;
         }
 
-        let view = MapViewOfFile(shm_mapping, FILE_MAP_ALL_ACCESS, 0, 0, wire::SHARED_REGION_SIZE);
+        let view = MapViewOfFile(
+            shm_mapping,
+            FILE_MAP_ALL_ACCESS,
+            0,
+            0,
+            wire::SHARED_REGION_SIZE,
+        );
         if view.Value.is_null() {
             tracing::warn!("wine_bridge: MapViewOfFile failed");
             CloseHandle(shm_mapping);
@@ -180,7 +194,12 @@ pub fn setup_and_launch(linux_bridge_resource_path: &str) -> Option<WineBridge> 
         CloseHandle(pi.hThread);
 
         tracing::info!("wine_bridge: launched linux-input helper (unix path {unix_bin_path})");
-        Some(WineBridge { shm_file, shm_mapping, view, region: &*(view as *const SharedRegion) })
+        Some(WineBridge {
+            shm_file,
+            shm_mapping,
+            view,
+            region: &*(view as *const SharedRegion),
+        })
     }
 }
 
@@ -198,7 +217,10 @@ pub fn spawn_capture_forwarder(region: &'static SharedRegion) {
                 Some(len) => {
                     let result = std::panic::catch_unwind(std::panic::AssertUnwindSafe(|| {
                         if let Some(WireCapture { event, ts }) = wire::decode_capture(&buf[..len]) {
-                            let timestamp = blockwork_core::macros::backend::CaptureTimestamp::Hardware(ts.to_system_time());
+                            let timestamp =
+                                blockwork_core::macros::backend::CaptureTimestamp::Hardware(
+                                    ts.to_system_time(),
+                                );
                             // Suppress never fires here: hotkey table is empty, no device grab.
                             let _ = callback(event.into(), timestamp);
                         }
@@ -211,7 +233,9 @@ pub fn spawn_capture_forwarder(region: &'static SharedRegion) {
                 None => std::thread::sleep(std::time::Duration::from_millis(1)),
             }
             if last_log.elapsed() >= std::time::Duration::from_secs(5) {
-                tracing::info!("wine_bridge: capture forwarder alive, {processed} events processed so far");
+                tracing::info!(
+                    "wine_bridge: capture forwarder alive, {processed} events processed so far"
+                );
                 last_log = std::time::Instant::now();
             }
         }
@@ -231,8 +255,15 @@ fn push_control(region: &SharedRegion, cmd: &WireControlCommand) -> Result<(), S
 }
 
 /// Asks the helper to run the macro with this id.
-pub fn send_run_macro(region: &SharedRegion, macro_id: &str, elapsed_overshoot_ms: f64) -> Result<(), String> {
-    push_control(region, &WireControlCommand::RunMacro(macro_id.to_string(), elapsed_overshoot_ms))
+pub fn send_run_macro(
+    region: &SharedRegion,
+    macro_id: &str,
+    elapsed_overshoot_ms: f64,
+) -> Result<(), String> {
+    push_control(
+        region,
+        &WireControlCommand::RunMacro(macro_id.to_string(), elapsed_overshoot_ms),
+    )
 }
 
 /// Asks the helper to stop all in-flight runs.

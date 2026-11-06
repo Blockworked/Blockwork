@@ -4,7 +4,9 @@
 
 use crate::Backend;
 use crate::commands;
-use crate::state::{BlockPiece, FragmentDto, HotkeyActionDto, InstructionDto, PathStep, ValueLocation};
+use crate::state::{
+    BlockPiece, FragmentDto, HotkeyActionDto, InstructionDto, PathStep, ValueLocation,
+};
 use blockwork_core::input::value::Value as BlockValue;
 use blockwork_core::macros::BlockShape;
 use serde::de::DeserializeOwned;
@@ -44,7 +46,12 @@ impl Backend {
             }
             "set_macro_folder" => {
                 let (id, folder): (String, String) = (arg(&args, "id")?, arg(&args, "folder")?);
-                to_json(commands::set_macro_folder(&self.state, &self.app, &id, &folder)?)
+                to_json(commands::set_macro_folder(
+                    &self.state,
+                    &self.app,
+                    &id,
+                    &folder,
+                )?)
             }
             "delete_macro" => {
                 let id: String = arg(&args, "id")?;
@@ -61,7 +68,11 @@ impl Backend {
             }
             "set_secret" | "delete_secret" => {
                 let name: String = arg(&args, "name")?;
-                let value: String = if cmd == "set_secret" { arg(&args, "value")? } else { String::new() };
+                let value: String = if cmd == "set_secret" {
+                    arg(&args, "value")?
+                } else {
+                    String::new()
+                };
                 let (state, app, set) = (self.state.clone(), self.app.clone(), cmd == "set_secret");
                 to_json(
                     tokio::task::spawn_blocking(move || {
@@ -77,7 +88,11 @@ impl Backend {
             }
             "new_macro_from_template" => {
                 let template: String = arg(&args, "template")?;
-                to_json(commands::new_macro_from_template(&self.state, &self.app, &template)?)
+                to_json(commands::new_macro_from_template(
+                    &self.state,
+                    &self.app,
+                    &template,
+                )?)
             }
             "remove_macro" => to_json(commands::remove_macro(&self.state, &self.app)?),
             "set_title" => {
@@ -102,15 +117,28 @@ impl Backend {
             }
             "set_macro_catch_up" => {
                 let enabled: bool = arg(&args, "enabled")?;
-                to_json(commands::set_macro_catch_up(&self.state, &self.app, enabled)?)
+                to_json(commands::set_macro_catch_up(
+                    &self.state,
+                    &self.app,
+                    enabled,
+                )?)
             }
             "set_macro_restricted" => {
                 let restricted: bool = arg(&args, "restricted")?;
-                to_json(commands::set_macro_restricted(&self.state, &self.app, restricted)?)
+                to_json(commands::set_macro_restricted(
+                    &self.state,
+                    &self.app,
+                    restricted,
+                )?)
             }
             "set_macro_permission" => {
                 let (kind, allowed): (String, bool) = (arg(&args, "kind")?, arg(&args, "allowed")?);
-                to_json(commands::set_macro_permission(&self.state, &self.app, &kind, allowed)?)
+                to_json(commands::set_macro_permission(
+                    &self.state,
+                    &self.app,
+                    &kind,
+                    allowed,
+                )?)
             }
             "bundle_macro_ids" => to_json(commands::bundle_macro_ids(arg(&args, "macroIds")?)),
             "export_bundle" => {
@@ -120,15 +148,30 @@ impl Backend {
             }
             "set_webhook" => {
                 let (enabled, port): (bool, u16) = (arg(&args, "enabled")?, arg(&args, "port")?);
-                to_json(crate::webhook::configure(&self.state, &self.app, enabled, port)?)
+                to_json(crate::webhook::configure(
+                    &self.state,
+                    &self.app,
+                    enabled,
+                    port,
+                )?)
             }
-            "refresh_block_library" => to_json(crate::block_library::refresh(&self.state, &self.app)?),
+            "refresh_block_library" => {
+                to_json(crate::block_library::refresh(&self.state, &self.app)?)
+            }
             "add_block_library_source" | "remove_block_library_source" => {
                 let url: String = arg(&args, "url")?;
                 if cmd == "add_block_library_source" {
-                    to_json(crate::block_library::add_source(&self.state, &self.app, url)?)
+                    to_json(crate::block_library::add_source(
+                        &self.state,
+                        &self.app,
+                        url,
+                    )?)
                 } else {
-                    to_json(crate::block_library::remove_source(&self.state, &self.app, url)?)
+                    to_json(crate::block_library::remove_source(
+                        &self.state,
+                        &self.app,
+                        url,
+                    )?)
                 }
             }
             "review_block_pack" => {
@@ -137,24 +180,47 @@ impl Backend {
             }
             "review_block_pack_file" => {
                 let path: String = arg(&args, "path")?;
-                to_json(crate::block_library::review_file(&self.state, &self.app, path)?)
+                to_json(crate::block_library::review_file(
+                    &self.state,
+                    &self.app,
+                    path,
+                )?)
             }
             "remove_block_pack" => {
                 let pack_id: String = arg(&args, "packId")?;
-                to_json(crate::block_library::remove(&self.state, &self.app, pack_id)?)
+                to_json(crate::block_library::remove(
+                    &self.state,
+                    &self.app,
+                    pack_id,
+                )?)
             }
             "confirm_block_pack" => to_json(crate::block_library::confirm(&self.state, &self.app)?),
             "cancel_block_pack" => to_json(crate::block_library::cancel(&self.state, &self.app)?),
-            "set_pack_setting" => {
-                to_json(crate::block_library::set_setting(&self.state, &self.app,
-                    arg(&args, "packId")?, arg(&args, "name")?, arg(&args, "value")?)?)
-            }
+            "set_pack_setting" => to_json(crate::block_library::set_setting(
+                &self.state,
+                &self.app,
+                arg(&args, "packId")?,
+                arg(&args, "name")?,
+                arg(&args, "value")?,
+            )?),
             "pack_variable_candidates" => {
                 let s = self.state.lock().map_err(|e| e.to_string())?;
                 let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
-                let pack = blockwork_core::block_packs::pack_from_macro(mac, &arg::<Vec<String>>(&args, "blockIds")?,
-                    blockwork_core::block_packs::PackInfo { name: "Preview".into(), ..Default::default() })?;
-                to_json(pack.content.variables.iter().map(|v| v.name.clone()).collect::<Vec<_>>())
+                let pack = blockwork_core::block_packs::pack_from_macro(
+                    mac,
+                    &arg::<Vec<String>>(&args, "blockIds")?,
+                    blockwork_core::block_packs::PackInfo {
+                        name: "Preview".into(),
+                        ..Default::default()
+                    },
+                )?;
+                to_json(
+                    pack.content
+                        .variables
+                        .iter()
+                        .map(|v| v.name.clone())
+                        .collect::<Vec<_>>(),
+                )
             }
             "export_block_pack" => {
                 let block_ids: Vec<String> = arg(&args, "blockIds")?;
@@ -166,27 +232,70 @@ impl Backend {
                     version: arg::<Option<String>>(&args, "version")?.unwrap_or_default(),
                 };
                 let path: String = arg(&args, "path")?;
-                to_json(crate::block_library::export(&self.state, &self.app, block_ids, info, path, arg::<Option<Vec<blockwork_core::block_packs::VariableInterface>>>(&args, "variableRoles")?.unwrap_or_default())?)
+                to_json(crate::block_library::export(
+                    &self.state,
+                    &self.app,
+                    block_ids,
+                    info,
+                    path,
+                    arg::<Option<Vec<blockwork_core::block_packs::VariableInterface>>>(
+                        &args,
+                        "variableRoles",
+                    )?
+                    .unwrap_or_default(),
+                )?)
             }
-            "block_library_previews" => to_json(crate::block_library::previews(&self.state, &self.app, arg(&args, "keys")?)),
-            "block_library_pack" => to_json(crate::block_library::pack_view(&self.state, &self.app,
-                arg(&args, "key")?, arg::<Option<String>>(&args, "sha256")?.unwrap_or_default())?),
-            "community_pack" => to_json(crate::community::pack_detail(&self.state, &self.app,
-                &arg::<String>(&args, "packId")?, arg::<Option<bool>>(&args, "refresh")?.unwrap_or(false))),
+            "block_library_previews" => to_json(crate::block_library::previews(
+                &self.state,
+                &self.app,
+                arg(&args, "keys")?,
+            )),
+            "block_library_pack" => to_json(crate::block_library::pack_view(
+                &self.state,
+                &self.app,
+                arg(&args, "key")?,
+                arg::<Option<String>>(&args, "sha256")?.unwrap_or_default(),
+            )?),
+            "community_pack" => to_json(crate::community::pack_detail(
+                &self.state,
+                &self.app,
+                &arg::<String>(&args, "packId")?,
+                arg::<Option<bool>>(&args, "refresh")?.unwrap_or(false),
+            )),
             "community_sign_in" => to_json(crate::community::sign_in(&self.state, &self.app)?),
-            "community_cancel_sign_in" => to_json(crate::community::cancel_sign_in(&self.state, &self.app)?),
+            "community_cancel_sign_in" => {
+                to_json(crate::community::cancel_sign_in(&self.state, &self.app)?)
+            }
             "community_sign_out" => {
                 let (state, app) = (self.state.clone(), self.app.clone());
-                to_json(tokio::task::spawn_blocking(move || crate::community::sign_out(&state, &app))
-                    .await.map_err(|e| e.to_string())??)
+                to_json(
+                    tokio::task::spawn_blocking(move || crate::community::sign_out(&state, &app))
+                        .await
+                        .map_err(|e| e.to_string())??,
+                )
             }
-            "community_post_comment" => to_json(crate::community::post_comment(&self.state, &self.app,
-                arg(&args, "packId")?, arg(&args, "body")?)?),
-            "community_delete_comment" => to_json(crate::community::delete_comment(&self.state, &self.app,
-                arg(&args, "packId")?, arg(&args, "id")?)?),
-            "community_my_packs" => to_json(crate::community::my_packs(&self.state, &self.app,
-                arg::<Option<bool>>(&args, "refresh")?.unwrap_or(false))),
-            "community_publish_file" => to_json(crate::community::publish_file(&self.state, &self.app, arg(&args, "path")?)?),
+            "community_post_comment" => to_json(crate::community::post_comment(
+                &self.state,
+                &self.app,
+                arg(&args, "packId")?,
+                arg(&args, "body")?,
+            )?),
+            "community_delete_comment" => to_json(crate::community::delete_comment(
+                &self.state,
+                &self.app,
+                arg(&args, "packId")?,
+                arg(&args, "id")?,
+            )?),
+            "community_my_packs" => to_json(crate::community::my_packs(
+                &self.state,
+                &self.app,
+                arg::<Option<bool>>(&args, "refresh")?.unwrap_or(false),
+            )),
+            "community_publish_file" => to_json(crate::community::publish_file(
+                &self.state,
+                &self.app,
+                arg(&args, "path")?,
+            )?),
             "community_publish" => {
                 let block_ids: Vec<String> = arg(&args, "blockIds")?;
                 let info = blockwork_core::block_packs::PackInfo {
@@ -196,12 +305,26 @@ impl Backend {
                     author: String::new(),
                     version: arg::<Option<String>>(&args, "version")?.unwrap_or_default(),
                 };
-                to_json(crate::community::publish_blocks(&self.state, &self.app, block_ids, info,
-                    arg::<Option<Vec<blockwork_core::block_packs::VariableInterface>>>(&args, "variableRoles")?.unwrap_or_default())?)
+                to_json(crate::community::publish_blocks(
+                    &self.state,
+                    &self.app,
+                    block_ids,
+                    info,
+                    arg::<Option<Vec<blockwork_core::block_packs::VariableInterface>>>(
+                        &args,
+                        "variableRoles",
+                    )?
+                    .unwrap_or_default(),
+                )?)
             }
             "set_browser_bridge" => {
                 let (enabled, port): (bool, u16) = (arg(&args, "enabled")?, arg(&args, "port")?);
-                to_json(crate::browser_bridge::configure(&self.state, &self.app, enabled, port)?)
+                to_json(crate::browser_bridge::configure(
+                    &self.state,
+                    &self.app,
+                    enabled,
+                    port,
+                )?)
             }
             "new_browser_key" => to_json(crate::browser_bridge::new_key(&self.state, &self.app)?),
             "browser_key" => to_json(blockwork_core::browser::key()),
@@ -209,18 +332,35 @@ impl Backend {
             "webhook_token" => to_json(crate::webhook::token()),
             "set_macro_max_run_secs" => {
                 let seconds: u32 = arg(&args, "seconds")?;
-                to_json(commands::set_macro_max_run_secs(&self.state, &self.app, seconds)?)
+                to_json(commands::set_macro_max_run_secs(
+                    &self.state,
+                    &self.app,
+                    seconds,
+                )?)
             }
             "set_macro_max_loop_iterations" => {
                 let iterations: u32 = arg(&args, "iterations")?;
-                to_json(commands::set_macro_max_loop_iterations(&self.state, &self.app, iterations)?)
+                to_json(commands::set_macro_max_loop_iterations(
+                    &self.state,
+                    &self.app,
+                    iterations,
+                )?)
             }
             "set_macro_conditions" => {
                 let window: String = arg(&args, "onlyInWindow")?;
                 let power = arg(&args, "power")?;
-                let (from, until): (String, String) = (arg(&args, "activeFrom")?, arg(&args, "activeUntil")?);
+                let (from, until): (String, String) =
+                    (arg(&args, "activeFrom")?, arg(&args, "activeUntil")?);
                 let days: u8 = arg(&args, "activeDays")?;
-                to_json(commands::set_macro_conditions(&self.state, &self.app, window, power, &from, &until, days)?)
+                to_json(commands::set_macro_conditions(
+                    &self.state,
+                    &self.app,
+                    window,
+                    power,
+                    &from,
+                    &until,
+                    days,
+                )?)
             }
             "list_macros" => to_json(crate::macro_runs::list(&self.state)?),
             // For the region picker: where a window is, to make a pick window-relative.
@@ -228,18 +368,22 @@ impl Backend {
                 let pattern: String = arg(&args, "pattern")?;
                 let by: blockwork_core::window::MatchBy = arg::<String>(&args, "by")?.parse()?;
                 to_json(
-                    tokio::task::spawn_blocking(move || blockwork_core::window::bounds(&pattern, by))
-                        .await
-                        .map_err(|e| e.to_string())??,
+                    tokio::task::spawn_blocking(move || {
+                        blockwork_core::window::bounds(&pattern, by)
+                    })
+                    .await
+                    .map_err(|e| e.to_string())??,
                 )
             }
             "screen_grab" => {
                 let (x, y): (f64, f64) = (arg(&args, "x")?, arg(&args, "y")?);
                 let (width, height): (f64, f64) = (arg(&args, "width")?, arg(&args, "height")?);
                 to_json(
-                    tokio::task::spawn_blocking(move || crate::screen_pick::grab(x, y, width, height))
-                        .await
-                        .map_err(|e| e.to_string())??,
+                    tokio::task::spawn_blocking(move || {
+                        crate::screen_pick::grab(x, y, width, height)
+                    })
+                    .await
+                    .map_err(|e| e.to_string())??,
                 )
             }
             // For the USB device picker.
@@ -252,9 +396,11 @@ impl Backend {
             "download_model" => {
                 let id: String = arg(&args, "id")?;
                 to_json(
-                    tokio::task::spawn_blocking(move || blockwork_core::detect::models::install(&id))
-                        .await
-                        .map_err(|e| e.to_string())??,
+                    tokio::task::spawn_blocking(move || {
+                        blockwork_core::detect::models::install(&id)
+                    })
+                    .await
+                    .map_err(|e| e.to_string())??,
                 )
             }
             "import_model" => {
@@ -303,12 +449,21 @@ impl Backend {
             }
             "confirm_import_macro" => {
                 let keep_settings: HashMap<String, bool> = arg(&args, "keepSettings")?;
-                let allow: Vec<String> = args.get("allow").cloned().map(serde_json::from_value).transpose().map_err(|e| e.to_string())?.unwrap_or_default();
+                let allow: Vec<String> = args
+                    .get("allow")
+                    .cloned()
+                    .map(serde_json::from_value)
+                    .transpose()
+                    .map_err(|e| e.to_string())?
+                    .unwrap_or_default();
                 to_json(
-                    commands::confirm_import_macro(&self.state, &self.app, keep_settings, allow).await?,
+                    commands::confirm_import_macro(&self.state, &self.app, keep_settings, allow)
+                        .await?,
                 )
             }
-            "cancel_import_macro" => to_json(commands::cancel_import_macro(&self.state, &self.app)?),
+            "cancel_import_macro" => {
+                to_json(commands::cancel_import_macro(&self.state, &self.app)?)
+            }
             "add_instruction" => {
                 let strand_id: String = arg(&args, "strandId")?;
                 let path: Vec<PathStep> = arg(&args, "path")?;
@@ -331,8 +486,14 @@ impl Backend {
                 let path: Vec<PathStep> = arg(&args, "path")?;
                 let instruction: InstructionDto = arg(&args, "instruction")?;
                 to_json(
-                    commands::edit_instruction(&self.state, &self.app, strand_id, path, instruction)
-                        .await?,
+                    commands::edit_instruction(
+                        &self.state,
+                        &self.app,
+                        strand_id,
+                        path,
+                        instruction,
+                    )
+                    .await?,
                 )
             }
             "create_variable" => {
@@ -352,15 +513,33 @@ impl Backend {
             "set_variable_value" => {
                 let name: String = arg(&args, "name")?;
                 let value: String = arg(&args, "value")?;
-                to_json(commands::set_variable_value(&self.state, &self.app, name, value)?)
+                to_json(commands::set_variable_value(
+                    &self.state,
+                    &self.app,
+                    name,
+                    value,
+                )?)
             }
             "delete_variable" => {
                 let name: String = arg(&args, "name")?;
                 to_json(commands::delete_variable(&self.state, &self.app, name)?)
             }
-            "create_signal" => to_json(commands::create_signal(&self.state, &self.app, arg(&args, "name")?)?),
-            "rename_signal" => to_json(commands::rename_signal(&self.state, &self.app, arg(&args, "oldName")?, arg(&args, "newName")?)?),
-            "delete_signal" => to_json(commands::delete_signal(&self.state, &self.app, arg(&args, "name")?)?),
+            "create_signal" => to_json(commands::create_signal(
+                &self.state,
+                &self.app,
+                arg(&args, "name")?,
+            )?),
+            "rename_signal" => to_json(commands::rename_signal(
+                &self.state,
+                &self.app,
+                arg(&args, "oldName")?,
+                arg(&args, "newName")?,
+            )?),
+            "delete_signal" => to_json(commands::delete_signal(
+                &self.state,
+                &self.app,
+                arg(&args, "name")?,
+            )?),
             "create_list" => {
                 let name: String = arg(&args, "name")?;
                 to_json(commands::create_list(&self.state, &self.app, name)?)
@@ -728,18 +907,34 @@ impl Backend {
                 let strand_id: String = arg(&args, "strandId")?;
                 let path: Vec<PathStep> = arg(&args, "path")?;
                 let count: Option<usize> = arg(&args, "count")?;
-                to_json(commands::copy_instructions(&self.state, strand_id, path, count)?)
+                to_json(commands::copy_instructions(
+                    &self.state,
+                    strand_id,
+                    path,
+                    count,
+                )?)
             }
             "paste_fragment" => {
                 let x: i32 = arg(&args, "x")?;
                 let y: i32 = arg(&args, "y")?;
                 let fragment: FragmentDto = arg(&args, "fragment")?;
-                to_json(commands::paste_fragment(&self.state, &self.app, x, y, fragment)?)
+                to_json(commands::paste_fragment(
+                    &self.state,
+                    &self.app,
+                    x,
+                    y,
+                    fragment,
+                )?)
             }
             "duplicate_instruction" => {
                 let strand_id: String = arg(&args, "strandId")?;
                 let path: Vec<PathStep> = arg(&args, "path")?;
-                to_json(commands::duplicate_instruction(&self.state, &self.app, strand_id, path)?)
+                to_json(commands::duplicate_instruction(
+                    &self.state,
+                    &self.app,
+                    strand_id,
+                    path,
+                )?)
             }
             "set_recording_target" => {
                 let strand_id: String = arg(&args, "strandId")?;
@@ -767,11 +962,7 @@ impl Backend {
             )?),
             "key_capture_event" => {
                 let keys: Vec<(String, String)> = arg(&args, "keys")?;
-                to_json(commands::key_capture_event(
-                    &self.state,
-                    &self.app,
-                    keys,
-                )?)
+                to_json(commands::key_capture_event(&self.state, &self.app, keys)?)
             }
             "clear_standalone_key_capture" => to_json(commands::clear_standalone_key_capture(
                 &self.state,
@@ -794,11 +985,15 @@ impl Backend {
             "stop_recording" => to_json(commands::stop_recording(&self.state, &self.app)?),
             "set_recording_countdown" => {
                 let seconds: u8 = arg(&args, "seconds")?;
-                to_json(commands::set_recording_countdown(&self.state, &self.app, seconds)?)
+                to_json(commands::set_recording_countdown(
+                    &self.state,
+                    &self.app,
+                    seconds,
+                )?)
             }
-            "request_absolute_mouse_support" => to_json(
-                commands::request_absolute_mouse_support(&self.state, &self.app).await?,
-            ),
+            "request_absolute_mouse_support" => {
+                to_json(commands::request_absolute_mouse_support(&self.state, &self.app).await?)
+            }
             "toggle_record_mouse_relative" => {
                 let relative: bool = arg(&args, "relative")?;
                 to_json(
@@ -920,7 +1115,11 @@ impl Backend {
             }
             "set_animation_speed" => {
                 let speed: f64 = arg(&args, "speed")?;
-                to_json(commands::set_animation_speed(&self.state, &self.app, speed)?)
+                to_json(commands::set_animation_speed(
+                    &self.state,
+                    &self.app,
+                    speed,
+                )?)
             }
             "set_palette_layout" => {
                 let layout: String = arg(&args, "layout")?;
@@ -940,11 +1139,7 @@ impl Backend {
             }
             "set_onboarding_done" => {
                 let done: bool = arg(&args, "done")?;
-                to_json(commands::set_onboarding_done(
-                    &self.state,
-                    &self.app,
-                    done,
-                )?)
+                to_json(commands::set_onboarding_done(&self.state, &self.app, done)?)
             }
             "check_for_updates" => to_json(commands::check_for_updates(&self.state, &self.app)?),
             "apply_update" => to_json(commands::apply_update(&self.state, &self.app)?),

@@ -69,9 +69,7 @@ pub(crate) async fn serve(
                     let was_ui = handle_connection(id, connection, &backend, &clients).await;
                     if was_ui {
                         tracing::info!("UI disconnected");
-                        if !backend.close_to_tray()
-                            && !crate::BACKGROUND.load(Ordering::Relaxed)
-                        {
+                        if !backend.close_to_tray() && !crate::BACKGROUND.load(Ordering::Relaxed) {
                             let _ = proxy.send_event(MainThreadEvent::Quit);
                         }
                     }
@@ -224,7 +222,9 @@ async fn serve_script<R: tokio::io::AsyncBufRead + Unpin>(
                 _ => return,
             },
         };
-        let Ok(ClientMessage::Call { id, cmd, args }) = serde_json::from_str::<ClientMessage>(&line) else {
+        let Ok(ClientMessage::Call { id, cmd, args }) =
+            serde_json::from_str::<ClientMessage>(&line)
+        else {
             continue;
         };
         let result = if blockwork_protocol::SCRIPT_COMMANDS.contains(&cmd.as_str()) {
@@ -232,7 +232,10 @@ async fn serve_script<R: tokio::io::AsyncBufRead + Unpin>(
         } else {
             Err(format!("\"{cmd}\" isn't available to scripts"))
         };
-        if tx.try_send(encode(&DaemonMessage::reply(id, result))).is_err() {
+        if tx
+            .try_send(encode(&DaemonMessage::reply(id, result)))
+            .is_err()
+        {
             return;
         }
     }
@@ -282,10 +285,12 @@ fn send_state_snapshot(backend: &Backend, tx: &mpsc::Sender<String>) {
 /// `/app/bin/blockwork` wrapper rather than the bare binary, and in a macOS
 /// bundle the UI binary is named after the app.
 pub(crate) fn ui_program() -> Option<std::path::PathBuf> {
-    std::env::var_os("BLOCKWORK_UI_EXE").map(std::path::PathBuf::from).or_else(|| {
-        let exe = std::env::current_exe().ok()?;
-        Some(exe.with_file_name(format!("blockwork{}", std::env::consts::EXE_SUFFIX)))
-    })
+    std::env::var_os("BLOCKWORK_UI_EXE")
+        .map(std::path::PathBuf::from)
+        .or_else(|| {
+            let exe = std::env::current_exe().ok()?;
+            Some(exe.with_file_name(format!("blockwork{}", std::env::consts::EXE_SUFFIX)))
+        })
 }
 
 /// Launches the editor UI.

@@ -16,7 +16,12 @@ pub fn regex(pattern: &str) -> Result<Regex, String> {
     if let Some(re) = cache.get(pattern) {
         return Ok(re.clone());
     }
-    let re = Regex::new(pattern).map_err(|e| format!("bad regex: {}", e.to_string().lines().last().unwrap_or("invalid")))?;
+    let re = Regex::new(pattern).map_err(|e| {
+        format!(
+            "bad regex: {}",
+            e.to_string().lines().last().unwrap_or("invalid")
+        )
+    })?;
     if cache.len() >= REGEX_CACHE_MAX {
         cache.clear();
     }
@@ -42,8 +47,14 @@ pub fn regex_replace(pattern: &str, text: &str, replacement: &str) -> Result<Str
 /// when nothing matches.
 pub fn regex_find(pattern: &str, text: &str) -> Result<String, String> {
     let re = regex(pattern)?;
-    let Some(caps) = re.captures(text) else { return Ok(String::new()) };
-    let found = if re.captures_len() > 1 { caps.get(1) } else { caps.get(0) };
+    let Some(caps) = re.captures(text) else {
+        return Ok(String::new());
+    };
+    let found = if re.captures_len() > 1 {
+        caps.get(1)
+    } else {
+        caps.get(0)
+    };
     Ok(found.map(|m| m.as_str().to_string()).unwrap_or_default())
 }
 
@@ -75,7 +86,10 @@ pub fn substring(text: &str, from: f64, to: f64) -> String {
     if from > to {
         return String::new();
     }
-    text.chars().skip((from - 1) as usize).take((to - from + 1) as usize).collect()
+    text.chars()
+        .skip((from - 1) as usize)
+        .take((to - from + 1) as usize)
+        .collect()
 }
 
 /// `n` with exactly `decimals` digits after the point.
@@ -92,19 +106,32 @@ pub fn now_timestamp() -> f64 {
 fn local(timestamp: f64) -> Result<DateTime<Local>, String> {
     let secs = timestamp.floor();
     let nanos = ((timestamp - secs) * 1e9).round().clamp(0.0, 999_999_999.0) as u32;
-    Local.timestamp_opt(secs as i64, nanos).single().ok_or_else(|| format!("{timestamp} isn't a valid timestamp"))
+    Local
+        .timestamp_opt(secs as i64, nanos)
+        .single()
+        .ok_or_else(|| format!("{timestamp} isn't a valid timestamp"))
 }
 
 /// Formats a Unix timestamp in local time with strftime codes like `%Y-%m-%d`.
 pub fn format_date(timestamp: f64, format: &str) -> Result<String, String> {
     let items: Vec<Item> = StrftimeItems::new(format).collect();
     if items.iter().any(|i| matches!(i, Item::Error)) {
-        return Err(format!("\"{format}\" isn't a valid date format (use codes like %Y-%m-%d %H:%M)"));
+        return Err(format!(
+            "\"{format}\" isn't a valid date format (use codes like %Y-%m-%d %H:%M)"
+        ));
     }
-    Ok(local(timestamp)?.format_with_items(items.into_iter()).to_string())
+    Ok(local(timestamp)?
+        .format_with_items(items.into_iter())
+        .to_string())
 }
 
-const AUTO_FORMATS: [&str; 5] = ["%Y-%m-%d %H:%M:%S", "%Y-%m-%d %H:%M", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%dT%H:%M", "%Y/%m/%d %H:%M"];
+const AUTO_FORMATS: [&str; 5] = [
+    "%Y-%m-%d %H:%M:%S",
+    "%Y-%m-%d %H:%M",
+    "%Y-%m-%dT%H:%M:%S",
+    "%Y-%m-%dT%H:%M",
+    "%Y/%m/%d %H:%M",
+];
 
 /// The Unix timestamp of a local date written in `format`, or in a common
 /// format when it's empty.
@@ -117,11 +144,20 @@ pub fn parse_date(text: &str, format: &str) -> Result<f64, String> {
         AUTO_FORMATS
             .iter()
             .find_map(|f| NaiveDateTime::parse_from_str(text, f).ok())
-            .or_else(|| ["%Y-%m-%d", "%Y/%m/%d"].iter().find_map(|f| NaiveDate::parse_from_str(text, f).ok()).and_then(|d| d.and_hms_opt(0, 0, 0)))
+            .or_else(|| {
+                ["%Y-%m-%d", "%Y/%m/%d"]
+                    .iter()
+                    .find_map(|f| NaiveDate::parse_from_str(text, f).ok())
+                    .and_then(|d| d.and_hms_opt(0, 0, 0))
+            })
     } else {
         NaiveDateTime::parse_from_str(text, format)
             .ok()
-            .or_else(|| NaiveDate::parse_from_str(text, format).ok().and_then(|d| d.and_hms_opt(0, 0, 0)))
+            .or_else(|| {
+                NaiveDate::parse_from_str(text, format)
+                    .ok()
+                    .and_then(|d| d.and_hms_opt(0, 0, 0))
+            })
     };
     let naive = naive.ok_or_else(|| format!("couldn't read \"{text}\" as a date"))?;
     Local
@@ -154,10 +190,20 @@ mod tests {
     #[test]
     fn text_tools() {
         assert!(check("hello world", "contains", "lo w").unwrap());
-        assert!(check("hello", "starts with", "he").unwrap() && !check("hello", "ends with", "he").unwrap());
+        assert!(
+            check("hello", "starts with", "he").unwrap()
+                && !check("hello", "ends with", "he").unwrap()
+        );
         assert!(check("order 1234", "matches regex", r"\d{4}$").unwrap());
-        assert!(check("x", "matches regex", "(").unwrap_err().starts_with("bad regex"));
-        assert_eq!(regex_replace(r"(\w+)@(\w+)", "me@host", "$2 at $1").unwrap(), "host at me");
+        assert!(
+            check("x", "matches regex", "(")
+                .unwrap_err()
+                .starts_with("bad regex")
+        );
+        assert_eq!(
+            regex_replace(r"(\w+)@(\w+)", "me@host", "$2 at $1").unwrap(),
+            "host at me"
+        );
         assert_eq!(regex_find(r"#(\d+)", "issue #42 and #7").unwrap(), "42");
         assert_eq!(regex_find(r"\d+", "abc").unwrap(), "");
         assert_eq!(split("a,b,,c", ","), ["a", "b", "", "c"]);
@@ -175,11 +221,20 @@ mod tests {
     #[test]
     fn dates_round_trip_in_local_time() {
         let ts = parse_date("2026-03-04 05:06:07", "").unwrap();
-        assert_eq!(format_date(ts, "%Y-%m-%d %H:%M:%S").unwrap(), "2026-03-04 05:06:07");
+        assert_eq!(
+            format_date(ts, "%Y-%m-%d %H:%M:%S").unwrap(),
+            "2026-03-04 05:06:07"
+        );
         assert_eq!(date_part(ts, "month").unwrap(), 3.0);
         assert_eq!(date_part(ts, "weekday").unwrap(), 4.0, "a Wednesday");
-        assert_eq!(parse_date("04.03.2026", "%d.%m.%Y").unwrap(), parse_date("2026-03-04", "").unwrap());
-        assert_eq!(parse_date("2026-03-04T05:06:07Z", "").unwrap(), 1_772_600_767.0);
+        assert_eq!(
+            parse_date("04.03.2026", "%d.%m.%Y").unwrap(),
+            parse_date("2026-03-04", "").unwrap()
+        );
+        assert_eq!(
+            parse_date("2026-03-04T05:06:07Z", "").unwrap(),
+            1_772_600_767.0
+        );
         assert!(parse_date("tomorrow", "").is_err());
         assert!(format_date(ts, "%Q").is_err());
         assert!(now_timestamp() > 1.7e9);

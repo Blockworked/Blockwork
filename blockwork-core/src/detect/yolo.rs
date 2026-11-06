@@ -17,8 +17,12 @@ pub struct Letterbox {
 /// Returns CHW RGB floats in 0-1, the layout YOLO exports expect.
 pub fn letterbox(image: &Image, size: u32) -> (Vec<f32>, Letterbox) {
     let s = size as usize;
-    let scale = (size as f64 / image.width.max(1) as f64).min(size as f64 / image.height.max(1) as f64);
-    let (w, h) = (((image.width as f64 * scale).round() as usize).max(1), ((image.height as f64 * scale).round() as usize).max(1));
+    let scale =
+        (size as f64 / image.width.max(1) as f64).min(size as f64 / image.height.max(1) as f64);
+    let (w, h) = (
+        ((image.width as f64 * scale).round() as usize).max(1),
+        ((image.height as f64 * scale).round() as usize).max(1),
+    );
     let (pad_x, pad_y) = ((s - w.min(s)) / 2, (s - h.min(s)) / 2);
     let mut out = vec![114.0 / 255.0; 3 * s * s];
     for y in 0..h.min(s) {
@@ -34,13 +38,26 @@ pub fn letterbox(image: &Image, size: u32) -> (Vec<f32>, Letterbox) {
             }
         }
     }
-    (out, Letterbox { scale, pad_x: pad_x as f64, pad_y: pad_y as f64 })
+    (
+        out,
+        Letterbox {
+            scale,
+            pad_x: pad_x as f64,
+            pad_y: pad_y as f64,
+        },
+    )
 }
 
 /// Boxes scoring at least `min_score` from a raw output of `shape`, in the
 /// original frame's pixels, after non-max suppression. Accepts both
 /// `[1, 4 + classes, anchors]` (the YOLOv8 export) and its transpose.
-pub fn decode(output: &[f32], shape: &[usize], labels: &[String], min_score: f32, lb: Letterbox) -> Result<Vec<Detection>, String> {
+pub fn decode(
+    output: &[f32],
+    shape: &[usize],
+    labels: &[String],
+    min_score: f32,
+    lb: Letterbox,
+) -> Result<Vec<Detection>, String> {
     let (rows, cols) = match shape {
         [1, a, b] | [a, b] => (*a, *b),
         _ => return Err(format!("unexpected model output shape {shape:?}")),
@@ -58,24 +75,44 @@ pub fn decode(output: &[f32], shape: &[usize], labels: &[String], min_score: f32
     } else {
         rows <= cols
     };
-    let (channels, anchors) = if channels_first { (rows, cols) } else { (cols, rows) };
+    let (channels, anchors) = if channels_first {
+        (rows, cols)
+    } else {
+        (cols, rows)
+    };
     if channels < 5 {
         return Err(format!("unexpected model output shape {shape:?}"));
     }
-    let at = |c: usize, a: usize| if channels_first { output[c * anchors + a] } else { output[a * channels + c] };
+    let at = |c: usize, a: usize| {
+        if channels_first {
+            output[c * anchors + a]
+        } else {
+            output[a * channels + c]
+        }
+    };
     let mut found = Vec::new();
     for a in 0..anchors {
-        let (class, score) = (4..channels).map(|c| (c - 4, at(c, a))).fold((0, f32::MIN), |best, x| if x.1 > best.1 { x } else { best });
+        let (class, score) = (4..channels)
+            .map(|c| (c - 4, at(c, a)))
+            .fold((0, f32::MIN), |best, x| if x.1 > best.1 { x } else { best });
         if score < min_score {
             continue;
         }
-        let (cx, cy, w, h) = (at(0, a) as f64, at(1, a) as f64, at(2, a) as f64, at(3, a) as f64);
+        let (cx, cy, w, h) = (
+            at(0, a) as f64,
+            at(1, a) as f64,
+            at(2, a) as f64,
+            at(3, a) as f64,
+        );
         found.push(Detection {
             x: (cx - w / 2.0 - lb.pad_x) / lb.scale,
             y: (cy - h / 2.0 - lb.pad_y) / lb.scale,
             w: w / lb.scale,
             h: h / lb.scale,
-            label: labels.get(class).cloned().unwrap_or_else(|| class.to_string()),
+            label: labels
+                .get(class)
+                .cloned()
+                .unwrap_or_else(|| class.to_string()),
             score: score as f64,
             id: None,
         });
@@ -88,7 +125,10 @@ pub fn nms(mut boxes: Vec<Detection>, iou: f64) -> Vec<Detection> {
     boxes.sort_by(|a, b| b.score.total_cmp(&a.score));
     let mut kept: Vec<Detection> = Vec::new();
     for b in boxes {
-        if !kept.iter().any(|k| k.label == b.label && overlap(k, &b) > iou) {
+        if !kept
+            .iter()
+            .any(|k| k.label == b.label && overlap(k, &b) > iou)
+        {
             kept.push(b);
         }
     }
@@ -108,8 +148,10 @@ fn overlap(a: &Detection, b: &Detection) -> f64 {
 /// like `{0: 'person', 1: 'bicycle'}`.
 pub fn parse_names(text: &str) -> Vec<String> {
     let re = regex::Regex::new(r#"(\d+)\s*:\s*['"]([^'"]*)['"]"#).expect("valid regex");
-    let mut pairs: Vec<(usize, String)> =
-        re.captures_iter(text).filter_map(|c| Some((c[1].parse().ok()?, c[2].to_string()))).collect();
+    let mut pairs: Vec<(usize, String)> = re
+        .captures_iter(text)
+        .filter_map(|c| Some((c[1].parse().ok()?, c[2].to_string())))
+        .collect();
     pairs.sort();
     let mut names = Vec::new();
     for (i, name) in pairs {
@@ -131,7 +173,14 @@ mod tests {
             image.rgba[i * 4..i * 4 + 4].copy_from_slice(&[255, 0, 0, 255]);
         }
         let (input, lb) = letterbox(&image, 100);
-        assert_eq!(lb, Letterbox { scale: 0.5, pad_x: 0.0, pad_y: 25.0 });
+        assert_eq!(
+            lb,
+            Letterbox {
+                scale: 0.5,
+                pad_x: 0.0,
+                pad_y: 25.0
+            }
+        );
         assert_eq!(input.len(), 3 * 100 * 100);
         // Padding is gray; the frame's top-left red pixel lands below it.
         assert!((input[0] - 114.0 / 255.0).abs() < 1e-6);
@@ -142,7 +191,11 @@ mod tests {
     #[test]
     fn decode_maps_boxes_back_and_suppresses_duplicates() {
         // Channels-first: 4 box rows + 2 classes, 3 anchors.
-        let lb = Letterbox { scale: 0.5, pad_x: 0.0, pad_y: 25.0 };
+        let lb = Letterbox {
+            scale: 0.5,
+            pad_x: 0.0,
+            pad_y: 25.0,
+        };
         #[rustfmt::skip]
         let out = [
             50.0, 52.0, 10.0, // cx
@@ -157,7 +210,10 @@ mod tests {
         // The second box overlaps the first too much and loses; the third is too weak.
         assert_eq!(found.len(), 1);
         let d = &found[0];
-        assert_eq!((d.x, d.y, d.w, d.h, d.label.as_str()), (80.0, 10.0, 40.0, 80.0, "person"));
+        assert_eq!(
+            (d.x, d.y, d.w, d.h, d.label.as_str()),
+            (80.0, 10.0, 40.0, 80.0, "person")
+        );
         assert!((d.score - 0.9).abs() < 1e-6);
         // The transposed layout reads the same.
         let mut t = vec![0.0; 18];
@@ -172,14 +228,21 @@ mod tests {
 
     #[test]
     fn unknown_classes_fall_back_to_their_index() {
-        let lb = Letterbox { scale: 1.0, pad_x: 0.0, pad_y: 0.0 };
+        let lb = Letterbox {
+            scale: 1.0,
+            pad_x: 0.0,
+            pad_y: 0.0,
+        };
         let found = decode(&[5.0, 5.0, 2.0, 2.0, 0.0, 0.7], &[1, 6, 1], &[], 0.5, lb).unwrap();
         assert_eq!(found[0].label, "1");
     }
 
     #[test]
     fn ultralytics_names_parse() {
-        assert_eq!(parse_names("{0: 'person', 1: 'bicycle', 3: \"car\"}"), vec!["person", "bicycle", "", "car"]);
+        assert_eq!(
+            parse_names("{0: 'person', 1: 'bicycle', 3: \"car\"}"),
+            vec!["person", "bicycle", "", "car"]
+        );
         assert!(parse_names("").is_empty());
     }
 }

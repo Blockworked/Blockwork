@@ -122,7 +122,7 @@ pub fn evdev_key_to_macro_key(key: KeyCode) -> Option<MacroKey> {
         KeyCode::KEY_VOLUMEDOWN => MacroKey::VolumeDown,
         KeyCode::KEY_MUTE => MacroKey::VolumeMute,
         KeyCode::KEY_VOLUMEUP => MacroKey::VolumeUp,
-        KeyCode::BTN_LEFT => return None,   // handled as MacroButton
+        KeyCode::BTN_LEFT => return None, // handled as MacroButton
         KeyCode::BTN_RIGHT => return None,
         KeyCode::BTN_MIDDLE => return None,
         KeyCode::BTN_BACK | KeyCode::BTN_SIDE => return None,

@@ -25,7 +25,11 @@ pub struct Match {
 /// Top-left pixel of the best match of `needle` in `hay`, if its pixels
 /// differ by at most `tolerance` percent on average.
 pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
-    if needle.width == 0 || needle.height == 0 || needle.width > hay.width || needle.height > hay.height {
+    if needle.width == 0
+        || needle.height == 0
+        || needle.width > hay.width
+        || needle.height > hay.height
+    {
         return None;
     }
     // Neither grayscale nor downsampled color can distinguish every texture.
@@ -43,7 +47,10 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
         return None;
     }
     // Shrink both as far as the needle stays recognizable.
-    let factor = [4, 2, 1].into_iter().find(|f| needle.width / f >= 7 && needle.height / f >= 7).unwrap_or(1);
+    let factor = [4, 2, 1]
+        .into_iter()
+        .find(|f| needle.width / f >= 7 && needle.height / f >= 7)
+        .unwrap_or(1);
     let small_hay = Rgb::shrink(hay, factor);
 
     // A match can sit at any offset from the shrunken grid, so the needle is
@@ -57,7 +64,11 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
             for (sum, cx, cy) in coarse(&small_hay, &small_needle, Some(CANDIDATES), u64::MAX) {
                 // Compare per pixel, since phases shrink to different sizes.
                 let score = sum * 1024 / area;
-                candidates.push((score, (cx * factor) as i64 - px as i64, (cy * factor) as i64 - py as i64));
+                candidates.push((
+                    score,
+                    (cx * factor) as i64 - px as i64,
+                    (cy * factor) as i64 - py as i64,
+                ));
             }
         }
     }
@@ -65,7 +76,10 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
     candidates.truncate(CANDIDATES);
 
     let mut best: Option<(f64, u32, u32)> = None;
-    let (max_x, max_y) = ((hay.width - needle.width) as i64, (hay.height - needle.height) as i64);
+    let (max_x, max_y) = (
+        (hay.width - needle.width) as i64,
+        (hay.height - needle.height) as i64,
+    );
     // Flat areas can give several phases the same coarse score. Refine a
     // whole downsampled cell so choosing one phase cannot lose its neighbors.
     let radius = factor.saturating_sub(1).max(1) as i64;
@@ -89,11 +103,16 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
 /// first. A match overlapping a better one by more than half the needle's
 /// width and height is the same match, so it's left out.
 pub fn find_all(hay: &Image, needle: &Image, tolerance: f64) -> Vec<Match> {
-    if needle.width == 0 || needle.height == 0 || needle.width > hay.width || needle.height > hay.height {
+    if needle.width == 0
+        || needle.height == 0
+        || needle.width > hay.width
+        || needle.height > hay.height
+    {
         return Vec::new();
     }
     let (half_w, half_h) = (needle.width.div_ceil(2), needle.height.div_ceil(2));
-    let overlaps = move |a: &Match, x: u32, y: u32| a.x.abs_diff(x) < half_w && a.y.abs_diff(y) < half_h;
+    let overlaps =
+        move |a: &Match, x: u32, y: u32| a.x.abs_diff(x) < half_w && a.y.abs_diff(y) < half_h;
     let mut found: Vec<Match> = Vec::new();
     exact_positions(hay, needle, |x, y| {
         if !found.iter().any(|m| overlaps(m, x, y)) {
@@ -103,7 +122,10 @@ pub fn find_all(hay: &Image, needle: &Image, tolerance: f64) -> Vec<Match> {
     });
     let max_diff = tolerance.clamp(0.0, 100.0) / 100.0 * 255.0;
     if max_diff > 0.0 {
-        let factor = [4, 2, 1].into_iter().find(|f| needle.width / f >= 7 && needle.height / f >= 7).unwrap_or(1);
+        let factor = [4, 2, 1]
+            .into_iter()
+            .find(|f| needle.width / f >= 7 && needle.height / f >= 7)
+            .unwrap_or(1);
         let small_hay = Rgb::shrink(hay, factor);
         // Averaging never adds difference, so a real match's coarse score
         // stays under the limit; the slack covers rounding and cropped edges.
@@ -115,7 +137,11 @@ pub fn find_all(hay: &Image, needle: &Image, tolerance: f64) -> Vec<Match> {
                 let area = (small_needle.width as u64 * small_needle.height as u64).max(1);
                 let cap = ((max_diff + 2.0) * 1.1 * 3.0 * area as f64) as u64 + 1;
                 for (sum, cx, cy) in coarse(&small_hay, &small_needle, None, cap) {
-                    candidates.push((sum * 1024 / area, (cx * factor) as i64 - px as i64, (cy * factor) as i64 - py as i64));
+                    candidates.push((
+                        sum * 1024 / area,
+                        (cx * factor) as i64 - px as i64,
+                        (cy * factor) as i64 - py as i64,
+                    ));
                 }
             }
         }
@@ -127,12 +153,17 @@ pub fn find_all(hay: &Image, needle: &Image, tolerance: f64) -> Vec<Match> {
             if spots.len() >= ALL_SPOTS {
                 break;
             }
-            let near = |&(x, y): &(i64, i64)| (x - cx).unsigned_abs() < half_w as u64 && (y - cy).unsigned_abs() < half_h as u64;
+            let near = |&(x, y): &(i64, i64)| {
+                (x - cx).unsigned_abs() < half_w as u64 && (y - cy).unsigned_abs() < half_h as u64
+            };
             if !spots.iter().any(near) {
                 spots.push((cx, cy));
             }
         }
-        let (max_x, max_y) = ((hay.width - needle.width) as i64, (hay.height - needle.height) as i64);
+        let (max_x, max_y) = (
+            (hay.width - needle.width) as i64,
+            (hay.height - needle.height) as i64,
+        );
         let radius = factor.saturating_sub(1).max(1) as i64;
         for (cx, cy) in spots {
             let mut best: Option<Match> = None;
@@ -142,7 +173,11 @@ pub fn find_all(hay: &Image, needle: &Image, tolerance: f64) -> Vec<Match> {
                     if let Some(diff) = color_diff(hay, needle, x as u32, y as u32, limit)
                         && best.is_none_or(|m| diff < m.diff)
                     {
-                        best = Some(Match { x: x as u32, y: y as u32, diff });
+                        best = Some(Match {
+                            x: x as u32,
+                            y: y as u32,
+                            diff,
+                        });
                     }
                 }
             }
@@ -154,7 +189,12 @@ pub fn find_all(hay: &Image, needle: &Image, tolerance: f64) -> Vec<Match> {
     let shape = Shape::of(needle);
     found.retain(|m| m.diff == 0.0 || shape.matches(hay, needle, m.x, m.y));
     // Best first, ties in reading order, then drop what overlaps a better one.
-    found.sort_by(|a, b| a.diff.total_cmp(&b.diff).then(a.y.cmp(&b.y)).then(a.x.cmp(&b.x)));
+    found.sort_by(|a, b| {
+        a.diff
+            .total_cmp(&b.diff)
+            .then(a.y.cmp(&b.y))
+            .then(a.x.cmp(&b.x))
+    });
     let mut kept: Vec<Match> = Vec::new();
     for m in found {
         if kept.len() >= MAX_MATCHES {
@@ -184,7 +224,10 @@ impl Shape {
         for px in pixels.clone() {
             (0..3).for_each(|c| mean[c] += px[c] as f64 / n);
         }
-        let spread = pixels.map(|px| (0..3).map(|c| (px[c] as f64 - mean[c]).abs()).sum::<f64>()).sum::<f64>() / (n * 3.0);
+        let spread = pixels
+            .map(|px| (0..3).map(|c| (px[c] as f64 - mean[c]).abs()).sum::<f64>())
+            .sum::<f64>()
+            / (n * 3.0);
         Shape { mean, spread }
     }
 
@@ -208,9 +251,12 @@ impl Shape {
         }
         let mut sum = 0.0;
         for row in 0..needle.height {
-            let n_row = &needle.rgba[(row * needle.width * 4) as usize..((row + 1) * needle.width * 4) as usize];
+            let n_row = &needle.rgba
+                [(row * needle.width * 4) as usize..((row + 1) * needle.width * 4) as usize];
             for (a, b) in patch(row).chunks_exact(4).zip(n_row.chunks_exact(4)) {
-                sum += (0..3).map(|c| ((a[c] as f64 - mean[c]) - (b[c] as f64 - self.mean[c])).abs()).sum::<f64>();
+                sum += (0..3)
+                    .map(|c| ((a[c] as f64 - mean[c]) - (b[c] as f64 - self.mean[c])).abs())
+                    .sum::<f64>();
             }
         }
         sum / (n * 3.0) < self.spread / 2.0
@@ -226,7 +272,11 @@ pub fn reading_order(matches: &mut [Match], needle_height: u32) {
     let mut start = 0;
     while start < matches.len() {
         let top = matches[start].y;
-        let end = start + matches[start..].iter().take_while(|m| m.y - top < band).count();
+        let end = start
+            + matches[start..]
+                .iter()
+                .take_while(|m| m.y - top < band)
+                .count();
         matches[start..end].sort_by_key(|m| m.x);
         start = end;
     }
@@ -238,10 +288,23 @@ pub fn reading_order(matches: &mut [Match], needle_height: u32) {
 /// rejects flat backgrounds cheaply when the template has a small mark.
 fn exact_positions(hay: &Image, needle: &Image, mut each: impl FnMut(u32, u32) -> bool) {
     let first = needle.pixel(0, 0);
-    let anchor = needle.rgba.chunks_exact(4).enumerate().max_by_key(|(_, pixel)| {
-        pixel[..3].iter().zip(first).map(|(a, b)| a.abs_diff(b) as u32).sum::<u32>()
-    }).map(|(index, _)| index).unwrap_or(0);
-    let (ax, ay) = (anchor % needle.width as usize, anchor / needle.width as usize);
+    let anchor = needle
+        .rgba
+        .chunks_exact(4)
+        .enumerate()
+        .max_by_key(|(_, pixel)| {
+            pixel[..3]
+                .iter()
+                .zip(first)
+                .map(|(a, b)| a.abs_diff(b) as u32)
+                .sum::<u32>()
+        })
+        .map(|(index, _)| index)
+        .unwrap_or(0);
+    let (ax, ay) = (
+        anchor % needle.width as usize,
+        anchor / needle.width as usize,
+    );
     let anchor_color = needle.pixel(ax as u32, ay as u32);
     let row_bytes = needle.width as usize * 4;
     for y in 0..=hay.height - needle.height {
@@ -252,7 +315,8 @@ fn exact_positions(hay: &Image, needle: &Image, mut each: impl FnMut(u32, u32) -
             let matches = (0..needle.height).all(|row| {
                 let h = ((y + row) as usize * hay.width as usize + x as usize) * 4;
                 let n = row as usize * row_bytes;
-                hay.rgba[h..h + row_bytes].chunks_exact(4)
+                hay.rgba[h..h + row_bytes]
+                    .chunks_exact(4)
                     .zip(needle.rgba[n..n + row_bytes].chunks_exact(4))
                     .all(|(a, b)| a[..3] == b[..3])
             });
@@ -273,8 +337,13 @@ fn color_diff(hay: &Image, needle: &Image, x: u32, y: u32, limit: f64) -> Option
     for row in 0..needle.height {
         let h = ((y + row) as usize * hay.width as usize + x as usize) * 4;
         let n = row as usize * row_len;
-        for (a, b) in hay.rgba[h..h + row_len].chunks_exact(4).zip(needle.rgba[n..n + row_len].chunks_exact(4)) {
-            sum += a[0].abs_diff(b[0]) as u64 + a[1].abs_diff(b[1]) as u64 + a[2].abs_diff(b[2]) as u64;
+        for (a, b) in hay.rgba[h..h + row_len]
+            .chunks_exact(4)
+            .zip(needle.rgba[n..n + row_len].chunks_exact(4))
+        {
+            sum += a[0].abs_diff(b[0]) as u64
+                + a[1].abs_diff(b[1]) as u64
+                + a[2].abs_diff(b[2]) as u64;
         }
         if sum > cap {
             return None;
@@ -311,7 +380,11 @@ impl Rgb {
                 pixels.push(sum.map(|value| (value / area) as u8));
             }
         }
-        Rgb { width, height, pixels }
+        Rgb {
+            width,
+            height,
+            pixels,
+        }
     }
 }
 
@@ -319,11 +392,18 @@ impl Rgb {
 /// threads by row: the best `keep`, or with `None` every one (up to
 /// [`ALL_CANDIDATES`]).
 fn coarse(hay: &Rgb, needle: &Rgb, keep: Option<usize>, cap: u64) -> Vec<(u64, u32, u32)> {
-    if needle.width == 0 || needle.height == 0 || needle.width > hay.width || needle.height > hay.height {
+    if needle.width == 0
+        || needle.height == 0
+        || needle.width > hay.width
+        || needle.height > hay.height
+    {
         return Vec::new();
     }
     let rows = hay.height - needle.height + 1;
-    let threads = std::thread::available_parallelism().map_or(4, |n| n.get()).min(rows as usize).max(1) as u32;
+    let threads = std::thread::available_parallelism()
+        .map_or(4, |n| n.get())
+        .min(rows as usize)
+        .max(1) as u32;
     let chunk = rows.div_ceil(threads);
     let mut all: Vec<(u64, u32, u32)> = std::thread::scope(|scope| {
         let workers: Vec<_> = (0..threads)
@@ -332,14 +412,24 @@ fn coarse(hay: &Rgb, needle: &Rgb, keep: Option<usize>, cap: u64) -> Vec<(u64, u
                 scope.spawn(move || coarse_rows(hay, needle, start, end, keep, cap))
             })
             .collect();
-        workers.into_iter().flat_map(|w| w.join().unwrap_or_default()).collect()
+        workers
+            .into_iter()
+            .flat_map(|w| w.join().unwrap_or_default())
+            .collect()
     });
     all.sort_unstable();
     all.truncate(keep.unwrap_or(ALL_CANDIDATES));
     all
 }
 
-fn coarse_rows(hay: &Rgb, needle: &Rgb, start: u32, end: u32, keep: Option<usize>, limit: u64) -> Vec<(u64, u32, u32)> {
+fn coarse_rows(
+    hay: &Rgb,
+    needle: &Rgb,
+    start: u32,
+    end: u32,
+    keep: Option<usize>,
+    limit: u64,
+) -> Vec<(u64, u32, u32)> {
     let Some(keep) = keep else {
         return coarse_rows_under(hay, needle, start, end, limit);
     };
@@ -347,13 +437,20 @@ fn coarse_rows(hay: &Rgb, needle: &Rgb, start: u32, end: u32, keep: Option<usize
     let (nw, nh) = (needle.width as usize, needle.height as usize);
     for y in start..end {
         for x in 0..=hay.width - needle.width {
-            let cap = if best.len() == keep { best[keep - 1].0 } else { limit };
+            let cap = if best.len() == keep {
+                best[keep - 1].0
+            } else {
+                limit
+            };
             let mut sum = 0u64;
             for row in 0..nh {
                 let h = (y as usize + row) * hay.width as usize + x as usize;
                 let n = row * nw;
-                sum += hay.pixels[h..h + nw].iter().zip(&needle.pixels[n..n + nw])
-                    .map(|(a, b)| (0..3).map(|c| a[c].abs_diff(b[c]) as u64).sum::<u64>()).sum::<u64>();
+                sum += hay.pixels[h..h + nw]
+                    .iter()
+                    .zip(&needle.pixels[n..n + nw])
+                    .map(|(a, b)| (0..3).map(|c| a[c].abs_diff(b[c]) as u64).sum::<u64>())
+                    .sum::<u64>();
                 if sum >= cap {
                     break;
                 }
@@ -369,7 +466,13 @@ fn coarse_rows(hay: &Rgb, needle: &Rgb, start: u32, end: u32, keep: Option<usize
 }
 
 /// Every position in rows `start..end` whose sum stays below `limit`.
-fn coarse_rows_under(hay: &Rgb, needle: &Rgb, start: u32, end: u32, limit: u64) -> Vec<(u64, u32, u32)> {
+fn coarse_rows_under(
+    hay: &Rgb,
+    needle: &Rgb,
+    start: u32,
+    end: u32,
+    limit: u64,
+) -> Vec<(u64, u32, u32)> {
     let mut under = Vec::new();
     let (nw, nh) = (needle.width as usize, needle.height as usize);
     for y in start..end {
@@ -378,8 +481,11 @@ fn coarse_rows_under(hay: &Rgb, needle: &Rgb, start: u32, end: u32, limit: u64) 
             for row in 0..nh {
                 let h = (y as usize + row) * hay.width as usize + x as usize;
                 let n = row * nw;
-                sum += hay.pixels[h..h + nw].iter().zip(&needle.pixels[n..n + nw])
-                    .map(|(a, b)| (0..3).map(|c| a[c].abs_diff(b[c]) as u64).sum::<u64>()).sum::<u64>();
+                sum += hay.pixels[h..h + nw]
+                    .iter()
+                    .zip(&needle.pixels[n..n + nw])
+                    .map(|(a, b)| (0..3).map(|c| a[c].abs_diff(b[c]) as u64).sum::<u64>())
+                    .sum::<u64>();
                 if sum >= limit {
                     break;
                 }
@@ -428,11 +534,22 @@ mod tests {
         let hay = noise(200, 120, 3);
         let mut needle = hay.crop(60, 40, 30, 20);
         // Brighten every pixel a little.
-        needle.rgba.chunks_exact_mut(4).for_each(|p| p.iter_mut().take(3).for_each(|c| *c = c.saturating_add(12)));
+        needle
+            .rgba
+            .chunks_exact_mut(4)
+            .for_each(|p| p.iter_mut().take(3).for_each(|c| *c = c.saturating_add(12)));
         assert_eq!(find(&hay, &needle, 0.0), None);
         assert_eq!(find(&hay, &needle, 10.0), Some((60, 40)));
-        assert_eq!(find(&hay, &noise(30, 20, 99), 10.0), None, "unrelated pixels never match");
-        assert_eq!(find(&hay, &noise(300, 20, 99), 100.0), None, "bigger than the screen");
+        assert_eq!(
+            find(&hay, &noise(30, 20, 99), 10.0),
+            None,
+            "unrelated pixels never match"
+        );
+        assert_eq!(
+            find(&hay, &noise(300, 20, 99), 100.0),
+            None,
+            "bigger than the screen"
+        );
     }
 
     /// `hay` with `needle` copied over it at (`x`, `y`), each channel moved by `shift`.
@@ -476,10 +593,21 @@ mod tests {
         paste(&mut hay, &needle, 420, 30, 12);
         assert!(find_all(&hay, &needle, 0.0).is_empty());
         let all = find_all(&hay, &needle, 10.0);
-        assert_eq!(spots(&all), [(300, 180), (420, 30), (50, 40)], "closest first");
-        assert_eq!(find(&hay, &needle, 10.0), Some((300, 180)), "find agrees on the best");
+        assert_eq!(
+            spots(&all),
+            [(300, 180), (420, 30), (50, 40)],
+            "closest first"
+        );
+        assert_eq!(
+            find(&hay, &needle, 10.0),
+            Some((300, 180)),
+            "find agrees on the best"
+        );
         // A tighter tolerance keeps only the closer copies.
-        assert_eq!(spots(&find_all(&hay, &needle, 6.0)), [(300, 180), (420, 30)]);
+        assert_eq!(
+            spots(&find_all(&hay, &needle, 6.0)),
+            [(300, 180), (420, 30)]
+        );
     }
 
     #[test]
@@ -491,7 +619,10 @@ mod tests {
         }
         let mut all = find_all(&hay, &needle, 5.0);
         reading_order(&mut all, needle.height);
-        assert_eq!(spots(&all), (0..5).map(|i| (20 + i * 12, 30)).collect::<Vec<_>>());
+        assert_eq!(
+            spots(&all),
+            (0..5).map(|i| (20 + i * 12, 30)).collect::<Vec<_>>()
+        );
     }
 
     /// A flat button: a gray face, a dark border and a small white arrow.
@@ -501,7 +632,13 @@ mod tests {
             for x in 0..24 {
                 let edge = x == 0 || y == 0 || x == 23 || y == 17;
                 let arrow = (5..13).contains(&y) && x >= 8 + (y - 5) && x < 16 - (y - 5);
-                let v = if edge { 90 } else if arrow { 250 } else { 200 };
+                let v = if edge {
+                    90
+                } else if arrow {
+                    250
+                } else {
+                    200
+                };
                 let i = ((y * 24 + x) * 4) as usize;
                 image.rgba[i..i + 3].fill((v + tint).clamp(0, 255) as u8);
             }
@@ -513,15 +650,32 @@ mod tests {
     fn finds_every_button_on_a_flat_page() {
         let mut page = Image::new(1280, 720);
         page.rgba.chunks_exact_mut(4).for_each(|p| p[..3].fill(245));
-        let places = [(100, 100), (500, 100), (900, 104), (100, 400), (500, 400), (1200, 690)];
+        let places = [
+            (100, 100),
+            (500, 100),
+            (900, 104),
+            (100, 400),
+            (500, 400),
+            (1200, 690),
+        ];
         for (i, &(x, y)) in places.iter().enumerate() {
             // The last one is hovered: a little lighter.
-            paste(&mut page, &button(0), x, y, if i == places.len() - 1 { 10 } else { 0 });
+            paste(
+                &mut page,
+                &button(0),
+                x,
+                y,
+                if i == places.len() - 1 { 10 } else { 0 },
+            );
         }
         let mut all = find_all(&page, &button(0), 10.0);
         reading_order(&mut all, 18);
         assert_eq!(spots(&all), places);
-        assert_eq!(spots(&find_all(&page, &button(0), 0.0)).len(), 5, "the hovered one isn't exact");
+        assert_eq!(
+            spots(&find_all(&page, &button(0), 0.0)).len(),
+            5,
+            "the hovered one isn't exact"
+        );
         // Mostly page around a small mark: blank page is close on average but has no mark.
         let mark = page.crop(92, 92, 40, 34);
         let mut all = find_all(&page, &mark, 10.0);

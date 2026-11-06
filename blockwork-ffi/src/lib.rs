@@ -79,7 +79,9 @@ fn catch_ptr(f: impl FnOnce() -> *mut c_char) -> *mut c_char {
 }
 
 fn owned_cstring(s: String) -> *mut c_char {
-    CString::new(s).map(CString::into_raw).unwrap_or(std::ptr::null_mut())
+    CString::new(s)
+        .map(CString::into_raw)
+        .unwrap_or(std::ptr::null_mut())
 }
 
 /// # Safety
@@ -89,7 +91,10 @@ unsafe fn cstr_to_owned(ptr: *const c_char) -> Option<String> {
     if ptr.is_null() {
         return None;
     }
-    unsafe { CStr::from_ptr(ptr) }.to_str().ok().map(str::to_owned)
+    unsafe { CStr::from_ptr(ptr) }
+        .to_str()
+        .ok()
+        .map(str::to_owned)
 }
 
 /// Call once on the host's main thread before other `blockwork_*` calls.
@@ -97,7 +102,10 @@ unsafe fn cstr_to_owned(ptr: *const c_char) -> Option<String> {
 /// `linux_bridge_resource_path_utf8` only matters under Wine on Linux.
 /// Returns 0 on success, -1 if no input backend exists for this platform.
 #[no_mangle]
-pub unsafe extern "C" fn blockwork_init(config_dir_override_utf8: *const c_char, linux_bridge_resource_path_utf8: *const c_char) -> i32 {
+pub unsafe extern "C" fn blockwork_init(
+    config_dir_override_utf8: *const c_char,
+    linux_bridge_resource_path_utf8: *const c_char,
+) -> i32 {
     let override_dir = unsafe { cstr_to_owned(config_dir_override_utf8) };
     // Only read under Wine, which is a Windows build.
     #[cfg_attr(not(windows), allow(unused_variables))]
@@ -184,8 +192,12 @@ pub extern "C" fn blockwork_stop_recording() -> i32 {
         }
         let count = instructions.len() as i32;
 
-        let Some(id) = config::get_selected_macro_id() else { return -2 };
-        let Some(mut mac) = config::get_macro_by_id(&id) else { return -2 };
+        let Some(id) = config::get_selected_macro_id() else {
+            return -2;
+        };
+        let Some(mut mac) = config::get_macro_by_id(&id) else {
+            return -2;
+        };
         mac.recording_target_mut().instructions.extend(instructions);
         if let Err(e) = mac.save() {
             tracing::warn!("blockwork-ffi: failed to save recorded macro: {e}");
@@ -205,12 +217,17 @@ pub extern "C" fn blockwork_stop_recording() -> i32 {
 /// start - pass 0 if not applicable. Backdates the run's first `Wait`
 /// deadline to the intended start instant via `Macro::run_with_offset`.
 #[no_mangle]
-pub unsafe extern "C" fn blockwork_run_macro(id_utf8: *const c_char, elapsed_overshoot_ms: f64) -> i32 {
+pub unsafe extern "C" fn blockwork_run_macro(
+    id_utf8: *const c_char,
+    elapsed_overshoot_ms: f64,
+) -> i32 {
     let requested_id = unsafe { cstr_to_owned(id_utf8) };
     catch(move || {
         let mac = requested_id
             .and_then(|id| config::get_macro_by_id(&id))
-            .or_else(|| config::get_selected_macro_id().and_then(|id| config::get_macro_by_id(&id)));
+            .or_else(|| {
+                config::get_selected_macro_id().and_then(|id| config::get_macro_by_id(&id))
+            });
         let Some(mac) = mac else { return -1 };
 
         // Under Wine, the entire timed run happens natively on the Linux
@@ -221,32 +238,50 @@ pub unsafe extern "C" fn blockwork_run_macro(id_utf8: *const c_char, elapsed_ove
             return match wine_bridge::send_run_macro(bridge.region, &mac.id, elapsed_overshoot_ms) {
                 Ok(()) => 0,
                 Err(e) => {
-                    tracing::warn!("blockwork-ffi: failed to forward run_macro to Linux bridge: {e}");
+                    tracing::warn!(
+                        "blockwork-ffi: failed to forward run_macro to Linux bridge: {e}"
+                    );
                     -3
                 }
             };
         }
 
-        let Some(emulator) = EMULATOR.get().cloned() else { return -2 };
+        let Some(emulator) = EMULATOR.get().cloned() else {
+            return -2;
+        };
 
-        let variables: VariableStore =
-            Arc::new(Mutex::new(mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect()));
+        let variables: VariableStore = Arc::new(Mutex::new(
+            mac.variables
+                .iter()
+                .map(|v| (v.name.clone(), v.value.clone()))
+                .collect(),
+        ));
         let settings = config::load_settings();
-        let speed_multiplier = mac.speed_multiplier * settings.global_speed_multiplier.unwrap_or(1.0);
-        let initial_offset = std::time::Duration::from_secs_f64(elapsed_overshoot_ms.max(0.0) / 1000.0);
+        let speed_multiplier =
+            mac.speed_multiplier * settings.global_speed_multiplier.unwrap_or(1.0);
+        let initial_offset =
+            std::time::Duration::from_secs_f64(elapsed_overshoot_ms.max(0.0) / 1000.0);
 
         let flag = run_registry::begin_run();
-        let spawned = std::thread::Builder::new().name("macros-run".to_string()).spawn(move || {
-            mac.clone().run_with_offset(Arc::clone(&emulator), Some(Arc::clone(&flag)), speed_multiplier, Arc::clone(&variables), initial_offset);
-            run_registry::end_run(&flag);
-            if let Ok(values) = variables.lock() {
-                let mut mac = mac.clone();
-                mac.sync_variables_from(&values);
-                if let Err(e) = mac.save() {
-                    tracing::warn!("blockwork-ffi: failed to persist variable values: {e}");
+        let spawned = std::thread::Builder::new()
+            .name("macros-run".to_string())
+            .spawn(move || {
+                mac.clone().run_with_offset(
+                    Arc::clone(&emulator),
+                    Some(Arc::clone(&flag)),
+                    speed_multiplier,
+                    Arc::clone(&variables),
+                    initial_offset,
+                );
+                run_registry::end_run(&flag);
+                if let Ok(values) = variables.lock() {
+                    let mut mac = mac.clone();
+                    mac.sync_variables_from(&values);
+                    if let Err(e) = mac.save() {
+                        tracing::warn!("blockwork-ffi: failed to persist variable values: {e}");
+                    }
                 }
-            }
-        });
+            });
 
         match spawned {
             Ok(_) => 0,
@@ -266,7 +301,9 @@ pub unsafe extern "C" fn blockwork_sync_begin(id_utf8: *const c_char) -> i32 {
     catch(move || {
         let mac = requested_id
             .and_then(|id| config::get_macro_by_id(&id))
-            .or_else(|| config::get_selected_macro_id().and_then(|id| config::get_macro_by_id(&id)));
+            .or_else(|| {
+                config::get_selected_macro_id().and_then(|id| config::get_macro_by_id(&id))
+            });
         let Some(mac) = mac else { return -1 };
 
         // Stop the earlier run and wait for it to fully unwind, so its
@@ -278,18 +315,30 @@ pub unsafe extern "C" fn blockwork_sync_begin(id_utf8: *const c_char) -> i32 {
         host_clock::finish();
 
         let emulator: Arc<Mutex<dyn InputBackend>> = Arc::new(Mutex::new(host_clock::HostBackend));
-        let variables: VariableStore =
-            Arc::new(Mutex::new(mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect()));
+        let variables: VariableStore = Arc::new(Mutex::new(
+            mac.variables
+                .iter()
+                .map(|v| (v.name.clone(), v.value.clone()))
+                .collect(),
+        ));
         // Waits are in the host's own time, which already carries any game speed.
         let speed_multiplier = 1.0;
 
         host_clock::begin();
         let flag = run_registry::begin_run();
-        let spawned = std::thread::Builder::new().name("macros-sync-run".to_string()).spawn(move || {
-            mac.run_with_offset(emulator, Some(Arc::clone(&flag)), speed_multiplier, variables, std::time::Duration::ZERO);
-            run_registry::end_run(&flag);
-            host_clock::finish();
-        });
+        let spawned = std::thread::Builder::new()
+            .name("macros-sync-run".to_string())
+            .spawn(move || {
+                mac.run_with_offset(
+                    emulator,
+                    Some(Arc::clone(&flag)),
+                    speed_multiplier,
+                    variables,
+                    std::time::Duration::ZERO,
+                );
+                run_registry::end_run(&flag);
+                host_clock::finish();
+            });
         match spawned {
             Ok(handle) => {
                 if let Ok(mut run) = SYNC_RUN.lock() {
@@ -313,7 +362,10 @@ pub unsafe extern "C" fn blockwork_sync_begin(id_utf8: *const c_char) -> i32 {
 /// and whether it went down. Returns the number of
 /// inputs delivered.
 #[no_mangle]
-pub extern "C" fn blockwork_sync_step(time_ms: f64, callback: Option<extern "C" fn(*const c_char, bool, bool)>) -> i32 {
+pub extern "C" fn blockwork_sync_step(
+    time_ms: f64,
+    callback: Option<extern "C" fn(*const c_char, bool, bool)>,
+) -> i32 {
     catch(move || {
         let events = host_clock::step(time_ms);
         if let Some(callback) = callback {
@@ -372,10 +424,22 @@ pub extern "C" fn blockwork_step_record_end() -> i32 {
         }
         let code = blockwork_core::macros::gdr_import::step_inputs_to_instructions(&inputs);
         let count = code.len() as i32;
-        let Some(id) = config::get_selected_macro_id() else { return -2 };
-        let Some(mut mac) = config::get_macro_by_id(&id) else { return -2 };
+        let Some(id) = config::get_selected_macro_id() else {
+            return -2;
+        };
+        let Some(mut mac) = config::get_macro_by_id(&id) else {
+            return -2;
+        };
         let strand = mac.recording_target_mut();
-        let keep = if strand.instructions.first().map_or(false, Instruction::is_header) { 1 } else { 0 };
+        let keep = if strand
+            .instructions
+            .first()
+            .map_or(false, Instruction::is_header)
+        {
+            1
+        } else {
+            0
+        };
         strand.instructions.truncate(keep);
         strand.instructions.extend(code);
         if let Err(e) = mac.save() {
@@ -393,10 +457,18 @@ pub extern "C" fn blockwork_step_record_end() -> i32 {
 /// replay, -4 if the macro couldn't be saved.
 #[no_mangle]
 pub unsafe extern "C" fn blockwork_import_gdr(path_utf8: *const c_char) -> i32 {
-    let Some(path) = (unsafe { cstr_to_owned(path_utf8) }) else { return -1 };
+    let Some(path) = (unsafe { cstr_to_owned(path_utf8) }) else {
+        return -1;
+    };
     catch(move || {
-        let Ok(bytes) = std::fs::read(&path) else { return -2 };
-        let fallback = std::path::Path::new(&path).file_stem().and_then(|s| s.to_str()).unwrap_or("Replay").to_string();
+        let Ok(bytes) = std::fs::read(&path) else {
+            return -2;
+        };
+        let fallback = std::path::Path::new(&path)
+            .file_stem()
+            .and_then(|s| s.to_str())
+            .unwrap_or("Replay")
+            .to_string();
         let mac = match blockwork_core::macros::gdr_import::import_gdr(&bytes, &fallback) {
             Ok(mac) => mac,
             Err(e) => {
@@ -432,15 +504,25 @@ pub extern "C" fn blockwork_imports_dir() -> *mut c_char {
 #[no_mangle]
 pub extern "C" fn blockwork_import_pending_gdrs() -> i32 {
     catch(|| {
-        let Ok(dir) = config::imports_dir() else { return -1 };
-        let Ok(entries) = std::fs::read_dir(&dir) else { return -1 };
+        let Ok(dir) = config::imports_dir() else {
+            return -1;
+        };
+        let Ok(entries) = std::fs::read_dir(&dir) else {
+            return -1;
+        };
         let mut imported = 0;
         for path in entries.flatten().map(|e| e.path()) {
-            let name = path.file_name().and_then(|n| n.to_str()).unwrap_or("").to_ascii_lowercase();
+            let name = path
+                .file_name()
+                .and_then(|n| n.to_str())
+                .unwrap_or("")
+                .to_ascii_lowercase();
             if !(name.ends_with(".gdr") || name.ends_with(".gdr2") || name.ends_with(".gdr.json")) {
                 continue;
             }
-            let Ok(c_path) = CString::new(path.to_string_lossy().into_owned()) else { continue };
+            let Ok(c_path) = CString::new(path.to_string_lossy().into_owned()) else {
+                continue;
+            };
             // c_path is a live, NUL-terminated string.
             if unsafe { blockwork_import_gdr(c_path.as_ptr()) } == 0 {
                 let mut done = path.clone().into_os_string();
@@ -463,7 +545,9 @@ pub extern "C" fn blockwork_stop_loop() -> i32 {
             return match wine_bridge::send_stop_loop(bridge.region) {
                 Ok(()) => 0,
                 Err(e) => {
-                    tracing::warn!("blockwork-ffi: failed to forward stop_loop to Linux bridge: {e}");
+                    tracing::warn!(
+                        "blockwork-ffi: failed to forward stop_loop to Linux bridge: {e}"
+                    );
                     -1
                 }
             };
@@ -521,7 +605,10 @@ pub extern "C" fn blockwork_list_macros() -> *mut c_char {
     catch_ptr(|| {
         let summaries: Vec<MacroSummary> = config::get_macros_from_config()
             .into_iter()
-            .map(|mac| MacroSummary { id: mac.id, name: mac.name })
+            .map(|mac| MacroSummary {
+                id: mac.id,
+                name: mac.name,
+            })
             .collect();
         owned_cstring(serde_json::to_string(&summaries).unwrap_or_else(|_| "[]".to_string()))
     })
@@ -544,7 +631,9 @@ pub extern "C" fn blockwork_get_selected_macro_id() -> *mut c_char {
 /// on success, -1 if no macro with that id exists.
 #[no_mangle]
 pub unsafe extern "C" fn blockwork_select_macro(id_utf8: *const c_char) -> i32 {
-    let Some(id) = (unsafe { cstr_to_owned(id_utf8) }) else { return -1 };
+    let Some(id) = (unsafe { cstr_to_owned(id_utf8) }) else {
+        return -1;
+    };
     catch(move || {
         if config::get_macro_by_id(&id).is_none() {
             return -1;
@@ -563,8 +652,12 @@ pub unsafe extern "C" fn blockwork_select_macro(id_utf8: *const c_char) -> i32 {
 pub unsafe extern "C" fn blockwork_rename_macro(name_utf8: *const c_char) -> i32 {
     let name = unsafe { cstr_to_owned(name_utf8) }.unwrap_or_default();
     catch(move || {
-        let Some(id) = config::get_selected_macro_id() else { return -1 };
-        let Some(mut mac) = config::get_macro_by_id(&id) else { return -2 };
+        let Some(id) = config::get_selected_macro_id() else {
+            return -1;
+        };
+        let Some(mut mac) = config::get_macro_by_id(&id) else {
+            return -2;
+        };
 
         let trimmed = name.trim();
         if trimmed.is_empty() {
@@ -588,8 +681,12 @@ pub unsafe extern "C" fn blockwork_rename_macro(name_utf8: *const c_char) -> i32
 #[no_mangle]
 pub extern "C" fn blockwork_delete_macro() -> i32 {
     catch(|| {
-        let Some(id) = config::get_selected_macro_id() else { return -1 };
-        let Some(mac) = config::get_macro_by_id(&id) else { return -2 };
+        let Some(id) = config::get_selected_macro_id() else {
+            return -1;
+        };
+        let Some(mac) = config::get_macro_by_id(&id) else {
+            return -2;
+        };
 
         if let Err(e) = mac.remove() {
             tracing::warn!("blockwork-ffi: failed to delete macro: {e}");
@@ -610,11 +707,23 @@ pub extern "C" fn blockwork_delete_macro() -> i32 {
 #[no_mangle]
 pub extern "C" fn blockwork_clear_recording_target_instructions() -> i32 {
     catch(|| {
-        let Some(id) = config::get_selected_macro_id() else { return -1 };
-        let Some(mut mac) = config::get_macro_by_id(&id) else { return -2 };
+        let Some(id) = config::get_selected_macro_id() else {
+            return -1;
+        };
+        let Some(mut mac) = config::get_macro_by_id(&id) else {
+            return -2;
+        };
 
         let strand = mac.recording_target_mut();
-        let keep = if strand.instructions.first().map_or(false, Instruction::is_header) { 1 } else { 0 };
+        let keep = if strand
+            .instructions
+            .first()
+            .map_or(false, Instruction::is_header)
+        {
+            1
+        } else {
+            0
+        };
         let removed = (strand.instructions.len() - keep) as i32;
         if removed == 0 {
             return 0;
@@ -622,7 +731,9 @@ pub extern "C" fn blockwork_clear_recording_target_instructions() -> i32 {
         strand.instructions.truncate(keep);
 
         if let Err(e) = mac.save() {
-            tracing::warn!("blockwork-ffi: failed to save after clearing recording-target instructions: {e}");
+            tracing::warn!(
+                "blockwork-ffi: failed to save after clearing recording-target instructions: {e}"
+            );
             return -3;
         }
         removed

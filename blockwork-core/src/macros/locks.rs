@@ -35,32 +35,53 @@ impl Drop for LockGuard {
 
 /// Waits for the lock called `name`. Returns `None` if `cancelled` says to
 /// give up first; it's checked every `poll`.
-pub fn acquire(name: &str, poll: Duration, mut cancelled: impl FnMut() -> bool) -> Option<LockGuard> {
+pub fn acquire(
+    name: &str,
+    poll: Duration,
+    mut cancelled: impl FnMut() -> bool,
+) -> Option<LockGuard> {
     let me = std::thread::current().id();
     let mut locks = LOCKS.lock().unwrap_or_else(|e| e.into_inner());
     loop {
         let map = locks.get_or_insert_with(HashMap::new);
         match map.get_mut(name) {
             None => {
-                map.insert(name.to_string(), Held { owner: me, depth: 1 });
-                return Some(LockGuard { name: name.to_string() });
+                map.insert(
+                    name.to_string(),
+                    Held {
+                        owner: me,
+                        depth: 1,
+                    },
+                );
+                return Some(LockGuard {
+                    name: name.to_string(),
+                });
             }
             Some(held) if held.owner == me => {
                 held.depth += 1;
-                return Some(LockGuard { name: name.to_string() });
+                return Some(LockGuard {
+                    name: name.to_string(),
+                });
             }
             Some(_) => {}
         }
         if cancelled() {
             return None;
         }
-        locks = RELEASED.wait_timeout(locks, poll).unwrap_or_else(|e| e.into_inner()).0;
+        locks = RELEASED
+            .wait_timeout(locks, poll)
+            .unwrap_or_else(|e| e.into_inner())
+            .0;
     }
 }
 
 /// Whether some strand holds the lock called `name`.
 pub fn is_held(name: &str) -> bool {
-    LOCKS.lock().unwrap_or_else(|e| e.into_inner()).as_ref().is_some_and(|m| m.contains_key(name))
+    LOCKS
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .as_ref()
+        .is_some_and(|m| m.contains_key(name))
 }
 
 #[cfg(test)]
@@ -78,8 +99,10 @@ mod tests {
                 let (inside, most) = (Arc::clone(&inside), Arc::clone(&most));
                 std::thread::spawn(move || {
                     for _ in 0..20 {
-                        let _outer = acquire("test-shared", Duration::from_millis(5), || false).unwrap();
-                        let _inner = acquire("test-shared", Duration::from_millis(5), || false).unwrap();
+                        let _outer =
+                            acquire("test-shared", Duration::from_millis(5), || false).unwrap();
+                        let _inner =
+                            acquire("test-shared", Duration::from_millis(5), || false).unwrap();
                         let n = inside.fetch_add(1, Ordering::SeqCst) + 1;
                         most.fetch_max(n, Ordering::SeqCst);
                         std::thread::sleep(Duration::from_micros(200));
@@ -98,7 +121,11 @@ mod tests {
     #[test]
     fn waiting_can_be_cancelled() {
         let _held = acquire("test-cancel", Duration::from_millis(5), || false).unwrap();
-        let waited = std::thread::spawn(|| acquire("test-cancel", Duration::from_millis(5), || true).is_none()).join().unwrap();
+        let waited = std::thread::spawn(|| {
+            acquire("test-cancel", Duration::from_millis(5), || true).is_none()
+        })
+        .join()
+        .unwrap();
         assert!(waited);
     }
 }

@@ -15,7 +15,10 @@ pub enum PowerCondition {
 
 impl MacroSettings {
     pub fn has_conditions(&self) -> bool {
-        !self.only_in_window.trim().is_empty() || self.power != PowerCondition::Any || self.active_hours.is_some() || self.active_days != 0
+        !self.only_in_window.trim().is_empty()
+            || self.power != PowerCondition::Any
+            || self.active_hours.is_some()
+            || self.active_days != 0
     }
 
     /// Why a trigger or hotkey can't start the macro right now, or `None` if it can.
@@ -24,7 +27,11 @@ impl MacroSettings {
         if !self.has_conditions() {
             return None;
         }
-        self.check(&Local::now(), crate::battery::is_plugged_in, crate::window::active)
+        self.check(
+            &Local::now(),
+            crate::battery::is_plugged_in,
+            crate::window::active,
+        )
     }
 
     #[cfg(feature = "system")]
@@ -34,7 +41,9 @@ impl MacroSettings {
         plugged_in: impl FnOnce() -> bool,
         window: impl FnOnce() -> Result<crate::window::ActiveWindow, String>,
     ) -> Option<String> {
-        if self.active_days != 0 && self.active_days & (1 << now.weekday().num_days_from_sunday()) == 0 {
+        if self.active_days != 0
+            && self.active_days & (1 << now.weekday().num_days_from_sunday()) == 0
+        {
             return Some("not on this day of the week".into());
         }
         if let Some((from, until)) = self.active_hours {
@@ -47,7 +56,11 @@ impl MacroSettings {
                 from == until || minute >= from || minute < until
             };
             if !inside {
-                return Some(format!("only runs from {} to {}", clock(from), clock(until)));
+                return Some(format!(
+                    "only runs from {} to {}",
+                    clock(from),
+                    clock(until)
+                ));
             }
         }
         if self.power != PowerCondition::Any {
@@ -61,7 +74,9 @@ impl MacroSettings {
         }
         let pattern = self.only_in_window.trim();
         if !pattern.is_empty() {
-            let focused = window().map(|w| w.matches(pattern, crate::window::MatchBy::Any)).unwrap_or(false);
+            let focused = window()
+                .map(|w| w.matches(pattern, crate::window::MatchBy::Any))
+                .unwrap_or(false);
             if !focused {
                 return Some(format!("only runs while '{pattern}' is focused"));
             }
@@ -77,8 +92,14 @@ pub fn clock(minutes: u16) -> String {
 
 /// `HH:MM` (or `H:MM`) as minutes after midnight.
 pub fn parse_clock(text: &str) -> Result<u16, String> {
-    let (h, m) = text.trim().split_once(':').ok_or_else(|| format!("'{text}' isn't a time like 09:30"))?;
-    let (h, m): (u16, u16) = (h.parse().map_err(|_| format!("'{text}' isn't a time"))?, m.parse().map_err(|_| format!("'{text}' isn't a time"))?);
+    let (h, m) = text
+        .trim()
+        .split_once(':')
+        .ok_or_else(|| format!("'{text}' isn't a time like 09:30"))?;
+    let (h, m): (u16, u16) = (
+        h.parse().map_err(|_| format!("'{text}' isn't a time"))?,
+        m.parse().map_err(|_| format!("'{text}' isn't a time"))?,
+    );
     if h > 23 || m > 59 {
         return Err(format!("'{text}' isn't a time of day"));
     }
@@ -99,7 +120,10 @@ mod tests {
 
     #[cfg(feature = "system")]
     fn window(app: &str) -> Result<ActiveWindow, String> {
-        Ok(ActiveWindow { title: String::new(), app: app.into() })
+        Ok(ActiveWindow {
+            title: String::new(),
+            app: app.into(),
+        })
     }
 
     #[test]
@@ -112,7 +136,10 @@ mod tests {
         s.active_hours = Some((parse_clock("22:00").unwrap(), parse_clock("6:00").unwrap()));
         assert_eq!(s.check(&at(15, 23, 30), || true, || window("x")), None);
         assert_eq!(s.check(&at(15, 5, 59), || true, || window("x")), None);
-        assert_eq!(s.check(&at(15, 6, 0), || true, || window("x")).unwrap(), "only runs from 22:00 to 06:00");
+        assert_eq!(
+            s.check(&at(15, 6, 0), || true, || window("x")).unwrap(),
+            "only runs from 22:00 to 06:00"
+        );
         s.active_hours = Some((parse_clock("9:00").unwrap(), parse_clock("9:00").unwrap()));
         assert_eq!(s.check(&at(15, 3, 0), || true, || window("x")), None);
         assert_eq!(s.check(&at(15, 9, 0), || true, || window("x")), None);
@@ -130,8 +157,14 @@ mod tests {
         s.power = PowerCondition::Any;
         s.only_in_window = "Firefox".into();
         assert_eq!(s.check(&at(15, 12, 0), || true, || window("firefox")), None);
-        assert!(s.check(&at(15, 12, 0), || true, || window("code")).is_some());
-        assert!(s.check(&at(15, 12, 0), || true, || Err("no window".into())).is_some());
+        assert!(
+            s.check(&at(15, 12, 0), || true, || window("code"))
+                .is_some()
+        );
+        assert!(
+            s.check(&at(15, 12, 0), || true, || Err("no window".into()))
+                .is_some()
+        );
     }
 
     #[test]

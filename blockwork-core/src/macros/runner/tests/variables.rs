@@ -49,11 +49,17 @@ fn list_commands_and_reporters_share_the_same_literal_store() {
             }),
             Instruction::new(InstructionKind::SetVariable(
                 "item".into(),
-                reporter(Op::from_name("ListItem"), vec![Value::number(1.0), text("items")]),
+                reporter(
+                    Op::from_name("ListItem"),
+                    vec![Value::number(1.0), text("items")],
+                ),
             )),
             Instruction::new(InstructionKind::SetVariable(
                 "position".into(),
-                reporter(Op::from_name("ListItemNumber"), vec![text("z"), text("items")]),
+                reporter(
+                    Op::from_name("ListItemNumber"),
+                    vec![text("z"), text("items")],
+                ),
             )),
             Instruction::new(InstructionKind::SetVariable(
                 "amount".into(),
@@ -65,11 +71,17 @@ fn list_commands_and_reporters_share_the_same_literal_store() {
             )),
             Instruction::new(InstructionKind::SetVariable(
                 "contains".into(),
-                reporter(Op::from_name("ListContains"), vec![text("items"), text("z")]),
+                reporter(
+                    Op::from_name("ListContains"),
+                    vec![text("items"), text("z")],
+                ),
             )),
             Instruction::new(InstructionKind::SetVariable(
                 "exists".into(),
-                reporter(Op::from_name("ListItemExists"), vec![Value::number(3.0), text("items")]),
+                reporter(
+                    Op::from_name("ListItemExists"),
+                    vec![Value::number(3.0), text("items")],
+                ),
             )),
             Instruction::new(InstructionKind::SetVariable(
                 "empty".into(),
@@ -120,8 +132,7 @@ fn resolve_list_reporters_supports_canvas_preview_without_running_a_macro() {
         ],
         saved: Box::new(Value::number(0.0)),
     };
-    let preview =
-        resolve_list_reporters(&list_item, &lists).and_then(|value| value.eval_text());
+    let preview = resolve_list_reporters(&list_item, &lists).and_then(|value| value.eval_text());
     assert_eq!(preview, Ok("7".to_string()));
 
     let nested_length = Value::Op {
@@ -251,17 +262,34 @@ fn globals_accept_variable_and_computed_names() {
     let name = "runner-dynamic-global-picker";
     crate::globals::remove(name);
     crate::globals::create(name).unwrap();
-    let dynamic = Value::Var { name: "target".into() };
-    let computed = Value::op(Op::from_name("Join"), vec![Value::text("runner-dynamic-"), Value::text("global-picker")]);
+    let dynamic = Value::Var {
+        name: "target".into(),
+    };
+    let computed = Value::op(
+        Op::from_name("Join"),
+        vec![Value::text("runner-dynamic-"), Value::text("global-picker")],
+    );
     let mac = Macro::new(
         "Dynamic globals".into(),
         String::new(),
         vec![
             set("target", Value::text(name)),
-            set("initial", Value::op(Op::from_name("GlobalVariable"), vec![dynamic.clone()])),
-            Instruction::new(InstructionKind::SetGlobal { name: dynamic.clone(), value: Value::number(4.0) }),
-            Instruction::new(InstructionKind::ChangeGlobal { name: computed, by: Value::number(3.0) }),
-            set("result", Value::op(Op::from_name("GlobalVariable"), vec![dynamic])),
+            set(
+                "initial",
+                Value::op(Op::from_name("GlobalVariable"), vec![dynamic.clone()]),
+            ),
+            Instruction::new(InstructionKind::SetGlobal {
+                name: dynamic.clone(),
+                value: Value::number(4.0),
+            }),
+            Instruction::new(InstructionKind::ChangeGlobal {
+                name: computed,
+                by: Value::number(3.0),
+            }),
+            set(
+                "result",
+                Value::op(Op::from_name("GlobalVariable"), vec![dynamic]),
+            ),
         ],
     );
     let vars = empty_vars();

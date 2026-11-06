@@ -139,7 +139,7 @@ pub use unsupported::{act, active, bounds, exists, place};
 
 #[cfg(target_os = "linux")]
 mod linux {
-    use super::{no_match, Action, ActiveWindow, MatchBy, Rect};
+    use super::{Action, ActiveWindow, MatchBy, Rect, no_match};
     use crate::flatpak::host_command;
 
     enum Desktop {
@@ -192,14 +192,29 @@ mod linux {
         }
     }
 
-    pub(super) fn place(pattern: &str, by: MatchBy, resize: bool, a: i32, b: i32) -> Result<(), String> {
+    pub(super) fn place(
+        pattern: &str,
+        by: MatchBy,
+        resize: bool,
+        a: i32,
+        b: i32,
+    ) -> Result<(), String> {
         match desktop()? {
             Desktop::Hyprland => hypr::place(&hypr::find(pattern, by)?, resize, a, b),
             Desktop::Sway => sway::place(&sway::find(pattern, by)?, resize, a, b),
             Desktop::Kde => {
                 let id = kde::find(pattern, by)?;
                 let (a, b) = (a.to_string(), b.to_string());
-                run("kdotool", &[if resize { "windowsize" } else { "windowmove" }, &id, &a, &b]).map(drop)
+                run(
+                    "kdotool",
+                    &[
+                        if resize { "windowsize" } else { "windowmove" },
+                        &id,
+                        &a,
+                        &b,
+                    ],
+                )
+                .map(drop)
             }
             Desktop::X11 => {
                 let x = x11::X11::connect()?;
@@ -242,17 +257,27 @@ mod linux {
         if !output.status.success() {
             let err = String::from_utf8_lossy(&output.stderr);
             let err = err.trim();
-            return Err(if err.is_empty() { format!("{program} failed") } else { format!("{program}: {err}") });
+            return Err(if err.is_empty() {
+                format!("{program} failed")
+            } else {
+                format!("{program}: {err}")
+            });
         }
-        Ok(String::from_utf8_lossy(&output.stdout).trim_end().to_string())
+        Ok(String::from_utf8_lossy(&output.stdout)
+            .trim_end()
+            .to_string())
     }
 
     fn json(program: &str, args: &[&str]) -> Result<serde_json::Value, String> {
-        serde_json::from_str(&run(program, args)?).map_err(|e| format!("unexpected {program} output: {e}"))
+        serde_json::from_str(&run(program, args)?)
+            .map_err(|e| format!("unexpected {program} output: {e}"))
     }
 
     fn text(node: &serde_json::Value, key: &str) -> String {
-        node.get(key).and_then(|v| v.as_str()).unwrap_or_default().to_string()
+        node.get(key)
+            .and_then(|v| v.as_str())
+            .unwrap_or_default()
+            .to_string()
     }
 
     fn number(node: &serde_json::Value, key: &str) -> f64 {
@@ -264,7 +289,12 @@ mod linux {
         if width < 1.0 || height < 1.0 {
             return Err("the window is minimized or hidden".into());
         }
-        Ok(Rect { x, y, width, height })
+        Ok(Rect {
+            x,
+            y,
+            width,
+            height,
+        })
     }
 
     mod hypr {
@@ -275,7 +305,10 @@ mod linux {
         }
 
         pub(super) fn info(client: &serde_json::Value) -> ActiveWindow {
-            ActiveWindow { title: text(client, "title"), app: text(client, "class") }
+            ActiveWindow {
+                title: text(client, "title"),
+                app: text(client, "class"),
+            }
         }
 
         pub(super) fn find(pattern: &str, by: MatchBy) -> Result<serde_json::Value, String> {
@@ -297,12 +330,20 @@ mod linux {
             let mut all = vec!["dispatch"];
             all.extend_from_slice(args);
             let out = run("hyprctl", &all)?;
-            if out.trim() == "ok" { Ok(()) } else { Err(format!("hyprctl: {}", out.trim())) }
+            if out.trim() == "ok" {
+                Ok(())
+            } else {
+                Err(format!("hyprctl: {}", out.trim()))
+            }
         }
 
         fn address(client: &serde_json::Value) -> Result<String, String> {
             let a = text(client, "address");
-            if a.is_empty() { Err("no window is focused".into()) } else { Ok(format!("address:{a}")) }
+            if a.is_empty() {
+                Err("no window is focused".into())
+            } else {
+                Ok(format!("address:{a}"))
+            }
         }
 
         /// 0 none, 1 maximized, 2 fullscreen; older versions report a bool.
@@ -322,7 +363,11 @@ mod linux {
                 Action::Minimize => Err("Hyprland has no minimized windows".into()),
                 Action::Maximize => {
                     dispatch(&["focuswindow", &target])?;
-                    if fullscreen(client) == 0 { dispatch(&["fullscreen", "1"]) } else { Ok(()) }
+                    if fullscreen(client) == 0 {
+                        dispatch(&["fullscreen", "1"])
+                    } else {
+                        Ok(())
+                    }
                 }
                 Action::Restore => {
                     dispatch(&["focuswindow", &target])?;
@@ -339,7 +384,11 @@ mod linux {
         pub(super) fn bounds(client: &serde_json::Value) -> Result<Rect, String> {
             let pair = |key: &str| {
                 let v = client.get(key).and_then(|v| v.as_array());
-                let at = |i: usize| v.and_then(|v| v.get(i)).and_then(|n| n.as_f64()).unwrap_or_default();
+                let at = |i: usize| {
+                    v.and_then(|v| v.get(i))
+                        .and_then(|n| n.as_f64())
+                        .unwrap_or_default()
+                };
                 (at(0), at(1))
             };
             if client.get("hidden").and_then(|h| h.as_bool()) == Some(true) {
@@ -349,13 +398,22 @@ mod linux {
             sized(x, y, w, h)
         }
 
-        pub(super) fn place(client: &serde_json::Value, resize: bool, a: i32, b: i32) -> Result<(), String> {
+        pub(super) fn place(
+            client: &serde_json::Value,
+            resize: bool,
+            a: i32,
+            b: i32,
+        ) -> Result<(), String> {
             let target = address(client)?;
             // Only floating windows have a free position or size.
             if client.get("floating").and_then(|f| f.as_bool()) != Some(true) {
                 dispatch(&["setfloating", &target])?;
             }
-            let verb = if resize { "resizewindowpixel" } else { "movewindowpixel" };
+            let verb = if resize {
+                "resizewindowpixel"
+            } else {
+                "movewindowpixel"
+            };
             dispatch(&[verb, &format!("exact {a} {b},{target}")])
         }
     }
@@ -367,7 +425,10 @@ mod linux {
         /// `workspace` so `act_command` can tell a minimized window.
         fn walk(node: &serde_json::Value, workspace: &str, out: &mut Vec<serde_json::Value>) {
             let workspace = match node.get("type").and_then(|t| t.as_str()) {
-                Some("workspace") => node.get("name").and_then(|n| n.as_str()).unwrap_or(workspace),
+                Some("workspace") => node
+                    .get("name")
+                    .and_then(|n| n.as_str())
+                    .unwrap_or(workspace),
                 _ => workspace,
             };
             if node.get("pid").is_some() {
@@ -380,7 +441,12 @@ mod linux {
                 out.push(window);
             }
             for key in ["nodes", "floating_nodes"] {
-                for child in node.get(key).and_then(|n| n.as_array()).into_iter().flatten() {
+                for child in node
+                    .get(key)
+                    .and_then(|n| n.as_array())
+                    .into_iter()
+                    .flatten()
+                {
                     walk(child, workspace, out);
                 }
             }
@@ -399,24 +465,37 @@ mod linux {
                 .and_then(|v| v.as_str())
                 .map(str::to_string)
                 .unwrap_or_else(|| {
-                    node.get("window_properties").map(|p| text(p, "class")).unwrap_or_default()
+                    node.get("window_properties")
+                        .map(|p| text(p, "class"))
+                        .unwrap_or_default()
                 });
-            ActiveWindow { title: text(node, "name"), app }
+            ActiveWindow {
+                title: text(node, "name"),
+                app,
+            }
         }
 
         pub(super) fn active() -> Result<Option<serde_json::Value>, String> {
-            Ok(windows()?.into_iter().find(|n| n.get("focused").and_then(|f| f.as_bool()) == Some(true)))
+            Ok(windows()?
+                .into_iter()
+                .find(|n| n.get("focused").and_then(|f| f.as_bool()) == Some(true)))
         }
 
         pub(super) fn find(pattern: &str, by: MatchBy) -> Result<serde_json::Value, String> {
             if pattern.is_empty() {
                 return active()?.ok_or_else(|| "no window is focused".to_string());
             }
-            windows()?.into_iter().find(|n| info(n).matches(pattern, by)).ok_or_else(|| no_match(pattern))
+            windows()?
+                .into_iter()
+                .find(|n| info(n).matches(pattern, by))
+                .ok_or_else(|| no_match(pattern))
         }
 
         fn command(node: &serde_json::Value, command: &str) -> Result<(), String> {
-            let id = node.get("id").and_then(|i| i.as_u64()).ok_or("window has no id")?;
+            let id = node
+                .get("id")
+                .and_then(|i| i.as_u64())
+                .ok_or("window has no id")?;
             run("swaymsg", &[&format!("[con_id={id}] {command}")]).map(drop)
         }
 
@@ -430,8 +509,12 @@ mod linux {
         pub(crate) fn act_command(action: Action, node: &serde_json::Value) -> &'static str {
             // Sway parks scratchpad windows on the hidden `__i3_scratch`
             // workspace; i3-style trees also say so in `scratchpad_state`.
-            let in_scratchpad = node.get("workspace").and_then(|w| w.as_str()) == Some("__i3_scratch")
-                || node.get("scratchpad_state").and_then(|s| s.as_str()).is_some_and(|s| s != "none");
+            let in_scratchpad = node.get("workspace").and_then(|w| w.as_str())
+                == Some("__i3_scratch")
+                || node
+                    .get("scratchpad_state")
+                    .and_then(|s| s.as_str())
+                    .is_some_and(|s| s != "none");
             match action {
                 Action::Focus => "focus",
                 Action::Close => "kill",
@@ -445,7 +528,10 @@ mod linux {
         /// `rect` is the container; `window_rect` is the content inside it.
         pub(super) fn bounds(node: &serde_json::Value) -> Result<Rect, String> {
             let empty = serde_json::Value::Null;
-            let (outer, inner) = (node.get("rect").unwrap_or(&empty), node.get("window_rect").unwrap_or(&empty));
+            let (outer, inner) = (
+                node.get("rect").unwrap_or(&empty),
+                node.get("window_rect").unwrap_or(&empty),
+            );
             sized(
                 number(outer, "x") + number(inner, "x"),
                 number(outer, "y") + number(inner, "y"),
@@ -454,8 +540,17 @@ mod linux {
             )
         }
 
-        pub(super) fn place(node: &serde_json::Value, resize: bool, a: i32, b: i32) -> Result<(), String> {
-            let verb = if resize { format!("resize set {a} {b}") } else { format!("move absolute position {a} {b}") };
+        pub(super) fn place(
+            node: &serde_json::Value,
+            resize: bool,
+            a: i32,
+            b: i32,
+        ) -> Result<(), String> {
+            let verb = if resize {
+                format!("resize set {a} {b}")
+            } else {
+                format!("move absolute position {a} {b}")
+            };
             command(node, &format!("floating enable, {verb}"))
         }
     }
@@ -488,11 +583,15 @@ mod linux {
                 let mut args = vec!["search", "--limit", "1"];
                 args.extend(*field);
                 args.push(&pattern);
-                let out = host_command("kdotool")
-                    .args(&args)
-                    .output()
-                    .map_err(|_| "window control on KDE Wayland needs kdotool installed".to_string())?;
-                let id = String::from_utf8_lossy(&out.stdout).lines().next().unwrap_or_default().trim().to_string();
+                let out = host_command("kdotool").args(&args).output().map_err(|_| {
+                    "window control on KDE Wayland needs kdotool installed".to_string()
+                })?;
+                let id = String::from_utf8_lossy(&out.stdout)
+                    .lines()
+                    .next()
+                    .unwrap_or_default()
+                    .trim()
+                    .to_string();
                 if !id.is_empty() {
                     return Ok(Some(id));
                 }
@@ -535,7 +634,8 @@ mod linux {
         /// The window's content area. kdotool's geometry is the frame,
         /// title bar included, so ask KWin for the client rect first.
         pub(super) fn bounds(id: &str) -> Result<Rect, String> {
-            client_geometry(id).or_else(|_| parse_geometry(&run("kdotool", &["getwindowgeometry", id])?))
+            client_geometry(id)
+                .or_else(|_| parse_geometry(&run("kdotool", &["getwindowgeometry", id])?))
         }
 
         fn client_geometry(id: &str) -> Result<Rect, String> {
@@ -550,7 +650,10 @@ mod linux {
 
         /// "x,y,width,height", as the client geometry script replies.
         pub(crate) fn parse_rect(text: &str) -> Result<Rect, String> {
-            let n: Vec<f64> = text.split(',').filter_map(|v| v.trim().parse().ok()).collect();
+            let n: Vec<f64> = text
+                .split(',')
+                .filter_map(|v| v.trim().parse().ok())
+                .collect();
             match n[..] {
                 [x, y, w, h] => sized(x, y, w, h),
                 _ => Err(format!("unexpected window geometry '{text}'")),
@@ -563,16 +666,27 @@ mod linux {
                 Action::Close => &["windowclose", id],
                 Action::Minimize => &["windowminimize", id],
                 Action::Maximize => &["windowstate", "--add", "MAXIMIZED", id],
-                Action::Restore => &["windowstate", "--remove", "MAXIMIZED", "--remove", "FULLSCREEN", "--remove", "MINIMIZED", id],
+                Action::Restore => &[
+                    "windowstate",
+                    "--remove",
+                    "MAXIMIZED",
+                    "--remove",
+                    "FULLSCREEN",
+                    "--remove",
+                    "MINIMIZED",
+                    id,
+                ],
             };
             run("kdotool", args).map(drop)
         }
     }
 
     pub(super) mod x11 {
-        use super::{no_match, sized, Action, ActiveWindow, MatchBy, Rect};
+        use super::{Action, ActiveWindow, MatchBy, Rect, no_match, sized};
         use x11rb::connection::Connection;
-        use x11rb::protocol::xproto::{AtomEnum, ClientMessageEvent, ConnectionExt, EventMask, Window};
+        use x11rb::protocol::xproto::{
+            AtomEnum, ClientMessageEvent, ConnectionExt, EventMask, Window,
+        };
         use x11rb::rust_connection::RustConnection;
 
         pub(crate) struct X11 {
@@ -582,7 +696,8 @@ mod linux {
 
         impl X11 {
             pub(crate) fn connect() -> Result<X11, String> {
-                let (conn, screen) = x11rb::connect(None).map_err(|e| format!("no X11 display: {e}"))?;
+                let (conn, screen) =
+                    x11rb::connect(None).map_err(|e| format!("no X11 display: {e}"))?;
                 let root = conn.setup().roots[screen].root;
                 Ok(X11 { conn, root })
             }
@@ -598,13 +713,27 @@ mod linux {
             }
 
             fn property(&self, window: Window, prop: u32, kind: u32) -> Option<Vec<u8>> {
-                Some(self.conn.get_property(false, window, prop, kind, 0, 4096).ok()?.reply().ok()?.value)
+                Some(
+                    self.conn
+                        .get_property(false, window, prop, kind, 0, 4096)
+                        .ok()?
+                        .reply()
+                        .ok()?
+                        .value,
+                )
             }
 
             fn windows_in(&self, prop: &str) -> Result<Vec<Window>, String> {
                 let reply = self
                     .conn
-                    .get_property(false, self.root, self.atom(prop)?, AtomEnum::WINDOW, 0, 4096)
+                    .get_property(
+                        false,
+                        self.root,
+                        self.atom(prop)?,
+                        AtomEnum::WINDOW,
+                        0,
+                        4096,
+                    )
                     .map_err(|e| e.to_string())?
                     .reply()
                     .map_err(|e| e.to_string())?;
@@ -612,7 +741,10 @@ mod linux {
             }
 
             pub(crate) fn active(&self) -> Result<Option<Window>, String> {
-                Ok(self.windows_in("_NET_ACTIVE_WINDOW")?.into_iter().find(|w| *w != 0))
+                Ok(self
+                    .windows_in("_NET_ACTIVE_WINDOW")?
+                    .into_iter()
+                    .find(|w| *w != 0))
             }
 
             pub(crate) fn info(&self, window: Window) -> ActiveWindow {
@@ -621,7 +753,9 @@ mod linux {
                 let title = self
                     .property(window, name, utf8)
                     .filter(|v| !v.is_empty())
-                    .or_else(|| self.property(window, AtomEnum::WM_NAME.into(), AtomEnum::STRING.into()))
+                    .or_else(|| {
+                        self.property(window, AtomEnum::WM_NAME.into(), AtomEnum::STRING.into())
+                    })
                     .map(|v| String::from_utf8_lossy(&v).into_owned())
                     .unwrap_or_default();
                 // WM_CLASS is "instance\0class\0"; the class is the readable app name.
@@ -639,7 +773,9 @@ mod linux {
 
             pub(crate) fn find(&self, pattern: &str, by: MatchBy) -> Result<Window, String> {
                 if pattern.is_empty() {
-                    return self.active()?.ok_or_else(|| "no window is focused".to_string());
+                    return self
+                        .active()?
+                        .ok_or_else(|| "no window is focused".to_string());
                 }
                 self.windows_in("_NET_CLIENT_LIST")?
                     .into_iter()
@@ -651,20 +787,30 @@ mod linux {
             fn message(&self, window: Window, kind: &str, data: [u32; 5]) -> Result<(), String> {
                 let event = ClientMessageEvent::new(32, window, self.atom(kind)?, data);
                 self.conn
-                    .send_event(false, self.root, EventMask::SUBSTRUCTURE_REDIRECT | EventMask::SUBSTRUCTURE_NOTIFY, event)
+                    .send_event(
+                        false,
+                        self.root,
+                        EventMask::SUBSTRUCTURE_REDIRECT | EventMask::SUBSTRUCTURE_NOTIFY,
+                        event,
+                    )
                     .map_err(|e| e.to_string())?;
                 self.conn.flush().map_err(|e| e.to_string())
             }
 
             pub(crate) fn act(&self, action: Action, window: Window) -> Result<(), String> {
                 // Source indication 2: a pager or tool acting for the user.
-                let max = [self.atom("_NET_WM_STATE_MAXIMIZED_VERT")?, self.atom("_NET_WM_STATE_MAXIMIZED_HORZ")?];
+                let max = [
+                    self.atom("_NET_WM_STATE_MAXIMIZED_VERT")?,
+                    self.atom("_NET_WM_STATE_MAXIMIZED_HORZ")?,
+                ];
                 match action {
                     Action::Focus => self.message(window, "_NET_ACTIVE_WINDOW", [2, 0, 0, 0, 0]),
                     Action::Close => self.message(window, "_NET_CLOSE_WINDOW", [0, 2, 0, 0, 0]),
                     // ICCCM IconicState.
                     Action::Minimize => self.message(window, "WM_CHANGE_STATE", [3, 0, 0, 0, 0]),
-                    Action::Maximize => self.message(window, "_NET_WM_STATE", [1, max[0], max[1], 2, 0]),
+                    Action::Maximize => {
+                        self.message(window, "_NET_WM_STATE", [1, max[0], max[1], 2, 0])
+                    }
                     Action::Restore => {
                         self.message(window, "_NET_WM_STATE", [0, max[0], max[1], 2, 0])?;
                         self.message(window, "_NET_ACTIVE_WINDOW", [2, 0, 0, 0, 0])
@@ -674,24 +820,47 @@ mod linux {
 
             /// The window's own area (without the frame), translated to root coordinates.
             pub(crate) fn bounds(&self, window: Window) -> Result<Rect, String> {
-                let geometry = self.conn.get_geometry(window).map_err(|e| e.to_string())?.reply().map_err(|e| e.to_string())?;
+                let geometry = self
+                    .conn
+                    .get_geometry(window)
+                    .map_err(|e| e.to_string())?
+                    .reply()
+                    .map_err(|e| e.to_string())?;
                 let origin = self
                     .conn
                     .translate_coordinates(window, self.root, 0, 0)
                     .map_err(|e| e.to_string())?
                     .reply()
                     .map_err(|e| e.to_string())?;
-                sized(origin.dst_x as f64, origin.dst_y as f64, geometry.width as f64, geometry.height as f64)
+                sized(
+                    origin.dst_x as f64,
+                    origin.dst_y as f64,
+                    geometry.width as f64,
+                    geometry.height as f64,
+                )
             }
 
-            pub(crate) fn place(&self, window: Window, resize: bool, a: i32, b: i32) -> Result<(), String> {
+            pub(crate) fn place(
+                &self,
+                window: Window,
+                resize: bool,
+                a: i32,
+                b: i32,
+            ) -> Result<(), String> {
                 // Flags: which of x/y/width/height apply, plus source 2.
                 let (flags, data) = if resize {
-                    ((1 << 10) | (1 << 11), [0, 0, a.max(1) as u32, b.max(1) as u32])
+                    (
+                        (1 << 10) | (1 << 11),
+                        [0, 0, a.max(1) as u32, b.max(1) as u32],
+                    )
                 } else {
                     ((1 << 8) | (1 << 9), [a as u32, b as u32, 0, 0])
                 };
-                self.message(window, "_NET_MOVERESIZE_WINDOW", [flags | (2 << 12), data[0], data[1], data[2], data[3]])
+                self.message(
+                    window,
+                    "_NET_MOVERESIZE_WINDOW",
+                    [flags | (2 << 12), data[0], data[1], data[2], data[3]],
+                )
             }
         }
     }
@@ -699,20 +868,26 @@ mod linux {
 
 #[cfg(windows)]
 mod windows {
-    use super::{no_match, Action, ActiveWindow, MatchBy, Rect};
+    use super::{Action, ActiveWindow, MatchBy, Rect, no_match};
     use std::time::{Duration, Instant};
     use windows_sys::Win32::Foundation::{CloseHandle, HWND, LPARAM, POINT, RECT};
-    use windows_sys::Win32::Graphics::Dwm::{DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute};
-    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput};
+    use windows_sys::Win32::Graphics::Dwm::{
+        DWMWA_CLOAKED, DWMWA_EXTENDED_FRAME_BOUNDS, DwmGetWindowAttribute,
+    };
     use windows_sys::Win32::Graphics::Gdi::ClientToScreen;
     use windows_sys::Win32::System::Threading::{
-        AttachThreadInput, GetCurrentThreadId, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION, QueryFullProcessImageNameW,
+        AttachThreadInput, GetCurrentThreadId, OpenProcess, PROCESS_QUERY_LIMITED_INFORMATION,
+        QueryFullProcessImageNameW,
+    };
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput,
     };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        BringWindowToTop, EnumChildWindows, EnumWindows, GA_ROOTOWNER, GWL_EXSTYLE, GetAncestor, GetClientRect,
-        GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowTextW, GetWindowThreadProcessId, IsIconic,
-        IsWindowVisible, IsZoomed, PostMessageW, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, SWP_NOACTIVATE, SWP_NOMOVE,
-        SWP_NOSIZE, SWP_NOZORDER, SetForegroundWindow, SetWindowPos, ShowWindow, WM_CLOSE, WS_EX_TOOLWINDOW,
+        BringWindowToTop, EnumChildWindows, EnumWindows, GA_ROOTOWNER, GWL_EXSTYLE, GetAncestor,
+        GetClientRect, GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowTextW,
+        GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed, PostMessageW, SW_MAXIMIZE,
+        SW_MINIMIZE, SW_RESTORE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
+        SetForegroundWindow, SetWindowPos, ShowWindow, WM_CLOSE, WS_EX_TOOLWINDOW,
     };
 
     /// Why Windows refuses to touch a window, almost always.
@@ -760,14 +935,21 @@ mod windows {
         }
         let mut out: Option<String> = None;
         // SAFETY: the callback only writes `out`, which outlives the call.
-        unsafe { EnumChildWindows(hwnd, Some(first_foreign), &mut out as *mut Option<String> as LPARAM) };
+        unsafe {
+            EnumChildWindows(
+                hwnd,
+                Some(first_foreign),
+                &mut out as *mut Option<String> as LPARAM,
+            )
+        };
         out
     }
 
     fn info(hwnd: HWND) -> ActiveWindow {
         let mut title = [0u16; 512];
         // SAFETY: the buffer's length is passed alongside it.
-        let len = unsafe { GetWindowTextW(hwnd, title.as_mut_ptr(), title.len() as i32) }.max(0) as usize;
+        let len =
+            unsafe { GetWindowTextW(hwnd, title.as_mut_ptr(), title.len() as i32) }.max(0) as usize;
         let title = String::from_utf16_lossy(&title[..len]);
         let mut app = process_name(hwnd);
         if app.eq_ignore_ascii_case("ApplicationFrameHost")
@@ -781,7 +963,11 @@ mod windows {
     pub fn active() -> Result<ActiveWindow, String> {
         // SAFETY: no arguments; may return null.
         let hwnd = unsafe { GetForegroundWindow() };
-        Ok(if hwnd.is_null() { ActiveWindow::default() } else { info(hwnd) })
+        Ok(if hwnd.is_null() {
+            ActiveWindow::default()
+        } else {
+            info(hwnd)
+        })
     }
 
     /// Whether `hwnd` is a window the user can see in the taskbar or
@@ -798,7 +984,12 @@ mod windows {
                 return false;
             }
             let mut cloaked = 0u32;
-            let ok = DwmGetWindowAttribute(hwnd, DWMWA_CLOAKED as u32, (&mut cloaked as *mut u32).cast(), 4) >= 0;
+            let ok = DwmGetWindowAttribute(
+                hwnd,
+                DWMWA_CLOAKED as u32,
+                (&mut cloaked as *mut u32).cast(),
+                4,
+            ) >= 0;
             !(ok && cloaked != 0)
         }
     }
@@ -824,7 +1015,11 @@ mod windows {
         if pattern.is_empty() {
             // SAFETY: no arguments; may return null.
             let hwnd = unsafe { GetForegroundWindow() };
-            return if hwnd.is_null() { Err("no window is focused".into()) } else { Ok(hwnd) };
+            return if hwnd.is_null() {
+                Err("no window is focused".into())
+            } else {
+                Ok(hwnd)
+            };
         }
         windows()
             .into_iter()
@@ -850,14 +1045,27 @@ mod windows {
                 // send a key no keyboard has (0xE8 is unassigned).
                 let key = |flags| INPUT {
                     r#type: INPUT_KEYBOARD,
-                    Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: 0xE8, wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: 0 } },
+                    Anonymous: INPUT_0 {
+                        ki: KEYBDINPUT {
+                            wVk: 0xE8,
+                            wScan: 0,
+                            dwFlags: flags,
+                            time: 0,
+                            dwExtraInfo: 0,
+                        },
+                    },
                 };
                 let taps = [key(0), key(KEYEVENTF_KEYUP)];
-                SendInput(taps.len() as u32, taps.as_ptr(), std::mem::size_of::<INPUT>() as i32);
+                SendInput(
+                    taps.len() as u32,
+                    taps.as_ptr(),
+                    std::mem::size_of::<INPUT>() as i32,
+                );
                 let foreground = GetForegroundWindow();
                 let theirs = GetWindowThreadProcessId(foreground, std::ptr::null_mut());
                 let ours = GetCurrentThreadId();
-                let attached = theirs != 0 && theirs != ours && AttachThreadInput(ours, theirs, 1) != 0;
+                let attached =
+                    theirs != 0 && theirs != ours && AttachThreadInput(ours, theirs, 1) != 0;
                 BringWindowToTop(hwnd);
                 SetForegroundWindow(hwnd);
                 if attached {
@@ -910,13 +1118,30 @@ mod windows {
             let mut frame: RECT = std::mem::zeroed();
             let size = std::mem::size_of::<RECT>() as u32;
             if GetWindowRect(hwnd, &mut rect) == 0
-                || DwmGetWindowAttribute(hwnd, DWMWA_EXTENDED_FRAME_BOUNDS as u32, (&mut frame as *mut RECT).cast(), size) < 0
+                || DwmGetWindowAttribute(
+                    hwnd,
+                    DWMWA_EXTENDED_FRAME_BOUNDS as u32,
+                    (&mut frame as *mut RECT).cast(),
+                    size,
+                ) < 0
             {
                 return (0, 0, 0, 0);
             }
-            let border = (frame.left - rect.left, frame.top - rect.top, rect.right - frame.right, rect.bottom - frame.bottom);
+            let border = (
+                frame.left - rect.left,
+                frame.top - rect.top,
+                rect.right - frame.right,
+                rect.bottom - frame.bottom,
+            );
             // A bogus answer (another DPI context, mid-animation) is worse than none.
-            if [border.0, border.1, border.2, border.3].iter().all(|b| (0..=32).contains(b)) { border } else { (0, 0, 0, 0) }
+            if [border.0, border.1, border.2, border.3]
+                .iter()
+                .all(|b| (0..=32).contains(b))
+            {
+                border
+            } else {
+                (0, 0, 0, 0)
+            }
         }
     }
 
@@ -933,7 +1158,8 @@ mod windows {
             } else {
                 (a - left, b - top, 0, 0)
             };
-            let flags = SWP_NOZORDER | SWP_NOACTIVATE | if resize { SWP_NOMOVE } else { SWP_NOSIZE };
+            let flags =
+                SWP_NOZORDER | SWP_NOACTIVATE | if resize { SWP_NOMOVE } else { SWP_NOSIZE };
             if SetWindowPos(hwnd, std::ptr::null_mut(), x, y, width, height, flags) == 0 {
                 return Err(format!("couldn't move the window: {ELEVATED}"));
             }
@@ -954,11 +1180,19 @@ mod windows {
             if GetClientRect(hwnd, &mut rect) == 0 || ClientToScreen(hwnd, &mut origin) == 0 {
                 return Err("couldn't read the window's position".into());
             }
-            let (width, height) = ((rect.right - rect.left) as f64, (rect.bottom - rect.top) as f64);
+            let (width, height) = (
+                (rect.right - rect.left) as f64,
+                (rect.bottom - rect.top) as f64,
+            );
             if width < 1.0 || height < 1.0 {
                 return Err("the window is minimized or hidden".into());
             }
-            Ok(Rect { x: origin.x as f64, y: origin.y as f64, width, height })
+            Ok(Rect {
+                x: origin.x as f64,
+                y: origin.y as f64,
+                width,
+                height,
+            })
         }
     }
 

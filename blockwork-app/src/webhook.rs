@@ -2,13 +2,13 @@
 //! carrying the token fires the live macros' `WhenWebhook` strands for that
 //! path. Only listens on this computer.
 
-use blockwork_core::macros::trigger::fired_message;
-use crate::scheduled_run;
-use crate::state::{emit_state_updated, SharedState};
 use crate::AppHandle;
+use crate::scheduled_run;
+use crate::state::{SharedState, emit_state_updated};
 use blockwork_core::config::{load_settings, update_settings};
 use blockwork_core::input::value::Evaluated;
 use blockwork_core::macros::InstructionKind;
+use blockwork_core::macros::trigger::fired_message;
 use serde::Serialize;
 use std::collections::HashMap;
 use std::io::{BufRead, BufReader, Read, Write};
@@ -53,7 +53,12 @@ fn fresh_token() -> String {
     uuid::Uuid::new_v4().simple().to_string()
 }
 
-pub(crate) fn configure(state: &SharedState, app: &AppHandle, enabled: bool, port: u16) -> Result<(), String> {
+pub(crate) fn configure(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+    port: u16,
+) -> Result<(), String> {
     if port == 0 {
         return Err("pick a port from 1 to 65535".into());
     }
@@ -88,7 +93,9 @@ fn set_problem(text: String, state: &SharedState, app: &AppHandle) {
 }
 
 pub(crate) fn start(state: SharedState, app: AppHandle) {
-    let _ = std::thread::Builder::new().name("webhook".into()).spawn(move || serve(state, app));
+    let _ = std::thread::Builder::new()
+        .name("webhook".into())
+        .spawn(move || serve(state, app));
 }
 
 fn serve(state: SharedState, app: AppHandle) {
@@ -98,17 +105,22 @@ fn serve(state: SharedState, app: AppHandle) {
         let changed = || GENERATION.load(Ordering::SeqCst) != generation;
         if settings.webhook_enabled.unwrap_or(false) {
             let port = settings.webhook_port.unwrap_or(DEFAULT_PORT);
-            match TcpListener::bind(("127.0.0.1", port)).and_then(|l| l.set_nonblocking(true).map(|_| l)) {
+            match TcpListener::bind(("127.0.0.1", port))
+                .and_then(|l| l.set_nonblocking(true).map(|_| l))
+            {
                 Ok(listener) => {
                     set_problem(String::new(), &state, &app);
                     let token = settings.webhook_token.unwrap_or_default();
                     while !changed() {
                         match listener.accept() {
                             Ok((stream, _)) => {
-                                let (state, app, token) = (Arc::clone(&state), app.clone(), token.clone());
+                                let (state, app, token) =
+                                    (Arc::clone(&state), app.clone(), token.clone());
                                 std::thread::spawn(move || handle(stream, &token, &state, &app));
                             }
-                            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(Duration::from_millis(100)),
+                            Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                                std::thread::sleep(Duration::from_millis(100))
+                            }
                             Err(e) => tracing::warn!("Webhook accept failed: {e}"),
                         }
                     }
@@ -136,9 +148,13 @@ struct Request {
 fn read_request(stream: &TcpStream) -> Result<Request, (u16, &'static str)> {
     let mut reader = BufReader::new(stream);
     let mut line = String::new();
-    reader.read_line(&mut line).map_err(|_| (400, "bad request"))?;
+    reader
+        .read_line(&mut line)
+        .map_err(|_| (400, "bad request"))?;
     let mut parts = line.split_whitespace();
-    let (Some(method), Some(target)) = (parts.next(), parts.next()) else { return Err((400, "bad request")) };
+    let (Some(method), Some(target)) = (parts.next(), parts.next()) else {
+        return Err((400, "bad request"));
+    };
     let (path, query) = target.split_once('?').unwrap_or((target, ""));
     let query = query
         .split('&')
@@ -148,7 +164,9 @@ fn read_request(stream: &TcpStream) -> Result<Request, (u16, &'static str)> {
     let mut headers = HashMap::new();
     for _ in 0..MAX_HEADER_LINES {
         let mut header = String::new();
-        reader.read_line(&mut header).map_err(|_| (400, "bad request"))?;
+        reader
+            .read_line(&mut header)
+            .map_err(|_| (400, "bad request"))?;
         let header = header.trim_end();
         if header.is_empty() {
             break;
@@ -157,12 +175,17 @@ fn read_request(stream: &TcpStream) -> Result<Request, (u16, &'static str)> {
             headers.insert(name.trim().to_ascii_lowercase(), value.trim().to_string());
         }
     }
-    let length: usize = headers.get("content-length").and_then(|l| l.parse().ok()).unwrap_or(0);
+    let length: usize = headers
+        .get("content-length")
+        .and_then(|l| l.parse().ok())
+        .unwrap_or(0);
     if length > MAX_BODY {
         return Err((413, "the body is too large"));
     }
     let mut body = vec![0; length];
-    reader.read_exact(&mut body).map_err(|_| (400, "the body was cut short"))?;
+    reader
+        .read_exact(&mut body)
+        .map_err(|_| (400, "the body was cut short"))?;
     Ok(Request {
         method: method.to_ascii_uppercase(),
         path: percent_decode(path.trim_matches('/'), false),
@@ -233,24 +256,44 @@ fn handle(stream: TcpStream, token: &str, state: &SharedState, app: &AppHandle) 
     prepare(&stream);
     let request = match read_request(&stream) {
         Ok(request) => request,
-        Err((status, message)) => return respond(&stream, status, serde_json::json!({ "error": message })),
+        Err((status, message)) => {
+            return respond(&stream, status, serde_json::json!({ "error": message }));
+        }
     };
     if !matches!(request.method.as_str(), "GET" | "POST" | "PUT") {
-        return respond(&stream, 405, serde_json::json!({ "error": "use GET, POST or PUT" }));
+        return respond(
+            &stream,
+            405,
+            serde_json::json!({ "error": "use GET, POST or PUT" }),
+        );
     }
     let given = request
         .headers
         .get("x-blockwork-token")
         .cloned()
-        .or_else(|| request.headers.get("authorization").and_then(|a| a.strip_prefix("Bearer ")).map(str::to_string))
+        .or_else(|| {
+            request
+                .headers
+                .get("authorization")
+                .and_then(|a| a.strip_prefix("Bearer "))
+                .map(str::to_string)
+        })
         .or_else(|| request.query.get("token").cloned())
         .unwrap_or_default();
     if token.is_empty() || !same_token(&given, token) {
-        return respond(&stream, 401, serde_json::json!({ "error": "missing or wrong token" }));
+        return respond(
+            &stream,
+            401,
+            serde_json::json!({ "error": "missing or wrong token" }),
+        );
     }
     let fired = fire(&request.path, &request.body, state, app);
     if fired == 0 {
-        return respond(&stream, 404, serde_json::json!({ "error": format!("no macro listens on /{}", request.path) }));
+        return respond(
+            &stream,
+            404,
+            serde_json::json!({ "error": format!("no macro listens on /{}", request.path) }),
+        );
     }
     respond(&stream, 200, serde_json::json!({ "fired": fired }));
 }
@@ -260,11 +303,21 @@ fn fire(path: &str, body: &str, state: &SharedState, app: &AppHandle) -> usize {
     let mut fires = Vec::new();
     let (emulator, speed) = {
         let Ok(s) = state.lock() else { return 0 };
-        let Some(emulator) = s.emulator.clone() else { return 0 };
+        let Some(emulator) = s.emulator.clone() else {
+            return 0;
+        };
         for mac in scheduled_run::live_macros(&s) {
-            let env: HashMap<_, _> = mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect();
+            let env: HashMap<_, _> = mac
+                .variables
+                .iter()
+                .map(|v| (v.name.clone(), v.value.clone()))
+                .collect();
             for strand in &mac.strands {
-                let Some(InstructionKind::WhenWebhook { path: listens, variable }) = strand.instructions.first().map(|i| &i.kind) else {
+                let Some(InstructionKind::WhenWebhook {
+                    path: listens,
+                    variable,
+                }) = strand.instructions.first().map(|i| &i.kind)
+                else {
                     continue;
                 };
                 let listens = listens.resolve_vars(&env).eval_text().unwrap_or_default();
@@ -277,14 +330,32 @@ fn fire(path: &str, body: &str, state: &SharedState, app: &AppHandle) -> usize {
                     input = Some((var.name.clone(), var.value.clone()));
                     var.value = Evaluated::Text(body.to_string());
                 }
-                fires.push((mac.id.clone(), fired_message(strand.instructions.first().map(|i| &i.kind)), strand.instructions[1..].to_vec(), variables, mac.lists.clone(), input));
+                fires.push((
+                    mac.id.clone(),
+                    fired_message(strand.instructions.first().map(|i| &i.kind)),
+                    strand.instructions[1..].to_vec(),
+                    variables,
+                    mac.lists.clone(),
+                    input,
+                ));
             }
         }
         (emulator, s.global_speed_multiplier)
     };
     let count = fires.len();
     for (id, message, body, variables, lists, input) in fires {
-        scheduled_run::fire_with_input(id, message, body, Arc::clone(&emulator), speed, &variables, &lists, Arc::clone(state), app.clone(), input);
+        scheduled_run::fire_with_input(
+            id,
+            message,
+            body,
+            Arc::clone(&emulator),
+            speed,
+            &variables,
+            &lists,
+            Arc::clone(state),
+            app.clone(),
+            input,
+        );
     }
     count
 }
@@ -308,13 +379,22 @@ mod tests {
         let stream = loop {
             match listener.accept() {
                 Ok((stream, _)) => break stream,
-                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => std::thread::sleep(Duration::from_millis(10)),
+                Err(e) if e.kind() == std::io::ErrorKind::WouldBlock => {
+                    std::thread::sleep(Duration::from_millis(10))
+                }
                 Err(e) => panic!("{e}"),
             }
         };
         prepare(&stream);
         let request = read_request(&stream).map_err(|(status, _)| status).unwrap();
-        assert_eq!((request.method.as_str(), request.path.as_str(), request.body.as_str()), ("POST", "deploy", "hi"));
+        assert_eq!(
+            (
+                request.method.as_str(),
+                request.path.as_str(),
+                request.body.as_str()
+            ),
+            ("POST", "deploy", "hi")
+        );
         client.join().unwrap();
     }
 

@@ -43,7 +43,11 @@ fn main() {
         application::init_appearance(engine.as_mut().upcast_pin());
         translations::set_engine(engine.upcast_pin());
     }
-    translations::set_language(&if prompt { prompt_bridge::language() } else { translations::saved_language() });
+    translations::set_language(&if prompt {
+        prompt_bridge::language()
+    } else {
+        translations::saved_language()
+    });
     if let Some(mut engine) = engine.as_mut() {
         engine
             .as_mut()

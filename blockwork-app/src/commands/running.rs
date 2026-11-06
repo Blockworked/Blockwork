@@ -94,10 +94,7 @@ pub(crate) fn clear_standalone_key_capture(
 
 // ─── Execution ─────────────────────────────────────────────────────────────
 
-pub(crate) fn run_macro(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn run_macro(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     run_open_macro(state, app, None)
 }
 
@@ -210,10 +207,7 @@ pub(super) fn seed_recording_mouse_pos(s: &crate::state::AppState) {
     }
 }
 
-pub(crate) fn start_recording(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn start_recording(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     // A second start while counting down or recording must not restart the
     // countdown; the UI cancels with stop_recording instead.
@@ -264,7 +258,11 @@ pub(super) fn begin_recording(s: &mut crate::state::AppState) {
 }
 
 /// Seconds the Record button counts down for, 0 to [`crate::MAX_RECORDING_COUNTDOWN`].
-pub(crate) fn set_recording_countdown(state: &SharedState, app: &AppHandle, seconds: u8) -> Result<(), String> {
+pub(crate) fn set_recording_countdown(
+    state: &SharedState,
+    app: &AppHandle,
+    seconds: u8,
+) -> Result<(), String> {
     if seconds > crate::MAX_RECORDING_COUNTDOWN {
         return Err(format!("Countdown out of range: {seconds}"));
     }
@@ -274,10 +272,7 @@ pub(crate) fn set_recording_countdown(state: &SharedState, app: &AppHandle, seco
     Ok(())
 }
 
-pub(crate) fn stop_recording(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn stop_recording(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     stop_recording_impl(&mut s);
     emit_state_updated(&app, &s);

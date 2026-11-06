@@ -5,9 +5,9 @@
 //! Watches the live macros (`scheduled_run::live_macros`) like every watcher.
 
 use super::{Target, variable_env};
+use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
-use crate::AppHandle;
 use blockwork_core::input::key_names::{match_key, parse_key_combo};
 use blockwork_core::input::types::{Direction, MacroKey};
 use blockwork_core::macros::InstructionKind;
@@ -16,7 +16,9 @@ use std::sync::Arc;
 
 pub(crate) fn start(shared_state: SharedState, app: AppHandle) {
     let rx = recording::subscribe_key_events();
-    let _ = std::thread::Builder::new().name("key-watch".into()).spawn(move || run(shared_state, app, rx));
+    let _ = std::thread::Builder::new()
+        .name("key-watch".into())
+        .spawn(move || run(shared_state, app, rx));
 }
 
 /// Exactly the combo's keys are held, no more and no fewer.
@@ -24,7 +26,11 @@ fn combo_matches(combo: &[MacroKey], held: &[MacroKey]) -> bool {
     combo.iter().all(|k| held.contains(k)) && held.iter().all(|k| combo.contains(k))
 }
 
-fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<recording::KeyEvent>) {
+fn run(
+    shared_state: SharedState,
+    app: AppHandle,
+    rx: std::sync::mpsc::Receiver<recording::KeyEvent>,
+) {
     let mut held: Vec<MacroKey> = Vec::new();
 
     while let Ok(event) = rx.recv() {
@@ -53,21 +59,31 @@ fn run(shared_state: SharedState, app: AppHandle, rx: std::sync::mpsc::Receiver<
         let speed_multiplier;
         {
             let Ok(s) = shared_state.lock() else { continue };
-            let Some(em) = s.emulator.as_ref().map(Arc::clone) else { continue };
+            let Some(em) = s.emulator.as_ref().map(Arc::clone) else {
+                continue;
+            };
             emulator = em;
             speed_multiplier = s.global_speed_multiplier;
             for mac in scheduled_run::live_macros(&s) {
                 for strand in &mac.strands {
-                    let Some(InstructionKind::WhenKey(value, direction)) = strand.instructions.first().map(|i| &i.kind) else {
+                    let Some(InstructionKind::WhenKey(value, direction)) =
+                        strand.instructions.first().map(|i| &i.kind)
+                    else {
                         continue;
                     };
                     let on_press = !matches!(direction, Direction::Release);
                     if on_press != event.pressed {
                         continue;
                     }
-                    let Ok(text) = value.resolve_vars(&variable_env(mac)).eval_text() else { continue };
-                    let combo: Vec<MacroKey> = parse_key_combo(&text).iter().map(match_key).collect();
-                    if combo.is_empty() || !combo.contains(&key) || !combo_matches(&combo, state_for_match) {
+                    let Ok(text) = value.resolve_vars(&variable_env(mac)).eval_text() else {
+                        continue;
+                    };
+                    let combo: Vec<MacroKey> =
+                        parse_key_combo(&text).iter().map(match_key).collect();
+                    if combo.is_empty()
+                        || !combo.contains(&key)
+                        || !combo_matches(&combo, state_for_match)
+                    {
                         continue;
                     }
                     trigger_keys.extend(combo);
@@ -92,8 +108,17 @@ mod tests {
     #[test]
     fn a_combo_matches_exactly_the_keys_held() {
         let ctrl_alt = [MacroKey::LControl, MacroKey::LMenu];
-        assert!(combo_matches(&ctrl_alt, &[MacroKey::LMenu, MacroKey::LControl]), "in any order");
+        assert!(
+            combo_matches(&ctrl_alt, &[MacroKey::LMenu, MacroKey::LControl]),
+            "in any order"
+        );
         assert!(!combo_matches(&ctrl_alt, &[MacroKey::LControl]), "too few");
-        assert!(!combo_matches(&ctrl_alt, &[MacroKey::LControl, MacroKey::LShift, MacroKey::LMenu]), "too many");
+        assert!(
+            !combo_matches(
+                &ctrl_alt,
+                &[MacroKey::LControl, MacroKey::LShift, MacroKey::LMenu]
+            ),
+            "too many"
+        );
     }
 }

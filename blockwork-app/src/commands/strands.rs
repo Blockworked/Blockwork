@@ -177,7 +177,9 @@ pub(crate) fn copy_instructions(
 ) -> Result<FragmentDto, String> {
     let s = state.lock().map_err(|e| e.to_string())?;
     let mac = s.current_macro.as_ref().ok_or("No macro selected")?;
-    Ok(fragment_to_dto(&mac.copy_fragment(&strand_id, &path, count)?))
+    Ok(fragment_to_dto(
+        &mac.copy_fragment(&strand_id, &path, count)?,
+    ))
 }
 
 /// Drops a copied fragment at `(x, y)` as a new strand, with fresh ids and

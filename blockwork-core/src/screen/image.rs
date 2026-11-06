@@ -24,7 +24,11 @@ impl Image {
     pub fn new(width: u32, height: u32) -> Image {
         let mut rgba = vec![0; width as usize * height as usize * 4];
         rgba.chunks_exact_mut(4).for_each(|px| px[3] = 255);
-        Image { width, height, rgba }
+        Image {
+            width,
+            height,
+            rgba,
+        }
     }
 
     pub fn pixel(&self, x: u32, y: u32) -> [u8; 3] {
@@ -38,7 +42,11 @@ impl Image {
             let start = (row as usize * self.width as usize + x as usize) * 4;
             rgba.extend_from_slice(&self.rgba[start..start + width as usize * 4]);
         }
-        Image { width, height, rgba }
+        Image {
+            width,
+            height,
+            rgba,
+        }
     }
 
     /// Repeats each pixel `factor` times both ways.
@@ -54,24 +62,47 @@ impl Image {
                 rgba.extend_from_slice(&self.rgba[i..i + 4]);
             }
         }
-        Image { width, height, rgba }
+        Image {
+            width,
+            height,
+            rgba,
+        }
     }
 
     pub fn from_png(bytes: &[u8]) -> Result<Image, String> {
         let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
         decoder.set_transformations(png::Transformations::normalize_to_color8());
-        let mut reader = decoder.read_info().map_err(|e| format!("not a PNG image: {e}"))?;
-        let mut buf = vec![0; reader.output_buffer_size().ok_or("PNG image is too large")?];
-        let info = reader.next_frame(&mut buf).map_err(|e| format!("couldn't read PNG image: {e}"))?;
+        let mut reader = decoder
+            .read_info()
+            .map_err(|e| format!("not a PNG image: {e}"))?;
+        let mut buf = vec![
+            0;
+            reader
+                .output_buffer_size()
+                .ok_or("PNG image is too large")?
+        ];
+        let info = reader
+            .next_frame(&mut buf)
+            .map_err(|e| format!("couldn't read PNG image: {e}"))?;
         buf.truncate(info.buffer_size());
         let rgba = match info.color_type {
             png::ColorType::Rgba => buf,
-            png::ColorType::Rgb => buf.chunks_exact(3).flat_map(|p| [p[0], p[1], p[2], 255]).collect(),
-            png::ColorType::GrayscaleAlpha => buf.chunks_exact(2).flat_map(|p| [p[0], p[0], p[0], p[1]]).collect(),
+            png::ColorType::Rgb => buf
+                .chunks_exact(3)
+                .flat_map(|p| [p[0], p[1], p[2], 255])
+                .collect(),
+            png::ColorType::GrayscaleAlpha => buf
+                .chunks_exact(2)
+                .flat_map(|p| [p[0], p[0], p[0], p[1]])
+                .collect(),
             png::ColorType::Grayscale => buf.iter().flat_map(|&v| [v, v, v, 255]).collect(),
             png::ColorType::Indexed => return Err("unsupported PNG color type".into()),
         };
-        Ok(Image { width: info.width, height: info.height, rgba })
+        Ok(Image {
+            width: info.width,
+            height: info.height,
+            rgba,
+        })
     }
 
     pub fn to_png(&self) -> Result<Vec<u8>, String> {
@@ -81,13 +112,18 @@ impl Image {
         encoder.set_depth(png::BitDepth::Eight);
         encoder.set_compression(png::Compression::Fast);
         let mut writer = encoder.write_header().map_err(|e| e.to_string())?;
-        writer.write_image_data(&self.rgba).map_err(|e| e.to_string())?;
+        writer
+            .write_image_data(&self.rgba)
+            .map_err(|e| e.to_string())?;
         writer.finish().map_err(|e| e.to_string())?;
         Ok(out)
     }
 
     pub fn to_data_uri(&self) -> Result<String, String> {
-        Ok(format!("{DATA_URI_PREFIX}{}", base64::engine::general_purpose::STANDARD.encode(self.to_png()?)))
+        Ok(format!(
+            "{DATA_URI_PREFIX}{}",
+            base64::engine::general_purpose::STANDARD.encode(self.to_png()?)
+        ))
     }
 
     /// An image block's image: a PNG `data:` URI, or a path to a PNG file.
@@ -97,7 +133,9 @@ impl Image {
             return Err("no image chosen; capture one from the screen first".into());
         }
         if let Some(encoded) = source.strip_prefix(DATA_URI_PREFIX) {
-            let bytes = base64::engine::general_purpose::STANDARD.decode(encoded).map_err(|e| format!("broken image data: {e}"))?;
+            let bytes = base64::engine::general_purpose::STANDARD
+                .decode(encoded)
+                .map_err(|e| format!("broken image data: {e}"))?;
             return Image::from_png(&bytes);
         }
         let bytes = crate::files::read_bytes(source)?;
@@ -114,7 +152,12 @@ pub fn load_cached(source: &str) -> Result<std::sync::Arc<Image>, String> {
     let mut hasher = std::collections::hash_map::DefaultHasher::new();
     source.hash(&mut hasher);
     let key = hasher.finish();
-    if let Some((_, image)) = CACHE.lock().unwrap_or_else(|e| e.into_inner()).iter().find(|(k, _)| *k == key) {
+    if let Some((_, image)) = CACHE
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .iter()
+        .find(|(k, _)| *k == key)
+    {
         return Ok(Arc::clone(image));
     }
     let image = Arc::new(Image::load(source)?);

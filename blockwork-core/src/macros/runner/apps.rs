@@ -19,7 +19,10 @@ pub(super) fn open_app(command: &str, launch: &LaunchOptions) -> std::io::Result
     if !launch.args.trim().is_empty() {
         cmd.raw_arg(launch.args.trim());
     }
-    cmd.envs(env_vars(launch)).creation_flags(CREATE_NO_WINDOW).spawn().map(|_| ())
+    cmd.envs(env_vars(launch))
+        .creation_flags(CREATE_NO_WINDOW)
+        .spawn()
+        .map(|_| ())
 }
 
 #[cfg(target_os = "macos")]
@@ -40,7 +43,10 @@ pub(super) fn open_app(command: &str, launch: &LaunchOptions) -> std::io::Result
     if output.status.success() {
         Ok(())
     } else {
-        Err(std::io::Error::other(format!("couldn't open the application: {}", String::from_utf8_lossy(&output.stderr).trim())))
+        Err(std::io::Error::other(format!(
+            "couldn't open the application: {}",
+            String::from_utf8_lossy(&output.stderr).trim()
+        )))
     }
 }
 
@@ -168,7 +174,10 @@ pub(super) fn close_app(command: &str, _name: &str) -> std::io::Result<()> {
     if proc_name.is_empty() {
         return Ok(());
     }
-    crate::flatpak::host_command("killall").arg(proc_name).status().map(|_| ())
+    crate::flatpak::host_command("killall")
+        .arg(proc_name)
+        .status()
+        .map(|_| ())
 }
 
 #[cfg(target_os = "windows")]

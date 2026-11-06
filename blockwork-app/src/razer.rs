@@ -32,7 +32,9 @@ mod linux {
     }
 
     fn daemon_installed() -> bool {
-        let Some(path) = std::env::var_os("PATH") else { return false };
+        let Some(path) = std::env::var_os("PATH") else {
+            return false;
+        };
         std::env::split_paths(&path).any(|dir| dir.join("openrazer-daemon").is_file())
     }
 
@@ -45,13 +47,22 @@ mod linux {
         if target_gids.is_empty() {
             return false;
         }
-        let Ok(status) = fs::read_to_string("/proc/self/status") else { return false };
-        let Some(line) = status.lines().find(|l| l.starts_with("Groups:")) else { return false };
-        line.split_whitespace().skip(1).filter_map(|g| g.parse::<u32>().ok()).any(|gid| target_gids.contains(&gid))
+        let Ok(status) = fs::read_to_string("/proc/self/status") else {
+            return false;
+        };
+        let Some(line) = status.lines().find(|l| l.starts_with("Groups:")) else {
+            return false;
+        };
+        line.split_whitespace()
+            .skip(1)
+            .filter_map(|g| g.parse::<u32>().ok())
+            .any(|gid| target_gids.contains(&gid))
     }
 
     fn gids_for_names(names: &[&str]) -> Vec<u32> {
-        let Ok(contents) = fs::read_to_string("/etc/group") else { return Vec::new() };
+        let Ok(contents) = fs::read_to_string("/etc/group") else {
+            return Vec::new();
+        };
         contents
             .lines()
             .filter_map(|line| {

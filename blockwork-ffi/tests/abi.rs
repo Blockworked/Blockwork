@@ -12,7 +12,9 @@ use std::sync::Mutex;
 static DELIVERED: Mutex<Vec<(String, bool, bool)>> = Mutex::new(Vec::new());
 
 extern "C" fn record_input(name: *const c_char, is_button: bool, down: bool) {
-    let name = unsafe { CStr::from_ptr(name) }.to_string_lossy().into_owned();
+    let name = unsafe { CStr::from_ptr(name) }
+        .to_string_lossy()
+        .into_owned();
     DELIVERED.lock().unwrap().push((name, is_button, down));
 }
 
@@ -21,7 +23,9 @@ fn take(ptr: *mut c_char) -> Option<String> {
     if ptr.is_null() {
         return None;
     }
-    let text = unsafe { CStr::from_ptr(ptr) }.to_string_lossy().into_owned();
+    let text = unsafe { CStr::from_ptr(ptr) }
+        .to_string_lossy()
+        .into_owned();
     unsafe { blockwork_free_string(ptr) };
     Some(text)
 }
@@ -41,11 +45,28 @@ fn a_host_records_plays_in_lockstep_and_manages_macros() {
     // The macro library.
     assert_eq!(unsafe { blockwork_create_macro(c("Lockstep").as_ptr()) }, 0);
     let id = take(blockwork_get_selected_macro_id()).expect("the new macro is selected");
-    let list: serde_json::Value = serde_json::from_str(&take(blockwork_list_macros()).unwrap()).unwrap();
-    assert!(list.as_array().unwrap().iter().any(|m| m["id"] == id.as_str() && m["name"] == "Lockstep"), "{list}");
-    assert_eq!(unsafe { blockwork_rename_macro(c("  Jump run ").as_ptr()) }, 0);
-    assert_eq!(unsafe { blockwork_rename_macro(c("   ").as_ptr()) }, -3, "a blank name is refused");
-    assert_eq!(unsafe { blockwork_select_macro(c("no-such-id").as_ptr()) }, -1);
+    let list: serde_json::Value =
+        serde_json::from_str(&take(blockwork_list_macros()).unwrap()).unwrap();
+    assert!(
+        list.as_array()
+            .unwrap()
+            .iter()
+            .any(|m| m["id"] == id.as_str() && m["name"] == "Lockstep"),
+        "{list}"
+    );
+    assert_eq!(
+        unsafe { blockwork_rename_macro(c("  Jump run ").as_ptr()) },
+        0
+    );
+    assert_eq!(
+        unsafe { blockwork_rename_macro(c("   ").as_ptr()) },
+        -3,
+        "a blank name is refused"
+    );
+    assert_eq!(
+        unsafe { blockwork_select_macro(c("no-such-id").as_ptr()) },
+        -1
+    );
     assert_eq!(unsafe { blockwork_select_macro(c(&id).as_ptr()) }, 0);
     let list = take(blockwork_list_macros()).unwrap();
     assert!(list.contains("\"Jump run\""), "{list}");
@@ -56,7 +77,11 @@ fn a_host_records_plays_in_lockstep_and_manages_macros() {
     blockwork_step_record_input(100.0, false, false);
     assert_eq!(blockwork_step_record_end(), 3, "press, wait, release");
     blockwork_step_record_begin();
-    assert_eq!(blockwork_step_record_end(), 0, "an empty recording leaves the macro alone");
+    assert_eq!(
+        blockwork_step_record_end(),
+        0,
+        "an empty recording leaves the macro alone"
+    );
 
     // Played back in lockstep, the input arrives on the host's ticks.
     assert_eq!(unsafe { blockwork_sync_begin(ptr::null()) }, 0);
@@ -66,7 +91,13 @@ fn a_host_records_plays_in_lockstep_and_manages_macros() {
     }
     let events = DELIVERED.lock().unwrap().clone();
     assert_eq!(delivered as usize, events.len());
-    assert_eq!(events, [("Left".to_string(), true, true), ("Left".to_string(), true, false)]);
+    assert_eq!(
+        events,
+        [
+            ("Left".to_string(), true, true),
+            ("Left".to_string(), true, false)
+        ]
+    );
 
     // Clearing keeps the strand's header; deleting clears the selection.
     assert!(blockwork_clear_recording_target_instructions() >= 3);

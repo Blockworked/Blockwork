@@ -34,14 +34,18 @@ fn host() -> Result<Arc<dyn MacroHost>, String> {
 /// The id of the macro called `name`.
 pub fn find(name: &str) -> Result<String, String> {
     let name = name.trim();
-    host()?.find(name).ok_or_else(|| format!("no macro named \"{name}\""))
+    host()?
+        .find(name)
+        .ok_or_else(|| format!("no macro named \"{name}\""))
 }
 
 /// Starts the macro called `name`. Returns its id and a flag set when it ends.
 pub fn start(name: &str) -> Result<(String, Arc<AtomicBool>), String> {
     let id = find(name)?;
     if run_registry::count() >= MAX_RUNS {
-        return Err(format!("{MAX_RUNS} runs are already going; is a macro starting itself?"));
+        return Err(format!(
+            "{MAX_RUNS} runs are already going; is a macro starting itself?"
+        ));
     }
     let done = host()?.start(&id)?;
     Ok((id, done))

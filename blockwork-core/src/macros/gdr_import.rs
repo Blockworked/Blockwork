@@ -31,14 +31,21 @@ const MAX_DEPTH: usize = 64;
 
 impl<'a> Reader<'a> {
     fn take(&mut self, n: usize) -> Result<&'a [u8], String> {
-        let end = self.pos.checked_add(n).filter(|e| *e <= self.data.len()).ok_or("unexpected end of file")?;
+        let end = self
+            .pos
+            .checked_add(n)
+            .filter(|e| *e <= self.data.len())
+            .ok_or("unexpected end of file")?;
         let slice = &self.data[self.pos..end];
         self.pos = end;
         Ok(slice)
     }
 
     fn uint(&mut self, n: usize) -> Result<u64, String> {
-        Ok(self.take(n)?.iter().fold(0u64, |acc, b| (acc << 8) | u64::from(*b)))
+        Ok(self
+            .take(n)?
+            .iter()
+            .fold(0u64, |acc, b| (acc << 8) | u64::from(*b)))
     }
 
     fn str(&mut self, n: usize) -> Result<String, String> {
@@ -46,7 +53,12 @@ impl<'a> Reader<'a> {
     }
 
     fn array(&mut self, n: usize) -> Result<Mp, String> {
-        self.nested(|r| (0..n).map(|_| r.value()).collect::<Result<_, _>>().map(Mp::Array))
+        self.nested(|r| {
+            (0..n)
+                .map(|_| r.value())
+                .collect::<Result<_, _>>()
+                .map(Mp::Array)
+        })
     }
 
     fn map(&mut self, n: usize) -> Result<Mp, String> {
@@ -143,10 +155,17 @@ impl Mp {
         match value {
             J::Null => Mp::Nil,
             J::Bool(b) => Mp::Bool(*b),
-            J::Number(n) => n.as_i64().map(Mp::Int).unwrap_or_else(|| Mp::Float(n.as_f64().unwrap_or(0.0))),
+            J::Number(n) => n
+                .as_i64()
+                .map(Mp::Int)
+                .unwrap_or_else(|| Mp::Float(n.as_f64().unwrap_or(0.0))),
             J::String(s) => Mp::Str(s.clone()),
             J::Array(a) => Mp::Array(a.iter().map(Mp::from_json).collect()),
-            J::Object(o) => Mp::Map(o.iter().map(|(k, v)| (k.clone(), Mp::from_json(v))).collect()),
+            J::Object(o) => Mp::Map(
+                o.iter()
+                    .map(|(k, v)| (k.clone(), Mp::from_json(v)))
+                    .collect(),
+            ),
         }
     }
 
@@ -204,13 +223,19 @@ fn xdbot_stalled_frames(ext: &[u8]) -> Vec<i64> {
     }
 
     let mut pos = 0;
-    let Some(count) = varint(ext, &mut pos) else { return Vec::new() };
+    let Some(count) = varint(ext, &mut pos) else {
+        return Vec::new();
+    };
     let mut stalled = Vec::new();
     let mut prev_x: Option<u32> = None;
     let mut expected = 1u64;
     for _ in 0..count {
-        let Some(frame) = varint(ext, &mut pos) else { break };
-        let Some(state) = ext.get(pos..pos + 26) else { break };
+        let Some(frame) = varint(ext, &mut pos) else {
+            break;
+        };
+        let Some(state) = ext.get(pos..pos + 26) else {
+            break;
+        };
         // Frames must run 1, 2, 3...; anything else isn't the layout above.
         if frame != expected {
             return Vec::new();
@@ -240,7 +265,11 @@ fn parse_binary(bytes: &[u8]) -> Result<Replay, String> {
     }
     impl Bin<'_> {
         fn take(&mut self, n: usize) -> Result<&[u8], String> {
-            let end = self.pos.checked_add(n).filter(|e| *e <= self.data.len()).ok_or("unexpected end of file")?;
+            let end = self
+                .pos
+                .checked_add(n)
+                .filter(|e| *e <= self.data.len())
+                .ok_or("unexpected end of file")?;
             let slice = &self.data[self.pos..end];
             self.pos = end;
             Ok(slice)
@@ -262,7 +291,10 @@ fn parse_binary(bytes: &[u8]) -> Result<Replay, String> {
         }
     }
 
-    let mut r = Bin { data: bytes, pos: 3 };
+    let mut r = Bin {
+        data: bytes,
+        pos: 3,
+    };
     let version = r.varint()?;
     if version != 2 {
         return Err(format!("unsupported GDR version {version}"));
@@ -272,7 +304,9 @@ fn parse_binary(bytes: &[u8]) -> Result<Replay, String> {
     r.string()?; // description
     r.take(4)?; // duration
     r.varint()?; // game version
-    let fps = f64::from_bits(u64::from_be_bytes(r.take(8)?.try_into().map_err(|_| "bad framerate")?));
+    let fps = f64::from_bits(u64::from_be_bytes(
+        r.take(8)?.try_into().map_err(|_| "bad framerate")?,
+    ));
     r.varint()?; // seed
     r.varint()?; // coins
     r.varint()?; // ldm
@@ -283,7 +317,11 @@ fn parse_binary(bytes: &[u8]) -> Result<Replay, String> {
     let level = r.string()?;
     let ext = r.varint()? as usize;
     let ext_data = r.take(ext)?;
-    let stalled = if bot_name.eq_ignore_ascii_case("xdBot") { xdbot_stalled_frames(ext_data) } else { Vec::new() };
+    let stalled = if bot_name.eq_ignore_ascii_case("xdBot") {
+        xdbot_stalled_frames(ext_data)
+    } else {
+        Vec::new()
+    };
     let deaths = r.varint()?;
     for _ in 0..deaths {
         r.varint()?;
@@ -302,7 +340,13 @@ fn parse_binary(bytes: &[u8]) -> Result<Replay, String> {
         };
         let frame = prev + delta;
         prev = frame;
-        clicks.push(Click { extra_update: false, frame: frame as i64, down, player2: p1_left == 0, button });
+        clicks.push(Click {
+            extra_update: false,
+            frame: frame as i64,
+            down,
+            player2: p1_left == 0,
+            button,
+        });
         if !input_tag.is_empty() {
             let n = r.varint()? as usize;
             r.take(n)?;
@@ -320,38 +364,63 @@ fn parse_binary(bytes: &[u8]) -> Result<Replay, String> {
     let mut last_extra_frame = None;
     for click in &mut clicks {
         // One extra update per stalled frame, however many inputs it holds.
-        click.extra_update = stalled.binary_search(&click.frame).is_ok() && last_extra_frame != Some(click.frame);
+        click.extra_update =
+            stalled.binary_search(&click.frame).is_ok() && last_extra_frame != Some(click.frame);
         if click.extra_update {
             last_extra_frame = Some(click.frame);
         }
         click.frame -= stalled.partition_point(|f| *f <= click.frame) as i64;
     }
-    Ok(Replay { fps, level: Some(level).filter(|l| !l.is_empty()), clicks })
+    Ok(Replay {
+        fps,
+        level: Some(level).filter(|l| !l.is_empty()),
+        clicks,
+    })
 }
 
 /// Msgpack (GDR1 / zBot style) or `.gdr.json`.
 fn parse_structured(bytes: &[u8]) -> Result<Replay, String> {
     let root = if bytes.iter().find(|b| !b.is_ascii_whitespace()) == Some(&b'{') {
-        Mp::from_json(&serde_json::from_slice(bytes).map_err(|e| format!("invalid JSON replay: {e}"))?)
+        Mp::from_json(
+            &serde_json::from_slice(bytes).map_err(|e| format!("invalid JSON replay: {e}"))?,
+        )
     } else {
-        Reader { data: bytes, pos: 0, depth: 0 }.value()?
+        Reader {
+            data: bytes,
+            pos: 0,
+            depth: 0,
+        }
+        .value()?
     };
     let inputs = match root.get("inputs") {
         Some(Mp::Array(inputs)) => inputs,
         _ => return Err("not a GDR replay (no inputs)".into()),
     };
-    let fps = root.get("framerate").and_then(Mp::as_f64).filter(|f| *f > 0.0).unwrap_or(240.0);
+    let fps = root
+        .get("framerate")
+        .and_then(Mp::as_f64)
+        .filter(|f| *f > 0.0)
+        .unwrap_or(240.0);
     let mut clicks = Vec::with_capacity(inputs.len());
     for input in inputs {
         clicks.push(Click {
             extra_update: false,
-            frame: input.get("frame").and_then(Mp::as_i64).ok_or("input without a frame")?,
+            frame: input
+                .get("frame")
+                .and_then(Mp::as_i64)
+                .ok_or("input without a frame")?,
             down: matches!(input.get("down"), Some(Mp::Bool(true))),
             player2: matches!(input.get_any(&["2p", "player2"]), Some(Mp::Bool(true))),
-            button: input.get_any(&["btn", "button"]).and_then(Mp::as_i64).unwrap_or(1),
+            button: input
+                .get_any(&["btn", "button"])
+                .and_then(Mp::as_i64)
+                .unwrap_or(1),
         });
     }
-    let level = match root.get_any(&["level", "levelInfo"]).and_then(|l| l.get("name")) {
+    let level = match root
+        .get_any(&["level", "levelInfo"])
+        .and_then(|l| l.get("name"))
+    {
         Some(Mp::Str(name)) if !name.is_empty() => Some(name.clone()),
         _ => None,
     };
@@ -366,12 +435,24 @@ pub fn step_inputs_to_instructions(inputs: &[(f64, bool, bool)]) -> Vec<Instruct
     let mut last = 0.0f64;
     for &(time_ms, secondary, down) in inputs {
         if time_ms > last + 1e-9 {
-            code.push(Instruction::new(InstructionKind::Wait(Value::number(time_ms - last))));
+            code.push(Instruction::new(InstructionKind::Wait(Value::number(
+                time_ms - last,
+            ))));
             last = time_ms;
         }
-        let button = if secondary { MacroButton::Right } else { MacroButton::Left };
-        let direction = if down { Direction::Press } else { Direction::Release };
-        code.push(Instruction::new(InstructionKind::Token(InputToken::Button(button, direction))));
+        let button = if secondary {
+            MacroButton::Right
+        } else {
+            MacroButton::Left
+        };
+        let direction = if down {
+            Direction::Press
+        } else {
+            Direction::Release
+        };
+        code.push(Instruction::new(InstructionKind::Token(
+            InputToken::Button(button, direction),
+        )));
     }
     code
 }
@@ -379,14 +460,26 @@ pub fn step_inputs_to_instructions(inputs: &[(f64, bool, bool)]) -> Vec<Instruct
 /// Builds a macro from GDR bytes (binary GDR2, msgpack, or JSON).
 /// `fallback_name` names it when the replay carries no level name.
 pub fn import_gdr(bytes: &[u8], fallback_name: &str) -> Result<Macro, String> {
-    let replay = if bytes.starts_with(b"GDR") { parse_binary(bytes)? } else { parse_structured(bytes)? };
+    let replay = if bytes.starts_with(b"GDR") {
+        parse_binary(bytes)?
+    } else {
+        parse_structured(bytes)?
+    };
     let ms_per_frame = 1000.0 / replay.fps;
 
     // The player with the most clicks is the main one (left button). Some
     // bots flag a single-player run as player 2, which a one-player level
     // would never act on.
-    let p2_clicks = replay.clicks.iter().filter(|c| c.player2 && c.button == 1).count();
-    let p1_clicks = replay.clicks.iter().filter(|c| !c.player2 && c.button == 1).count();
+    let p2_clicks = replay
+        .clicks
+        .iter()
+        .filter(|c| c.player2 && c.button == 1)
+        .count();
+    let p1_clicks = replay
+        .clicks
+        .iter()
+        .filter(|c| !c.player2 && c.button == 1)
+        .count();
     let swap_players = p2_clicks > p1_clicks;
 
     let mut code = Vec::with_capacity(replay.clicks.len() * 2);
@@ -410,15 +503,29 @@ pub fn import_gdr(bytes: &[u8], fallback_name: &str) -> Result<Macro, String> {
             code.push(Instruction::new(InstructionKind::Wait(Value::number(wait))));
             last_frame = click.frame;
         }
-        let direction = if click.down { Direction::Press } else { Direction::Release };
-        code.push(Instruction::new(InstructionKind::Token(InputToken::Button(button, direction))));
+        let direction = if click.down {
+            Direction::Press
+        } else {
+            Direction::Release
+        };
+        code.push(Instruction::new(InstructionKind::Token(
+            InputToken::Button(button, direction),
+        )));
     }
     if code.is_empty() {
         return Err("replay has no jump inputs".into());
     }
     let level = replay.level.unwrap_or_else(|| fallback_name.to_string());
-    let description = format!("Imported GDR replay ({} clicks, {} fps)", replay.clicks.len(), replay.fps);
-    Ok(Macro::new(format!("{level} (frame-locked)"), description, code))
+    let description = format!(
+        "Imported GDR replay ({} clicks, {} fps)",
+        replay.clicks.len(),
+        replay.fps
+    );
+    Ok(Macro::new(
+        format!("{level} (frame-locked)"),
+        description,
+        code,
+    ))
 }
 
 #[cfg(test)]

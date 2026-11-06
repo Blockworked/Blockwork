@@ -167,7 +167,10 @@ pub(crate) fn create_list(
         .ok_or("No macro selected")?
         .check_list_name(&name, None)?;
     push_undo(&mut s);
-    s.current_macro.as_mut().ok_or("No macro selected")?.add_list(&name)?;
+    s.current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .add_list(&name)?;
     sync_list_values(&mut s);
     auto_save(&mut s);
     emit_state_updated(&app, &s);

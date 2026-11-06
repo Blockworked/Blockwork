@@ -153,8 +153,14 @@ fn run_macro_waits_for_the_other_run_to_end() {
     let started = Instant::now();
     run_instructions(
         vec![
-            Instruction::new(InstructionKind::RunMacro { target: Value::text("Nope"), wait: true }),
-            Instruction::new(InstructionKind::RunMacro { target: Value::text("Helper"), wait: true }),
+            Instruction::new(InstructionKind::RunMacro {
+                target: Value::text("Nope"),
+                wait: true,
+            }),
+            Instruction::new(InstructionKind::RunMacro {
+                target: Value::text("Helper"),
+                wait: true,
+            }),
             set("after", Value::number(1.0)),
         ],
         noop_emulator(),
@@ -162,8 +168,15 @@ fn run_macro_waits_for_the_other_run_to_end() {
         1.0,
         Arc::clone(&vars),
     );
-    assert!(started.elapsed() >= Duration::from_millis(60), "waited for the helper");
-    assert_eq!(vars.lock().unwrap().get("after"), Some(&Evaluated::Number(1.0)), "an unknown macro is a soft error");
+    assert!(
+        started.elapsed() >= Duration::from_millis(60),
+        "waited for the helper"
+    );
+    assert_eq!(
+        vars.lock().unwrap().get("after"),
+        Some(&Evaluated::Number(1.0)),
+        "an unknown macro is a soft error"
+    );
 }
 
 #[test]
@@ -177,18 +190,35 @@ fn signal_expressions_can_use_unregistered_computed_names() {
                 name: Value::op(Op::Join, vec![Value::text("task:"), Value::text("42")]).into(),
                 wait: true,
             }),
-            set("seen", Value::Var { name: "received".into() }),
+            set(
+                "seen",
+                Value::Var {
+                    name: "received".into(),
+                },
+            ),
         ],
     );
-    mac.graph.strands.push(Strand::with_instructions(0, 200, vec![
-        Instruction::new(InstructionKind::WhenSignal(Value::Var { name: "target".into() }.into())),
-        set("received", Value::number(1.0)),
-    ]));
+    mac.graph.strands.push(Strand::with_instructions(
+        0,
+        200,
+        vec![
+            Instruction::new(InstructionKind::WhenSignal(
+                Value::Var {
+                    name: "target".into(),
+                }
+                .into(),
+            )),
+            set("received", Value::number(1.0)),
+        ],
+    ));
     mac.collect_named_signals();
     assert!(mac.signals.is_empty());
     let vars = empty_vars();
     mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
-    assert_eq!(vars.lock().unwrap().get("seen"), Some(&Evaluated::Number(1.0)));
+    assert_eq!(
+        vars.lock().unwrap().get("seen"),
+        Some(&Evaluated::Number(1.0))
+    );
 }
 
 #[test]
@@ -197,19 +227,30 @@ fn send_signal_and_wait_runs_the_receivers_first() {
         "Signals".into(),
         String::new(),
         vec![
-            Instruction::new(InstructionKind::SendSignal { name: Value::text("Go").into(), wait: true }),
+            Instruction::new(InstructionKind::SendSignal {
+                name: Value::text("Go").into(),
+                wait: true,
+            }),
             set("seen", Value::Var { name: "x".into() }),
         ],
     );
-    mac.graph.strands.push(Strand::with_instructions(0, 200, vec![
-        Instruction::new(InstructionKind::WhenSignal(Value::text("go").into())),
-        Instruction::new(InstructionKind::Wait(Value::number(40.0))),
-        set("x", Value::number(5.0)),
-    ]));
-    mac.graph.strands.push(Strand::with_instructions(0, 400, vec![
-        Instruction::new(InstructionKind::WhenSignal(Value::text("other").into())),
-        set("wrong", Value::number(1.0)),
-    ]));
+    mac.graph.strands.push(Strand::with_instructions(
+        0,
+        200,
+        vec![
+            Instruction::new(InstructionKind::WhenSignal(Value::text("go").into())),
+            Instruction::new(InstructionKind::Wait(Value::number(40.0))),
+            set("x", Value::number(5.0)),
+        ],
+    ));
+    mac.graph.strands.push(Strand::with_instructions(
+        0,
+        400,
+        vec![
+            Instruction::new(InstructionKind::WhenSignal(Value::text("other").into())),
+            set("wrong", Value::number(1.0)),
+        ],
+    ));
     let vars = empty_vars();
     mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
     let vars = vars.lock().unwrap();
@@ -219,22 +260,44 @@ fn send_signal_and_wait_runs_the_receivers_first() {
 
 #[test]
 fn run_strand_runs_one_strand_whatever_heads_it() {
-    let mut mac = Macro::new("One strand".into(), String::new(), vec![set("main", Value::number(1.0))]);
-    let mut keyed = Strand::with_instructions(0, 200, vec![
-        Instruction::new(InstructionKind::WhenIdle(Value::number(5.0))),
-        Instruction::new(InstructionKind::SendSignal { name: Value::text("go").into(), wait: true }),
-        set("keyed", Value::Var { name: "x".into() }),
-    ]);
+    let mut mac = Macro::new(
+        "One strand".into(),
+        String::new(),
+        vec![set("main", Value::number(1.0))],
+    );
+    let mut keyed = Strand::with_instructions(
+        0,
+        200,
+        vec![
+            Instruction::new(InstructionKind::WhenIdle(Value::number(5.0))),
+            Instruction::new(InstructionKind::SendSignal {
+                name: Value::text("go").into(),
+                wait: true,
+            }),
+            set("keyed", Value::Var { name: "x".into() }),
+        ],
+    );
     keyed.id = "keyed".into();
     mac.graph.strands.push(keyed);
-    mac.graph.strands.push(Strand::with_instructions(0, 400, vec![
-        Instruction::new(InstructionKind::WhenSignal(Value::text("go").into())),
-        set("x", Value::number(7.0)),
-    ]));
+    mac.graph.strands.push(Strand::with_instructions(
+        0,
+        400,
+        vec![
+            Instruction::new(InstructionKind::WhenSignal(Value::text("go").into())),
+            set("x", Value::number(7.0)),
+        ],
+    ));
     assert!(!mac.can_run_strand("missing"));
     let vars = empty_vars();
     let lists: ListStore = Arc::new(Mutex::new(HashMap::new()));
-    assert!(mac.run_strand_with_lists("keyed", noop_emulator(), None, 1.0, Arc::clone(&vars), lists));
+    assert!(mac.run_strand_with_lists(
+        "keyed",
+        noop_emulator(),
+        None,
+        1.0,
+        Arc::clone(&vars),
+        lists
+    ));
     let vars = vars.lock().unwrap();
     assert_eq!(vars.get("keyed"), Some(&Evaluated::Number(7.0)));
     assert_eq!(vars.get("main"), None);
@@ -246,12 +309,23 @@ fn run_command_moves_on_and_run_command_and_wait_waits() {
     let dir = std::env::temp_dir().join(format!("bw-command-{}", std::process::id()));
     std::fs::create_dir_all(&dir).unwrap();
     let run = |kind: InstructionKind| {
-        Macro::new("Commands".into(), String::new(), vec![Instruction::new(kind)]).run(noop_emulator(), None, 1.0, empty_vars());
+        Macro::new(
+            "Commands".into(),
+            String::new(),
+            vec![Instruction::new(kind)],
+        )
+        .run(noop_emulator(), None, 1.0, empty_vars());
     };
     let (started, waited) = (dir.join("started"), dir.join("waited"));
-    run(InstructionKind::Command(format!("sleep 1; touch '{}'", started.display())));
+    run(InstructionKind::Command(format!(
+        "sleep 1; touch '{}'",
+        started.display()
+    )));
     assert!(!started.exists(), "run command didn't wait");
-    run(InstructionKind::CommandWait(format!("sleep 1; touch '{}'", waited.display())));
+    run(InstructionKind::CommandWait(format!(
+        "sleep 1; touch '{}'",
+        waited.display()
+    )));
     assert!(waited.exists(), "run command and wait waited");
     let deadline = Instant::now() + Duration::from_secs(5);
     while !started.exists() && Instant::now() < deadline {
@@ -263,15 +337,30 @@ fn run_command_moves_on_and_run_command_and_wait_waits() {
 
 #[test]
 fn lock_blocks_run_their_body_and_give_up_when_stopped() {
-    let lock = |name: &str, body| Instruction::new(InstructionKind::WithLock { name: Value::text(name), body });
+    let lock = |name: &str, body| {
+        Instruction::new(InstructionKind::WithLock {
+            name: Value::text(name),
+            body,
+        })
+    };
     let vars = empty_vars();
-    run_instructions(vec![lock("runner-free", vec![set("ran", Value::number(1.0))])], noop_emulator(), None, 1.0, Arc::clone(&vars));
-    assert_eq!(vars.lock().unwrap().get("ran"), Some(&Evaluated::Number(1.0)));
+    run_instructions(
+        vec![lock("runner-free", vec![set("ran", Value::number(1.0))])],
+        noop_emulator(),
+        None,
+        1.0,
+        Arc::clone(&vars),
+    );
+    assert_eq!(
+        vars.lock().unwrap().get("ran"),
+        Some(&Evaluated::Number(1.0))
+    );
     assert!(!crate::macros::locks::is_held("runner-free"));
 
     // Keep the lock held until the stopped strand has returned. Sleeping
     // for a fixed holder lifetime made cancellation depend on CI scheduling.
-    let held = crate::macros::locks::acquire("runner-busy", Duration::from_millis(5), || false).unwrap();
+    let held =
+        crate::macros::locks::acquire("runner-busy", Duration::from_millis(5), || false).unwrap();
     let stop = Arc::new(Mutex::new(true));
     let worker_stop = Arc::clone(&stop);
     let vars = empty_vars();
@@ -282,8 +371,14 @@ fn lock_blocks_run_their_body_and_give_up_when_stopped() {
     let worker = std::thread::spawn(move || {
         run_fired_strand(
             crate::run_log::Source::for_macro("runner-lock-cancellation", "Lock cancellation"),
-            vec![instruction], noop_emulator(), Some(worker_stop), 1.0,
-            worker_vars, Arc::new(Mutex::new(HashMap::new())), Arc::new(HashMap::new()), 0,
+            vec![instruction],
+            noop_emulator(),
+            Some(worker_stop),
+            1.0,
+            worker_vars,
+            Arc::new(Mutex::new(HashMap::new())),
+            Arc::new(HashMap::new()),
+            0,
         );
         let _ = finished.send(());
     });
@@ -294,7 +389,9 @@ fn lock_blocks_run_their_body_and_give_up_when_stopped() {
         }) {
             break true;
         }
-        if Instant::now() >= deadline { break false; }
+        if Instant::now() >= deadline {
+            break false;
+        }
         std::thread::sleep(Duration::from_millis(1));
     };
     *stop.lock().unwrap() = false;
@@ -302,14 +399,19 @@ fn lock_blocks_run_their_body_and_give_up_when_stopped() {
     drop(held);
     worker.join().unwrap();
     assert!(reached_lock, "the strand never reached the held lock");
-    assert!(cancelled_while_held, "the strand needed the lock released before it could stop");
+    assert!(
+        cancelled_while_held,
+        "the strand needed the lock released before it could stop"
+    );
     assert_eq!(vars.lock().unwrap().get("ran"), None);
 }
 
 #[test]
 fn stop_macro_stops_every_strand_of_the_run() {
     let mut stopper = when_ran_strand("b", 0.0);
-    stopper.instructions.push(Instruction::new(InstructionKind::StopMacro));
+    stopper
+        .instructions
+        .push(Instruction::new(InstructionKind::StopMacro));
     let mac = Macro {
         id: "m".into(),
         name: "Stops itself".into(),
@@ -325,5 +427,8 @@ fn stop_macro_stops_every_strand_of_the_run() {
     };
     let start = Instant::now();
     mac.run(noop_emulator(), None, 1.0, empty_vars());
-    assert!(start.elapsed() < Duration::from_millis(1000), "stop macro didn't end the waiting strand");
+    assert!(
+        start.elapsed() < Duration::from_millis(1000),
+        "stop macro didn't end the waiting strand"
+    );
 }

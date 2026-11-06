@@ -34,7 +34,10 @@ fn lists_what_a_macro_can_do_including_nested_blocks_and_reporters() {
         speed_multiplier: 1.0,
         settings: blockwork_core::macros::MacroSettings::default(),
     };
-    let kinds: Vec<_> = macro_capabilities(&mac).into_iter().map(|c| (c.kind, c.risky)).collect();
+    let kinds: Vec<_> = macro_capabilities(&mac)
+        .into_iter()
+        .map(|c| (c.kind, c.risky))
+        .collect();
     assert_eq!(
         kinds,
         vec![
@@ -52,7 +55,12 @@ fn macro_of(instructions: Vec<Instruction>) -> Macro {
         name: "Test".into(),
         description: "".into(),
         graph: MacroGraph {
-            strands: vec![Strand { id: "s1".into(), x: 0, y: 0, instructions }],
+            strands: vec![Strand {
+                id: "s1".into(),
+                x: 0,
+                y: 0,
+                instructions,
+            }],
             ..MacroGraph::new()
         },
         signals: Vec::new(),
@@ -65,8 +73,13 @@ fn macro_of(instructions: Vec<Instruction>) -> Macro {
 #[test]
 fn spots_browser_blocks_and_reporters_anywhere() {
     blockwork_core::init();
-    assert!(!uses_browser(&macro_of(vec![Instruction::new(InstructionKind::Log(Value::text("hi")))])));
-    let open = Instruction::new(InstructionKind::BrowserOpen { url: Value::text("https://example.com"), new_tab: false });
+    assert!(!uses_browser(&macro_of(vec![Instruction::new(
+        InstructionKind::Log(Value::text("hi"))
+    )])));
+    let open = Instruction::new(InstructionKind::BrowserOpen {
+        url: Value::text("https://example.com"),
+        new_tab: false,
+    });
     assert!(uses_browser(&macro_of(vec![open])));
     let nested = Instruction::new(InstructionKind::If {
         condition: Value::op(Op::from_name("BrowserConnected"), vec![]),

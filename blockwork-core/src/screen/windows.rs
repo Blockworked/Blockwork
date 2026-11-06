@@ -8,12 +8,13 @@ use std::mem::{size_of, zeroed};
 use std::ptr::null_mut;
 use windows_sys::Win32::Foundation::{LPARAM, POINT, RECT};
 use windows_sys::Win32::Graphics::Gdi::{
-    BitBlt, CreateCompatibleBitmap, CreateCompatibleDC, DeleteDC, DeleteObject, EnumDisplayMonitors, GetDC, GetDIBits,
-    GetMonitorInfoW, ReleaseDC, SelectObject, BITMAPINFO, BITMAPINFOHEADER, BI_RGB, CAPTUREBLT, DIB_RGB_COLORS, HDC, HMONITOR,
-    MONITORINFO, SRCCOPY,
+    BI_RGB, BITMAPINFO, BITMAPINFOHEADER, BitBlt, CAPTUREBLT, CreateCompatibleBitmap,
+    CreateCompatibleDC, DIB_RGB_COLORS, DeleteDC, DeleteObject, EnumDisplayMonitors, GetDC,
+    GetDIBits, GetMonitorInfoW, HDC, HMONITOR, MONITORINFO, ReleaseDC, SRCCOPY, SelectObject,
 };
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    GetCursorPos, GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+    GetCursorPos, GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+    SM_YVIRTUALSCREEN,
 };
 
 /// GDI copies just the asked-for pixels, so a small area is far cheaper
@@ -72,7 +73,15 @@ fn grab(x: i32, y: i32, w: i32, h: i32) -> Result<Shot, String> {
         info.bmiHeader.biBitCount = 32;
         info.bmiHeader.biCompression = BI_RGB;
         let mut rgba = vec![0u8; w as usize * h as usize * 4];
-        let rows = GetDIBits(memory, bitmap, 0, h as u32, rgba.as_mut_ptr().cast(), &mut info, DIB_RGB_COLORS);
+        let rows = GetDIBits(
+            memory,
+            bitmap,
+            0,
+            h as u32,
+            rgba.as_mut_ptr().cast(),
+            &mut info,
+            DIB_RGB_COLORS,
+        );
         SelectObject(memory, previous);
         DeleteObject(bitmap);
         DeleteDC(memory);
@@ -86,7 +95,15 @@ fn grab(x: i32, y: i32, w: i32, h: i32) -> Result<Shot, String> {
             px.swap(0, 2);
             px[3] = 255;
         }
-        Ok(Shot { image: Image { width: w as u32, height: h as u32, rgba }, origin: (x as f64, y as f64), scale: 1.0 })
+        Ok(Shot {
+            image: Image {
+                width: w as u32,
+                height: h as u32,
+                rgba,
+            },
+            origin: (x as f64, y as f64),
+            scale: 1.0,
+        })
     }
 }
 
@@ -110,7 +127,14 @@ pub(super) fn monitors() -> Vec<Rect> {
     }
     let mut out: Vec<Rect> = Vec::new();
     // SAFETY: the callback only runs during this call, while `out` lives.
-    unsafe { EnumDisplayMonitors(null_mut(), std::ptr::null(), Some(add), &mut out as *mut Vec<Rect> as LPARAM) };
+    unsafe {
+        EnumDisplayMonitors(
+            null_mut(),
+            std::ptr::null(),
+            Some(add),
+            &mut out as *mut Vec<Rect> as LPARAM,
+        )
+    };
     out
 }
 

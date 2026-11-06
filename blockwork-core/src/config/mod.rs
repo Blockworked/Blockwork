@@ -2,9 +2,11 @@ pub mod persistence;
 pub mod selection;
 pub mod settings;
 
-pub use persistence::{flush_saves, get_macros_from_config, read_macro_by_id, read_macro_file, write_macro_file};
+pub use persistence::{
+    flush_saves, get_macros_from_config, read_macro_by_id, read_macro_file, write_macro_file,
+};
 pub use selection::{get_macro_by_id, get_selected_macro_id, set_selected_macro_id};
-pub use settings::{load_settings, save_settings, update_settings, AppSettings};
+pub use settings::{AppSettings, load_settings, save_settings, update_settings};
 
 pub const APP_ID: &str = "Blockwork";
 /// The app's previous identifier, back when it was named "Macros" - the OS
@@ -44,7 +46,8 @@ pub fn config_root() -> Result<PathBuf, String> {
 /// on demand.
 pub fn imports_dir() -> Result<PathBuf, String> {
     let dir = config_root()?.join("imports");
-    std::fs::create_dir_all(&dir).map_err(|e| format!("Unable to create {}: {e}", dir.display()))?;
+    std::fs::create_dir_all(&dir)
+        .map_err(|e| format!("Unable to create {}: {e}", dir.display()))?;
     Ok(dir)
 }
 
@@ -58,7 +61,9 @@ pub fn migrate_legacy_app_id() {
     if CONFIG_DIR_OVERRIDE.get().is_some() {
         return;
     }
-    let Some(base) = dirs::config_dir() else { return };
+    let Some(base) = dirs::config_dir() else {
+        return;
+    };
     let new_root = base.join(APP_ID);
     let old_root = base.join(LEGACY_APP_ID);
     if new_root.exists() || !old_root.exists() {
@@ -71,7 +76,11 @@ pub fn migrate_legacy_app_id() {
             new_root.display(),
         );
     } else {
-        tracing::info!("migrated config dir '{}' -> '{}'", old_root.display(), new_root.display());
+        tracing::info!(
+            "migrated config dir '{}' -> '{}'",
+            old_root.display(),
+            new_root.display()
+        );
     }
 }
 
@@ -90,10 +99,15 @@ pub fn load_hotkey_bindings() -> Vec<HotkeyBinding> {
     // Saved bindings predate the kill switch: add its default once, so
     // removing it later sticks.
     if !settings.emergency_stop_seeded.unwrap_or(false) {
-        if !bindings.iter().any(|b| b.action == HotkeyAction::EmergencyStop)
+        if !bindings
+            .iter()
+            .any(|b| b.action == HotkeyAction::EmergencyStop)
             && let Some(combo) = default_combo_for_action(&HotkeyAction::EmergencyStop)
         {
-            bindings.push(HotkeyBinding { action: HotkeyAction::EmergencyStop, combo });
+            bindings.push(HotkeyBinding {
+                action: HotkeyAction::EmergencyStop,
+                combo,
+            });
         }
         let saved = bindings.clone();
         update_settings(|s| {
@@ -122,27 +136,45 @@ fn default_hotkey_bindings() -> Vec<HotkeyBinding> {
     vec![
         HotkeyBinding {
             action: HotkeyAction::RunMacro,
-            combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT, key: "KeyM".to_string() },
+            combo: KeyCombo {
+                modifiers: MOD_CTRL | MOD_ALT,
+                key: "KeyM".to_string(),
+            },
         },
         HotkeyBinding {
             action: HotkeyAction::StopLoop,
-            combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT, key: "KeyS".to_string() },
+            combo: KeyCombo {
+                modifiers: MOD_CTRL | MOD_ALT,
+                key: "KeyS".to_string(),
+            },
         },
         HotkeyBinding {
             action: HotkeyAction::EmergencyStop,
-            combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT | MOD_SHIFT, key: "Escape".to_string() },
+            combo: KeyCombo {
+                modifiers: MOD_CTRL | MOD_ALT | MOD_SHIFT,
+                key: "Escape".to_string(),
+            },
         },
         HotkeyBinding {
             action: HotkeyAction::NextMacro,
-            combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT, key: "RightArrow".to_string() },
+            combo: KeyCombo {
+                modifiers: MOD_CTRL | MOD_ALT,
+                key: "RightArrow".to_string(),
+            },
         },
         HotkeyBinding {
             action: HotkeyAction::PrevMacro,
-            combo: KeyCombo { modifiers: MOD_CTRL | MOD_ALT, key: "LeftArrow".to_string() },
+            combo: KeyCombo {
+                modifiers: MOD_CTRL | MOD_ALT,
+                key: "LeftArrow".to_string(),
+            },
         },
         HotkeyBinding {
             action: HotkeyAction::StopRecording,
-            combo: KeyCombo { modifiers: 0, key: "Escape".to_string() },
+            combo: KeyCombo {
+                modifiers: 0,
+                key: "Escape".to_string(),
+            },
         },
     ]
 }

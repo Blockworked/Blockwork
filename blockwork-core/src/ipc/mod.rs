@@ -28,15 +28,27 @@ struct IpcResponse {
 
 impl IpcResponse {
     fn ok() -> Self {
-        IpcResponse { ok: true, error: None, pong: None }
+        IpcResponse {
+            ok: true,
+            error: None,
+            pong: None,
+        }
     }
 
     fn pong() -> Self {
-        IpcResponse { ok: true, error: None, pong: Some(true) }
+        IpcResponse {
+            ok: true,
+            error: None,
+            pong: Some(true),
+        }
     }
 
     fn error(message: impl Into<String>) -> Self {
-        IpcResponse { ok: false, error: Some(message.into()), pong: None }
+        IpcResponse {
+            ok: false,
+            error: Some(message.into()),
+            pong: None,
+        }
     }
 
     fn to_line(&self) -> String {
@@ -145,13 +157,10 @@ mod tests {
         tx.send(true).unwrap();
 
         let mut buf2 = [0u8; 64];
-        let read = tokio::time::timeout(
-            std::time::Duration::from_secs(2),
-            stream.read(&mut buf2),
-        )
-        .await
-        .expect("connection was not closed after shutdown")
-        .unwrap();
+        let read = tokio::time::timeout(std::time::Duration::from_secs(2), stream.read(&mut buf2))
+            .await
+            .expect("connection was not closed after shutdown")
+            .unwrap();
         assert_eq!(read, 0, "connection should be closed (EOF) after shutdown");
 
         server.abort();
@@ -166,7 +175,9 @@ fn handle_request(line: &str) -> IpcResponse {
 
     match request.cmd.as_str() {
         "start_recording" => {
-            recording::push_queue_signal(QueueSignal::Hotkey(HotkeyAction::StartRecordingImmediate));
+            recording::push_queue_signal(QueueSignal::Hotkey(
+                HotkeyAction::StartRecordingImmediate,
+            ));
             IpcResponse::ok()
         }
         "stop_recording" => {

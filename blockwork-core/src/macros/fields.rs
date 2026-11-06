@@ -196,16 +196,38 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
         (InstructionKind::SetGlobal { value, .. }, FieldId::GlobalValue) => Some(value),
         (InstructionKind::ChangeGlobal { name, .. }, FieldId::GlobalName) => Some(name),
         (InstructionKind::ChangeGlobal { by, .. }, FieldId::GlobalValue) => Some(by),
-        (InstructionKind::WaitUntil { error_timeout, .. } | InstructionKind::WaitForImage { error_timeout, .. }, FieldId::WaitErrorTimeout) => error_timeout.as_mut(),
+        (
+            InstructionKind::WaitUntil { error_timeout, .. }
+            | InstructionKind::WaitForImage { error_timeout, .. },
+            FieldId::WaitErrorTimeout,
+        ) => error_timeout.as_mut(),
         (InstructionKind::WaitUntil { condition, .. }, FieldId::Condition) => Some(condition),
         (InstructionKind::WaitUntil { timeout, .. }, FieldId::WaitTimeout) => timeout.as_mut(),
         (InstructionKind::WaitForImage { timeout, .. }, FieldId::WaitTimeout) => timeout.as_mut(),
-        (InstructionKind::FindImage { tolerance, .. }, FieldId::ImageTolerance) => tolerance.as_mut(),
-        (InstructionKind::ClickImage { tolerance, .. }, FieldId::ImageTolerance) => tolerance.as_mut(),
-        (InstructionKind::WaitForImage { tolerance, .. }, FieldId::ImageTolerance) => tolerance.as_mut(),
-        (InstructionKind::FindImage { pick: Some(m), .. } | InstructionKind::ClickImage { pick: Some(m), .. }, FieldId::ImageIndex) => Some(&mut m.index),
-        (InstructionKind::FindImage { pick: Some(m), .. } | InstructionKind::ClickImage { pick: Some(m), .. }, FieldId::ImageNearX) => Some(&mut m.near_x),
-        (InstructionKind::FindImage { pick: Some(m), .. } | InstructionKind::ClickImage { pick: Some(m), .. }, FieldId::ImageNearY) => Some(&mut m.near_y),
+        (InstructionKind::FindImage { tolerance, .. }, FieldId::ImageTolerance) => {
+            tolerance.as_mut()
+        }
+        (InstructionKind::ClickImage { tolerance, .. }, FieldId::ImageTolerance) => {
+            tolerance.as_mut()
+        }
+        (InstructionKind::WaitForImage { tolerance, .. }, FieldId::ImageTolerance) => {
+            tolerance.as_mut()
+        }
+        (
+            InstructionKind::FindImage { pick: Some(m), .. }
+            | InstructionKind::ClickImage { pick: Some(m), .. },
+            FieldId::ImageIndex,
+        ) => Some(&mut m.index),
+        (
+            InstructionKind::FindImage { pick: Some(m), .. }
+            | InstructionKind::ClickImage { pick: Some(m), .. },
+            FieldId::ImageNearX,
+        ) => Some(&mut m.near_x),
+        (
+            InstructionKind::FindImage { pick: Some(m), .. }
+            | InstructionKind::ClickImage { pick: Some(m), .. },
+            FieldId::ImageNearY,
+        ) => Some(&mut m.near_y),
         (InstructionKind::WhenTyped { text, .. }, FieldId::TypedText) => Some(text),
         (InstructionKind::PasteText(v), FieldId::PasteValue) => Some(v),
         (InstructionKind::BrowserOpen { url, .. }, FieldId::BrowserUrl) => Some(url),
@@ -215,7 +237,11 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
             | InstructionKind::BrowserWaitFor { selector, .. },
             FieldId::BrowserSelector,
         ) => Some(selector),
-        (InstructionKind::BrowserClick { nth: Some(nth), .. } | InstructionKind::BrowserType { nth: Some(nth), .. }, FieldId::BrowserNth) => Some(nth),
+        (
+            InstructionKind::BrowserClick { nth: Some(nth), .. }
+            | InstructionKind::BrowserType { nth: Some(nth), .. },
+            FieldId::BrowserNth,
+        ) => Some(nth),
         (InstructionKind::BrowserType { text, .. }, FieldId::BrowserText) => Some(text),
         (InstructionKind::BrowserWaitFor { timeout, .. }, FieldId::WaitTimeout) => Some(timeout),
         (InstructionKind::BrowserScript { code, .. }, FieldId::BrowserCode) => Some(code),
@@ -225,14 +251,26 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
         (InstructionKind::WhenCron(v), FieldId::CronExpression) => Some(v),
         (InstructionKind::WhenTime(_, v), FieldId::ScheduleTime) => Some(v),
         (InstructionKind::SplitIntoList { text, .. }, FieldId::SplitText) => Some(text),
-        (InstructionKind::SplitIntoList { separator, .. }, FieldId::SplitSeparator) => Some(separator),
+        (InstructionKind::SplitIntoList { separator, .. }, FieldId::SplitSeparator) => {
+            Some(separator)
+        }
         (InstructionKind::WhenUsb { pattern, .. }, FieldId::UsbPattern) => Some(pattern),
-        (InstructionKind::WhenMouseButton { modifiers, .. }, FieldId::MouseModifiers) => modifiers.as_mut(),
-        (InstructionKind::AskText { prompt, .. } | InstructionKind::AskYesNo { prompt, .. } | InstructionKind::AskChoice { prompt, .. }, FieldId::AskPrompt) => Some(prompt),
+        (InstructionKind::WhenMouseButton { modifiers, .. }, FieldId::MouseModifiers) => {
+            modifiers.as_mut()
+        }
+        (
+            InstructionKind::AskText { prompt, .. }
+            | InstructionKind::AskYesNo { prompt, .. }
+            | InstructionKind::AskChoice { prompt, .. },
+            FieldId::AskPrompt,
+        ) => Some(prompt),
         (InstructionKind::AskText { default, .. }, FieldId::AskDefault) => Some(default),
         (InstructionKind::ShowMessage(v), FieldId::MessageText) => Some(v),
         (InstructionKind::WhenAt(v), FieldId::AtTime) => Some(v),
-        (InstructionKind::WhenSignal(v) | InstructionKind::SendSignal { name: v, .. }, FieldId::SignalName) => Some(&mut v.value),
+        (
+            InstructionKind::WhenSignal(v) | InstructionKind::SendSignal { name: v, .. },
+            FieldId::SignalName,
+        ) => Some(&mut v.value),
         (InstructionKind::WhenWebhook { path, .. }, FieldId::WebhookPath) => Some(path),
         (
             InstructionKind::DetectObjectsInWindow { pattern, .. }
@@ -241,30 +279,41 @@ pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Opti
             FieldId::WindowPattern,
         ) => Some(pattern),
         (
-            InstructionKind::DetectObjectsInWindow { detector, .. } | InstructionKind::WaitForDetection { detector, .. },
+            InstructionKind::DetectObjectsInWindow { detector, .. }
+            | InstructionKind::WaitForDetection { detector, .. },
             FieldId::DetectorUrl,
         ) => Some(detector),
         (
-            InstructionKind::DetectObjectsInWindow { label, .. } | InstructionKind::WaitForDetection { label, .. },
+            InstructionKind::DetectObjectsInWindow { label, .. }
+            | InstructionKind::WaitForDetection { label, .. },
             FieldId::DetectLabel,
         ) => Some(label),
         (
-            InstructionKind::DetectObjectsInWindow { confidence, .. } | InstructionKind::WaitForDetection { confidence, .. },
+            InstructionKind::DetectObjectsInWindow { confidence, .. }
+            | InstructionKind::WaitForDetection { confidence, .. },
             FieldId::DetectConfidence,
         ) => Some(confidence),
         (
-            InstructionKind::WaitForDetection { timeout, .. } | InstructionKind::AimAtDetection { timeout, .. },
+            InstructionKind::WaitForDetection { timeout, .. }
+            | InstructionKind::AimAtDetection { timeout, .. },
             FieldId::WaitTimeout,
         ) => Some(timeout),
         (InstructionKind::AimStep { target_x, .. }, FieldId::AimTargetX) => Some(target_x),
         (InstructionKind::AimStep { target_y, .. }, FieldId::AimTargetY) => Some(target_y),
-        (InstructionKind::AimStep { gain, .. } | InstructionKind::AimAtDetection { gain, .. }, FieldId::AimGain) => Some(gain),
-        (InstructionKind::AimStep { max_step, .. } | InstructionKind::AimAtDetection { max_step, .. }, FieldId::AimMaxStep) => {
-            Some(max_step)
-        }
-        (InstructionKind::AimStep { deadzone, .. } | InstructionKind::AimAtDetection { deadzone, .. }, FieldId::AimDeadzone) => {
-            Some(deadzone)
-        }
+        (
+            InstructionKind::AimStep { gain, .. } | InstructionKind::AimAtDetection { gain, .. },
+            FieldId::AimGain,
+        ) => Some(gain),
+        (
+            InstructionKind::AimStep { max_step, .. }
+            | InstructionKind::AimAtDetection { max_step, .. },
+            FieldId::AimMaxStep,
+        ) => Some(max_step),
+        (
+            InstructionKind::AimStep { deadzone, .. }
+            | InstructionKind::AimAtDetection { deadzone, .. },
+            FieldId::AimDeadzone,
+        ) => Some(deadzone),
         (InstructionKind::AimAtDetection { index, .. }, FieldId::AimIndex) => Some(index),
         (InstructionKind::AimAtDetection { settle_ms, .. }, FieldId::AimSettle) => Some(settle_ms),
         _ => None,
@@ -280,10 +329,14 @@ pub(crate) fn blank_field_value(
 ) -> Option<Value> {
     match (kind, field) {
         (_, FieldId::Condition) => Some(Value::Bool),
-        (_, FieldId::KeyValue) => Some(Value::Text { value: String::new() }),
-        (InstructionKind::CallBlock { block_id, .. }, FieldId::CallArg(index)) => {
-            blocks.iter().find(|def| def.id == *block_id)?.input_defaults().nth(index)
-        }
+        (_, FieldId::KeyValue) => Some(Value::Text {
+            value: String::new(),
+        }),
+        (InstructionKind::CallBlock { block_id, .. }, FieldId::CallArg(index)) => blocks
+            .iter()
+            .find(|def| def.id == *block_id)?
+            .input_defaults()
+            .nth(index),
         _ => None,
     }
 }
@@ -329,9 +382,11 @@ mod tests {
         use blockstitch_core::graph::BlockKind;
         let fields = every_field();
         assert!(fields.len() > 40, "only parsed {} field ids", fields.len());
-        let fixtures: serde_json::Value = serde_json::from_str(include_str!("../../tests/fixtures/wire_blocks.json")).unwrap();
+        let fixtures: serde_json::Value =
+            serde_json::from_str(include_str!("../../tests/fixtures/wire_blocks.json")).unwrap();
         for block in fixtures.as_array().unwrap() {
-            let dto: crate::frontend::InstructionDto = serde_json::from_value(block.clone()).unwrap();
+            let dto: crate::frontend::InstructionDto =
+                serde_json::from_value(block.clone()).unwrap();
             let mut kind = crate::frontend::dto_to_instruction(&dto).unwrap().kind;
             let mut visited = Vec::new();
             kind.visit_values_mut(&mut |value, _| visited.push(value as *const Value));
@@ -344,7 +399,11 @@ mod tests {
             visited.sort();
             named.sort();
             named.dedup();
-            assert_eq!(visited, named, "{} visits a different set of values than its field ids reach", block["type"]);
+            assert_eq!(
+                visited, named,
+                "{} visits a different set of values than its field ids reach",
+                block["type"]
+            );
         }
     }
 }

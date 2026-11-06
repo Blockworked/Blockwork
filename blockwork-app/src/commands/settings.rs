@@ -2,10 +2,7 @@
 
 use super::*;
 
-pub(crate) fn open_settings(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn open_settings(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.page = Page::Settings;
     s.hotkey_bindings = config::load_hotkey_bindings();
@@ -15,10 +12,7 @@ pub(crate) fn open_settings(
     Ok(())
 }
 
-pub(crate) fn close_settings(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn close_settings(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.page = Page::Main;
     s.combo_capture = None;
@@ -26,7 +20,6 @@ pub(crate) fn close_settings(
     emit_state_updated(&app, &s);
     Ok(())
 }
-
 
 // ─── Hotkey bindings ───────────────────────────────────────────────────────
 
@@ -116,10 +109,7 @@ pub(crate) fn combo_capture_event(
     Ok(())
 }
 
-pub(crate) fn cancel_combo_capture(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn cancel_combo_capture(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     s.combo_capture = None;
     emit_state_updated(&app, &s);
@@ -138,10 +128,7 @@ pub(crate) fn set_pending_macro_idx(
     Ok(())
 }
 
-pub(crate) fn add_macro_hotkey(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn add_macro_hotkey(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some((Some(idx), Some(combo))) = s.pending_macro_hotkey.take() {
         let macros = config::get_macros_from_config();
@@ -234,10 +221,7 @@ pub(crate) fn set_ipc_port_text(
     Ok(())
 }
 
-pub(crate) async fn start_ipc_server(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) async fn start_ipc_server(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if s.ipc_server.is_none() {
         if let Ok(port) = s.ipc_port_text.trim().parse::<u16>() {
@@ -253,10 +237,7 @@ pub(crate) async fn start_ipc_server(
     Ok(())
 }
 
-pub(crate) fn stop_ipc_server(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn stop_ipc_server(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     if let Some(tx) = s.ipc_shutdown_tx.take() {
         let _ = tx.send(true);
@@ -314,41 +295,67 @@ pub(crate) fn set_palette_layout(
 }
 
 /// The UI language, like "de"; empty follows the system.
-pub(crate) fn set_language(state: &SharedState, app: &AppHandle, language: String) -> Result<(), String> {
+pub(crate) fn set_language(
+    state: &SharedState,
+    app: &AppHandle,
+    language: String,
+) -> Result<(), String> {
     let language = language.trim().to_string();
-    if !language.is_empty() && !language.chars().all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-') {
+    if !language.is_empty()
+        && !language
+            .chars()
+            .all(|c| c.is_ascii_alphanumeric() || c == '_' || c == '-')
+    {
         return Err(format!("Unknown language: {language}"));
     }
-    config::update_settings(|settings| settings.language = (!language.is_empty()).then_some(language));
+    config::update_settings(|settings| {
+        settings.language = (!language.is_empty()).then_some(language)
+    });
     let s = state.lock().map_err(|e| e.to_string())?;
     emit_state_updated(app, &s);
     Ok(())
 }
 
 /// How times show: "12h", "24h", or empty to follow the system locale.
-pub(crate) fn set_clock_format(state: &SharedState, app: &AppHandle, format: String) -> Result<(), String> {
+pub(crate) fn set_clock_format(
+    state: &SharedState,
+    app: &AppHandle,
+    format: String,
+) -> Result<(), String> {
     if !matches!(format.as_str(), "" | "12h" | "24h") {
         return Err(format!("Unknown clock format: {format}"));
     }
-    config::update_settings(|settings| settings.clock_format = (!format.is_empty()).then_some(format));
+    config::update_settings(|settings| {
+        settings.clock_format = (!format.is_empty()).then_some(format)
+    });
     let s = state.lock().map_err(|e| e.to_string())?;
     emit_state_updated(app, &s);
     Ok(())
 }
 
 /// Empty follows the system appearance.
-pub(crate) fn set_color_scheme(state: &SharedState, app: &AppHandle, scheme: String) -> Result<(), String> {
+pub(crate) fn set_color_scheme(
+    state: &SharedState,
+    app: &AppHandle,
+    scheme: String,
+) -> Result<(), String> {
     if !matches!(scheme.as_str(), "" | "light" | "dark") {
         return Err(format!("Unknown color scheme: {scheme}"));
     }
-    config::update_settings(|settings| settings.color_scheme = (!scheme.is_empty()).then_some(scheme));
+    config::update_settings(|settings| {
+        settings.color_scheme = (!scheme.is_empty()).then_some(scheme)
+    });
     let s = state.lock().map_err(|e| e.to_string())?;
     emit_state_updated(app, &s);
     Ok(())
 }
 
 /// How long UI animations take, as a duration multiplier: 0 is instant, 1 normal.
-pub(crate) fn set_animation_speed(state: &SharedState, app: &AppHandle, speed: f64) -> Result<(), String> {
+pub(crate) fn set_animation_speed(
+    state: &SharedState,
+    app: &AppHandle,
+    speed: f64,
+) -> Result<(), String> {
     if !speed.is_finite() || !(0.0..=crate::MAX_ANIMATION_SPEED).contains(&speed) {
         return Err(format!("Animation speed out of range: {speed}"));
     }
@@ -388,10 +395,7 @@ pub(crate) fn set_onboarding_done(
 
 // ─── Updates (Windows/macOS) ───────────────────────────────────────────────
 
-pub(crate) fn check_for_updates(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn check_for_updates(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     {
         let mut s = state.lock().map_err(|e| e.to_string())?;
         s.update_check_state = UpdateCheckState::Checking;
@@ -405,10 +409,7 @@ pub(crate) fn check_for_updates(
     Ok(())
 }
 
-pub(crate) async fn check_for_updates_internal(
-    state: &SharedState,
-    app: &AppHandle,
-) {
+pub(crate) async fn check_for_updates_internal(state: &SharedState, app: &AppHandle) {
     #[cfg(any(windows, target_os = "macos"))]
     {
         let version = env!("CARGO_PKG_VERSION").to_string();
@@ -434,10 +435,7 @@ pub(crate) async fn check_for_updates_internal(
     }
 }
 
-pub(crate) fn apply_update(
-    state: &SharedState,
-    app: &AppHandle,
-) -> Result<(), String> {
+pub(crate) fn apply_update(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     {
         let mut s = state.lock().map_err(|e| e.to_string())?;
         s.update_check_state = UpdateCheckState::Applying;

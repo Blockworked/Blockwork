@@ -14,7 +14,12 @@ pub(super) struct ImageSearch<'a> {
 
 /// The screen point of the match `search` picks, if there is one, and how
 /// many matches there are (only counted when `count` asks or the pick needs them).
-pub(super) fn find_picked_image(ctx: &mut ExecCtx, depth: u32, search: &ImageSearch, count: bool) -> Result<(Option<(f64, f64)>, usize), String> {
+pub(super) fn find_picked_image(
+    ctx: &mut ExecCtx,
+    depth: u32,
+    search: &ImageSearch,
+    count: bool,
+) -> Result<(Option<(f64, f64)>, usize), String> {
     let tolerance = optional_number(ctx, depth, search.tolerance, 10.0)?;
     let needle = crate::screen::image::load_cached(search.image)?;
     let region = crate::detect::parse_region(search.region.unwrap_or(""))?;
@@ -50,20 +55,35 @@ pub(super) enum MatchTarget {
 }
 
 /// The match `target` names among `matches` (in reading order), if any.
-pub(super) fn pick_match(matches: &[crate::screen::ScreenMatch], target: MatchTarget) -> Result<Option<crate::screen::ScreenMatch>, String> {
+pub(super) fn pick_match(
+    matches: &[crate::screen::ScreenMatch],
+    target: MatchTarget,
+) -> Result<Option<crate::screen::ScreenMatch>, String> {
     let distance = |m: &crate::screen::ScreenMatch, x: f64, y: f64| (m.x - x).hypot(m.y - y);
     Ok(match target {
         // min_by keeps the first of equals: reading order breaks ties.
-        MatchTarget::Best => matches.iter().min_by(|a, b| a.diff.total_cmp(&b.diff)).copied(),
+        MatchTarget::Best => matches
+            .iter()
+            .min_by(|a, b| a.diff.total_cmp(&b.diff))
+            .copied(),
         MatchTarget::Nth(n) => {
             let n = n.round();
             if n == 0.0 || !n.is_finite() {
                 return Err("match numbers count from 1 (or from -1 at the end)".into());
             }
-            let at = if n > 0.0 { n - 1.0 } else { matches.len() as f64 + n };
-            (at >= 0.0).then(|| matches.get(at as usize).copied()).flatten()
+            let at = if n > 0.0 {
+                n - 1.0
+            } else {
+                matches.len() as f64 + n
+            };
+            (at >= 0.0)
+                .then(|| matches.get(at as usize).copied())
+                .flatten()
         }
-        MatchTarget::Near(x, y) => matches.iter().min_by(|a, b| distance(a, x, y).total_cmp(&distance(b, x, y))).copied(),
+        MatchTarget::Near(x, y) => matches
+            .iter()
+            .min_by(|a, b| distance(a, x, y).total_cmp(&distance(b, x, y)))
+            .copied(),
     })
 }
 
@@ -90,17 +110,32 @@ pub(super) fn detect_query(
 }
 
 /// One tracked detection pass, written to `list` in the query's order.
-pub(super) fn detect_into_list(ctx: &ExecCtx, query: &crate::detect::Query, list: &str, capture: &dyn crate::detect::WindowCapture) -> Result<crate::detect::Frame, String> {
+pub(super) fn detect_into_list(
+    ctx: &ExecCtx,
+    query: &crate::detect::Query,
+    list: &str,
+    capture: &dyn crate::detect::WindowCapture,
+) -> Result<crate::detect::Frame, String> {
     let frame = crate::detect::detect_with(query, capture)?;
-    let kept = crate::detect::overlay::filter(&overlay_scope(ctx, list), frame.detections, frame.crosshair);
+    let kept = crate::detect::overlay::filter(
+        &overlay_scope(ctx, list),
+        frame.detections,
+        frame.crosshair,
+    );
     let mut found = crate::detect::track::update(&ctx.source.macro_id, list, query, kept);
     crate::detect::sort(&mut found, query.sort, frame.crosshair);
     if !list.is_empty()
         && let Ok(mut lists) = ctx.lists.lock()
     {
-        lists.insert(list.to_string(), found.iter().map(|d| ListItem::Text(d.to_item())).collect());
+        lists.insert(
+            list.to_string(),
+            found.iter().map(|d| ListItem::Text(d.to_item())).collect(),
+        );
     }
-    Ok(crate::detect::Frame { detections: found, ..frame })
+    Ok(crate::detect::Frame {
+        detections: found,
+        ..frame
+    })
 }
 
 /// Overlay spots are per macro and list, like tracks.
@@ -108,7 +143,13 @@ pub(super) fn overlay_scope(ctx: &ExecCtx, list: &str) -> String {
     format!("{}\n{list}", ctx.source.macro_id)
 }
 
-pub(super) fn aim_controller(ctx: &mut ExecCtx, depth: u32, gain: &Value, max_step: &Value, deadzone: &Value) -> Result<crate::detect::AimController, String> {
+pub(super) fn aim_controller(
+    ctx: &mut ExecCtx,
+    depth: u32,
+    gain: &Value,
+    max_step: &Value,
+    deadzone: &Value,
+) -> Result<crate::detect::AimController, String> {
     Ok(crate::detect::AimController {
         gain: ctx.resolve(gain, depth)?.eval_number()?,
         max_step: ctx.resolve(max_step, depth)?.eval_number()?,
@@ -123,15 +164,23 @@ pub(super) static AIM_ALLOWED: Mutex<Vec<String>> = Mutex::new(Vec::new());
 /// `Ok(false)` means the user said no (already logged as the block's error).
 pub(super) fn confirm_aim(ctx: &mut ExecCtx, block_id: &str) -> Result<bool, String> {
     let id = ctx.source.macro_id.clone();
-    if AIM_ALLOWED.lock().unwrap_or_else(|e| e.into_inner()).contains(&id) {
+    if AIM_ALLOWED
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
+        .contains(&id)
+    {
         return Ok(true);
     }
     let message = "This macro moves the mouse toward what it sees on screen. \
         Only allow it where automation is allowed, never against other players. Let it aim?";
-    let request = crate::prompt::Request::new(crate::prompt::Kind::Confirm, &ctx.source.name, message);
+    let request =
+        crate::prompt::Request::new(crate::prompt::Kind::Confirm, &ctx.source.name, message);
     match ask(ctx, block_id, "Aim", request)? {
         Some(reply) if reply.answer == "yes" => {
-            AIM_ALLOWED.lock().unwrap_or_else(|e| e.into_inner()).push(id);
+            AIM_ALLOWED
+                .lock()
+                .unwrap_or_else(|e| e.into_inner())
+                .push(id);
             Ok(true)
         }
         Some(_) => {
@@ -158,16 +207,32 @@ pub(super) fn aim_at(
     let glide = Arc::new(Mutex::new(crate::detect::Glide::new(aim, rand::random())));
     let done = Arc::new(AtomicBool::new(false));
     let mover = {
-        let (glide, done, emulator, stop_flag) = (Arc::clone(&glide), Arc::clone(&done), Arc::clone(&ctx.emulator), ctx.stop_flag.clone());
+        let (glide, done, emulator, stop_flag) = (
+            Arc::clone(&glide),
+            Arc::clone(&done),
+            Arc::clone(&ctx.emulator),
+            ctx.stop_flag.clone(),
+        );
         std::thread::Builder::new()
             .name("aim-glide".into())
             .spawn(move || {
                 raise_current_thread_priority();
                 let tick = Duration::from_secs_f64(GLIDE_TICK);
                 let mut next = Instant::now();
-                while !done.load(Ordering::Relaxed) && !stop_flag.as_ref().is_some_and(stop_requested) {
-                    let (dx, dy) = glide.lock().unwrap_or_else(|e| e.into_inner()).tick(started.elapsed().as_secs_f64(), GLIDE_TICK);
-                    if (dx, dy) != (0, 0) && emulator.lock().map_err(|e| e.to_string()).and_then(|mut em| em.move_mouse_rel(dx, dy)).is_err() {
+                while !done.load(Ordering::Relaxed)
+                    && !stop_flag.as_ref().is_some_and(stop_requested)
+                {
+                    let (dx, dy) = glide
+                        .lock()
+                        .unwrap_or_else(|e| e.into_inner())
+                        .tick(started.elapsed().as_secs_f64(), GLIDE_TICK);
+                    if (dx, dy) != (0, 0)
+                        && emulator
+                            .lock()
+                            .map_err(|e| e.to_string())
+                            .and_then(|mut em| em.move_mouse_rel(dx, dy))
+                            .is_err()
+                    {
                         break;
                     }
                     next += tick;
@@ -181,7 +246,9 @@ pub(super) fn aim_at(
             })
             .map_err(|e| e.to_string())?
     };
-    let result = follow(ctx, query, list, target, &glide, started, aim, timeout_ms, settle_ms);
+    let result = follow(
+        ctx, query, list, target, &glide, started, aim, timeout_ms, settle_ms,
+    );
     done.store(true, Ordering::Relaxed);
     let _ = mover.join();
     result
@@ -212,20 +279,37 @@ pub(super) fn follow(
         }
         let frame = detect_into_list(ctx, query, list, &prefetch)?;
         stats.add(&frame);
-        glide.lock().unwrap_or_else(|e| e.into_inner()).set_aim(aim.for_window(frame.window_height));
+        glide
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .set_aim(aim.for_window(frame.window_height));
         // The frame shows the game as it was a little before the capture.
-        let captured = prefetch.captured_at().map_or(0.0, |at| at.duration_since(started).as_secs_f64()) - FRAME_LAG;
+        let captured = prefetch
+            .captured_at()
+            .map_or(0.0, |at| at.duration_since(started).as_secs_f64())
+            - FRAME_LAG;
         // Turning the view moves everything on screen, so the tracker can
         // give the same target a new id; take over the box where it should be.
-        let expected = glide.lock().unwrap_or_else(|e| e.into_inner()).expected_px(started.elapsed().as_secs_f64());
-        let found = frame.detections.iter().find(|d| d.id == Some(target)).or_else(|| {
-            let (ex, ey) = expected?;
-            let off = |d: &&crate::detect::Detection| {
-                let (x, y) = d.center();
-                (x - frame.crosshair.0 - ex).hypot(y - frame.crosshair.1 - ey)
-            };
-            frame.detections.iter().filter(|d| off(d) <= d.h.max(RELOCK_MIN_PX)).min_by(|a, b| off(a).total_cmp(&off(b)))
-        });
+        let expected = glide
+            .lock()
+            .unwrap_or_else(|e| e.into_inner())
+            .expected_px(started.elapsed().as_secs_f64());
+        let found = frame
+            .detections
+            .iter()
+            .find(|d| d.id == Some(target))
+            .or_else(|| {
+                let (ex, ey) = expected?;
+                let off = |d: &&crate::detect::Detection| {
+                    let (x, y) = d.center();
+                    (x - frame.crosshair.0 - ex).hypot(y - frame.crosshair.1 - ey)
+                };
+                frame
+                    .detections
+                    .iter()
+                    .filter(|d| off(d) <= d.h.max(RELOCK_MIN_PX))
+                    .min_by(|a, b| off(a).total_cmp(&off(b)))
+            });
         if let Some(id) = found.and_then(|d| d.id) {
             if id != target {
                 overlay.reset();
@@ -236,7 +320,10 @@ pub(super) fn follow(
             // Missed this frame; give up once the tracker drops it.
             None => {
                 centered_since = None;
-                glide.lock().unwrap_or_else(|e| e.into_inner()).hold(started.elapsed().as_secs_f64());
+                glide
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .hold(started.elapsed().as_secs_f64());
                 if !crate::detect::track::alive(&ctx.source.macro_id, list, target) {
                     stats.report(&ctx.source);
                     return Ok("lost");
@@ -259,14 +346,27 @@ pub(super) fn follow(
                 );
                 if overlay.is_overlay(captured, error, turned) {
                     // Part of the game's HUD: chasing it would only spin the view.
-                    tracing::debug!("aim: skipping a box fixed to the screen at {:.0},{:.0} px", error.0, error.1);
+                    tracing::debug!(
+                        "aim: skipping a box fixed to the screen at {:.0},{:.0} px",
+                        error.0,
+                        error.1
+                    );
                     crate::detect::overlay::remember(&overlay_scope(ctx, list), d, frame.crosshair);
                     stats.report(&ctx.source);
                     return Ok("lost");
                 }
-                glide.lock().unwrap_or_else(|e| e.into_inner()).observe(captured, error);
+                glide
+                    .lock()
+                    .unwrap_or_else(|e| e.into_inner())
+                    .observe(captured, error);
                 if error.0.hypot(error.1) <= aim.deadzone.max(0.0) {
-                    if centered_since.get_or_insert_with(Instant::now).elapsed().as_secs_f64() * 1000.0 >= settle_ms {
+                    if centered_since
+                        .get_or_insert_with(Instant::now)
+                        .elapsed()
+                        .as_secs_f64()
+                        * 1000.0
+                        >= settle_ms
+                    {
                         stats.report(&ctx.source);
                         return Ok("hit");
                     }
@@ -300,7 +400,9 @@ impl AimStats {
     }
 
     fn report(&self, source: &crate::run_log::Source) {
-        let (Some(started), n) = (self.started, self.frames.max(1) as f64) else { return };
+        let (Some(started), n) = (self.started, self.frames.max(1) as f64) else {
+            return;
+        };
         tracing::info!(
             "{}: aimed for {:.1} s at {:.0} frames/s (waited {:.1} ms for capture, model {:.1} ms)",
             source.name,
@@ -313,10 +415,27 @@ impl AimStats {
 }
 
 /// Runs one image, detection or aim block. `Some(flow)` ends the strand with it; `None` goes on to the next block.
-pub(super) fn run_screen_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32) -> Result<Option<Flow>, String> {
+pub(super) fn run_screen_block(
+    ins: &Instruction,
+    ctx: &mut ExecCtx,
+    depth: u32,
+) -> Result<Option<Flow>, String> {
     match &ins.kind {
-        InstructionKind::FindImage { image, tolerance, x_variable, y_variable, pick, region, count_variable } => {
-            let search = ImageSearch { image, tolerance: tolerance.as_ref(), pick: pick.as_ref(), region: region.as_deref() };
+        InstructionKind::FindImage {
+            image,
+            tolerance,
+            x_variable,
+            y_variable,
+            pick,
+            region,
+            count_variable,
+        } => {
+            let search = ImageSearch {
+                image,
+                tolerance: tolerance.as_ref(),
+                pick: pick.as_ref(),
+                region: region.as_deref(),
+            };
             let count_variable = count_variable.as_deref().unwrap_or("");
             match find_picked_image(ctx, depth, &search, !count_variable.is_empty()) {
                 Ok((at, count)) => {
@@ -328,11 +447,23 @@ pub(super) fn run_screen_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
                 Err(e) => soft_fail(ctx, &ins.id, "Find image", e)?,
             }
         }
-        InstructionKind::ClickImage { image, tolerance, button, pick, region } => {
+        InstructionKind::ClickImage {
+            image,
+            tolerance,
+            button,
+            pick,
+            region,
+        } => {
             let clicked = (|| {
-                let search = ImageSearch { image, tolerance: tolerance.as_ref(), pick: pick.as_ref(), region: region.as_deref() };
+                let search = ImageSearch {
+                    image,
+                    tolerance: tolerance.as_ref(),
+                    pick: pick.as_ref(),
+                    region: region.as_deref(),
+                };
                 let mode = pick.as_ref().map(|m| m.mode);
-                let (at, count) = find_picked_image(ctx, depth, &search, mode == Some(ImagePick::Nth))?;
+                let (at, count) =
+                    find_picked_image(ctx, depth, &search, mode == Some(ImagePick::Nth))?;
                 let (x, y) = at.ok_or_else(|| match (mode, count) {
                     (_, 0) => "the image isn't on screen".to_string(),
                     (Some(ImagePick::Nth), 1) => "the image is on screen only once".to_string(),
@@ -346,13 +477,26 @@ pub(super) fn run_screen_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
                 soft_fail(ctx, &ins.id, "Click image", e)?;
             }
         }
-        InstructionKind::WaitForImage { image, tolerance, appear, timeout, region, error_timeout } => {
+        InstructionKind::WaitForImage {
+            image,
+            tolerance,
+            appear,
+            timeout,
+            region,
+            error_timeout,
+        } => {
             let setup = (|| {
                 let tolerance = optional_number(ctx, depth, tolerance.as_ref(), 10.0)?;
                 let timeout = optional_number(ctx, depth, timeout.as_ref(), 0.0)?;
                 let error_timeout = optional_number(ctx, depth, error_timeout.as_ref(), 0.0)?;
                 let region = crate::detect::parse_region(region.as_deref().unwrap_or(""))?;
-                Ok::<_, String>((crate::screen::image::load_cached(image)?, tolerance, timeout, region, error_timeout))
+                Ok::<_, String>((
+                    crate::screen::image::load_cached(image)?,
+                    tolerance,
+                    timeout,
+                    region,
+                    error_timeout,
+                ))
             })();
             let (needle, tolerance, timeout, region, error_timeout) = match setup {
                 Ok(setup) => setup,
@@ -371,7 +515,11 @@ pub(super) fn run_screen_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
                         break;
                     }
                 }
-                let what = if *appear { "Wait for image: the image didn't appear" } else { "Wait for image: the image didn't go away" };
+                let what = if *appear {
+                    "Wait for image: the image didn't appear"
+                } else {
+                    "Wait for image: the image didn't go away"
+                };
                 if wait_limit_reached(ctx, &ins.id, started, timeout, error_timeout, what)? {
                     break;
                 }
@@ -380,17 +528,44 @@ pub(super) fn run_screen_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
                 }
             }
         }
-        InstructionKind::DetectObjectsInWindow { pattern, by, detector, label, confidence, sort, results_list, count_variable, region } => {
-            let found = detect_query(ctx, depth, pattern, by, detector, label, confidence, sort, region)
-                .and_then(|query| detect_into_list(ctx, &query, results_list, &crate::detect::Screen));
+        InstructionKind::DetectObjectsInWindow {
+            pattern,
+            by,
+            detector,
+            label,
+            confidence,
+            sort,
+            results_list,
+            count_variable,
+            region,
+        } => {
+            let found = detect_query(
+                ctx, depth, pattern, by, detector, label, confidence, sort, region,
+            )
+            .and_then(|query| detect_into_list(ctx, &query, results_list, &crate::detect::Screen));
             match found {
-                Ok(frame) => set_variable(ctx, count_variable, Evaluated::Number(frame.detections.len() as f64)),
+                Ok(frame) => set_variable(
+                    ctx,
+                    count_variable,
+                    Evaluated::Number(frame.detections.len() as f64),
+                ),
                 Err(e) => soft_fail(ctx, &ins.id, "Detect objects", e)?,
             }
         }
-        InstructionKind::WaitForDetection { pattern, by, detector, label, confidence, appear, timeout, region } => {
-            let setup = detect_query(ctx, depth, pattern, by, detector, label, confidence, "Score", region)
-                .and_then(|query| Ok((query, ctx.resolve(timeout, depth)?.eval_number()?.max(0.0))));
+        InstructionKind::WaitForDetection {
+            pattern,
+            by,
+            detector,
+            label,
+            confidence,
+            appear,
+            timeout,
+            region,
+        } => {
+            let setup = detect_query(
+                ctx, depth, pattern, by, detector, label, confidence, "Score", region,
+            )
+            .and_then(|query| Ok((query, ctx.resolve(timeout, depth)?.eval_number()?.max(0.0))));
             let (query, timeout) = match setup {
                 Ok(setup) => setup,
                 Err(e) => {
@@ -409,8 +584,17 @@ pub(super) fn run_screen_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
                     }
                 }
                 if timeout > 0.0 && started.elapsed().as_secs_f64() * 1000.0 >= timeout {
-                    let what = if *appear { "didn't appear" } else { "didn't go away" };
-                    soft_fail(ctx, &ins.id, "Wait for detection", format!("it {what} within {timeout} ms"))?;
+                    let what = if *appear {
+                        "didn't appear"
+                    } else {
+                        "didn't go away"
+                    };
+                    soft_fail(
+                        ctx,
+                        &ins.id,
+                        "Wait for detection",
+                        format!("it {what} within {timeout} ms"),
+                    )?;
                     break;
                 }
                 if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
@@ -418,18 +602,35 @@ pub(super) fn run_screen_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
                 }
             }
         }
-        InstructionKind::AimStep { pattern, by, target_x, target_y, gain, max_step, deadzone } => {
+        InstructionKind::AimStep {
+            pattern,
+            by,
+            target_x,
+            target_y,
+            gain,
+            max_step,
+            deadzone,
+        } => {
             if !confirm_aim(ctx, &ins.id)? {
                 return Ok(None);
             }
             let done = (|| {
                 let pattern = ctx.resolve(pattern, depth)?.eval_text()?;
-                let target = (ctx.resolve(target_x, depth)?.eval_number()?, ctx.resolve(target_y, depth)?.eval_number()?);
+                let target = (
+                    ctx.resolve(target_x, depth)?.eval_number()?,
+                    ctx.resolve(target_y, depth)?.eval_number()?,
+                );
                 let aim = aim_controller(ctx, depth, gain, max_step, deadzone)?;
                 let window = crate::window::bounds(&pattern, by.parse()?)?;
-                let crosshair = (window.x + window.width / 2.0, window.y + window.height / 2.0);
+                let crosshair = (
+                    window.x + window.width / 2.0,
+                    window.y + window.height / 2.0,
+                );
                 if let Some((dx, dy)) = aim.for_window(window.height).step(target, crosshair) {
-                    ctx.emulator.lock().map_err(|e| e.to_string())?.move_mouse_rel(dx, dy)?;
+                    ctx.emulator
+                        .lock()
+                        .map_err(|e| e.to_string())?
+                        .move_mouse_rel(dx, dy)?;
                 }
                 Ok::<_, String>(())
             })();
@@ -437,19 +638,38 @@ pub(super) fn run_screen_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
                 soft_fail(ctx, &ins.id, "Aim", e)?;
             }
         }
-        InstructionKind::AimAtDetection { results_list, index, gain, max_step, deadzone, timeout, settle_ms, status_variable } => {
+        InstructionKind::AimAtDetection {
+            results_list,
+            index,
+            gain,
+            max_step,
+            deadzone,
+            timeout,
+            settle_ms,
+            status_variable,
+        } => {
             if !confirm_aim(ctx, &ins.id)? {
                 return Ok(None);
             }
             let setup = (|| {
                 let query = crate::detect::track::query_for(&ctx.source.macro_id, results_list)
-                    .ok_or_else(|| format!("detect objects into the list \"{results_list}\" first"))?;
+                    .ok_or_else(|| {
+                        format!("detect objects into the list \"{results_list}\" first")
+                    })?;
                 let n = ctx.resolve(index, depth)?.eval_number()?;
                 let item = ctx
                     .lists
                     .lock()
                     .ok()
-                    .and_then(|lists| Some(lists.get(results_list)?.get((n.round() as usize).wrapping_sub(1))?.evaluated().as_text()))
+                    .and_then(|lists| {
+                        Some(
+                            lists
+                                .get(results_list)?
+                                .get((n.round() as usize).wrapping_sub(1))?
+                                .evaluated()
+                                .as_text(),
+                        )
+                    })
                     .ok_or_else(|| format!("the list \"{results_list}\" has no item {n}"))?;
                 let target = crate::detect::Detection::from_item(&item)?
                     .id
@@ -459,9 +679,13 @@ pub(super) fn run_screen_block(ins: &Instruction, ctx: &mut ExecCtx, depth: u32)
                 let settle = ctx.resolve(settle_ms, depth)?.eval_number()?.max(0.0);
                 Ok::<_, String>((query, target, aim, timeout, settle))
             })();
-            let result = setup.and_then(|(query, target, aim, timeout, settle)| aim_at(ctx, &query, results_list, target, aim, timeout, settle));
+            let result = setup.and_then(|(query, target, aim, timeout, settle)| {
+                aim_at(ctx, &query, results_list, target, aim, timeout, settle)
+            });
             match result {
-                Ok(status) => set_variable(ctx, status_variable, Evaluated::Text(status.to_string())),
+                Ok(status) => {
+                    set_variable(ctx, status_variable, Evaluated::Text(status.to_string()))
+                }
                 Err(e) => soft_fail(ctx, &ins.id, "Aim at detection", e)?,
             }
         }

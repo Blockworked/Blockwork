@@ -4,23 +4,34 @@
 use blockstitch_core::editor::PathStep;
 
 use super::conditions::{PowerCondition, parse_clock};
-use super::{BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro, MacroSettings, placement};
+use super::{
+    BlockDef, BlockPiece, BlockShape, Instruction, InstructionKind, Macro, MacroSettings, placement,
+};
 use crate::input::value::Value;
 
 /// How many steps undo remembers, in the app and the web demo.
 pub const UNDO_LIMIT: usize = 50;
 
 /// What undo restores: the canvas plus the macro's signals and block packs.
-pub type UndoSnapshot = (blockstitch_core::graph::BlockGraph<InstructionKind>, Vec<String>, Vec<crate::block_packs::PackRecord>);
+pub type UndoSnapshot = (
+    blockstitch_core::graph::BlockGraph<InstructionKind>,
+    Vec<String>,
+    Vec<crate::block_packs::PackRecord>,
+);
 
 /// How every Blockwork editor applies typed edits: "09" typed into an
 /// operator argument stays text.
 pub const EDIT_CONTEXT: blockstitch_core::editor::EditContext =
-    blockstitch_core::editor::EditContext { numbers: blockstitch_core::editor::NumberSpelling::KeepTypedInOperands };
+    blockstitch_core::editor::EditContext {
+        numbers: blockstitch_core::editor::NumberSpelling::KeepTypedInOperands,
+    };
 
 /// A speed multiplier as stored, inside [`super::SPEED_MULTIPLIER_RANGE`].
 pub fn clamp_speed(multiplier: f64) -> f64 {
-    multiplier.clamp(*super::SPEED_MULTIPLIER_RANGE.start(), *super::SPEED_MULTIPLIER_RANGE.end())
+    multiplier.clamp(
+        *super::SPEED_MULTIPLIER_RANGE.start(),
+        *super::SPEED_MULTIPLIER_RANGE.end(),
+    )
 }
 
 /// A folder name as stored: no surrounding spaces or slashes, empty for the top level.
@@ -31,7 +42,8 @@ pub fn clean_folder(folder: &str) -> String {
 /// A custom block's color as stored: six-digit hex, so a shared macro can't
 /// put arbitrary CSS into the editor.
 pub fn checked_block_color(color: &str) -> Result<String, String> {
-    blockstitch_core::graph::normalize_block_color(color).ok_or_else(|| "Choose a valid block color".to_string())
+    blockstitch_core::graph::normalize_block_color(color)
+        .ok_or_else(|| "Choose a valid block color".to_string())
 }
 
 /// What "Make a Block" sends: a custom block's prototype and details.
@@ -61,7 +73,11 @@ impl BlockDraft {
 impl Macro {
     /// The part of the macro undo checkpoints.
     pub fn undo_snapshot(&self) -> UndoSnapshot {
-        (self.graph.clone(), self.signals.clone(), self.settings.block_packs.clone())
+        (
+            self.graph.clone(),
+            self.signals.clone(),
+            self.settings.block_packs.clone(),
+        )
     }
 
     /// Puts an undo checkpoint back.
@@ -80,7 +96,11 @@ impl Macro {
 
     /// Defines a custom block from a checked draft, at `at` or beside the
     /// existing strands; returns its id.
-    pub fn add_block(&mut self, draft: BlockDraft, at: Option<(i32, i32)>) -> Result<String, String> {
+    pub fn add_block(
+        &mut self,
+        draft: BlockDraft,
+        at: Option<(i32, i32)>,
+    ) -> Result<String, String> {
         let color = checked_block_color(&draft.color)?;
         let (x, y) = at.unwrap_or_else(|| self.next_editor_position());
         let id = self.create_block(draft.pieces, draft.shape, color, x, y);
@@ -103,7 +123,12 @@ impl Macro {
 
     /// Whether `ins` may go at `path` in the strand: headers only on top,
     /// `Return` only in a reporter body, loop control only inside a loop.
-    pub fn check_insert(&self, strand_id: &str, path: &[PathStep], ins: &Instruction) -> Result<(), String> {
+    pub fn check_insert(
+        &self,
+        strand_id: &str,
+        path: &[PathStep],
+        ins: &Instruction,
+    ) -> Result<(), String> {
         self.check_header_placement(strand_id, path, ins)?;
         if let Some(strand) = self.strand(strand_id) {
             placement::check_return(self, strand, ins)?;
@@ -120,7 +145,8 @@ impl Macro {
         }
         let mut used = false;
         self.graph.walk_instructions(&mut |ins| {
-            if let InstructionKind::WhenSignal(target) | InstructionKind::SendSignal { name: target, .. } = &ins.kind
+            if let InstructionKind::WhenSignal(target)
+            | InstructionKind::SendSignal { name: target, .. } = &ins.kind
                 && !target.expression
                 && let Value::Text { value } = &target.value
             {
@@ -154,7 +180,12 @@ impl Macro {
     /// Adds a list with its editor window near the top left; returns its name.
     pub fn add_list(&mut self, name: &str) -> Result<String, String> {
         let trimmed = self.graph.create_list(name)?;
-        if let Some(list) = self.graph.lists.iter_mut().find(|list| list.name == trimmed) {
+        if let Some(list) = self
+            .graph
+            .lists
+            .iter_mut()
+            .find(|list| list.name == trimmed)
+        {
             list.editor_x = 36;
             list.editor_y = 36;
         }
@@ -203,8 +234,20 @@ mod tests {
     #[test]
     fn active_hours_need_both_ends() {
         let mut settings = Macro::new("m".into(), String::new(), vec![]).settings;
-        assert!(settings.set_conditions("", PowerCondition::default(), "09:00", "", 0).is_err());
-        settings.set_conditions(" Editor ", PowerCondition::default(), "09:00", "17:00", 0xff).unwrap();
+        assert!(
+            settings
+                .set_conditions("", PowerCondition::default(), "09:00", "", 0)
+                .is_err()
+        );
+        settings
+            .set_conditions(
+                " Editor ",
+                PowerCondition::default(),
+                "09:00",
+                "17:00",
+                0xff,
+            )
+            .unwrap();
         assert_eq!(settings.only_in_window, "Editor");
         assert!(settings.active_hours.is_some());
         assert_eq!(settings.active_days, 0x7f);

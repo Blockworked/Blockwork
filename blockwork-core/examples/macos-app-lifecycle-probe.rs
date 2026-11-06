@@ -4,21 +4,36 @@
 fn main() -> Result<(), String> {
     use blockwork_core::system::{app_running, close_application, open_application};
     use core_foundation::runloop::{CFRunLoop, kCFRunLoopDefaultMode};
-    use std::{path::Path, time::{Duration, Instant}};
+    use std::{
+        path::Path,
+        time::{Duration, Instant},
+    };
     let target = std::env::var("BW_LIVE_APP").map_err(|e| e.to_string())?;
-    if Path::new(&target).file_name().and_then(|name| name.to_str()) != Some("BlockworkTestWindow.app") {
+    if Path::new(&target)
+        .file_name()
+        .and_then(|name| name.to_str())
+        != Some("BlockworkTestWindow.app")
+    {
         return Err("only target the dedicated native fixture".into());
     }
     let turn = || {
-        CFRunLoop::run_in_mode(unsafe { kCFRunLoopDefaultMode }, Duration::from_millis(30), false);
+        CFRunLoop::run_in_mode(
+            unsafe { kCFRunLoopDefaultMode },
+            Duration::from_millis(30),
+            false,
+        );
     };
     let close = || -> Result<(), String> {
         let deadline = Instant::now() + Duration::from_secs(5);
         loop {
             close_application(&target, "Blockwork Test Window").map_err(|e| e.to_string())?;
             turn();
-            if !app_running("BlockworkTestWindow")? { return Ok(()) }
-            if Instant::now() >= deadline { return Err("fixture did not quit".into()) }
+            if !app_running("BlockworkTestWindow")? {
+                return Ok(());
+            }
+            if Instant::now() >= deadline {
+                return Err("fixture did not quit".into());
+            }
         }
     };
     close()?;
@@ -26,7 +41,9 @@ fn main() -> Result<(), String> {
     let deadline = Instant::now() + Duration::from_secs(5);
     while !app_running("BlockworkTestWindow")? {
         turn();
-        if Instant::now() >= deadline { return Err("fixture did not launch".into()) }
+        if Instant::now() >= deadline {
+            return Err("fixture did not launch".into());
+        }
     }
     close()?;
     println!("Native close → open → close passed for the dedicated fixture, without Apple Events.");
@@ -34,4 +51,6 @@ fn main() -> Result<(), String> {
 }
 
 #[cfg(not(all(target_os = "macos", feature = "system")))]
-fn main() { eprintln!("This probe requires macOS and the system feature."); }
+fn main() {
+    eprintln!("This probe requires macOS and the system feature.");
+}

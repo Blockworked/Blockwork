@@ -30,7 +30,11 @@ fn main() {
     let (lucide_icons, lucide_item) = lucide_qt::stage_qml_here("qml/Lucide");
     assert_eq!(
         list(&qml.json["lucide"]["files"], "lucide.files"),
-        [&lucide_icons, &lucide_item].map(|p| p.file_name().unwrap().to_string_lossy().into_owned()),
+        [&lucide_icons, &lucide_item].map(|p| p
+            .file_name()
+            .unwrap()
+            .to_string_lossy()
+            .into_owned()),
         "qml/module.json: `lucide.files` differs from what lucide-qt stages"
     );
 
@@ -42,15 +46,24 @@ fn main() {
             QmlModule::new(qml.string("uri").as_str())
                 .version(qml.version().0, qml.version().1)
                 .qml_file(QmlFile::from(lucide_icons).singleton(true)),
-            |module, name| module.qml_file(QmlFile::from(format!("qml/{name}")).singleton(singletons.contains(name))),
+            |module, name| {
+                module.qml_file(
+                    QmlFile::from(format!("qml/{name}")).singleton(singletons.contains(name)),
+                )
+            },
         )
         .qml_files([lucide_item]);
 
     let mut style = QResources::new();
-    for (name, files) in qml.json["style_modules"].as_object().expect("`style_modules` must be an object") {
+    for (name, files) in qml.json["style_modules"]
+        .as_object()
+        .expect("`style_modules` must be an object")
+    {
         let resource = list(files, name).iter().fold(
             QResource::new().prefix(format!("/qt/qml/{name}")),
-            |resource, file| resource.file(QResourceFile::new(format!("qml/{name}/{file}")).alias(file.as_str())),
+            |resource, file| {
+                resource.file(QResourceFile::new(format!("qml/{name}/{file}")).alias(file.as_str()))
+            },
         );
         style = style.resource(resource);
     }
@@ -58,15 +71,24 @@ fn main() {
     // in C++) beside the editor's own resources; kept under /icons so its
     // resource path stays stable.
     let mut resources = QResources::new();
-    for (prefix, files) in qml.json["editor_resources"].as_object().expect("`editor_resources` must be an object") {
+    for (prefix, files) in qml.json["editor_resources"]
+        .as_object()
+        .expect("`editor_resources` must be an object")
+    {
         let mut resource = QResource::new().prefix(prefix.as_str());
         for file in list(files, prefix) {
             let path = format!("qml/{file}");
-            let alias = Path::new(&path).file_name().unwrap().to_string_lossy().into_owned();
+            let alias = Path::new(&path)
+                .file_name()
+                .unwrap()
+                .to_string_lossy()
+                .into_owned();
             resource = resource.file(QResourceFile::new(path).alias(alias));
         }
         if prefix == "/icons" {
-            resource = resource.file(QResourceFile::new("../res/icons/window-shadow.png").alias("window-shadow.png"));
+            resource = resource.file(
+                QResourceFile::new("../res/icons/window-shadow.png").alias("window-shadow.png"),
+            );
         }
         resources = resources.resource(resource);
     }
@@ -74,21 +96,23 @@ fn main() {
     let builder = qml
         .strings("qt_modules")
         .iter()
-        .fold(CxxQtBuilder::new_qml_module(module), |builder, qt| builder.qt_module(qt))
+        .fold(CxxQtBuilder::new_qml_module(module), |builder, qt| {
+            builder.qt_module(qt)
+        })
         .qrc_resources(style)
         .qrc_resources(resources)
-    .file("src/app_bridge.rs")
-    .file("src/prompt_bridge.rs")
-    .file("src/translator.rs")
-    .file("src/translations.rs")
-    .file("src/app_icon.rs")
-    .file("src/application.rs")
-    .file("src/qt_diagnostics.rs")
-    .file("src/window_frame.rs")
-    // UI translations, built from i18n/*.ts by `just translations`.
-    .qrc_resources(translation_resources())
-    .qt_module("Network")
-    .qt_module("Widgets");
+        .file("src/app_bridge.rs")
+        .file("src/prompt_bridge.rs")
+        .file("src/translator.rs")
+        .file("src/translations.rs")
+        .file("src/app_icon.rs")
+        .file("src/application.rs")
+        .file("src/qt_diagnostics.rs")
+        .file("src/window_frame.rs")
+        // UI translations, built from i18n/*.ts by `just translations`.
+        .qrc_resources(translation_resources())
+        .qt_module("Network")
+        .qt_module("Widgets");
 
     // QtGui private headers for the Wayland frame-margin hook (window_frame.cpp).
     let private_includes = qt_private_includes();
@@ -132,7 +156,8 @@ fn translation_resources() -> QResources {
         resource = resource.file(QResourceFile::new(format!("i18n/{name}")).alias(name));
     }
     let metadata = translation_catalogs::metadata(Path::new("i18n"));
-    let metadata_path = std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("languages.json");
+    let metadata_path =
+        std::path::PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("languages.json");
     std::fs::write(&metadata_path, metadata.to_string()).expect("write language completeness");
     QResources::new().resource(resource)
 }
@@ -168,7 +193,11 @@ fn list(value: &Value, what: &str) -> Vec<String> {
         .as_array()
         .unwrap_or_else(|| panic!("qml/module.json: `{what}` must be a list"))
         .iter()
-        .map(|v| v.as_str().unwrap_or_else(|| panic!("qml/module.json: `{what}` holds strings")).to_owned())
+        .map(|v| {
+            v.as_str()
+                .unwrap_or_else(|| panic!("qml/module.json: `{what}` holds strings"))
+                .to_owned()
+        })
         .collect()
 }
 
@@ -176,14 +205,20 @@ impl Manifest {
     fn read(path: &str) -> Self {
         println!("cargo:rerun-if-changed={path}");
         println!("cargo:rerun-if-changed=qml");
-        let text = std::fs::read_to_string(path).unwrap_or_else(|e| panic!("cannot read {path}: {e}"));
-        let manifest = Self { json: serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path}: {e}")) };
+        let text =
+            std::fs::read_to_string(path).unwrap_or_else(|e| panic!("cannot read {path}: {e}"));
+        let manifest = Self {
+            json: serde_json::from_str(&text).unwrap_or_else(|e| panic!("{path}: {e}")),
+        };
         manifest.check();
         manifest
     }
 
     fn string(&self, key: &str) -> String {
-        self.json[key].as_str().unwrap_or_else(|| panic!("qml/module.json: `{key}` missing")).to_owned()
+        self.json[key]
+            .as_str()
+            .unwrap_or_else(|| panic!("qml/module.json: `{key}` missing"))
+            .to_owned()
     }
 
     fn strings(&self, key: &str) -> Vec<String> {
@@ -198,7 +233,10 @@ impl Manifest {
     }
 
     fn desktop_files(&self) -> Vec<String> {
-        ["editor", "host_provided", "desktop"].iter().flat_map(|group| self.strings(group)).collect()
+        ["editor", "host_provided", "desktop"]
+            .iter()
+            .flat_map(|group| self.strings(group))
+            .collect()
     }
 
     /// Fails the build when the manifest and qml/ disagree, so the website's
@@ -226,7 +264,9 @@ impl Manifest {
                 problems.push(format!("singleton {name} is in no group"));
             }
         }
-        let styles = self.json["style_modules"].as_object().expect("`style_modules` must be an object");
+        let styles = self.json["style_modules"]
+            .as_object()
+            .expect("`style_modules` must be an object");
         for (name, style_files) in styles {
             let mut want: Vec<String> = list(style_files, name);
             let mut have: Vec<String> = std::fs::read_dir(format!("qml/{name}"))
@@ -238,33 +278,57 @@ impl Manifest {
             want.sort();
             have.sort();
             if want != have {
-                problems.push(format!("style module {name} lists {want:?} but holds {have:?}"));
+                problems.push(format!(
+                    "style module {name} lists {want:?} but holds {have:?}"
+                ));
             }
         }
 
         // Every local type or module an editor file uses must be packaged with the editor.
         let editor: BTreeSet<String> = self.strings("editor").into_iter().collect();
-        let reachable: BTreeSet<String> = editor.iter().chain(&self.strings("host_provided")).cloned().collect();
+        let reachable: BTreeSet<String> = editor
+            .iter()
+            .chain(&self.strings("host_provided"))
+            .cloned()
+            .collect();
         for file in &editor {
             let text = std::fs::read_to_string(format!("qml/{file}")).unwrap_or_default();
-            let code: String = text.lines().filter(|l| !l.trim_start().starts_with("//")).collect::<Vec<_>>().join("\n");
+            let code: String = text
+                .lines()
+                .filter(|l| !l.trim_start().starts_with("//"))
+                .collect::<Vec<_>>()
+                .join("\n");
             for name in &on_disk {
                 let ty = name.trim_end_matches(".qml");
                 if name != file && !reachable.contains(name) && uses_type(&code, ty) {
-                    problems.push(format!("editor file {file} uses {ty}, which is not in `editor` or `host_provided`"));
+                    problems.push(format!(
+                        "editor file {file} uses {ty}, which is not in `editor` or `host_provided`"
+                    ));
                 }
             }
             for line in code.lines() {
-                let Some(module) = line.trim().strip_prefix("import ").and_then(|r| r.split_whitespace().next()) else {
+                let Some(module) = line
+                    .trim()
+                    .strip_prefix("import ")
+                    .and_then(|r| r.split_whitespace().next())
+                else {
                     continue;
                 };
-                if Path::new("qml").join(module).is_dir() && module != "Lucide" && !styles.contains_key(module) {
-                    problems.push(format!("editor file {file} imports {module}, which is not in `style_modules`"));
+                if Path::new("qml").join(module).is_dir()
+                    && module != "Lucide"
+                    && !styles.contains_key(module)
+                {
+                    problems.push(format!(
+                        "editor file {file} imports {module}, which is not in `style_modules`"
+                    ));
                 }
             }
         }
         if !problems.is_empty() {
-            panic!("qml/module.json is out of step with qml/:\n  {}", problems.join("\n  "));
+            panic!(
+                "qml/module.json is out of step with qml/:\n  {}",
+                problems.join("\n  ")
+            );
         }
     }
 }

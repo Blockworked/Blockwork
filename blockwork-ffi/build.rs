@@ -9,7 +9,11 @@ fn main() {
     let config = cbindgen::Config::from_file(PathBuf::from(&crate_dir).join("cbindgen.toml"))
         .expect("failed to read cbindgen.toml");
 
-    match cbindgen::Builder::new().with_crate(&crate_dir).with_config(config).generate() {
+    match cbindgen::Builder::new()
+        .with_crate(&crate_dir)
+        .with_config(config)
+        .generate()
+    {
         Ok(bindings) => {
             bindings.write_to_file(PathBuf::from(&crate_dir).join("include/blockwork_ffi.h"));
         }

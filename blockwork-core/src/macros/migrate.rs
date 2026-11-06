@@ -3,7 +3,7 @@
 //! all become notes on the canvas instead of failing the whole file.
 
 use crate::macros::{Instruction, Macro};
-use serde_json::{json, Map, Value};
+use serde_json::{Map, Value, json};
 
 /// The version this build writes; 1 is the format 0.6.0 first had, 2 split
 /// run command into one that waits and one that doesn't. Version 3 adds pack state. Bump it
@@ -32,7 +32,8 @@ impl Upgrade {
 type Step = fn(&mut Value, &mut Vec<String>);
 
 /// `STEPS[n]` upgrades version `n` to `n + 1`.
-const STEPS: [Step; FORMAT_VERSION as usize] = [v0_old_window_blocks, v1_run_command_waits, v2_pack_state];
+const STEPS: [Step; FORMAT_VERSION as usize] =
+    [v0_old_window_blocks, v1_run_command_waits, v2_pack_state];
 
 // Pack ownership is migrated by Macro's deserializer.
 fn v2_pack_state(_: &mut Value, _: &mut Vec<String>) {}
@@ -47,9 +48,14 @@ pub fn from_value(mut value: Value) -> Result<(Macro, Upgrade), String> {
     }
     let from = value.get(VERSION_KEY).and_then(Value::as_u64).unwrap_or(0);
     if from > FORMAT_VERSION {
-        return Err("it was saved by a newer version of Blockwork. Update Blockwork to open it".into());
+        return Err(
+            "it was saved by a newer version of Blockwork. Update Blockwork to open it".into(),
+        );
     }
-    let mut upgrade = Upgrade { from, notes: Vec::new() };
+    let mut upgrade = Upgrade {
+        from,
+        notes: Vec::new(),
+    };
     for step in &STEPS[from as usize..] {
         step(&mut value, &mut upgrade.notes);
     }
@@ -98,7 +104,9 @@ fn kind_name(ins: &Value) -> String {
 /// rest of the macro. Nested blocks are fixed first so one bad block inside
 /// a loop doesn't take the loop with it.
 fn salvage(value: &mut Value, removed: &mut Vec<String>) {
-    let Some(strands) = value.get_mut("strands").and_then(Value::as_array_mut) else { return };
+    let Some(strands) = value.get_mut("strands").and_then(Value::as_array_mut) else {
+        return;
+    };
     for strand in strands {
         if let Some(list) = strand.get_mut("instructions").and_then(Value::as_array_mut) {
             salvage_list(list, removed);
@@ -112,7 +120,9 @@ fn salvage_list(list: &mut [Value], removed: &mut Vec<String>) {
             continue;
         }
         if let Some(payload) = ins.get_mut("kind").and_then(Value::as_object_mut) {
-            payload.values_mut().for_each(|p| salvage_nested(p, removed));
+            payload
+                .values_mut()
+                .for_each(|p| salvage_nested(p, removed));
             if serde_json::from_value::<Instruction>(ins.clone()).is_ok() {
                 continue;
             }
@@ -120,12 +130,19 @@ fn salvage_list(list: &mut [Value], removed: &mut Vec<String>) {
         let name = kind_name(ins);
         let mut detail = ins.get("kind").unwrap_or(ins).to_string();
         if detail.len() > 300 {
-            let cut = (0..=300).rev().find(|i| detail.is_char_boundary(*i)).unwrap_or(0);
+            let cut = (0..=300)
+                .rev()
+                .find(|i| detail.is_char_boundary(*i))
+                .unwrap_or(0);
             detail.truncate(cut);
             detail.push('…');
         }
         removed.push(name.clone());
-        let id = ins.get("id").and_then(Value::as_str).map(str::to_string).unwrap_or_else(blockstitch_core::graph::new_id);
+        let id = ins
+            .get("id")
+            .and_then(Value::as_str)
+            .map(str::to_string)
+            .unwrap_or_else(blockstitch_core::graph::new_id);
         *ins = json!({ "id": id, "kind": { "Comment": format!("Removed a \"{name}\" block Blockwork can't run: {detail}") } });
     }
 }
@@ -134,8 +151,16 @@ fn salvage_list(list: &mut [Value], removed: &mut Vec<String>) {
 fn salvage_nested(value: &mut Value, removed: &mut Vec<String>) {
     match value {
         Value::Object(fields) => fields.values_mut().for_each(|v| salvage_nested(v, removed)),
-        Value::Array(items) if items.iter().all(Value::is_array) => items.iter_mut().for_each(|v| salvage_nested(v, removed)),
-        Value::Array(items) if items.iter().all(|i| i.get("id").is_some() && i.get("kind").is_some()) => salvage_list(items, removed),
+        Value::Array(items) if items.iter().all(Value::is_array) => {
+            items.iter_mut().for_each(|v| salvage_nested(v, removed))
+        }
+        Value::Array(items)
+            if items
+                .iter()
+                .all(|i| i.get("id").is_some() && i.get("kind").is_some()) =>
+        {
+            salvage_list(items, removed)
+        }
         _ => {}
     }
 }
@@ -153,7 +178,10 @@ fn walk_objects(value: &mut Value, f: &mut dyn FnMut(&mut Map<String, Value>)) {
 }
 
 fn is_empty_text(value: Option<&Value>) -> bool {
-    value.is_none_or(|v| v.get("kind").and_then(Value::as_str) == Some("Text") && v.get("value").and_then(Value::as_str) == Some(""))
+    value.is_none_or(|v| {
+        v.get("kind").and_then(Value::as_str) == Some("Text")
+            && v.get("value").and_then(Value::as_str) == Some("")
+    })
 }
 
 /// The window blocks from before they were merged into `WindowAction` and
@@ -165,8 +193,12 @@ fn v0_old_window_blocks(value: &mut Value, notes: &mut Vec<String>) {
         if obj.len() != 1 {
             return;
         }
-        let Some((name, payload)) = obj.iter_mut().next() else { return };
-        let Some(fields) = payload.as_object_mut() else { return };
+        let Some((name, payload)) = obj.iter_mut().next() else {
+            return;
+        };
+        let Some(fields) = payload.as_object_mut() else {
+            return;
+        };
         let action = match name.as_str() {
             "FocusWindow" => "Focus",
             "MinimizeWindow" => "Minimize",
@@ -182,11 +214,12 @@ fn v0_old_window_blocks(value: &mut Value, notes: &mut Vec<String>) {
             }
             _ => return,
         };
-        let (pattern, by) = if !is_empty_text(fields.get("title_contains")) || is_empty_text(fields.get("app")) {
-            (fields.remove("title_contains"), "Title")
-        } else {
-            (fields.remove("app"), "App")
-        };
+        let (pattern, by) =
+            if !is_empty_text(fields.get("title_contains")) || is_empty_text(fields.get("app")) {
+                (fields.remove("title_contains"), "Title")
+            } else {
+                (fields.remove("app"), "App")
+            };
         let pattern = pattern.unwrap_or_else(|| json!({ "kind": "Text", "value": "" }));
         let new = if action.is_empty() {
             let (x, y) = (fields.remove("x"), fields.remove("y"));
@@ -200,7 +233,10 @@ fn v0_old_window_blocks(value: &mut Value, notes: &mut Vec<String>) {
         converted += 1;
     });
     if converted > 0 {
-        notes.push(format!("Updated {converted} block{} from an older version", if converted == 1 { "" } else { "s" }));
+        notes.push(format!(
+            "Updated {converted} block{} from an older version",
+            if converted == 1 { "" } else { "s" }
+        ));
     }
 }
 
@@ -217,8 +253,14 @@ fn v1_run_command_waits(value: &mut Value, notes: &mut Vec<String>) {
         }
     });
     if converted > 0 {
-        let blocks = if converted == 1 { "run command block is now a \"run command and wait\" block" } else { "run command blocks are now \"run command and wait\" blocks" };
-        notes.push(format!("{converted} {blocks}, so they still wait for their command to finish"));
+        let blocks = if converted == 1 {
+            "run command block is now a \"run command and wait\" block"
+        } else {
+            "run command blocks are now \"run command and wait\" blocks"
+        };
+        notes.push(format!(
+            "{converted} {blocks}, so they still wait for their command to finish"
+        ));
     }
 }
 
@@ -228,7 +270,11 @@ mod tests {
     use crate::macros::InstructionKind;
 
     fn first_strand(mac: &Macro) -> Vec<InstructionKind> {
-        mac.strands[0].instructions.iter().map(|i| i.kind.clone()).collect()
+        mac.strands[0]
+            .instructions
+            .iter()
+            .map(|i| i.kind.clone())
+            .collect()
     }
 
     #[test]
@@ -243,7 +289,8 @@ mod tests {
 
     #[test]
     fn newer_files_are_refused() {
-        let err = parse(r#"{"format_version":999,"name":"x","description":"","strands":[]}"#).unwrap_err();
+        let err = parse(r#"{"format_version":999,"name":"x","description":"","strands":[]}"#)
+            .unwrap_err();
         assert!(err.contains("newer version"));
     }
 
@@ -261,10 +308,14 @@ mod tests {
         assert_eq!(upgrade.from, 0);
         assert!(upgrade.changed());
         let kinds = first_strand(&mac);
-        assert!(matches!(&kinds[1], InstructionKind::WindowAction { action, by, pattern }
-            if action == "Focus" && by == "App" && pattern.eval_text().unwrap() == "firefox"));
-        assert!(matches!(&kinds[2], InstructionKind::MoveWindow { by, resize: false, pattern, .. }
-            if by == "Title" && pattern.eval_text().unwrap() == "Notes"));
+        assert!(
+            matches!(&kinds[1], InstructionKind::WindowAction { action, by, pattern }
+            if action == "Focus" && by == "App" && pattern.eval_text().unwrap() == "firefox")
+        );
+        assert!(
+            matches!(&kinds[2], InstructionKind::MoveWindow { by, resize: false, pattern, .. }
+            if by == "Title" && pattern.eval_text().unwrap() == "Notes")
+        );
         assert!(matches!(&kinds[3], InstructionKind::WaitUntil { .. }));
     }
 
@@ -282,13 +333,19 @@ mod tests {
         assert!(upgrade.notes[0].starts_with("2 run command blocks"));
         let kinds = first_strand(&mac);
         assert_eq!(kinds[1], InstructionKind::CommandWait("make".into()));
-        let InstructionKind::Repeat { body, .. } = &kinds[2] else { panic!("{kinds:?}") };
+        let InstructionKind::Repeat { body, .. } = &kinds[2] else {
+            panic!("{kinds:?}")
+        };
         assert_eq!(body[0].kind, InstructionKind::CommandWait("sleep 1".into()));
         // Current files keep both kinds as they are.
         let (back, upgrade) = from_value(to_value(&mac).unwrap()).unwrap();
         assert_eq!(back, mac);
         assert!(!upgrade.changed());
-        let mac = Macro::new("New".into(), String::new(), vec![Instruction::new(InstructionKind::Command("make".into()))]);
+        let mac = Macro::new(
+            "New".into(),
+            String::new(),
+            vec![Instruction::new(InstructionKind::Command("make".into()))],
+        );
         let (back, _) = from_value(to_value(&mac).unwrap()).unwrap();
         assert_eq!(back, mac);
     }
@@ -310,7 +367,9 @@ mod tests {
         let kinds = first_strand(&mac);
         // The bad blocks left the strand as notes; the loop kept its good block.
         assert_eq!(kinds.len(), 2);
-        let InstructionKind::Repeat { body, .. } = &kinds[1] else { panic!("{kinds:?}") };
+        let InstructionKind::Repeat { body, .. } = &kinds[1] else {
+            panic!("{kinds:?}")
+        };
         assert_eq!(body.len(), 1);
         assert!(mac.comments.iter().any(|c| c.text.contains("ClickElement")));
         assert!(mac.comments.iter().any(|c| c.text.contains("Teleport")));

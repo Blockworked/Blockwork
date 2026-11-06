@@ -2,7 +2,7 @@
 //! `Run macro` block and the `blockwork run` command line.
 
 use crate::state::{AppState, SharedState};
-use crate::{macros_thread, scheduled_run, AppHandle};
+use crate::{AppHandle, macros_thread, scheduled_run};
 use blockwork_core::macros::calls::MacroHost;
 use blockwork_core::macros::run_registry;
 use blockwork_core::run_log;
@@ -39,7 +39,12 @@ pub(crate) fn find_id(s: &AppState, name: &str) -> Option<String> {
 }
 
 /// Runs macro `id` on its own thread. The flag is set once the run ends.
-pub(crate) fn start(state: &SharedState, app: &AppHandle, id: &str, reason: &str) -> Result<Arc<AtomicBool>, String> {
+pub(crate) fn start(
+    state: &SharedState,
+    app: &AppHandle,
+    id: &str,
+    reason: &str,
+) -> Result<Arc<AtomicBool>, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     // The open copy holds unsaved edits and the live variable store.
     let is_open = s.current_macro.as_ref().is_some_and(|m| m.id == id);
@@ -50,14 +55,27 @@ pub(crate) fn start(state: &SharedState, app: &AppHandle, id: &str, reason: &str
         .find(|m| m.id == id)
         .cloned()
         .ok_or("macro not found")?;
-    let emulator = s.emulator.clone().ok_or("input emulation isn't available")?;
+    let emulator = s
+        .emulator
+        .clone()
+        .ok_or("input emulation isn't available")?;
     let speed = mac.speed_multiplier * s.global_speed_multiplier;
     let (variables, lists) = if is_open {
         (Arc::clone(&s.variable_values), Arc::clone(&s.list_values))
     } else {
         (
-            Arc::new(Mutex::new(mac.variables.iter().map(|v| (v.name.clone(), v.value.clone())).collect::<HashMap<_, _>>())),
-            Arc::new(Mutex::new(mac.lists.iter().map(|l| (l.name.clone(), l.items.clone())).collect::<HashMap<_, _>>())),
+            Arc::new(Mutex::new(
+                mac.variables
+                    .iter()
+                    .map(|v| (v.name.clone(), v.value.clone()))
+                    .collect::<HashMap<_, _>>(),
+            )),
+            Arc::new(Mutex::new(
+                mac.lists
+                    .iter()
+                    .map(|l| (l.name.clone(), l.items.clone()))
+                    .collect::<HashMap<_, _>>(),
+            )),
         )
     };
     let thread_name = format!("called_{}", mac.name);
@@ -66,17 +84,36 @@ pub(crate) fn start(state: &SharedState, app: &AppHandle, id: &str, reason: &str
     // running when this returns (`blockwork run --wait` polls for that).
     let run_flag = run_registry::begin_macro_run(&mac.id);
     let task = {
-        let (done, state, app, reason) = (Arc::clone(&done), Arc::clone(state), app.clone(), reason.to_string());
+        let (done, state, app, reason) = (
+            Arc::clone(&done),
+            Arc::clone(state),
+            app.clone(),
+            reason.to_string(),
+        );
         let run_flag = Arc::clone(&run_flag);
         move || {
             let id = mac.id.clone();
             let source = run_log::Source::for_macro(&mac.id, &mac.name);
             run_log::run_event(&source, run_log::RunEvent::Started, reason);
             let limit = scheduled_run::limit_run(&source, &run_flag, mac.settings.max_run_secs);
-            mac.run_with_lists(emulator, Some(Arc::clone(&run_flag)), speed, Arc::clone(&variables), Arc::clone(&lists));
+            mac.run_with_lists(
+                emulator,
+                Some(Arc::clone(&run_flag)),
+                speed,
+                Arc::clone(&variables),
+                Arc::clone(&lists),
+            );
             limit.store(true, Ordering::Relaxed);
             let stopped = !run_flag.lock().map(|r| *r).unwrap_or(true);
-            run_log::run_event(&source, run_log::RunEvent::Ended, if stopped { "Run stopped" } else { "Run finished" });
+            run_log::run_event(
+                &source,
+                run_log::RunEvent::Ended,
+                if stopped {
+                    "Run stopped"
+                } else {
+                    "Run finished"
+                },
+            );
             run_registry::end_run(&run_flag);
             if is_open {
                 macros_thread::persist_variables(&state, &app, &id, &variables, &lists);
@@ -103,7 +140,10 @@ pub(crate) fn list(state: &SharedState) -> Result<Vec<MacroInfo>, String> {
     let s = state.lock().map_err(|e| e.to_string())?;
     Ok(s.macros_list
         .iter()
-        .map(|m| MacroInfo { name: m.name.clone(), running: run_registry::is_running(&m.id) })
+        .map(|m| MacroInfo {
+            name: m.name.clone(),
+            running: run_registry::is_running(&m.id),
+        })
         .collect())
 }
 

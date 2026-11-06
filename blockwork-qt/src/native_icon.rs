@@ -53,12 +53,18 @@ mod imp {
         // Shortcut targets resolve through COM-based shell handlers; make
         // sure this thread is initialized (balanced: only uninitialize
         // what we own).
-        let initialized =
-            unsafe { CoInitializeEx(std::ptr::null(), (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32) };
+        let initialized = unsafe {
+            CoInitializeEx(
+                std::ptr::null(),
+                (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
+            )
+        };
         let mut hicon: HICON = std::ptr::null_mut();
         let edge = size.clamp(16, 256) as u32;
         // SHDefExtractIcon resolves shortcuts to their target's icon.
-        let extracted = unsafe { SHDefExtractIconW(wide.as_ptr(), 0, 0, &mut hicon, std::ptr::null_mut(), edge) };
+        let extracted = unsafe {
+            SHDefExtractIconW(wide.as_ptr(), 0, 0, &mut hicon, std::ptr::null_mut(), edge)
+        };
         if extracted < 0 {
             hicon = std::ptr::null_mut();
         }
@@ -229,7 +235,10 @@ mod tests {
         );
         use base64::Engine;
         let png = base64::engine::general_purpose::STANDARD
-            .decode(uri.strip_prefix("data:image/png;base64,").expect("checked above"))
+            .decode(
+                uri.strip_prefix("data:image/png;base64,")
+                    .expect("checked above"),
+            )
             .expect("valid base64");
         // A real PNG signature; QML's image loader accepts the same bytes.
         assert!(png.starts_with(&[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']));

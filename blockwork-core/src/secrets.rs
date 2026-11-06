@@ -27,7 +27,9 @@ fn names_path() -> Option<std::path::PathBuf> {
     if cfg!(test) {
         return None;
     }
-    crate::config::config_root().ok().map(|root| root.join("secrets.json"))
+    crate::config::config_root()
+        .ok()
+        .map(|root| root.join("secrets.json"))
 }
 
 static TEST_NAMES: Mutex<Vec<String>> = Mutex::new(Vec::new());
@@ -35,7 +37,10 @@ static TEST_NAMES: Mutex<Vec<String>> = Mutex::new(Vec::new());
 /// Names of the saved secrets, sorted.
 pub fn names() -> Vec<String> {
     let mut names: Vec<String> = match names_path() {
-        Some(path) => std::fs::read_to_string(path).ok().and_then(|t| serde_json::from_str(&t).ok()).unwrap_or_default(),
+        Some(path) => std::fs::read_to_string(path)
+            .ok()
+            .and_then(|t| serde_json::from_str(&t).ok())
+            .unwrap_or_default(),
         None => TEST_NAMES.lock().map(|n| n.clone()).unwrap_or_default(),
     };
     names.sort_by_key(|n| n.to_lowercase());
@@ -91,9 +96,12 @@ pub fn get(name: &str) -> Result<String, String> {
         return Ok(value);
     }
     if !names().contains(&name) {
-        return Err(format!("there's no secret named \"{name}\" (add it in Settings > Secrets)"));
+        return Err(format!(
+            "there's no secret named \"{name}\" (add it in Settings > Secrets)"
+        ));
     }
-    let value = backend::load(&name)?.ok_or_else(|| format!("the keyring has no value for secret \"{name}\""))?;
+    let value = backend::load(&name)?
+        .ok_or_else(|| format!("the keyring has no value for secret \"{name}\""))?;
     cache(|c| c.insert(name, value.clone()));
     Ok(value)
 }
@@ -124,10 +132,15 @@ pub fn remove_private(name: &str) -> Result<(), String> {
 /// `text` with every secret value read or saved this session masked.
 pub fn redact(text: &str) -> String {
     let guard = CACHE.lock().unwrap_or_else(|e| e.into_inner());
-    let Some(values) = guard.as_ref() else { return text.to_string() };
+    let Some(values) = guard.as_ref() else {
+        return text.to_string();
+    };
     let mut out = text.to_string();
     // Longest first, so a secret containing another is masked whole.
-    let mut secrets: Vec<&String> = values.values().filter(|v| v.chars().count() >= MIN_REDACT_LEN).collect();
+    let mut secrets: Vec<&String> = values
+        .values()
+        .filter(|v| v.chars().count() >= MIN_REDACT_LEN)
+        .collect();
     secrets.sort_by_key(|v| std::cmp::Reverse(v.len()));
     for secret in secrets {
         if out.contains(secret.as_str()) {
@@ -150,16 +163,29 @@ mod backend {
     static STORE: Mutex<Option<HashMap<String, String>>> = Mutex::new(None);
 
     pub fn store(name: &str, value: &str) -> Result<(), String> {
-        STORE.lock().unwrap().get_or_insert_with(HashMap::new).insert(name.into(), value.into());
+        STORE
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashMap::new)
+            .insert(name.into(), value.into());
         Ok(())
     }
 
     pub fn load(name: &str) -> Result<Option<String>, String> {
-        Ok(STORE.lock().unwrap().get_or_insert_with(HashMap::new).get(name).cloned())
+        Ok(STORE
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashMap::new)
+            .get(name)
+            .cloned())
     }
 
     pub fn remove(name: &str) -> Result<(), String> {
-        STORE.lock().unwrap().get_or_insert_with(HashMap::new).remove(name);
+        STORE
+            .lock()
+            .unwrap()
+            .get_or_insert_with(HashMap::new)
+            .remove(name);
         Ok(())
     }
 }
@@ -191,12 +217,17 @@ mod backend {
         move |e| format!("keyring: couldn't {what} ({e})")
     }
 
-    fn proxy<'a>(connection: &Connection, path: &'a str, iface: &'a str) -> Result<Proxy<'a>, String> {
+    fn proxy<'a>(
+        connection: &Connection,
+        path: &'a str,
+        iface: &'a str,
+    ) -> Result<Proxy<'a>, String> {
         Proxy::new(connection, BUS_NAME, path, iface).map_err(fail("reach the Secret Service"))
     }
 
     fn open() -> Result<Session, String> {
-        let connection = Connection::session().map_err(|e| format!("keyring: no session bus ({e})"))?;
+        let connection =
+            Connection::session().map_err(|e| format!("keyring: no session bus ({e})"))?;
         let service = proxy(&connection, SERVICE_PATH, SERVICE_IFACE)?;
         let (_, path): (OwnedValue, OwnedObjectPath) = service.call("OpenSession", &("plain", Value::from(""))).map_err(|e| {
             format!("keyring: no Secret Service is running ({e}). Install GNOME Keyring, KWallet or KeePassXC")
@@ -214,10 +245,17 @@ mod backend {
             return Ok(());
         }
         let prompt = proxy(&session.connection, path.as_str(), PROMPT_IFACE)?;
-        let mut completed = prompt.receive_signal("Completed").map_err(fail("show the keyring prompt"))?;
-        prompt.call_method("Prompt", &("",)).map_err(fail("show the keyring prompt"))?;
+        let mut completed = prompt
+            .receive_signal("Completed")
+            .map_err(fail("show the keyring prompt"))?;
+        prompt
+            .call_method("Prompt", &("",))
+            .map_err(fail("show the keyring prompt"))?;
         let message = completed.next().ok_or("keyring: the prompt went away")?;
-        let (dismissed, _): (bool, OwnedValue) = message.body().deserialize().map_err(fail("read the prompt result"))?;
+        let (dismissed, _): (bool, OwnedValue) = message
+            .body()
+            .deserialize()
+            .map_err(fail("read the prompt result"))?;
         if dismissed {
             return Err("keyring: the unlock prompt was dismissed".into());
         }
@@ -229,16 +267,18 @@ mod backend {
             return Ok(());
         }
         let service = proxy(&session.connection, SERVICE_PATH, SERVICE_IFACE)?;
-        let (_, prompt_path): (Vec<OwnedObjectPath>, OwnedObjectPath) =
-            service.call("Unlock", &(paths,)).map_err(fail("unlock the keyring"))?;
+        let (_, prompt_path): (Vec<OwnedObjectPath>, OwnedObjectPath) = service
+            .call("Unlock", &(paths,))
+            .map_err(fail("unlock the keyring"))?;
         prompt(session, &prompt_path)
     }
 
     /// Unlocked items holding secret `name`.
     fn find(session: &Session, name: &str) -> Result<Vec<OwnedObjectPath>, String> {
         let service = proxy(&session.connection, SERVICE_PATH, SERVICE_IFACE)?;
-        let (mut unlocked, locked): (Vec<OwnedObjectPath>, Vec<OwnedObjectPath>) =
-            service.call("SearchItems", &(attributes(name),)).map_err(fail("search the keyring"))?;
+        let (mut unlocked, locked): (Vec<OwnedObjectPath>, Vec<OwnedObjectPath>) = service
+            .call("SearchItems", &(attributes(name),))
+            .map_err(fail("search the keyring"))?;
         if !locked.is_empty() {
             unlock(session, locked.clone())?;
             unlocked.extend(locked);
@@ -250,7 +290,9 @@ mod backend {
     /// any, else a new one (the service asks for its password).
     fn collection(session: &Session, service: &Proxy) -> Result<OwnedObjectPath, String> {
         for alias in ["default", "login"] {
-            let path: OwnedObjectPath = service.call("ReadAlias", &(alias,)).map_err(fail("find the keyring"))?;
+            let path: OwnedObjectPath = service
+                .call("ReadAlias", &(alias,))
+                .map_err(fail("find the keyring"))?;
             if path.as_str() != "/" {
                 return Ok(path);
             }
@@ -259,14 +301,20 @@ mod backend {
         if let Some(first) = all.into_iter().find(|p| !p.as_str().ends_with("/session")) {
             return Ok(first);
         }
-        let properties: HashMap<&str, Value> = HashMap::from([("org.freedesktop.Secret.Collection.Label", Value::from("Blockwork"))]);
-        let (created, prompt_path): (OwnedObjectPath, OwnedObjectPath) =
-            service.call("CreateCollection", &(properties, "default")).map_err(fail("create a keyring"))?;
+        let properties: HashMap<&str, Value> = HashMap::from([(
+            "org.freedesktop.Secret.Collection.Label",
+            Value::from("Blockwork"),
+        )]);
+        let (created, prompt_path): (OwnedObjectPath, OwnedObjectPath) = service
+            .call("CreateCollection", &(properties, "default"))
+            .map_err(fail("create a keyring"))?;
         if created.as_str() != "/" {
             return Ok(created);
         }
         prompt(session, &prompt_path)?;
-        let path: OwnedObjectPath = service.call("ReadAlias", &("default",)).map_err(fail("find the keyring"))?;
+        let path: OwnedObjectPath = service
+            .call("ReadAlias", &("default",))
+            .map_err(fail("find the keyring"))?;
         if path.as_str() == "/" {
             return Err("keyring: there's no keyring to save into".into());
         }
@@ -276,7 +324,12 @@ mod backend {
     /// zbus's blocking API panics on a thread inside a tokio runtime (the
     /// daemon's tray turns on zbus's tokio support), so calls run on a plain thread.
     fn off_runtime<T: Send>(f: impl FnOnce() -> Result<T, String> + Send) -> Result<T, String> {
-        std::thread::scope(|scope| scope.spawn(f).join().unwrap_or_else(|_| Err("keyring: the request crashed".into())))
+        std::thread::scope(|scope| {
+            scope
+                .spawn(f)
+                .join()
+                .unwrap_or_else(|_| Err("keyring: the request crashed".into()))
+        })
     }
 
     pub fn store(name: &str, value: &str) -> Result<(), String> {
@@ -298,29 +351,49 @@ mod backend {
         unlock(&session, vec![collection.clone()])?;
         let label = format!("Blockwork secret: {name}");
         let properties: HashMap<&str, Value> = HashMap::from([
-            ("org.freedesktop.Secret.Item.Label", Value::from(label.as_str())),
-            ("org.freedesktop.Secret.Item.Attributes", Value::from(attributes(name))),
+            (
+                "org.freedesktop.Secret.Item.Label",
+                Value::from(label.as_str()),
+            ),
+            (
+                "org.freedesktop.Secret.Item.Attributes",
+                Value::from(attributes(name)),
+            ),
         ]);
-        let secret: Secret = (session.path.clone(), Vec::new(), value.as_bytes().to_vec(), "text/plain".into());
+        let secret: Secret = (
+            session.path.clone(),
+            Vec::new(),
+            value.as_bytes().to_vec(),
+            "text/plain".into(),
+        );
         let collection_proxy = proxy(&session.connection, collection.as_str(), COLLECTION_IFACE)?;
-        let (_, prompt_path): (OwnedObjectPath, OwnedObjectPath) =
-            collection_proxy.call("CreateItem", &(properties, secret, true)).map_err(fail("save the secret"))?;
+        let (_, prompt_path): (OwnedObjectPath, OwnedObjectPath) = collection_proxy
+            .call("CreateItem", &(properties, secret, true))
+            .map_err(fail("save the secret"))?;
         prompt(&session, &prompt_path)
     }
 
     fn load_now(name: &str) -> Result<Option<String>, String> {
         let session = open()?;
-        let Some(item) = find(&session, name)?.into_iter().next() else { return Ok(None) };
+        let Some(item) = find(&session, name)?.into_iter().next() else {
+            return Ok(None);
+        };
         let item = proxy(&session.connection, item.as_str(), ITEM_IFACE)?;
-        let (_, _, value, _): Secret = item.call("GetSecret", &(&session.path,)).map_err(fail("read the secret"))?;
-        String::from_utf8(value).map(Some).map_err(|_| "keyring: the secret isn't text".into())
+        let (_, _, value, _): Secret = item
+            .call("GetSecret", &(&session.path,))
+            .map_err(fail("read the secret"))?;
+        String::from_utf8(value)
+            .map(Some)
+            .map_err(|_| "keyring: the secret isn't text".into())
     }
 
     fn remove_now(name: &str) -> Result<(), String> {
         let session = open()?;
         for item in find(&session, name)? {
             let item = proxy(&session.connection, item.as_str(), ITEM_IFACE)?;
-            let prompt_path: OwnedObjectPath = item.call("Delete", &()).map_err(fail("delete the secret"))?;
+            let prompt_path: OwnedObjectPath = item
+                .call("Delete", &())
+                .map_err(fail("delete the secret"))?;
             prompt(&session, &prompt_path)?;
         }
         Ok(())
@@ -333,16 +406,23 @@ mod backend {
     use super::SERVICE;
     use windows_sys::Win32::Foundation::{ERROR_NOT_FOUND, GetLastError};
     use windows_sys::Win32::Security::Credentials::{
-        CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW, CredDeleteW, CredFree, CredReadW, CredWriteW,
+        CRED_PERSIST_LOCAL_MACHINE, CRED_TYPE_GENERIC, CREDENTIALW, CredDeleteW, CredFree,
+        CredReadW, CredWriteW,
     };
 
     fn target(name: &str) -> Vec<u16> {
-        format!("{SERVICE}/{name}").encode_utf16().chain(std::iter::once(0)).collect()
+        format!("{SERVICE}/{name}")
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect()
     }
 
     pub fn store(name: &str, value: &str) -> Result<(), String> {
         let mut target = target(name);
-        let mut user: Vec<u16> = "Blockwork".encode_utf16().chain(std::iter::once(0)).collect();
+        let mut user: Vec<u16> = "Blockwork"
+            .encode_utf16()
+            .chain(std::iter::once(0))
+            .collect();
         let mut blob = value.as_bytes().to_vec();
         // SAFETY: every pointer refers to a live buffer for the duration of the call.
         let ok = unsafe {
@@ -356,7 +436,10 @@ mod backend {
             CredWriteW(&credential, 0)
         };
         if ok == 0 {
-            return Err(format!("Credential Manager: couldn't save the secret (error {})", unsafe { GetLastError() }));
+            return Err(format!(
+                "Credential Manager: couldn't save the secret (error {})",
+                unsafe { GetLastError() }
+            ));
         }
         Ok(())
     }
@@ -368,11 +451,23 @@ mod backend {
         unsafe {
             if CredReadW(target.as_ptr(), CRED_TYPE_GENERIC, 0, &mut credential) == 0 {
                 let error = GetLastError();
-                return if error == ERROR_NOT_FOUND { Ok(None) } else { Err(format!("Credential Manager: couldn't read the secret (error {error})")) };
+                return if error == ERROR_NOT_FOUND {
+                    Ok(None)
+                } else {
+                    Err(format!(
+                        "Credential Manager: couldn't read the secret (error {error})"
+                    ))
+                };
             }
-            let blob = std::slice::from_raw_parts((*credential).CredentialBlob, (*credential).CredentialBlobSize as usize).to_vec();
+            let blob = std::slice::from_raw_parts(
+                (*credential).CredentialBlob,
+                (*credential).CredentialBlobSize as usize,
+            )
+            .to_vec();
             CredFree(credential as *const _);
-            String::from_utf8(blob).map(Some).map_err(|_| "Credential Manager: the secret isn't text".into())
+            String::from_utf8(blob)
+                .map(Some)
+                .map_err(|_| "Credential Manager: the secret isn't text".into())
         }
     }
 
@@ -382,7 +477,9 @@ mod backend {
         if unsafe { CredDeleteW(target.as_ptr(), CRED_TYPE_GENERIC, 0) } == 0 {
             let error = unsafe { GetLastError() };
             if error != ERROR_NOT_FOUND {
-                return Err(format!("Credential Manager: couldn't delete the secret (error {error})"));
+                return Err(format!(
+                    "Credential Manager: couldn't delete the secret (error {error})"
+                ));
             }
         }
         Ok(())
@@ -393,18 +490,23 @@ mod backend {
 #[cfg(all(target_os = "macos", not(test)))]
 mod backend {
     use super::SERVICE;
-    use security_framework::passwords::{delete_generic_password, get_generic_password, set_generic_password};
+    use security_framework::passwords::{
+        delete_generic_password, get_generic_password, set_generic_password,
+    };
 
     // errSecItemNotFound
     const NOT_FOUND: i32 = -25300;
 
     pub fn store(name: &str, value: &str) -> Result<(), String> {
-        set_generic_password(SERVICE, name, value.as_bytes()).map_err(|e| format!("Keychain: couldn't save the secret ({e})"))
+        set_generic_password(SERVICE, name, value.as_bytes())
+            .map_err(|e| format!("Keychain: couldn't save the secret ({e})"))
     }
 
     pub fn load(name: &str) -> Result<Option<String>, String> {
         match get_generic_password(SERVICE, name) {
-            Ok(bytes) => String::from_utf8(bytes).map(Some).map_err(|_| "Keychain: the secret isn't text".into()),
+            Ok(bytes) => String::from_utf8(bytes)
+                .map(Some)
+                .map_err(|_| "Keychain: the secret isn't text".into()),
             Err(e) if e.code() == NOT_FOUND => Ok(None),
             Err(e) => Err(format!("Keychain: couldn't read the secret ({e})")),
         }
@@ -412,7 +514,9 @@ mod backend {
 
     pub fn remove(name: &str) -> Result<(), String> {
         match delete_generic_password(SERVICE, name) {
-            Err(e) if e.code() != NOT_FOUND => Err(format!("Keychain: couldn't delete the secret ({e})")),
+            Err(e) if e.code() != NOT_FOUND => {
+                Err(format!("Keychain: couldn't delete the secret ({e})"))
+            }
             _ => Ok(()),
         }
     }
@@ -440,11 +544,18 @@ mod tests {
     #[test]
     fn secrets_round_trip_and_are_redacted() {
         assert!(set(" ", "x").is_err());
-        assert!(get("missing-secret").unwrap_err().contains("no secret named"));
+        assert!(
+            get("missing-secret")
+                .unwrap_err()
+                .contains("no secret named")
+        );
         set("api token", "tok-12345").unwrap();
         assert!(names().contains(&"api token".to_string()));
         assert_eq!(get("api token").unwrap(), "tok-12345");
-        assert_eq!(redact("Authorization: tok-12345!"), format!("Authorization: {MASK}!"));
+        assert_eq!(
+            redact("Authorization: tok-12345!"),
+            format!("Authorization: {MASK}!")
+        );
         assert!(contains_secret("x tok-12345"));
         assert!(!contains_secret("nothing here"));
         delete("api token").unwrap();

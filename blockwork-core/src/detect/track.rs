@@ -72,14 +72,22 @@ impl Tracker {
                 }
                 None => {
                     self.next_id += 1;
-                    let det = Detection { id: Some(self.next_id), ..det };
-                    self.tracks.push(Track { box_: det.clone(), misses: 0, seen: now });
+                    let det = Detection {
+                        id: Some(self.next_id),
+                        ..det
+                    };
+                    self.tracks.push(Track {
+                        box_: det.clone(),
+                        misses: 0,
+                        seen: now,
+                    });
                     det
                 }
             };
             out.push(tracked);
         }
-        self.tracks.retain(|t| t.misses <= MAX_MISSES || now.duration_since(t.seen) < LOST_AFTER);
+        self.tracks
+            .retain(|t| t.misses <= MAX_MISSES || now.duration_since(t.seen) < LOST_AFTER);
         out
     }
 
@@ -103,7 +111,11 @@ fn similarity(a: &Detection, b: &Detection) -> f64 {
     let ((ax, ay), (bx, by)) = (a.center(), b.center());
     let reach = 2.0 * a.w.max(a.h).max(b.w.max(b.h));
     let distance = (ax - bx).hypot(ay - by);
-    if reach > 0.0 && distance < reach { 1.0 - distance / reach } else { 0.0 }
+    if reach > 0.0 && distance < reach {
+        1.0 - distance / reach
+    } else {
+        0.0
+    }
 }
 
 fn iou(a: &Detection, b: &Detection) -> f64 {
@@ -142,11 +154,13 @@ static TRACKERS: Mutex<Option<HashMap<(String, String), Entry>>> = Mutex::new(No
 pub fn update(macro_id: &str, list: &str, query: &Query, found: Vec<Detection>) -> Vec<Detection> {
     let mut all = TRACKERS.lock().unwrap_or_else(|e| e.into_inner());
     let all = all.get_or_insert_with(HashMap::new);
-    let entry = all.entry((macro_id.to_string(), list.to_string())).or_insert_with(|| Entry {
-        query: query.clone(),
-        tracker: Tracker::default(),
-        used: Instant::now(),
-    });
+    let entry = all
+        .entry((macro_id.to_string(), list.to_string()))
+        .or_insert_with(|| Entry {
+            query: query.clone(),
+            tracker: Tracker::default(),
+            used: Instant::now(),
+        });
     if entry.query != *query || entry.used.elapsed() > STALE_AFTER {
         entry.query = query.clone();
         entry.tracker.tracks.clear();
@@ -158,7 +172,9 @@ pub fn update(macro_id: &str, list: &str, query: &Query, found: Vec<Detection>) 
 /// The query that last filled (`macro_id`, `list`), for repeating it.
 pub fn query_for(macro_id: &str, list: &str) -> Option<Query> {
     let all = TRACKERS.lock().unwrap_or_else(|e| e.into_inner());
-    all.as_ref()?.get(&(macro_id.to_string(), list.to_string())).map(|e| e.query.clone())
+    all.as_ref()?
+        .get(&(macro_id.to_string(), list.to_string()))
+        .map(|e| e.query.clone())
 }
 
 /// Whether track `id` in (`macro_id`, `list`) is still alive.
@@ -177,11 +193,23 @@ mod tests {
     #[test]
     fn ids_follow_objects_across_frames() {
         let mut t = Tracker::default();
-        let first = t.update(vec![boxed(0.0, 0.0, 10.0, 20.0, "p", 0.9), boxed(100.0, 0.0, 10.0, 20.0, "p", 0.8)]);
-        assert_eq!(first.iter().map(|d| d.id).collect::<Vec<_>>(), vec![Some(1), Some(2)]);
+        let first = t.update(vec![
+            boxed(0.0, 0.0, 10.0, 20.0, "p", 0.9),
+            boxed(100.0, 0.0, 10.0, 20.0, "p", 0.8),
+        ]);
+        assert_eq!(
+            first.iter().map(|d| d.id).collect::<Vec<_>>(),
+            vec![Some(1), Some(2)]
+        );
         // Both moved a little and came back in the other order.
-        let second = t.update(vec![boxed(104.0, 2.0, 10.0, 20.0, "p", 0.8), boxed(3.0, 1.0, 10.0, 20.0, "p", 0.9)]);
-        assert_eq!(second.iter().map(|d| d.id).collect::<Vec<_>>(), vec![Some(2), Some(1)]);
+        let second = t.update(vec![
+            boxed(104.0, 2.0, 10.0, 20.0, "p", 0.8),
+            boxed(3.0, 1.0, 10.0, 20.0, "p", 0.9),
+        ]);
+        assert_eq!(
+            second.iter().map(|d| d.id).collect::<Vec<_>>(),
+            vec![Some(2), Some(1)]
+        );
         // Smoothed part of the way toward the new position.
         assert!((second[0].x - 102.4).abs() < 1e-9, "{}", second[0].x);
         // A different label never continues a track.
@@ -194,9 +222,15 @@ mod tests {
         let mut t = Tracker::default();
         t.update(vec![boxed(0.0, 0.0, 10.0, 10.0, "p", 0.9)]);
         // No overlap, but within two box sizes.
-        assert_eq!(t.update(vec![boxed(12.0, 0.0, 10.0, 10.0, "p", 0.9)])[0].id, Some(1));
+        assert_eq!(
+            t.update(vec![boxed(12.0, 0.0, 10.0, 10.0, "p", 0.9)])[0].id,
+            Some(1)
+        );
         // Too far: a new object.
-        assert_eq!(t.update(vec![boxed(80.0, 0.0, 10.0, 10.0, "p", 0.9)])[0].id, Some(2));
+        assert_eq!(
+            t.update(vec![boxed(80.0, 0.0, 10.0, 10.0, "p", 0.9)])[0].id,
+            Some(2)
+        );
     }
 
     #[test]
@@ -210,7 +244,10 @@ mod tests {
         }
         assert!(t.alive(1));
         // Reappearing within the limit keeps its id.
-        assert_eq!(t.update_at(vec![boxed(1.0, 0.0, 10.0, 10.0, "p", 0.9)], frame(6))[0].id, Some(1));
+        assert_eq!(
+            t.update_at(vec![boxed(1.0, 0.0, 10.0, 10.0, "p", 0.9)], frame(6))[0].id,
+            Some(1)
+        );
         for n in 7..=7 + MAX_MISSES {
             t.update_at(vec![], frame(n));
         }
@@ -227,7 +264,10 @@ mod tests {
         for n in 1..=10 {
             t.update_at(vec![], frame(n));
         }
-        assert_eq!(t.update_at(vec![boxed(1.0, 0.0, 10.0, 10.0, "p", 0.9)], frame(11))[0].id, Some(1));
+        assert_eq!(
+            t.update_at(vec![boxed(1.0, 0.0, 10.0, 10.0, "p", 0.9)], frame(11))[0].id,
+            Some(1)
+        );
         for n in 12..=60 {
             t.update_at(vec![], frame(n));
         }

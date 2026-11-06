@@ -73,7 +73,9 @@ impl TimeSchedule {
             TimeSchedule::Daily => true,
             TimeSchedule::Weekly { weekday } => weekday.matches(now.weekday()),
             TimeSchedule::Monthly { day } => now.day() as u8 == *day,
-            TimeSchedule::Yearly { month, day } => now.month() as u8 == *month && now.day() as u8 == *day,
+            TimeSchedule::Yearly { month, day } => {
+                now.month() as u8 == *month && now.day() as u8 == *day
+            }
         }
     }
 }
@@ -83,9 +85,15 @@ impl TimeSchedule {
 pub fn parse_time_of_day(text: &str) -> Result<(u8, u8), String> {
     let invalid = || format!("\"{}\" isn't a time of day like 09:30", text.trim());
     let lower = text.trim().to_ascii_lowercase();
-    let (clock, meridiem) = if let Some(rest) = lower.strip_suffix("am").or_else(|| lower.strip_suffix("a.m.")) {
+    let (clock, meridiem) = if let Some(rest) = lower
+        .strip_suffix("am")
+        .or_else(|| lower.strip_suffix("a.m."))
+    {
         (rest.trim_end(), Some(false))
-    } else if let Some(rest) = lower.strip_suffix("pm").or_else(|| lower.strip_suffix("p.m.")) {
+    } else if let Some(rest) = lower
+        .strip_suffix("pm")
+        .or_else(|| lower.strip_suffix("p.m."))
+    {
         (rest.trim_end(), Some(true))
     } else {
         (lower.as_str(), None)
@@ -94,7 +102,9 @@ pub fn parse_time_of_day(text: &str) -> Result<(u8, u8), String> {
     let number = |part: Option<&str>| -> Result<Option<u32>, String> {
         match part {
             None => Ok(None),
-            Some(p) if !p.is_empty() && p.len() <= 2 && p.bytes().all(|b| b.is_ascii_digit()) => Ok(p.parse().ok()),
+            Some(p) if !p.is_empty() && p.len() <= 2 && p.bytes().all(|b| b.is_ascii_digit()) => {
+                Ok(p.parse().ok())
+            }
             Some(_) => Err(invalid()),
         }
     };
@@ -133,7 +143,9 @@ mod tests {
     #[test]
     fn weekly_matches_only_the_chosen_weekday() {
         // 2026-03-05 is a Thursday.
-        let sched = TimeSchedule::Weekly { weekday: Weekday::Thursday };
+        let sched = TimeSchedule::Weekly {
+            weekday: Weekday::Thursday,
+        };
         assert!(sched.matches(&at(2026, 3, 5, 8, 0), 8, 0));
         assert!(!sched.matches(&at(2026, 3, 6, 8, 0), 8, 0));
     }
@@ -180,8 +192,15 @@ mod tests {
 
     #[test]
     fn reads_the_old_saved_shape() {
-        let old: LegacyTimeSchedule = serde_json::from_str(r#"{"kind":"Weekly","weekday":"Friday","hour":7,"minute":45}"#).unwrap();
-        assert_eq!(old.schedule, TimeSchedule::Weekly { weekday: Weekday::Friday });
+        let old: LegacyTimeSchedule =
+            serde_json::from_str(r#"{"kind":"Weekly","weekday":"Friday","hour":7,"minute":45}"#)
+                .unwrap();
+        assert_eq!(
+            old.schedule,
+            TimeSchedule::Weekly {
+                weekday: Weekday::Friday
+            }
+        );
         assert_eq!((old.hour, old.minute), (7, 45));
     }
 }

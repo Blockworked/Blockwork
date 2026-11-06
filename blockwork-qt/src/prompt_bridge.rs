@@ -51,13 +51,19 @@ pub fn requested() -> bool {
     #[cfg(unix)]
     PARENT.get_or_init(|| {
         let ppid = unsafe { libc::getppid() };
-        let pid = std::env::var("BLOCKWORK_PROMPT_PARENT_PID").ok().and_then(|value| value.parse().ok()).unwrap_or(ppid);
+        let pid = std::env::var("BLOCKWORK_PROMPT_PARENT_PID")
+            .ok()
+            .and_then(|value| value.parse().ok())
+            .unwrap_or(ppid);
         (pid, pid == ppid)
     });
     #[cfg(windows)]
-    if let Some(pid) = std::env::var("BLOCKWORK_PROMPT_PARENT_PID").ok().and_then(|value| value.parse::<u32>().ok()) {
-        use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_SYNCHRONIZE};
+    if let Some(pid) = std::env::var("BLOCKWORK_PROMPT_PARENT_PID")
+        .ok()
+        .and_then(|value| value.parse::<u32>().ok())
+    {
         use windows_sys::Win32::Foundation::{ERROR_INVALID_PARAMETER, GetLastError};
+        use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_SYNCHRONIZE};
         let handle = unsafe { OpenProcess(PROCESS_SYNCHRONIZE, 0, pid) };
         if !handle.is_null() {
             PARENT.get_or_init(|| Some(handle as usize));
@@ -89,7 +95,11 @@ pub struct PromptBridgeRust {
 
 impl Default for PromptBridgeRust {
     fn default() -> Self {
-        Self { request_json: cxx_qt_lib::QString::from(REQUEST.get().map(String::as_str).unwrap_or("{}")) }
+        Self {
+            request_json: cxx_qt_lib::QString::from(
+                REQUEST.get().map(String::as_str).unwrap_or("{}"),
+            ),
+        }
     }
 }
 
@@ -109,7 +119,11 @@ impl qobject::PromptBridge {
             // finished launching, without relying on PID liveness/reuse. A
             // launcher in between (a wrapper that doesn't exec) breaks that,
             // so fall back to asking whether the daemon's PID still exists.
-            let alive = if direct { unsafe { libc::getppid() == parent } } else { unsafe { libc::kill(parent, 0) == 0 } };
+            let alive = if direct {
+                unsafe { libc::getppid() == parent }
+            } else {
+                unsafe { libc::kill(parent, 0) == 0 }
+            };
             return alive;
         }
         #[cfg(windows)]
@@ -117,7 +131,9 @@ impl qobject::PromptBridge {
             use windows_sys::Win32::Foundation::WAIT_TIMEOUT;
             use windows_sys::Win32::System::Threading::WaitForSingleObject;
             // The handle is signalled once the daemon exits.
-            return parent.is_some_and(|handle| unsafe { WaitForSingleObject(handle as _, 0) == WAIT_TIMEOUT });
+            return parent.is_some_and(|handle| unsafe {
+                WaitForSingleObject(handle as _, 0) == WAIT_TIMEOUT
+            });
         }
         true
     }
@@ -131,10 +147,15 @@ impl qobject::PromptBridge {
 #[cfg(windows)]
 mod front {
     use windows_sys::Win32::Foundation::{HWND, LPARAM};
-    use windows_sys::Win32::System::Threading::{AttachThreadInput, GetCurrentProcessId, GetCurrentThreadId};
-    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput};
+    use windows_sys::Win32::System::Threading::{
+        AttachThreadInput, GetCurrentProcessId, GetCurrentThreadId,
+    };
+    use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
+        INPUT, INPUT_0, INPUT_KEYBOARD, KEYBDINPUT, KEYEVENTF_KEYUP, SendInput,
+    };
     use windows_sys::Win32::UI::WindowsAndMessaging::{
-        BringWindowToTop, EnumWindows, GetForegroundWindow, GetWindowThreadProcessId, IsWindowVisible, SetForegroundWindow,
+        BringWindowToTop, EnumWindows, GetForegroundWindow, GetWindowThreadProcessId,
+        IsWindowVisible, SetForegroundWindow,
     };
 
     /// Windows only lets the process that sent the last input take focus, so
@@ -163,10 +184,22 @@ mod front {
             }
             let key = |flags| INPUT {
                 r#type: INPUT_KEYBOARD,
-                Anonymous: INPUT_0 { ki: KEYBDINPUT { wVk: 0xE8, wScan: 0, dwFlags: flags, time: 0, dwExtraInfo: 0 } },
+                Anonymous: INPUT_0 {
+                    ki: KEYBDINPUT {
+                        wVk: 0xE8,
+                        wScan: 0,
+                        dwFlags: flags,
+                        time: 0,
+                        dwExtraInfo: 0,
+                    },
+                },
             };
             let taps = [key(0), key(KEYEVENTF_KEYUP)];
-            SendInput(taps.len() as u32, taps.as_ptr(), std::mem::size_of::<INPUT>() as i32);
+            SendInput(
+                taps.len() as u32,
+                taps.as_ptr(),
+                std::mem::size_of::<INPUT>() as i32,
+            );
             let theirs = GetWindowThreadProcessId(GetForegroundWindow(), std::ptr::null_mut());
             let ours = GetCurrentThreadId();
             let attached = theirs != 0 && theirs != ours && AttachThreadInput(ours, theirs, 1) != 0;

@@ -3,15 +3,15 @@ use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::thread_pool::ThreadPool;
 // Canvas addressing and undo come from blockstitch. Both these groups are
 // re-exported so the rest of the crate still reaches them via `crate::state`.
+use crate::AppHandle;
 pub(crate) use blockstitch_core::editor::{
     EditSession, History, InstrPath, PathStep, ValueBuffers, ValueLocation,
 };
+pub(crate) use blockstitch_core::graph::ListItem;
 pub(crate) use blockwork_core::input::value::Evaluated;
 pub(crate) use blockwork_core::macros::{BlockPiece, InstructionKind, Macro};
-pub(crate) use blockstitch_core::graph::ListItem;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
-use crate::AppHandle;
 use std::sync::{Arc, Mutex};
 
 pub(crate) type EditorSnapshot = blockwork_core::macros::UndoSnapshot;
@@ -527,12 +527,19 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         import_review: s.pending_import.as_ref().map(|(_, review)| review.clone()),
         globals: blockwork_core::globals::all()
             .into_iter()
-            .map(|(name, value)| GlobalDto { name, value: blockwork_core::secrets::redact(&value.as_text()) })
+            .map(|(name, value)| GlobalDto {
+                name,
+                value: blockwork_core::secrets::redact(&value.as_text()),
+            })
             .collect(),
         templates: crate::templates::list(),
         secret_names: blockwork_core::secrets::names(),
         library: s.macros_list.iter().map(library_entry).collect(),
-        breakpoints: s.current_macro.as_ref().map(|m| blockwork_core::macros::debug::breakpoints(&m.id)).unwrap_or_default(),
+        breakpoints: s
+            .current_macro
+            .as_ref()
+            .map(|m| blockwork_core::macros::debug::breakpoints(&m.id))
+            .unwrap_or_default(),
         paused_macros: s
             .macros_list
             .iter()
@@ -540,17 +547,28 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
             .map(|m| m.id.clone())
             .collect(),
         paused_strands: blockwork_core::macros::debug::paused_strands(),
-        permissions: s.current_macro.as_ref().and_then(|m| blockwork_core::permissions::grants(&m.id)).map(|g| g.allowed),
+        permissions: s
+            .current_macro
+            .as_ref()
+            .and_then(|m| blockwork_core::permissions::grants(&m.id))
+            .map(|g| g.allowed),
         webhook: crate::webhook::dto(),
         browser: blockwork_core::browser::status(),
-        macro_uses_browser: s.current_macro.as_ref().is_some_and(crate::commands::uses_browser),
+        macro_uses_browser: s
+            .current_macro
+            .as_ref()
+            .is_some_and(crate::commands::uses_browser),
         block_library: crate::block_library::dto(s),
         pack_review: s.pending_pack.as_ref().map(|p| p.review.clone()),
         community: crate::community::dto(),
         language: crate::ui_language(),
         animation_speed: crate::animation_speed(),
-        clock_format: blockwork_core::config::load_settings().clock_format.unwrap_or_default(),
-        color_scheme: blockwork_core::config::load_settings().color_scheme.unwrap_or_default(),
+        clock_format: blockwork_core::config::load_settings()
+            .clock_format
+            .unwrap_or_default(),
+        color_scheme: blockwork_core::config::load_settings()
+            .color_scheme
+            .unwrap_or_default(),
     }
 }
 
@@ -564,7 +582,12 @@ fn library_entry(mac: &Macro) -> LibraryEntryDto {
         has_triggers: mac.strands.iter().any(|st| {
             st.instructions.first().is_some_and(|i| {
                 i.kind.is_header()
-                    && !matches!(i.kind, InstructionKind::WhenRan | InstructionKind::BlockHeader(_) | InstructionKind::WhenSignal(_))
+                    && !matches!(
+                        i.kind,
+                        InstructionKind::WhenRan
+                            | InstructionKind::BlockHeader(_)
+                            | InstructionKind::WhenSignal(_)
+                    )
             })
         }),
         restricted: blockwork_core::permissions::grants(&mac.id).is_some(),
@@ -593,11 +616,23 @@ mod tests {
         author.graph.block_def_mut(&id).unwrap().identifier = "Wait".into();
         author.graph.block_def_mut(&id).unwrap().description = "Waits for an interval.".into();
         let body = author.block_body(&id).unwrap().clone();
-        let note = Comment::new(0, 0, "Hidden implementation note".into(), Some(body.instructions[0].id.clone()));
+        let note = Comment::new(
+            0,
+            0,
+            "Hidden implementation note".into(),
+            Some(body.instructions[0].id.clone()),
+        );
         author.graph.comments.push(note);
-        let pack = block_packs::pack_from_macro(&author, &[id.clone()], PackInfo {
-            name: "Timing".into(), author: "Alice".into(), ..Default::default()
-        }).unwrap();
+        let pack = block_packs::pack_from_macro(
+            &author,
+            &[id.clone()],
+            PackInfo {
+                name: "Timing".into(),
+                author: "Alice".into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
         let mut mac = Macro::new("User".into(), String::new(), vec![]);
         block_packs::merge_into(&mut mac, &pack, "");
         let dto = macro_to_dto(&mac);
@@ -605,14 +640,21 @@ mod tests {
         assert!(dto.comments.is_empty());
         assert!(dto.block_defs[0].read_only);
         assert_eq!(dto.block_defs[0].definition.identifier, "Alice:Wait");
-        assert_eq!(dto.block_defs[0].definition.description, "Waits for an interval.");
+        assert_eq!(
+            dto.block_defs[0].definition.description,
+            "Waits for an interval."
+        );
         let json = serde_json::to_value(&dto).unwrap();
         assert_eq!(json["block_defs"][0]["id"], id);
         assert_eq!(json["block_defs"][0]["read_only"], true);
         assert_eq!(json["block_defs"][0]["packs"][0]["id"], "timing");
         assert_eq!(json["block_defs"][0]["packs"][0]["name"], "Timing");
         assert!(mac.block_body(&id).is_some());
-        assert!(!serde_json::to_string(&dto).unwrap().contains("Hidden implementation note"));
+        assert!(
+            !serde_json::to_string(&dto)
+                .unwrap()
+                .contains("Hidden implementation note")
+        );
     }
 
     #[test]
@@ -685,7 +727,8 @@ mod tests {
         for kind in kinds {
             let dto = instruction_to_dto(&Instruction::new(kind.clone()));
             // Through JSON too, the way the frontend sends it back.
-            let dto: InstructionDto = serde_json::from_str(&serde_json::to_string(&dto).unwrap()).unwrap();
+            let dto: InstructionDto =
+                serde_json::from_str(&serde_json::to_string(&dto).unwrap()).unwrap();
             assert_eq!(dto_to_instruction(&dto).map(|i| i.kind), Some(kind));
         }
     }
@@ -696,7 +739,9 @@ mod state_size {
     #[test]
     #[ignore]
     fn time_state_for_a_real_library() {
-        let Ok(dir) = std::env::var("BW_STATE_DIR") else { return };
+        let Ok(dir) = std::env::var("BW_STATE_DIR") else {
+            return;
+        };
         blockwork_core::config::set_config_dir_override(dir.into());
         let mut s = crate::initial_state(&Default::default(), None, true, false);
         s.macros_list = blockwork_core::config::get_macros_from_config();
@@ -708,8 +753,17 @@ mod state_size {
             let built = t.elapsed();
             let json = serde_json::to_string(&dto).unwrap();
             let cur = serde_json::to_string(&dto.current_macro).unwrap().len();
-            if let Ok(out) = std::env::var("BW_STATE_OUT") { std::fs::write(out, &json).unwrap(); }
-            eprintln!("macros {} build {:?} total {:?} bytes {} current_macro bytes {}", s.macros_list.len(), built, t.elapsed(), json.len(), cur);
+            if let Ok(out) = std::env::var("BW_STATE_OUT") {
+                std::fs::write(out, &json).unwrap();
+            }
+            eprintln!(
+                "macros {} build {:?} total {:?} bytes {} current_macro bytes {}",
+                s.macros_list.len(),
+                built,
+                t.elapsed(),
+                json.len(),
+                cur
+            );
         }
     }
 }

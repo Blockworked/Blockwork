@@ -21,12 +21,10 @@ fn custom_block_runs_the_callback_supplied_to_its_branch() {
                         Instruction::new(InstructionKind::CallBlock {
                             block_id: block_id.clone(),
                             args: vec![],
-                            branches: vec![vec![Instruction::new(
-                                InstructionKind::SetVariable(
-                                    "ran".into(),
-                                    Value::number(1.0),
-                                ),
-                            )]],
+                            branches: vec![vec![Instruction::new(InstructionKind::SetVariable(
+                                "ran".into(),
+                                Value::number(1.0),
+                            ))]],
                         }),
                     ],
                 },
@@ -75,48 +73,135 @@ fn pack_state_is_isolated_persistent_and_available_to_reporters_and_triggers() {
     use crate::block_packs::{self, PackInfo, VariableInterface, VariableRole};
     use crate::macros::{BlockPiece, BlockShape, VariableDef};
     let mut mac = Macro::new("user".into(), String::new(), vec![]);
-    mac.graph.variables.push(VariableDef { name: "counter".into(), value: Evaluated::Number(99.0) });
+    mac.graph.variables.push(VariableDef {
+        name: "counter".into(),
+        value: Evaluated::Number(99.0),
+    });
     let mut calls = Vec::new();
     for name in ["first", "second"] {
         let mut author = Macro::new("author".into(), String::new(), vec![]);
-        author.graph.variables.push(VariableDef { name: "counter".into(), value: Evaluated::Number(5.0) });
-        let block = author.create_block(vec![BlockPiece::Label { id: "label".into(), text: name.into() }], BlockShape::Normal, "#4C97FF".into(), 0, 0);
-        author.graph.strands.iter_mut().find(|s| s.block_header_id() == Some(block.as_str())).unwrap().instructions.push(Instruction::new(InstructionKind::ChangeVariable("counter".into(), Value::number(1.0))));
-        let mut pack = block_packs::pack_from_macro(&author, &[block.clone()], PackInfo { id: name.into(), name: name.into(), ..Default::default() }).unwrap();
-        pack.variable_roles.push(VariableInterface { name: "counter".into(), role: VariableRole::Output });
+        author.graph.variables.push(VariableDef {
+            name: "counter".into(),
+            value: Evaluated::Number(5.0),
+        });
+        let block = author.create_block(
+            vec![BlockPiece::Label {
+                id: "label".into(),
+                text: name.into(),
+            }],
+            BlockShape::Normal,
+            "#4C97FF".into(),
+            0,
+            0,
+        );
+        author
+            .graph
+            .strands
+            .iter_mut()
+            .find(|s| s.block_header_id() == Some(block.as_str()))
+            .unwrap()
+            .instructions
+            .push(Instruction::new(InstructionKind::ChangeVariable(
+                "counter".into(),
+                Value::number(1.0),
+            )));
+        let mut pack = block_packs::pack_from_macro(
+            &author,
+            &[block.clone()],
+            PackInfo {
+                id: name.into(),
+                name: name.into(),
+                ..Default::default()
+            },
+        )
+        .unwrap();
+        pack.variable_roles.push(VariableInterface {
+            name: "counter".into(),
+            role: VariableRole::Output,
+        });
         block_packs::merge_into(&mut mac, &pack, "");
-        calls.push(Instruction::new(InstructionKind::CallBlock { block_id: block, args: vec![], branches: vec![] }));
+        calls.push(Instruction::new(InstructionKind::CallBlock {
+            block_id: block,
+            args: vec![],
+            branches: vec![],
+        }));
     }
     let first = mac.settings.block_packs[0].clone();
     let second = mac.settings.block_packs[1].clone();
-    let reporter = Value::Call { block_id: first.output_id("counter"), args: vec![], branches: vec![], saved: Box::new(Value::number(0.0)) };
+    let reporter = Value::Call {
+        block_id: first.output_id("counter"),
+        args: vec![],
+        branches: vec![],
+        saved: Box::new(Value::number(0.0)),
+    };
     let mut body = calls.clone();
-    body.push(Instruction::new(InstructionKind::SetVariable("result".into(), reporter)));
-    mac.graph.strands.push(Strand::with_instructions(0, 0, [vec![Instruction::new(InstructionKind::WhenRan)], body.clone()].concat()));
+    body.push(Instruction::new(InstructionKind::SetVariable(
+        "result".into(),
+        reporter,
+    )));
+    mac.graph.strands.push(Strand::with_instructions(
+        0,
+        0,
+        [
+            vec![Instruction::new(InstructionKind::WhenRan)],
+            body.clone(),
+        ]
+        .concat(),
+    ));
     let vars = Arc::new(Mutex::new(mac.variable_values()));
-    mac.clone().run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+    mac.clone()
+        .run(noop_emulator(), None, 1.0, Arc::clone(&vars));
     {
         let values = vars.lock().unwrap();
         assert_eq!(values.get("counter"), Some(&Evaluated::Number(99.0)));
         assert_eq!(values.get("result"), Some(&Evaluated::Number(6.0)));
-        assert_eq!(values.get(&first.variable_key("counter")), Some(&Evaluated::Number(6.0)));
-        assert_eq!(values.get(&second.variable_key("counter")), Some(&Evaluated::Number(6.0)));
+        assert_eq!(
+            values.get(&first.variable_key("counter")),
+            Some(&Evaluated::Number(6.0))
+        );
+        assert_eq!(
+            values.get(&second.variable_key("counter")),
+            Some(&Evaluated::Number(6.0))
+        );
         mac.sync_variables_from(&values);
     }
-    let (loaded, _) = crate::macros::migrate::from_value(crate::macros::migrate::to_value(&mac).unwrap()).unwrap();
+    let (loaded, _) =
+        crate::macros::migrate::from_value(crate::macros::migrate::to_value(&mac).unwrap())
+            .unwrap();
     let triggered = empty_vars();
-    run_fired_strand(crate::run_log::Source::default(), body, noop_emulator(), None, 1.0, Arc::clone(&triggered),
-        Arc::new(Mutex::new(HashMap::new())), loaded.block_table(), 0);
-    assert_eq!(triggered.lock().unwrap().get("result"), Some(&Evaluated::Number(7.0)));
+    run_fired_strand(
+        crate::run_log::Source::default(),
+        body,
+        noop_emulator(),
+        None,
+        1.0,
+        Arc::clone(&triggered),
+        Arc::new(Mutex::new(HashMap::new())),
+        loaded.block_table(),
+        0,
+    );
+    assert_eq!(
+        triggered.lock().unwrap().get("result"),
+        Some(&Evaluated::Number(7.0))
+    );
 }
 
 #[test]
 fn shipped_text_helpers_pack_runs() {
     crate::input::value::register_blockwork_operators();
-    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/../blockwork-core/tests/fixtures/blocks/packs/text-helpers.json");
+    let path = concat!(
+        env!("CARGO_MANIFEST_DIR"),
+        "/../blockwork-core/tests/fixtures/blocks/packs/text-helpers.json"
+    );
     let pack = crate::block_packs::read_pack(&std::fs::read_to_string(path).unwrap()).unwrap();
     let id = |name: &str| {
-        pack.content.block_defs.iter().find(|b| crate::block_packs::block_name(b) == name).unwrap().id.clone()
+        pack.content
+            .block_defs
+            .iter()
+            .find(|b| crate::block_packs::block_name(b) == name)
+            .unwrap()
+            .id
+            .clone()
     };
     let call = |name: &str, text: &str| Value::Call {
         block_id: id(name),
@@ -124,13 +209,19 @@ fn shipped_text_helpers_pack_runs() {
         branches: vec![],
         saved: Box::new(Value::number(0.0)),
     };
-    let set = |var: &str, value: Value| Instruction::new(InstructionKind::SetVariable(var.to_string(), value));
-    let mut mac = Macro::new("t".into(), String::new(), vec![
-        set("cap", call("capitalize (text)", "hello")),
-        set("empty", call("capitalize (text)", "")),
-        set("last", call("last letter of (text)", "abc")),
-        set("blank", call("(text) is empty?", "  ")),
-    ]);
+    let set = |var: &str, value: Value| {
+        Instruction::new(InstructionKind::SetVariable(var.to_string(), value))
+    };
+    let mut mac = Macro::new(
+        "t".into(),
+        String::new(),
+        vec![
+            set("cap", call("capitalize (text)", "hello")),
+            set("empty", call("capitalize (text)", "")),
+            set("last", call("last letter of (text)", "abc")),
+            set("blank", call("(text) is empty?", "  ")),
+        ],
+    );
     crate::block_packs::merge_into(&mut mac, &pack, "");
     let vars = empty_vars();
     mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
@@ -146,16 +237,34 @@ fn value_call_runs_its_supplied_branch() {
     let mut mac = macro_with_double_block(vec![Instruction::new(InstructionKind::SetVariable(
         "result".into(),
         Value::Call {
-            block_id: "double".into(), args: vec![Value::number(21.0)],
-            branches: vec![vec![serde_json::to_value(crate::frontend::instruction_to_dto(&Instruction::new(
-                InstructionKind::SetVariable("branch_ran".into(), Value::number(7.0)),
-            ))).unwrap()]],
+            block_id: "double".into(),
+            args: vec![Value::number(21.0)],
+            branches: vec![vec![
+                serde_json::to_value(crate::frontend::instruction_to_dto(&Instruction::new(
+                    InstructionKind::SetVariable("branch_ran".into(), Value::number(7.0)),
+                )))
+                .unwrap(),
+            ]],
             saved: Box::new(Value::number(0.0)),
         },
     ))]);
-    mac.block_defs[0].pieces.push(BlockPiece::Branch { id: "callback".into(), name: "callback".into() });
-    let body = mac.strands.iter_mut().find(|s| s.instructions.first().is_some_and(|i| matches!(&i.kind, InstructionKind::BlockHeader(_)))).unwrap();
-    body.instructions.insert(1, Instruction::new(InstructionKind::RunBranch("callback".into())));
+    mac.block_defs[0].pieces.push(BlockPiece::Branch {
+        id: "callback".into(),
+        name: "callback".into(),
+    });
+    let body = mac
+        .strands
+        .iter_mut()
+        .find(|s| {
+            s.instructions
+                .first()
+                .is_some_and(|i| matches!(&i.kind, InstructionKind::BlockHeader(_)))
+        })
+        .unwrap();
+    body.instructions.insert(
+        1,
+        Instruction::new(InstructionKind::RunBranch("callback".into())),
+    );
     let vars = empty_vars();
     mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
     let vars = vars.lock().unwrap();
@@ -170,11 +279,21 @@ fn custom_components_bind_their_enabled_parameter_in_commands_and_reporters() {
             let vars = empty_vars();
             let args = vec![Evaluated::Bool(enabled).into_value(), Value::number(21.0)];
             let call = if reporter {
-                InstructionKind::SetVariable("x".into(), Value::Call {
-                    block_id: "double".into(), args, branches: vec![], saved: Box::new(Value::number(0.0))
-                })
+                InstructionKind::SetVariable(
+                    "x".into(),
+                    Value::Call {
+                        block_id: "double".into(),
+                        args,
+                        branches: vec![],
+                        saved: Box::new(Value::number(0.0)),
+                    },
+                )
             } else {
-                InstructionKind::CallBlock { block_id: "double".into(), args, branches: vec![] }
+                InstructionKind::CallBlock {
+                    block_id: "double".into(),
+                    args,
+                    branches: vec![],
+                }
             };
             let mut mac = macro_with_double_block(vec![Instruction::new(call)]);
             mac.graph.block_defs[0].pieces = serde_json::from_value(serde_json::json!([
@@ -182,21 +301,36 @@ fn custom_components_bind_their_enabled_parameter_in_commands_and_reporters() {
                 {"kind":"Input","id":"enabled","name":"optional","value_type":"Bool","component":true},
                 {"kind":"Input","id":"value","name":"n"}
             ])).unwrap();
-            mac.graph.block_defs[0].shape = if reporter { BlockShape::ReturnsValue } else { BlockShape::Normal };
-            let result = |value| Instruction::new(if reporter {
-                InstructionKind::Return(value)
+            mac.graph.block_defs[0].shape = if reporter {
+                BlockShape::ReturnsValue
             } else {
-                InstructionKind::SetVariable("x".into(), value)
-            });
+                BlockShape::Normal
+            };
+            let result = |value| {
+                Instruction::new(if reporter {
+                    InstructionKind::Return(value)
+                } else {
+                    InstructionKind::SetVariable("x".into(), value)
+                })
+            };
             mac.graph.strands[1].instructions.truncate(1);
-            mac.graph.strands[1].instructions.push(Instruction::new(InstructionKind::IfElse {
-                condition: Value::Param { name: "optional".into() },
-                then_body: vec![result(Value::Param { name: "n".into() })],
-                else_body: vec![result(Value::number(7.0))],
-            }));
-            let (mac, _) = crate::macros::migrate::from_value(crate::macros::migrate::to_value(&mac).unwrap()).unwrap();
+            mac.graph.strands[1]
+                .instructions
+                .push(Instruction::new(InstructionKind::IfElse {
+                    condition: Value::Param {
+                        name: "optional".into(),
+                    },
+                    then_body: vec![result(Value::Param { name: "n".into() })],
+                    else_body: vec![result(Value::number(7.0))],
+                }));
+            let (mac, _) =
+                crate::macros::migrate::from_value(crate::macros::migrate::to_value(&mac).unwrap())
+                    .unwrap();
             mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
-            assert_eq!(vars.lock().unwrap().get("x"), Some(&Evaluated::Number(if enabled { 21.0 } else { 7.0 })));
+            assert_eq!(
+                vars.lock().unwrap().get("x"),
+                Some(&Evaluated::Number(if enabled { 21.0 } else { 7.0 }))
+            );
         }
     }
 }
@@ -571,8 +705,8 @@ fn reporter_block_composes_with_another_reporter_block() {
                     shape: BlockShape::ReturnsValue,
                     color: default_block_color(),
                     icon: String::new(),
-                identifier: String::new(),
-                description: String::new(),
+                    identifier: String::new(),
+                    description: String::new(),
                 },
                 BlockDef {
                     id: triple_id,
@@ -587,8 +721,8 @@ fn reporter_block_composes_with_another_reporter_block() {
                     shape: BlockShape::ReturnsValue,
                     color: default_block_color(),
                     icon: String::new(),
-                identifier: String::new(),
-                description: String::new(),
+                    identifier: String::new(),
+                    description: String::new(),
                 },
             ],
             lists: vec![],

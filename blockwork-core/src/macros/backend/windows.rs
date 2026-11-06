@@ -5,26 +5,21 @@ use std::sync::{Arc, Mutex, OnceLock};
 use enigo::{Enigo, Keyboard, Mouse, Settings};
 use tracing::{info, warn};
 use windows_sys::Win32::Foundation::HWND;
+use windows_sys::Win32::UI::Accessibility::{HWINEVENTHOOK, SetWinEventHook};
 use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-    GetAsyncKeyState, VIRTUAL_KEY,
-    VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END, VK_ESCAPE, VK_F1,
-    VK_F10, VK_F11, VK_F12, VK_HOME, VK_INSERT, VK_LCONTROL, VK_LMENU, VK_LSHIFT, VK_LWIN,
-    VK_LEFT, VK_MENU, VK_NEXT, VK_NUMLOCK, VK_NUMPAD0, VK_NUMPAD1, VK_NUMPAD2, VK_NUMPAD3,
-    VK_NUMPAD4, VK_NUMPAD5, VK_NUMPAD6, VK_NUMPAD7, VK_NUMPAD8, VK_NUMPAD9,
-    VK_PAUSE, VK_PRIOR, VK_RCONTROL, VK_RETURN, VK_RIGHT,
-    VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SCROLL, VK_SHIFT, VK_SNAPSHOT, VK_SPACE, VK_TAB, VK_UP,
-    VK_VOLUME_DOWN, VK_VOLUME_MUTE, VK_VOLUME_UP,
+    GetAsyncKeyState, VIRTUAL_KEY, VK_BACK, VK_CAPITAL, VK_CONTROL, VK_DELETE, VK_DOWN, VK_END,
+    VK_ESCAPE, VK_F1, VK_F10, VK_F11, VK_F12, VK_HOME, VK_INSERT, VK_LCONTROL, VK_LEFT, VK_LMENU,
+    VK_LSHIFT, VK_LWIN, VK_MENU, VK_NEXT, VK_NUMLOCK, VK_NUMPAD0, VK_NUMPAD1, VK_NUMPAD2,
+    VK_NUMPAD3, VK_NUMPAD4, VK_NUMPAD5, VK_NUMPAD6, VK_NUMPAD7, VK_NUMPAD8, VK_NUMPAD9, VK_PAUSE,
+    VK_PRIOR, VK_RCONTROL, VK_RETURN, VK_RIGHT, VK_RMENU, VK_RSHIFT, VK_RWIN, VK_SCROLL, VK_SHIFT,
+    VK_SNAPSHOT, VK_SPACE, VK_TAB, VK_UP, VK_VOLUME_DOWN, VK_VOLUME_MUTE, VK_VOLUME_UP,
 };
-use windows_sys::Win32::UI::Accessibility::{SetWinEventHook, HWINEVENTHOOK};
 use windows_sys::Win32::UI::WindowsAndMessaging::{
-    CallNextHookEx, GetForegroundWindow,
-    IsIconic, IsWindow, IsWindowVisible, SetForegroundWindow, SetWindowsHookExW,
-    EVENT_SYSTEM_DESKTOPSWITCH,
-    KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT,
-    WH_KEYBOARD_LL, WH_MOUSE_LL, WINEVENT_OUTOFCONTEXT,
-    WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP, WM_MBUTTONDOWN,
-    WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN, WM_RBUTTONUP,
-    WM_SYSKEYDOWN, WM_XBUTTONDOWN, WM_XBUTTONUP,
+    CallNextHookEx, EVENT_SYSTEM_DESKTOPSWITCH, GetForegroundWindow, IsIconic, IsWindow,
+    IsWindowVisible, KBDLLHOOKSTRUCT, MSLLHOOKSTRUCT, SetForegroundWindow, SetWindowsHookExW,
+    WH_KEYBOARD_LL, WH_MOUSE_LL, WINEVENT_OUTOFCONTEXT, WM_KEYDOWN, WM_LBUTTONDOWN, WM_LBUTTONUP,
+    WM_MBUTTONDOWN, WM_MBUTTONUP, WM_MOUSEHWHEEL, WM_MOUSEMOVE, WM_MOUSEWHEEL, WM_RBUTTONDOWN,
+    WM_RBUTTONUP, WM_SYSKEYDOWN, WM_XBUTTONDOWN, WM_XBUTTONUP,
 };
 
 use crate::input::types::{Axis, Direction, MacroButton, MacroKey};
@@ -32,8 +27,9 @@ use crate::macros::backend::{CaptureDecision, CaptureEvent, CaptureTimestamp, In
 
 // ── Globals ───────────────────────────────────────────────────────────────────
 
-static CALLBACK: OnceLock<Mutex<Box<dyn FnMut(CaptureEvent, CaptureTimestamp) -> CaptureDecision + Send + 'static>>> =
-    OnceLock::new();
+static CALLBACK: OnceLock<
+    Mutex<Box<dyn FnMut(CaptureEvent, CaptureTimestamp) -> CaptureDecision + Send + 'static>>,
+> = OnceLock::new();
 
 /// State shared by the keyboard/mouse/desktop-switch hook procedures. Plain
 /// thread-local `RefCell`, not `Mutex`/atomics: all three callbacks run only
@@ -63,7 +59,12 @@ struct HookThreadState {
 
 impl Default for HookThreadState {
     fn default() -> Self {
-        Self { key_held: [false; 256], key_suppressed: [false; 256], last_cursor: None, wheel_rest: (0, 0) }
+        Self {
+            key_held: [false; 256],
+            key_suppressed: [false; 256],
+            last_cursor: None,
+            wheel_rest: (0, 0),
+        }
     }
 }
 
@@ -219,7 +220,9 @@ impl WinApiBackend {
 impl InputBackend for WinApiBackend {
     fn key(&mut self, key: MacroKey, dir: Direction) -> Result<(), String> {
         let key = macro_key_to_enigo_key(&key);
-        self.enigo.key(key, to_enigo_dir(dir)).map_err(|e| e.to_string())
+        self.enigo
+            .key(key, to_enigo_dir(dir))
+            .map_err(|e| e.to_string())
     }
 
     fn raw_keycode(&mut self, keycode: u16, dir: Direction) -> Result<(), String> {
@@ -260,11 +263,12 @@ impl InputBackend for WinApiBackend {
     /// onto the whole virtual desktop instead.
     fn move_mouse_abs(&mut self, x: i32, y: i32) -> Result<(), String> {
         use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
-            INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_MOVE, MOUSEEVENTF_VIRTUALDESK, MOUSEINPUT,
-            SendInput,
+            INPUT, INPUT_0, INPUT_MOUSE, MOUSEEVENTF_ABSOLUTE, MOUSEEVENTF_MOVE,
+            MOUSEEVENTF_VIRTUALDESK, MOUSEINPUT, SendInput,
         };
         use windows_sys::Win32::UI::WindowsAndMessaging::{
-            GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN, SM_YVIRTUALSCREEN,
+            GetSystemMetrics, SM_CXVIRTUALSCREEN, SM_CYVIRTUALSCREEN, SM_XVIRTUALSCREEN,
+            SM_YVIRTUALSCREEN,
         };
         // SAFETY: plain metrics queries.
         let (vx, vy, vw, vh) = unsafe {
@@ -276,7 +280,10 @@ impl InputBackend for WinApiBackend {
             )
         };
         if vw < 2 || vh < 2 {
-            return self.enigo.move_mouse(x, y, enigo::Coordinate::Abs).map_err(|e| e.to_string());
+            return self
+                .enigo
+                .move_mouse(x, y, enigo::Coordinate::Abs)
+                .map_err(|e| e.to_string());
         }
         let input = INPUT {
             r#type: INPUT_MOUSE,
@@ -293,7 +300,10 @@ impl InputBackend for WinApiBackend {
         };
         // SAFETY: one INPUT, its size passed alongside.
         if unsafe { SendInput(1, &input, std::mem::size_of::<INPUT>() as i32) } != 1 {
-            return Err("Windows blocked the mouse move (is a program running as administrator focused?)".into());
+            return Err(
+                "Windows blocked the mouse move (is a program running as administrator focused?)"
+                    .into(),
+            );
         }
         Ok(())
     }
@@ -438,11 +448,7 @@ unsafe extern "system" fn desktop_switch_event_proc(
     }
 }
 
-unsafe extern "system" fn keyboard_proc(
-    n_code: i32,
-    w_param: usize,
-    l_param: isize,
-) -> isize {
+unsafe extern "system" fn keyboard_proc(n_code: i32, w_param: usize, l_param: isize) -> isize {
     use windows_sys::Win32::UI::WindowsAndMessaging::HC_ACTION;
     if n_code == HC_ACTION as i32 {
         let kb = unsafe { &*(l_param as *const KBDLLHOOKSTRUCT) };
@@ -462,10 +468,11 @@ unsafe extern "system" fn keyboard_proc(
         // Hotkey matching and recording capture happen in the shared
         // callback. This hook's extra jobs: telling auto-repeat apart from a
         // real press, and keeping key-up suppression paired with its key-down.
-        let is_repeat = pressed && HOOK_STATE.with_borrow_mut(|s| {
-            // Already held means this key-down is a repeat, not a fresh press.
-            std::mem::replace(&mut s.key_held[vk], true)
-        });
+        let is_repeat = pressed
+            && HOOK_STATE.with_borrow_mut(|s| {
+                // Already held means this key-down is a repeat, not a fresh press.
+                std::mem::replace(&mut s.key_held[vk], true)
+            });
         if !pressed {
             HOOK_STATE.with_borrow_mut(|s| s.key_held[vk] = false);
         }
@@ -507,11 +514,7 @@ unsafe extern "system" fn keyboard_proc(
     unsafe { CallNextHookEx(std::ptr::null_mut(), n_code, w_param, l_param) }
 }
 
-unsafe extern "system" fn mouse_proc(
-    n_code: i32,
-    w_param: usize,
-    l_param: isize,
-) -> isize {
+unsafe extern "system" fn mouse_proc(n_code: i32, w_param: usize, l_param: isize) -> isize {
     use windows_sys::Win32::UI::WindowsAndMessaging::HC_ACTION;
     if n_code == HC_ACTION as i32 {
         let ms = unsafe { &*(l_param as *const MSLLHOOKSTRUCT) };
@@ -545,11 +548,13 @@ unsafe extern "system" fn mouse_proc(
             WM_XBUTTONDOWN => xbutton(high_word).map(CaptureEvent::ButtonPress),
             WM_XBUTTONUP => xbutton(high_word).map(CaptureEvent::ButtonRelease),
             WM_MOUSEWHEEL => {
-                let notches = HOOK_STATE.with_borrow_mut(|s| wheel_notches(&mut s.wheel_rest.1, high_word));
+                let notches =
+                    HOOK_STATE.with_borrow_mut(|s| wheel_notches(&mut s.wheel_rest.1, high_word));
                 (notches != 0).then_some(CaptureEvent::Scroll(0, notches))
             }
             WM_MOUSEHWHEEL => {
-                let notches = HOOK_STATE.with_borrow_mut(|s| wheel_notches(&mut s.wheel_rest.0, high_word));
+                let notches =
+                    HOOK_STATE.with_borrow_mut(|s| wheel_notches(&mut s.wheel_rest.0, high_word));
                 (notches != 0).then_some(CaptureEvent::Scroll(notches, 0))
             }
             _ => None,
@@ -681,12 +686,18 @@ pub fn prepare_for_macro_execution(backend: &Arc<Mutex<dyn InputBackend>>) {
 
     // Release any physically-held modifier keys, so a combo the user is still
     // holding from the hotkey doesn't modify everything the macro types.
-    let Ok(mut backend) = backend.lock() else { return };
+    let Ok(mut backend) = backend.lock() else {
+        return;
+    };
     for &vk in &[
-        VK_LCONTROL, VK_RCONTROL,
-        VK_LSHIFT, VK_RSHIFT,
-        VK_LMENU, VK_RMENU,
-        VK_LWIN, VK_RWIN,
+        VK_LCONTROL,
+        VK_RCONTROL,
+        VK_LSHIFT,
+        VK_RSHIFT,
+        VK_LMENU,
+        VK_RMENU,
+        VK_LWIN,
+        VK_RWIN,
     ] {
         if unsafe { GetAsyncKeyState(vk as i32) } < 0 {
             let _ = backend.raw_keycode(vk, Direction::Release);
@@ -702,7 +713,10 @@ mod tests {
     fn wheel_fractions_add_up_to_notches() {
         let mut rest = 0;
         assert_eq!(wheel_notches(&mut rest, 240), 2);
-        assert_eq!([30, 30, 30, 30].map(|d| wheel_notches(&mut rest, d)), [0, 0, 0, 1]);
+        assert_eq!(
+            [30, 30, 30, 30].map(|d| wheel_notches(&mut rest, d)),
+            [0, 0, 0, 1]
+        );
         assert_eq!(wheel_notches(&mut rest, 90), 0);
         // Turning back starts over instead of cancelling the 90 first.
         assert_eq!(wheel_notches(&mut rest, -120), -1);
@@ -715,7 +729,11 @@ mod tests {
         let back = |units: i32, size: i32| (units as i64 * size as i64 / 65536) as i32;
         for size in [2, 1080, 1707, 6400] {
             for offset in 0..size {
-                assert_eq!(back(normalize(offset, size), size), offset, "{offset} of {size}");
+                assert_eq!(
+                    back(normalize(offset, size), size),
+                    offset,
+                    "{offset} of {size}"
+                );
             }
         }
         assert_eq!(normalize(-5, 100), 0);

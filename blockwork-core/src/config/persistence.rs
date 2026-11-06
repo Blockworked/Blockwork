@@ -1,5 +1,5 @@
-use crate::macros::migrate::{self, Upgrade};
 use crate::macros::Macro;
+use crate::macros::migrate::{self, Upgrade};
 use std::collections::HashMap;
 use std::fs;
 use std::path::{Path, PathBuf};
@@ -27,8 +27,13 @@ fn macro_cache() -> &'static Mutex<HashMap<String, (SystemTime, Macro)>> {
 fn ensure_macros_dir() -> Result<PathBuf, String> {
     let mut path = super::config_root()?;
     path.push(MACROS_DIR_NAME);
-    fs::create_dir_all(&path)
-        .map_err(|err| format!("Failed to create macros directory '{}': {}", path.display(), err))?;
+    fs::create_dir_all(&path).map_err(|err| {
+        format!(
+            "Failed to create macros directory '{}': {}",
+            path.display(),
+            err
+        )
+    })?;
     Ok(path)
 }
 
@@ -60,19 +65,30 @@ pub fn read_macro_file_upgrading(path: &Path) -> Result<(Macro, Upgrade), String
 fn load_own_macro_file(path: &Path) -> Result<Macro, String> {
     let (mac, upgrade) = read_macro_file_upgrading(path)?;
     if upgrade.changed() {
-        let moved_pack_state = upgrade.from < 3 && mac.settings.block_packs.iter().any(|p| !p.variables.is_empty());
+        let moved_pack_state = upgrade.from < 3
+            && mac
+                .settings
+                .block_packs
+                .iter()
+                .any(|p| !p.variables.is_empty());
         if !upgrade.notes.is_empty() || moved_pack_state {
             // A fresh backup every time: a file can be salvaged more than
             // once (opened in an older build, edited in a newer one, opened
             // in the older one again), and each time loses different blocks.
             let backup = unused_backup_path(path, upgrade.from);
             if let Err(e) = fs::copy(path, &backup) {
-                warn!("Failed to back up '{}' before upgrading it: {e}", path.display());
+                warn!(
+                    "Failed to back up '{}' before upgrading it: {e}",
+                    path.display()
+                );
                 return Ok(mac);
             }
             let source = crate::run_log::Source::for_macro(&mac.id, &mac.name);
             for note in &upgrade.notes {
-                crate::run_log::info(&source, format!("{note} (the old file is kept as {})", backup.display()));
+                crate::run_log::info(
+                    &source,
+                    format!("{note} (the old file is kept as {})", backup.display()),
+                );
             }
         }
         if let Err(e) = write_macro_file(path, &mac) {
@@ -123,8 +139,13 @@ pub fn read_macro_by_id(id: &str) -> Option<Macro> {
         }
     };
     // The upgrade may have rewritten the file.
-    let mtime = fs::metadata(&path).and_then(|m| m.modified()).unwrap_or(mtime);
-    macro_cache().lock().unwrap().insert(id.to_string(), (mtime, mac.clone()));
+    let mtime = fs::metadata(&path)
+        .and_then(|m| m.modified())
+        .unwrap_or(mtime);
+    macro_cache()
+        .lock()
+        .unwrap()
+        .insert(id.to_string(), (mtime, mac.clone()));
     Some(mac)
 }
 
@@ -133,11 +154,18 @@ pub fn read_macro_by_id(id: &str) -> Option<Macro> {
 fn without_secrets(mac: &Macro) -> Option<Macro> {
     use crate::input::value::Evaluated;
     use blockstitch_core::graph::ListItem;
-    let secret_var = |v: &Evaluated| matches!(v, Evaluated::Text(t) if crate::secrets::contains_secret(t));
-    let secret_item = |i: &ListItem| matches!(i, ListItem::Text(t) if crate::secrets::contains_secret(t));
+    let secret_var =
+        |v: &Evaluated| matches!(v, Evaluated::Text(t) if crate::secrets::contains_secret(t));
+    let secret_item =
+        |i: &ListItem| matches!(i, ListItem::Text(t) if crate::secrets::contains_secret(t));
     if !mac.variables.iter().any(|v| secret_var(&v.value))
-        && !mac.settings.block_packs.iter().any(|p| p.variables.iter().any(|v| secret_var(&v.value)))
-        && !mac.lists.iter().any(|l| l.items.iter().any(secret_item)) {
+        && !mac
+            .settings
+            .block_packs
+            .iter()
+            .any(|p| p.variables.iter().any(|v| secret_var(&v.value)))
+        && !mac.lists.iter().any(|l| l.items.iter().any(secret_item))
+    {
         return None;
     }
     let mut clean = mac.clone();
@@ -148,7 +176,9 @@ fn without_secrets(mac: &Macro) -> Option<Macro> {
     }
     for pack in &mut clean.settings.block_packs {
         for var in &mut pack.variables {
-            if let Evaluated::Text(text) = &mut var.value { *text = crate::secrets::redact(text); }
+            if let Evaluated::Text(text) = &mut var.value {
+                *text = crate::secrets::redact(text);
+            }
         }
     }
     for list in &mut clean.graph.lists {
@@ -175,16 +205,26 @@ pub fn write_macro_file(path: &Path, mac: &Macro) -> Result<(), String> {
         .ok_or_else(|| format!("Invalid macro file name '{}'", path.display()))?;
     temp_path.set_file_name(format!("{}.tmp", file_name));
 
-    fs::write(&temp_path, serialized)
-        .map_err(|err| format!("Failed to write temporary macro file '{}': {}", temp_path.display(), err))?;
+    fs::write(&temp_path, serialized).map_err(|err| {
+        format!(
+            "Failed to write temporary macro file '{}': {}",
+            temp_path.display(),
+            err
+        )
+    })?;
 
     if path.exists() {
         fs::remove_file(path)
             .map_err(|err| format!("Failed to replace macro file '{}': {}", path.display(), err))?;
     }
 
-    fs::rename(&temp_path, path)
-        .map_err(|err| format!("Failed to finalize macro file '{}': {}", path.display(), err))?;
+    fs::rename(&temp_path, path).map_err(|err| {
+        format!(
+            "Failed to finalize macro file '{}': {}",
+            path.display(),
+            err
+        )
+    })?;
 
     Ok(())
 }
@@ -192,8 +232,13 @@ pub fn write_macro_file(path: &Path, mac: &Macro) -> Result<(), String> {
 fn list_macro_file_paths() -> Result<Vec<PathBuf>, String> {
     flush_saves();
     let dir = ensure_macros_dir()?;
-    let entries = fs::read_dir(&dir)
-        .map_err(|err| format!("Failed to scan macros directory '{}': {}", dir.display(), err))?;
+    let entries = fs::read_dir(&dir).map_err(|err| {
+        format!(
+            "Failed to scan macros directory '{}': {}",
+            dir.display(),
+            err
+        )
+    })?;
 
     let mut paths = entries
         .filter_map(|entry| entry.ok().map(|e| e.path()))
@@ -217,30 +262,36 @@ struct Saves {
 fn saves() -> &'static Saves {
     static SAVES: OnceLock<Saves> = OnceLock::new();
     SAVES.get_or_init(|| {
-        let spawned = std::thread::Builder::new().name("blockwork-saves".into()).spawn(|| {
-            let saves = saves();
-            loop {
-                {
-                    let mut queue = saves.queue.lock().unwrap();
-                    while queue.is_empty() {
-                        queue = saves.queued.wait(queue).unwrap();
+        let spawned = std::thread::Builder::new()
+            .name("blockwork-saves".into())
+            .spawn(|| {
+                let saves = saves();
+                loop {
+                    {
+                        let mut queue = saves.queue.lock().unwrap();
+                        while queue.is_empty() {
+                            queue = saves.queued.wait(queue).unwrap();
+                        }
+                    }
+                    let _writing = saves.writing.lock().unwrap();
+                    let next = {
+                        let mut queue = saves.queue.lock().unwrap();
+                        let key = queue.keys().next().cloned();
+                        key.and_then(|key| queue.remove_entry(&key))
+                    };
+                    if let Some((path, mac)) = next {
+                        write_saved(&path, &mac);
                     }
                 }
-                let _writing = saves.writing.lock().unwrap();
-                let next = {
-                    let mut queue = saves.queue.lock().unwrap();
-                    let key = queue.keys().next().cloned();
-                    key.and_then(|key| queue.remove_entry(&key))
-                };
-                if let Some((path, mac)) = next {
-                    write_saved(&path, &mac);
-                }
-            }
-        });
+            });
         if let Err(e) = spawned {
             warn!("Couldn't start the save thread, saving in place: {e}");
         }
-        Saves { queue: Mutex::new(HashMap::new()), queued: Condvar::new(), writing: Mutex::new(()) }
+        Saves {
+            queue: Mutex::new(HashMap::new()),
+            queued: Condvar::new(),
+            writing: Mutex::new(()),
+        }
     })
 }
 
@@ -253,7 +304,9 @@ fn write_saved(path: &Path, mac: &Macro) {
 
 /// Writes every queued save now. Call before reading macro files or exiting.
 pub fn flush_saves() {
-    let Some(saves) = SAVES_STARTED.get().map(|_| saves()) else { return };
+    let Some(saves) = SAVES_STARTED.get().map(|_| saves()) else {
+        return;
+    };
     let _writing = saves.writing.lock().unwrap();
     let queued: Vec<_> = saves.queue.lock().unwrap().drain().collect();
     for (path, mac) in queued {
@@ -297,8 +350,9 @@ impl Macro {
         flush_saves();
         let path = macro_file_path(&self.id)?;
         if path.exists() {
-            fs::remove_file(&path)
-                .map_err(|err| format!("Failed to remove macro file '{}': {}", path.display(), err))?;
+            fs::remove_file(&path).map_err(|err| {
+                format!("Failed to remove macro file '{}': {}", path.display(), err)
+            })?;
         }
         macro_cache().lock().unwrap().remove(&self.id);
         crate::permissions::trust(&self.id);
@@ -360,25 +414,50 @@ pub struct ImportFile {
 
 /// Reads a single macro file or a bundle.
 pub fn read_import_file(path: &Path) -> Result<ImportFile, String> {
-    let text = fs::read_to_string(path).map_err(|e| format!("Couldn't read '{}': {e}", path.display()))?;
-    let value: serde_json::Value = serde_json::from_str(&text).map_err(|e| format!("'{}' isn't a macro file: {e}", path.display()))?;
+    let text =
+        fs::read_to_string(path).map_err(|e| format!("Couldn't read '{}': {e}", path.display()))?;
+    let value: serde_json::Value = serde_json::from_str(&text)
+        .map_err(|e| format!("'{}' isn't a macro file: {e}", path.display()))?;
     let Some(version) = value.get(BUNDLE_KEY) else {
-        let (mut mac, upgrade) = migrate::from_value(value).map_err(|e| format!("Couldn't import '{}': {e}", path.display()))?;
+        let (mut mac, upgrade) = migrate::from_value(value)
+            .map_err(|e| format!("Couldn't import '{}': {e}", path.display()))?;
         mac.ensure_id();
-        return Ok(ImportFile { name: mac.name.clone(), macros: vec![mac], notes: upgrade.notes });
+        return Ok(ImportFile {
+            name: mac.name.clone(),
+            macros: vec![mac],
+            notes: upgrade.notes,
+        });
     };
     if version.as_u64().is_none_or(|v| v > 1) {
-        return Err("This bundle was made by a newer version of Blockwork. Update Blockwork to import it".into());
+        return Err(
+            "This bundle was made by a newer version of Blockwork. Update Blockwork to import it"
+                .into(),
+        );
     }
     let mut out = ImportFile {
-        name: value.get("name").and_then(|n| n.as_str()).unwrap_or("Bundle").to_string(),
+        name: value
+            .get("name")
+            .and_then(|n| n.as_str())
+            .unwrap_or("Bundle")
+            .to_string(),
         macros: Vec::new(),
         notes: Vec::new(),
     };
-    for entry in value.get("macros").and_then(|m| m.as_array()).into_iter().flatten() {
-        let (mut mac, upgrade) = migrate::from_value(entry.clone()).map_err(|e| format!("Couldn't import a macro in the bundle: {e}"))?;
+    for entry in value
+        .get("macros")
+        .and_then(|m| m.as_array())
+        .into_iter()
+        .flatten()
+    {
+        let (mut mac, upgrade) = migrate::from_value(entry.clone())
+            .map_err(|e| format!("Couldn't import a macro in the bundle: {e}"))?;
         mac.ensure_id();
-        out.notes.extend(upgrade.notes.into_iter().map(|n| format!("{}: {n}", mac.name)));
+        out.notes.extend(
+            upgrade
+                .notes
+                .into_iter()
+                .map(|n| format!("{}: {n}", mac.name)),
+        );
         out.macros.push(mac);
     }
     if out.macros.is_empty() {
@@ -440,9 +519,19 @@ mod tests {
         }).to_string();
         fs::write(&path, &original).unwrap();
         let loaded = load_own_macro_file(&path).unwrap();
-        assert_eq!(loaded.settings.block_packs[0].variables[0].value, Evaluated::Number(42.0));
-        assert_eq!(fs::read_to_string(path.with_extension("json.v2.bak")).unwrap(), original);
-        assert_eq!(serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&path).unwrap()).unwrap()["format_version"], 3);
+        assert_eq!(
+            loaded.settings.block_packs[0].variables[0].value,
+            Evaluated::Number(42.0)
+        );
+        assert_eq!(
+            fs::read_to_string(path.with_extension("json.v2.bak")).unwrap(),
+            original
+        );
+        assert_eq!(
+            serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&path).unwrap()).unwrap()
+                ["format_version"],
+            3
+        );
         fs::remove_dir_all(dir).unwrap();
     }
 
@@ -452,7 +541,8 @@ mod tests {
         fs::create_dir_all(&dir).unwrap();
         let path = dir.join("m.json");
         let with_unknown = |text: &str| {
-            let mut value = serde_json::to_value(Macro::new("M".into(), String::new(), Vec::new())).unwrap();
+            let mut value =
+                serde_json::to_value(Macro::new("M".into(), String::new(), Vec::new())).unwrap();
             value["strands"] = serde_json::json!([{ "id": "s", "x": 0, "y": 0, "instructions": [
                 { "id": "a", "kind": "WhenRan" },
                 { "id": "b", "kind": { "BlockFromTheFuture": text } },
@@ -470,7 +560,10 @@ mod tests {
             .map(|n| fs::read_to_string(dir.join(n)).unwrap())
             .collect();
         assert_eq!(backups.len(), 2);
-        assert!(backups.iter().any(|b| b.contains("first")) && backups.iter().any(|b| b.contains("second")));
+        assert!(
+            backups.iter().any(|b| b.contains("first"))
+                && backups.iter().any(|b| b.contains("second"))
+        );
         let _ = fs::remove_dir_all(&dir);
     }
 }
@@ -481,7 +574,9 @@ mod background_saves {
 
     #[test]
     fn queued_saves_are_seen_by_readers_and_never_land_late() {
-        super::super::set_config_dir_override(std::env::temp_dir().join(format!("bw-saves-{}", std::process::id())));
+        super::super::set_config_dir_override(
+            std::env::temp_dir().join(format!("bw-saves-{}", std::process::id())),
+        );
         let mut mac = Macro::new("Queued".into(), String::new(), Vec::new());
         mac.ensure_id();
         for i in 0..50 {

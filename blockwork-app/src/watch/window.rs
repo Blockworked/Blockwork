@@ -34,12 +34,16 @@ fn run(shared_state: SharedState, app: AppHandle) {
 
         let (watched, emulator, speed_multiplier) = {
             let Ok(s) = shared_state.lock() else { continue };
-            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else { continue };
+            let Some(emulator) = s.emulator.as_ref().map(Arc::clone) else {
+                continue;
+            };
             let mut watched = Vec::new();
             for mac in scheduled_run::live_macros(&s) {
                 let env = variable_env(mac);
                 for strand in &mac.strands {
-                    let Some(InstructionKind::WhenWindow { pattern, focused }) = strand.instructions.first().map(|i| &i.kind) else {
+                    let Some(InstructionKind::WhenWindow { pattern, focused }) =
+                        strand.instructions.first().map(|i| &i.kind)
+                    else {
                         continue;
                     };
                     watched.push(Watched {
@@ -57,13 +61,16 @@ fn run(shared_state: SharedState, app: AppHandle) {
         }
 
         // Says once why window triggers can't work here.
-        let Some(window) = errors.check("Window trigger", blockwork_core::window::active()) else { continue };
+        let Some(window) = errors.check("Window trigger", blockwork_core::window::active()) else {
+            continue;
+        };
 
         let mut next = HashMap::with_capacity(watched.len());
         for w in watched {
             let matched = window.matches(&w.pattern, blockwork_core::window::MatchBy::Any);
             if fires_on_change(last_match.get(&w.target.key).copied(), matched, w.focused) {
-                w.target.fire(&emulator, speed_multiplier, &shared_state, &app);
+                w.target
+                    .fire(&emulator, speed_multiplier, &shared_state, &app);
             }
             next.insert(w.target.key, matched);
         }

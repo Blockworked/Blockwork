@@ -42,7 +42,10 @@ struct Clock {
 
 fn clock() -> &'static Clock {
     static CLOCK: OnceLock<Clock> = OnceLock::new();
-    CLOCK.get_or_init(|| Clock { state: Mutex::new(State::default()), cv: Condvar::new() })
+    CLOCK.get_or_init(|| Clock {
+        state: Mutex::new(State::default()),
+        cv: Condvar::new(),
+    })
 }
 
 /// Whether a lockstep run is active.
@@ -54,7 +57,11 @@ pub fn enabled() -> bool {
 pub fn begin() {
     let c = clock();
     if let Ok(mut s) = c.state.lock() {
-        *s = State { enabled: true, starting: true, ..State::default() };
+        *s = State {
+            enabled: true,
+            starting: true,
+            ..State::default()
+        };
     }
     c.cv.notify_all();
 }
@@ -92,7 +99,9 @@ pub(crate) fn detach() {
 /// Returns false if stopped.
 pub(crate) fn wait_until(target_ms: f64, should_stop: &dyn Fn() -> bool) -> bool {
     let c = clock();
-    let Ok(mut s) = c.state.lock() else { return false };
+    let Ok(mut s) = c.state.lock() else {
+        return false;
+    };
     if s.now_ms + EPSILON_MS >= target_ms {
         return !should_stop();
     }
@@ -121,7 +130,9 @@ pub(crate) fn wait_until(target_ms: f64, should_stop: &dyn Fn() -> bool) -> bool
 /// on a future deadline, or finished), and drains what it emitted.
 pub fn step(time_ms: f64) -> Vec<HostInput> {
     let c = clock();
-    let Ok(mut s) = c.state.lock() else { return Vec::new() };
+    let Ok(mut s) = c.state.lock() else {
+        return Vec::new();
+    };
     if !s.enabled {
         return Vec::new();
     }
@@ -150,7 +161,13 @@ pub fn step(time_ms: f64) -> Vec<HostInput> {
 fn push(name: String, is_button: bool, dir: Direction) {
     let c = clock();
     let Ok(mut s) = c.state.lock() else { return };
-    let mut add = |down| s.events.push(HostInput { name: name.clone(), is_button, down });
+    let mut add = |down| {
+        s.events.push(HostInput {
+            name: name.clone(),
+            is_button,
+            down,
+        })
+    };
     match dir {
         Direction::Press => add(true),
         Direction::Release => add(false),
@@ -220,7 +237,12 @@ mod tests {
         run.join().unwrap();
         finish();
         // Clicks at 33.3, 66.6 and 100ms land on the first step at or past each.
-        let hits: Vec<usize> = counts.iter().enumerate().filter(|(_, c)| **c > 0).map(|(i, _)| i).collect();
+        let hits: Vec<usize> = counts
+            .iter()
+            .enumerate()
+            .filter(|(_, c)| **c > 0)
+            .map(|(i, _)| i)
+            .collect();
         assert_eq!(hits, vec![14, 27, 40]);
     }
 }

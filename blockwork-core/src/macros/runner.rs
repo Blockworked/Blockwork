@@ -1,9 +1,11 @@
 use crate::input::types::{Coordinate, Direction, InputToken, MacroButton, MacroKey};
 use crate::input::value::{Evaluated, Op, Value};
-use crate::macros::backend::{create_backend, InputBackend};
+use crate::macros::backend::{InputBackend, create_backend};
 use crate::macros::host_clock;
 use crate::macros::priority::raise_current_thread_priority;
-use crate::macros::{BlockKind, ImageMatch, ImagePick, Instruction, InstructionKind, LaunchOptions, Macro, Strand};
+use crate::macros::{
+    BlockKind, ImageMatch, ImagePick, Instruction, InstructionKind, LaunchOptions, Macro, Strand,
+};
 use blockstitch_core::graph::{
     ListItem, ListStore, is_list_reporter, list_index, resolve_list_reporter,
 };
@@ -161,7 +163,12 @@ fn resolve_calls_and_params(value: &Value, ctx: &mut ExecCtx, depth: u32) -> Res
                 saved: saved.clone(),
             })
         }
-        Value::Call { block_id, args, branches, .. } => {
+        Value::Call {
+            block_id,
+            args,
+            branches,
+            ..
+        } => {
             // Args evaluate in the caller's scope, fully resolved to
             // concrete values before call_block swaps in the callee's scope.
             let mut evaluated_args = Vec::with_capacity(args.len());
@@ -169,9 +176,10 @@ fn resolve_calls_and_params(value: &Value, ctx: &mut ExecCtx, depth: u32) -> Res
                 let resolved = resolve_calls_and_params(a, ctx, depth)?;
                 evaluated_args.push(resolved.eval()?);
             }
-            let branch_values = branches.iter().map(|body| {
-                crate::frontend::reporter_branch_to_instructions(body)
-            }).collect::<Result<Vec<_>, _>>()?;
+            let branch_values = branches
+                .iter()
+                .map(|body| crate::frontend::reporter_branch_to_instructions(body))
+                .collect::<Result<Vec<_>, _>>()?;
             match call_block(block_id, evaluated_args, branch_values, ctx, depth + 1)? {
                 Some(e) => Ok(e.into_value()),
                 None => Err(format!("custom block '{block_id}' didn't return a value")),
@@ -200,8 +208,12 @@ fn call_block(
     let runtime = block_table
         .get(block_id)
         .ok_or_else(|| format!("call to unknown custom block '{block_id}'"))?;
-    if !runtime.variable_defaults.is_empty() && let Ok(mut vars) = ctx.variables.lock() {
-        for (key, value) in &runtime.variable_defaults { vars.entry(key.clone()).or_insert_with(|| value.clone()); }
+    if !runtime.variable_defaults.is_empty()
+        && let Ok(mut vars) = ctx.variables.lock()
+    {
+        for (key, value) in &runtime.variable_defaults {
+            vars.entry(key.clone()).or_insert_with(|| value.clone());
+        }
     }
     let new_env: HashMap<String, Evaluated> = runtime
         .input_names
@@ -243,7 +255,12 @@ pub fn last_error() -> String {
 
 /// A block couldn't do its job. Inside a `TryCatch` that's an error the
 /// catch handles; elsewhere the block is skipped and the run log says why.
-fn soft_fail(ctx: &mut ExecCtx, block_id: &str, block: &str, error: impl std::fmt::Display) -> Result<(), String> {
+fn soft_fail(
+    ctx: &mut ExecCtx,
+    block_id: &str,
+    block: &str,
+    error: impl std::fmt::Display,
+) -> Result<(), String> {
     let message = format!("{block}: {error}");
     if ctx.try_depth > 0 {
         ctx.error_block = block_id.to_string();
@@ -274,7 +291,10 @@ fn wait_limit_reached(
 ) -> Result<bool, String> {
     let elapsed = started.elapsed().as_secs_f64() * 1000.0;
     // If both are present, the earlier deadline wins; errors win a tie.
-    if error_timeout > 0.0 && (timeout <= 0.0 || error_timeout <= timeout) && elapsed >= error_timeout {
+    if error_timeout > 0.0
+        && (timeout <= 0.0 || error_timeout <= timeout)
+        && elapsed >= error_timeout
+    {
         ctx.error_block = block_id.to_string();
         return Err(format!("{message} after {error_timeout} ms"));
     }
@@ -289,7 +309,12 @@ fn loop_limit_hit(ctx: &mut ExecCtx, block_id: &str, iterations: &mut u64) -> Re
         return Ok(false);
     }
     let limit = ctx.max_loop_iterations;
-    soft_fail(ctx, block_id, "Loop", format!("stopped after {limit} iterations (this macro's loop limit)"))?;
+    soft_fail(
+        ctx,
+        block_id,
+        "Loop",
+        format!("stopped after {limit} iterations (this macro's loop limit)"),
+    )?;
     Ok(true)
 }
 
@@ -352,7 +377,11 @@ fn paste_text(ctx: &ExecCtx, text: String) -> Result<(), String> {
     std::thread::sleep(PASTE_SETTLE);
     {
         let mut em = ctx.emulator.lock().map_err(|e| e.to_string())?;
-        let modifier = if cfg!(target_os = "macos") { MacroKey::Meta } else { MacroKey::LControl };
+        let modifier = if cfg!(target_os = "macos") {
+            MacroKey::Meta
+        } else {
+            MacroKey::LControl
+        };
         em.key(modifier.clone(), Direction::Press)?;
         let pressed = em.key(MacroKey::Unicode('v'), Direction::Click);
         em.key(modifier, Direction::Release)?;
@@ -385,9 +414,17 @@ fn signal_bodies(ctx: &mut ExecCtx, name: &str, depth: u32) -> Vec<Vec<Instructi
     keys.into_iter()
         .filter_map(|key| {
             let body = &table[key].body;
-            let Some(InstructionKind::WhenSignal(listens)) = body.first().map(|i| &i.kind) else { return None };
-            let listens = ctx.resolve(&listens.value, depth).and_then(|v| v.eval_text()).ok()?;
-            listens.trim().eq_ignore_ascii_case(name.trim()).then(|| body[1..].to_vec())
+            let Some(InstructionKind::WhenSignal(listens)) = body.first().map(|i| &i.kind) else {
+                return None;
+            };
+            let listens = ctx
+                .resolve(&listens.value, depth)
+                .and_then(|v| v.eval_text())
+                .ok()?;
+            listens
+                .trim()
+                .eq_ignore_ascii_case(name.trim())
+                .then(|| body[1..].to_vec())
         })
         .collect()
 }
@@ -404,7 +441,12 @@ fn shell_process(command: &str) -> Command {
 /// Shows a dialog for this strand. `None` when there's no answer to use:
 /// cancelled (which stops the run unless a try block catches it), stopped,
 /// or failed.
-fn ask(ctx: &mut ExecCtx, block_id: &str, block: &str, request: crate::prompt::Request) -> Result<Option<crate::prompt::Reply>, String> {
+fn ask(
+    ctx: &mut ExecCtx,
+    block_id: &str,
+    block: &str,
+    request: crate::prompt::Request,
+) -> Result<Option<crate::prompt::Reply>, String> {
     let flag = ctx.stop_flag.clone();
     let stopped = || flag.as_ref().is_some_and(stop_requested);
     match crate::prompt::ask(&request, &stopped) {
@@ -413,7 +455,10 @@ fn ask(ctx: &mut ExecCtx, block_id: &str, block: &str, request: crate::prompt::R
                 ctx.error_block = block_id.to_string();
                 return Err(format!("{block}: cancelled"));
             }
-            crate::run_log::info(&ctx.source, format!("{block}: cancelled, so the run stopped"));
+            crate::run_log::info(
+                &ctx.source,
+                format!("{block}: cancelled, so the run stopped"),
+            );
             if let Some(flag) = &ctx.stop_flag
                 && let Ok(mut running) = flag.lock()
             {
@@ -439,13 +484,13 @@ fn set_variable(ctx: &ExecCtx, name: &str, value: Evaluated) {
     }
 }
 
-mod vision;
 mod apps;
-mod input;
 mod browser;
 mod data;
 mod dialogs;
+mod input;
 mod system;
+mod vision;
 use apps::*;
 
 impl Macro {
@@ -455,8 +500,16 @@ impl Macro {
         // Signal strands ride along under reserved keys, header included,
         // so every run entry point can reach them without another argument.
         for (index, strand) in self.graph.strands.iter().enumerate() {
-            if matches!(strand.instructions.first().map(|i| &i.kind), Some(InstructionKind::WhenSignal(_))) {
-                let runtime = BlockRuntime { input_names: Vec::new(), branch_names: Vec::new(), body: strand.instructions.clone(), variable_defaults: Vec::new() };
+            if matches!(
+                strand.instructions.first().map(|i| &i.kind),
+                Some(InstructionKind::WhenSignal(_))
+            ) {
+                let runtime = BlockRuntime {
+                    input_names: Vec::new(),
+                    branch_names: Vec::new(),
+                    body: strand.instructions.clone(),
+                    variable_defaults: Vec::new(),
+                };
                 table.insert(format!("{SIGNAL_KEY}{index}"), runtime);
             }
         }
@@ -479,20 +532,36 @@ impl Macro {
             }
         }
         for pack in &self.settings.block_packs {
-            let defaults: Vec<_> = pack.variables.iter().map(|v| (pack.variable_key(&v.name), v.value.clone())).collect();
+            let defaults: Vec<_> = pack
+                .variables
+                .iter()
+                .map(|v| (pack.variable_key(&v.name), v.value.clone()))
+                .collect();
             for id in &pack.blocks {
-                if crate::block_packs::owner(self, id).is_some_and(|owner| owner.id != pack.id) { continue; }
+                if crate::block_packs::owner(self, id).is_some_and(|owner| owner.id != pack.id) {
+                    continue;
+                }
                 if let Some(runtime) = table.get_mut(id) {
                     crate::block_packs::scope_body(&mut runtime.body, pack);
                     runtime.variable_defaults = defaults.clone();
                 }
             }
-            for var in pack.variables.iter().filter(|v| v.role == crate::block_packs::VariableRole::Output) {
-                table.insert(pack.output_id(&var.name), BlockRuntime {
-                    input_names: Vec::new(), branch_names: Vec::new(),
-                    body: vec![Instruction::new(InstructionKind::Return(Value::Var { name: pack.variable_key(&var.name) }))],
-                    variable_defaults: defaults.clone(),
-                });
+            for var in pack
+                .variables
+                .iter()
+                .filter(|v| v.role == crate::block_packs::VariableRole::Output)
+            {
+                table.insert(
+                    pack.output_id(&var.name),
+                    BlockRuntime {
+                        input_names: Vec::new(),
+                        branch_names: Vec::new(),
+                        body: vec![Instruction::new(InstructionKind::Return(Value::Var {
+                            name: pack.variable_key(&var.name),
+                        }))],
+                        variable_defaults: defaults.clone(),
+                    },
+                );
             }
         }
         Arc::new(table)
@@ -582,7 +651,12 @@ impl Macro {
         // Trigger strands are fired by the app's watchers via
         // `run_fired_strand`, never by a manual Run.
         self.run_entries(
-            |s| matches!(s.instructions.first().map(|i| &i.kind), Some(InstructionKind::WhenRan)),
+            |s| {
+                matches!(
+                    s.instructions.first().map(|i| &i.kind),
+                    Some(InstructionKind::WhenRan)
+                )
+            },
             emulator,
             stop_flag,
             speed_multiplier,
@@ -607,14 +681,23 @@ impl Macro {
         if !self.can_run_strand(strand_id) {
             return false;
         }
-        self.run_entries(|s| s.id == strand_id, emulator, stop_flag, speed_multiplier, variables, lists, Duration::ZERO);
+        self.run_entries(
+            |s| s.id == strand_id,
+            emulator,
+            stop_flag,
+            speed_multiplier,
+            variables,
+            lists,
+            Duration::ZERO,
+        );
         true
     }
 
     /// Whether `run_strand_with_lists` would run `strand_id`.
     pub fn can_run_strand(&self, strand_id: &str) -> bool {
         self.graph.strand(strand_id).is_some_and(|s| {
-            !s.instructions.is_empty() && !matches!(s.instructions[0].kind, InstructionKind::BlockHeader(_))
+            !s.instructions.is_empty()
+                && !matches!(s.instructions[0].kind, InstructionKind::BlockHeader(_))
         })
     }
 
@@ -888,7 +971,14 @@ fn run_block(
         }
         if !ins.kind.is_header() && !matches!(ins.kind, InstructionKind::Comment(_)) {
             let stopped = || ctx.stop_flag.as_ref().is_some_and(stop_requested);
-            let paused = crate::macros::debug::checkpoint(&ctx.source.macro_id, &ins.id, &stopped, &ctx.variables, &ctx.lists, &ctx.param_env);
+            let paused = crate::macros::debug::checkpoint(
+                &ctx.source.macro_id,
+                &ins.id,
+                &stopped,
+                &ctx.variables,
+                &ctx.lists,
+                &ctx.param_env,
+            );
             if !paused.is_zero() {
                 // Waits after the pause keep their spacing instead of catching up.
                 deadline += paused;
@@ -898,7 +988,10 @@ fn run_block(
             }
         }
 
-        if let Some(Err(e)) = crate::capabilities::checked_when_run(&ins.kind).map(crate::permissions::require).find(Result::is_err) {
+        if let Some(Err(e)) = crate::capabilities::checked_when_run(&ins.kind)
+            .map(crate::permissions::require)
+            .find(Result::is_err)
+        {
             soft_fail(ctx, &ins.id, "Permission", e)?;
             continue;
         }
@@ -953,22 +1046,37 @@ fn run_block(
             | InstructionKind::HttpRequest { .. }
             | InstructionKind::Command(_)
             | InstructionKind::CommandWait(_) => system::run_system_block(ins, ctx, depth)?,
-            InstructionKind::SplitIntoList { text, separator, name } => {
+            InstructionKind::SplitIntoList {
+                text,
+                separator,
+                name,
+            } => {
                 let parts = ctx
                     .resolve(text, depth)
                     .and_then(|v| v.eval_text())
-                    .and_then(|text| Ok(crate::text::split(&text, &ctx.resolve(separator, depth)?.eval_text()?)));
+                    .and_then(|text| {
+                        Ok(crate::text::split(
+                            &text,
+                            &ctx.resolve(separator, depth)?.eval_text()?,
+                        ))
+                    });
                 match parts {
                     Ok(parts) => {
                         if let Ok(mut lists) = ctx.lists.lock() {
-                            lists.insert(name.clone(), parts.into_iter().map(ListItem::Text).collect());
+                            lists.insert(
+                                name.clone(),
+                                parts.into_iter().map(ListItem::Text).collect(),
+                            );
                         }
                     }
                     Err(e) => soft_fail(ctx, &ins.id, "Split", e)?,
                 }
             }
             InstructionKind::PasteText(text) => {
-                let pasted = ctx.resolve(text, depth).and_then(|v| v.eval_text()).and_then(|text| paste_text(ctx, text));
+                let pasted = ctx
+                    .resolve(text, depth)
+                    .and_then(|v| v.eval_text())
+                    .and_then(|text| paste_text(ctx, text));
                 if let Err(e) = pasted {
                     soft_fail(ctx, &ins.id, "Paste", e)?;
                 }
@@ -982,7 +1090,11 @@ fn run_block(
                     }
                 };
                 let stop = ctx.stop_flag.clone();
-                let Some(_guard) = crate::macros::locks::acquire(&name, Duration::from_millis(50), || stop.as_ref().is_some_and(stop_requested)) else {
+                let Some(_guard) =
+                    crate::macros::locks::acquire(&name, Duration::from_millis(50), || {
+                        stop.as_ref().is_some_and(stop_requested)
+                    })
+                else {
                     break;
                 };
                 let flow = run_block(body, ctx, depth, Instant::now())?;
@@ -990,7 +1102,9 @@ fn run_block(
                     return Ok(flow);
                 }
             }
-            InstructionKind::OpenApp { command, launch, .. } => {
+            InstructionKind::OpenApp {
+                command, launch, ..
+            } => {
                 println!("Opening app: {command}");
                 if let Err(e) = open_app(command, launch) {
                     soft_fail(ctx, &ins.id, "Open app", e)?;
@@ -1023,7 +1137,11 @@ fn run_block(
                     .and_then(|v| v.eval_text())
                     .unwrap_or_else(|e| e);
                 ctx.error_block = ins.id.clone();
-                return Err(if message.is_empty() { "error".to_string() } else { message });
+                return Err(if message.is_empty() {
+                    "error".to_string()
+                } else {
+                    message
+                });
             }
             InstructionKind::TryCatch { body, catch_body } => {
                 ctx.try_depth += 1;
@@ -1065,16 +1183,28 @@ fn run_block(
                     ctx.error_block.clear();
                     LAST_ERROR.with(|e| *e.borrow_mut() = message.clone());
                     if attempt == attempts {
-                        soft_fail(ctx, &ins.id, "Retry", format!("gave up after {attempts} attempts: {message}"))?;
+                        soft_fail(
+                            ctx,
+                            &ins.id,
+                            "Retry",
+                            format!("gave up after {attempts} attempts: {message}"),
+                        )?;
                         break;
                     }
-                    crate::run_log::info(&ctx.source, format!("Attempt {attempt} of {attempts} failed: {message}"));
+                    crate::run_log::info(
+                        &ctx.source,
+                        format!("Attempt {attempt} of {attempts} failed: {message}"),
+                    );
                     if sleep_unless_stopped(ctx, delay_ms) {
                         break;
                     }
                 }
             }
-            InstructionKind::WaitUntil { condition, timeout, error_timeout } => {
+            InstructionKind::WaitUntil {
+                condition,
+                timeout,
+                error_timeout,
+            } => {
                 let (timeout, error_timeout) = match (|| {
                     Ok::<_, String>((
                         optional_number(ctx, depth, timeout.as_ref(), 0.0)?,
@@ -1089,7 +1219,11 @@ fn run_block(
                 };
                 let started = Instant::now();
                 loop {
-                    match ctx.resolve(condition, depth).and_then(|v| v.eval()).map(|v| v.as_bool()) {
+                    match ctx
+                        .resolve(condition, depth)
+                        .and_then(|v| v.eval())
+                        .map(|v| v.as_bool())
+                    {
                         Ok(true) => break,
                         Ok(false) => {}
                         Err(e) => {
@@ -1097,7 +1231,14 @@ fn run_block(
                             break;
                         }
                     }
-                    if wait_limit_reached(ctx, &ins.id, started, timeout, error_timeout, "Wait until: still false")? {
+                    if wait_limit_reached(
+                        ctx,
+                        &ins.id,
+                        started,
+                        timeout,
+                        error_timeout,
+                        "Wait until: still false",
+                    )? {
                         break;
                     }
                     if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
@@ -1341,7 +1482,8 @@ fn run_block(
 /// `make_backend`, or an `UnavailableBackend` when there is none, so macros
 /// still run and their input blocks say why they can't.
 pub fn make_backend_or_unavailable() -> Arc<Mutex<dyn InputBackend>> {
-    make_backend().unwrap_or_else(|| Arc::new(Mutex::new(crate::macros::backend::UnavailableBackend::new())))
+    make_backend()
+        .unwrap_or_else(|| Arc::new(Mutex::new(crate::macros::backend::UnavailableBackend::new())))
 }
 
 pub fn make_backend() -> Option<Arc<Mutex<dyn InputBackend>>> {

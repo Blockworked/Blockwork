@@ -2,9 +2,9 @@
 //! them as temporary strands (`open_reporter_branches`), this runs the edit,
 //! and blockstitch writes them back.
 
+use crate::macros::InstructionKind;
 use blockstitch_core::editor::{EditCommand, EditContext, ValueDestination, ValueLocation};
 use blockstitch_core::graph::BlockGraph;
-use crate::macros::InstructionKind;
 use serde::de::DeserializeOwned;
 use serde_json::{Value as Json, json};
 
@@ -19,7 +19,8 @@ fn read_body(body: &[Json]) -> Result<Vec<crate::macros::Instruction>, String> {
 }
 
 fn write_instruction(instruction: &crate::macros::Instruction) -> Result<Json, String> {
-    serde_json::to_value(crate::frontend::instruction_to_dto(instruction)).map_err(|e| e.to_string())
+    serde_json::to_value(crate::frontend::instruction_to_dto(instruction))
+        .map_err(|e| e.to_string())
 }
 
 /// Runs one editor command inside a reporter's branches (an `args` naming a
@@ -191,9 +192,9 @@ pub fn edit_reporter_branch(graph: &mut Graph, cmd: &str, args: &Json) -> Result
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::input::value::Value;
     use blockstitch_core::editor::REPORTER_BRANCH_PREFIX as PREFIX;
     use blockstitch_core::graph::Strand;
-    use crate::input::value::Value;
     use blockstitch_core::graph::{FloatingValue, Instruction};
 
     fn fixture() -> (Graph, String, ValueLocation) {
@@ -263,10 +264,14 @@ mod tests {
             0,
             0,
             vec![
-                crate::frontend::dto_to_instruction(&serde_json::from_value(wait("first")).unwrap())
-                    .unwrap(),
-                crate::frontend::dto_to_instruction(&serde_json::from_value(wait("second")).unwrap())
-                    .unwrap(),
+                crate::frontend::dto_to_instruction(
+                    &serde_json::from_value(wait("first")).unwrap(),
+                )
+                .unwrap(),
+                crate::frontend::dto_to_instruction(
+                    &serde_json::from_value(wait("second")).unwrap(),
+                )
+                .unwrap(),
             ],
         );
         edit_reporter_branch(
@@ -296,8 +301,10 @@ mod tests {
             x: 0,
             y: 0,
             instructions: vec![
-                crate::frontend::dto_to_instruction(&serde_json::from_value(wait("first")).unwrap())
-                    .unwrap(),
+                crate::frontend::dto_to_instruction(
+                    &serde_json::from_value(wait("first")).unwrap(),
+                )
+                .unwrap(),
                 Instruction {
                     id: "owner".into(),
                     kind: InstructionKind::Wait(value),
@@ -306,13 +313,17 @@ mod tests {
         });
         let location = json!({ "kind": "Field", "strand_id": "source", "index": [{"index": 1}], "field_id": "WaitDuration", "path": [] });
         let id = format!("{PREFIX}{}", json!({ "location": location, "slot": 0 }));
-        let branches = graph.open_reporter_branches(&[id.clone()], &read_body).unwrap();
+        let branches = graph
+            .open_reporter_branches(&[id.clone()], &read_body)
+            .unwrap();
         graph.strands[0].instructions.remove(0);
         graph.strand_mut(&id).unwrap().instructions.push(
             crate::frontend::dto_to_instruction(&serde_json::from_value(wait("nested")).unwrap())
                 .unwrap(),
         );
-        graph.close_reporter_branches(branches, &write_instruction).unwrap();
+        graph
+            .close_reporter_branches(branches, &write_instruction)
+            .unwrap();
         assert_eq!(graph.strands.len(), 1);
         let InstructionKind::Wait(Value::Call { branches, .. }) =
             &graph.strands[0].instructions[0].kind

@@ -41,7 +41,13 @@ fn templates() -> [Template; 4] {
                 vec![
                     ins(InstructionKind::WhenRan),
                     ins(InstructionKind::Forever {
-                        body: vec![ins(InstructionKind::Token(InputToken::Button(MacroButton::Left, Direction::Click))), wait(100.0)],
+                        body: vec![
+                            ins(InstructionKind::Token(InputToken::Button(
+                                MacroButton::Left,
+                                Direction::Click,
+                            ))),
+                            wait(100.0),
+                        ],
                     }),
                 ]
             },
@@ -56,8 +62,13 @@ fn templates() -> [Template; 4] {
             },
             build: || {
                 vec![
-                    ins(InstructionKind::WhenTyped { text: Value::text(";thx"), erase: true }),
-                    ins(InstructionKind::PasteText(Value::text("Thanks for reaching out! I'll get back to you soon."))),
+                    ins(InstructionKind::WhenTyped {
+                        text: Value::text(";thx"),
+                        erase: true,
+                    }),
+                    ins(InstructionKind::PasteText(Value::text(
+                        "Thanks for reaching out! I'll get back to you soon.",
+                    ))),
                 ]
             },
             always_listen: true,
@@ -75,14 +86,22 @@ fn templates() -> [Template; 4] {
                     ins(InstructionKind::Forever {
                         body: vec![
                             wait(30.0 * 60.0 * 1000.0),
-                            ins(InstructionKind::ChangeGlobal { name: Value::text("breaks"), by: Value::number(1.0) }),
+                            ins(InstructionKind::ChangeGlobal {
+                                name: Value::text("breaks"),
+                                by: Value::number(1.0),
+                            }),
                             ins(InstructionKind::Notify {
                                 title: Value::text("Time for a break"),
                                 message: Value::op(
                                     Op::from_name("Join"),
                                     vec![
-                                        Value::text("Stand up and look away from the screen. Breaks so far: "),
-                                        Value::op(Op::from_name("GlobalVariable"), vec![Value::text("breaks")]),
+                                        Value::text(
+                                            "Stand up and look away from the screen. Breaks so far: ",
+                                        ),
+                                        Value::op(
+                                            Op::from_name("GlobalVariable"),
+                                            vec![Value::text("breaks")],
+                                        ),
                                     ],
                                 ),
                             }),
@@ -137,8 +156,15 @@ pub(crate) fn list() -> Vec<TemplateDto> {
 
 /// A new, unsaved macro made from template `id`.
 pub(crate) fn build(id: &str) -> Result<Macro, String> {
-    let template = templates().into_iter().find(|t| t.info.id == id).ok_or("unknown template")?;
-    let mut mac = Macro::new(template.info.name.into(), template.info.description.into(), vec![]);
+    let template = templates()
+        .into_iter()
+        .find(|t| t.info.id == id)
+        .ok_or("unknown template")?;
+    let mut mac = Macro::new(
+        template.info.name.into(),
+        template.info.description.into(),
+        vec![],
+    );
     mac.graph.strands[0].instructions = (template.build)();
     mac.settings.always_listen = template.always_listen;
     Ok(mac)
@@ -155,7 +181,12 @@ mod tests {
             let mac = build(template.id).unwrap();
             let json = serde_json::to_string(&mac).unwrap();
             let back: Macro = serde_json::from_str(&json).unwrap();
-            assert_eq!(back.graph.strands[0].instructions.len(), mac.graph.strands[0].instructions.len(), "{}", template.id);
+            assert_eq!(
+                back.graph.strands[0].instructions.len(),
+                mac.graph.strands[0].instructions.len(),
+                "{}",
+                template.id
+            );
         }
         assert!(build("nope").is_err());
     }

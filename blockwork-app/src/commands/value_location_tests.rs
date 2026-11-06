@@ -1,8 +1,8 @@
 use super::*;
-use blockwork_core::macros::BlockDef;
 use blockstitch_core::editor::apply_value_kind;
 use blockwork_core::input::types::Coordinate;
 use blockwork_core::input::value::Op;
+use blockwork_core::macros::BlockDef;
 use blockwork_core::macros::{
     BlockShape, FieldId, FloatingValue, InputValueType, MacroGraph, VariableDef,
 };
@@ -50,18 +50,26 @@ fn bundle_dependencies_are_transitive_and_handle_cycles() {
     a.id = "a".into();
     a.name = "First".into();
     a.strands[0].instructions = vec![Instruction::new(InstructionKind::RunMacro {
-        target: Value::text(" second "), wait: false,
+        target: Value::text(" second "),
+        wait: false,
     })];
     let mut b = test_macro();
     b.id = "b".into();
     b.name = "Second".into();
-    b.strands[0].instructions = vec![Instruction::new(InstructionKind::StopMacroNamed(Value::text("Third")))];
+    b.strands[0].instructions = vec![Instruction::new(InstructionKind::StopMacroNamed(
+        Value::text("Third"),
+    ))];
     let mut c = test_macro();
     c.id = "c".into();
     c.name = "Third".into();
-    c.strands[0].instructions = vec![Instruction::new(InstructionKind::StopMacroNamed(Value::text("First")))];
+    c.strands[0].instructions = vec![Instruction::new(InstructionKind::StopMacroNamed(
+        Value::text("First"),
+    ))];
     let all = vec![a, b, c];
-    let ids = bundle_macros(&all, &["a".into()]).into_iter().map(|m| m.id).collect::<Vec<_>>();
+    let ids = bundle_macros(&all, &["a".into()])
+        .into_iter()
+        .map(|m| m.id)
+        .collect::<Vec<_>>();
     assert_eq!(ids, ["a", "b", "c"]);
     assert!(bundle_macros(&all, &[]).is_empty());
     assert!(bundle_macros(&all, &["missing".into()]).is_empty());
@@ -76,10 +84,7 @@ fn resolves_field_location() {
         field_id: FieldId::WaitDuration.to_string(),
         path: vec![],
     };
-    assert_eq!(
-        mac.value_at_mut(&loc),
-        Some(&mut Value::number(1000.0))
-    );
+    assert_eq!(mac.value_at_mut(&loc), Some(&mut Value::number(1000.0)));
 }
 
 #[test]
@@ -89,10 +94,7 @@ fn resolves_floating_location() {
         floating_id: "f1".into(),
         path: vec![],
     };
-    assert_eq!(
-        mac.value_at_mut(&loc),
-        Some(&mut Value::number(5.0))
-    );
+    assert_eq!(mac.value_at_mut(&loc), Some(&mut Value::number(5.0)));
 }
 
 #[test]
@@ -491,20 +493,14 @@ fn move_mouse_field_still_resolves_after_rework() {
         field_id: FieldId::MoveMouseY.to_string(),
         path: vec![],
     };
-    assert_eq!(
-        mac.value_at_mut(&loc),
-        Some(&mut Value::number(2.0))
-    );
+    assert_eq!(mac.value_at_mut(&loc), Some(&mut Value::number(2.0)));
 }
 
 #[test]
 fn preview_value_stringifies_numeric_result() {
     let dto = Value::Op {
         op: Op::Add,
-        args: vec![
-            Value::Number { value: 2.0 },
-            Value::Number { value: 3.0 },
-        ],
+        args: vec![Value::Number { value: 2.0 }, Value::Number { value: 3.0 }],
         saved: Box::new(Value::Number { value: 0.0 }),
     };
     assert_eq!(
@@ -537,10 +533,7 @@ fn preview_value_joins_text_args() {
 fn preview_value_surfaces_eval_errors() {
     let dto = Value::Op {
         op: Op::Div,
-        args: vec![
-            Value::Number { value: 1.0 },
-            Value::Number { value: 0.0 },
-        ],
+        args: vec![Value::Number { value: 1.0 }, Value::Number { value: 0.0 }],
         saved: Box::new(Value::Number { value: 0.0 }),
     };
     assert!(preview_value_with_env(&dto, &HashMap::new()).is_err());
@@ -549,7 +542,8 @@ fn preview_value_surfaces_eval_errors() {
 #[tokio::test]
 async fn palette_variable_creation_is_atomic_with_insertion_and_undo() {
     config::set_config_dir_override(std::env::temp_dir().join(format!(
-        "blockwork-palette-variables-{}", std::process::id()
+        "blockwork-palette-variables-{}",
+        std::process::id()
     )));
     blockwork_core::init();
     let mut initial = crate::initial_state(&config::AppSettings::default(), None, true, false);
@@ -558,22 +552,39 @@ async fn palette_variable_creation_is_atomic_with_insertion_and_undo() {
     let state = Arc::new(Mutex::new(initial));
     let (events, _) = tokio::sync::broadcast::channel(16);
     let app = AppHandle { events };
-    let variable_block = || serde_json::from_value::<InstructionDto>(serde_json::json!({
-        "id": "set", "type": "SetVariable", "name": "my variable",
-        "value": {"kind": "Number", "value": 0}
-    })).unwrap();
+    let variable_block = || {
+        serde_json::from_value::<InstructionDto>(serde_json::json!({
+            "id": "set", "type": "SetVariable", "name": "my variable",
+            "value": {"kind": "Number", "value": 0}
+        }))
+        .unwrap()
+    };
     let name = || Some("my variable".to_string());
-    add_strand(&state, &app, Some(20), Some(30), Some(variable_block()), name()).unwrap();
+    add_strand(
+        &state,
+        &app,
+        Some(20),
+        Some(30),
+        Some(variable_block()),
+        name(),
+    )
+    .unwrap();
     {
         let s = state.lock().unwrap();
         assert_eq!(s.current_macro.as_ref().unwrap().variables.len(), 1);
-        assert_eq!(s.variable_values.lock().unwrap().get("my variable"), Some(&Evaluated::Number(0.0)));
+        assert_eq!(
+            s.variable_values.lock().unwrap().get("my variable"),
+            Some(&Evaluated::Number(0.0))
+        );
     }
     undo(&state, &app).unwrap();
     {
         let s = state.lock().unwrap();
         assert!(s.current_macro.as_ref().unwrap().variables.is_empty());
-        assert_eq!(s.current_macro.as_ref().unwrap().strands.len(), initial_strands);
+        assert_eq!(
+            s.current_macro.as_ref().unwrap().strands.len(),
+            initial_strands
+        );
         assert!(s.variable_values.lock().unwrap().is_empty());
     }
     redo(&state, &app).unwrap();
@@ -586,16 +597,54 @@ async fn palette_variable_creation_is_atomic_with_insertion_and_undo() {
     {
         let s = state.lock().unwrap();
         assert_eq!(s.current_macro.as_ref().unwrap().variables.len(), 1);
-        assert_eq!(s.variable_values.lock().unwrap().get("my variable"), Some(&Evaluated::Number(42.0)));
+        assert_eq!(
+            s.variable_values.lock().unwrap().get("my variable"),
+            Some(&Evaluated::Number(42.0))
+        );
     }
     // Start a fresh canvas and attach the variable block to an existing strand.
-    state.lock().unwrap().current_macro = Some(Macro::new("Snapped variables".into(), "".into(), vec![]));
+    state.lock().unwrap().current_macro =
+        Some(Macro::new("Snapped variables".into(), "".into(), vec![]));
     let strand = add_strand(&state, &app, None, None, None, None).unwrap();
-    let rejected = serde_json::from_value(serde_json::json!({"id": "break", "type": "EscapeLoop"})).unwrap();
-    assert!(add_instruction(&state, &app, strand.clone(), top(0), rejected, None, name()).await.is_err());
-    assert!(state.lock().unwrap().current_macro.as_ref().unwrap().variables.is_empty());
-    add_instruction(&state, &app, strand.clone(), top(0), variable_block(), None, name()).await.unwrap();
-    assert_eq!(state.lock().unwrap().current_macro.as_ref().unwrap().variables.len(), 1);
+    let rejected =
+        serde_json::from_value(serde_json::json!({"id": "break", "type": "EscapeLoop"})).unwrap();
+    assert!(
+        add_instruction(&state, &app, strand.clone(), top(0), rejected, None, name())
+            .await
+            .is_err()
+    );
+    assert!(
+        state
+            .lock()
+            .unwrap()
+            .current_macro
+            .as_ref()
+            .unwrap()
+            .variables
+            .is_empty()
+    );
+    add_instruction(
+        &state,
+        &app,
+        strand.clone(),
+        top(0),
+        variable_block(),
+        None,
+        name(),
+    )
+    .await
+    .unwrap();
+    assert_eq!(
+        state
+            .lock()
+            .unwrap()
+            .current_macro
+            .as_ref()
+            .unwrap()
+            .variables
+            .len(),
+        1
+    );
     undo(&state, &app).unwrap();
     let s = state.lock().unwrap();
     let mac = s.current_macro.as_ref().unwrap();
@@ -688,10 +737,7 @@ fn rename_variable_rejects_duplicate_name() {
 fn rename_variable_allows_renaming_to_its_own_current_name() {
     let mut mac = Macro::new("Test".into(), "".into(), vec![]);
     mac.create_variable("score").unwrap();
-    assert_eq!(
-        mac.rename_variable("score", "score").unwrap(),
-        "score"
-    );
+    assert_eq!(mac.rename_variable("score", "score").unwrap(), "score");
     assert_eq!(mac.variables.len(), 1);
 }
 
@@ -779,7 +825,10 @@ fn create_block_appends_def_and_empty_header_strand() {
 
 #[test]
 fn reordering_branches_keeps_each_call_body_with_its_branch() {
-    let branch = |id: &str, name: &str| BlockPiece::Branch { id: id.into(), name: name.into() };
+    let branch = |id: &str, name: &str| BlockPiece::Branch {
+        id: id.into(),
+        name: name.into(),
+    };
     let say = |text: &str| Instruction::new(InstructionKind::Log(Value::text(text)));
     let mut mac = Macro::new("Test".into(), "".into(), vec![]);
     let id = mac.create_block(
@@ -799,8 +848,13 @@ fn reordering_branches_keeps_each_call_body_with_its_branch() {
             branches: vec![vec![say("yes")], vec![say("no")]],
         })],
     });
-    mac.update_block(&id, vec![label("either"), branch("b2", "no"), branch("b1", "yes")], BlockShape::Normal, "#4C97FF")
-        .unwrap();
+    mac.update_block(
+        &id,
+        vec![label("either"), branch("b2", "no"), branch("b1", "yes")],
+        BlockShape::Normal,
+        "#4C97FF",
+    )
+    .unwrap();
     let caller = mac.strands.iter().find(|s| s.id == "caller").unwrap();
     let InstructionKind::CallBlock { branches, .. } = &caller.instructions[0].kind else {
         panic!("expected CallBlock")
@@ -1015,18 +1069,24 @@ fn wait_field(path: Vec<u8>) -> ValueLocation {
 #[test]
 fn typed_spelling_survives_in_an_operand_through_the_shared_edit() {
     let mut mac = test_macro();
-    mac.put_value(&wait_field(vec![]), Value::Op {
-        op: Op::Add,
-        args: vec![Value::number(1.0), Value::number(2.0)],
-        saved: Box::new(Value::number(0.0)),
-    });
+    mac.put_value(
+        &wait_field(vec![]),
+        Value::Op {
+            op: Op::Add,
+            args: vec![Value::number(1.0), Value::number(2.0)],
+            saved: Box::new(Value::number(0.0)),
+        },
+    );
     for (path, text, stored) in [
         (vec![0], "09", Value::text("09")),
         (vec![1], "1.50", Value::text("1.50")),
     ] {
         let outcome = mac
             .apply_edit(
-                EditCommand::EditFieldText { location: wait_field(path.clone()), text: text.into() },
+                EditCommand::EditFieldText {
+                    location: wait_field(path.clone()),
+                    text: text.into(),
+                },
                 &EDIT_CONTEXT,
             )
             .unwrap();
@@ -1037,14 +1097,20 @@ fn typed_spelling_survives_in_an_operand_through_the_shared_edit() {
 
 #[test]
 fn a_shared_move_matches_the_old_take_then_put() {
-    let floating = ValueLocation::Floating { floating_id: "f1".into(), path: vec![] };
+    let floating = ValueLocation::Floating {
+        floating_id: "f1".into(),
+        path: vec![],
+    };
     let mut old = test_macro();
     let mut new = old.clone();
     let value = old.take_value(&floating).unwrap();
     old.put_value(&wait_field(vec![]), value);
 
     new.apply_edit(
-        EditCommand::MoveValue { from: floating, to: ValueDestination::Slot(wait_field(vec![])) },
+        EditCommand::MoveValue {
+            from: floating,
+            to: ValueDestination::Slot(wait_field(vec![])),
+        },
         &EDIT_CONTEXT,
     )
     .unwrap();
@@ -1058,12 +1124,21 @@ fn a_shared_move_matches_the_old_take_then_put() {
 fn a_rejected_move_leaves_the_macro_alone() {
     let mut mac = test_macro();
     let before = serde_json::to_value(&mac.graph).unwrap();
-    let missing = ValueLocation::Floating { floating_id: "nope".into(), path: vec![] };
+    let missing = ValueLocation::Floating {
+        floating_id: "nope".into(),
+        path: vec![],
+    };
     let result = mac.apply_edit(
-        EditCommand::MoveValue { from: missing, to: ValueDestination::Slot(wait_field(vec![])) },
+        EditCommand::MoveValue {
+            from: missing,
+            to: ValueDestination::Slot(wait_field(vec![])),
+        },
         &EDIT_CONTEXT,
     );
-    assert_eq!(String::from(result.unwrap_err()), "Nothing to take at that location");
+    assert_eq!(
+        String::from(result.unwrap_err()),
+        "Nothing to take at that location"
+    );
     assert_eq!(serde_json::to_value(&mac.graph).unwrap(), before);
 }
 
@@ -1072,7 +1147,11 @@ fn delete_tail_is_one_edit() {
     let mut mac = test_macro();
     let outcome = mac
         .apply_edit(
-            EditCommand::RemoveInstructions { strand_id: "s1".into(), path: top(0), count: 2 },
+            EditCommand::RemoveInstructions {
+                strand_id: "s1".into(),
+                path: top(0),
+                count: 2,
+            },
             &EDIT_CONTEXT,
         )
         .unwrap();
@@ -1092,24 +1171,45 @@ fn duplicating_a_try_renames_its_on_error_part_and_copies_notes() {
         catch_body: vec![caught],
     });
     mac.insert_instruction("s1", &top(2), try_block).unwrap();
-    mac.comments.push(blockwork_core::macros::Comment::new(4, 4, "n".into(), Some(caught_id.clone())));
+    mac.comments.push(blockwork_core::macros::Comment::new(
+        4,
+        4,
+        "n".into(),
+        Some(caught_id.clone()),
+    ));
     let outcome = mac
-        .apply_edit(EditCommand::DuplicateInstruction { strand_id: "s1".into(), path: top(2) }, &EDIT_CONTEXT)
+        .apply_edit(
+            EditCommand::DuplicateInstruction {
+                strand_id: "s1".into(),
+                path: top(2),
+            },
+            &EDIT_CONTEXT,
+        )
         .unwrap();
     let list = &mac.strand("s1").unwrap().instructions;
     assert_eq!(list.len(), 4);
-    let InstructionKind::TryCatch { catch_body, .. } = &list[3].kind else { panic!() };
+    let InstructionKind::TryCatch { catch_body, .. } = &list[3].kind else {
+        panic!()
+    };
     assert_ne!(catch_body[0].id, caught_id);
     assert_eq!(outcome.ids[&caught_id], catch_body[0].id);
     assert_eq!(mac.instruction_ids().len(), 2 + 3 + 3);
-    assert_eq!(mac.comments.last().unwrap().attached_to.as_ref(), Some(&catch_body[0].id));
+    assert_eq!(
+        mac.comments.last().unwrap().attached_to.as_ref(),
+        Some(&catch_body[0].id)
+    );
 }
 
 #[test]
 fn a_fragment_round_trips_through_the_frontend_dto() {
     let mut mac = test_macro();
     let wait_id = mac.strand("s1").unwrap().instructions[1].id.clone();
-    mac.comments.push(blockwork_core::macros::Comment::new(1, 2, "n".into(), Some(wait_id.clone())));
+    mac.comments.push(blockwork_core::macros::Comment::new(
+        1,
+        2,
+        "n".into(),
+        Some(wait_id.clone()),
+    ));
     let fragment = mac.copy_fragment("s1", &top(1), None).unwrap();
     let dto: crate::state::FragmentDto =
         serde_json::from_value(serde_json::to_value(fragment_to_dto(&fragment)).unwrap()).unwrap();
@@ -1117,7 +1217,14 @@ fn a_fragment_round_trips_through_the_frontend_dto() {
     assert_eq!(back, fragment);
     assert_eq!(back.instructions[0].id, wait_id);
     let outcome = mac
-        .apply_edit(EditCommand::PasteFragment { fragment: back, x: 5, y: 6 }, &EDIT_CONTEXT)
+        .apply_edit(
+            EditCommand::PasteFragment {
+                fragment: back,
+                x: 5,
+                y: 6,
+            },
+            &EDIT_CONTEXT,
+        )
         .unwrap();
     assert!(outcome.changed);
     assert_ne!(outcome.ids[&wait_id], wait_id);

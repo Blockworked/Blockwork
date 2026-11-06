@@ -40,7 +40,9 @@ pub fn begin_macro_run(macro_id: &str) -> Arc<Mutex<bool>> {
 /// Whether some run of `macro_id` hasn't ended yet.
 pub fn is_running(macro_id: &str) -> bool {
     !macro_id.is_empty()
-        && active_runs().lock().is_ok_and(|runs| runs.iter().any(|(_, id)| id == macro_id))
+        && active_runs()
+            .lock()
+            .is_ok_and(|runs| runs.iter().any(|(_, id)| id == macro_id))
 }
 
 /// Ids of the macros with a run in flight.
@@ -65,7 +67,10 @@ pub fn count() -> usize {
 pub fn stop_macro(macro_id: &str) -> usize {
     let mut cleared = 0;
     if let Ok(runs) = active_runs().lock() {
-        for (flag, _) in runs.iter().filter(|(_, id)| !macro_id.is_empty() && id == macro_id) {
+        for (flag, _) in runs
+            .iter()
+            .filter(|(_, id)| !macro_id.is_empty() && id == macro_id)
+        {
             if let Ok(mut running) = flag.lock() {
                 *running = false;
                 cleared += 1;
@@ -118,8 +123,14 @@ mod tests {
 
         stop_all();
 
-        assert!(!*running.lock().unwrap(), "an in-flight run should be stopped");
-        assert!(*finished.lock().unwrap(), "a finished run should be deregistered");
+        assert!(
+            !*running.lock().unwrap(),
+            "an in-flight run should be stopped"
+        );
+        assert!(
+            *finished.lock().unwrap(),
+            "a finished run should be deregistered"
+        );
 
         end_run(&running);
 

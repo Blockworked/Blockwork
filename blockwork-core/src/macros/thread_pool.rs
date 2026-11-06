@@ -6,7 +6,9 @@ pub struct ThreadPool {
 
 impl ThreadPool {
     pub fn new() -> Self {
-        ThreadPool { workers: Vec::new() }
+        ThreadPool {
+            workers: Vec::new(),
+        }
     }
 
     pub fn add_worker(&mut self, worker: JoinHandle<()>) {

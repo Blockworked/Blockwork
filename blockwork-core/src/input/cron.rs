@@ -16,7 +16,9 @@ pub struct Cron {
     weekdays_restricted: bool,
 }
 
-const MONTHS: [&str; 12] = ["jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec"];
+const MONTHS: [&str; 12] = [
+    "jan", "feb", "mar", "apr", "may", "jun", "jul", "aug", "sep", "oct", "nov", "dec",
+];
 const WEEKDAYS: [&str; 7] = ["sun", "mon", "tue", "wed", "thu", "fri", "sat"];
 
 impl std::str::FromStr for Cron {
@@ -57,9 +59,13 @@ impl std::str::FromStr for Cron {
         // month has (like 31 2, February 31st) would never come.
         if cron.days_restricted && !cron.weekdays_restricted {
             const LONGEST: [u32; 12] = [31, 29, 31, 30, 31, 30, 31, 31, 30, 31, 30, 31];
-            let possible = (1..=12u32).any(|m| has(cron.months, m) && (1..=LONGEST[m as usize - 1]).any(|d| has(cron.days, d)));
+            let possible = (1..=12u32).any(|m| {
+                has(cron.months, m) && (1..=LONGEST[m as usize - 1]).any(|d| has(cron.days, d))
+            });
             if !possible {
-                return Err(format!("'{text}' never runs: none of its months has that day"));
+                return Err(format!(
+                    "'{text}' never runs: none of its months has that day"
+                ));
             }
         }
         Ok(cron)
@@ -74,7 +80,9 @@ fn field(text: &str, min: u32, max: u32, names: &[&str], what: &str) -> Result<u
         if let Some(i) = names.iter().position(|n| *n == lower) {
             return Ok(i as u32 + min);
         }
-        let n: u32 = part.parse().map_err(|_| format!("'{part}' isn't a valid {what}"))?;
+        let n: u32 = part
+            .parse()
+            .map_err(|_| format!("'{part}' isn't a valid {what}"))?;
         if n < min || n > max {
             return Err(format!("{what} {n} is out of range ({min}-{max})"));
         }
@@ -84,7 +92,9 @@ fn field(text: &str, min: u32, max: u32, names: &[&str], what: &str) -> Result<u
     for item in text.split(',') {
         let (range, step) = match item.split_once('/') {
             Some((range, step)) => {
-                let step: u32 = step.parse().map_err(|_| format!("'{step}' isn't a valid step"))?;
+                let step: u32 = step
+                    .parse()
+                    .map_err(|_| format!("'{step}' isn't a valid step"))?;
                 if step == 0 {
                     return Err("a step can't be 0".into());
                 }
@@ -104,7 +114,9 @@ fn field(text: &str, min: u32, max: u32, names: &[&str], what: &str) -> Result<u
         if from > to {
             return Err(format!("'{range}' runs backwards"));
         }
-        mask |= (from..=to).step_by(step as usize).fold(0, |m, v| m | 1 << v);
+        mask |= (from..=to)
+            .step_by(step as usize)
+            .fold(0, |m, v| m | 1 << v);
     }
     Ok(mask)
 }
@@ -112,13 +124,20 @@ fn field(text: &str, min: u32, max: u32, names: &[&str], what: &str) -> Result<u
 impl Cron {
     /// Whether `at`'s minute is one this schedule fires on.
     pub fn matches(&self, at: &DateTime<Local>) -> bool {
-        has(self.minutes, at.minute()) && has(self.hours, at.hour()) && has(self.months, at.month()) && self.day_matches(at)
+        has(self.minutes, at.minute())
+            && has(self.hours, at.hour())
+            && has(self.months, at.month())
+            && self.day_matches(at)
     }
 
     fn day_matches(&self, at: &DateTime<Local>) -> bool {
         let day = has(self.days, at.day());
         let weekday = has(self.weekdays, at.weekday().num_days_from_sunday());
-        if self.days_restricted && self.weekdays_restricted { day || weekday } else { day && weekday }
+        if self.days_restricted && self.weekdays_restricted {
+            day || weekday
+        } else {
+            day && weekday
+        }
     }
 
     /// The first minute after `at` this fires on, within about four years.
@@ -128,7 +147,11 @@ impl Cron {
         while t < end {
             // Skip whole months, days and hours that can't match.
             if !has(self.months, t.month()) {
-                let (y, m) = if t.month() == 12 { (t.year() + 1, 1) } else { (t.year(), t.month() + 1) };
+                let (y, m) = if t.month() == 12 {
+                    (t.year() + 1, 1)
+                } else {
+                    (t.year(), t.month() + 1)
+                };
                 t = local_midnight(y, m, 1)?;
             } else if !self.day_matches(&t) {
                 let next = t.date_naive().succ_opt()?;
@@ -200,7 +223,17 @@ mod tests {
         assert!(cron("@hourly").matches(&at(2026, 1, 1, 7, 0)));
         // A weekday makes it run on those days anyway.
         assert!("0 0 31 2 fri".parse::<Cron>().is_ok());
-        for bad in ["", "* * * *", "60 * * * *", "*/0 * * * *", "5-1 * * * *", "* * * smarch *", "@sometimes", "0 0 31 2 *", "0 0 30-31 feb *"] {
+        for bad in [
+            "",
+            "* * * *",
+            "60 * * * *",
+            "*/0 * * * *",
+            "5-1 * * * *",
+            "* * * smarch *",
+            "@sometimes",
+            "0 0 31 2 *",
+            "0 0 30-31 feb *",
+        ] {
             assert!(bad.parse::<Cron>().is_err(), "{bad} should fail");
         }
     }
@@ -208,8 +241,17 @@ mod tests {
     #[test]
     fn finds_the_next_run() {
         let c = cron("30 8 * * mon");
-        assert_eq!(c.next_after(&at(2026, 10, 15, 12, 0)), Some(at(2026, 10, 19, 8, 30)));
-        assert_eq!(cron("0 0 29 2 *").next_after(&at(2026, 3, 1, 0, 0)), Some(at(2028, 2, 29, 0, 0)));
-        assert_eq!(cron("* * * * *").next_after(&at(2026, 1, 1, 0, 0)), Some(at(2026, 1, 1, 0, 1)));
+        assert_eq!(
+            c.next_after(&at(2026, 10, 15, 12, 0)),
+            Some(at(2026, 10, 19, 8, 30))
+        );
+        assert_eq!(
+            cron("0 0 29 2 *").next_after(&at(2026, 3, 1, 0, 0)),
+            Some(at(2028, 2, 29, 0, 0))
+        );
+        assert_eq!(
+            cron("* * * * *").next_after(&at(2026, 1, 1, 0, 0)),
+            Some(at(2026, 1, 1, 0, 1))
+        );
     }
 }

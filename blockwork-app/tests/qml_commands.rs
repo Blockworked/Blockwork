@@ -28,7 +28,13 @@ fn first_argument(code: &str) -> &str {
 /// The names a literal, or a `cond ? "a" : "b"`, can send.
 fn literal_names(arg: &str) -> Option<Vec<String>> {
     let is_name = |s: &str| !s.is_empty() && s.chars().all(|c| c.is_ascii_lowercase() || c == '_');
-    let quoted = |s: &str| s.trim().strip_prefix('"')?.strip_suffix('"').filter(|n| is_name(n)).map(str::to_owned);
+    let quoted = |s: &str| {
+        s.trim()
+            .strip_prefix('"')?
+            .strip_suffix('"')
+            .filter(|n| is_name(n))
+            .map(str::to_owned)
+    };
     if let Some(name) = quoted(arg) {
         return Some(vec![name]);
     }
@@ -39,7 +45,8 @@ fn literal_names(arg: &str) -> Option<Vec<String>> {
 
 /// Every `"name"` before `=>` in the dispatcher's match.
 fn dispatched() -> BTreeSet<String> {
-    let source = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/dispatch.rs")).unwrap();
+    let source =
+        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/dispatch.rs")).unwrap();
     let mut names = BTreeSet::new();
     for line in source.lines() {
         let trimmed = line.trim_start();
@@ -58,7 +65,11 @@ fn every_command_the_qml_sends_is_dispatched() {
     let qml = Path::new(env!("CARGO_MANIFEST_DIR")).join("../blockwork-qt/qml");
     let handled = dispatched();
     let (mut sent, mut problems) = (0, Vec::new());
-    let mut files: Vec<_> = std::fs::read_dir(&qml).unwrap().flatten().map(|e| e.path()).collect();
+    let mut files: Vec<_> = std::fs::read_dir(&qml)
+        .unwrap()
+        .flatten()
+        .map(|e| e.path())
+        .collect();
     files.retain(|p| p.extension().is_some_and(|e| e == "qml"));
     files.sort();
     for path in files {
@@ -72,7 +83,11 @@ fn every_command_the_qml_sends_is_dispatched() {
             }
             // Rows that name the command they run, like the onboarding toggles.
             for part in line.split("command: \"").skip(1) {
-                if let Some(name) = part.split('"').next().filter(|n| literal_names(&format!("\"{n}\"")).is_some()) {
+                if let Some(name) = part
+                    .split('"')
+                    .next()
+                    .filter(|n| literal_names(&format!("\"{n}\"")).is_some())
+                {
                     names.push((name.to_owned(), line_no));
                 }
             }
@@ -88,8 +103,13 @@ fn every_command_the_qml_sends_is_dispatched() {
                     match literal_names(arg) {
                         Some(found) => found.into_iter().for_each(|n| names.push((n, line_no))),
                         // Forwarders pass a caller's name on; it was checked where it was written.
-                        None if matches!(arg, "command" | "key" | "" | "preferenceRow.modelData.command") => {}
-                        None => problems.push(format!("{file}:{line_no}: can't tell which command `{arg}` sends")),
+                        None if matches!(
+                            arg,
+                            "command" | "key" | "" | "preferenceRow.modelData.command"
+                        ) => {}
+                        None => problems.push(format!(
+                            "{file}:{line_no}: can't tell which command `{arg}` sends"
+                        )),
                     }
                 }
             }
@@ -101,6 +121,9 @@ fn every_command_the_qml_sends_is_dispatched() {
             }
         }
     }
-    assert!(sent > 100, "found only {sent} commands; is the scan still reading the QML?");
+    assert!(
+        sent > 100,
+        "found only {sent} commands; is the scan still reading the QML?"
+    );
     assert!(problems.is_empty(), "{}", problems.join("\n"));
 }

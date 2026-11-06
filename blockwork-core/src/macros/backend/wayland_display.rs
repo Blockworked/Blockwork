@@ -5,9 +5,8 @@
 use std::sync::OnceLock;
 
 use wayland_client::{
-    delegate_noop,
+    Connection, Dispatch, Proxy, QueueHandle, delegate_noop,
     protocol::{wl_output, wl_registry},
-    Connection, Dispatch, Proxy, QueueHandle,
 };
 use wayland_protocols::xdg::xdg_output::zv1::client::{zxdg_output_manager_v1, zxdg_output_v1};
 

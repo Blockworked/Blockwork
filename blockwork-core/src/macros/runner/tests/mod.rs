@@ -1,21 +1,20 @@
-use super::*;
 use super::vision::*;
+use super::*;
 use crate::input::types::{Axis, Direction, MacroButton, MacroKey};
 use crate::macros::{
-    BlockDef, BlockPiece, BlockShape, InputValueType, MacroGraph, Strand,
-    default_block_color,
+    BlockDef, BlockPiece, BlockShape, InputValueType, MacroGraph, Strand, default_block_color,
 };
 use blockstitch_core::graph::resolve_list_reporters;
 
 mod apps;
-mod variables;
-mod custom_blocks;
-mod errors;
-mod runs;
-mod dialogs;
-mod vision;
-mod input;
 mod control_flow;
+mod custom_blocks;
+mod dialogs;
+mod errors;
+mod input;
+mod runs;
+mod variables;
+mod vision;
 
 struct NoopBackend;
 impl InputBackend for NoopBackend {
@@ -159,21 +158,31 @@ fn bad_number() -> Value {
 }
 
 fn bump(name: &str) -> Instruction {
-    Instruction::new(InstructionKind::ChangeVariable(name.to_string(), Value::number(1.0)))
+    Instruction::new(InstructionKind::ChangeVariable(
+        name.to_string(),
+        Value::number(1.0),
+    ))
 }
 
 /// Answers dialogs by their message: "cancel" cancels, permissions are denied.
 fn install_test_dialogs() {
     use crate::prompt::{Kind, Reply};
-    crate::prompt::set_handler(Arc::new(|request: &crate::prompt::Request, _stopped: &dyn Fn() -> bool| {
-        let reply = |answer: &str, text: &str| Ok(Reply { answer: answer.into(), text: text.into() });
-        match request.kind {
-            _ if request.message == "cancel" => reply("cancel", ""),
-            Kind::Text => reply("ok", &format!("{}!", request.default)),
-            Kind::Confirm => reply("yes", ""),
-            Kind::Choice => reply("ok", &request.options[1]),
-            Kind::Message => reply("ok", ""),
-            Kind::Permission => reply("deny", ""),
-        }
-    }));
+    crate::prompt::set_handler(Arc::new(
+        |request: &crate::prompt::Request, _stopped: &dyn Fn() -> bool| {
+            let reply = |answer: &str, text: &str| {
+                Ok(Reply {
+                    answer: answer.into(),
+                    text: text.into(),
+                })
+            };
+            match request.kind {
+                _ if request.message == "cancel" => reply("cancel", ""),
+                Kind::Text => reply("ok", &format!("{}!", request.default)),
+                Kind::Confirm => reply("yes", ""),
+                Kind::Choice => reply("ok", &request.options[1]),
+                Kind::Message => reply("ok", ""),
+                Kind::Permission => reply("deny", ""),
+            }
+        },
+    ));
 }

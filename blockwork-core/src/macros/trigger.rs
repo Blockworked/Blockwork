@@ -27,12 +27,18 @@ fn bare(value: &Value) -> String {
 /// A key combo as the key chips show it: one-letter keys in capitals, so "r"
 /// and "R" read as the same key.
 fn key_combo(value: &Value) -> String {
-    let Value::Text { value } = value else { return show(value) };
+    let Value::Text { value } = value else {
+        return show(value);
+    };
     let parts: Vec<String> = value
         .split_inclusive('+')
         .map(|p| {
             let key = p.strip_suffix('+').filter(|k| !k.is_empty()).unwrap_or(p);
-            if key.chars().count() == 1 { p.to_uppercase() } else { p.to_string() }
+            if key.chars().count() == 1 {
+                p.to_uppercase()
+            } else {
+                p.to_string()
+            }
         })
         .collect();
     format!("\"{}\"", parts.concat())
@@ -86,33 +92,72 @@ impl InstructionKind {
             K::WhenPowerUnplugged => "when power is unplugged".into(),
             K::WhenClipboardChanged => "when clipboard changes".into(),
             K::WhenKey(key, dir) => {
-                let dir = if *dir == Direction::Release { "released" } else { "pressed" };
+                let dir = if *dir == Direction::Release {
+                    "released"
+                } else {
+                    "pressed"
+                };
                 format!("when key {} is {dir}", key_combo(key))
             }
             K::WhenWindow { pattern, focused } => {
-                format!("when window {} is {}", show(pattern), if *focused { "focused" } else { "unfocused" })
+                format!(
+                    "when window {} is {}",
+                    show(pattern),
+                    if *focused { "focused" } else { "unfocused" }
+                )
             }
             K::WhenFileChanged(path) => format!("when file {} changes", show(path)),
             K::WhenTyped { text, .. } => format!("when I type {}", show(text)),
-            K::WhenApp { pattern, started } => format!("when app {} {}", show(pattern), if *started { "starts" } else { "exits" }),
+            K::WhenApp { pattern, started } => format!(
+                "when app {} {}",
+                show(pattern),
+                if *started { "starts" } else { "exits" }
+            ),
             K::WhenIdle(minutes) => format!("when idle for {} minutes", show(minutes)),
-            K::WhenScreenLock { locked } => format!("when screen is {}", if *locked { "locked" } else { "unlocked" }),
+            K::WhenScreenLock { locked } => format!(
+                "when screen is {}",
+                if *locked { "locked" } else { "unlocked" }
+            ),
             K::WhenCron(expr) => format!("on schedule {}", bare(expr)),
-            K::WhenNetwork { connected } => format!("when network {}", if *connected { "connects" } else { "disconnects" }),
+            K::WhenNetwork { connected } => format!(
+                "when network {}",
+                if *connected {
+                    "connects"
+                } else {
+                    "disconnects"
+                }
+            ),
             K::WhenUsb { pattern, connected } => {
                 let device = match pattern {
-                    Value::Text { value } if value.trim().is_empty() => "any USB device".to_string(),
+                    Value::Text { value } if value.trim().is_empty() => {
+                        "any USB device".to_string()
+                    }
                     p => format!("USB device {}", show(p)),
                 };
-                format!("when {device} is {}", if *connected { "plugged in" } else { "unplugged" })
+                format!(
+                    "when {device} is {}",
+                    if *connected {
+                        "plugged in"
+                    } else {
+                        "unplugged"
+                    }
+                )
             }
-            K::WhenMouseButton { button: b, pressed, modifiers } => {
+            K::WhenMouseButton {
+                button: b,
+                pressed,
+                modifiers,
+            } => {
                 let with = match modifiers {
                     Some(Value::Text { value }) if value.trim().is_empty() => String::new(),
                     Some(m) => format!(" with {}", show(m)),
                     None => String::new(),
                 };
-                format!("when {} is {}{with}", button(b), if *pressed { "pressed" } else { "released" })
+                format!(
+                    "when {} is {}{with}",
+                    button(b),
+                    if *pressed { "pressed" } else { "released" }
+                )
             }
             K::WhenAt(at) => format!("once at {}", bare(at)),
             K::WhenSignal(name) => format!("when I receive {}", show(&name.value)),
@@ -137,19 +182,44 @@ mod tests {
     #[test]
     fn names_the_trigger() {
         let key = InstructionKind::WhenKey(Value::text("F8"), Direction::Press);
-        assert_eq!(fired_message(Some(&key)), "Trigger fired: when key \"F8\" is pressed");
-        let time = InstructionKind::WhenTime(TimeSchedule::Weekly { weekday: Weekday::Monday }, Value::text("09:30"));
+        assert_eq!(
+            fired_message(Some(&key)),
+            "Trigger fired: when key \"F8\" is pressed"
+        );
+        let time = InstructionKind::WhenTime(
+            TimeSchedule::Weekly {
+                weekday: Weekday::Monday,
+            },
+            Value::text("09:30"),
+        );
         assert_eq!(time.trigger_label().unwrap(), "every Monday at 09:30");
-        let usb = InstructionKind::WhenUsb { pattern: Value::text(""), connected: false };
-        assert_eq!(usb.trigger_label().unwrap(), "when any USB device is unplugged");
-        assert_eq!(InstructionKind::WhenIdle(Value::number(5.0)).trigger_label().unwrap(), "when idle for 5 minutes");
+        let usb = InstructionKind::WhenUsb {
+            pattern: Value::text(""),
+            connected: false,
+        };
+        assert_eq!(
+            usb.trigger_label().unwrap(),
+            "when any USB device is unplugged"
+        );
+        assert_eq!(
+            InstructionKind::WhenIdle(Value::number(5.0))
+                .trigger_label()
+                .unwrap(),
+            "when idle for 5 minutes"
+        );
         assert_eq!(fired_message(None), "Trigger fired");
         let r = InstructionKind::WhenKey(Value::text("r"), Direction::Release);
         assert_eq!(r.trigger_label().unwrap(), "when key \"R\" is released");
         let combo = InstructionKind::WhenKey(Value::text("Control++"), Direction::Press);
-        assert_eq!(combo.trigger_label().unwrap(), "when key \"Control++\" is pressed");
+        assert_eq!(
+            combo.trigger_label().unwrap(),
+            "when key \"Control++\" is pressed"
+        );
         let combo = InstructionKind::WhenKey(Value::text("Control+Alt+o"), Direction::Press);
-        assert_eq!(combo.trigger_label().unwrap(), "when key \"Control+Alt+O\" is pressed");
+        assert_eq!(
+            combo.trigger_label().unwrap(),
+            "when key \"Control+Alt+O\" is pressed"
+        );
         assert_eq!(InstructionKind::WhenRan.trigger_label(), None);
     }
 }

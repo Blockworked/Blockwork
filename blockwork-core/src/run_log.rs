@@ -38,11 +38,17 @@ pub struct Source {
 
 impl Source {
     pub fn app(name: &str) -> Source {
-        Source { macro_id: String::new(), name: name.to_string() }
+        Source {
+            macro_id: String::new(),
+            name: name.to_string(),
+        }
     }
 
     pub fn for_macro(macro_id: &str, name: &str) -> Source {
-        Source { macro_id: macro_id.to_string(), name: name.to_string() }
+        Source {
+            macro_id: macro_id.to_string(),
+            name: name.to_string(),
+        }
     }
 }
 
@@ -70,13 +76,21 @@ static ENTRIES: Mutex<VecDeque<Entry>> = Mutex::new(VecDeque::new());
 /// Bumped on every push and clear, so pollers can tell when to refresh.
 static REVISION: AtomicU64 = AtomicU64::new(0);
 
-fn push(source: &Source, level: Level, block_id: &str, event: Option<RunEvent>, message: impl Into<String>) {
+fn push(
+    source: &Source,
+    level: Level,
+    block_id: &str,
+    event: Option<RunEvent>,
+    message: impl Into<String>,
+) {
     let mut message = crate::secrets::redact(&message.into());
     if let Some((cut, _)) = message.char_indices().nth(MAX_MESSAGE_CHARS) {
         message.truncate(cut);
         message.push('…');
     }
-    let Ok(mut entries) = ENTRIES.lock() else { return };
+    let Ok(mut entries) = ENTRIES.lock() else {
+        return;
+    };
     let seq = REVISION.fetch_add(1, Ordering::SeqCst) + 1;
     if entries.len() >= CAPACITY {
         entries.pop_front();
@@ -116,7 +130,10 @@ pub fn revision() -> u64 {
 
 /// Every retained entry, oldest first.
 pub fn snapshot() -> Vec<Entry> {
-    ENTRIES.lock().map(|e| e.iter().cloned().collect()).unwrap_or_default()
+    ENTRIES
+        .lock()
+        .map(|e| e.iter().cloned().collect())
+        .unwrap_or_default()
 }
 
 /// One line per entry for compact lists like the tray menu.
@@ -124,8 +141,16 @@ pub fn summary(entry: &Entry, max_chars: usize) -> String {
     let time = chrono::DateTime::from_timestamp_millis(entry.time_ms)
         .map(|t| t.with_timezone(&chrono::Local).format("%H:%M").to_string())
         .unwrap_or_default();
-    let mark = if entry.level == Level::Error { "Error: " } else { "" };
-    let line = format!("{time}  {}: {mark}{}", entry.source, entry.message.lines().next().unwrap_or_default());
+    let mark = if entry.level == Level::Error {
+        "Error: "
+    } else {
+        ""
+    };
+    let line = format!(
+        "{time}  {}: {mark}{}",
+        entry.source,
+        entry.message.lines().next().unwrap_or_default()
+    );
     match line.char_indices().nth(max_chars) {
         Some((cut, _)) => format!("{}…", &line[..cut]),
         None => line,
@@ -162,7 +187,10 @@ mod tests {
         let last = entries.last().unwrap();
         assert_eq!(last.level, Level::Error);
         assert_eq!(last.message.chars().count(), MAX_MESSAGE_CHARS + 1);
-        assert_eq!((last.macro_id.as_str(), last.block_id.as_str()), ("m1", "b1"));
+        assert_eq!(
+            (last.macro_id.as_str(), last.block_id.as_str()),
+            ("m1", "b1")
+        );
         assert!(summary(last, 20).ends_with('…'));
         assert!(revision() > before);
         clear();

@@ -2,7 +2,7 @@
 //! KWin scripts for window state kdotool doesn't expose.
 
 use crate::backoff::Backoff;
-use std::sync::mpsc::{channel, Receiver, Sender};
+use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Mutex, OnceLock};
 use std::time::Duration;
 use zbus::blocking::Connection;
@@ -31,8 +31,14 @@ fn bus() -> Result<&'static Bus, String> {
         let _runtime = crate::dbus::enter();
         let connection = Connection::session().map_err(|e| format!("no session bus: {e}"))?;
         let (tx, rx) = channel();
-        connection.object_server().at(PATH, Listener(tx)).map_err(|e| e.to_string())?;
-        Ok(Bus { connection, replies: Mutex::new(rx) })
+        connection
+            .object_server()
+            .at(PATH, Listener(tx))
+            .map_err(|e| e.to_string())?;
+        Ok(Bus {
+            connection,
+            replies: Mutex::new(rx),
+        })
     })
     .as_ref()
     .map_err(Clone::clone)
@@ -58,7 +64,11 @@ pub fn script(body: &str) -> Result<String, String> {
     let replies = bus.replies.lock().unwrap_or_else(|e| e.into_inner());
     while replies.try_recv().is_ok() {}
     let token = uuid::Uuid::new_v4().simple().to_string();
-    let sender = bus.connection.unique_name().ok_or("no D-Bus name")?.to_string();
+    let sender = bus
+        .connection
+        .unique_name()
+        .ok_or("no D-Bus name")?
+        .to_string();
     let source = format!(
         "function reply(text) {{ callDBus({}, {}, {}, \"Reply\", {}, String(text)); }}\n{body}\n",
         js_string(&sender),
@@ -67,7 +77,9 @@ pub fn script(body: &str) -> Result<String, String> {
         js_string(&token)
     );
     // Under the user's cache dir, so KWin can read it from a Flatpak too.
-    let dir = dirs::cache_dir().ok_or("no cache directory")?.join("blockwork");
+    let dir = dirs::cache_dir()
+        .ok_or("no cache directory")?
+        .join("blockwork");
     std::fs::create_dir_all(&dir).map_err(|e| e.to_string())?;
     let file = dir.join(format!("kwin-{token}.js"));
     std::fs::write(&file, source).map_err(|e| e.to_string())?;
@@ -84,7 +96,13 @@ pub fn script(body: &str) -> Result<String, String> {
     result
 }
 
-fn run(bus: &Bus, file: &std::path::Path, plugin: &str, token: &str, replies: &Receiver<(String, String)>) -> Result<String, String> {
+fn run(
+    bus: &Bus,
+    file: &std::path::Path,
+    plugin: &str,
+    token: &str,
+    replies: &Receiver<(String, String)>,
+) -> Result<String, String> {
     let failed = |e: zbus::Error| {
         NO_SCRIPTS.failed();
         format!("couldn't run a KWin script: {e}")
@@ -106,7 +124,13 @@ fn run(bus: &Bus, file: &std::path::Path, plugin: &str, token: &str, replies: &R
         return Err("KWin wouldn't load the script".into());
     }
     bus.connection
-        .call_method(Some("org.kde.KWin"), format!("/Scripting/Script{id}").as_str(), Some("org.kde.kwin.Script"), "run", &())
+        .call_method(
+            Some("org.kde.KWin"),
+            format!("/Scripting/Script{id}").as_str(),
+            Some("org.kde.kwin.Script"),
+            "run",
+            &(),
+        )
         .map_err(failed)?;
     loop {
         match replies.recv_timeout(Duration::from_secs(1)) {

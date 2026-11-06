@@ -12,10 +12,15 @@ enum WhenTimeDe {
     Legacy(LegacyTimeSchedule),
 }
 
-pub(super) fn when_time<'de, D: serde::Deserializer<'de>>(d: D) -> Result<(TimeSchedule, Value), D::Error> {
+pub(super) fn when_time<'de, D: serde::Deserializer<'de>>(
+    d: D,
+) -> Result<(TimeSchedule, Value), D::Error> {
     Ok(match WhenTimeDe::deserialize(d)? {
         WhenTimeDe::Current(schedule, time) => (schedule, time),
-        WhenTimeDe::Legacy(old) => (old.schedule, Value::text(format!("{:02}:{:02}", old.hour, old.minute))),
+        WhenTimeDe::Legacy(old) => (
+            old.schedule,
+            Value::text(format!("{:02}:{:02}", old.hour, old.minute)),
+        ),
     })
 }
 

@@ -31,7 +31,12 @@ impl TypedBuffer {
                 self.shift = pressed;
                 return false;
             }
-            MacroKey::Control | MacroKey::LControl | MacroKey::RControl | MacroKey::Alt | MacroKey::Meta | MacroKey::Option => {
+            MacroKey::Control
+            | MacroKey::LControl
+            | MacroKey::RControl
+            | MacroKey::Alt
+            | MacroKey::Meta
+            | MacroKey::Option => {
                 let bit = match key {
                     MacroKey::Alt | MacroKey::Option => 2,
                     MacroKey::Meta => 4,
@@ -102,7 +107,11 @@ impl TypedBuffer {
 
     fn apply_shift(&self, c: char) -> char {
         if c.is_ascii_alphabetic() {
-            return if self.shift != self.caps_lock { c.to_ascii_uppercase() } else { c.to_ascii_lowercase() };
+            return if self.shift != self.caps_lock {
+                c.to_ascii_uppercase()
+            } else {
+                c.to_ascii_lowercase()
+            };
         }
         if !self.shift {
             return c;
@@ -163,12 +172,18 @@ mod tests {
         type_keys(&mut b, &[(MacroKey::LShift, false)]);
         type_keys(&mut b, &tap('d'));
         type_keys(&mut b, &tap('x'));
-        type_keys(&mut b, &[(MacroKey::Backspace, true), (MacroKey::Backspace, false)]);
+        type_keys(
+            &mut b,
+            &[(MacroKey::Backspace, true), (MacroKey::Backspace, false)],
+        );
         assert_eq!(b.text(), ";A!d");
         assert!(b.ends_with("A!d"));
         assert!(!b.ends_with(""));
 
-        type_keys(&mut b, &[(MacroKey::CapsLock, true), (MacroKey::CapsLock, false)]);
+        type_keys(
+            &mut b,
+            &[(MacroKey::CapsLock, true), (MacroKey::CapsLock, false)],
+        );
         type_keys(&mut b, &tap('q'));
         assert_eq!(b.text(), ";A!dQ");
     }

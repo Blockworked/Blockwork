@@ -4,7 +4,10 @@ use super::*;
 
 pub(super) fn open_macro_id(state: &SharedState) -> Result<String, String> {
     let s = state.lock().map_err(|e| e.to_string())?;
-    s.current_macro.as_ref().map(|m| m.id.clone()).ok_or_else(|| "No macro selected".to_string())
+    s.current_macro
+        .as_ref()
+        .map(|m| m.id.clone())
+        .ok_or_else(|| "No macro selected".to_string())
 }
 
 /// Turns the breakpoint on block `block_id` of the open macro on or off.
@@ -41,14 +44,23 @@ pub(crate) fn debug_action(state: &SharedState, action: &str) -> Result<(), Stri
 // ─── Secrets ───────────────────────────────────────────────────────────────
 
 /// Saves a secret to the keyring. Blocking: the keyring may show an unlock prompt.
-pub(crate) fn set_secret(state: &SharedState, app: &AppHandle, name: &str, value: &str) -> Result<(), String> {
+pub(crate) fn set_secret(
+    state: &SharedState,
+    app: &AppHandle,
+    name: &str,
+    value: &str,
+) -> Result<(), String> {
     blockwork_core::secrets::set(name, value)?;
     let s = state.lock().map_err(|e| e.to_string())?;
     emit_state_updated(app, &s);
     Ok(())
 }
 
-pub(crate) fn delete_secret(state: &SharedState, app: &AppHandle, name: &str) -> Result<(), String> {
+pub(crate) fn delete_secret(
+    state: &SharedState,
+    app: &AppHandle,
+    name: &str,
+) -> Result<(), String> {
     blockwork_core::secrets::delete(name)?;
     let s = state.lock().map_err(|e| e.to_string())?;
     emit_state_updated(app, &s);

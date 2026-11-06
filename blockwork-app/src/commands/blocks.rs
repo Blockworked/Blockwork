@@ -17,10 +17,21 @@ pub(crate) fn create_block(
     position: Option<(i32, i32)>,
 ) -> Result<String, String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let draft = BlockDraft { pieces, shape, color, icon, identifier, description };
+    let draft = BlockDraft {
+        pieces,
+        shape,
+        color,
+        icon,
+        identifier,
+        description,
+    };
     draft.check()?;
     push_undo(&mut s);
-    let id = s.current_macro.as_mut().ok_or("No macro selected")?.add_block(draft, position)?;
+    let id = s
+        .current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .add_block(draft, position)?;
     auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(id)
@@ -41,11 +52,24 @@ pub(crate) fn edit_block(
     description: String,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    let draft = BlockDraft { pieces, shape, color, icon, identifier, description };
+    let draft = BlockDraft {
+        pieces,
+        shape,
+        color,
+        icon,
+        identifier,
+        description,
+    };
     // Checked first so a rejected edit leaves no useless undo step.
-    s.current_macro.as_ref().ok_or("No macro selected")?.check_block_edit(&block_id, &draft)?;
+    s.current_macro
+        .as_ref()
+        .ok_or("No macro selected")?
+        .check_block_edit(&block_id, &draft)?;
     push_undo(&mut s);
-    s.current_macro.as_mut().ok_or("No macro selected")?.edit_block(&block_id, draft)?;
+    s.current_macro
+        .as_mut()
+        .ok_or("No macro selected")?
+        .edit_block(&block_id, draft)?;
     auto_save(&mut s);
     emit_state_updated(&app, &s);
     Ok(())
@@ -60,7 +84,8 @@ pub(crate) fn delete_block(
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
     blockwork_core::block_packs::check_editable(
-        s.current_macro.as_ref().ok_or("No macro selected")?, &block_id,
+        s.current_macro.as_ref().ok_or("No macro selected")?,
+        &block_id,
     )?;
     push_undo(&mut s);
     if let Some(mac) = &mut s.current_macro {

@@ -203,7 +203,15 @@ mod combo_tests {
     #[test]
     fn combo_round_trips() {
         let keys = parse_key_combo("Control+Alt+o+s");
-        assert_eq!(keys, vec![MacroKey::Control, MacroKey::Alt, MacroKey::Unicode('o'), MacroKey::Unicode('s')]);
+        assert_eq!(
+            keys,
+            vec![
+                MacroKey::Control,
+                MacroKey::Alt,
+                MacroKey::Unicode('o'),
+                MacroKey::Unicode('s')
+            ]
+        );
         assert_eq!(format_key_combo(&keys), "Control+Alt+o+s");
     }
 
@@ -227,8 +235,15 @@ mod combo_tests {
 
     #[test]
     fn pc_key_triggers_use_native_aliases_on_mac() {
-        for (pc, native) in [(MacroKey::PrintScr, MacroKey::F13), (MacroKey::ScrollLock, MacroKey::F14), (MacroKey::Pause, MacroKey::F15)] {
-            assert_eq!(match_key(&pc) == match_key(&native), cfg!(target_os = "macos"));
+        for (pc, native) in [
+            (MacroKey::PrintScr, MacroKey::F13),
+            (MacroKey::ScrollLock, MacroKey::F14),
+            (MacroKey::Pause, MacroKey::F15),
+        ] {
+            assert_eq!(
+                match_key(&pc) == match_key(&native),
+                cfg!(target_os = "macos")
+            );
         }
         assert_eq!(parse_key_name("PrintScreen"), Some(MacroKey::PrintScr));
     }
@@ -236,6 +251,9 @@ mod combo_tests {
     #[test]
     fn plus_key_is_literal() {
         assert_eq!(parse_key_combo("+"), vec![MacroKey::Unicode('+')]);
-        assert_eq!(parse_key_combo("Control++"), vec![MacroKey::Control, MacroKey::Unicode('+')]);
+        assert_eq!(
+            parse_key_combo("Control++"),
+            vec![MacroKey::Control, MacroKey::Unicode('+')]
+        );
     }
 }

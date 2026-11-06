@@ -61,7 +61,12 @@ static SPOTS: Mutex<Vec<Spot>> = Mutex::new(Vec::new());
 pub fn remember(scope: &str, d: &Detection, crosshair: (f64, f64)) {
     let (x, y) = d.center();
     let mut spots = SPOTS.lock().unwrap_or_else(|e| e.into_inner());
-    spots.push((scope.to_string(), (x - crosshair.0, y - crosshair.1), (d.w, d.h), Instant::now()));
+    spots.push((
+        scope.to_string(),
+        (x - crosshair.0, y - crosshair.1),
+        (d.w, d.h),
+        Instant::now(),
+    ));
 }
 
 /// `detections` without the ones on a remembered overlay spot.
@@ -124,13 +129,40 @@ mod tests {
 
     #[test]
     fn remembered_spots_are_skipped_in_their_scope() {
-        let hud = Detection { x: 380.0, y: 420.0, w: 100.0, h: 30.0, label: "player".into(), score: 0.5, id: None };
-        let real = Detection { x: 400.0, y: 200.0, w: 30.0, h: 80.0, ..hud.clone() };
+        let hud = Detection {
+            x: 380.0,
+            y: 420.0,
+            w: 100.0,
+            h: 30.0,
+            label: "player".into(),
+            score: 0.5,
+            id: None,
+        };
+        let real = Detection {
+            x: 400.0,
+            y: 200.0,
+            w: 30.0,
+            h: 80.0,
+            ..hud.clone()
+        };
         // A player standing over the same spot is a different box.
-        let nearby = Detection { x: 410.0, y: 360.0, w: 40.0, h: 100.0, ..hud.clone() };
+        let nearby = Detection {
+            x: 410.0,
+            y: 360.0,
+            w: 40.0,
+            h: 100.0,
+            ..hud.clone()
+        };
         remember("test-scope", &hud, (427.0, 240.0));
-        let kept = filter("test-scope", vec![hud.clone(), real.clone(), nearby.clone()], (427.0, 240.0));
+        let kept = filter(
+            "test-scope",
+            vec![hud.clone(), real.clone(), nearby.clone()],
+            (427.0, 240.0),
+        );
         assert_eq!(kept, vec![real.clone(), nearby]);
-        assert_eq!(filter("other-scope", vec![hud.clone()], (427.0, 240.0)).len(), 1);
+        assert_eq!(
+            filter("other-scope", vec![hud.clone()], (427.0, 240.0)).len(),
+            1
+        );
     }
 }

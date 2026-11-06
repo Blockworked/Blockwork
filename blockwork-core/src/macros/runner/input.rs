@@ -11,12 +11,18 @@ fn normalize_modifier_key(key: MacroKey) -> MacroKey {
 }
 
 fn shift_is_pressed(keys: &[MacroKey]) -> bool {
-    keys.iter().any(|k| matches!(k, MacroKey::Shift | MacroKey::LShift | MacroKey::RShift))
+    keys.iter()
+        .any(|k| matches!(k, MacroKey::Shift | MacroKey::LShift | MacroKey::RShift))
 }
 
 /// Runs one input token. `Some(flow)` ends the strand with it; `None` goes
 /// on to the next block.
-pub(super) fn run_token(token: &InputToken, ins: &Instruction, ctx: &mut ExecCtx, depth: u32) -> Result<Option<Flow>, String> {
+pub(super) fn run_token(
+    token: &InputToken,
+    ins: &Instruction,
+    ctx: &mut ExecCtx,
+    depth: u32,
+) -> Result<Option<Flow>, String> {
     match token {
         InputToken::Text(value) => {
             let text = match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {

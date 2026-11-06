@@ -6,11 +6,11 @@
 //! carries a `revision` that moves whenever the cache does, and the UI asks
 //! for what it shows with quick commands that never wait on the network.
 
-use crate::state::{emit_state_updated, SharedState};
 use crate::AppHandle;
+use crate::state::{SharedState, emit_state_updated};
 use base64::Engine;
 use serde::{Deserialize, Serialize};
-use serde_json::{json, Value};
+use serde_json::{Value, json};
 use std::collections::{BTreeMap, HashMap, HashSet};
 use std::io::{Read, Write};
 use std::net::{TcpListener, TcpStream};
@@ -527,7 +527,8 @@ fn respond(mut stream: TcpStream, status: u16, title: &str, text: &str) {
          main{{max-width:28rem;padding:2rem;text-align:center}}h1{{font-size:1.4rem}}p{{color:#a9abb3}}\
          @media(prefers-color-scheme:light){{body{{background:#f6f6f8;color:#1c1d21}}p{{color:#55575f}}}}</style>\
          <main><h1>{0}</h1><p>{1}</p></main>",
-        escape(title), escape(text)
+        escape(title),
+        escape(text)
     );
     let reason = if status == 200 {
         "OK"
@@ -536,7 +537,11 @@ fn respond(mut stream: TcpStream, status: u16, title: &str, text: &str) {
     } else {
         "Bad Request"
     };
-    let _ = write!(stream, "HTTP/1.1 {status} {reason}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n{body}", body.len());
+    let _ = write!(
+        stream,
+        "HTTP/1.1 {status} {reason}\r\nContent-Type: text/html; charset=utf-8\r\nContent-Length: {}\r\nCache-Control: no-store\r\nConnection: close\r\n\r\n{body}",
+        body.len()
+    );
 }
 
 fn percent_decode(text: &str) -> String {
