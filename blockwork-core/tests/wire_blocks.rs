@@ -69,3 +69,38 @@ fn variable_dropdowns_match_the_backend_refs() {
         }
     }
 }
+
+/// Every block has a palette entry and help text, and every value piece in
+/// `BlockCatalog.qml` names a real `FieldId`.
+#[test]
+fn the_catalog_covers_every_block() {
+    let catalog = include_str!("../../blockwork-qt/qml/BlockCatalog.qml");
+    let help = include_str!("../../blockwork-qt/qml/BlockHelp.qml");
+    let start = catalog.find("paletteSections: [").unwrap();
+    let sections = &catalog[start..start + catalog[start..].find("\n    ]").unwrap()];
+    // Not in the palette: placed by the editor itself, or old shapes.
+    const UNLISTED: [&str; 5] = ["Comment", "BlockHeader", "CallBlock", "BranchCallBlock", "RunBranch"];
+    let path = concat!(env!("CARGO_MANIFEST_DIR"), "/tests/fixtures/wire_blocks.json");
+    let blocks: Vec<Value> = serde_json::from_str(&std::fs::read_to_string(path).unwrap()).unwrap();
+    let mut missing = Vec::new();
+    for block in &blocks {
+        let ty = block["type"].as_str().unwrap();
+        if UNLISTED.contains(&ty) {
+            continue;
+        }
+        if !sections.contains(&format!("\"{ty}\"")) {
+            missing.push(format!("{ty}: no paletteSections entry"));
+        }
+        if !help.contains(&format!("{ty}: qsTr(")) {
+            missing.push(format!("{ty}: no BlockHelp explainer"));
+        }
+    }
+    let pieces = catalog.split("value(\"").skip(1).chain(catalog.split("box(\"").skip(1));
+    for piece in pieces {
+        let field = piece.split('"').next().unwrap();
+        if field.parse::<blockwork_core::macros::fields::FieldId>().is_err() {
+            missing.push(format!("{field} (a value or box piece) is not a FieldId"));
+        }
+    }
+    assert!(missing.is_empty(), "{}", missing.join("\n"));
+}

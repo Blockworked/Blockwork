@@ -49,6 +49,9 @@ Item {
             .reduce((names, pack) => names.concat((pack.variables || []).map(v => v.name)), []));
         return BlockRegistry.sortedVariables(root.macroVariables.filter(name => !packNames.has(name)));
     }
+    // The same array until the names change, so bindings to it don't rebuild.
+    readonly property string userVariablesKey: JSON.stringify(userVariableNames())
+    readonly property var userVariables: JSON.parse(userVariablesKey)
     function firstVariableName() { return BlockRegistry.defaultVariableName(userVariableNames()); }
     function firstListName() { return root.macro && root.macro.lists && root.macro.lists.length ? root.macro.lists[0].name : ""; }
     function customEntry(definition) { return { kind: "custom", definition: definition, instruction: palette.customInstruction(definition) }; }
@@ -599,7 +602,7 @@ Item {
                     appCategories: [{ id: "screen", name: qsTr("Screen"), icon: "monitor" }].concat(root.browserShown ? [{ id: "browser", name: qsTr("Browser"), icon: "panels-top-left" }] : [])
                     // Leaves the Browser category when switching to a macro that hides it.
                     onAppCategoriesChanged: if (category === "browser" && !root.browserShown) category = layout === "accordion" ? "input" : "all"
-                    variables: root.userVariableNames()
+                    variables: root.userVariables
                     lists: root.macroLists
                     blockDefinitions: root.macroBlockDefinitions
                     keyCapture: appState.key_capture
@@ -1632,7 +1635,7 @@ Item {
         id: dragController
         anchors.fill: parent
         canvas: canvas
-        variables: root.userVariableNames()
+        variables: root.userVariables
         lists: root.macroLists
         blockDefinitions: root.macroBlockDefinitions
         // Counting down or recording: nothing lands on the canvas.

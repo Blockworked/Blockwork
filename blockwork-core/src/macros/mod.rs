@@ -152,6 +152,8 @@ pub enum InstructionKind {
     Command(String),
     /// Runs a shell command and waits for it to finish.
     CommandWait(String),
+    /// An old in-strand note. Loading moves it onto the canvas as a
+    /// `graph::Comment`; nothing makes new ones.
     Comment(String),
     /// Marks a strand as an entry point (always at index 0): it runs as its
     /// own concurrent thread when the macro runs. A macro can have several.

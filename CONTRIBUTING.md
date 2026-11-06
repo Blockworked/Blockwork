@@ -11,7 +11,7 @@
 | `blockwork-qt` | The Qt Quick editor (`qml/`) and its Rust/C++ glue (`src/`). |
 | `blockwork-web` | The same editor commands in WebAssembly, for the website's demo. |
 | `blockwork-ffi` | A C ABI for recording and playback inside another process (the Geometry Dash mod). |
-| `blockwork-linux-bridge` | A helper for Proton/Wine hosts. |
+| `blockwork-linux-bridge` | A native Linux input helper that the FFI starts when it runs under Proton/Wine. `blockwork-ffi/build-windows.sh` builds it, and the Geometry Dash mod ships it as `linux-input.so`. |
 
 The block canvas, palette and document model come from
 [blockstitch](https://github.com/Blockworked/blockstitch), pinned to one commit
@@ -32,8 +32,8 @@ in `Cargo.toml`. `just blockstitch-local` builds against a sibling checkout.
 You need Rust (stable), [just](https://github.com/casey/just), Qt 6.10 (CI uses 6.10.3)
 (`qmake6` on PATH or `QMAKE` set; without one the build downloads a minimal
 Qt) and Python 3 for the QML tests. `just` leaves out
-`blockwork-linux-bridge`, which needs a Windows cross toolchain; do the same
-with `--exclude blockwork-linux-bridge` when calling cargo yourself. The QML tests need a
+`blockwork-linux-bridge`, which only builds on Linux; do the same with
+`--exclude blockwork-linux-bridge` when calling cargo yourself. The QML tests need a
 blockstitch checkout at the pinned commit (`scripts/fetch-blockstitch.sh`) and
 one build first, which stages the Lucide icons.
 
@@ -68,8 +68,8 @@ other. The rest are listed so nothing is missed.
    whole numbers.
 4. `blockwork-core/src/macros/runner.rs`: what it does, in `run_block`.
 5. `blockwork-core/src/capabilities.rs`: what it can do (commands, network,
-   screen, ...), or add it to the list that does nothing guarded. This drives the import review and the
-   permission prompts for shared macros.
+   screen, ...), or add it to the arm that does nothing guarded. This drives
+   the import review and the permission prompts for shared macros.
 6. `blockwork-core/src/frontend/instructions.rs`: its line in `wire_blocks!`,
    and a case in `blockwork-core/tests/fixtures/wire_blocks.json`.
 7. A trigger also needs a watcher in `blockwork-app` (see `system_watch.rs`)
@@ -81,8 +81,21 @@ other. The rest are listed so nothing is missed.
 9. `blockwork-qt/qml/BlockHelp.qml`: one sentence on what it does.
 10. `just translations`.
 
-A reporter is an `Op` in `blockwork-core/src/input/value.rs` plus a line in
-`BlockCatalog.qml`'s `extraOperators`; rerun the `BLESS=1` test above.
+## Adding a reporter
+
+1. `blockwork-core/src/input/value.rs`: an `ExtOperator` (name, arity,
+   default args, evaluation). One that reads the machine calls
+   `permissions::require` first; one with side effects goes in
+   `SIDE_EFFECT_OPERATORS`.
+2. `blockwork-core/src/capabilities.rs`: its capability in
+   `operator_capability`, or its name in `UNGUARDED_OPERATORS`. A test fails
+   until it is in one of them.
+3. `BLESS=1 cargo test -p blockwork-core --test operator_descriptors` to
+   regenerate `hostDescriptors`.
+4. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry, a line in
+   `extraOperators` and its label and result in `registerOperators` (the QML
+   tests check the two agree).
+5. `blockwork-qt/qml/BlockHelp.qml` and `just translations`, as for a block.
 
 ## Rules
 

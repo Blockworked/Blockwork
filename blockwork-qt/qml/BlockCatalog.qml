@@ -7,9 +7,8 @@ import com.blockworked.Blockstitch 1.0
 // result types and arities, dropdown options and the rows, operators, icons
 // and prefabs handed to BlockRegistry. Help texts live in BlockHelp.qml.
 //
-// Adding a block: put it in a section, give it a row (and an icon) in
-// register(), a prefab in register() if it needs defaults,
-// and a line in BlockHelp. A reporter also goes in extraOperators.
+// Adding a block or a reporter: see CONTRIBUTING.md, which lists every place
+// (tests/wire_blocks.rs checks most of them against each other).
 QtObject {
     id: catalog
     // The EditorPage these blocks are for: its macro, state and dialogs.
@@ -251,7 +250,7 @@ QtObject {
             WindowExists: { prefix: qsTr("window"), suffix: qsTr("exists?"), result: "bool" },
             LastError: { prefix: qsTr("error message"), result: "text" },
             MacroRunning: { prefix: qsTr("macro"), suffix: qsTr("is running?"), result: "bool" },
-            GlobalVariable: { prefix: qsTr("global"), result: "text", enumArg: { index: 0, options: () => root ? page.globalChoices() : [] } },
+            GlobalVariable: { prefix: qsTr("global"), result: "text", enumArg: { index: 0, options: () => page.globalChoices() } },
             PixelColor: { prefix: qsTr("color at x"), infix: [qsTr("y")], result: "text",
                 pickOp: { action: "pickScreenPoint", icon: "crosshair", tip: qsTr("Click a point on screen") } },
             AverageColor: { prefix: qsTr("average color at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text",
@@ -460,8 +459,8 @@ QtObject {
                 { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
                   encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
             StopMacroNamed: { icon: "square", head: [label(qsTr("stop macro")), value("MacroTarget", "target")] },
-            SetGlobal: { icon: "variable", head: [label(qsTr("set global")), { kind: "value", field: "GlobalName", key: "name", options: () => root ? page.globalChoices() : [], placeholder: qsTr("(no global variable)") }, label(qsTr("to")), value("GlobalValue", "value")] },
-            ChangeGlobal: { icon: "variable", head: [label(qsTr("change global")), { kind: "value", field: "GlobalName", key: "name", options: () => root ? page.globalChoices() : [], placeholder: qsTr("(no global variable)") }, label(qsTr("by")), value("GlobalValue", "by")] },
+            SetGlobal: { icon: "variable", head: [label(qsTr("set global")), { kind: "value", field: "GlobalName", key: "name", options: () => page.globalChoices(), placeholder: qsTr("(no global variable)") }, label(qsTr("to")), value("GlobalValue", "value")] },
+            ChangeGlobal: { icon: "variable", head: [label(qsTr("change global")), { kind: "value", field: "GlobalName", key: "name", options: () => page.globalChoices(), placeholder: qsTr("(no global variable)") }, label(qsTr("by")), value("GlobalValue", "by")] },
             WaitUntil: { icon: "loader", components: [timeoutComponent, errorTimeoutComponent],
                 head: [label(qsTr("wait until")), { kind: "value", field: "Condition", key: "condition", bool: true }] },
             FindImage: { icon: "search", head: [label(qsTr("find")), ...imagePieces, label(qsTr("put x in")),

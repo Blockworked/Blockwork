@@ -4,7 +4,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 dest="${1:-../blockstitch}"
-rev=$(sed -nE 's/^blockstitch-core *=.*rev *= *"([^"]+)".*/\1/p' Cargo.toml)
+rev=$(sed -n '/^blockstitch-core *=/,/}/p' Cargo.toml | grep -oE 'rev *= *"[^"]+"' | head -n 1 | cut -d'"' -f2)
 [ -n "$rev" ] || { echo "no blockstitch-core rev in Cargo.toml" >&2; exit 1; }
 git init -q "$dest"
 git -C "$dest" remote add origin https://github.com/Blockworked/blockstitch.git 2>/dev/null || true

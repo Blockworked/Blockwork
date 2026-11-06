@@ -77,6 +77,7 @@ Item {
             const definitions = canvas.blockDefinitions;
             const variables = canvas.variables;
             const lists = canvas.lists;
+            const paletteVariables = palette.variables;
             const moved = JSON.parse(JSON.stringify(page.appState));
             moved.current_macro.strands[0].instructions[1].duration.value = 200;
             page.appState = moved;
@@ -85,7 +86,7 @@ Item {
             verify(canvas.variables === variables);
             verify(canvas.lists === lists);
             verify(palette.blockDefinitions === definitions);
-            verify(palette.variables === variables);
+            verify(palette.variables === paletteVariables);
             verify(palette.lists === lists);
 
             const edited = JSON.parse(JSON.stringify(moved));

@@ -67,6 +67,15 @@ pub fn checked_when_run(kind: &InstructionKind) -> impl Iterator<Item = &'static
     block_capabilities(kind).iter().copied().filter(|k| !NOT_ASKED_BY_BLOCKS.contains(k))
 }
 
+/// Blockwork reporters that read nothing guarded. Every reporter in
+/// `input/value.rs` is either here or in [`operator_capability`].
+pub const UNGUARDED_OPERATORS: [&str; 28] = [
+    "BatteryPercentage", "PluggedIn", "JsonGet", "Detection", "ColorsMatch", "MousePosition", "ScreenSize",
+    "MonitorCount", "MonitorInfo", "IdleSeconds", "ScreenLocked", "NetworkConnected", "UsbConnected",
+    "BrowserConnected", "TextCheck", "TextReplace", "RegexReplace", "RegexFind", "SplitPart", "SplitCount",
+    "Substring", "Trim", "FormatNumber", "Timestamp", "FormatDate", "ParseDate", "DatePart", "LastError",
+];
+
 /// The capability a reporter needs, by operator name.
 pub fn operator_capability(op: &str) -> Option<&'static str> {
     Some(match op {
@@ -133,5 +142,27 @@ mod tests {
             }
         }
         assert!(seen > 0);
+    }
+
+    #[test]
+    fn every_reporter_is_decided() {
+        let kinds: HashSet<&str> = CAPABILITIES.iter().map(|(k, ..)| *k).collect();
+        let source = include_str!("input/value.rs");
+        let mut seen = 0;
+        for line in source.lines().map(str::trim) {
+            let Some(name) = line.strip_prefix("op: \"").and_then(|rest| rest.split('"').next()) else { continue };
+            seen += 1;
+            match operator_capability(name) {
+                Some(cap) => {
+                    assert!(kinds.contains(cap), "{cap} has no label");
+                    assert!(!UNGUARDED_OPERATORS.contains(&name), "{name} is both guarded and unguarded");
+                }
+                None => assert!(
+                    UNGUARDED_OPERATORS.contains(&name),
+                    "{name} needs an entry in operator_capability or UNGUARDED_OPERATORS"
+                ),
+            }
+        }
+        assert!(seen > 40, "parsed only {seen} reporters from input/value.rs");
     }
 }

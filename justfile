@@ -21,7 +21,8 @@ default: build
 
 # Build everything. The UI starts `blockwork-daemon` from beside itself,
 # so the whole workspace has to be built, not just the default members.
-# blockwork-linux-bridge is Linux-only and ships separately (see packaging).
+# blockwork-linux-bridge is Linux-only and ships with the Geometry Dash mod
+# (blockwork-ffi/build-windows.sh builds it).
 build *args:
     cargo build --release --workspace --exclude blockwork-linux-bridge {{args}}
 
@@ -37,6 +38,11 @@ run: build
 
 test:
     cargo test --workspace --exclude blockwork-linux-bridge
+
+# QML tests against the pinned blockstitch (fetched into ../blockstitch if missing).
+test-qml blockstitch="../blockstitch" *filters="":
+    [ -d "{{blockstitch}}/.git" ] || scripts/fetch-blockstitch.sh "{{blockstitch}}"
+    python3 blockwork-qt/tests/run.py "{{blockstitch}}" {{filters}}
 
 # Editor timings with a big macro (page, load, edit, drag, zoom), offscreen.
 # Prints PERF lines; pass a blockstitch checkout and optional test filters.

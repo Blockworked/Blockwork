@@ -2,6 +2,8 @@ import QtQuick
 import QtTest
 import com.blockworked.Blockstitch 1.0
 import com.blockworked.Blockwork 1.0
+// Blockwork has an Icons of its own; the blocks draw with blockstitch's.
+import com.blockworked.Blockstitch 1.0 as Stitch
 
 Item {
     id: scene
@@ -53,6 +55,22 @@ Item {
             compare(BlockRegistry.iconFor("WhenRan"), "play");
             compare(BlockRegistry.iconFor("If"), "git-branch");
         }
+        function test_every_block_icon_is_drawable() {
+            const page = createTemporaryObject(editorComponent, scene);
+            wait(50);
+            const missing = [];
+            const check = (name, where) => { if (name && !Stitch.Icons.paths[name]) missing.push(where + ": " + name); };
+            for (const section of page.catalog.paletteSections) {
+                for (const type of section.items) {
+                    if (type[0] === "@") continue;
+                    check(BlockRegistry.iconFor(type), type);
+                    const row = BlockRegistry.row(type);
+                    for (const component of (row && row.components) || []) check(component.icon, type + " component");
+                    for (const piece of (row && row.head) || []) check(piece.icon, type + " piece");
+                }
+            }
+            compare(missing, [], "icons blockstitch's Icons.qml doesn't have (they draw as info)");
+        }
         function test_palette_reporters_start_from_the_core_defaults() {
             const page = createTemporaryObject(editorComponent, scene);
             wait(50);
@@ -64,6 +82,7 @@ Item {
                 compare(value.args.length, spec[2], spec[0]);
                 if (!spec[3]) compare(value, BlockRegistry.freshValue(spec[0]), spec[0]);
                 verify(!!BlockRegistry.descriptor(spec[0]), spec[0]);
+                compare(BlockRegistry.operator(spec[0]).result, spec[1], spec[0] + " result differs from registerOperators");
             }
             compare(palette.operatorValue(["ReadFile", "text", 1]).args, [{ kind: "Text", value: "~/notes.txt" }]);
             compare(palette.operatorValue(["LetterOf", "text", 2]).args, [{ kind: "Number", value: 1 }, { kind: "Text", value: "" }]);

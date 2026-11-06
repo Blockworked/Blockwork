@@ -1,8 +1,11 @@
 #!/usr/bin/env python3
 """Run source QML tests. Args: [blockstitch checkout] [qmltestrunner options/test filters...].
-BLOCKWORK_QML_TESTS names another test directory (the perf benchmarks use it)."""
+BLOCKWORK_QML_TESTS names another test directory (the perf benchmarks use it).
+The checkout must be at Cargo.toml's blockstitch rev, unless `just
+blockstitch-local` is on (.cargo/config.toml) or BLOCKWORK_ANY_BLOCKSTITCH=1."""
 
 import os
+import re
 from pathlib import Path
 import shutil
 import subprocess
@@ -16,6 +19,13 @@ qtpaths = shutil.which("qtpaths6") or shutil.which("qtpaths")
 qtbin = Path(subprocess.check_output([qtpaths, "--query", "QT_HOST_BINS"], text=True).strip()) if qtpaths else Path("/usr/lib/qt6/bin")
 if not (blockstitch / "qml/Blockstitch").is_dir():
     sys.exit(f"No blockstitch checkout at {blockstitch} (scripts/fetch-blockstitch.sh makes one)")
+pinned = re.search(r'^blockstitch-core *=[^}]*?rev *= *"([^"]+)"', (root / "Cargo.toml").read_text(), re.M)
+local = (root / ".cargo/config.toml").is_file() or os.environ.get("BLOCKWORK_ANY_BLOCKSTITCH") == "1"
+if pinned and not local:
+    head = subprocess.run(["git", "-C", str(blockstitch), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
+    if head != pinned.group(1):
+        sys.exit(f"{blockstitch} is at {head or 'no commit'}, Cargo.toml pins {pinned.group(1)}.\n"
+                 f"Run scripts/fetch-blockstitch.sh {blockstitch}, or set BLOCKWORK_ANY_BLOCKSTITCH=1.")
 if not (root / "blockwork-qt/qml/Lucide").is_dir():
     sys.exit("blockwork-qt/qml/Lucide is missing; `just` (any build) stages it")
 
