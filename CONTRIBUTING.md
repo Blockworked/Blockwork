@@ -72,7 +72,7 @@ other. The rest are listed so nothing is missed.
    whole numbers.
 4. `blockwork-core/src/macros/runner.rs`: what it does, in `run_block`, or in
    the category's own file under `runner/` (`input`, `data`, `dialogs`,
-   `browser`, `vision`, `apps`) with one arm in `run_block` that calls it.
+   `browser`, `vision`, `apps`, `system`) with one arm in `run_block` that calls it.
 5. `blockwork-core/src/capabilities.rs`: what it can do (commands, network,
    screen, ...), or add it to the arm that does nothing guarded. This drives
    the import review and the permission prompts for shared macros.
