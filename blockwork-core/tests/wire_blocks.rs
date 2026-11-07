@@ -111,7 +111,8 @@ fn variable_dropdowns_match_the_backend_refs() {
     }
 }
 
-/// Every block has a palette entry and help text, and every value piece in
+/// Every block has a palette entry and help text, its row is drawn as a
+/// header exactly when the backend says it is one, and every value piece in
 /// `BlockCatalog.qml` names a real `FieldId`.
 #[test]
 fn the_catalog_covers_every_block() {
@@ -143,6 +144,19 @@ fn the_catalog_covers_every_block() {
         }
         if !help.contains(&format!("{ty}: qsTr(")) {
             missing.push(format!("{ty}: no BlockHelp explainer"));
+        }
+        if let Some(at) = catalog.find(&format!("\n            {ty}: {{")) {
+            use blockstitch_core::graph::BlockKind;
+            let row = &catalog[at..];
+            let row = &row[..row.find("head: ").unwrap_or(row.len())];
+            let kind = dto_to_instruction(&serde_json::from_value(block.clone()).unwrap())
+                .unwrap()
+                .kind;
+            if row.contains("shape: \"header\"") != kind.is_header() {
+                missing.push(format!(
+                    "{ty}: its row's `shape: \"header\"` disagrees with is_header"
+                ));
+            }
         }
     }
     // Which blocks have rows is checked in QML, against blockstitch's own

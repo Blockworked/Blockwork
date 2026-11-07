@@ -73,13 +73,13 @@ other. The rest are listed so nothing is missed.
 1. `blockwork-core/src/macros/kind.rs`: add the `InstructionKind` variant with
    a doc comment. A field added to an existing block needs `#[serde(default)]`
    so older files still load.
-2. `blockwork-core/src/macros/block_kind.rs`: list its value slots in
-   `visit_values_mut`, its nested bodies in `body`/`body_mut`, any variable
-   or list names it holds in `visit_refs_mut`, and add it to `is_header` if it
-   is a trigger.
+2. `blockwork-core/src/macros/block_kind.rs`: its nested bodies in
+   `body`/`body_mut`, any variable or list names it holds in `for_each_ref`,
+   and add it to `is_header` if it is a trigger.
 3. `blockwork-core/src/macros/fields.rs`: a `FieldId` per value slot, and
-   its line in `value_slot_mut`. Add it to `requires_integer` if it only takes
-   whole numbers.
+   its slots in `slots_mut` (field id, value, type). That one list is what the
+   canvas visits and what a drag or a typed edit resolves through. Add the
+   field to `requires_integer` if it only takes whole numbers.
 4. `blockwork-core/src/macros/runner/`: what it does, in its category's file
    (`control`, `input`, `data`, `dialogs`, `browser`, `vision`, `system`;
    `apps.rs` holds helpers for the system blocks), and
@@ -98,8 +98,9 @@ other. The rest are listed so nothing is missed.
    and a line in `macros/trigger.rs` for the run log.
 8. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry, a row in
    its palette category's function (`eventRows`, `inputRows`, ...: label,
-   value and dropdown pieces, icon; `blockwork-core/tests/wire_blocks.rs` lists any block
-   without one), a prefab if a
+   value and dropdown pieces, icon, and `shape: "header"` for a trigger;
+   `blockwork-core/tests/wire_blocks.rs` lists any block without one and
+   checks the shape against `is_header`), a prefab if a
    fresh block needs defaults, and its variable dropdowns in
    `registerVariableFields`.
 9. `blockwork-qt/qml/BlockHelp.qml`: one sentence on what it does.

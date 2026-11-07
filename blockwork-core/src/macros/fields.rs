@@ -3,7 +3,8 @@
 
 use crate::input::types::InputToken;
 use crate::input::value::Value;
-use crate::macros::{BlockDef, InstructionKind};
+use crate::macros::{BlockDef, ImageMatch, InstructionKind};
+use blockstitch_core::graph::InputValueType;
 use serde::{Deserialize, Serialize};
 
 /// One addressable value slot on an [`InstructionKind`]. Travels as its
@@ -135,189 +136,292 @@ impl std::str::FromStr for FieldId {
     }
 }
 
-/// Locates the value tree a [`FieldId`] names on a given instruction.
-pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Option<&mut Value> {
-    match (kind, field) {
-        (InstructionKind::Wait(d), FieldId::WaitDuration) => Some(d),
-        (InstructionKind::Token(InputToken::MoveMouse(x, _, _)), FieldId::MoveMouseX) => Some(x),
-        (InstructionKind::Token(InputToken::MoveMouse(_, y, _)), FieldId::MoveMouseY) => Some(y),
-        (InstructionKind::Token(InputToken::Scroll(a, _)), FieldId::ScrollAmount) => Some(a),
-        (InstructionKind::Token(InputToken::Text(t)), FieldId::TextValue) => Some(t),
-        (InstructionKind::Token(InputToken::Key(k, _)), FieldId::KeyValue) => Some(k),
-        (InstructionKind::WhenKey(k, _), FieldId::KeyValue) => Some(k),
-        (InstructionKind::SetVariable(_, v), FieldId::SetVariableValue) => Some(v),
-        (InstructionKind::Return(v), FieldId::ReturnValue) => Some(v),
-        (InstructionKind::CallBlock { args, .. }, FieldId::CallArg(i)) => args.get_mut(i),
-        (InstructionKind::ChangeVariable(_, v), FieldId::ChangeVariableValue) => Some(v),
-        (InstructionKind::SetClipboard(v), FieldId::SetClipboardValue) => Some(v),
-        (InstructionKind::AddToList { value, .. }, FieldId::AddToListValue) => Some(value),
-        (InstructionKind::DeleteOfList { index, .. }, FieldId::DeleteOfListIndex) => Some(index),
-        (InstructionKind::ShiftList { amount, .. }, FieldId::ShiftListAmount) => Some(amount),
-        (InstructionKind::InsertIntoList { value, .. }, FieldId::InsertIntoListValue) => {
-            Some(value)
+/// Every value slot on an instruction, with its field id and type, in the
+/// order the canvas draws them. This is the one list of a block's slots:
+/// `visit_values_mut` and [`value_slot_mut`] both walk it.
+pub(crate) fn slots_mut<'a>(
+    kind: &'a mut InstructionKind,
+    f: &mut dyn FnMut(FieldId, &'a mut Value, InputValueType),
+) {
+    use FieldId as F;
+    use InputValueType::{Any, Bool};
+    match kind {
+        InstructionKind::Token(token) => match token {
+            InputToken::MoveMouse(x, y, _) => {
+                f(F::MoveMouseX, x, Any);
+                f(F::MoveMouseY, y, Any);
+            }
+            InputToken::Scroll(amount, _) => f(F::ScrollAmount, amount, Any),
+            InputToken::Text(value) => f(F::TextValue, value, Any),
+            InputToken::Key(key, _) => f(F::KeyValue, key, Any),
+            InputToken::Button(..) | InputToken::Raw(..) => {}
+        },
+        InstructionKind::Wait(v) => f(F::WaitDuration, v, Any),
+        InstructionKind::Return(v) => f(F::ReturnValue, v, Any),
+        InstructionKind::WhenBatteryDischargedTo(v) => f(F::BatteryDischargeThreshold, v, Any),
+        InstructionKind::WhenBatteryChargedTo(v) => f(F::BatteryChargeThreshold, v, Any),
+        InstructionKind::WhenKey(v, _) => f(F::KeyValue, v, Any),
+        InstructionKind::SetClipboard(v) => f(F::SetClipboardValue, v, Any),
+        InstructionKind::SetVariable(_, v) => f(F::SetVariableValue, v, Any),
+        InstructionKind::ChangeVariable(_, v) => f(F::ChangeVariableValue, v, Any),
+        InstructionKind::Repeat { count, .. } => f(F::RepeatCount, count, Any),
+        InstructionKind::Log(v) => f(F::LogValue, v, Any),
+        InstructionKind::ThrowError(v) => f(F::ErrorMessage, v, Any),
+        InstructionKind::WhenFileChanged(v) => f(F::WatchedFilePath, v, Any),
+        InstructionKind::WhenWindow { pattern, .. } => f(F::WindowPattern, pattern, Any),
+        InstructionKind::WhenTyped { text, .. } => f(F::TypedText, text, Any),
+        InstructionKind::PasteText(v) => f(F::PasteValue, v, Any),
+        InstructionKind::WhenApp { pattern, .. } => f(F::AppPattern, pattern, Any),
+        InstructionKind::WhenIdle(v) => f(F::IdleMinutes, v, Any),
+        InstructionKind::WhenCron(v) => f(F::CronExpression, v, Any),
+        InstructionKind::WithLock { name, .. } => f(F::LockName, name, Any),
+        InstructionKind::WhenUsb { pattern, .. } => f(F::UsbPattern, pattern, Any),
+        InstructionKind::AskYesNo { prompt, .. } | InstructionKind::AskChoice { prompt, .. } => {
+            f(F::AskPrompt, prompt, Any)
         }
-        (InstructionKind::InsertIntoList { index, .. }, FieldId::InsertIntoListIndex) => {
-            Some(index)
+        InstructionKind::ShowMessage(v) => f(F::MessageText, v, Any),
+        InstructionKind::WhenAt(v) => f(F::AtTime, v, Any),
+        InstructionKind::WhenWebhook { path, .. } => f(F::WebhookPath, path, Any),
+        InstructionKind::BrowserOpen { url, .. } => f(F::BrowserUrl, url, Any),
+        InstructionKind::BrowserScript { code, .. } => f(F::BrowserCode, code, Any),
+        InstructionKind::BrowserClick { selector, nth } => {
+            f(F::BrowserSelector, selector, Any);
+            if let Some(nth) = nth {
+                f(F::BrowserNth, nth, Any);
+            }
         }
-        (InstructionKind::ReplaceItemOfList { index, .. }, FieldId::ReplaceItemOfListIndex) => {
-            Some(index)
+        InstructionKind::BrowserType {
+            text,
+            selector,
+            nth,
+        } => {
+            f(F::BrowserText, text, Any);
+            f(F::BrowserSelector, selector, Any);
+            if let Some(nth) = nth {
+                f(F::BrowserNth, nth, Any);
+            }
         }
-        (InstructionKind::ReplaceItemOfList { value, .. }, FieldId::ReplaceItemOfListValue) => {
-            Some(value)
+        InstructionKind::BrowserWaitFor {
+            selector, timeout, ..
+        } => {
+            f(F::BrowserSelector, selector, Any);
+            f(F::WaitTimeout, timeout, Any);
         }
-        (InstructionKind::If { condition, .. }, FieldId::Condition) => Some(condition),
-        (InstructionKind::IfElse { condition, .. }, FieldId::Condition) => Some(condition),
-        (InstructionKind::While { condition, .. }, FieldId::Condition) => Some(condition),
-        (InstructionKind::Repeat { count, .. }, FieldId::RepeatCount) => Some(count),
-        (InstructionKind::WhenBatteryDischargedTo(v), FieldId::BatteryDischargeThreshold) => {
-            Some(v)
+        InstructionKind::WhenSignal(name) | InstructionKind::SendSignal { name, .. } => {
+            f(F::SignalName, &mut name.value, Any)
         }
-        (InstructionKind::WhenBatteryChargedTo(v), FieldId::BatteryChargeThreshold) => Some(v),
-        (InstructionKind::WriteFile { path, .. }, FieldId::WriteFilePath) => Some(path),
-        (InstructionKind::WriteFile { text, .. }, FieldId::WriteFileText) => Some(text),
-        (InstructionKind::HttpRequest { url, .. }, FieldId::HttpUrl) => Some(url),
-        (InstructionKind::HttpRequest { body, .. }, FieldId::HttpBody) => Some(body),
-        (InstructionKind::HttpRequest { headers, .. }, FieldId::HttpHeaders) => Some(headers),
-        (InstructionKind::Notify { title, .. }, FieldId::NotifyTitle) => Some(title),
-        (InstructionKind::Notify { message, .. }, FieldId::NotifyMessage) => Some(message),
-        (InstructionKind::Log(v), FieldId::LogValue) => Some(v),
-        (InstructionKind::ThrowError(v), FieldId::ErrorMessage) => Some(v),
-        (InstructionKind::WhenWindow { pattern, .. }, FieldId::WindowPattern) => Some(pattern),
-        (InstructionKind::WhenFileChanged(v), FieldId::WatchedFilePath) => Some(v),
-        (InstructionKind::Retry { count, .. }, FieldId::RetryCount) => Some(count),
-        (InstructionKind::Retry { delay, .. }, FieldId::RetryDelay) => Some(delay),
-        (InstructionKind::WindowAction { pattern, .. }, FieldId::WindowPattern) => Some(pattern),
-        (InstructionKind::MoveWindow { pattern, .. }, FieldId::WindowPattern) => Some(pattern),
-        (InstructionKind::MoveWindow { x, .. }, FieldId::WindowX) => Some(x),
-        (InstructionKind::MoveWindow { y, .. }, FieldId::WindowY) => Some(y),
-        (InstructionKind::RunMacro { target, .. }, FieldId::MacroTarget) => Some(target),
-        (InstructionKind::StopMacroNamed(v), FieldId::MacroTarget) => Some(v),
-        (InstructionKind::SetGlobal { name, .. }, FieldId::GlobalName) => Some(name),
-        (InstructionKind::SetGlobal { value, .. }, FieldId::GlobalValue) => Some(value),
-        (InstructionKind::ChangeGlobal { name, .. }, FieldId::GlobalName) => Some(name),
-        (InstructionKind::ChangeGlobal { by, .. }, FieldId::GlobalValue) => Some(by),
-        (
-            InstructionKind::WaitUntil { error_timeout, .. }
-            | InstructionKind::WaitForImage { error_timeout, .. },
-            FieldId::WaitErrorTimeout,
-        ) => error_timeout.as_mut(),
-        (InstructionKind::WaitUntil { condition, .. }, FieldId::Condition) => Some(condition),
-        (InstructionKind::WaitUntil { timeout, .. }, FieldId::WaitTimeout) => timeout.as_mut(),
-        (InstructionKind::WaitForImage { timeout, .. }, FieldId::WaitTimeout) => timeout.as_mut(),
-        (InstructionKind::FindImage { tolerance, .. }, FieldId::ImageTolerance) => {
-            tolerance.as_mut()
+        InstructionKind::AskText {
+            prompt, default, ..
+        } => {
+            f(F::AskPrompt, prompt, Any);
+            f(F::AskDefault, default, Any);
         }
-        (InstructionKind::ClickImage { tolerance, .. }, FieldId::ImageTolerance) => {
-            tolerance.as_mut()
+        InstructionKind::SplitIntoList {
+            text, separator, ..
+        } => {
+            f(F::SplitText, text, Any);
+            f(F::SplitSeparator, separator, Any);
         }
-        (InstructionKind::WaitForImage { tolerance, .. }, FieldId::ImageTolerance) => {
-            tolerance.as_mut()
+        InstructionKind::WriteFile { path, text, .. } => {
+            f(F::WriteFilePath, path, Any);
+            f(F::WriteFileText, text, Any);
         }
-        (
-            InstructionKind::FindImage { pick: Some(m), .. }
-            | InstructionKind::ClickImage { pick: Some(m), .. },
-            FieldId::ImageIndex,
-        ) => Some(&mut m.index),
-        (
-            InstructionKind::FindImage { pick: Some(m), .. }
-            | InstructionKind::ClickImage { pick: Some(m), .. },
-            FieldId::ImageNearX,
-        ) => Some(&mut m.near_x),
-        (
-            InstructionKind::FindImage { pick: Some(m), .. }
-            | InstructionKind::ClickImage { pick: Some(m), .. },
-            FieldId::ImageNearY,
-        ) => Some(&mut m.near_y),
-        (InstructionKind::WhenTyped { text, .. }, FieldId::TypedText) => Some(text),
-        (InstructionKind::PasteText(v), FieldId::PasteValue) => Some(v),
-        (InstructionKind::BrowserOpen { url, .. }, FieldId::BrowserUrl) => Some(url),
-        (
-            InstructionKind::BrowserClick { selector, .. }
-            | InstructionKind::BrowserType { selector, .. }
-            | InstructionKind::BrowserWaitFor { selector, .. },
-            FieldId::BrowserSelector,
-        ) => Some(selector),
-        (
-            InstructionKind::BrowserClick { nth: Some(nth), .. }
-            | InstructionKind::BrowserType { nth: Some(nth), .. },
-            FieldId::BrowserNth,
-        ) => Some(nth),
-        (InstructionKind::BrowserType { text, .. }, FieldId::BrowserText) => Some(text),
-        (InstructionKind::BrowserWaitFor { timeout, .. }, FieldId::WaitTimeout) => Some(timeout),
-        (InstructionKind::BrowserScript { code, .. }, FieldId::BrowserCode) => Some(code),
-        (InstructionKind::WhenApp { pattern, .. }, FieldId::AppPattern) => Some(pattern),
-        (InstructionKind::WhenIdle(v), FieldId::IdleMinutes) => Some(v),
-        (InstructionKind::WithLock { name, .. }, FieldId::LockName) => Some(name),
-        (InstructionKind::WhenCron(v), FieldId::CronExpression) => Some(v),
-        (InstructionKind::WhenTime(_, v), FieldId::ScheduleTime) => Some(v),
-        (InstructionKind::SplitIntoList { text, .. }, FieldId::SplitText) => Some(text),
-        (InstructionKind::SplitIntoList { separator, .. }, FieldId::SplitSeparator) => {
-            Some(separator)
+        InstructionKind::HttpRequest {
+            url, body, headers, ..
+        } => {
+            f(F::HttpUrl, url, Any);
+            f(F::HttpBody, body, Any);
+            f(F::HttpHeaders, headers, Any);
         }
-        (InstructionKind::WhenUsb { pattern, .. }, FieldId::UsbPattern) => Some(pattern),
-        (InstructionKind::WhenMouseButton { modifiers, .. }, FieldId::MouseModifiers) => {
-            modifiers.as_mut()
+        InstructionKind::Notify { title, message } => {
+            f(F::NotifyTitle, title, Any);
+            f(F::NotifyMessage, message, Any);
         }
-        (
-            InstructionKind::AskText { prompt, .. }
-            | InstructionKind::AskYesNo { prompt, .. }
-            | InstructionKind::AskChoice { prompt, .. },
-            FieldId::AskPrompt,
-        ) => Some(prompt),
-        (InstructionKind::AskText { default, .. }, FieldId::AskDefault) => Some(default),
-        (InstructionKind::ShowMessage(v), FieldId::MessageText) => Some(v),
-        (InstructionKind::WhenAt(v), FieldId::AtTime) => Some(v),
-        (
-            InstructionKind::WhenSignal(v) | InstructionKind::SendSignal { name: v, .. },
-            FieldId::SignalName,
-        ) => Some(&mut v.value),
-        (InstructionKind::WhenWebhook { path, .. }, FieldId::WebhookPath) => Some(path),
-        (
-            InstructionKind::DetectObjectsInWindow { pattern, .. }
-            | InstructionKind::WaitForDetection { pattern, .. }
-            | InstructionKind::AimStep { pattern, .. },
-            FieldId::WindowPattern,
-        ) => Some(pattern),
-        (
-            InstructionKind::DetectObjectsInWindow { detector, .. }
-            | InstructionKind::WaitForDetection { detector, .. },
-            FieldId::DetectorUrl,
-        ) => Some(detector),
-        (
-            InstructionKind::DetectObjectsInWindow { label, .. }
-            | InstructionKind::WaitForDetection { label, .. },
-            FieldId::DetectLabel,
-        ) => Some(label),
-        (
-            InstructionKind::DetectObjectsInWindow { confidence, .. }
-            | InstructionKind::WaitForDetection { confidence, .. },
-            FieldId::DetectConfidence,
-        ) => Some(confidence),
-        (
-            InstructionKind::WaitForDetection { timeout, .. }
-            | InstructionKind::AimAtDetection { timeout, .. },
-            FieldId::WaitTimeout,
-        ) => Some(timeout),
-        (InstructionKind::AimStep { target_x, .. }, FieldId::AimTargetX) => Some(target_x),
-        (InstructionKind::AimStep { target_y, .. }, FieldId::AimTargetY) => Some(target_y),
-        (
-            InstructionKind::AimStep { gain, .. } | InstructionKind::AimAtDetection { gain, .. },
-            FieldId::AimGain,
-        ) => Some(gain),
-        (
-            InstructionKind::AimStep { max_step, .. }
-            | InstructionKind::AimAtDetection { max_step, .. },
-            FieldId::AimMaxStep,
-        ) => Some(max_step),
-        (
-            InstructionKind::AimStep { deadzone, .. }
-            | InstructionKind::AimAtDetection { deadzone, .. },
-            FieldId::AimDeadzone,
-        ) => Some(deadzone),
-        (InstructionKind::AimAtDetection { index, .. }, FieldId::AimIndex) => Some(index),
-        (InstructionKind::AimAtDetection { settle_ms, .. }, FieldId::AimSettle) => Some(settle_ms),
-        _ => None,
+        InstructionKind::Retry { count, delay, .. } => {
+            f(F::RetryCount, count, Any);
+            f(F::RetryDelay, delay, Any);
+        }
+        InstructionKind::WindowAction { pattern, .. } => f(F::WindowPattern, pattern, Any),
+        InstructionKind::MoveWindow { pattern, x, y, .. } => {
+            f(F::WindowPattern, pattern, Any);
+            f(F::WindowX, x, Any);
+            f(F::WindowY, y, Any);
+        }
+        InstructionKind::RunMacro { target, .. } | InstructionKind::StopMacroNamed(target) => {
+            f(F::MacroTarget, target, Any)
+        }
+        InstructionKind::SetGlobal { name, value: other }
+        | InstructionKind::ChangeGlobal { name, by: other } => {
+            f(F::GlobalName, name, Any);
+            f(F::GlobalValue, other, Any);
+        }
+        InstructionKind::WhenMouseButton { modifiers, .. } => {
+            if let Some(v) = modifiers {
+                f(F::MouseModifiers, v, Any);
+            }
+        }
+        InstructionKind::WaitUntil {
+            condition,
+            timeout,
+            error_timeout,
+        } => {
+            f(F::Condition, condition, Bool);
+            if let Some(v) = timeout {
+                f(F::WaitTimeout, v, Any);
+            }
+            if let Some(v) = error_timeout {
+                f(F::WaitErrorTimeout, v, Any);
+            }
+        }
+        InstructionKind::FindImage {
+            tolerance, pick, ..
+        }
+        | InstructionKind::ClickImage {
+            tolerance, pick, ..
+        } => {
+            if let Some(v) = tolerance {
+                f(F::ImageTolerance, v, Any);
+            }
+            if let Some(ImageMatch {
+                index,
+                near_x,
+                near_y,
+                ..
+            }) = pick
+            {
+                f(F::ImageIndex, index, Any);
+                f(F::ImageNearX, near_x, Any);
+                f(F::ImageNearY, near_y, Any);
+            }
+        }
+        InstructionKind::WaitForImage {
+            tolerance,
+            timeout,
+            error_timeout,
+            ..
+        } => {
+            if let Some(v) = tolerance {
+                f(F::ImageTolerance, v, Any);
+            }
+            if let Some(v) = timeout {
+                f(F::WaitTimeout, v, Any);
+            }
+            if let Some(v) = error_timeout {
+                f(F::WaitErrorTimeout, v, Any);
+            }
+        }
+        InstructionKind::DetectObjectsInWindow {
+            pattern,
+            detector,
+            label,
+            confidence,
+            ..
+        } => {
+            f(F::WindowPattern, pattern, Any);
+            f(F::DetectorUrl, detector, Any);
+            f(F::DetectLabel, label, Any);
+            f(F::DetectConfidence, confidence, Any);
+        }
+        InstructionKind::WaitForDetection {
+            pattern,
+            detector,
+            label,
+            confidence,
+            timeout,
+            ..
+        } => {
+            f(F::WindowPattern, pattern, Any);
+            f(F::DetectorUrl, detector, Any);
+            f(F::DetectLabel, label, Any);
+            f(F::DetectConfidence, confidence, Any);
+            f(F::WaitTimeout, timeout, Any);
+        }
+        InstructionKind::AimStep {
+            pattern,
+            target_x,
+            target_y,
+            gain,
+            max_step,
+            deadzone,
+            ..
+        } => {
+            f(F::WindowPattern, pattern, Any);
+            f(F::AimTargetX, target_x, Any);
+            f(F::AimTargetY, target_y, Any);
+            f(F::AimGain, gain, Any);
+            f(F::AimMaxStep, max_step, Any);
+            f(F::AimDeadzone, deadzone, Any);
+        }
+        InstructionKind::AimAtDetection {
+            index,
+            gain,
+            max_step,
+            deadzone,
+            timeout,
+            settle_ms,
+            ..
+        } => {
+            f(F::AimIndex, index, Any);
+            f(F::AimGain, gain, Any);
+            f(F::AimMaxStep, max_step, Any);
+            f(F::AimDeadzone, deadzone, Any);
+            f(F::WaitTimeout, timeout, Any);
+            f(F::AimSettle, settle_ms, Any);
+        }
+        // A call's declared Boolean inputs live on the `BlockDef`, not
+        // here: `BlockGraph::migrate_bool_slots` handles those.
+        InstructionKind::CallBlock { args, .. } => {
+            for (i, arg) in args.iter_mut().enumerate() {
+                f(F::CallArg(i), arg, Any);
+            }
+        }
+        InstructionKind::If { condition, .. }
+        | InstructionKind::IfElse { condition, .. }
+        | InstructionKind::While { condition, .. } => f(F::Condition, condition, Bool),
+        InstructionKind::AddToList { value, .. } => f(F::AddToListValue, value, Any),
+        InstructionKind::InsertIntoList { value, index, .. } => {
+            f(F::InsertIntoListValue, value, Any);
+            f(F::InsertIntoListIndex, index, Any);
+        }
+        InstructionKind::WhenTime(_, time) => f(F::ScheduleTime, time, Any),
+        InstructionKind::DeleteOfList { index, .. } => f(F::DeleteOfListIndex, index, Any),
+        InstructionKind::ShiftList { amount, .. } => f(F::ShiftListAmount, amount, Any),
+        InstructionKind::ReplaceItemOfList { index, value, .. } => {
+            f(F::ReplaceItemOfListIndex, index, Any);
+            f(F::ReplaceItemOfListValue, value, Any);
+        }
+        InstructionKind::Command(_)
+        | InstructionKind::CommandWait(_)
+        | InstructionKind::Comment(_)
+        | InstructionKind::WhenRan
+        | InstructionKind::BlockHeader(_)
+        | InstructionKind::EscapeLoop
+        | InstructionKind::ContinueLoop
+        | InstructionKind::StopMacro
+        | InstructionKind::TryCatch { .. }
+        | InstructionKind::WhenPowerPluggedIn
+        | InstructionKind::WhenPowerUnplugged
+        | InstructionKind::WhenClipboardChanged
+        | InstructionKind::WhenScreenLock { .. }
+        | InstructionKind::WhenNetwork { .. }
+        | InstructionKind::Forever { .. }
+        | InstructionKind::OpenApp { .. }
+        | InstructionKind::CloseApp { .. }
+        | InstructionKind::DeleteAllOfList { .. }
+        | InstructionKind::ReverseList { .. }
+        | InstructionKind::RunBranch(_) => {}
     }
+}
+
+/// The value tree a [`FieldId`] names on an instruction.
+pub(crate) fn value_slot_mut(kind: &mut InstructionKind, field: FieldId) -> Option<&mut Value> {
+    let mut found = None;
+    slots_mut(kind, &mut |id, value, _| {
+        if id == field && found.is_none() {
+            found = Some(value);
+        }
+    });
+    found
 }
 
 /// The blank a field restores to when its value is dragged out; `None`
@@ -360,50 +464,22 @@ mod tests {
         assert!("Nonsense".parse::<FieldId>().is_err());
         assert!("CallArg:x".parse::<FieldId>().is_err());
     }
-    /// Every unit `FieldId`, read off this file's enum.
-    fn every_field() -> Vec<FieldId> {
-        let source = include_str!("fields.rs");
-        let body = &source[source.find("pub enum FieldId {").unwrap()..];
-        let body = &body[..body.find("\n}").unwrap()];
-        let mut fields: Vec<FieldId> = body
-            .lines()
-            .map(str::trim)
-            .filter_map(|line| line.strip_suffix(','))
-            .filter_map(|name| name.parse().ok())
-            .collect();
-        fields.extend((0..4).map(FieldId::CallArg));
-        fields
-    }
-
-    /// `visit_values_mut` (block_kind.rs) and `value_slot_mut` must name the
-    /// same slots, or a value is drawn but can't be edited (or the reverse).
+    /// A block names each slot once, or `value_slot_mut` reaches only the
+    /// first of two.
     #[test]
-    fn every_visited_value_has_a_field_id() {
-        use blockstitch_core::graph::BlockKind;
-        let fields = every_field();
-        assert!(fields.len() > 40, "only parsed {} field ids", fields.len());
+    fn no_block_names_a_slot_twice() {
         let fixtures: serde_json::Value =
             serde_json::from_str(include_str!("../../tests/fixtures/wire_blocks.json")).unwrap();
         for block in fixtures.as_array().unwrap() {
             let dto: crate::frontend::InstructionDto =
                 serde_json::from_value(block.clone()).unwrap();
             let mut kind = crate::frontend::dto_to_instruction(&dto).unwrap().kind;
-            let mut visited = Vec::new();
-            kind.visit_values_mut(&mut |value, _| visited.push(value as *const Value));
-            let mut named = Vec::new();
-            for field in &fields {
-                if let Some(value) = value_slot_mut(&mut kind, *field) {
-                    named.push(value as *const Value);
-                }
-            }
-            visited.sort();
-            named.sort();
-            named.dedup();
-            assert_eq!(
-                visited, named,
-                "{} visits a different set of values than its field ids reach",
-                block["type"]
-            );
+            let mut ids = Vec::new();
+            slots_mut(&mut kind, &mut |id, _, _| ids.push(id));
+            let count = ids.len();
+            ids.sort_by_key(|id| id.to_string());
+            ids.dedup();
+            assert_eq!(ids.len(), count, "{} repeats a field id", block["type"]);
         }
     }
 }

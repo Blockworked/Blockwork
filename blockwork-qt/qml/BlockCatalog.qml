@@ -564,10 +564,6 @@ QtObject {
         BlockRegistry.registerOperators(operatorRows());
         const p = rowPieces();
         const rows = Object.assign({}, eventRows(p), inputRows(p), controlRows(p), dataRows(p), systemRows(p), screenRows(p), browserRows(p));
-        // Every trigger (When...) starts a strand, so it draws as a header.
-        for (const type in rows)
-            if (type.startsWith("When") && !rows[type].shape)
-                rows[type] = Object.assign({ shape: "header" }, rows[type]);
         BlockRegistry.registerRows(rows);
         BlockRegistry.registerVariableFields({
             WhenWebhook: ["variable"], AskText: ["name"], AskYesNo: ["name"], AskChoice: ["name"],
