@@ -41,11 +41,12 @@ Popup {
     function openAt(item, h, m) {
         hour = Math.max(0, Math.min(23, h | 0)); minute = Math.max(0, Math.min(59, m | 0));
         today = new Date();
-        const host = parent || Overlay.overlay;
+        const host = Overlay.overlay || parent;
+        parent = item;
         const p = item.mapToItem(host, 0, 0);
         const below = p.y + item.height + 6;
-        x = Math.max(8, Math.min(p.x, host.width - implicitWidth - 8));
-        y = below + implicitHeight + 8 <= host.height ? below : Math.max(8, p.y - implicitHeight - 6);
+        x = Math.max(8, Math.min(p.x, host.width - implicitWidth - 8)) - p.x;
+        y = (below + implicitHeight + 8 <= host.height ? below : Math.max(8, p.y - implicitHeight - 6)) - p.y;
         transformOrigin = below + implicitHeight + 8 <= host.height ? Popup.TopLeft : Popup.BottomLeft;
         open();
     }
@@ -74,6 +75,7 @@ Popup {
     }
 
     parent: Overlay.overlay
+    popupType: Popup.Window
     modal: false; focus: true
     closePolicy: Popup.CloseOnEscape | Popup.CloseOnPressOutside
     padding: 14

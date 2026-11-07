@@ -106,14 +106,13 @@ ColumnLayout {
             text: qsTr("You haven't shared any packs yet. Pick some of this macro's blocks with Share a new pack.")
         }
 
-        ListView {
+        StitchListView {
             id: list
             objectName: "myPacksList"
             Layout.fillWidth: true; Layout.fillHeight: true
             clip: true; spacing: 8
             model: mine.result.packs
-            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-            WheelPan { flickable: list }
+
             delegate: Rectangle {
                 id: card
                 required property var modelData

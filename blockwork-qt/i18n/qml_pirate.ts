@@ -5389,16 +5389,6 @@
         <source>Add variable</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1287"/>
-        <source>Open a new copy even if the app is already running</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/EditorPage.qml" line="1289"/>
-        <source>Only changes anything on macOS. On Windows and Linux the app decides whether a second launch opens a new window.</source>
-        <translation type="unfinished"></translation>
-    </message>
 </context>
 <context>
     <name>LibraryPanel</name>

@@ -18,7 +18,6 @@ fn open_app_passes_arguments_folder_and_environment() {
             name: "GREETING".into(),
             value: "hi".into(),
         }],
-        new_instance: false,
     };
     let command = format!(
         "sh -c 'printf \"%s|\" \"$PWD\" \"$@\" > {}' app",

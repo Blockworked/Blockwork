@@ -1,5 +1,4 @@
-//! Older saved shapes of `Wait` and `WhenTime`, and how they load into the
-//! current ones. Every other block loads with its own derive.
+//! Older saved block shapes and how they load into the current vocabulary.
 
 use super::*;
 
@@ -68,5 +67,23 @@ pub(super) fn migrate_wait_duration(duration: Value, randomness: Value) -> Value
             },
         ],
         saved: zero(),
+    }
+}
+
+// `remote = "Self"` derives inherent methods for the current shape.
+// These trait impls delegate to them after accepting the old unit StopMacro.
+impl Serialize for InstructionKind {
+    fn serialize<S: serde::Serializer>(&self, serializer: S) -> Result<S::Ok, S::Error> {
+        InstructionKind::serialize(self, serializer)
+    }
+}
+
+impl<'de> Deserialize<'de> for InstructionKind {
+    fn deserialize<D: serde::Deserializer<'de>>(deserializer: D) -> Result<Self, D::Error> {
+        let mut value = serde_json::Value::deserialize(deserializer)?;
+        if value == serde_json::json!("StopMacro") {
+            value = serde_json::json!({"Stop": {"scope": "All"}});
+        }
+        InstructionKind::deserialize(value).map_err(serde::de::Error::custom)
     }
 }

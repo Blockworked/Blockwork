@@ -19,7 +19,6 @@ AppDialog {
         launchDir.text = l.working_dir || "";
         launchEnv.clear();
         for (const v of (l.env || [])) launchEnv.append({ name: v.name || "", value: v.value || "" });
-        launchNewCopy.checked = !!l.new_instance;
         open();
         launchArgs.forceActiveFocus();
     }
@@ -33,7 +32,7 @@ AppDialog {
             if (row.name.trim()) env.push({ name: row.name.trim(), value: row.value });
         }
         const updated = JSON.parse(JSON.stringify(req.instruction || {}));
-        updated.launch = { args: launchArgs.text.trim(), working_dir: launchDir.text.trim(), env: env, new_instance: launchNewCopy.checked };
+        updated.launch = { args: launchArgs.text.trim(), working_dir: launchDir.text.trim(), env: env };
         page.invoke("edit_instruction", { strandId: req.strandId, path: req.path, instruction: updated });
     }
     ListModel { id: launchEnv }
@@ -77,9 +76,5 @@ AppDialog {
             }
         }
         StitchButton { text: qsTr("Add variable"); iconName: "plus"; onClicked: launchEnv.append({ name: "", value: "" }) }
-        Item { width: 1; height: 4 }
-        StitchCheckBox { id: launchNewCopy; text: qsTr("Open a new copy even if the app is already running") }
-        Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
-            text: qsTr("Only changes anything on macOS. On Windows and Linux the app decides whether a second launch opens a new window.") }
     }
 }

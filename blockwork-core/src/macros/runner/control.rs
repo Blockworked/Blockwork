@@ -50,14 +50,14 @@ pub(super) fn run_control_block(
         }
         InstructionKind::EscapeLoop => return Ok(Next::Exit(Flow::Break)),
         InstructionKind::ContinueLoop => return Ok(Next::Exit(Flow::Continue)),
-        InstructionKind::StopMacro => {
-            crate::run_log::info(&ctx.source, "Stopped by a stop macro block");
-            if let Some(flag) = &ctx.stop_flag
-                && let Ok(mut running) = flag.lock()
-            {
-                *running = false;
+        InstructionKind::Stop { scope } => {
+            crate::run_log::info(&ctx.source, format!("Stopped {scope:?} by a stop block"));
+            if let Some(flag) = &ctx.stop_flag {
+                flag.stop(*scope);
             }
-            return Ok(Next::Stop);
+            if *scope != StopScope::OtherStrands {
+                return Ok(Next::Stop);
+            }
         }
         InstructionKind::ThrowError(message) => {
             let message = ctx

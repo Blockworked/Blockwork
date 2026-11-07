@@ -8,6 +8,7 @@
 
 use super::*;
 use crate::input::index_to_mouse_button;
+use crate::macros::StopScope;
 
 /// One field's wire form: the same value for most types, the DTO list for a
 /// nested body.
@@ -43,7 +44,7 @@ macro_rules! wire_blocks {
     (
         unit { $($unit:ident),* $(,)? }
         tuple { $($tup:ident ( $($(#[$tm:meta])* $tf:ident : $tt:ty),+ )),* $(,)? }
-        named { $($nam:ident { $($(#[$nm:meta])* $nf:ident : $nt:ty),+ }),* $(,)? }
+        named { $($(#[$nv:meta])* $nam:ident { $($(#[$nm:meta])* $nf:ident : $nt:ty),+ }),* $(,)? }
         custom { $($cus:ident { $($(#[$cm:meta])* $cf:ident : $ct:ty),* }),* $(,)? }
         to_wire($ins:ident, $id:ident) { $($tp:pat $(if $tg:expr)? => $te:expr),* $(,)? }
         from_wire($dto:ident) { $($fp:pat => $fe:expr),* $(,)? }
@@ -53,7 +54,7 @@ macro_rules! wire_blocks {
         pub enum InstructionDto {
             $($unit { id: String },)*
             $($tup { id: String, $($(#[$tm])* $tf: $tt,)+ },)*
-            $($nam { id: String, $($(#[$nm])* $nf: $nt,)+ },)*
+            $($(#[$nv])* $nam { id: String, $($(#[$nm])* $nf: $nt,)+ },)*
             $($cus { id: String, $($(#[$cm])* $cf: $ct,)* },)*
         }
 
@@ -97,7 +98,6 @@ wire_blocks! {
         WhenClipboardChanged,
         EscapeLoop,
         ContinueLoop,
-        StopMacro,
     }
     tuple {
         Wait(duration: Value),
@@ -124,6 +124,7 @@ wire_blocks! {
         WhenAt(at: Value),
     }
     named {
+        #[serde(alias = "StopMacro")] Stop { #[serde(default)] scope: StopScope },
         OpenApp { command: String, name: String, icon: Option<String>, #[serde(default)] launch: LaunchOptions },
         CloseApp { command: String, name: String, icon: Option<String> },
         AddToList { value: Value, name: String },

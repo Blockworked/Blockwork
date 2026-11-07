@@ -28,9 +28,6 @@ pub(super) fn open_app(command: &str, launch: &LaunchOptions) -> std::io::Result
 #[cfg(target_os = "macos")]
 pub(super) fn open_app(command: &str, launch: &LaunchOptions) -> std::io::Result<()> {
     let mut cmd = Command::new("/usr/bin/open");
-    if launch.new_instance {
-        cmd.arg("-n");
-    }
     for (name, value) in env_vars(launch) {
         cmd.arg("--env").arg(format!("{name}={value}"));
     }

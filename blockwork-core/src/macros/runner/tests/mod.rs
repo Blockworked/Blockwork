@@ -13,6 +13,7 @@ mod dialogs;
 mod errors;
 mod input;
 mod runs;
+mod stopping;
 mod variables;
 mod vision;
 

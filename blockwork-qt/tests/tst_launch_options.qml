@@ -10,7 +10,7 @@ Item {
     function invoke(command, args) { calls.push({command: command, args: args}); }
     MockBridge { id: bridge; silent: true }
     readonly property var openApp: ({ id: "open", type: "OpenApp", command: "brave", name: "Brave", icon: null,
-        launch: { args: "--incognito", working_dir: "", env: [{ name: "LANG", value: "C" }], new_instance: false } })
+        launch: { args: "--incognito", working_dir: "", env: [{ name: "LANG", value: "C" }] } })
     Component {
         id: editorComponent
         EditorPage {
@@ -43,8 +43,8 @@ Item {
             const summary = BlockRegistry.row("OpenApp").head.find(p => p.action === "launchOptions").text;
             compare(summary(scene.openApp), "--incognito");
             compare(summary({ type: "OpenApp" }), "");
-            compare(summary({ launch: { args: "", working_dir: "~/x", env: [], new_instance: false } }), "custom");
-            compare(summary({ launch: { args: "", working_dir: "", env: [], new_instance: false } }), "");
+            compare(summary({ launch: { args: "", working_dir: "~/x", env: [] } }), "custom");
+            compare(summary({ launch: { args: "", working_dir: "", env: [] } }), "");
             verify(summary({ launch: { args: "x".repeat(40) } }).length <= 28);
         }
         function test_the_panel_saves_the_launch_options() {
@@ -68,7 +68,7 @@ Item {
             compare(edit.args.path, path);
             compare(edit.args.instruction.command, "brave");
             compare(edit.args.instruction.launch, { args: "--incognito --new-window", working_dir: "~/Downloads",
-                env: [{ name: "LANG", value: "C" }], new_instance: false });
+                env: [{ name: "LANG", value: "C" }] });
         }
         function test_the_row_has_an_app_button_and_a_gear() {
             createTemporaryObject(editorComponent, scene);

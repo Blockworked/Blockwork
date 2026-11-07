@@ -276,17 +276,17 @@ ApplicationWindow {
         ] : []
         delegate: MouseArea {
             required property var modelData
-            readonly property int grip: Math.max(5, root.shadowMargin)
+            readonly property int grip: 7
             readonly property bool edgeL: (modelData.e & Qt.LeftEdge) !== 0
             readonly property bool edgeR: (modelData.e & Qt.RightEdge) !== 0
             readonly property bool edgeT: (modelData.e & Qt.TopEdge) !== 0
             readonly property bool edgeB: (modelData.e & Qt.BottomEdge) !== 0
             readonly property bool corner: (edgeL || edgeR) && (edgeT || edgeB)
             z: 200; cursorShape: modelData.c
-            x: edgeR ? root.width - (corner ? grip * 2 : grip) : 0
-            y: edgeB ? root.height - (corner ? grip * 2 : grip) : 0
-            width: (edgeL || edgeR) ? (corner ? grip * 2 : grip) : root.width
-            height: (edgeT || edgeB) ? (corner ? grip * 2 : grip) : root.height
+            x: edgeR ? root.width - root.shadowMargin - width : root.shadowMargin
+            y: edgeB ? root.height - root.shadowMargin - height : root.shadowMargin
+            width: (edgeL || edgeR) ? (corner ? grip * 2 : grip) : root.width - 2 * root.shadowMargin
+            height: (edgeT || edgeB) ? (corner ? grip * 2 : grip) : root.height - 2 * root.shadowMargin
             onPressed: root.startSystemResize(modelData.e)
         }
     }

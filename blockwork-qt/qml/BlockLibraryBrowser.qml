@@ -193,13 +193,12 @@ AppDialog {
                 text: (browser.library.packs || []).length ? qsTr("No packs match that.")
                     : qsTr("No packs here yet. Add a library in Settings > Block library, or add a pack from a file.")
             }
-            ListView {
+            StitchListView {
                 id: packList
                 Layout.fillWidth: true; Layout.fillHeight: true
                 clip: true; spacing: 8
                 model: browser.shown
-                ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-                WheelPan { flickable: packList }
+
                 delegate: PackCard {
                     width: packList.width - 12
                     owner: browser

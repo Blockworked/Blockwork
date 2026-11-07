@@ -54,8 +54,6 @@ pub struct LaunchOptions {
     pub working_dir: String,
     /// Environment variables set for the app only.
     pub env: Vec<EnvVar>,
-    /// macOS only: open another copy even if the app is already running.
-    pub new_instance: bool,
 }
 
 #[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -71,7 +69,18 @@ impl LaunchOptions {
     }
 }
 
+/// Which strands a Stop block ends in the current macro run.
+#[derive(Debug, Clone, Copy, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum StopScope {
+    #[default]
+    All,
+    ThisStrand,
+    OtherStrands,
+}
+
+// The trait implementations in saved_shapes accept the old StopMacro shape.
 #[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(remote = "Self")]
 pub enum InstructionKind {
     Token(InputToken),
     #[serde(deserialize_with = "super::saved_shapes::wait")]
@@ -283,8 +292,11 @@ pub enum InstructionKind {
     /// Fails with the given message: ends the strand unless a `TryCatch`
     /// catches it.
     ThrowError(Value),
-    /// Stops every strand of the current run.
-    StopMacro,
+    /// Stops the selected strands of the current macro run.
+    Stop {
+        #[serde(default)]
+        scope: StopScope,
+    },
     /// Runs `body`; if a block in it fails, waits `delay` ms and runs it
     /// again, up to `count` attempts in all.
     Retry {

@@ -184,10 +184,9 @@ ColumnLayout {
         currentIndex: page.tab === "source" ? 1 : page.tab === "comments" ? 2 : 0
 
         // Overview
-        ScrollView {
+        StitchScrollView {
             id: overviewScroll
             clip: true; contentWidth: availableWidth
-            WheelPan { flickable: overviewScroll.contentItem }
             ColumnLayout {
                 width: overviewScroll.availableWidth - 12; spacing: 10
                 Text {
@@ -329,7 +328,7 @@ ColumnLayout {
                     blockDefinitions: page.view.macro ? page.view.macro.block_defs : []
                     onWidthChanged: if (visible && page.view.macro) Qt.callLater(page.placeStrands)
                 }
-                ScrollView {
+                StitchScrollView {
                     id: fileScroll
                     visible: page.showFile
                     anchors.fill: parent; anchors.margins: 1
@@ -353,10 +352,9 @@ ColumnLayout {
         }
 
         // Comments
-        ScrollView {
+        StitchScrollView {
             id: commentsScroll
             clip: true; contentWidth: availableWidth
-            WheelPan { flickable: commentsScroll.contentItem }
             ColumnLayout {
                 width: commentsScroll.availableWidth - 12; spacing: 12
                 Text {

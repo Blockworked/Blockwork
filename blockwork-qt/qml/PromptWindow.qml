@@ -120,7 +120,7 @@ ApplicationWindow {
             text: root.request.default || ""
             onAccepted: root.accept()
         }
-        ListView {
+        StitchListView {
             id: choices
             objectName: "promptChoices"
             Accessible.role: Accessible.List
@@ -130,8 +130,7 @@ ApplicationWindow {
             Layout.preferredHeight: Math.min(240, contentHeight)
             clip: true; currentIndex: 0
             model: root.request.options || []
-            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-            WheelPan { flickable: choices }
+
             delegate: Rectangle {
                 required property string modelData
                 required property int index

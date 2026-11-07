@@ -26,12 +26,13 @@ pub(crate) fn select_macro(
     Ok(())
 }
 
-pub(crate) fn new_macro(state: &SharedState, app: &AppHandle) -> Result<(), String> {
-    add_and_select(
-        state,
-        app,
-        Macro::new("New Macro".into(), "".into(), vec![]),
-    )
+pub(crate) fn new_macro(
+    state: &SharedState,
+    app: &AppHandle,
+    new_macro: Macro,
+    permissions: Option<Vec<String>>,
+) -> Result<(), String> {
+    add_and_select_with_permissions(state, app, new_macro, permissions)
 }
 
 /// Adds a starter macro from `templates` and opens it.
@@ -48,9 +49,29 @@ pub(super) fn add_and_select(
     app: &AppHandle,
     new_macro: Macro,
 ) -> Result<(), String> {
+    add_and_select_with_permissions(state, app, new_macro, None)
+}
+
+fn add_and_select_with_permissions(
+    state: &SharedState,
+    app: &AppHandle,
+    new_macro: Macro,
+    permissions: Option<Vec<String>>,
+) -> Result<(), String> {
     let new_id = new_macro.id.clone();
     if let Err(e) = new_macro.add() {
         return Err(format!("Failed to create macro: {e}"));
+    }
+    if let Some(allowed) = permissions {
+        let allowed = allowed
+            .into_iter()
+            .filter(|kind| {
+                blockwork_core::permissions::GUARDED
+                    .iter()
+                    .any(|(known, _)| known == kind)
+            })
+            .collect();
+        blockwork_core::permissions::restrict(&new_id, allowed);
     }
     let mut s = state.lock().map_err(|e| e.to_string())?;
     refresh_macro_list(&mut s);

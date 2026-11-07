@@ -24,7 +24,7 @@ pub(super) fn run_system_block(
                 let (source, emulator, stop_flag) = (
                     Arc::clone(&ctx.source),
                     Arc::clone(&ctx.emulator),
-                    ctx.stop_flag.clone(),
+                    ctx.stop_flag.as_ref().map(StrandStop::fork),
                 );
                 let (variables, lists, table) = (
                     Arc::clone(&ctx.variables),

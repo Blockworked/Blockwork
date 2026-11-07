@@ -124,6 +124,11 @@ fn open_app_launch_options_are_optional_and_round_trip() {
     // Untouched blocks save the same shape as before.
     assert_eq!(serde_json::to_string(&kind).unwrap(), old);
 
+    let legacy = r#"{"OpenApp":{"command":"brave","name":"Brave","icon":null,"launch":{"new_instance":true}}}"#;
+    let migrated: InstructionKind = serde_json::from_str(legacy).unwrap();
+    assert_eq!(migrated, kind);
+    assert_eq!(serde_json::to_string(&migrated).unwrap(), old);
+
     let launch = LaunchOptions {
         args: "--incognito".into(),
         working_dir: "~/Downloads".into(),
@@ -131,7 +136,6 @@ fn open_app_launch_options_are_optional_and_round_trip() {
             name: "LANG".into(),
             value: "C".into(),
         }],
-        new_instance: true,
     };
     let kind = InstructionKind::OpenApp {
         command: "brave".into(),
@@ -970,4 +974,36 @@ fn body_mut_addresses_loop_slots() {
 
     assert_eq!(InstructionKind::EscapeLoop.body_mut(0), None);
     assert_eq!(InstructionKind::ContinueLoop.body_mut(0), None);
+}
+
+#[test]
+fn stop_scopes_round_trip_and_legacy_stop_defaults_to_all() {
+    use crate::frontend::{InstructionDto, dto_to_instruction, instruction_to_dto};
+    let legacy: super::InstructionKind = serde_json::from_str("\"StopMacro\"").unwrap();
+    assert_eq!(
+        legacy,
+        super::InstructionKind::Stop {
+            scope: super::StopScope::All
+        }
+    );
+    let legacy_dto: InstructionDto =
+        serde_json::from_value(serde_json::json!({"type":"StopMacro", "id":"old"})).unwrap();
+    assert_eq!(dto_to_instruction(&legacy_dto).unwrap().kind, legacy);
+    for scope in [
+        super::StopScope::All,
+        super::StopScope::ThisStrand,
+        super::StopScope::OtherStrands,
+    ] {
+        let ins = super::Instruction::new(super::InstructionKind::Stop { scope });
+        let json = serde_json::to_value(&ins).unwrap();
+        assert_eq!(
+            serde_json::from_value::<super::Instruction>(json).unwrap(),
+            ins
+        );
+        let dto = instruction_to_dto(&ins);
+        let json = serde_json::to_value(&dto).unwrap();
+        assert_eq!(json["type"], "Stop");
+        let dto = serde_json::from_value::<InstructionDto>(json).unwrap();
+        assert_eq!(dto_to_instruction(&dto).unwrap(), ins);
+    }
 }

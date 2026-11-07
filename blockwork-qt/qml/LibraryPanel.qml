@@ -27,6 +27,7 @@ Popup {
     signal exportRequested(string macroId)
     signal bundleRequested(var macroIds, string name)
     signal templateRequested()
+    signal newRequested()
     signal deleteRequested(string macroId, string name)
 
     padding: 0
@@ -80,13 +81,12 @@ Popup {
             }
             Keys.onEscapePressed: root.close()
         }
-        ListView {
+        StitchListView {
             id: list
             Layout.fillWidth: true; Layout.fillHeight: true
             clip: true; boundsBehavior: Flickable.StopAtBounds
             model: root.rows
-            ScrollBar.vertical: ScrollBar { policy: ScrollBar.AsNeeded }
-            WheelPan { flickable: list }
+
             delegate: Item {
                 id: row
                 required property var modelData
@@ -182,7 +182,7 @@ Popup {
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderSoft }
         RowLayout {
             Layout.fillWidth: true; Layout.margins: 10; spacing: 6
-            StitchButton { iconName: "plus"; text: qsTr("New"); implicitHeight: 32; onClicked: { root.invoke("new_macro"); root.close(); } }
+            StitchButton { iconName: "plus"; text: qsTr("New"); implicitHeight: 32; onClicked: { root.newRequested(); root.close(); } }
             StitchButton { iconName: "sparkles"; text: qsTr("Template"); implicitHeight: 32; onClicked: { root.close(); root.templateRequested(); } }
             Item { Layout.fillWidth: true }
             StitchButton { iconName: "download"; text: qsTr("Import..."); implicitHeight: 32; onClicked: { root.close(); root.importRequested(); } }

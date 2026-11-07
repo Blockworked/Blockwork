@@ -128,8 +128,7 @@
   "launch": {
    "args": "a b",
    "working_dir": "/w",
-   "env": [],
-   "new_instance": true
+   "env": []
   },
   "id": "openapp"
  },
@@ -478,7 +477,8 @@
   "id": "throwerror"
  },
  {
-  "type": "StopMacro",
+  "type": "Stop",
+  "scope": "All",
   "id": "stopmacro"
  },
  {

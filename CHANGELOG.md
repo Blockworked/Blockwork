@@ -18,8 +18,7 @@ section below as the GitHub release notes, followed by the downloads table.
   - The HTTP request (body and headers), JavaScript, write file and notify blocks get a text box of their own under the block that shows every line.
   - Custom blocks can give an input the same box ("Inputs" in the Make a Block editor).
 - Launch options for the Open app block: a gear on the block opens a panel
-  for arguments (like `--incognito`), a working folder, environment variables,
-  and opening a new copy on macOS.
+  for arguments (like `--incognito`), a working folder, and environment variables.
 - File blocks:
   - Write or append to a file, read a file, check a file exists, list a folder.
   - "When file changes" trigger.

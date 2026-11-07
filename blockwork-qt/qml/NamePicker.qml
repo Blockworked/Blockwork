@@ -63,11 +63,10 @@ AppDialog {
             placeholderText: qsTr("Search names")
             onAccepted: if (root.matches.length === 1) root.use(root.matches[0], false)
         }
-        ScrollView {
+        StitchScrollView {
             id: scroll; visible: !root.creating
             width: parent.width; height: Math.min(240, entries.implicitHeight)
             contentWidth: availableWidth; clip: true
-            WheelPan { flickable: scroll.contentItem }
             Column {
                 id: entries; width: scroll.availableWidth; spacing: 2
                 Repeater {

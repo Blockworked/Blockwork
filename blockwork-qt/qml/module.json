@@ -6,6 +6,8 @@
   "editor": [
     "EditorPage.qml",
     "MacroSettingsDialog.qml",
+    "MacroSettingsEditor.qml",
+    "NewMacroDialog.qml",
     "LaunchOptionsDialog.qml",
     "DetectionModelDialog.qml",
     "RecordingSettingsDialog.qml",

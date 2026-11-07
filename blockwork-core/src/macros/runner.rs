@@ -6,7 +6,7 @@ use crate::macros::host_clock;
 use crate::macros::priority::raise_current_thread_priority;
 use crate::macros::{
     BlockKind, ImageMatch, ImagePick, Instruction, InstructionKind, LaunchOptions, Macro, Role,
-    Strand,
+    StopScope, Strand,
 };
 use blockstitch_core::graph::{
     ListItem, ListStore, is_list_reporter, list_index, resolve_list_reporter,
@@ -68,7 +68,7 @@ enum Flow {
 /// isolated from its caller's.
 struct ExecCtx<'a> {
     emulator: Arc<Mutex<dyn InputBackend>>,
-    stop_flag: Option<Arc<Mutex<bool>>>,
+    stop_flag: Option<StrandStop>,
     speed_multiplier: f64,
     variables: VariableStore,
     lists: ListStore,
@@ -391,12 +391,6 @@ fn paste_text(ctx: &ExecCtx, text: String) -> Result<(), String> {
     Ok(())
 }
 
-/// `true` once a stop has been requested on `flag` (the flag itself holds
-/// "should keep running", so this is just its negation behind the lock).
-fn stop_requested(flag: &Arc<Mutex<bool>>) -> bool {
-    !flag.lock().map(|g| *g).unwrap_or(false)
-}
-
 /// Custom block bodies keyed by block id, shared read-only by a run's strands.
 pub type BlockTable = Arc<HashMap<String, BlockRuntime>>;
 
@@ -456,10 +450,8 @@ fn ask(
                 &ctx.source,
                 format!("{block}: cancelled, so the run stopped"),
             );
-            if let Some(flag) = &ctx.stop_flag
-                && let Ok(mut running) = flag.lock()
-            {
-                *running = false;
+            if let Some(flag) = &ctx.stop_flag {
+                flag.stop(StopScope::All);
             }
             Ok(None)
         }
@@ -487,9 +479,11 @@ mod control;
 mod data;
 mod dialogs;
 mod input;
+mod stop;
 mod system;
 mod vision;
 use apps::*;
+use stop::{StrandStop, stop_requested};
 
 /// How a Run plays: what presses the keys, how it is stopped, and the
 /// stores its blocks read and write.
@@ -723,23 +717,23 @@ fn run_entries(mac: Macro, pick: impl Fn(&Strand) -> bool, options: RunOptions) 
         lists,
         offset: initial_offset,
     } = options;
+    let stop = StrandStop::new(stop_flag);
     let run = StrandRun {
         source: Arc::new(crate::run_log::Source::for_macro(&mac.id, &mac.name)),
         emulator,
-        // StopMacro needs a flag every strand of this run shares.
-        stop_flag: stop_flag.or_else(|| Some(Arc::new(Mutex::new(true)))),
+        stop_flag: Some(stop.clone()),
         speed_multiplier,
         variables,
         lists: lists.unwrap_or_else(|| mac.list_store()),
         block_table: mac.block_table(),
         max_loop_iterations: mac.settings.max_loop_iterations,
     };
-    let entry_strands: Vec<Vec<Instruction>> = mac
+    let entry_strands: Vec<(Vec<Instruction>, StrandStop)> = mac
         .graph
         .strands
         .into_iter()
         .filter(|s| pick(s))
-        .map(|s| s.instructions)
+        .map(|s| (s.instructions, stop.fork()))
         .collect();
 
     if entry_strands.is_empty() {
@@ -751,8 +745,9 @@ fn run_entries(mac: Macro, pick: impl Fn(&Strand) -> bool, options: RunOptions) 
     // Every entry strand gets its own thread, including the first, so
     // deep recursion errors out on a known stack instead of aborting.
     std::thread::scope(|scope| {
-        for instructions in entry_strands {
-            let run = run.clone();
+        for (instructions, stop) in entry_strands {
+            let mut run = run.clone();
+            run.stop_flag = Some(stop);
             let spawned = std::thread::Builder::new()
                 .stack_size(STRAND_STACK_SIZE)
                 .spawn_scoped(scope, move || run_strand(run, instructions, initial_offset));
@@ -779,7 +774,7 @@ impl Drop for Defer {
 pub(super) struct StrandRun {
     pub(super) source: Arc<crate::run_log::Source>,
     pub(super) emulator: Arc<Mutex<dyn InputBackend>>,
-    pub(super) stop_flag: Option<Arc<Mutex<bool>>>,
+    pub(super) stop_flag: Option<StrandStop>,
     pub(super) speed_multiplier: f64,
     pub(super) variables: VariableStore,
     pub(super) lists: ListStore,
@@ -813,7 +808,11 @@ pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>, initial
         .unwrap_or_else(Instant::now);
     let mut pressed_keys: Vec<MacroKey> = Vec::new();
     let mut pressed_buttons: Vec<MacroButton> = Vec::new();
-    let _permissions = crate::permissions::enter(Arc::clone(&source), stop_flag.clone());
+    let permission_stop = stop_flag.clone();
+    let _permissions = crate::permissions::enter_with_stop(
+        Arc::clone(&source),
+        Arc::new(move || permission_stop.as_ref().is_some_and(stop_requested)),
+    );
     {
         let mut ctx = ExecCtx {
             emulator: Arc::clone(&emulator),
@@ -906,7 +905,7 @@ pub fn run_fired_strand(
     let run = StrandRun {
         source: Arc::new(source),
         emulator,
-        stop_flag: stop_flag.or_else(|| Some(Arc::new(Mutex::new(true)))),
+        stop_flag: Some(StrandStop::new(stop_flag).fork()),
         speed_multiplier,
         variables,
         lists,

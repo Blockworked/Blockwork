@@ -108,7 +108,7 @@ AppDialog {
             font.pixelSize: 13
         }
 
-        ScrollView {
+        StitchScrollView {
             id: appScroll
             Layout.fillWidth: true
             Layout.fillHeight: true
@@ -116,7 +116,6 @@ AppDialog {
             clip: true
             ScrollBar.vertical.policy: ScrollBar.AsNeeded
             ScrollBar.horizontal.policy: ScrollBar.AlwaysOff
-            WheelPan { flickable: appScroll.contentItem }
 
             Flow {
                 id: appGrid

@@ -28,7 +28,15 @@ impl Backend {
         }
         match cmd {
             "get_state" => to_json(commands::get_state(&self.state)?),
-            "new_macro" => to_json(commands::new_macro(&self.state, &self.app)?),
+            "new_macro" => {
+                let mac = blockwork_core::macros::creation::from_args(&args)?;
+                to_json(commands::new_macro(
+                    &self.state,
+                    &self.app,
+                    mac,
+                    arg(&args, "permissions")?,
+                )?)
+            }
             "select_macro_by_id" => {
                 let id: String = arg(&args, "id")?;
                 to_json(commands::select_macro_by_id(&self.state, &self.app, &id)?)

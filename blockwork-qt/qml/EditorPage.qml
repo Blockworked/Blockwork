@@ -329,6 +329,7 @@ Item {
                         onImportRequested: if (root.macroFiles) root.macroFiles.importMacro()
                         onExportRequested: macroId => { if (root.macroFiles) root.macroFiles.exportMacro(macroId); }
                         onBundleRequested: (macroIds, name) => { if (root.macroFiles) root.macroFiles.exportBundle(macroIds, name); }
+                        onNewRequested: newMacroDialog.open()
                         onTemplateRequested: templateDialog.open()
                         onDeleteRequested: (macroId, name) => { deleteMacroDialog.macroId = macroId; deleteMacroDialog.macroName = name; deleteMacroDialog.open(); }
                     }
@@ -349,7 +350,7 @@ Item {
                         StitchMenuItem { iconName: "sliders"; text: qsTr("Macro settings"); enabled: !!root.macro; onTriggered: macroSettings.open() }
                         StitchMenuItem { iconName: "navigation"; text: qsTr("Signals…"); enabled: !!root.macro; onTriggered: signalsDialog.open() }
                         StitchMenuItem { iconName: "variable"; text: qsTr("Globals…"); onTriggered: globalPicker.openFor(null) }
-                        StitchMenuItem { iconName: "plus"; text: qsTr("New macro"); onTriggered: root.invoke("new_macro") }
+                        StitchMenuItem { iconName: "plus"; text: qsTr("New macro"); onTriggered: newMacroDialog.open() }
                         StitchMenuItem { iconName: "sparkles"; text: qsTr("New from template..."); onTriggered: templateDialog.open() }
                         StitchMenuItem { iconName: "copy"; text: qsTr("Duplicate macro"); enabled: !!root.macro; onTriggered: root.invoke("duplicate_macro", { id: root.macro.id }) }
                         StitchMenuItem { iconName: "upload"; text: qsTr("Export..."); enabled: !!root.macro && !!root.macroFiles; onTriggered: root.macroFiles.exportMacro(root.macro.id) }
@@ -679,7 +680,19 @@ Item {
         Text { text: qsTr("This removes the selected macro from Blockwork."); color: Theme.text }
         onAccepted: root.invoke("remove_macro")
     }
-    MacroSettingsDialog { id: macroSettings; page: root }
+    NewMacroDialog {
+        id: newMacroDialog
+        guardedAbilities: root.guardedAbilities
+        onCreateRequested: options => root.invoke("new_macro", options)
+    }
+
+    MacroSettingsDialog {
+        id: macroSettings
+        macro: root.macro
+        invoke: root.invoke
+        permissions: root.permissions
+        guardedAbilities: root.guardedAbilities
+    }
     AppDialog {
         id: pickError; title: qsTr("Couldn't read the screen"); standardButtons: Dialog.Ok
         property string message: ""

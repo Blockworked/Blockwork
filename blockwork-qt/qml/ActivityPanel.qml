@@ -154,17 +154,19 @@ Rectangle {
                 anchors.centerIn: parent; color: Theme.textDim; font.pixelSize: 12
                 text: root.allMacros ? qsTr("Nothing yet. Runs, triggers, log blocks and errors show up here.") : qsTr("Nothing yet for this macro.")
             }
-            ListView {
+            StitchListView {
                 id: list
+                objectName: "activityList"
                 anchors.fill: parent; anchors.margins: 4
                 clip: true; spacing: 1
                 model: root.shown
                 // Follow new entries unless the user scrolled up to read.
                 property bool atEnd: true
                 onMovementEnded: atEnd = atYEnd
+                onContentYChanged: if (list.wheelScrolling) atEnd = atYEnd
                 onCountChanged: if (atEnd) Qt.callLater(() => list.positionViewAtEnd())
                 Component.onCompleted: positionViewAtEnd()
-                ScrollBar.vertical: ScrollBar {}
+
                 delegate: Rectangle {
                     id: row
                     required property var modelData

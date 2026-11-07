@@ -397,7 +397,7 @@ pub(crate) fn slots_mut<'a>(
         | InstructionKind::BlockHeader(_)
         | InstructionKind::EscapeLoop
         | InstructionKind::ContinueLoop
-        | InstructionKind::StopMacro
+        | InstructionKind::Stop { .. }
         | InstructionKind::TryCatch { .. }
         | InstructionKind::WhenPowerPluggedIn
         | InstructionKind::WhenPowerUnplugged

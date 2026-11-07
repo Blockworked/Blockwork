@@ -401,30 +401,3 @@ fn lock_blocks_run_their_body_and_give_up_when_stopped() {
     );
     assert_eq!(vars.lock().unwrap().get("ran"), None);
 }
-
-#[test]
-fn stop_macro_stops_every_strand_of_the_run() {
-    let mut stopper = when_ran_strand("b", 0.0);
-    stopper
-        .instructions
-        .push(Instruction::new(InstructionKind::StopMacro));
-    let mac = Macro {
-        id: "m".into(),
-        name: "Stops itself".into(),
-        description: "".into(),
-        graph: MacroGraph {
-            strands: vec![when_ran_strand("a", 5_000.0), stopper],
-            ..MacroGraph::new()
-        },
-        signals: Vec::new(),
-        recording_target: None,
-        speed_multiplier: 1.0,
-        settings: crate::macros::MacroSettings::default(),
-    };
-    let start = Instant::now();
-    mac.run(noop_emulator(), None, 1.0, empty_vars());
-    assert!(
-        start.elapsed() < Duration::from_millis(1000),
-        "stop macro didn't end the waiting strand"
-    );
-}

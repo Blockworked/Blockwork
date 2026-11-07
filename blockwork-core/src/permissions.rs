@@ -206,7 +206,7 @@ pub fn check(source: &Source, kind: &str, stopped: &dyn Fn() -> bool) -> Result<
     }
 }
 
-type Current = (Arc<Source>, Option<Arc<Mutex<bool>>>);
+type Current = (Arc<Source>, Arc<dyn Fn() -> bool + Send + Sync>);
 
 thread_local! {
     static CURRENT: RefCell<Option<Current>> = const { RefCell::new(None) };
@@ -217,7 +217,21 @@ thread_local! {
 pub struct Scope(Option<Current>);
 
 pub fn enter(source: Arc<Source>, stop_flag: Option<Arc<Mutex<bool>>>) -> Scope {
-    Scope(CURRENT.with(|c| c.replace(Some((source, stop_flag)))))
+    enter_with_stop(
+        source,
+        Arc::new(move || {
+            stop_flag
+                .as_ref()
+                .is_some_and(|f| f.lock().map(|r| !*r).unwrap_or(true))
+        }),
+    )
+}
+
+pub(crate) fn enter_with_stop(
+    source: Arc<Source>,
+    stopped: Arc<dyn Fn() -> bool + Send + Sync>,
+) -> Scope {
+    Scope(CURRENT.with(|c| c.replace(Some((source, stopped)))))
 }
 
 impl Drop for Scope {
@@ -229,14 +243,10 @@ impl Drop for Scope {
 
 /// [`check`] for the macro running on this thread; outside a run (previews) it's allowed.
 pub fn require(kind: &str) -> Result<(), String> {
-    let Some((source, flag)) = CURRENT.with(|c| c.borrow().clone()) else {
+    let Some((source, stopped)) = CURRENT.with(|c| c.borrow().clone()) else {
         return Ok(());
     };
-    let stopped = || {
-        flag.as_ref()
-            .is_some_and(|f| f.lock().map(|r| !*r).unwrap_or(true))
-    };
-    check(&source, kind, &stopped)
+    check(&source, kind, &*stopped)
 }
 
 #[cfg(test)]

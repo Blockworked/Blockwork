@@ -145,7 +145,7 @@ impl Demo {
 
             // Macro library: in memory, one history for whichever is open.
             "new_macro" => {
-                self.add_and_select(Macro::new("New Macro".into(), String::new(), vec![]));
+                self.add_and_select(blockwork_model::macros::creation::from_args(a)?);
                 Ok(Json::Null)
             }
             "select_macro_by_id" => {

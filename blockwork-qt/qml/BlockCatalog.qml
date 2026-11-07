@@ -179,7 +179,7 @@ QtObject {
         { category: "control", title: qsTr("Conditions"), items: ["If", "IfElse"] },
         { category: "control", title: qsTr("Loops"), items: ["Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"] },
         { category: "control", title: qsTr("Errors"), items: ["TryCatch", "Retry", "ThrowError", "LastError"] },
-        { category: "control", title: qsTr("Stopping"), items: ["StopMacro", "Return"] },
+        { category: "control", title: qsTr("Stopping"), items: ["Stop", "Return"] },
         { category: "control", title: qsTr("Other macros"), items: ["RunMacro", "StopMacroNamed", "MacroRunning"] },
         { category: "control", title: qsTr("Signals and locks"), items: ["SendSignal", "WithLock"] },
         { category: "data", title: qsTr("Variables"), action: "makeVariable", items: ["@variables", "SetVariable", "ChangeVariable"] },
@@ -318,7 +318,7 @@ QtObject {
             if (!l) return "";
             const args = (l.args || "").trim();
             if (args) return args.length > 28 ? args.slice(0, 27) + "…" : args;
-            return l.working_dir || (l.env && l.env.length) || l.new_instance ? qsTr("custom") : "";
+            return l.working_dir || (l.env && l.env.length) ? qsTr("custom") : "";
         };
         const direction = (pairs) => ({ kind: "dropdown", key: "direction", options: choices(pairs) });
         const keyValue = { kind: "value", field: "KeyValue", key: "key", keyCapture: true };
@@ -409,7 +409,8 @@ QtObject {
             WithLock: { icon: "lock", mouths: ["body"], head: [label(qsTr("with lock")), value("LockName", "name")] },
             TryCatch: { icon: "circle-alert", mouths: ["body", "catch_body"], separators: [qsTr("on error")], head: [label(qsTr("try"))] },
             ThrowError: { shape: "cap", icon: "triangle-alert", head: [label(qsTr("throw error")), value("ErrorMessage", "message")] },
-            StopMacro: { shape: "cap", icon: "octagon", head: [label(qsTr("stop macro"))] },
+            Stop: { shape: i => i.scope === "OtherStrands" ? "stack" : "cap", icon: "octagon", head: [label(qsTr("stop")),
+                { kind: "dropdown", key: "scope", options: choices([["All", qsTr("all")], ["ThisStrand", qsTr("this strand")], ["OtherStrands", qsTr("other strands in macro")]]) }] },
             Retry: { icon: "refresh-cw", mouths: ["body"], head: [label(qsTr("try up to")), value("RetryCount", "count"), label(qsTr("times,")),
                 value("RetryDelay", "delay"), label(qsTr("ms apart"))] },
             RunMacro: { icon: "play", head: [label(qsTr("run macro")), value("MacroTarget", "target"),
@@ -615,7 +616,7 @@ QtObject {
             Log: { value: textValue(qsTr("checkpoint")) },
             TryCatch: { body: [], catch_body: [] },
             ThrowError: { message: textValue(qsTr("something went wrong")) },
-            StopMacro: {},
+            Stop: { scope: "All" },
             Retry: { count: numberValue(3), delay: numberValue(1000), body: [] },
             WindowAction: { action: "Focus", by: "Title", pattern: textValue("Firefox") },
             MoveWindow: { pattern: textValue("Firefox"), by: "Title", resize: false, x: numberValue(0), y: numberValue(0) },

@@ -77,7 +77,7 @@ impl InstructionKind {
             | K::Return(_)
             | K::EscapeLoop
             | K::ContinueLoop
-            | K::StopMacro
+            | K::Stop { .. }
             | K::ThrowError(_)
             | K::TryCatch { .. }
             | K::Retry { .. }

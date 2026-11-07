@@ -529,7 +529,7 @@ mod tests {
         assert_eq!(
             serde_json::from_str::<serde_json::Value>(&fs::read_to_string(&path).unwrap()).unwrap()
                 ["format_version"],
-            3
+            crate::macros::migrate::FORMAT_VERSION
         );
         fs::remove_dir_all(dir).unwrap();
     }

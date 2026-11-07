@@ -203,7 +203,8 @@ Item {
                 Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
                 text: qsTr("Values from the last completed run.")
             }
-            ScrollView {
+            StitchScrollView {
+                id: inspectorScroll
                 visible: packDataDialog.inspect
                 Layout.fillWidth: true
                 Layout.preferredHeight: Math.min(260, inspector.implicitHeight)
@@ -314,7 +315,7 @@ Item {
                 iconName: reviewDialog.detailsExpanded ? "chevron-up" : "chevron-down"
                 onClicked: reviewDialog.detailsExpanded = !reviewDialog.detailsExpanded
             }
-            ScrollView {
+            StitchScrollView {
                 id: reviewDetailsScroll
                 objectName: "packReviewDetails"
                 width: parent.width
@@ -425,7 +426,7 @@ Item {
             packVersion.text = saved ? saved.info.version : "1.0.0";
             packName.forceActiveFocus();
         }
-        contentItem: ScrollView {
+        contentItem: StitchScrollView {
             id: shareScroll
             objectName: "sharePackScroll"
             clip: true; contentWidth: availableWidth
@@ -521,7 +522,7 @@ Item {
                         Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
                         text: qsTr("Keep working variables internal. Outputs become reporter blocks; settings appear in the pack's settings. Use block inputs for per-call options.")
                     }
-                    ScrollView {
+                    StitchScrollView {
                         id: authorVariablesScroll
                         Layout.fillWidth: true
                         Layout.preferredHeight: Math.min(240, authorVariablesContent.implicitHeight)
