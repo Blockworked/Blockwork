@@ -45,6 +45,6 @@ AppDialog {
             }
         }
         Text { width: parent.width - 36; text: detailsDialog.detailExplainer; color: Theme.textDim; font.pixelSize: 13; wrapMode: Text.Wrap }
-        Row { anchors.right: parent.right; anchors.rightMargin: 18; BwButton { text: qsTr("Close"); onClicked: detailsDialog.close() } }
+        Row { anchors.right: parent.right; anchors.rightMargin: 18; StitchButton { text: qsTr("Close"); onClicked: detailsDialog.close() } }
     }
 }

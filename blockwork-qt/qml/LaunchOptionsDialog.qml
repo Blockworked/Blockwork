@@ -47,14 +47,14 @@ AppDialog {
     }
     Column { width: 440; spacing: 8
         Text { text: qsTr("Arguments"); color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold }
-        BwTextField { id: launchArgs; width: parent.width; placeholderText: "--incognito" }
+        StitchTextField { id: launchArgs; width: parent.width; placeholderText: "--incognito" }
         Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
             text: qsTr("Added after the app's own command, the way you'd type them in a terminal. Put quotes around an argument with spaces.") }
         Item { width: 1; height: 4 }
         Text { text: qsTr("Working folder"); color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold }
         RowLayout { width: parent.width; spacing: 8
-            BwTextField { id: launchDir; Layout.fillWidth: true; placeholderText: qsTr("Leave empty to use the default") }
-            BwButton { text: qsTr("Browse..."); iconName: "folder-open"; onClicked: launchFolder.open() }
+            StitchTextField { id: launchDir; Layout.fillWidth: true; placeholderText: qsTr("Leave empty to use the default") }
+            StitchButton { text: qsTr("Browse..."); iconName: "folder-open"; onClicked: launchFolder.open() }
         }
         Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
             text: launchDialog.mac ? qsTr("macOS always starts apps in their own folder, so this is only used on Windows and Linux.")
@@ -70,15 +70,15 @@ AppDialog {
                 required property string name
                 required property string value
                 width: 440; spacing: 6
-                BwTextField { Layout.preferredWidth: 150; text: name; placeholderText: qsTr("NAME"); onTextEdited: launchEnv.setProperty(index, "name", text) }
+                StitchTextField { Layout.preferredWidth: 150; text: name; placeholderText: qsTr("NAME"); onTextEdited: launchEnv.setProperty(index, "name", text) }
                 Text { text: "="; color: Theme.textDim }
-                BwTextField { Layout.fillWidth: true; text: value; placeholderText: qsTr("value"); onTextEdited: launchEnv.setProperty(index, "value", text) }
-                BwButton { iconName: "x"; implicitWidth: 32; onClicked: launchEnv.remove(index) }
+                StitchTextField { Layout.fillWidth: true; text: value; placeholderText: qsTr("value"); onTextEdited: launchEnv.setProperty(index, "value", text) }
+                StitchButton { iconName: "x"; implicitWidth: 32; onClicked: launchEnv.remove(index) }
             }
         }
-        BwButton { text: qsTr("Add variable"); iconName: "plus"; onClicked: launchEnv.append({ name: "", value: "" }) }
+        StitchButton { text: qsTr("Add variable"); iconName: "plus"; onClicked: launchEnv.append({ name: "", value: "" }) }
         Item { width: 1; height: 4 }
-        BwCheckBox { id: launchNewCopy; text: qsTr("Open a new copy even if the app is already running") }
+        StitchCheckBox { id: launchNewCopy; text: qsTr("Open a new copy even if the app is already running") }
         Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 11
             text: qsTr("Only changes anything on macOS. On Windows and Linux the app decides whether a second launch opens a new window.") }
     }

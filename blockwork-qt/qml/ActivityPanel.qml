@@ -125,15 +125,15 @@ Rectangle {
                 }
                 Row {
                     visible: root.expanded; spacing: 4
-                    BwButton {
+                    StitchButton {
                         text: qsTr("This macro"); implicitHeight: 22; font.pixelSize: 11; primary: !root.allMacros
                         onClicked: root.allMacros = false
                     }
-                    BwButton {
+                    StitchButton {
                         text: qsTr("All"); implicitHeight: 22; font.pixelSize: 11; primary: root.allMacros
                         onClicked: root.allMacros = true
                     }
-                    BwButton {
+                    StitchButton {
                         iconName: "trash"; text: ""; implicitWidth: 22; implicitHeight: 22; enabled: root.entries.length > 0
                         ToolTip.visible: hovered; ToolTip.text: qsTr("Clear the log")
                         onClicked: root.clearRequested()

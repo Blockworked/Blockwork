@@ -25,8 +25,8 @@ AppDialog {
                         required property string modelData
                         width: signalRows.width; spacing: 6
                         Text { Layout.fillWidth: true; text: modelData; elide: Text.ElideRight; color: Theme.text }
-                        BwButton { text: qsTr("Rename"); onClicked: signalsDialog.renameRequested(modelData) }
-                        BwButton {
+                        StitchButton { text: qsTr("Rename"); onClicked: signalsDialog.renameRequested(modelData) }
+                        StitchButton {
                             text: qsTr("Delete")
                             onClicked: signalsDialog.page.daemonCall("delete_signal", { name: modelData }, (result, error) => { signalsError.text = error || ""; })
                         }
@@ -36,7 +36,7 @@ AppDialog {
         }
         Text { visible: !signalsDialog.page.macro || !(signalsDialog.page.macro.signals || []).length; text: qsTr("No named signals yet."); color: Theme.textDim }
         Text { id: signalsError; width: parent.width; visible: text.length > 0; wrapMode: Text.WordWrap; color: Theme.danger }
-        BwButton { text: qsTr("New signal…"); iconName: "plus"; onClicked: signalsDialog.newSignalRequested() }
+        StitchButton { text: qsTr("New signal…"); iconName: "plus"; onClicked: signalsDialog.newSignalRequested() }
     }
     onOpened: signalsError.text = ""
 }

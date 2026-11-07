@@ -52,7 +52,7 @@ AppDialog {
                     Text { width: parent.width; text: usbDialog.current; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight }
                     Text { text: qsTr("Chosen now, but not plugged in"); color: Theme.warning; font.pixelSize: 11 }
                 }
-                BwButton { text: qsTr("Keep"); onClicked: usbDialog.close() }
+                StitchButton { text: qsTr("Keep"); onClicked: usbDialog.close() }
             }
         }
         Text { visible: !usbDialog.loaded; text: qsTr("Looking for USB devices..."); color: Theme.textDim; font.pixelSize: 12 }
@@ -78,21 +78,21 @@ AppDialog {
                                 Text { width: parent.width; color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideRight
                                     text: modelData.maker ? qsTr("%1 · id %2").arg(modelData.maker).arg(modelData.ids) : qsTr("id %1").arg(modelData.ids) }
                             }
-                            BwButton { text: chosen ? qsTr("Chosen") : qsTr("Use"); onClicked: usbDialog.use(modelData.ids) }
+                            StitchButton { text: chosen ? qsTr("Chosen") : qsTr("Use"); onClicked: usbDialog.use(modelData.ids) }
                         }
                     }
                 }
             }
         }
         RowLayout { width: parent.width; spacing: 8
-            BwButton { text: qsTr("Any USB device"); enabled: usbDialog.current !== ""; onClicked: usbDialog.use("") }
+            StitchButton { text: qsTr("Any USB device"); enabled: usbDialog.current !== ""; onClicked: usbDialog.use("") }
             Item { Layout.fillWidth: true }
-            BwButton { text: qsTr("Refresh"); iconName: "refresh-cw"; onClicked: usbDialog.refresh() }
+            StitchButton { text: qsTr("Refresh"); iconName: "refresh-cw"; onClicked: usbDialog.refresh() }
         }
         Text { text: qsTr("Or part of a device's name or id"); color: Theme.text; font.pixelSize: 12 }
         RowLayout { width: parent.width; spacing: 8
-            BwTextField { id: customPattern; Layout.fillWidth: true; placeholderText: "046d:c52b"; onAccepted: useCustom.clicked() }
-            BwButton { id: useCustom; text: qsTr("Use"); enabled: customPattern.text.trim().length > 0; onClicked: usbDialog.use(customPattern.text.trim()) }
+            StitchTextField { id: customPattern; Layout.fillWidth: true; placeholderText: "046d:c52b"; onAccepted: useCustom.clicked() }
+            StitchButton { id: useCustom; text: qsTr("Use"); enabled: customPattern.text.trim().length > 0; onClicked: usbDialog.use(customPattern.text.trim()) }
         }
     }
 }

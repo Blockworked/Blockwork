@@ -2,7 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import com.blockworked.Blockstitch
 
-BwMenu {
+StitchMenu {
     id: menu
     required property Item editor
     readonly property bool editable: !editor.readOnly
@@ -11,7 +11,7 @@ BwMenu {
 
     // Use the same in-window rendering as the canvas menus on every platform.
     popupType: Popup.Item
-    delegate: BwMenuItem {
+    delegate: StitchMenuItem {
         iconName: action ? action.objectName : ""
         opacity: enabled ? 1 : 0.4
     }

@@ -98,7 +98,7 @@ AppDialog {
     component SectionLabel: Text { color: Theme.textDim; font.pixelSize: 13; font.weight: Font.Medium }
     component Phrase: Text { color: Theme.text; font.pixelSize: 13; Layout.alignment: Qt.AlignVCenter }
     // A time that opens the time picker.
-    component TimeButton: BwButton {
+    component TimeButton: StitchButton {
         id: timeButton
         property int h: 0
         property int m: 0
@@ -107,7 +107,7 @@ AppDialog {
         onClicked: picker.openAt(timeButton, h, m)
         TimePicker { id: picker; use12h: Schedules.use12h; amText: Schedules.amText; pmText: Schedules.pmText; onPicked: (h, m) => timeButton.changed(h, m) }
     }
-    component Choice: BwComboBox {
+    component Choice: StitchComboBox {
         id: choice
         property var values: []
         property var labels: values.map(String)
@@ -169,7 +169,7 @@ AppDialog {
                             current: root.every
                             onChangedTo: v => root.every = v
                         }
-                        BwComboBox {
+                        StitchComboBox {
                             model: [qsTr("minutes"), qsTr("hours")]; currentIndex: root.unit === "minutes" ? 0 : 1
                             implicitHeight: 32; implicitWidth: 110; font.pixelSize: 13
                             onActivated: index => {
@@ -181,7 +181,7 @@ AppDialog {
                     }
                     RowLayout {
                         spacing: 8
-                        BwCheckBox { id: windowBox; text: qsTr("Only between"); checked: root.windowed; onToggled: root.windowed = checked; font.pixelSize: 13 }
+                        StitchCheckBox { id: windowBox; text: qsTr("Only between"); checked: root.windowed; onToggled: root.windowed = checked; font.pixelSize: 13 }
                         Choice {
                             enabled: root.windowed; opacity: enabled ? 1 : .45
                             values: Array.from({ length: 24 }, (_, i) => i); labels: values.map(h => Schedules.clock(h, 0))
@@ -233,9 +233,9 @@ AppDialog {
                     }
                     Row {
                         spacing: 6
-                        BwButton { text: qsTr("Every day"); flat: true; implicitHeight: 28; font.pixelSize: 12; onClicked: root.days = [true, true, true, true, true, true, true] }
-                        BwButton { text: qsTr("Weekdays"); flat: true; implicitHeight: 28; font.pixelSize: 12; onClicked: root.days = [false, true, true, true, true, true, false] }
-                        BwButton { text: qsTr("Weekends"); flat: true; implicitHeight: 28; font.pixelSize: 12; onClicked: root.days = [true, false, false, false, false, false, true] }
+                        StitchButton { text: qsTr("Every day"); flat: true; implicitHeight: 28; font.pixelSize: 12; onClicked: root.days = [true, true, true, true, true, true, true] }
+                        StitchButton { text: qsTr("Weekdays"); flat: true; implicitHeight: 28; font.pixelSize: 12; onClicked: root.days = [false, true, true, true, true, true, false] }
+                        StitchButton { text: qsTr("Weekends"); flat: true; implicitHeight: 28; font.pixelSize: 12; onClicked: root.days = [true, false, false, false, false, false, true] }
                     }
                 }
 
@@ -260,8 +260,8 @@ AppDialog {
                     visible: root.mode === "custom"; width: parent.width; spacing: 8
                     RowLayout {
                         width: parent.width; spacing: 6
-                        BwTextField { id: customField; Layout.fillWidth: true; font.family: "monospace"; placeholderText: "*/15 9-17 * * mon-fri"; onAccepted: if (root.valid) root.accept() }
-                        BwButton {
+                        StitchTextField { id: customField; Layout.fillWidth: true; font.family: "monospace"; placeholderText: "*/15 9-17 * * mon-fri"; onAccepted: if (root.valid) root.accept() }
+                        StitchButton {
                             objectName: "cronHelpButton"
                             iconName: "info"; text: ""; flat: true
                             implicitWidth: 30; implicitHeight: 30

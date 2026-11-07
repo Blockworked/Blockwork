@@ -142,7 +142,7 @@ Item {
                 }
                 Repeater {
                     model: root.appState.library || []
-                    delegate: BwCheckBox {
+                    delegate: StitchCheckBox {
                         required property var modelData
                         objectName: "bundleMacro_" + modelData.id
                         width: bundleRows.width
@@ -230,7 +230,7 @@ Item {
                         name: modelData.risky ? "triangle-alert" : "check"; color: modelData.risky ? Theme.warning : Theme.textDim
                     }
                     Text { anchors.verticalCenter: parent.verticalCenter; text: root.capabilityLabel(modelData); color: modelData.risky ? Theme.warning : Theme.text; font.pixelSize: 13 }
-                    BwCheckBox {
+                    StitchCheckBox {
                         visible: modelData.guarded
                         anchors.verticalCenter: parent.verticalCenter
                         text: qsTr("allow without asking")
@@ -264,7 +264,7 @@ Item {
             }
             Repeater {
                 model: reviewDialog.customSettings
-                delegate: BwCheckBox {
+                delegate: StitchCheckBox {
                     required property var modelData
                     text: root.settingLabel(modelData); checked: modelData.enabled
                     onToggled: root.keepSettings[modelData.key] = checked

@@ -163,8 +163,8 @@ Item {
                         anchors.centerIn: parent; spacing: 10
                         LucideIcon { name: "crosshair"; width: 16; height: 16; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
                         Text { text: root.hint; color: Theme.text; font.pixelSize: 13; anchors.verticalCenter: parent.verticalCenter }
-                        BwButton { text: qsTr("Cancel"); onClicked: root.cancel() }
-                        BwButton { iconName: "check"; text: qsTr("Use selection"); primary: true; enabled: root.hasSelection; onClicked: root.accept() }
+                        StitchButton { text: qsTr("Cancel"); onClicked: root.cancel() }
+                        StitchButton { iconName: "check"; text: qsTr("Use selection"); primary: true; enabled: root.hasSelection; onClicked: root.accept() }
                     }
                 }
             }

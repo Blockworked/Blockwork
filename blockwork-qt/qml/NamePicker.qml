@@ -58,7 +58,7 @@ AppDialog {
     Column {
         width: 400; spacing: 12
         Text { visible: !root.creating && root.scopeText.length > 0; text: root.scopeText; color: Theme.textDim; font.pixelSize: 13 }
-        BwTextField {
+        StitchTextField {
             id: search; objectName: "namePickerSearch"; width: parent.width; visible: !root.creating
             placeholderText: qsTr("Search names")
             onAccepted: if (root.matches.length === 1) root.use(root.matches[0], false)
@@ -89,7 +89,7 @@ AppDialog {
         }
         Text { visible: !root.creating && !root.matches.length; text: root.names.length ? qsTr("No matching names.") : qsTr("No saved names yet."); color: Theme.textDim; font.pixelSize: 13 }
         Text { visible: root.creating; text: qsTr("Name"); color: Theme.text; font.pixelSize: 13 }
-        BwTextField { id: nameField; objectName: "namePickerName"; width: parent.width; visible: root.creating; enabled: !root.busy; onAccepted: root.create() }
+        StitchTextField { id: nameField; objectName: "namePickerName"; width: parent.width; visible: root.creating; enabled: !root.busy; onAccepted: root.create() }
         Text { visible: root.creating && root.exists; text: qsTr("This name already exists."); color: Theme.warning; font.pixelSize: 13 }
         Text { visible: root.error.length > 0; width: parent.width; wrapMode: Text.WordWrap; text: root.error; color: Theme.danger; font.pixelSize: 13 }
     }
@@ -99,11 +99,11 @@ AppDialog {
             id: actions
             anchors.fill: parent; anchors.leftMargin: 18; anchors.rightMargin: 18; anchors.topMargin: 8; anchors.bottomMargin: 18
             spacing: 8
-            BwButton { visible: !root.creating; flat: true; iconName: "plus"; text: root.newText; onClicked: root.beginCreate() }
-            BwButton { visible: !root.creating && root.allowExpression; flat: true; text: qsTr("Use expression"); onClicked: root.use(root.selectedName, true) }
+            StitchButton { visible: !root.creating; flat: true; iconName: "plus"; text: root.newText; onClicked: root.beginCreate() }
+            StitchButton { visible: !root.creating && root.allowExpression; flat: true; text: qsTr("Use expression"); onClicked: root.use(root.selectedName, true) }
             Item { Layout.fillWidth: true }
-            BwButton { text: qsTr("Cancel"); enabled: !root.busy; onClicked: root.reject() }
-            BwButton { visible: root.creating; text: qsTr("Create"); primary: true; enabled: root.newName.length > 0 && !root.exists && !root.busy; onClicked: root.create() }
+            StitchButton { text: qsTr("Cancel"); enabled: !root.busy; onClicked: root.reject() }
+            StitchButton { visible: root.creating; text: qsTr("Create"); primary: true; enabled: root.newName.length > 0 && !root.exists && !root.busy; onClicked: root.create() }
         }
     }
 }

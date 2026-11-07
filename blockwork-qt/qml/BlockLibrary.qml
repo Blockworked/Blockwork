@@ -166,12 +166,12 @@ Item {
                     required property var modelData
                     Layout.fillWidth: true; spacing: 4
                     Text { text: modelData.label; color: Theme.text; font.pixelSize: 13 }
-                    BwCheckBox {
+                    StitchCheckBox {
                         visible: modelData.value.kind === "Bool"
                         text: qsTr("Enabled"); checked: modelData.value.value === true
                         onToggled: root.invoke("set_pack_setting", {packId: packDataDialog.packId, name: modelData.name, value: {kind: "Bool", value: checked}})
                     }
-                    BwTextField {
+                    StitchTextField {
                         objectName: "packSettingValue"
                         Layout.fillWidth: true
                         visible: modelData.value.kind !== "Bool"
@@ -192,7 +192,7 @@ Item {
                 Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
                 text: qsTr("This pack has no settings. Use its block inputs to configure it.")
             }
-            BwButton {
+            StitchButton {
                 objectName: "packInspectButton"
                 text: qsTr("Inspect variables"); flat: true
                 iconName: packDataDialog.inspect ? "chevron-up" : "chevron-down"
@@ -307,7 +307,7 @@ Item {
                     text: "• " + modelData
                 }
             }
-            BwButton {
+            StitchButton {
                 objectName: "packReviewDetailsButton"
                 flat: true
                 text: reviewDialog.detailsExpanded ? qsTr("Hide details") : qsTr("Show details")
@@ -432,22 +432,22 @@ Item {
             ColumnLayout {
                 width: shareScroll.availableWidth; spacing: 8
                 Text { text: qsTr("Name"); color: Theme.textDim; font.pixelSize: 12 }
-                BwTextField { id: packName; objectName: "sharePackName"; Layout.fillWidth: true; Layout.minimumWidth: 0 }
+                StitchTextField { id: packName; objectName: "sharePackName"; Layout.fillWidth: true; Layout.minimumWidth: 0 }
                 Text { text: qsTr("What the blocks do"); color: Theme.textDim; font.pixelSize: 12 }
-                BwTextField { id: packDescription; objectName: "sharePackDescription"; Layout.fillWidth: true; Layout.minimumWidth: 0 }
+                StitchTextField { id: packDescription; objectName: "sharePackDescription"; Layout.fillWidth: true; Layout.minimumWidth: 0 }
                 RowLayout {
                     Layout.fillWidth: true; spacing: 8
                     ColumnLayout {
                         visible: !shareDialog.publishing
                         Layout.fillWidth: true; spacing: 4
                         Text { text: qsTr("Author"); color: Theme.textDim; font.pixelSize: 12 }
-                        BwTextField { id: packAuthor; objectName: "sharePackAuthor"; Layout.fillWidth: true; Layout.minimumWidth: 0 }
+                        StitchTextField { id: packAuthor; objectName: "sharePackAuthor"; Layout.fillWidth: true; Layout.minimumWidth: 0 }
                     }
                     Item { visible: shareDialog.publishing; Layout.fillWidth: true }
                     ColumnLayout {
                         spacing: 4
                         Text { text: qsTr("Version"); color: Theme.textDim; font.pixelSize: 12 }
-                        BwTextField { id: packVersion; objectName: "sharePackVersion"; Layout.preferredWidth: 110; text: "1.0.0" }
+                        StitchTextField { id: packVersion; objectName: "sharePackVersion"; Layout.preferredWidth: 110; text: "1.0.0" }
                     }
                 }
                 Text { topPadding: 4; text: qsTr("Blocks"); color: Theme.textDim; font.pixelSize: 12 }
@@ -465,7 +465,7 @@ Item {
                         id: blockRow
                         required property var modelData
                         Layout.fillWidth: true
-                        BwCheckBox {
+                        StitchCheckBox {
                             objectName: "sharePackBlockCheck"
                             checked: shareDialog.picked.indexOf(blockRow.modelData.id) >= 0
                             onToggled: shareDialog.picked = checked ? shareDialog.picked.concat([blockRow.modelData.id]) : shareDialog.picked.filter(id => id !== blockRow.modelData.id)
@@ -508,7 +508,7 @@ Item {
                         }
                     }
                 }
-                BwButton {
+                StitchButton {
                     visible: shareDialog.variableCandidates.length > 0
                     flat: true; text: qsTr("Pack variables")
                     iconName: shareDialog.showVariables ? "chevron-up" : "chevron-down"
@@ -536,7 +536,7 @@ Item {
                                     required property string modelData
                                     Layout.fillWidth: true
                                     Text { Layout.fillWidth: true; text: modelData; elide: Text.ElideRight; color: Theme.text; font.pixelSize: 12 }
-                                    BwComboBox {
+                                    StitchComboBox {
                                         objectName: "packVariableRole"
                                         model: [qsTr("Internal"), qsTr("Output"), qsTr("Setting")]
                                         currentIndex: ["internal", "output", "setting"].indexOf(shareDialog.variableRoles[modelData] || "internal")
@@ -614,7 +614,7 @@ Item {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
                 text: qsTr("Your browser opened the community library. Sign in there with GitHub or Google, then come back here.")
             }
-            BwButton {
+            StitchButton {
                 flat: true; iconName: "external-link"; text: qsTr("Open the page again")
                 enabled: root.community.sign_in_url !== ""
                 onClicked: Qt.openUrlExternally(root.community.sign_in_url)

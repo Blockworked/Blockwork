@@ -70,7 +70,7 @@ Popup {
 
     contentItem: ColumnLayout {
         spacing: 0
-        BwTextField {
+        StitchTextField {
             id: query
             Layout.fillWidth: true; Layout.margins: 10; Layout.bottomMargin: 6
             placeholderText: qsTr("Search macros")
@@ -131,7 +131,7 @@ Popup {
                         ToolTip.visible: listeningHover.hovered; ToolTip.text: qsTr("Listens for its triggers even when it isn't open")
                         HoverHandler { id: listeningHover }
                     }
-                    BwButton {
+                    StitchButton {
                         id: moreButton
                         visible: rowHover.hovered || rowMenu.visible || folderMenu.visible
                         iconName: "ellipsis"; text: ""; flat: true; implicitWidth: 28; implicitHeight: 28
@@ -151,10 +151,10 @@ Popup {
                     acceptedButtons: Qt.RightButton
                     onTapped: (row.isFolder ? folderMenu : rowMenu).popup()
                 }
-                BwMenu {
+                StitchMenu {
                     id: folderMenu
                     implicitWidth: 220
-                    BwMenuItem {
+                    StitchMenuItem {
                         iconName: "package"; text: qsTr("Export folder as bundle...")
                         onTriggered: {
                             const name = row.modelData.name;
@@ -163,15 +163,15 @@ Popup {
                         }
                     }
                 }
-                BwMenu {
+                StitchMenu {
                     id: rowMenu
                     implicitWidth: 190
-                    BwMenuItem { iconName: "folder-open"; text: qsTr("Open"); onTriggered: root.openMacro(row.entry.id) }
-                    BwMenuItem { iconName: "copy"; text: qsTr("Duplicate"); onTriggered: { root.invoke("duplicate_macro", { id: row.entry.id }); root.close(); } }
-                    BwMenuItem { iconName: "folder"; text: qsTr("Move to folder..."); onTriggered: folderDialog.openFor(row.entry) }
-                    BwMenuItem { iconName: "upload"; text: qsTr("Export..."); onTriggered: { root.close(); root.exportRequested(row.entry.id); } }
-                    BwMenuItem { iconName: "package"; text: qsTr("Export as bundle..."); onTriggered: { root.close(); root.bundleRequested([row.entry.id], row.entry.name); } }
-                    BwMenuItem { iconName: "trash"; text: qsTr("Delete"); danger: true; onTriggered: { root.close(); root.deleteRequested(row.entry.id, row.entry.name); } }
+                    StitchMenuItem { iconName: "folder-open"; text: qsTr("Open"); onTriggered: root.openMacro(row.entry.id) }
+                    StitchMenuItem { iconName: "copy"; text: qsTr("Duplicate"); onTriggered: { root.invoke("duplicate_macro", { id: row.entry.id }); root.close(); } }
+                    StitchMenuItem { iconName: "folder"; text: qsTr("Move to folder..."); onTriggered: folderDialog.openFor(row.entry) }
+                    StitchMenuItem { iconName: "upload"; text: qsTr("Export..."); onTriggered: { root.close(); root.exportRequested(row.entry.id); } }
+                    StitchMenuItem { iconName: "package"; text: qsTr("Export as bundle..."); onTriggered: { root.close(); root.bundleRequested([row.entry.id], row.entry.name); } }
+                    StitchMenuItem { iconName: "trash"; text: qsTr("Delete"); danger: true; onTriggered: { root.close(); root.deleteRequested(row.entry.id, row.entry.name); } }
                 }
             }
             Text {
@@ -182,10 +182,10 @@ Popup {
         Rectangle { Layout.fillWidth: true; height: 1; color: Theme.borderSoft }
         RowLayout {
             Layout.fillWidth: true; Layout.margins: 10; spacing: 6
-            BwButton { iconName: "plus"; text: qsTr("New"); implicitHeight: 32; onClicked: { root.invoke("new_macro"); root.close(); } }
-            BwButton { iconName: "sparkles"; text: qsTr("Template"); implicitHeight: 32; onClicked: { root.close(); root.templateRequested(); } }
+            StitchButton { iconName: "plus"; text: qsTr("New"); implicitHeight: 32; onClicked: { root.invoke("new_macro"); root.close(); } }
+            StitchButton { iconName: "sparkles"; text: qsTr("Template"); implicitHeight: 32; onClicked: { root.close(); root.templateRequested(); } }
             Item { Layout.fillWidth: true }
-            BwButton { iconName: "download"; text: qsTr("Import..."); implicitHeight: 32; onClicked: { root.close(); root.importRequested(); } }
+            StitchButton { iconName: "download"; text: qsTr("Import..."); implicitHeight: 32; onClicked: { root.close(); root.importRequested(); } }
         }
     }
 
@@ -201,12 +201,12 @@ Popup {
                 width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
                 text: qsTr("Type a new folder name or pick one. Leave it empty to take \"%1\" out of its folder.").arg(folderDialog.entry ? folderDialog.entry.name : "")
             }
-            BwTextField { id: folderName; width: parent.width; placeholderText: qsTr("Work"); onAccepted: folderDialog.accept() }
+            StitchTextField { id: folderName; width: parent.width; placeholderText: qsTr("Work"); onAccepted: folderDialog.accept() }
             Flow {
                 width: parent.width; spacing: 6
                 Repeater {
                     model: root.folders
-                    delegate: BwButton {
+                    delegate: StitchButton {
                         required property string modelData
                         iconName: "folder"; text: modelData; implicitHeight: 28
                         onClicked: { folderName.text = modelData; folderDialog.accept(); }

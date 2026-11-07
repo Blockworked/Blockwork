@@ -208,10 +208,10 @@ Popup {
         Row {
             width: parent.width
             spacing: 8
-            BwButton { id: nowButton; text: qsTr("Now"); flat: true; implicitHeight: 32; onClicked: { const d = new Date(); control.hour = d.getHours(); control.minute = d.getMinutes(); if (control.withDate) control.setDate(d.getFullYear(), d.getMonth() + 1, d.getDate()); } }
+            StitchButton { id: nowButton; text: qsTr("Now"); flat: true; implicitHeight: 32; onClicked: { const d = new Date(); control.hour = d.getHours(); control.minute = d.getMinutes(); if (control.withDate) control.setDate(d.getFullYear(), d.getMonth() + 1, d.getDate()); } }
             Item { width: parent.width - nowButton.width - cancelButton.width - setButton.width - 3 * parent.spacing; height: 1 }
-            BwButton { id: cancelButton; text: qsTr("Cancel"); implicitHeight: 32; onClicked: control.close() }
-            BwButton { id: setButton; text: qsTr("Set"); primary: true; implicitHeight: 32; onClicked: control.accept() }
+            StitchButton { id: cancelButton; text: qsTr("Cancel"); implicitHeight: 32; onClicked: control.close() }
+            StitchButton { id: setButton; text: qsTr("Set"); primary: true; implicitHeight: 32; onClicked: control.accept() }
         }
     }
 

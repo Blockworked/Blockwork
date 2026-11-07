@@ -30,7 +30,7 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true; spacing: 8
-        BwButton { flat: true; iconName: "arrow-left"; text: qsTr("All packs"); onClicked: mine.browser.showList() }
+        StitchButton { flat: true; iconName: "arrow-left"; text: qsTr("All packs"); onClicked: mine.browser.showList() }
         Item { Layout.fillWidth: true }
         CommunityParts.AccountButton { host: mine.host; browser: mine.browser }
     }
@@ -43,7 +43,7 @@ ColumnLayout {
             Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 14
             text: qsTr("Sign in to share packs with the community library and publish updates to them. Your browser opens to sign in with GitHub or Google.")
         }
-        BwButton { primary: true; iconName: "user"; text: qsTr("Sign in with your browser"); onClicked: mine.host.signIn() }
+        StitchButton { primary: true; iconName: "user"; text: qsTr("Sign in with your browser"); onClicked: mine.host.signIn() }
     }
 
     ColumnLayout {
@@ -57,13 +57,13 @@ ColumnLayout {
                 Layout.fillWidth: true; spacing: 2
                 Text { text: mine.community.user.name; color: Theme.text; font.pixelSize: 16; font.weight: Font.DemiBold }
             }
-            BwButton {
+            StitchButton {
                 objectName: "shareNewPack"
                 primary: true; iconName: "upload"; text: qsTr("Share a new pack...")
                 enabled: !mine.publish.running
                 onClicked: mine.host.publishNew()
             }
-            BwButton {
+            StitchButton {
                 iconName: "folder-open"; text: qsTr("Send a pack file...")
                 enabled: !mine.publish.running
                 onClicked: mine.host.publishFromFile()
@@ -153,14 +153,14 @@ ColumnLayout {
                         Row {
                             spacing: 6
                             Layout.alignment: Qt.AlignTop
-                            BwButton {
+                            StitchButton {
                                 objectName: "publishUpdate"
                                 visible: card.modelData.listed
                                 primary: true; iconName: "upload"; text: qsTr("Publish update...")
                                 enabled: !mine.publish.running && !!mine.browser.macro
                                 onClicked: mine.host.publishUpdate(card.modelData)
                             }
-                            BwButton {
+                            StitchButton {
                                 visible: !!card.listed
                                 text: qsTr("View"); iconName: "package"
                                 onClicked: mine.browser.showPack(card.listed.key)

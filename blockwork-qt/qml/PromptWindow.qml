@@ -111,7 +111,7 @@ ApplicationWindow {
             Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
             text: qsTr("Macros you import ask before running commands, going online, writing files, reading secrets or reading the screen. Change what this macro may do in its Macro settings.")
         }
-        BwTextField {
+        StitchTextField {
             id: field
             objectName: "promptText"
             Accessible.name: root.message
@@ -156,7 +156,7 @@ ApplicationWindow {
             Item { Layout.fillWidth: true }
             Repeater {
                 model: root.buttons
-                delegate: BwButton {
+                delegate: StitchButton {
                     required property var modelData
                     objectName: "promptButton_" + modelData[1]
                     text: modelData[0]; primary: modelData[2]

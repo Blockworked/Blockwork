@@ -189,31 +189,6 @@
         <source>Delete all blocks</source>
         <translation type="unfinished"></translation>
     </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1448"/>
-        <source>Paste</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1449"/>
-        <source>Add Comment</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1467"/>
-        <source>Block strand</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1596"/>
-        <source>Details</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1596"/>
-        <source>Delete value</source>
-        <translation type="unfinished"></translation>
-    </message>
     <message numerus="yes">
         <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="1750"/>
         <source>%n item(s)</source>
@@ -1837,21 +1812,6 @@
         <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1104"/>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1490"/>
         <source>Add label</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1155"/>
-        <source>Move left</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1160"/>
-        <source>Remove</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1165"/>
-        <source>Move right</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4036,6 +3996,19 @@
     <name>BwTimePicker</name>
 </context>
 <context>
+    <name>CanvasMenu</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/CanvasMenu.qml" line="28"/>
+        <source>Paste</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/CanvasMenu.qml" line="33"/>
+        <source>Add Comment</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>CollectionPanel</name>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/CollectionPanel.qml" line="34"/>
@@ -4521,6 +4494,34 @@
     <message>
         <location filename="../qml/DataNameDialog.qml" line="36"/>
         <source>Enter a variable name.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>DefinitionPiece</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/DefinitionPiece.qml" line="72"/>
+        <source>Add label</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/DefinitionPiece.qml" line="72"/>
+        <source>value</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/DefinitionPiece.qml" line="123"/>
+        <source>Move left</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/DefinitionPiece.qml" line="128"/>
+        <source>Remove</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/DefinitionPiece.qml" line="133"/>
+        <source>Move right</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -5173,6 +5174,19 @@
     </message>
 </context>
 <context>
+    <name>FloatingValue</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/FloatingValue.qml" line="35"/>
+        <source>Details</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/FloatingValue.qml" line="40"/>
+        <source>Delete value</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>GlobalPicker</name>
     <message>
         <location filename="../qml/GlobalPicker.qml" line="6"/>
@@ -5268,6 +5282,24 @@
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="1210"/>
         <source>Breakpoint: runs pause here. Click to remove.</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
+    <name>KeycapLeaf</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/KeycapLeaf.qml" line="23"/>
+        <source>Click to set key</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/KeycapLeaf.qml" line="23"/>
+        <source>Press keys...</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/KeycapLeaf.qml" line="73"/>
+        <source>Click to set key, or drop a variable here</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -7539,6 +7571,14 @@
     </message>
 </context>
 <context>
+    <name>StrandView</name>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/StrandView.qml" line="9"/>
+        <source>Block strand</source>
+        <translation type="unfinished"></translation>
+    </message>
+</context>
+<context>
     <name>TextEditingMenu</name>
     <message>
         <location filename="../qml/BlockworkStyle/TextEditingMenu.qml" line="21"/>
@@ -7730,21 +7770,6 @@
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="378"/>
         <source>Details</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="570"/>
-        <source>Press keys...</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="570"/>
-        <source>Click to set key</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="597"/>
-        <source>Click to set key, or drop a variable here</source>
         <translation type="unfinished"></translation>
     </message>
     <message>

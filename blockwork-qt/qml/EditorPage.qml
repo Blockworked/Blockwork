@@ -297,7 +297,7 @@ Item {
                     Layout.preferredWidth: 20; Layout.preferredHeight: 20; Layout.rightMargin: 2
                     fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
                 }
-                BwButton {
+                StitchButton {
                     iconName: "panel-left"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro
                     ToolTip.visible: hovered; ToolTip.text: root.sidebarCollapsed ? qsTr("Show sidebar") : qsTr("Hide sidebar")
                     onClicked: { root.sidebarToggling = Motion.enabled; root.sidebarCollapsed = !root.sidebarCollapsed; }
@@ -333,7 +333,7 @@ Item {
                         onDeleteRequested: (macroId, name) => { deleteMacroDialog.macroId = macroId; deleteMacroDialog.macroName = name; deleteMacroDialog.open(); }
                     }
                 }
-                BwButton {
+                StitchButton {
                     id: macroMenuButton
                     iconName: "ellipsis"; text: ""; implicitWidth: 34; implicitHeight: 34
                     ToolTip.visible: hovered && !macroMenu.visible; ToolTip.text: qsTr("Macro actions")
@@ -342,24 +342,24 @@ Item {
                     onPressed: pressStamp = Date.now()
                     // The press that closes the menu also clicks the button; don't reopen on release.
                     onClicked: if (Math.abs(closeStamp - pressStamp) > 100) macroMenu.popup(macroMenuButton, 0, macroMenuButton.height + 4)
-                    BwMenu {
+                    StitchMenu {
                         id: macroMenu
                         onAboutToHide: macroMenuButton.closeStamp = Date.now()
                         implicitWidth: 200
-                        BwMenuItem { iconName: "sliders"; text: qsTr("Macro settings"); enabled: !!root.macro; onTriggered: macroSettings.open() }
-                        BwMenuItem { iconName: "navigation"; text: qsTr("Signals…"); enabled: !!root.macro; onTriggered: signalsDialog.open() }
-                        BwMenuItem { iconName: "variable"; text: qsTr("Globals…"); onTriggered: globalPicker.openFor(null) }
-                        BwMenuItem { iconName: "plus"; text: qsTr("New macro"); onTriggered: root.invoke("new_macro") }
-                        BwMenuItem { iconName: "sparkles"; text: qsTr("New from template..."); onTriggered: templateDialog.open() }
-                        BwMenuItem { iconName: "copy"; text: qsTr("Duplicate macro"); enabled: !!root.macro; onTriggered: root.invoke("duplicate_macro", { id: root.macro.id }) }
-                        BwMenuItem { iconName: "upload"; text: qsTr("Export..."); enabled: !!root.macro && !!root.macroFiles; onTriggered: root.macroFiles.exportMacro(root.macro.id) }
-                        BwMenuItem { iconName: "circle-dot"; text: qsTr("Clear breakpoints"); enabled: (appState.breakpoints || []).length > 0; onTriggered: root.invoke("clear_breakpoints") }
-                        BwMenuItem { iconName: "octagon"; text: qsTr("Emergency stop"); danger: true; onTriggered: root.invoke("emergency_stop") }
-                        BwMenuItem { iconName: "trash"; text: qsTr("Delete macro"); danger: true; enabled: !!root.macro; onTriggered: removeDialog.open() }
+                        StitchMenuItem { iconName: "sliders"; text: qsTr("Macro settings"); enabled: !!root.macro; onTriggered: macroSettings.open() }
+                        StitchMenuItem { iconName: "navigation"; text: qsTr("Signals…"); enabled: !!root.macro; onTriggered: signalsDialog.open() }
+                        StitchMenuItem { iconName: "variable"; text: qsTr("Globals…"); onTriggered: globalPicker.openFor(null) }
+                        StitchMenuItem { iconName: "plus"; text: qsTr("New macro"); onTriggered: root.invoke("new_macro") }
+                        StitchMenuItem { iconName: "sparkles"; text: qsTr("New from template..."); onTriggered: templateDialog.open() }
+                        StitchMenuItem { iconName: "copy"; text: qsTr("Duplicate macro"); enabled: !!root.macro; onTriggered: root.invoke("duplicate_macro", { id: root.macro.id }) }
+                        StitchMenuItem { iconName: "upload"; text: qsTr("Export..."); enabled: !!root.macro && !!root.macroFiles; onTriggered: root.macroFiles.exportMacro(root.macro.id) }
+                        StitchMenuItem { iconName: "circle-dot"; text: qsTr("Clear breakpoints"); enabled: (appState.breakpoints || []).length > 0; onTriggered: root.invoke("clear_breakpoints") }
+                        StitchMenuItem { iconName: "octagon"; text: qsTr("Emergency stop"); danger: true; onTriggered: root.invoke("emergency_stop") }
+                        StitchMenuItem { iconName: "trash"; text: qsTr("Delete macro"); danger: true; enabled: !!root.macro; onTriggered: removeDialog.open() }
                     }
                 }
                 Item { Layout.fillWidth: true }
-                BwButton {
+                StitchButton {
                     implicitHeight: 34; iconName: "play"; iconFilled: true; iconColor: Theme.accent; text: toolbar.tier < 2 ? qsTr("Run") : ""
                     implicitWidth: toolbar.tier < 2 ? 76 : 34
                     enabled: appState.macro_selected !== null; ToolTip.visible: hovered && toolbar.tier >= 2; ToolTip.text: qsTr("Run macro")
@@ -367,7 +367,7 @@ Item {
                 }
                 Row {
                     spacing: -1
-                    BwButton {
+                    StitchButton {
                         id: recordButton
                         implicitHeight: 34
                         iconName: root.recording ? "square" : (root.recordingCountdown ? "x" : "circle")
@@ -382,16 +382,16 @@ Item {
                         enabled: appState.macro_selected !== null; ToolTip.visible: hovered; ToolTip.text: root.recordingTooltip()
                         onClicked: root.invoke(root.recordingBusy ? "stop_recording" : "start_recording")
                     }
-                    BwButton {
+                    StitchButton {
                         iconName: "chevron-down"; text: ""; implicitWidth: 26; implicitHeight: 34
                         ToolTip.visible: hovered; ToolTip.text: qsTr("Recording settings"); onClicked: recordingSettings.open()
                     }
                 }
                 Item { Layout.fillWidth: true }
-                BwButton { visible: toolbar.tier < 3; iconName: "undo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_undo; ToolTip.visible: hovered; ToolTip.text: qsTr("Undo"); onClicked: root.invoke("undo") }
-                BwButton { visible: toolbar.tier < 3; iconName: "redo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_redo; ToolTip.visible: hovered; ToolTip.text: qsTr("Redo"); onClicked: root.invoke("redo") }
-                BwButton { visible: toolbar.tier < 3; iconName: "save"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro; ToolTip.visible: hovered; ToolTip.text: qsTr("Save macro"); onClicked: root.invoke("save_macro") }
-                BwButton {
+                StitchButton { visible: toolbar.tier < 3; iconName: "undo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_undo; ToolTip.visible: hovered; ToolTip.text: qsTr("Undo"); onClicked: root.invoke("undo") }
+                StitchButton { visible: toolbar.tier < 3; iconName: "redo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_redo; ToolTip.visible: hovered; ToolTip.text: qsTr("Redo"); onClicked: root.invoke("redo") }
+                StitchButton { visible: toolbar.tier < 3; iconName: "save"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro; ToolTip.visible: hovered; ToolTip.text: qsTr("Save macro"); onClicked: root.invoke("save_macro") }
+                StitchButton {
                     id: editMenuButton
                     visible: toolbar.tier >= 3
                     iconName: "ellipsis"; text: ""; implicitWidth: 34; implicitHeight: 34
@@ -401,16 +401,16 @@ Item {
                     onPressed: pressStamp = Date.now()
                     // The press that closes the menu also clicks the button; don't reopen on release.
                     onClicked: if (Math.abs(closeStamp - pressStamp) > 100) editMenu.popup(editMenuButton, 0, editMenuButton.height + 4)
-                    BwMenu {
+                    StitchMenu {
                         id: editMenu
                         onAboutToHide: editMenuButton.closeStamp = Date.now()
                         implicitWidth: 170
-                        BwMenuItem { iconName: "undo"; text: qsTr("Undo"); enabled: appState.can_undo; onTriggered: root.invoke("undo") }
-                        BwMenuItem { iconName: "redo"; text: qsTr("Redo"); enabled: appState.can_redo; onTriggered: root.invoke("redo") }
-                        BwMenuItem { iconName: "save"; text: qsTr("Save macro"); enabled: !!root.macro; onTriggered: root.invoke("save_macro") }
+                        StitchMenuItem { iconName: "undo"; text: qsTr("Undo"); enabled: appState.can_undo; onTriggered: root.invoke("undo") }
+                        StitchMenuItem { iconName: "redo"; text: qsTr("Redo"); enabled: appState.can_redo; onTriggered: root.invoke("redo") }
+                        StitchMenuItem { iconName: "save"; text: qsTr("Save macro"); enabled: !!root.macro; onTriggered: root.invoke("save_macro") }
                     }
                 }
-                BwButton { iconName: "settings"; text: ""; implicitWidth: 34; implicitHeight: 34; ToolTip.visible: hovered; ToolTip.text: qsTr("Settings"); onClicked: root.invoke("open_settings") }
+                StitchButton { iconName: "settings"; text: ""; implicitWidth: 34; implicitHeight: 34; ToolTip.visible: hovered; ToolTip.text: qsTr("Settings"); onClicked: root.invoke("open_settings") }
                 WindowControls { visible: Qt.platform.os !== "osx" }
             }
         }
@@ -421,7 +421,7 @@ Item {
                 anchors.fill: parent; anchors.leftMargin: 14; anchors.rightMargin: 10; spacing: 10
                 LucideIcon { name: "pause"; color: Theme.warning; width: 16; height: 16 }
                 Text { Layout.fillWidth: true; text: qsTr("Emergency stop: triggers are paused until you resume them."); color: Theme.text; font.pixelSize: 13; elide: Text.ElideRight }
-                BwButton { text: qsTr("Resume triggers"); implicitHeight: 28; onClicked: root.invoke("resume_triggers") }
+                StitchButton { text: qsTr("Resume triggers"); implicitHeight: 28; onClicked: root.invoke("resume_triggers") }
             }
         }
         Rectangle {
@@ -450,10 +450,10 @@ Item {
                         HoverHandler { cursorShape: debugBar.strand ? Qt.PointingHandCursor : Qt.ArrowCursor }
                         TapHandler { enabled: !!debugBar.strand; onTapped: canvas.revealInstruction(debugBar.strand.block_id) }
                     }
-                    BwButton { visible: !debugBar.isPaused; iconName: "pause"; text: qsTr("Pause"); implicitHeight: 28; ToolTip.visible: hovered; ToolTip.text: qsTr("Pause before the next block (F8)"); onClicked: debugBar.act("pause") }
-                    BwButton { visible: debugBar.isPaused; iconName: "play"; text: qsTr("Resume"); implicitHeight: 28; ToolTip.visible: hovered; ToolTip.text: qsTr("Run on until the next breakpoint (F8)"); onClicked: debugBar.act("resume") }
-                    BwButton { visible: debugBar.isPaused; iconName: "step-forward"; text: qsTr("Step"); implicitHeight: 28; enabled: debugBar.paused.length > 0; ToolTip.visible: hovered; ToolTip.text: qsTr("Run one block, then pause again (F10)"); onClicked: debugBar.act("step") }
-                    BwButton { iconName: "square"; text: qsTr("Stop"); danger: true; implicitHeight: 28; onClicked: debugBar.act("stop") }
+                    StitchButton { visible: !debugBar.isPaused; iconName: "pause"; text: qsTr("Pause"); implicitHeight: 28; ToolTip.visible: hovered; ToolTip.text: qsTr("Pause before the next block (F8)"); onClicked: debugBar.act("pause") }
+                    StitchButton { visible: debugBar.isPaused; iconName: "play"; text: qsTr("Resume"); implicitHeight: 28; ToolTip.visible: hovered; ToolTip.text: qsTr("Run on until the next breakpoint (F8)"); onClicked: debugBar.act("resume") }
+                    StitchButton { visible: debugBar.isPaused; iconName: "step-forward"; text: qsTr("Step"); implicitHeight: 28; enabled: debugBar.paused.length > 0; ToolTip.visible: hovered; ToolTip.text: qsTr("Run one block, then pause again (F10)"); onClicked: debugBar.act("step") }
+                    StitchButton { iconName: "square"; text: qsTr("Stop"); danger: true; implicitHeight: 28; onClicked: debugBar.act("stop") }
                 }
                 Flow {
                     visible: !!debugBar.strand
@@ -692,7 +692,7 @@ Item {
         function openFor(req) { request = req; imagePath.text = ""; open(); imagePath.forceActiveFocus(); }
         Column { width: 420; spacing: 8
             Text { text: qsTr("Path to a PNG image"); color: Theme.text }
-            BwTextField { id: imagePath; width: parent.width; placeholderText: "~/Pictures/button.png"; onAccepted: imageFileDialog.accept() }
+            StitchTextField { id: imagePath; width: parent.width; placeholderText: "~/Pictures/button.png"; onAccepted: imageFileDialog.accept() }
         }
         onAccepted: {
             const req = request;
@@ -796,7 +796,7 @@ Item {
         }
         Column { width: 340; spacing: 8
             Text { width: parent.width; text: qsTr("Value of %1").arg(variableValueDialog.target); color: Theme.text; elide: Text.ElideRight }
-            BwTextField { id: variableValue; objectName: "variableValue"; width: parent.width; placeholderText: qsTr("0"); onAccepted: variableValueDialog.accept() }
+            StitchTextField { id: variableValue; objectName: "variableValue"; width: parent.width; placeholderText: qsTr("0"); onAccepted: variableValueDialog.accept() }
             Text { width: parent.width; visible: text.length > 0; text: variableValueDialog.errorText; color: Theme.text; wrapMode: Text.WordWrap }
         }
         onAccepted: {
@@ -834,8 +834,8 @@ Item {
             spacing: 8
             padding: 18; topPadding: 8
             background: null
-            BwButton { text: qsTr("Cancel"); onClicked: clearInstructionsDialog.reject() }
-            BwButton { text: qsTr("Delete"); danger: true; onClicked: clearInstructionsDialog.accept() }
+            StitchButton { text: qsTr("Cancel"); onClicked: clearInstructionsDialog.reject() }
+            StitchButton { text: qsTr("Delete"); danger: true; onClicked: clearInstructionsDialog.accept() }
         }
         onAccepted: {
             if (root.macro && root.macro.id === macroId) root.invoke("clear_instructions");

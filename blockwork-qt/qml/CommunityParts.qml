@@ -151,7 +151,7 @@ QtObject {
     }
 
     // Sign in, or the signed-in account with its menu.
-    component AccountButton: BwButton {
+    component AccountButton: StitchButton {
         id: account
         required property var host
         required property var browser
@@ -163,15 +163,15 @@ QtObject {
         iconSource: signedIn ? host.community.user.avatar : ""
         text: signedIn ? host.community.user.name : signingIn ? qsTr("Signing in...") : qsTr("Sign in")
         onClicked: signedIn ? accountMenu.popup(account, account.width - accountMenu.width, account.height + 4) : host.signIn()
-        BwMenu {
+        StitchMenu {
             id: accountMenu
-            BwMenuItem { text: qsTr("My packs"); iconName: "package"; onTriggered: account.browser.showMine() }
-            BwMenuItem {
+            StitchMenuItem { text: qsTr("My packs"); iconName: "package"; onTriggered: account.browser.showMine() }
+            StitchMenuItem {
                 text: qsTr("My page on the website"); iconName: "external-link"
                 visible: account.host.community.user.page !== ""
                 onTriggered: Qt.openUrlExternally(account.host.community.user.page)
             }
-            BwMenuItem { text: qsTr("Sign out"); iconName: "log-out"; onTriggered: account.host.invoke("community_sign_out") }
+            StitchMenuItem { text: qsTr("Sign out"); iconName: "log-out"; onTriggered: account.host.invoke("community_sign_out") }
         }
     }
 }

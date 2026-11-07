@@ -4,7 +4,7 @@ import com.blockworked.Blockstitch 1.0
 
 // Keep standard buttons in the selected app language, including when Qt's
 // own translation catalogs aren't installed on the user's computer.
-BwDialog {
+StitchDialog {
     id: root
     // Keep dimming inside the window frame, clear of its transparent shadow padding.
     Overlay.modal: Item {

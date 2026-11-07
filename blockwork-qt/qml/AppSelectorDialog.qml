@@ -69,7 +69,7 @@ AppDialog {
     contentItem: ColumnLayout {
         spacing: 10
 
-        BwTextField {
+        StitchTextField {
             id: searchField
             Layout.fillWidth: true
             placeholderText: qsTr("Search apps...")
@@ -218,12 +218,12 @@ AppDialog {
         RowLayout {
             Layout.fillWidth: true
             Item { Layout.fillWidth: true }
-            BwButton {
+            StitchButton {
                 visible: root.timedOut || root.appsError.length > 0
                 text: qsTr("Retry")
                 onClicked: root.refreshApps()
             }
-            BwButton { text: qsTr("Cancel"); onClicked: root.reject() }
+            StitchButton { text: qsTr("Cancel"); onClicked: root.reject() }
         }
     }
 }

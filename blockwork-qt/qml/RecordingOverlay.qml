@@ -126,7 +126,7 @@ Item {
                     wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
                     text: qsTr("Editing is paused while recording.")
                 }
-                BwButton {
+                StitchButton {
                     id: stopButton
                     anchors.right: parent.right
                     implicitHeight: 34

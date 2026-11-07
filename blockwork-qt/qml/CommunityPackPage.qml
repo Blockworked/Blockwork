@@ -107,7 +107,7 @@ ColumnLayout {
 
     RowLayout {
         Layout.fillWidth: true; spacing: 8
-        BwButton { objectName: "libraryBackButton"; flat: true; iconName: "arrow-left"; text: qsTr("All packs"); onClicked: page.browser.showList() }
+        StitchButton { objectName: "libraryBackButton"; flat: true; iconName: "arrow-left"; text: qsTr("All packs"); onClicked: page.browser.showList() }
         Item { Layout.fillWidth: true }
         CommunityParts.AccountButton { host: page.host; browser: page.browser }
     }
@@ -142,7 +142,7 @@ ColumnLayout {
         Row {
             spacing: 6
             Layout.alignment: Qt.AlignTop
-            BwButton {
+            StitchButton {
                 objectName: "packPageAdd"
                 visible: page.pack.available && (!page.installed || page.pack.update)
                 enabled: !!page.browser.macro && !page.fetching && page.browser.library.fetching === ""
@@ -150,9 +150,9 @@ ColumnLayout {
                 text: page.fetching ? qsTr("Downloading...") : page.installed ? qsTr("Update") : qsTr("Add to macro")
                 onClicked: page.host.invoke("review_block_pack", { key: page.pack.key })
             }
-            BwButton { visible: page.installed; text: qsTr("Settings"); iconName: "settings"; onClicked: page.host.showPackData(page.pack.id) }
-            BwButton { visible: page.installed; text: qsTr("Remove"); iconName: "trash-2"; onClicked: page.host.confirmRemove(page.pack.id, page.pack.name) }
-            BwButton {
+            StitchButton { visible: page.installed; text: qsTr("Settings"); iconName: "settings"; onClicked: page.host.showPackData(page.pack.id) }
+            StitchButton { visible: page.installed; text: qsTr("Remove"); iconName: "trash-2"; onClicked: page.host.confirmRemove(page.pack.id, page.pack.name) }
+            StitchButton {
                 visible: page.pack.page !== ""
                 iconName: "external-link"; Accessible.name: qsTr("Open on the website")
                 ToolTip.visible: hovered; ToolTip.delay: 400; ToolTip.text: qsTr("Open on the website")
@@ -390,7 +390,7 @@ ColumnLayout {
                                 CommunityParts.Pill { visible: comment.modelData.pack_author; text: qsTr("author") }
                                 Text { text: page.browser.date(comment.modelData.created); color: Theme.textDim; font.pixelSize: 12 }
                                 Item { Layout.fillWidth: true }
-                                BwButton {
+                                StitchButton {
                                     visible: comment.modelData.can_delete
                                     flat: true; implicitHeight: 28; iconName: "trash-2"
                                     text: qsTr("Delete")
@@ -436,7 +436,7 @@ ColumnLayout {
                             color: Theme.danger; font.pixelSize: 12
                             text: (page.host.community.tasks.comment || {}).error || ""
                         }
-                        BwButton {
+                        StitchButton {
                             objectName: "packCommentPost"
                             primary: true; text: qsTr("Post comment")
                             enabled: commentBox.text.trim() !== "" && commentBox.text.length <= 2000 && !(page.host.community.tasks.comment || {}).running
@@ -456,7 +456,7 @@ ColumnLayout {
                     visible: !!page.site && !page.host.community.signed_in
                     spacing: 10
                     Text { text: qsTr("Sign in to comment."); color: Theme.textDim; font.pixelSize: 13 }
-                    BwButton { iconName: "user"; text: qsTr("Sign in"); onClicked: page.host.signIn() }
+                    StitchButton { iconName: "user"; text: qsTr("Sign in"); onClicked: page.host.signIn() }
                 }
                 Item { implicitHeight: 8 }
             }

@@ -131,32 +131,32 @@ AppDialog {
             spacing: 10
             RowLayout {
                 Layout.fillWidth: true; spacing: 8
-                BwTextField {
+                StitchTextField {
                     id: search; objectName: "librarySearch"
                     Layout.fillWidth: true; placeholderText: qsTr("Search packs, blocks and authors")
                 }
-                BwButton {
+                StitchButton {
                     iconName: "refresh-cw"; text: qsTr("Refresh"); enabled: !browser.library.loading
                     onClicked: { browser.previews = ({}); browser.host.invoke("refresh_block_library"); }
                 }
-                BwButton { iconName: "folder-open"; text: qsTr("From file..."); onClicked: browser.host.addFromFile() }
+                StitchButton { iconName: "folder-open"; text: qsTr("From file..."); onClicked: browser.host.addFromFile() }
                 CommunityParts.AccountButton { host: browser.host; browser: browser }
             }
             Flow {
                 Layout.fillWidth: true; spacing: 8
-                BwComboBox {
+                StitchComboBox {
                     id: usesBox; objectName: "libraryPermissions"
                     width: 210
                     model: browser.permissionFilters.map(f => f[1])
                 }
-                BwComboBox {
+                StitchComboBox {
                     id: sortBox; objectName: "librarySort"
                     width: 180; currentIndex: 1
                     model: browser.sorts.map(s => s[1])
                     onActivated: browser.sortTouched = true
                 }
-                BwCheckBox { id: officialOnly; text: qsTr("Official only"); height: 34 }
-                BwCheckBox { id: hideInstalled; text: qsTr("Hide installed"); height: 34 }
+                StitchCheckBox { id: officialOnly; text: qsTr("Official only"); height: 34 }
+                StitchCheckBox { id: hideInstalled; text: qsTr("Hide installed"); height: 34 }
             }
             Text {
                 visible: !browser.macro
@@ -275,20 +275,20 @@ AppDialog {
                 Row {
                     spacing: 6
                     Layout.alignment: Qt.AlignTop
-                    BwButton {
+                    StitchButton {
                         visible: card.modelData.available && (!card.installed || card.modelData.update)
                         enabled: !!card.owner.macro && !card.fetching && card.owner.library.fetching === ""
                         primary: true; iconName: "download"
                         text: card.fetching ? qsTr("Downloading...") : card.installed ? qsTr("Update") : qsTr("Add")
                         onClicked: card.owner.host.invoke("review_block_pack", { key: card.modelData.key })
                     }
-                    BwButton {
+                    StitchButton {
                         visible: card.installed
                         iconName: "settings"; ToolTip.visible: hovered; ToolTip.text: qsTr("Settings"); ToolTip.delay: 400
                         Accessible.name: qsTr("Settings")
                         onClicked: card.owner.host.showPackData(card.modelData.id)
                     }
-                    BwButton {
+                    StitchButton {
                         visible: card.installed
                         text: qsTr("Remove"); iconName: "trash-2"
                         onClicked: card.owner.host.confirmRemove(card.modelData.id, card.modelData.name)

@@ -109,7 +109,7 @@ Item {
                                             font.pixelSize: 12; wrapMode: Text.WordWrap
                                         }
                                     }
-                                    BwSwitch {
+                                    StitchSwitch {
                                         id: preferenceSwitch
                                         anchors.right: parent.right; anchors.verticalCenter: parent.verticalCenter
                                         checked: preferenceRow.modelData.on
@@ -170,7 +170,7 @@ Item {
                             }
                         }
                     }
-                    BwButton {
+                    StitchButton {
                         Layout.alignment: Qt.AlignRight
                         text: qsTr("Get started"); primary: true
                         onClicked: root.invoke("set_onboarding_done", { done: true })

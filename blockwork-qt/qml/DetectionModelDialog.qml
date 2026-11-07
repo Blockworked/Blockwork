@@ -40,7 +40,7 @@ AppDialog {
                         Text { text: modelData.id; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold }
                         Text { width: parent.width; text: modelData.about; color: Theme.textDim; font.pixelSize: 11; elide: Text.ElideRight }
                     }
-                    BwButton {
+                    StitchButton {
                         enabled: !modelDialog.busy && (modelData.installed || modelData.downloadable)
                         text: modelData.installed ? qsTr("Use") : modelData.downloadable ? qsTr("Download %1 MB").arg(modelData.megabytes) : qsTr("Not published yet")
                         onClicked: modelData.installed ? modelDialog.use(modelData.id) : modelDialog.download(modelData.id)
@@ -49,11 +49,11 @@ AppDialog {
             }
         }
         Text { visible: modelDialog.busy; text: qsTr("Downloading..."); color: Theme.textDim; font.pixelSize: 12 }
-        BwButton { text: qsTr("Add a .onnx file..."); iconName: "folder-open"; enabled: !modelDialog.busy; onClicked: modelFile.open() }
+        StitchButton { text: qsTr("Add a .onnx file..."); iconName: "folder-open"; enabled: !modelDialog.busy; onClicked: modelFile.open() }
         Text { text: qsTr("Or a detector on this computer"); color: Theme.text; font.pixelSize: 12 }
         RowLayout { width: parent.width; spacing: 8
-            BwTextField { id: localUrl; Layout.fillWidth: true; placeholderText: modelDialog.page.catalog.defaultDetector; onAccepted: useUrl.clicked() }
-            BwButton { id: useUrl; text: qsTr("Use"); enabled: localUrl.text.trim().length > 0; onClicked: modelDialog.use(localUrl.text.trim()) }
+            StitchTextField { id: localUrl; Layout.fillWidth: true; placeholderText: modelDialog.page.catalog.defaultDetector; onAccepted: useUrl.clicked() }
+            StitchButton { id: useUrl; text: qsTr("Use"); enabled: localUrl.text.trim().length > 0; onClicked: modelDialog.use(localUrl.text.trim()) }
         }
     }
     FileDialog {

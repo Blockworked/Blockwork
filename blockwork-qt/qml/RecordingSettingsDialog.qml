@@ -7,15 +7,15 @@ AppDialog {
     id: recordingSettings; title: qsTr("Recording settings"); standardButtons: Dialog.Close
     required property Item page
     Column { spacing: 14; width: 390
-        BwSwitch { Accessible.name: qsTr("Record mouse movement"); checked: appState.record_mouse_movement; onToggled: checked => recordingSettings.page.invoke("toggle_record_mouse_movement", { enabled: checked }) }
-        BwSwitch { Accessible.name: qsTr("Use relative mouse movement"); checked: appState.record_mouse_relative; onToggled: checked => recordingSettings.page.invoke("toggle_record_mouse_relative", { relative: checked }) }
+        StitchSwitch { Accessible.name: qsTr("Record mouse movement"); checked: appState.record_mouse_movement; onToggled: checked => recordingSettings.page.invoke("toggle_record_mouse_movement", { enabled: checked }) }
+        StitchSwitch { Accessible.name: qsTr("Use relative mouse movement"); checked: appState.record_mouse_relative; onToggled: checked => recordingSettings.page.invoke("toggle_record_mouse_relative", { relative: checked }) }
         Text { width: parent.width; wrapMode: Text.WordWrap; text: appState.absolute_mouse_position_available ? qsTr("Absolute positioning is available on this system.") : qsTr("Absolute positioning is unavailable; relative movement will be used."); color: Theme.textDim; font.pixelSize: 12 }
         Rectangle { width: parent.width; height: 1; color: Theme.borderSoft }
         Column { width: parent.width; spacing: 6
             Text { text: qsTr("Countdown"); color: Theme.text; font.pixelSize: 14 }
             Text { width: parent.width; wrapMode: Text.WordWrap; text: qsTr("How long Record waits before it starts, so you can switch to the app you want to record."); color: Theme.textDim; font.pixelSize: 12 }
             Row { spacing: 12
-                BwSlider {
+                StitchSlider {
                     id: countdownSlider
                     width: 280; from: 0; to: 10; stepSize: 1; ticks: true
                     anchors.verticalCenter: parent.verticalCenter

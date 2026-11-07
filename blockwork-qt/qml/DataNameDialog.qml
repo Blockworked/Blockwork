@@ -24,7 +24,7 @@ AppDialog {
     function openForRename(name) { selectCreated = null; errorText = ""; renameTarget = name; nameField.text = name; open(); nameField.forceActiveFocus(); nameField.selectAll(); }
     Column { width: 340; spacing: 8
         Text { text: dialog.isList ? qsTr("List name") : qsTr("Variable name"); color: Theme.text }
-        BwTextField {
+        StitchTextField {
             id: nameField; objectName: dialog.fieldObjectName; width: parent.width
             placeholderText: dialog.isList ? qsTr("items") : qsTr("score")
             onAccepted: dialog.accept()

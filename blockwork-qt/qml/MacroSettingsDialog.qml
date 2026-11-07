@@ -22,7 +22,7 @@ AppDialog {
     Column { id: settingsColumn; spacing: 14; width: 360
         Text { text: qsTr("Controls behavior specific to this macro."); color: Theme.textDim }
         Text { text: qsTr("Title"); color: Theme.textDim; font.pixelSize: 13 }
-        BwTextField { width: parent.width; text: page.macro ? page.macro.name : ""; onEditingFinished: page.invoke("set_title", { title: text }) }
+        StitchTextField { width: parent.width; text: page.macro ? page.macro.name : ""; onEditingFinished: page.invoke("set_title", { title: text }) }
         Text { text: qsTr("Speed"); color: Theme.textDim; font.pixelSize: 13 }
         RowLayout { width: parent.width; spacing: 10
             Slider {
@@ -39,14 +39,14 @@ AppDialog {
                 background: Rectangle { x: speed.leftPadding; y: speed.topPadding + speed.availableHeight / 2 - height / 2; width: speed.availableWidth; height: 5; radius: 3; color: Theme.border; Rectangle { width: speed.visualPosition * parent.width; height: parent.height; radius: 3; color: Theme.accent } }
                 handle: Rectangle { x: speed.leftPadding + speed.visualPosition * (speed.availableWidth - width); y: speed.topPadding + speed.availableHeight / 2 - height / 2; width: 16; height: 16; radius: 8; color: "white"; border.width: 2; border.color: Theme.accent }
             }
-            BwTextField { text: Number(speed.value).toFixed(2); Layout.preferredWidth: 62; horizontalAlignment: Text.AlignRight; onEditingFinished: page.invoke("set_macro_speed_multiplier", { multiplier: Number(text) }) }
+            StitchTextField { text: Number(speed.value).toFixed(2); Layout.preferredWidth: 62; horizontalAlignment: Text.AlignRight; onEditingFinished: page.invoke("set_macro_speed_multiplier", { multiplier: Number(text) }) }
             Text { text: "×"; color: Theme.textDim }
         }
-        BwSwitch { Accessible.name: qsTr("Listen for triggers while Blockwork is open"); checked: page.macro && page.macro.settings ? page.macro.settings.always_listen : false; onToggled: checked => page.invoke("set_macro_always_listen", { enabled: checked }) }
+        StitchSwitch { Accessible.name: qsTr("Listen for triggers while Blockwork is open"); checked: page.macro && page.macro.settings ? page.macro.settings.always_listen : false; onToggled: checked => page.invoke("set_macro_always_listen", { enabled: checked }) }
         Text { text: qsTr("Time limit"); color: Theme.textDim; font.pixelSize: 13 }
         RowLayout { width: parent.width; spacing: 10
             Text { text: qsTr("Stop a run after"); color: Theme.text; font.pixelSize: 13 }
-            BwTextField {
+            StitchTextField {
                 Layout.preferredWidth: 70; horizontalAlignment: Text.AlignRight
                 validator: IntValidator { bottom: 0; top: 86400 }
                 text: page.macro && page.macro.settings ? String(page.macro.settings.max_run_secs) : "0"
@@ -57,7 +57,7 @@ AppDialog {
         Text { text: qsTr("Loop limit"); color: Theme.textDim; font.pixelSize: 13 }
         RowLayout { width: parent.width; spacing: 10
             Text { text: qsTr("Stop a loop after"); color: Theme.text; font.pixelSize: 13 }
-            BwTextField {
+            StitchTextField {
                 Layout.preferredWidth: 90; horizontalAlignment: Text.AlignRight
                 validator: IntValidator { bottom: 0; top: 2000000000 }
                 text: page.macro && page.macro.settings ? String(page.macro.settings.max_loop_iterations || 0) : "0"
@@ -72,7 +72,7 @@ AppDialog {
         }
         RowLayout { width: parent.width; spacing: 8
             Text { text: qsTr("While"); color: Theme.text; font.pixelSize: 13 }
-            BwTextField {
+            StitchTextField {
                 id: condWindow; Layout.fillWidth: true; placeholderText: qsTr("any window")
                 text: macroSettings.settings.only_in_window || ""
                 onEditingFinished: macroSettings.saveConditions()
@@ -81,7 +81,7 @@ AppDialog {
         }
         RowLayout { width: parent.width; spacing: 8
             Text { text: qsTr("On"); color: Theme.text; font.pixelSize: 13 }
-            BwComboBox {
+            StitchComboBox {
                 id: powerBox; Layout.fillWidth: true; textRole: "text"
                 readonly property var options: [{ value: "Any", text: qsTr("battery or AC power") }, { value: "PluggedIn", text: qsTr("AC power only") }, { value: "OnBattery", text: qsTr("battery only") }]
                 model: options
@@ -91,13 +91,13 @@ AppDialog {
         }
         RowLayout { width: parent.width; spacing: 8
             Text { text: qsTr("Between"); color: Theme.text; font.pixelSize: 13 }
-            BwTextField {
+            StitchTextField {
                 id: condFrom; Layout.preferredWidth: 70; horizontalAlignment: Text.AlignHCenter; placeholderText: "09:00"
                 text: macroSettings.settings.active_from || ""
                 onEditingFinished: if (!!text === !!condUntil.text) macroSettings.saveConditions()
             }
             Text { text: qsTr("and"); color: Theme.text; font.pixelSize: 13 }
-            BwTextField {
+            StitchTextField {
                 id: condUntil; Layout.preferredWidth: 70; horizontalAlignment: Text.AlignHCenter; placeholderText: "17:00"
                 text: macroSettings.settings.active_until || ""
                 onEditingFinished: if (!!text === !!condFrom.text) macroSettings.saveConditions()
@@ -130,7 +130,7 @@ AppDialog {
             }
         }
         Text { text: qsTr("Schedules"); color: Theme.textDim; font.pixelSize: 13 }
-        BwSwitch {
+        StitchSwitch {
             Accessible.name: qsTr("Catch up on missed schedules")
             checked: !!macroSettings.settings.catch_up_missed
             onToggled: checked => page.invoke("set_macro_catch_up", { enabled: checked })
@@ -140,7 +140,7 @@ AppDialog {
             text: qsTr("Runs a schedule or \"once at\" trigger once if its time passed while Blockwork was closed or the computer was asleep (up to a week back).")
         }
         Text { text: qsTr("Permissions"); color: Theme.textDim; font.pixelSize: 13 }
-        BwSwitch {
+        StitchSwitch {
             Accessible.name: qsTr("Ask before risky actions")
             checked: page.permissions !== null
             onToggled: checked => page.invoke("set_macro_restricted", { restricted: checked })
@@ -153,7 +153,7 @@ AppDialog {
         }
         Repeater {
             model: page.permissions === null ? [] : page.guardedAbilities
-            delegate: BwCheckBox {
+            delegate: StitchCheckBox {
                 required property var modelData
                 text: modelData.label
                 checked: page.permissions.indexOf(modelData.kind) >= 0

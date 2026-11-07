@@ -92,7 +92,7 @@ Item {
                     Layout.preferredWidth: 20; Layout.preferredHeight: 20; Layout.rightMargin: 2
                     fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
                 }
-                BwButton { iconName: "arrow-left"; text: qsTr("Back"); implicitHeight: 34; onClicked: root.invoke("close_settings") }
+                StitchButton { iconName: "arrow-left"; text: qsTr("Back"); implicitHeight: 34; onClicked: root.invoke("close_settings") }
                 Text { text: qsTr("Settings"); color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold }
                 Item { Layout.fillWidth: true }
                 WindowControls { visible: Qt.platform.os !== "osx" }
@@ -148,7 +148,7 @@ Item {
                         SettingsGrid { visible: root.tab === 0
                             SettingsSection { title: qsTr("Preferences")
                                 SettingsRow { first: true; title: qsTr("Appearance")
-                                    BwComboBox {
+                                    StitchComboBox {
                                         readonly property var schemes: [{ id: "", text: qsTr("System default") }, { id: "light", text: qsTr("Light") }, { id: "dark", text: qsTr("Dark") }]
                                         model: schemes; textRole: "text"; implicitWidth: 210
                                         currentIndex: Math.max(0, schemes.findIndex(s => s.id === (appState.color_scheme || "")))
@@ -156,13 +156,13 @@ Item {
                                     }
                                 }
                                 SettingsRow { title: qsTr("Close to tray"); detail: qsTr("Keep hotkeys and schedules active after closing the editor.")
-                                    BwSwitch { checked: appState.close_to_tray; onToggled: checked => root.invoke("set_close_to_tray", { enabled: checked }) }
+                                    StitchSwitch { checked: appState.close_to_tray; onToggled: checked => root.invoke("set_close_to_tray", { enabled: checked }) }
                                 }
                                 SettingsRow { title: qsTr("Start at system startup")
-                                    BwSwitch { checked: appState.start_at_startup === true; onToggled: checked => root.invoke("set_start_at_startup", { enabled: checked }) }
+                                    StitchSwitch { checked: appState.start_at_startup === true; onToggled: checked => root.invoke("set_start_at_startup", { enabled: checked }) }
                                 }
                                 SettingsRow { title: qsTr("Language")
-                                    BwButton {
+                                    StitchButton {
                                         objectName: "chooseLanguage"
                                         implicitWidth: 210
                                         text: appState.language ? root.languageName(appState.language) : qsTr("System default")
@@ -171,7 +171,7 @@ Item {
                                     }
                                 }
                                 SettingsRow { title: qsTr("Time format")
-                                    BwComboBox {
+                                    StitchComboBox {
                                         readonly property var formats: [{ id: "", text: qsTr("System default") }, { id: "12h", text: qsTr("12-hour (9:30 PM)") }, { id: "24h", text: qsTr("24-hour (21:30)") }]
                                         model: formats; textRole: "text"; implicitWidth: 210
                                         currentIndex: Math.max(0, formats.findIndex(f => f.id === (appState.clock_format || "")))
@@ -181,7 +181,7 @@ Item {
                                 SettingsRow { title: qsTr("Animation speed"); detail: qsTr("How long menus, dialogs, scrolling and other transitions take. Instant turns animations off.")
                                     Column {
                                         spacing: 2
-                                        BwSlider {
+                                        StitchSlider {
                                             id: animationSlider
                                             // Duration multipliers, Instant to Slow; Normal sits in the middle.
                                             readonly property var speeds: [0, 0.25, 0.5, 1, 1.5, 2, 3]
@@ -212,7 +212,7 @@ Item {
                             }
                             SettingsSection { title: qsTr("App and data")
                                 SettingsRow { first: true; title: root.updateTitle(); detail: root.updateDetail()
-                                    BwButton {
+                                    StitchButton {
                                         readonly property bool available: !!appState.update_check_state && appState.update_check_state.state === "UpdateAvailable"
                                         text: available ? qsTr("Install update") : qsTr("Check for updates"); primary: available
                                         onClicked: root.invoke(available ? "apply_update" : "check_for_updates")
@@ -229,12 +229,12 @@ Item {
                                         Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 6; spacing: 10
                                         Text { text: modelData.name; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.maximumWidth: 220 }
                                         Text { text: modelData.value; color: Theme.textDim; font.pixelSize: 13; elide: Text.ElideRight; Layout.fillWidth: true }
-                                        BwButton { iconName: "trash-2"; text: qsTr("Delete"); onClicked: root.invoke("delete_global", { name: modelData.name }) }
+                                        StitchButton { iconName: "trash-2"; text: qsTr("Delete"); onClicked: root.invoke("delete_global", { name: modelData.name }) }
                                     }
                                 }
                                 Rectangle { Layout.fillWidth: true; Layout.topMargin: 8; height: 1; color: Theme.borderSoft }
                                 RowLayout { Layout.fillWidth: true; Layout.topMargin: 16; spacing: 8
-                                    BwButton { iconName: "play"; text: qsTr("Replay welcome tour"); onClicked: root.invoke("set_onboarding_done", { done: false }) }
+                                    StitchButton { iconName: "play"; text: qsTr("Replay welcome tour"); onClicked: root.invoke("set_onboarding_done", { done: false }) }
                                     Item { Layout.fillWidth: true }
                                 }
                             }
@@ -254,19 +254,19 @@ Item {
                                         readonly property var binding: (appState.hotkey_bindings || []).find(b => JSON.stringify(b.action) === JSON.stringify(modelData.action))
                                         readonly property bool capturing: root.capturingAction(modelData.action)
                                         readonly property bool atDefault: modelData.combo_display == null || (binding ? binding.combo_display : null) === modelData.combo_display
-                                        BwButton {
+                                        StitchButton {
                                             text: hotkeyRow.capturing ? qsTr("Press shortcut...") : (hotkeyRow.binding ? hotkeyRow.binding.combo_display : qsTr("Not set"))
                                             primary: hotkeyRow.capturing; implicitWidth: 190; implicitHeight: 36
                                             onClicked: if (!hotkeyRow.capturing) root.invoke("start_combo_capture", { action: hotkeyRow.modelData.action })
                                         }
                                         Item { width: 36; height: 36
-                                            BwButton { anchors.fill: parent; visible: !hotkeyRow.capturing && !hotkeyRow.atDefault; iconName: "rotate-ccw"; implicitHeight: 36
+                                            StitchButton { anchors.fill: parent; visible: !hotkeyRow.capturing && !hotkeyRow.atDefault; iconName: "rotate-ccw"; implicitHeight: 36
                                                 Accessible.name: qsTr("Reset %1 to default").arg(hotkeyRow.title)
                                                 ToolTip.visible: hovered; ToolTip.text: qsTr("Reset to default")
                                                 onClicked: root.invoke("reset_hotkey_to_default", { action: hotkeyRow.modelData.action }) }
                                         }
                                         Item { width: 36; height: 36
-                                            BwButton { anchors.fill: parent; visible: !hotkeyRow.capturing && !!hotkeyRow.binding; iconName: "x"; text: ""; flat: true; implicitHeight: 36
+                                            StitchButton { anchors.fill: parent; visible: !hotkeyRow.capturing && !!hotkeyRow.binding; iconName: "x"; text: ""; flat: true; implicitHeight: 36
                                                 Accessible.name: qsTr("Clear %1 shortcut").arg(hotkeyRow.title)
                                                 ToolTip.visible: hovered; ToolTip.text: qsTr("Clear shortcut")
                                                 onClicked: root.invoke("clear_named_hotkey", { action: hotkeyRow.modelData.action }) }
@@ -284,12 +284,12 @@ Item {
                                         first: index === 0
                                         title: modelData.macro_name || qsTr("Macro")
                                         readonly property bool capturing: root.capturingBinding(modelData.binding_index)
-                                        BwButton {
+                                        StitchButton {
                                             text: macroRow.capturing ? qsTr("Press shortcut...") : macroRow.modelData.combo_display
                                             primary: macroRow.capturing; implicitWidth: 190; implicitHeight: 36
                                             onClicked: if (!macroRow.capturing) root.invoke("start_binding_combo_capture", { index: macroRow.modelData.binding_index })
                                         }
-                                        BwButton { iconName: "x"; text: ""; flat: true; implicitWidth: 36; implicitHeight: 36
+                                        StitchButton { iconName: "x"; text: ""; flat: true; implicitWidth: 36; implicitHeight: 36
                                             Accessible.name: qsTr("Remove shortcut for %1").arg(macroRow.title)
                                             ToolTip.visible: hovered; ToolTip.text: qsTr("Remove shortcut")
                                             onClicked: root.invoke("remove_hotkey_binding", { index: macroRow.modelData.binding_index }) }
@@ -297,9 +297,9 @@ Item {
                                 }
                                 Text { text: qsTr("Add a macro shortcut"); color: Theme.textDim; font.pixelSize: 12; Layout.topMargin: 18; Layout.bottomMargin: 8 }
                                 Flow { Layout.fillWidth: true; spacing: 8
-                                    BwComboBox { id: macroBox; model: appState.macro_names || []; width: Math.min(210, parent.width); onActivated: index => root.invoke("set_pending_macro_idx", { index: index }) }
-                                    BwButton { text: appState.combo_capture&&appState.combo_capture.kind==="Pending"?qsTr("Press shortcut..."):qsTr("Set combo"); primary:!!appState.combo_capture&&appState.combo_capture.kind==="Pending"; onClicked: root.invoke("start_pending_combo_capture") }
-                                    BwButton { iconName: "plus"; text: qsTr("Add"); onClicked: root.invoke("add_macro_hotkey") }
+                                    StitchComboBox { id: macroBox; model: appState.macro_names || []; width: Math.min(210, parent.width); onActivated: index => root.invoke("set_pending_macro_idx", { index: index }) }
+                                    StitchButton { text: appState.combo_capture&&appState.combo_capture.kind==="Pending"?qsTr("Press shortcut..."):qsTr("Set combo"); primary:!!appState.combo_capture&&appState.combo_capture.kind==="Pending"; onClicked: root.invoke("start_pending_combo_capture") }
+                                    StitchButton { iconName: "plus"; text: qsTr("Add"); onClicked: root.invoke("add_macro_hotkey") }
                                 }
                             }
                         }
@@ -308,7 +308,7 @@ Item {
                         SettingsGrid { visible: root.tab === 2
                             SettingsSection {
                                 SettingsRow { first: true; title: qsTr("Block palette layout"); detail: qsTr("How the block sidebar is organized in the editor.")
-                                    BwComboBox {
+                                    StitchComboBox {
                                         id: paletteLayoutBox
                                         readonly property var layouts: [
                                             { id: "rail", text: qsTr("Category rail") }, { id: "chips", text: qsTr("Chip strip") }, { id: "accordion", text: qsTr("Accordion") },
@@ -336,16 +336,16 @@ Item {
                                             }
                                         }
                                         Text { visible: modelData.builtin; text: qsTr("Built-in"); color: Theme.textDim; font.pixelSize: 12; Layout.rightMargin: 4 }
-                                        BwButton { visible: !modelData.builtin; iconName: "trash-2"; text: qsTr("Remove"); onClicked: root.invoke("remove_block_library_source", { url: modelData.url }) }
+                                        StitchButton { visible: !modelData.builtin; iconName: "trash-2"; text: qsTr("Remove"); onClicked: root.invoke("remove_block_library_source", { url: modelData.url }) }
                                     }
                                 }
                                 RowLayout { Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 14; spacing: 8
-                                    BwTextField { id: librarySource; Layout.fillWidth: true; placeholderText: "https://example.com/blocks/index.json" }
-                                    BwButton {
+                                    StitchTextField { id: librarySource; Layout.fillWidth: true; placeholderText: "https://example.com/blocks/index.json" }
+                                    StitchButton {
                                         iconName: "plus"; text: qsTr("Add library"); enabled: librarySource.text.trim() !== ""
                                         onClicked: { root.invoke("add_block_library_source", { url: librarySource.text.trim() }); librarySource.text = ""; }
                                     }
-                                    BwButton { iconName: "refresh-cw"; text: qsTr("Refresh"); onClicked: root.invoke("refresh_block_library") }
+                                    StitchButton { iconName: "refresh-cw"; text: qsTr("Refresh"); onClicked: root.invoke("refresh_block_library") }
                                 }
                             }
                         }
@@ -356,11 +356,11 @@ Item {
                                 SettingsRow { first: true
                                     title: appState.ipc_active_port === null ? qsTr("TCP server stopped") : qsTr("TCP server listening on port %1").arg(appState.ipc_active_port)
                                     detail: qsTr("Allow local integrations to run Blockwork macros.")
-                                    BwTextField { id: port; text: appState.ipc_port_text || "47821"; validator: IntValidator { bottom: 1; top: 65535 } implicitWidth: 100; onEditingFinished: root.invoke("set_ipc_port_text", { text: text }) }
-                                    BwButton { text: appState.ipc_active_port === null ? qsTr("Start") : qsTr("Stop"); primary: appState.ipc_active_port === null; onClicked: root.invoke(appState.ipc_active_port === null ? "start_ipc_server" : "stop_ipc_server") }
+                                    StitchTextField { id: port; text: appState.ipc_port_text || "47821"; validator: IntValidator { bottom: 1; top: 65535 } implicitWidth: 100; onEditingFinished: root.invoke("set_ipc_port_text", { text: text }) }
+                                    StitchButton { text: appState.ipc_active_port === null ? qsTr("Start") : qsTr("Stop"); primary: appState.ipc_active_port === null; onClicked: root.invoke(appState.ipc_active_port === null ? "start_ipc_server" : "stop_ipc_server") }
                                 }
                                 SettingsRow { title: qsTr("Start automatically")
-                                    BwSwitch { Accessible.name: qsTr("Start TCP server automatically"); checked: appState.ipc_auto_start; onToggled: checked => root.invoke("set_ipc_auto_start", { enabled: checked }) }
+                                    StitchSwitch { Accessible.name: qsTr("Start TCP server automatically"); checked: appState.ipc_auto_start; onToggled: checked => root.invoke("set_ipc_auto_start", { enabled: checked }) }
                                 }
                             }
                             SettingsSection {
@@ -372,12 +372,12 @@ Item {
                                         Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 6; spacing: 10
                                         LucideIcon { name: "lock"; width: 14; height: 14; color: Theme.textDim }
                                         Text { text: modelData; color: Theme.text; font.pixelSize: 13; font.weight: Font.DemiBold; elide: Text.ElideRight; Layout.fillWidth: true }
-                                        BwButton { iconName: "pencil"; text: qsTr("Change"); onClicked: secretDialog.openFor(modelData) }
-                                        BwButton { iconName: "trash-2"; text: qsTr("Delete"); onClicked: root.invoke("delete_secret", { name: modelData }) }
+                                        StitchButton { iconName: "pencil"; text: qsTr("Change"); onClicked: secretDialog.openFor(modelData) }
+                                        StitchButton { iconName: "trash-2"; text: qsTr("Delete"); onClicked: root.invoke("delete_secret", { name: modelData }) }
                                     }
                                 }
                                 RowLayout { Layout.fillWidth: true; Layout.leftMargin: 12; Layout.bottomMargin: 14; spacing: 8
-                                    BwButton { iconName: "plus"; text: qsTr("Add secret..."); onClicked: secretDialog.openFor("") }
+                                    StitchButton { iconName: "plus"; text: qsTr("Add secret..."); onClicked: secretDialog.openFor("") }
                                     Item { Layout.fillWidth: true }
                                 }
                             }
@@ -397,7 +397,7 @@ Item {
                                             text: !hookRow.hook.enabled ? qsTr("Off") : hookRow.hook.error ? qsTr("Not running") : qsTr("Listening")
                                         }
                                     }
-                                    BwTextField {
+                                    StitchTextField {
                                         id: hookPort; implicitWidth: 80; Accessible.name: qsTr("Webhook port")
                                         text: String(hookRow.hook.port); validator: IntValidator { bottom: 1; top: 65535 }
                                         onEditingFinished: root.invoke("set_webhook", { enabled: !!hookRow.hook.enabled, port: Number(text) || 8787 })
@@ -405,7 +405,7 @@ Item {
                                     // The row's title names the switch, so its own label is clipped off.
                                     Item {
                                         anchors.verticalCenter: parent.verticalCenter; implicitWidth: 38; implicitHeight: 28; clip: true
-                                        BwSwitch {
+                                        StitchSwitch {
                                             Accessible.name: qsTr("Webhook server"); checked: !!hookRow.hook.enabled
                                             onToggled: checked => root.invoke("set_webhook", { enabled: checked, port: Number(hookPort.text) || 8787 })
                                         }
@@ -441,15 +441,15 @@ Item {
                                             color: hookInfo.revealed ? Theme.text : Theme.textDim; font.family: "monospace"; font.pixelSize: 12
                                             Accessible.name: hookInfo.revealed ? hookInfo.token : qsTr("Hidden token")
                                         }
-                                        BwButton {
+                                        StitchButton {
                                             iconName: hookInfo.revealed ? "lock" : "eye"; text: hookInfo.revealed ? qsTr("Hide") : qsTr("Show")
                                             onClicked: hookInfo.revealed ? hookInfo.hide() : root.withWebhookToken(token => { hookInfo.token = token; hideTimer.restart() })
                                         }
-                                        BwButton {
+                                        StitchButton {
                                             iconName: hookInfo.copied === "token" ? "check" : "copy"; text: hookInfo.copied === "token" ? qsTr("Copied") : qsTr("Copy")
                                             onClicked: root.withWebhookToken(token => hookInfo.copy("token", token))
                                         }
-                                        BwButton { iconName: "refresh-cw"; text: qsTr("New token"); onClicked: { hookInfo.hide(); root.invoke("new_webhook_token") } }
+                                        StitchButton { iconName: "refresh-cw"; text: qsTr("New token"); onClicked: { hookInfo.hide(); root.invoke("new_webhook_token") } }
                                     }
                                     Item {
                                         implicitWidth: expander.implicitWidth; implicitHeight: expander.implicitHeight
@@ -473,7 +473,7 @@ Item {
                                                     text: hookInfo.example(hookInfo.revealed ? hookInfo.token : "<token>")
                                                 }
                                             }
-                                            BwButton {
+                                            StitchButton {
                                                 iconName: hookInfo.copied === "example" ? "check" : "copy"; text: hookInfo.copied === "example" ? qsTr("Copied") : qsTr("Copy")
                                                 onClicked: root.withWebhookToken(token => hookInfo.copy("example", hookInfo.example(token)))
                                             }
@@ -502,14 +502,14 @@ Item {
                                                 : browserRow.connections ? qsTr("Connected") : qsTr("Waiting for a browser")
                                         }
                                     }
-                                    BwTextField {
+                                    StitchTextField {
                                         id: browserPort; implicitWidth: 80; Accessible.name: qsTr("Browser extension port")
                                         text: String(browserRow.bridge.port); validator: IntValidator { bottom: 1; top: 65535 }
                                         onEditingFinished: root.invoke("set_browser_bridge", { enabled: !!browserRow.bridge.enabled, port: Number(text) || 8788 })
                                     }
                                     Item {
                                         anchors.verticalCenter: parent.verticalCenter; implicitWidth: 38; implicitHeight: 28; clip: true
-                                        BwSwitch {
+                                        StitchSwitch {
                                             Accessible.name: qsTr("Browser extension"); checked: !!browserRow.bridge.enabled
                                             onToggled: checked => root.invoke("set_browser_bridge", { enabled: checked, port: Number(browserPort.text) || 8788 })
                                         }
@@ -541,15 +541,15 @@ Item {
                                             color: browserInfo.revealed ? Theme.text : Theme.textDim; font.family: "monospace"; font.pixelSize: 12
                                             Accessible.name: browserInfo.revealed ? browserInfo.key : qsTr("Hidden pairing key")
                                         }
-                                        BwButton {
+                                        StitchButton {
                                             iconName: browserInfo.revealed ? "lock" : "eye"; text: browserInfo.revealed ? qsTr("Hide") : qsTr("Show")
                                             onClicked: browserInfo.revealed ? browserInfo.hide() : root.withReply("browser_key", key => { browserInfo.key = key; browserHideTimer.restart() })
                                         }
-                                        BwButton {
+                                        StitchButton {
                                             iconName: browserInfo.copied ? "check" : "copy"; text: browserInfo.copied ? qsTr("Copied") : qsTr("Copy")
                                             onClicked: root.withReply("browser_key", key => { root.copyText(key); browserInfo.copied = true; browserCopiedTimer.restart() })
                                         }
-                                        BwButton { iconName: "refresh-cw"; text: qsTr("New key"); onClicked: { browserInfo.hide(); root.invoke("new_browser_key") } }
+                                        StitchButton { iconName: "refresh-cw"; text: qsTr("New key"); onClicked: { browserInfo.hide(); root.invoke("new_browser_key") } }
                                     }
                                     Text {
                                         Layout.fillWidth: true; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
@@ -597,7 +597,7 @@ Item {
                 text: qsTr("Untranslated text appears in English.")
                 color: Theme.textDim; font.pixelSize: 12; wrapMode: Text.WordWrap
             }
-            BwTextField {
+            StitchTextField {
                 id: languageSearch
                 objectName: "languageSearch"
                 Layout.fillWidth: true
@@ -743,9 +743,9 @@ Item {
         }
         Column { width: 380; spacing: 8
             Text { text: qsTr("Name"); color: Theme.text }
-            BwTextField { id: secretName; width: parent.width; readOnly: !!secretDialog.editing; placeholderText: qsTr("api token") }
+            StitchTextField { id: secretName; width: parent.width; readOnly: !!secretDialog.editing; placeholderText: qsTr("api token") }
             Text { text: qsTr("Value"); color: Theme.text }
-            BwTextField { id: secretValue; width: parent.width; echoMode: TextInput.Password; placeholderText: qsTr("Paste it here"); onAccepted: secretDialog.accept() }
+            StitchTextField { id: secretValue; width: parent.width; echoMode: TextInput.Password; placeholderText: qsTr("Paste it here"); onAccepted: secretDialog.accept() }
         }
         onAccepted: {
             if (secretName.text.trim() && secretValue.text) root.invoke("set_secret", { name: secretName.text.trim(), value: secretValue.text });
