@@ -358,16 +358,18 @@ pub fn dispatch<D: Document>(doc: &mut D, cmd: &str, args: &Json) -> Option<Resu
 
         "create_comment" => (|| {
             let (x, y): (i32, i32) = (arg(args, "x")?, arg(args, "y")?);
-            to_json(create_comment(doc, x, y, arg(args, "text")?, None)?)
+            let text: Option<String> = arg(args, "text")?;
+            to_json(create_comment(doc, x, y, text.unwrap_or_default(), None)?)
         })(),
         "create_attached_comment" => (|| {
             let (dx, dy): (i32, i32) = (arg(args, "dx")?, arg(args, "dy")?);
             let attached: String = arg(args, "instructionId")?;
+            let text: Option<String> = arg(args, "text")?;
             to_json(create_comment(
                 doc,
                 dx,
                 dy,
-                arg(args, "text")?,
+                text.unwrap_or_default(),
                 Some(attached),
             )?)
         })(),
@@ -1144,7 +1146,81 @@ pub fn delete_block<D: Document>(doc: &mut D, block_id: &str) -> Result<(), Stri
 
 #[cfg(test)]
 mod tests {
-    use super::COMMANDS;
+    use super::*;
+    use serde_json::json;
+
+    /// A host with no hooks, counting saves.
+    struct Doc {
+        mac: Option<Macro>,
+        history: History<UndoSnapshot>,
+        buffers: ValueBuffers,
+        saves: usize,
+    }
+
+    impl Document for Doc {
+        fn parts(&mut self) -> Parts<'_> {
+            Parts {
+                open: self.mac.as_mut(),
+                history: &mut self.history,
+                buffers: &mut self.buffers,
+            }
+        }
+        fn variable_values(&self) -> HashMap<String, Evaluated> {
+            HashMap::new()
+        }
+        fn changed(&mut self) {
+            self.saves += 1;
+        }
+    }
+
+    fn doc() -> Doc {
+        Doc {
+            mac: Some(Macro::new("Test".into(), String::new(), vec![])),
+            history: History::new(crate::macros::UNDO_LIMIT),
+            buffers: ValueBuffers::new(),
+            saves: 0,
+        }
+    }
+
+    fn run(doc: &mut Doc, cmd: &str, args: Json) -> Result<Json, String> {
+        dispatch(doc, cmd, &args).expect("a canvas command")
+    }
+
+    #[test]
+    fn an_edit_saves_and_undo_takes_it_back() {
+        let mut d = doc();
+        let before = d.mac.as_ref().unwrap().strands.len();
+        run(&mut d, "add_strand", json!({})).unwrap();
+        assert_eq!(d.mac.as_ref().unwrap().strands.len(), before + 1);
+        assert_eq!(d.saves, 1);
+        run(&mut d, "undo", json!({})).unwrap();
+        assert_eq!(d.mac.as_ref().unwrap().strands.len(), before);
+        assert!(d.history.can_redo());
+    }
+
+    #[test]
+    fn a_rejected_edit_costs_no_undo_step_or_save() {
+        let mut d = doc();
+        let missing = json!({"draggedId": "nope", "targetId": "nope", "path": []});
+        assert!(run(&mut d, "merge_strand", missing).is_err());
+        assert!(!d.history.can_undo());
+        assert_eq!(d.saves, 0);
+        // Moving is a view change: saved, but not an undo step.
+        let id = run(&mut d, "add_strand", json!({})).unwrap();
+        run(
+            &mut d,
+            "move_strand",
+            json!({"strandId": id, "x": 5, "y": 6}),
+        )
+        .unwrap();
+        run(&mut d, "undo", json!({})).unwrap();
+        assert!(!d.history.can_undo());
+    }
+
+    #[test]
+    fn other_commands_are_left_to_the_host() {
+        assert!(dispatch(&mut doc(), "run_macro", &json!({})).is_none());
+    }
 
     /// Every command `dispatch` matches is listed, so hosts and the page's
     /// contract check see it.

@@ -92,14 +92,9 @@ fn to_json<T: serde::Serialize>(value: T) -> Result<Json, String> {
     serde_json::to_value(value).map_err(|e| e.to_string())
 }
 
-/// Commands that only read; everything else saves like the app's `auto_save`.
-const READS: &[&str] = &[
-    "state",
-    "commands",
-    "preview_value",
-    "copy_instructions",
-    "select_macro_by_id",
-];
+/// Page commands that only read; the rest tidy signal names as the app's
+/// `auto_save` does. Shared canvas commands tidy through `changed`.
+const READS: &[&str] = &["state", "commands", "preview_value", "select_macro_by_id"];
 
 impl editing::Document for Demo {
     fn parts(&mut self) -> editing::Parts<'_> {
@@ -114,13 +109,22 @@ impl editing::Document for Demo {
     fn variable_values(&self) -> HashMap<String, Evaluated> {
         Demo::variable_values(self)
     }
+
+    /// The app tidies signal names on every save; the page has no disk but
+    /// keeps the same document.
+    fn changed(&mut self) {
+        if let Some(mac) = self.open_mut() {
+            mac.collect_named_signals();
+        }
+    }
 }
 
 impl Host for Demo {
     fn dispatch(&mut self, command: &str, args: &Json) -> Result<Json, String> {
+        if let Some(result) = editing::dispatch(self, command, args) {
+            return result;
+        }
         let result = self.run(command, args);
-        // The app tidies signal names on every save; the page has no disk
-        // but keeps the same document.
         if result.is_ok()
             && !READS.contains(&command)
             && let Some(mac) = self.open_mut()
@@ -133,9 +137,6 @@ impl Host for Demo {
 
 impl Demo {
     fn run(&mut self, command: &str, args: &Json) -> Result<Json, String> {
-        if let Some(result) = editing::dispatch(self, command, args) {
-            return result;
-        }
         let a = args;
         match command {
             "state" => Ok(self.state()),

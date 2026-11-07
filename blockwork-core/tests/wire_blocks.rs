@@ -145,18 +145,33 @@ fn the_catalog_covers_every_block() {
         if !help.contains(&format!("{ty}: qsTr(")) {
             missing.push(format!("{ty}: no BlockHelp explainer"));
         }
-        if let Some(at) = catalog.find(&format!("\n            {ty}: {{")) {
-            use blockstitch_core::graph::BlockKind;
-            let row = &catalog[at..];
-            let row = &row[..row.find("head: ").unwrap_or(row.len())];
-            let kind = dto_to_instruction(&serde_json::from_value(block.clone()).unwrap())
-                .unwrap()
-                .kind;
-            if row.contains("shape: \"header\"") != kind.is_header() {
-                missing.push(format!(
-                    "{ty}: its row's `shape: \"header\"` disagrees with is_header"
-                ));
+        // A row runs from `Ty: {` to the next row's name; a header must have one.
+        use blockstitch_core::graph::BlockKind;
+        let kind = dto_to_instruction(&serde_json::from_value(block.clone()).unwrap())
+            .unwrap()
+            .kind;
+        let row = catalog
+            .lines()
+            .skip_while(|line| !line.trim_start().starts_with(&format!("{ty}: {{")))
+            .enumerate()
+            .take_while(|(i, line)| {
+                let name = line.trim_start().split(": {").next().unwrap_or("");
+                *i == 0
+                    || !(name.chars().all(|c| c.is_ascii_alphanumeric())
+                        && line.contains(": {")
+                        && name.starts_with(|c: char| c.is_ascii_uppercase()))
+            })
+            .map(|(_, line)| line)
+            .collect::<Vec<_>>()
+            .join("\n");
+        if row.is_empty() {
+            if kind.is_header() && ty != "BlockHeader" {
+                missing.push(format!("{ty}: a header with no catalog row"));
             }
+        } else if row.contains("shape: \"header\"") != kind.is_header() {
+            missing.push(format!(
+                "{ty}: its row's `shape: \"header\"` disagrees with is_header"
+            ));
         }
     }
     // Which blocks have rows is checked in QML, against blockstitch's own

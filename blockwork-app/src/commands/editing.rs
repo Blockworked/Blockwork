@@ -85,6 +85,7 @@ pub(crate) async fn edit_command(
         Err(e) => return Some(Err(e.to_string())),
     };
     let result = editing::dispatch(&mut AppDoc(&mut s), cmd, args)?;
+    // Sent after a failed edit too: some change the document before failing.
     if !editing::READS.contains(&cmd) {
         emit_state_updated(app, &s);
     }

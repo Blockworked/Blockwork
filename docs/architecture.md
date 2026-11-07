@@ -80,7 +80,7 @@ The canvas commands (strands, blocks, values, comments, variables, lists,
 custom blocks, undo) are written once, in `blockwork-core/src/editing.rs`.
 Each host hands over its document through `editing::Document`: the app's
 `AppDoc` (`commands/editing.rs`) saves and keeps its live variable and list
-stores in step, and the page's `Demo` has no hooks. What only one side has
+stores in step, and the page's `Demo` only tidies signal names on a change. What only one side has
 stays there: the app's library, runs and settings, and the page's in-memory
 macro list. `blockwork-app/src/web_parity.rs` replays one script through both
 and fails if their documents differ, and another test fails when a web

@@ -231,35 +231,6 @@ fn deserialize_key_value<'de, D: serde::Deserializer<'de>>(d: D) -> Result<Value
     })
 }
 
-impl InputToken {
-    /// Every `Value` this token owns, for `InstructionKind`'s
-    /// `BlockKind::visit_values_mut`. None of them are boolean-typed.
-    pub fn visit_values_mut(
-        &mut self,
-        f: &mut dyn FnMut(&mut Value, blockstitch_core::graph::InputValueType),
-    ) {
-        use blockstitch_core::graph::InputValueType::Any;
-        match self {
-            InputToken::MoveMouse(x, y, _) => {
-                f(x, Any);
-                f(y, Any);
-            }
-            InputToken::Scroll(amount, _) => f(amount, Any),
-            InputToken::Text(value) => f(value, Any),
-            InputToken::Key(key, _) => f(key, Any),
-            InputToken::Button(..) | InputToken::Raw(..) => {}
-        }
-    }
-
-    /// Renames a list inside every embedded `Value` tree - see
-    /// `blockstitch_core::graph::rename_list_in_value`.
-    pub fn rename_list(&mut self, old: &str, new: &str) {
-        self.visit_values_mut(&mut |v, _| {
-            blockstitch_core::graph::rename_list_in_value(v, old, new)
-        });
-    }
-}
-
 #[cfg(test)]
 mod key_token_tests {
     use super::*;
