@@ -173,10 +173,11 @@ mod imp {
                 return None;
             }
             // 32-bit BI_RGB arrives as BGRA on little-endian; swap to RGBA.
-            for pixel in bgra.chunks_exact_mut(4) {
+            for pixel in bgra.as_chunks_mut::<4>().0.iter_mut() {
                 pixel.swap(0, 2);
             }
-            if !bgra.chunks_exact(4).any(|pixel| pixel[3] != 0) && !info.hbmMask.is_null() {
+            if !bgra.as_chunks::<4>().0.iter().any(|pixel| pixel[3] != 0) && !info.hbmMask.is_null()
+            {
                 // 1-bit mask rows are DWORD-aligned, MSB first.
                 let stride = ((width as usize + 31) / 32) * 4;
                 let mut mask = vec![0u8; stride * height as usize];

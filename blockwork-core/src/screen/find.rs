@@ -218,7 +218,7 @@ struct Shape {
 
 impl Shape {
     fn of(needle: &Image) -> Shape {
-        let pixels = needle.rgba.chunks_exact(4);
+        let pixels = needle.rgba.as_chunks::<4>().0.iter();
         let n = (needle.width as f64 * needle.height as f64).max(1.0);
         let mut mean = [0.0; 3];
         for px in pixels.clone() {
@@ -245,7 +245,7 @@ impl Shape {
         };
         let mut mean = [0.0; 3];
         for row in 0..needle.height {
-            for px in patch(row).chunks_exact(4) {
+            for px in patch(row).as_chunks::<4>().0.iter() {
                 (0..3).for_each(|c| mean[c] += px[c] as f64 / n);
             }
         }
@@ -253,7 +253,12 @@ impl Shape {
         for row in 0..needle.height {
             let n_row = &needle.rgba
                 [(row * needle.width * 4) as usize..((row + 1) * needle.width * 4) as usize];
-            for (a, b) in patch(row).chunks_exact(4).zip(n_row.chunks_exact(4)) {
+            for (a, b) in patch(row)
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .zip(n_row.as_chunks::<4>().0.iter())
+            {
                 sum += (0..3)
                     .map(|c| ((a[c] as f64 - mean[c]) - (b[c] as f64 - self.mean[c])).abs())
                     .sum::<f64>();
@@ -290,7 +295,9 @@ fn exact_positions(hay: &Image, needle: &Image, mut each: impl FnMut(u32, u32) -
     let first = needle.pixel(0, 0);
     let anchor = needle
         .rgba
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .enumerate()
         .max_by_key(|(_, pixel)| {
             pixel[..3]
@@ -316,8 +323,10 @@ fn exact_positions(hay: &Image, needle: &Image, mut each: impl FnMut(u32, u32) -
                 let h = ((y + row) as usize * hay.width as usize + x as usize) * 4;
                 let n = row as usize * row_bytes;
                 hay.rgba[h..h + row_bytes]
-                    .chunks_exact(4)
-                    .zip(needle.rgba[n..n + row_bytes].chunks_exact(4))
+                    .as_chunks::<4>()
+                    .0
+                    .iter()
+                    .zip(needle.rgba[n..n + row_bytes].as_chunks::<4>().0.iter())
                     .all(|(a, b)| a[..3] == b[..3])
             });
             if matches && !each(x, y) {
@@ -338,8 +347,10 @@ fn color_diff(hay: &Image, needle: &Image, x: u32, y: u32, limit: f64) -> Option
         let h = ((y + row) as usize * hay.width as usize + x as usize) * 4;
         let n = row as usize * row_len;
         for (a, b) in hay.rgba[h..h + row_len]
-            .chunks_exact(4)
-            .zip(needle.rgba[n..n + row_len].chunks_exact(4))
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .zip(needle.rgba[n..n + row_len].as_chunks::<4>().0.iter())
         {
             sum += a[0].abs_diff(b[0]) as u64
                 + a[1].abs_diff(b[1]) as u64
@@ -509,7 +520,7 @@ mod tests {
     fn noise(width: u32, height: u32, seed: u32) -> Image {
         let mut image = Image::new(width, height);
         let mut state = seed.wrapping_mul(2654435761).max(1);
-        for px in image.rgba.chunks_exact_mut(4) {
+        for px in image.rgba.as_chunks_mut::<4>().0.iter_mut() {
             for c in px.iter_mut().take(3) {
                 state ^= state << 13;
                 state ^= state >> 17;
@@ -536,7 +547,9 @@ mod tests {
         // Brighten every pixel a little.
         needle
             .rgba
-            .chunks_exact_mut(4)
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
             .for_each(|p| p.iter_mut().take(3).for_each(|c| *c = c.saturating_add(12)));
         assert_eq!(find(&hay, &needle, 0.0), None);
         assert_eq!(find(&hay, &needle, 10.0), Some((60, 40)));
@@ -649,7 +662,11 @@ mod tests {
     #[test]
     fn finds_every_button_on_a_flat_page() {
         let mut page = Image::new(1280, 720);
-        page.rgba.chunks_exact_mut(4).for_each(|p| p[..3].fill(245));
+        page.rgba
+            .as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .for_each(|p| p[..3].fill(245));
         let places = [
             (100, 100),
             (500, 100),

@@ -224,7 +224,8 @@ fn run_block_routes_each_block_to_the_file_that_runs_it() {
         })
     };
     // Each `module::run_*(` arm in `run_block`, and the variants it lists.
-    let runner = include_str!("../../runner.rs");
+    // A Windows checkout may have CRLF line ends.
+    let runner = include_str!("../../runner.rs").replace("\r\n", "\n");
     let body = &runner[runner.find("\nfn run_block(").unwrap()..];
     let body = &body[..body.find("\n}\n").unwrap()];
     let mut routed: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();

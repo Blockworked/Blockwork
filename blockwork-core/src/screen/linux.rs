@@ -122,7 +122,9 @@ fn parse_ppm(data: &[u8]) -> Result<Image, String> {
         return Err(bad());
     }
     let rgba = pixels
-        .chunks_exact(3)
+        .as_chunks::<3>()
+        .0
+        .iter()
         .take(width as usize * height as usize)
         .flat_map(|p| [p[0], p[1], p[2], 255])
         .collect();
@@ -243,7 +245,7 @@ mod kwin {
         }
         let mut rgba = Vec::with_capacity(row * height as usize);
         for y in 0..height as usize {
-            for p in data[y * stride..y * stride + row].chunks_exact(4) {
+            for p in data[y * stride..y * stride + row].as_chunks::<4>().0.iter() {
                 let [r, g, b] = if bgra {
                     [p[2], p[1], p[0]]
                 } else {
@@ -402,7 +404,9 @@ mod x11 {
         // 24/32-bit ZPixmap is BGRX in memory.
         let rgba = reply
             .data
-            .chunks_exact(4)
+            .as_chunks::<4>()
+            .0
+            .iter()
             .flat_map(|p| [p[2], p[1], p[0], 255])
             .collect();
         Ok(Shot {

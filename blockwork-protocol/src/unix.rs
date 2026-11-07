@@ -19,6 +19,9 @@ fn uid() -> u32 {
     unsafe { libc::geteuid() }
 }
 
+// The sticky bit. libc's S_ISVTX is a u16 on macOS and a u32 on Linux.
+const STICKY: u32 = 0o1000;
+
 fn denied() -> io::Error {
     io::Error::new(io::ErrorKind::PermissionDenied, "untrusted IPC endpoint")
 }
@@ -43,7 +46,7 @@ fn validate_dir(dir: &Path) -> io::Result<()> {
         }
         if !m.file_type().is_symlink()
             && m.mode() & 0o022 != 0
-            && !(m.uid() == 0 && m.mode() & libc::S_ISVTX != 0)
+            && !(m.uid() == 0 && m.mode() & STICKY != 0)
         {
             return Err(denied());
         }
@@ -54,7 +57,7 @@ fn validate_dir(dir: &Path) -> io::Result<()> {
         if m.uid() != 0 && m.uid() != uid() {
             return Err(denied());
         }
-        if m.mode() & 0o022 != 0 && !(m.uid() == 0 && m.mode() & libc::S_ISVTX != 0) {
+        if m.mode() & 0o022 != 0 && !(m.uid() == 0 && m.mode() & STICKY != 0) {
             return Err(denied());
         }
     }

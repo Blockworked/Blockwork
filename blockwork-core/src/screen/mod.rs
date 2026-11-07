@@ -198,7 +198,7 @@ pub fn average_color(x: f64, y: f64, width: f64, height: f64) -> Result<String, 
     })?
     .image;
     let mut sum = [0u64; 3];
-    for px in region.rgba.chunks_exact(4) {
+    for px in region.rgba.as_chunks::<4>().0.iter() {
         for c in 0..3 {
             sum[c] += px[c] as u64;
         }
@@ -517,7 +517,7 @@ mod live_window {
             "#ff0000"
         );
         let mut needle = super::Image::new(16, 16);
-        for pixel in needle.rgba.chunks_exact_mut(4) {
+        for pixel in needle.rgba.as_chunks_mut::<4>().0.iter_mut() {
             pixel.copy_from_slice(&[255, 0, 0, 255]);
         }
         let at = super::find(&shot.image, &needle, 0.0).expect("red marker must be searchable");

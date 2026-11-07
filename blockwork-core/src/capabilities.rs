@@ -305,7 +305,10 @@ mod tests {
         if std::env::var_os("BLESS").is_some() {
             std::fs::write(path, &text).unwrap();
         }
-        let saved = std::fs::read_to_string(path).unwrap_or_default();
+        // A Windows checkout may have turned the file's line ends into CRLF.
+        let saved = std::fs::read_to_string(path)
+            .unwrap_or_default()
+            .replace("\r\n", "\n");
         assert!(
             saved == text,
             "capabilities.json is out of date: rerun with BLESS=1"

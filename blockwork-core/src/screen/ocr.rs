@@ -12,10 +12,26 @@ pub(super) fn read(image: &Image) -> Result<String, String> {
     // on empty images (even its CPU path can wait indefinitely on those).
     let uniform = image
         .rgba
-        .chunks_exact(4)
+        .as_chunks::<4>()
+        .0
+        .iter()
         .next()
-        .is_none_or(|first| image.rgba.chunks_exact(4).all(|pixel| pixel == first));
-    if uniform || image.rgba.chunks_exact(4).all(|pixel| pixel[3] == 0) {
+        .is_none_or(|first| {
+            image
+                .rgba
+                .as_chunks::<4>()
+                .0
+                .iter()
+                .all(|pixel| pixel == first)
+        });
+    if uniform
+        || image
+            .rgba
+            .as_chunks::<4>()
+            .0
+            .iter()
+            .all(|pixel| pixel[3] == 0)
+    {
         return Ok(String::new());
     }
     // OCR engines want text a good 20px+ tall; small regions are blown up.
@@ -470,7 +486,7 @@ mod tests {
         assert_eq!(super::read(&image).unwrap(), "");
         image.rgba.fill(255);
         assert_eq!(super::read(&image).unwrap(), "");
-        for (i, pixel) in image.rgba.chunks_exact_mut(4).enumerate() {
+        for (i, pixel) in image.rgba.as_chunks_mut::<4>().0.iter_mut().enumerate() {
             pixel.copy_from_slice(&[i as u8, 50, 100, 0]);
         }
         assert_eq!(super::read(&image).unwrap(), "");

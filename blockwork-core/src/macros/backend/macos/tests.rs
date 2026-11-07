@@ -105,7 +105,7 @@ fn live_media_keys_are_dispatched_and_captured() {
         6,
         "each media click must deliver down and up"
     );
-    for (pair, expected) in received.chunks_exact(2).zip([
+    for (pair, expected) in received.as_chunks::<2>().0.iter().zip([
         MacroKey::VolumeUp,
         MacroKey::VolumeDown,
         MacroKey::VolumeMute,
@@ -657,7 +657,7 @@ fn live_pc_key_aliases_deliver_matching_native_pairs() {
         6,
         "each alias needs one native down and up: {received:?}"
     );
-    for (pair, code) in received.chunks_exact(2).zip([105, 107, 113]) {
+    for (pair, code) in received.as_chunks::<2>().0.iter().zip([105, 107, 113]) {
         assert_eq!((pair[0].0, pair[0].1), (code, 10));
         assert_eq!((pair[1].0, pair[1].1), (code, 11));
         for event in pair {

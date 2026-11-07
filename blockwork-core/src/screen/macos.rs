@@ -99,7 +99,7 @@ fn normalize_image(image: &CGImage) -> Image {
         image,
     );
     let mut rgba = context.data().to_vec();
-    for pixel in rgba.chunks_exact_mut(4) {
+    for pixel in rgba.as_chunks_mut::<4>().0.iter_mut() {
         pixel[3] = 255;
     }
     Image {
@@ -168,7 +168,7 @@ mod tests {
             assert_eq!(image.pixel(1, 0), [0, 255, 0]);
             assert_eq!(image.pixel(0, 1), [0, 0, 255]);
             assert_eq!(image.pixel(1, 1), [255, 255, 255]);
-            assert!(image.rgba.chunks_exact(4).all(|p| p[3] == 255));
+            assert!(image.rgba.as_chunks::<4>().0.iter().all(|p| p[3] == 255));
         }
     }
 

@@ -23,7 +23,10 @@ impl Image {
     /// An all-black image.
     pub fn new(width: u32, height: u32) -> Image {
         let mut rgba = vec![0; width as usize * height as usize * 4];
-        rgba.chunks_exact_mut(4).for_each(|px| px[3] = 255);
+        rgba.as_chunks_mut::<4>()
+            .0
+            .iter_mut()
+            .for_each(|px| px[3] = 255);
         Image {
             width,
             height,
@@ -88,11 +91,15 @@ impl Image {
         let rgba = match info.color_type {
             png::ColorType::Rgba => buf,
             png::ColorType::Rgb => buf
-                .chunks_exact(3)
+                .as_chunks::<3>()
+                .0
+                .iter()
                 .flat_map(|p| [p[0], p[1], p[2], 255])
                 .collect(),
             png::ColorType::GrayscaleAlpha => buf
-                .chunks_exact(2)
+                .as_chunks::<2>()
+                .0
+                .iter()
                 .flat_map(|p| [p[0], p[0], p[0], p[1]])
                 .collect(),
             png::ColorType::Grayscale => buf.iter().flat_map(|&v| [v, v, v, 255]).collect(),

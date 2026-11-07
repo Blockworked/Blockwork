@@ -91,7 +91,7 @@ fn grab(x: i32, y: i32, w: i32, h: i32) -> Result<Shot, String> {
             return Err("couldn't capture the screen (is it locked?)".into());
         }
         // BGRA to RGBA, in place.
-        for px in rgba.chunks_exact_mut(4) {
+        for px in rgba.as_chunks_mut::<4>().0.iter_mut() {
             px.swap(0, 2);
             px[3] = 255;
         }
