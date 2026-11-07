@@ -126,15 +126,17 @@ other. The rest are listed so nothing is missed.
 
 ## Adding a command
 
-1. `blockwork-app/src/commands/`: the function, in the file for its area
-   (`editing`, `data`, `settings`, ...). It takes `&SharedState` and
-   `&AppHandle`, and calls `emit_state_updated` after changing state.
-2. `blockwork-app/src/dispatch.rs`: its arm, reading arguments with `arg`.
-   QML spells argument names in camelCase.
-3. If it edits the document, the same command in
-   `blockwork-web/src/session.rs`; `blockwork-app/src/web_parity.rs` compares the two.
+1. A canvas edit (anything the website's editor should do too) goes in
+   `blockwork-core/src/editing.rs`: a function over `D: Document`, its arm in
+   `dispatch` and its name in `COMMANDS`. Both the app and the page then
+   answer it. Give it a step in `blockwork-app/src/web_parity.rs`.
+2. Anything else is app-only: the function in `blockwork-app/src/commands/`,
+   in the file for its area (`library`, `settings`, ...). It takes
+   `&SharedState` and `&AppHandle`, and calls `emit_state_updated` after
+   changing state. Then its arm in `blockwork-app/src/dispatch.rs`.
+3. Arms read arguments with `arg`. QML spells argument names in camelCase.
 4. QML calls it with `invoke("name", {...})`. `blockwork-app/tests/qml_commands.rs` fails
-   if QML names a command `dispatch.rs` doesn't have, or sends an argument key in
+   if QML names a command neither dispatcher has, or sends an argument key in
    a `{...}` literal that the command's arm never reads.
 
 ## Adding a setting
@@ -158,11 +160,10 @@ other. The rest are listed so nothing is missed.
 - Keep comments short and plain. No em-dashes.
 - A change to saved files needs a loader for the old shape (see
   `macros/saved_shapes.rs` and `macros/migrate.rs`).
-- An editor command lives twice: in `blockwork-app/src/commands/` and in
-  `blockwork-web/src/session.rs` (the website demo), and
-  `blockwork-app/src/web_parity.rs` checks they agree. Put any check or
-  edit both need on `Macro` (`macros/document_rules.rs`, or blockstitch if
-  it isn't Blockwork-specific) and keep the two commands thin. A new web
-  command gets a step in the parity script, or a line in its `NOT_REPLAYED`
-  list saying why not; a test fails until it has one.
+- Canvas edits live once, in `blockwork-core/src/editing.rs`. A rule that
+  isn't about one command goes on `Macro` (`macros/document_rules.rs`, or
+  blockstitch if it isn't Blockwork-specific). A command only the website
+  demo answers (`blockwork-web/src/session.rs`) gets a step in the parity
+  script, or a line in its `NOT_REPLAYED` list saying why not; a test fails
+  until it has one.
 - Changelog entries go under the unreleased version in `CHANGELOG.md`.

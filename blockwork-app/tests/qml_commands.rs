@@ -1,6 +1,7 @@
-//! Every command the editor's QML sends by name has an arm in
-//! `src/dispatch.rs`, and every argument key it sends in an object literal is
-//! one that arm reads, so a typo fails here rather than at run time.
+//! Every command the editor's QML sends by name has an arm in the app's
+//! `src/dispatch.rs` or the shared canvas commands (`blockwork_core::editing`),
+//! and every argument key it sends in an object literal is one that arm reads,
+//! so a typo fails here rather than at run time.
 
 use std::collections::BTreeSet;
 use std::path::Path;
@@ -44,21 +45,50 @@ fn literal_names(arg: &str) -> Option<Vec<String>> {
     Some(vec![quoted(a)?, quoted(b)?])
 }
 
-/// Every `"name"` before `=>` in the dispatcher's match.
-fn dispatched() -> BTreeSet<String> {
-    let source =
-        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/dispatch.rs")).unwrap();
-    let mut names = BTreeSet::new();
-    for line in source.lines() {
-        let trimmed = line.trim_start();
-        let indent = line.len() - trimmed.len();
-        if indent != 12 || !(trimmed.starts_with('"') || trimmed.starts_with("| \"")) {
-            continue;
+/// The dispatchers: a file, the line their match opens on, and the indent of
+/// its arms.
+const DISPATCHERS: &[(&str, &str, usize)] = &[
+    ("src/dispatch.rs", "        match cmd {", 12),
+    (
+        "../blockwork-core/src/editing.rs",
+        "    let result = match cmd {",
+        8,
+    ),
+];
+
+/// Each arm of every dispatcher: the names it matches and its source.
+fn arms() -> Vec<(Vec<String>, String)> {
+    let mut arms: Vec<(Vec<String>, String)> = Vec::new();
+    for (file, opening, arm_indent) in DISPATCHERS {
+        let path = Path::new(env!("CARGO_MANIFEST_DIR")).join(file);
+        let source = std::fs::read_to_string(path).unwrap();
+        let body_start = source.find(opening).unwrap();
+        let first = arms.len();
+        for line in source[body_start..].lines().skip(1) {
+            let trimmed = line.trim_start();
+            let indent = line.len() - trimmed.len();
+            if indent < *arm_indent && !trimmed.is_empty() {
+                break;
+            }
+            if indent == *arm_indent && (trimmed.starts_with('"') || trimmed.starts_with('_')) {
+                let pattern = trimmed.split("=>").next().unwrap();
+                let names = pattern.split('"').skip(1).step_by(2).map(str::to_owned);
+                arms.push((names.collect(), String::new()));
+            }
+            if arms.len() > first
+                && let Some((_, body)) = arms.last_mut()
+            {
+                body.push_str(line);
+            }
         }
-        let pattern = trimmed.split("=>").next().unwrap();
-        names.extend(pattern.split('"').skip(1).step_by(2).map(str::to_owned));
+        assert!(arms.len() > first + 20, "{file}: found too few arms");
     }
-    names
+    arms
+}
+
+/// Every command name some dispatcher matches.
+fn dispatched() -> BTreeSet<String> {
+    arms().into_iter().flat_map(|(names, _)| names).collect()
 }
 
 #[test]
@@ -123,7 +153,9 @@ fn every_command_the_qml_sends_is_dispatched() {
         for (name, line) in names {
             sent += 1;
             if !handled.contains(&name) {
-                problems.push(format!("{file}:{line}: {name} has no arm in dispatch.rs"));
+                problems.push(format!(
+                    "{file}:{line}: {name} has no arm in dispatch.rs or editing.rs"
+                ));
             }
         }
     }
@@ -137,8 +169,6 @@ fn every_command_the_qml_sends_is_dispatched() {
 /// Per command, the argument keys its arm reads, or `None` when the arm hands
 /// `args` on whole and the keys can't be listed.
 fn read_keys() -> std::collections::HashMap<String, Option<BTreeSet<String>>> {
-    let source =
-        std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/src/dispatch.rs")).unwrap();
     let draft = [
         "pieces",
         "shape",
@@ -147,22 +177,8 @@ fn read_keys() -> std::collections::HashMap<String, Option<BTreeSet<String>>> {
         "identifier",
         "description",
     ];
-    let body_start = source.find("        match cmd {").unwrap();
-    let mut arms: Vec<(Vec<String>, String)> = Vec::new();
-    for line in source[body_start..].lines().skip(1) {
-        let trimmed = line.trim_start();
-        let indent = line.len() - trimmed.len();
-        if indent == 12 && (trimmed.starts_with('"') || trimmed.starts_with('_')) {
-            let pattern = trimmed.split("=>").next().unwrap();
-            let names = pattern.split('"').skip(1).step_by(2).map(str::to_owned);
-            arms.push((names.collect(), String::new()));
-        }
-        if let Some((_, body)) = arms.last_mut() {
-            body.push_str(line);
-        }
-    }
     let mut keys = std::collections::HashMap::new();
-    for (names, body) in arms {
+    for (names, body) in arms() {
         let code: String = body.chars().filter(|c| !c.is_whitespace()).collect();
         let mut read = Some(BTreeSet::new());
         let mut at = 0;
@@ -175,12 +191,12 @@ fn read_keys() -> std::collections::HashMap<String, Option<BTreeSet<String>>> {
             }
             let (before, after) = (&code[..start], &code[at..]);
             let quoted = |s: &str| s.split('"').nth(1).map(str::to_owned);
-            let key = if before.ends_with("block_draft(&") {
+            let key = if before.ends_with("block_draft(&") || before.ends_with("block_draft(") {
                 read.iter_mut()
                     .for_each(|r| r.extend(draft.map(String::from)));
                 continue;
-            } else if before.ends_with('&') && after.starts_with(",\"") {
-                // `arg(&args, "key")` and `arg::<T>(&args, "key")`
+            } else if after.starts_with(",\"") {
+                // `arg(&args, "key")` and `arg::<T>(args, "key")`
                 let call = before.trim_end_matches('&').trim_end_matches('(');
                 (call.ends_with("arg") || call.ends_with('>'))
                     .then(|| quoted(after))

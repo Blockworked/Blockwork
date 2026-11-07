@@ -1,8 +1,11 @@
 use super::*;
 use blockstitch_core::editor::apply_value_kind;
+use blockstitch_core::editor::{EditCommand, ValueDestination, ValueLocation, prune_value_buffers};
+use blockwork_core::frontend::{FragmentDto, InstructionDto, dto_to_fragment, fragment_to_dto};
 use blockwork_core::input::types::Coordinate;
 use blockwork_core::input::value::Op;
 use blockwork_core::macros::BlockDef;
+use blockwork_core::macros::EDIT_CONTEXT;
 use blockwork_core::macros::{
     BlockShape, FieldId, FloatingValue, InputValueType, MacroGraph, VariableDef,
 };
@@ -559,15 +562,20 @@ async fn palette_variable_creation_is_atomic_with_insertion_and_undo() {
         }))
         .unwrap()
     };
-    let name = || Some("my variable".to_string());
-    add_strand(
-        &state,
-        &app,
-        Some(20),
-        Some(30),
-        Some(variable_block()),
-        name(),
+    let send = |cmd: &'static str, args: serde_json::Value| {
+        let (state, app) = (state.clone(), app.clone());
+        async move {
+            edit_command(&state, &app, cmd, &args)
+                .await
+                .expect("a canvas command")
+        }
+    };
+    let name = "my variable";
+    send(
+        "add_strand",
+        serde_json::json!({"x": 20, "y": 30, "instruction": variable_block(), "variableToCreate": name}),
     )
+    .await
     .unwrap();
     {
         let s = state.lock().unwrap();
@@ -593,7 +601,12 @@ async fn palette_variable_creation_is_atomic_with_insertion_and_undo() {
         s.current_macro.as_mut().unwrap().variables[0].value = Evaluated::Number(42.0);
         sync_variable_values(&mut s);
     }
-    add_strand(&state, &app, None, None, Some(variable_block()), name()).unwrap();
+    send(
+        "add_strand",
+        serde_json::json!({"instruction": variable_block(), "variableToCreate": name}),
+    )
+    .await
+    .unwrap();
     {
         let s = state.lock().unwrap();
         assert_eq!(s.current_macro.as_ref().unwrap().variables.len(), 1);
@@ -605,14 +618,15 @@ async fn palette_variable_creation_is_atomic_with_insertion_and_undo() {
     // Start a fresh canvas and attach the variable block to an existing strand.
     state.lock().unwrap().current_macro =
         Some(Macro::new("Snapped variables".into(), "".into(), vec![]));
-    let strand = add_strand(&state, &app, None, None, None, None).unwrap();
-    let rejected =
-        serde_json::from_value(serde_json::json!({"id": "break", "type": "EscapeLoop"})).unwrap();
-    assert!(
-        add_instruction(&state, &app, strand.clone(), top(0), rejected, None, name())
-            .await
-            .is_err()
-    );
+    let strand = send("add_strand", serde_json::json!({}))
+        .await
+        .unwrap()
+        .as_str()
+        .unwrap()
+        .to_owned();
+    let rejected = serde_json::json!({"id": "break", "type": "EscapeLoop"});
+    let add = |instruction: serde_json::Value| serde_json::json!({"strandId": strand, "path": top(0), "instruction": instruction, "variableToCreate": name});
+    assert!(send("add_instruction", add(rejected)).await.is_err());
     assert!(
         state
             .lock()
@@ -623,14 +637,9 @@ async fn palette_variable_creation_is_atomic_with_insertion_and_undo() {
             .variables
             .is_empty()
     );
-    add_instruction(
-        &state,
-        &app,
-        strand.clone(),
-        top(0),
-        variable_block(),
-        None,
-        name(),
+    send(
+        "add_instruction",
+        add(serde_json::to_value(variable_block()).unwrap()),
     )
     .await
     .unwrap();
@@ -1210,7 +1219,7 @@ fn a_fragment_round_trips_through_the_frontend_dto() {
         Some(wait_id.clone()),
     ));
     let fragment = mac.copy_fragment("s1", &top(1), None).unwrap();
-    let dto: crate::state::FragmentDto =
+    let dto: FragmentDto =
         serde_json::from_value(serde_json::to_value(fragment_to_dto(&fragment)).unwrap()).unwrap();
     let back = dto_to_fragment(&dto).unwrap();
     assert_eq!(back, fragment);

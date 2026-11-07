@@ -4,14 +4,9 @@
 use crate::AppHandle;
 use crate::macros_thread;
 use crate::state::{
-    AppState, ComboCapture, EditSession, FragmentDto, HotkeyActionDto, InstructionDto,
-    KeyCaptureTarget, ListItemDto, Page, PathStep, RecordingPhase, SharedState, StateDto,
-    UpdateCheckState, ValueLocation, build_state_dto, dto_to_fragment, dto_to_hotkey_action,
-    dto_to_instruction, emit_state_updated, fragment_to_dto,
-};
-use blockstitch_core::editor::{
-    Created, EditCommand, EditError, EditOutcome, ValueDestination, apply_buffer_effects,
-    drop_strand_buffers, prune_value_buffers, retain_live_buffers,
+    AppState, ComboCapture, HotkeyActionDto, KeyCaptureTarget, Page, PathStep, RecordingPhase,
+    SharedState, StateDto, UpdateCheckState, build_state_dto, dto_to_hotkey_action,
+    emit_state_updated,
 };
 use blockstitch_core::graph::{ListItem, ListStore, resolve_list_reporters};
 use blockwork_core::config;
@@ -21,57 +16,16 @@ use blockwork_core::input::value::{Evaluated, Value};
 use blockwork_core::macros::runner::VariableStore;
 #[cfg(test)]
 use blockwork_core::macros::{BlockPiece, Strand};
-use blockwork_core::macros::{
-    EDIT_CONTEXT, Instruction, InstructionKind, Macro, clamp_speed, loop_control,
-};
+use blockwork_core::macros::{Instruction, InstructionKind, Macro, clamp_speed, loop_control};
 use blockwork_core::recording;
 use std::collections::HashMap;
 use std::sync::atomic::Ordering;
 use std::sync::{Arc, Mutex};
 use tracing::warn;
 
-/// Checkpoints the canvas before a structural edit, and ends the current
-/// text-edit group so the next keystroke starts a fresh step.
+/// Checkpoints the canvas before a structural edit.
 pub(crate) fn push_undo(s: &mut AppState) {
-    push_undo_for(s, None);
-}
-
-/// [`push_undo`] for an edit that coalesces with the keystrokes already in
-/// progress at `session` - only the first one checkpoints.
-fn push_undo_for(s: &mut AppState, session: Option<EditSession>) {
-    let snapshot = s.current_macro.as_ref().map(Macro::undo_snapshot);
-    match (snapshot, session) {
-        (Some(snapshot), Some(session)) => {
-            s.history.push_for_session(snapshot, session);
-        }
-        (Some(snapshot), None) => s.history.push(snapshot),
-        (None, _) => s.history.end_session(),
-    }
-}
-
-/// Runs one typed edit on the open macro: a rejected or no-op edit costs no
-/// undo step and no save; buffers follow the outcome either way.
-fn run_edit(
-    s: &mut AppState,
-    command: EditCommand<InstructionKind>,
-) -> Result<EditOutcome, EditError> {
-    let mac = s
-        .current_macro
-        .as_ref()
-        .ok_or(EditError::Missing("No macro selected"))?;
-    let prepared = mac.prepare_edit(command, &EDIT_CONTEXT)?;
-    if prepared.changes() {
-        push_undo_for(s, prepared.coalesce().cloned());
-    }
-    let outcome = match &mut s.current_macro {
-        Some(mac) => mac.commit_edit(prepared),
-        None => EditOutcome::default(),
-    };
-    apply_buffer_effects(&mut s.invalid_field_buffers, &outcome.buffers);
-    if outcome.changed {
-        auto_save(s);
-    }
-    Ok(outcome)
+    blockwork_core::editing::push_undo(&mut AppDoc(s));
 }
 
 /// Max wait for the libei permission prompt; a portal that never replies
@@ -184,8 +138,6 @@ pub(crate) fn get_state(state: &SharedState) -> Result<StateDto, String> {
     Ok(build_state_dto(&s))
 }
 
-mod blocks;
-mod data;
 mod debugging;
 mod editing;
 mod files;
@@ -193,9 +145,6 @@ mod hotkey_actions;
 mod library;
 mod running;
 mod settings;
-mod strands;
-pub(crate) use blocks::*;
-pub(crate) use data::*;
 pub(crate) use debugging::*;
 pub(crate) use editing::*;
 pub(crate) use files::*;
@@ -203,7 +152,6 @@ pub(crate) use hotkey_actions::*;
 pub(crate) use library::*;
 pub(crate) use running::*;
 pub(crate) use settings::*;
-pub(crate) use strands::*;
 
 // ─── Open App picker ────────────────────────────────────────────────────────
 
@@ -228,43 +176,3 @@ mod value_location_tests;
 
 #[cfg(test)]
 mod import_review_tests;
-
-/// Commits a reporter body edit as one undoable document change.
-pub(crate) async fn edit_reporter_branch(
-    state: &SharedState,
-    app: &AppHandle,
-    cmd: &str,
-    args: &serde_json::Value,
-) -> Result<serde_json::Value, String> {
-    if matches!(cmd, "add_instruction" | "edit_instruction") {
-        let dto: InstructionDto =
-            serde_json::from_value(args["instruction"].clone()).map_err(|e| e.to_string())?;
-        let instruction = dto_to_instruction(&dto).ok_or("Unknown instruction type")?;
-        if matches!(
-            instruction.kind,
-            InstructionKind::Token(InputToken::MoveMouse(
-                _,
-                _,
-                blockwork_core::input::types::Coordinate::Abs
-            ))
-        ) {
-            request_absolute_mouse_support(state, app).await?;
-        }
-    }
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    let mut graph = s
-        .current_macro
-        .as_ref()
-        .ok_or("No macro selected")?
-        .graph
-        .clone();
-    let result = blockwork_core::frontend::edit_reporter_branch(&mut graph, cmd, args)?;
-    if cmd != "copy_instructions" {
-        push_undo(&mut s);
-        s.current_macro.as_mut().ok_or("No macro selected")?.graph = graph;
-        s.invalid_field_buffers.clear();
-        auto_save(&mut s);
-        emit_state_updated(app, &s);
-    }
-    Ok(result)
-}

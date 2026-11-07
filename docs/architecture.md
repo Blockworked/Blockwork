@@ -76,11 +76,15 @@ blockworked.com's `qt-demo/DemoBackend.qml` sends each command to a `Core` objec
 in-memory session and answers with the new state. Nothing is saved and
 nothing runs.
 
-Most commands therefore exist twice: in `blockwork-app/src/commands/` and in
-`blockwork-web/src/session.rs`. Keep both thin by putting shared rules on
-`Macro`. `blockwork-app/src/web_parity.rs` replays one script through both and
-fails if their documents differ, and another test fails when a web command is
-missing from that script.
+The canvas commands (strands, blocks, values, comments, variables, lists,
+custom blocks, undo) are written once, in `blockwork-core/src/editing.rs`.
+Each host hands over its document through `editing::Document`: the app's
+`AppDoc` (`commands/editing.rs`) saves and keeps its live variable and list
+stores in step, and the page's `Demo` has no hooks. What only one side has
+stays there: the app's library, runs and settings, and the page's in-memory
+macro list. `blockwork-app/src/web_parity.rs` replays one script through both
+and fails if their documents differ, and another test fails when a web
+command is missing from that script.
 
 ## Embedding
 

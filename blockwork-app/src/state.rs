@@ -4,9 +4,7 @@ use blockwork_core::macros::thread_pool::ThreadPool;
 // Canvas addressing and undo come from blockstitch. Both these groups are
 // re-exported so the rest of the crate still reaches them via `crate::state`.
 use crate::AppHandle;
-pub(crate) use blockstitch_core::editor::{
-    EditSession, History, InstrPath, PathStep, ValueBuffers, ValueLocation,
-};
+pub(crate) use blockstitch_core::editor::{History, InstrPath, PathStep, ValueBuffers};
 pub(crate) use blockstitch_core::graph::ListItem;
 pub(crate) use blockwork_core::input::value::Evaluated;
 pub(crate) use blockwork_core::macros::{InstructionKind, Macro};
@@ -204,10 +202,7 @@ pub(crate) struct GlobalDto {
 }
 
 // The canvas's wire shape is shared with the website's editor.
-pub(crate) use blockwork_core::frontend::{
-    FragmentDto, InstructionDto, InvalidFieldDto, KeyCaptureDto, ListItemDto, MacroDto,
-    dto_to_fragment, dto_to_instruction, dto_to_list_item, fragment_to_dto, macro_to_dto,
-};
+pub(crate) use blockwork_core::frontend::{InvalidFieldDto, KeyCaptureDto, MacroDto, macro_to_dto};
 
 /// One non-default `MacroSettings` field an import wants confirmed - see
 /// `commands::non_default_macro_settings`.
@@ -603,7 +598,7 @@ pub(crate) fn emit_state_updated(app: &AppHandle, s: &AppState) {
 #[cfg(test)]
 mod tests {
     use super::*;
-    use blockwork_core::frontend::instruction_to_dto;
+    use blockwork_core::frontend::{InstructionDto, dto_to_instruction, instruction_to_dto};
     use blockwork_core::input::value::Value;
     use blockwork_core::macros::{Comment, Instruction};
 

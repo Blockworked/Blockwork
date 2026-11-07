@@ -452,9 +452,8 @@ const NOT_REPLAYED: &[(&str, &str)] = &[
 #[test]
 fn the_script_covers_every_web_command() {
     let replayed: std::collections::HashSet<&str> = script().iter().map(|(c, _)| *c).collect();
-    let missing: Vec<&str> = blockwork_web::COMMANDS
-        .iter()
-        .copied()
+    let missing: Vec<&str> = blockwork_web::commands()
+        .into_iter()
         .filter(|c| !replayed.contains(c) && !NOT_REPLAYED.iter().any(|(n, _)| n == c))
         .collect();
     assert!(

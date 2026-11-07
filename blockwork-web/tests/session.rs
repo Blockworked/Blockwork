@@ -58,7 +58,7 @@ fn unknown_commands_are_refused_by_name() {
     let mut demo = loaded();
     let error = demo.dispatch("run_macro", &json!({})).unwrap_err();
     assert!(error.contains("run_macro"));
-    for command in blockwork_web::COMMANDS {
+    for command in blockwork_web::commands() {
         let answer = demo.dispatch(command, &json!({}));
         assert!(
             !matches!(&answer, Err(e) if e.starts_with("unsupported command")),
@@ -185,7 +185,7 @@ fn a_drop_makes_its_variable_and_keeps_the_strands_top() {
     );
 }
 
-/// The other direction: every command `Demo::run` answers is in `COMMANDS`,
+/// The other direction: every command `Demo::run` answers is in `commands()`,
 /// so the parity script and the page's contract check see it too.
 #[test]
 fn every_answered_command_is_listed() {
@@ -202,7 +202,7 @@ fn every_answered_command_is_listed() {
         let pattern = trimmed.split("=>").next().unwrap();
         for name in pattern.split('"').skip(1).step_by(2) {
             seen += 1;
-            if !blockwork_web::COMMANDS.contains(&name) {
+            if !blockwork_web::commands().contains(&name) {
                 missing.push(name.to_owned());
             }
         }
@@ -211,5 +211,5 @@ fn every_answered_command_is_listed() {
         seen > 20,
         "found only {seen} commands; is the scan still reading run()?"
     );
-    assert!(missing.is_empty(), "add to COMMANDS: {missing:?}");
+    assert!(missing.is_empty(), "add to PAGE_COMMANDS: {missing:?}");
 }

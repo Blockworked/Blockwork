@@ -14,6 +14,7 @@ pub mod config;
 pub mod dbus;
 #[cfg(feature = "system")]
 pub mod detect;
+pub mod editing;
 #[cfg(feature = "system")]
 pub mod files;
 #[cfg(feature = "system")]

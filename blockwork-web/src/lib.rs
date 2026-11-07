@@ -4,6 +4,6 @@
 
 mod session;
 
-pub use session::{COMMANDS, Demo};
+pub use session::{Demo, commands};
 
 blockstitch_ffi::export_abi!(Demo);
