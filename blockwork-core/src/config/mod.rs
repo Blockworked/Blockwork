@@ -17,7 +17,6 @@ const LEGACY_APP_ID: &str = "Macros";
 pub const GLOBAL_HOTKEYS_KEY: &str = "global_hotkeys";
 
 use crate::hotkey_types::{HotkeyAction, HotkeyBinding, KeyCombo, MOD_ALT, MOD_CTRL, MOD_SHIFT};
-use crate::macros::Macro;
 use std::path::PathBuf;
 use std::sync::OnceLock;
 
@@ -84,11 +83,18 @@ pub fn migrate_legacy_app_id() {
     }
 }
 
-impl Macro {
-    pub fn add(mut self) -> Result<(), String> {
-        self.ensure_id();
-        self.save()
-    }
+/// Keeping a macro in the config folder; `Macro` itself lives in
+/// `blockwork_model`, which has no files.
+pub trait MacroFiles {
+    /// Gives the macro an id if it has none, then saves it.
+    fn add(self) -> Result<(), String>;
+    /// Queues a save on the save thread and returns at once; a later save of
+    /// the same macro replaces a queued one.
+    fn save_soon(&self) -> Result<(), String>;
+    /// Saves now, replacing any queued save.
+    fn save(&self) -> Result<(), String>;
+    /// Deletes the macro's file and forgets its trust.
+    fn remove(self) -> Result<(), String>;
 }
 
 pub fn load_hotkey_bindings() -> Vec<HotkeyBinding> {

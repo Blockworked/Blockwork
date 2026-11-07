@@ -224,8 +224,10 @@ fn each_role_is_run_by_the_file_that_handles_its_blocks() {
                 .collect::<String>()
         })
     };
-    let fixtures: serde_json::Value =
-        serde_json::from_str(include_str!("../../../../tests/fixtures/wire_blocks.json")).unwrap();
+    let fixtures: serde_json::Value = serde_json::from_str(include_str!(
+        "../../../../../blockwork-model/tests/fixtures/wire_blocks.json"
+    ))
+    .unwrap();
     let mut routed: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
     for block in fixtures.as_array().unwrap() {
         let dto: crate::frontend::InstructionDto = serde_json::from_value(block.clone()).unwrap();

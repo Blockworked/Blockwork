@@ -1,6 +1,8 @@
 //! Key capture, running macros and recording.
 
 use super::*;
+use blockwork_core::config::MacroFiles;
+use blockwork_core::macros::Run;
 
 pub(crate) fn start_key_capture(
     state: &SharedState,

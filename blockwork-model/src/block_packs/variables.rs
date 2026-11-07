@@ -504,7 +504,6 @@ mod tests {
     }
 
     #[test]
-    #[cfg(feature = "system")]
     fn pack_files_keep_the_interface_and_legacy_files_default_to_internal() {
         let mut pack = pack("roles");
         pack.variable_roles.push(VariableInterface {

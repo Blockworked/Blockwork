@@ -36,7 +36,7 @@ Take dragging a block onto the canvas.
    arguments and calls the matching function under `blockwork-app/src/commands/`
    (`editing.rs`, `strands.rs`, `blocks.rs`, ...). Edits that only touch the
    block graph go through blockstitch's `EditCommand`s; rules that are
-   Blockwork's own live on `Macro` (`blockwork-core/src/macros/document_rules.rs`).
+   Blockwork's own live on `Macro` (`blockwork-model/src/macros/document_rules.rs`).
 5. **Save and publish.** A command that changes a macro pushes an undo step,
    saves it (`blockwork-core/src/config/persistence.rs`), and calls
    `emit_state_updated` (`blockwork-app/src/state.rs`). That builds a
@@ -52,7 +52,7 @@ reply tagged with the request's key, for the callers that wait on one.
 
 ## Running a macro
 
-`commands/running.rs` starts a run with `Macro::run` (`blockwork-core/src/macros/runner.rs`)
+`commands/running.rs` starts a run with `Run::run` (`blockwork-core/src/macros/runner.rs`)
 on its own thread (`macros_thread.rs`). The runner walks the strands, sends
 input through the platform's `InputBackend` (`macros/backend/`), and marks
 which blocks are running in `macros/trace.rs`. A `trace-watch` thread in
@@ -67,8 +67,8 @@ condition happens.
 
 ## The web build
 
-`blockwork-web` is the same editor without the daemon, for the home page demo
-on blockworked.com. The page runs Blockwork's own `EditorPage.qml`, built with
+`blockwork-web` is the same editor without the daemon, built on
+`blockwork-model` alone, for the home page demo on blockworked.com. The page runs Blockwork's own `EditorPage.qml`, built with
 Qt for WebAssembly (`blockworked.com/qt-demo`). In place of the daemon,
 blockworked.com's `qt-demo/DemoBackend.qml` sends each command to a `Core` object that links
 `blockwork-web` as a static library and calls it through blockstitch's C ABI
@@ -77,7 +77,7 @@ in-memory session and answers with the new state. Nothing is saved and
 nothing runs.
 
 The canvas commands (strands, blocks, values, comments, variables, lists,
-custom blocks, undo) are written once, in `blockwork-core/src/editing.rs`.
+custom blocks, undo) are written once, in `blockwork-model/src/editing.rs`.
 Each host hands over its document through `editing::Document`: the app's
 `AppDoc` (`commands/editing.rs`) saves and keeps its live variable and list
 stores in step, and the page's `Demo` only tidies signal names on a change. What only one side has

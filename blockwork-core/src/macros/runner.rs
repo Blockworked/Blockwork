@@ -1,3 +1,4 @@
+use crate::config::MacroFiles;
 use crate::input::types::{Coordinate, Direction, InputToken, MacroButton, MacroKey};
 use crate::input::value::{Evaluated, Op, Value};
 use crate::macros::backend::{InputBackend, create_backend};
@@ -521,9 +522,51 @@ impl RunOptions {
     }
 }
 
-impl Macro {
+/// Running a macro and the stores a run reads; `Macro` itself lives in
+/// `blockwork_model`, which can't run anything.
+pub trait Run {
     /// A fresh variable store holding the macro's saved values.
-    pub fn variable_store(&self) -> VariableStore {
+    fn variable_store(&self) -> VariableStore;
+
+    /// Runs to the end, then saves the variables and lists the run finished
+    /// with. For hosts with no open editor copy to merge into.
+    fn run_and_save(self, options: RunOptions) -> Result<(), String>;
+
+    /// A fresh list store holding the macro's saved lists.
+    fn list_store(&self) -> ListStore;
+
+    /// Builds the custom block table from this macro's `BlockHeader` strands.
+    fn block_table(&self) -> BlockTable;
+
+    /// Runs every "When Ran" entry-point strand concurrently on its own
+    /// thread, sharing one `stop_flag`, from the macro's saved lists. A custom
+    /// block's header strand isn't run directly - its body is extracted into
+    /// `block_table` and only executes via `CallBlock`/`Value::Call`. Blocks
+    /// until every strand finishes or is stopped. [`Run::run_with`] takes
+    /// the rest of the options.
+    fn run(
+        self,
+        emulator: Arc<Mutex<dyn InputBackend>>,
+        stop_flag: Option<Arc<Mutex<bool>>>,
+        speed_multiplier: f64,
+        variables: VariableStore,
+    );
+
+    /// [`Run::run`] with every option. Trigger strands are fired by the
+    /// app's watchers via `run_fired_strand`, never by a manual Run.
+    fn run_with(self, options: RunOptions);
+
+    /// Runs just the strand `strand_id`, from its top block, whatever event
+    /// heads it. False when there's no such strand or it's a custom block's
+    /// definition, which only runs when called.
+    fn run_one_strand(self, strand_id: &str, options: RunOptions) -> bool;
+
+    /// Whether `run_one_strand` would run `strand_id`.
+    fn can_run_strand(&self, strand_id: &str) -> bool;
+}
+
+impl Run for Macro {
+    fn variable_store(&self) -> VariableStore {
         Arc::new(Mutex::new(
             self.variables
                 .iter()
@@ -532,9 +575,7 @@ impl Macro {
         ))
     }
 
-    /// Runs to the end, then saves the variables and lists the run finished
-    /// with. For hosts with no open editor copy to merge into.
-    pub fn run_and_save(self, mut options: RunOptions) -> Result<(), String> {
+    fn run_and_save(self, mut options: RunOptions) -> Result<(), String> {
         let lists = Arc::clone(options.lists.get_or_insert_with(|| self.list_store()));
         let variables = Arc::clone(&options.variables);
         let mut saved = self.clone();
@@ -548,8 +589,7 @@ impl Macro {
         saved.save()
     }
 
-    /// A fresh list store holding the macro's saved lists.
-    pub fn list_store(&self) -> ListStore {
+    fn list_store(&self) -> ListStore {
         Arc::new(Mutex::new(
             self.lists
                 .iter()
@@ -558,8 +598,7 @@ impl Macro {
         ))
     }
 
-    /// Builds the custom block table from this macro's `BlockHeader` strands.
-    pub fn block_table(&self) -> BlockTable {
+    fn block_table(&self) -> BlockTable {
         let mut table = HashMap::new();
         // Signal strands ride along under reserved keys, header included,
         // so every run entry point can reach them without another argument.
@@ -631,13 +670,7 @@ impl Macro {
         Arc::new(table)
     }
 
-    /// Runs every "When Ran" entry-point strand concurrently on its own
-    /// thread, sharing one `stop_flag`, from the macro's saved lists. A custom
-    /// block's header strand isn't run directly - its body is extracted into
-    /// `block_table` and only executes via `CallBlock`/`Value::Call`. Blocks
-    /// until every strand finishes or is stopped. [`Macro::run_with`] takes
-    /// the rest of the options.
-    pub fn run(
+    fn run(
         self,
         emulator: Arc<Mutex<dyn InputBackend>>,
         stop_flag: Option<Arc<Mutex<bool>>>,
@@ -651,10 +684,9 @@ impl Macro {
         });
     }
 
-    /// [`Macro::run`] with every option. Trigger strands are fired by the
-    /// app's watchers via `run_fired_strand`, never by a manual Run.
-    pub fn run_with(self, options: RunOptions) {
-        self.run_entries(
+    fn run_with(self, options: RunOptions) {
+        run_entries(
+            self,
             |s| {
                 matches!(
                     s.instructions.first().map(|i| &i.kind),
@@ -665,74 +697,70 @@ impl Macro {
         )
     }
 
-    /// Runs just the strand `strand_id`, from its top block, whatever event
-    /// heads it. False when there's no such strand or it's a custom block's
-    /// definition, which only runs when called.
-    pub fn run_one_strand(self, strand_id: &str, options: RunOptions) -> bool {
+    fn run_one_strand(self, strand_id: &str, options: RunOptions) -> bool {
         if !self.can_run_strand(strand_id) {
             return false;
         }
-        self.run_entries(|s| s.id == strand_id, options);
+        run_entries(self, |s| s.id == strand_id, options);
         true
     }
 
-    /// Whether `run_one_strand` would run `strand_id`.
-    pub fn can_run_strand(&self, strand_id: &str) -> bool {
+    fn can_run_strand(&self, strand_id: &str) -> bool {
         self.graph.strand(strand_id).is_some_and(|s| {
             !s.instructions.is_empty()
                 && !matches!(s.instructions[0].kind, InstructionKind::BlockHeader(_))
         })
     }
+}
 
-    /// Runs every strand `pick` accepts side by side, each on its own thread.
-    fn run_entries(self, pick: impl Fn(&Strand) -> bool, options: RunOptions) {
-        let RunOptions {
-            emulator,
-            stop_flag,
-            speed_multiplier,
-            variables,
-            lists,
-            offset: initial_offset,
-        } = options;
-        let run = StrandRun {
-            source: Arc::new(crate::run_log::Source::for_macro(&self.id, &self.name)),
-            emulator,
-            // StopMacro needs a flag every strand of this run shares.
-            stop_flag: stop_flag.or_else(|| Some(Arc::new(Mutex::new(true)))),
-            speed_multiplier,
-            variables,
-            lists: lists.unwrap_or_else(|| self.list_store()),
-            block_table: self.block_table(),
-            max_loop_iterations: self.settings.max_loop_iterations,
-        };
-        let entry_strands: Vec<Vec<Instruction>> = self
-            .graph
-            .strands
-            .into_iter()
-            .filter(|s| pick(s))
-            .map(|s| s.instructions)
-            .collect();
+/// Runs every strand `pick` accepts side by side, each on its own thread.
+fn run_entries(mac: Macro, pick: impl Fn(&Strand) -> bool, options: RunOptions) {
+    let RunOptions {
+        emulator,
+        stop_flag,
+        speed_multiplier,
+        variables,
+        lists,
+        offset: initial_offset,
+    } = options;
+    let run = StrandRun {
+        source: Arc::new(crate::run_log::Source::for_macro(&mac.id, &mac.name)),
+        emulator,
+        // StopMacro needs a flag every strand of this run shares.
+        stop_flag: stop_flag.or_else(|| Some(Arc::new(Mutex::new(true)))),
+        speed_multiplier,
+        variables,
+        lists: lists.unwrap_or_else(|| mac.list_store()),
+        block_table: mac.block_table(),
+        max_loop_iterations: mac.settings.max_loop_iterations,
+    };
+    let entry_strands: Vec<Vec<Instruction>> = mac
+        .graph
+        .strands
+        .into_iter()
+        .filter(|s| pick(s))
+        .map(|s| s.instructions)
+        .collect();
 
-        if entry_strands.is_empty() {
-            return;
-        }
-        if host_clock::enabled() {
-            host_clock::attach(entry_strands.len());
-        }
-        // Every entry strand gets its own thread, including the first, so
-        // deep recursion errors out on a known stack instead of aborting.
-        std::thread::scope(|scope| {
-            for instructions in entry_strands {
-                let run = run.clone();
-                let spawned = std::thread::Builder::new()
-                    .stack_size(STRAND_STACK_SIZE)
-                    .spawn_scoped(scope, move || run_strand(run, instructions, initial_offset));
-                if let Err(e) = spawned {
-                    warn!("Failed to start a strand thread: {e}");
-                }
-            }
-        });
+    if entry_strands.is_empty() {
+        return;
     }
+    if host_clock::enabled() {
+        host_clock::attach(entry_strands.len());
+    }
+    // Every entry strand gets its own thread, including the first, so
+    // deep recursion errors out on a known stack instead of aborting.
+    std::thread::scope(|scope| {
+        for instructions in entry_strands {
+            let run = run.clone();
+            let spawned = std::thread::Builder::new()
+                .stack_size(STRAND_STACK_SIZE)
+                .spawn_scoped(scope, move || run_strand(run, instructions, initial_offset));
+            if let Err(e) = spawned {
+                warn!("Failed to start a strand thread: {e}");
+            }
+        }
+    });
 }
 
 /// Runs a function when dropped.

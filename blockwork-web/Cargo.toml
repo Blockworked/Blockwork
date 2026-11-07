@@ -4,15 +4,15 @@ version.workspace = true
 edition.workspace = true
 rust-version.workspace = true
 
-# The website's in-browser editor: the headless vocabulary behind the shared
-# C ABI. Built for wasm32-unknown-emscripten with `--profile web` and linked
+# The website's in-browser editor: blockwork-model (the headless
+# vocabulary) behind the shared C ABI. Built for wasm32-unknown-emscripten with `--profile web` and linked
 # into the Qt for WebAssembly page as a static library.
 [lib]
 name = "blockwork_web"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-blockwork-core = { path = "../blockwork-core", default-features = false }
+blockwork-model = { path = "../blockwork-model" }
 blockstitch-core.workspace = true
 blockstitch-ffi.workspace = true
 serde.workspace = true

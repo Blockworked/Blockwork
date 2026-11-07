@@ -4,7 +4,8 @@
 
 | Crate | What it is |
 | --- | --- |
-| `blockwork-core` | The engine: the macro document (`macros/`), the block runner (`macros/runner.rs`), input, screen, browser and system helpers, and the wire shapes the editor speaks (`frontend/`). |
+| `blockwork-model` | The blocks and documents, with nothing that touches the machine: the macro document (`macros/`), block packs, canvas edits (`editing.rs`) and the wire shapes the editor speaks (`frontend/`). The website's editor links this alone. |
+| `blockwork-core` | Everything that runs on this machine: the block runner (`macros/runner.rs`), input, screen, browser, config and system helpers. It re-exports `blockwork-model` under the same paths (`blockwork_core::macros::Macro` still works). |
 | `blockwork-app` | Every command the editor can issue and the background watchers that fire trigger blocks (`watch/`). No UI toolkit. |
 | `blockwork-daemon` | The long-lived process that owns `blockwork-app`'s state, hotkeys and playback. |
 | `blockwork-protocol` | Messages between the daemon and the Qt UI. |
@@ -52,7 +53,7 @@ just translations     # refresh blockwork-qt/i18n after changing UI text
 Three tests check generated files and rewrite them with `BLESS=1`:
 `--test operator_descriptors` (the reporter table in `BlockCatalog.qml`),
 `--test editor_baseline` (a saved macro in the current format) and
-`--lib capabilities` (`blockwork-core/capabilities.json`, which the community
+`-p blockwork-core --test capabilities` (`blockwork-core/capabilities.json`, which the community
 site copies).
 
 Rust is formatted with `cargo fmt --all` (rustfmt's defaults, as in
@@ -67,13 +68,13 @@ refuses a file that isn't listed there, or a listed one that is missing.
 
 The compiler catches most of these, since `InstructionKind::info` and the
 `BlockKind` impl match every kind, and the tests in `fields.rs` and
-`blockwork-core/tests/wire_blocks.rs` check the slot, variable and fixture lists against each
+`blockwork-model/tests/wire_blocks.rs` check the slot, variable and fixture lists against each
 other. The rest are listed so nothing is missed.
 
-1. `blockwork-core/src/macros/kind.rs`: add the `InstructionKind` variant with
+1. `blockwork-model/src/macros/kind.rs`: add the `InstructionKind` variant with
    a doc comment. A field added to an existing block needs `#[serde(default)]`
    so older files still load.
-2. `blockwork-core/src/macros/info.rs`: its row in `InstructionKind::info`,
+2. `blockwork-model/src/macros/info.rs`: its row in `InstructionKind::info`,
    which says what the block is and does in one place:
    - its `Role`: `Header` or `Trigger` if it heads a strand (that is what
      `is_header` reads), `Comment` if it does nothing, otherwise the runner
@@ -83,12 +84,12 @@ other. The rest are listed so nothing is missed.
      import review and the permission prompts for shared macros.
 
    If it can do something, rerun `BLESS=1 cargo test -p blockwork-core
-   capabilities` to refresh `blockwork-core/capabilities.json`, then copy
+   --test capabilities` to refresh `blockwork-core/capabilities.json`, then copy
    that into the community site (`node scripts/sync-capabilities.js` there).
-3. `blockwork-core/src/macros/block_kind.rs`: its nested bodies in
+3. `blockwork-model/src/macros/block_kind.rs`: its nested bodies in
    `body`/`body_mut`, and any variable or list names it holds in
    `for_each_ref`.
-4. `blockwork-core/src/macros/fields.rs`: a `FieldId` per value slot, and
+4. `blockwork-model/src/macros/fields.rs`: a `FieldId` per value slot, and
    its slots in `slots_mut` (field id, value, type). That one list is what the
    canvas visits and what a drag or a typed edit resolves through. Add the
    field to `requires_integer` if it only takes whole numbers.
@@ -97,14 +98,14 @@ other. The rest are listed so nothing is missed.
    `runner.rs` sends it there by its role and otherwise only handles tracing,
    the debugger, stop flags and call depth; a test fails if a file's arms and
    the roles disagree.
-6. `blockwork-core/src/frontend/instructions.rs`: its line in `wire_blocks!`,
-   and a case in `blockwork-core/tests/fixtures/wire_blocks.json`.
+6. `blockwork-model/src/frontend/instructions.rs`: its line in `wire_blocks!`,
+   and a case in `blockwork-model/tests/fixtures/wire_blocks.json`.
 7. A trigger also needs a watcher in `blockwork-app` (see `watch/system.rs`)
    and a line in `macros/trigger.rs` for the run log.
 8. `blockwork-qt/qml/BlockCatalog.qml`: a palette section entry, a row in
    its palette category's function (`eventRows`, `inputRows`, ...: label,
    value and dropdown pieces, icon, and `shape: "header"` for a trigger;
-   `blockwork-core/tests/wire_blocks.rs` lists any block without one and
+   `blockwork-model/tests/wire_blocks.rs` lists any block without one and
    checks the shape against `is_header`), a prefab if a
    fresh block needs defaults, and its variable dropdowns in
    `registerVariableFields`.
@@ -113,11 +114,12 @@ other. The rest are listed so nothing is missed.
 
 ## Adding a reporter
 
-1. `blockwork-core/src/input/value.rs`: an `ExtOperator` (name, arity,
-   default args, evaluation). One that reads the machine calls
-   `permissions::require` first; one with side effects goes in
+1. An `ExtOperator` (name, arity, default args, evaluation): in
+   `blockwork-model/src/input/value.rs` if it only works on text, numbers or
+   dates, else in `blockwork-core/src/input/value.rs`. One that reads the
+   machine calls `permissions::require` first; one with side effects goes in
    `SIDE_EFFECT_OPERATORS`.
-2. `blockwork-core/src/capabilities.rs`: its capability in
+2. `blockwork-model/src/capabilities.rs`: its capability in
    `operator_capability`, or its name in `UNGUARDED_OPERATORS`. A test fails
    until it is in one of them. A guarded one also needs the
    `capabilities.json` refresh described under adding a block.
@@ -133,7 +135,7 @@ other. The rest are listed so nothing is missed.
 ## Adding a command
 
 1. A canvas edit (anything the website's editor should do too) goes in
-   `blockwork-core/src/editing.rs`: a function over `D: Document`, its arm in
+   `blockwork-model/src/editing.rs`: a function over `D: Document`, its arm in
    `dispatch` and its name in `COMMANDS`. Both the app and the page then
    answer it. Give it a step in `blockwork-app/src/web_parity.rs`.
 2. Anything else is app-only: the function in `blockwork-app/src/commands/`,
@@ -166,7 +168,7 @@ other. The rest are listed so nothing is missed.
 - Keep comments short and plain. No em-dashes.
 - A change to saved files needs a loader for the old shape (see
   `macros/saved_shapes.rs` and `macros/migrate.rs`).
-- Canvas edits live once, in `blockwork-core/src/editing.rs`. A rule that
+- Canvas edits live once, in `blockwork-model/src/editing.rs`. A rule that
   isn't about one command goes on `Macro` (`macros/document_rules.rs`, or
   blockstitch if it isn't Blockwork-specific). A command only the website
   demo answers (`blockwork-web/src/session.rs`) gets a step in the parity

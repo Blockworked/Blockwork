@@ -1,2 +1,2 @@
 # Test copies of packs from Blockworked/Blockwork-community-blocks; hash-pinned.
-blockwork-core/tests/fixtures/blocks/** -text
+blockwork-model/tests/fixtures/blocks/** -text

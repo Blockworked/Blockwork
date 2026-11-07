@@ -6,7 +6,7 @@ use blockstitch_ffi::Host;
 use blockwork_web::Demo;
 use serde_json::{Value, json};
 
-const SAVED: &str = include_str!("../../blockwork-core/tests/fixtures/editor-baseline/macro.json");
+const SAVED: &str = include_str!("../../blockwork-model/tests/fixtures/editor-baseline/macro.json");
 
 fn loaded() -> Demo {
     let mut demo = Demo::default();
@@ -112,7 +112,7 @@ fn the_c_abi_answers_in_the_shared_envelope() {
 
 #[test]
 fn blocks_can_be_dropped_into_a_reporters_branch() {
-    use blockwork_core::input::value::Value as BlockValue;
+    use blockwork_model::input::value::Value as BlockValue;
     let mut demo = loaded();
     let call = BlockValue::Call {
         block_id: "custom".into(),

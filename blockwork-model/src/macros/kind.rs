@@ -112,7 +112,7 @@ pub enum InstructionKind {
     /// Run/Loop and driven by the same background watcher as
     /// `WhenBattery*To` (`watch::battery` in the desktop app), which fires
     /// this strand's body the moment the system starts receiving external
-    /// power. See `crate::battery::is_plugged_in`.
+    /// power. See `blockwork_core::battery::is_plugged_in`.
     WhenPowerPluggedIn,
     /// Same as `WhenPowerPluggedIn`, but fires when external power is lost
     /// instead - never fires at all on a system with no battery/UPS, since
@@ -162,7 +162,7 @@ pub enum InstructionKind {
     /// if it wasn't already numeric.
     ChangeVariable(String, Value),
     /// `set clipboard to <value>`: overwrites the system clipboard with the
-    /// value's text. See `crate::clipboard::set_text`.
+    /// value's text. See `blockwork_core::clipboard::set_text`.
     SetClipboard(Value),
     /// Appends a number/text value to a named list. Boolean values are ignored.
     AddToList {
@@ -539,7 +539,7 @@ pub enum InstructionKind {
     },
     /// Opens `url` in the browser's active tab, or with `new_tab` in a new
     /// one, and waits for it to load. The browser blocks go through the
-    /// Blockwork extension; see [`crate::browser`].
+    /// Blockwork extension; see `blockwork_core::browser`.
     BrowserOpen {
         url: Value,
         new_tab: bool,

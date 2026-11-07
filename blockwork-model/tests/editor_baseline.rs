@@ -3,8 +3,8 @@
 //! on-disk shape and what a variable rename reaches today.
 //! `BLESS=1` rewrites the fixture in the current format.
 
-use blockwork_core::input::value::Value;
-use blockwork_core::macros::{Instruction, InstructionKind, Macro, migrate};
+use blockwork_model::input::value::Value;
+use blockwork_model::macros::{Instruction, InstructionKind, Macro, migrate};
 use std::path::PathBuf;
 
 fn fixture() -> PathBuf {
@@ -12,7 +12,7 @@ fn fixture() -> PathBuf {
 }
 
 fn load() -> Macro {
-    blockwork_core::init();
+    blockwork_model::init();
     let (mac, upgrade) = migrate::parse(&std::fs::read_to_string(fixture()).unwrap()).unwrap();
     assert!(
         !upgrade.changed(),
@@ -64,7 +64,7 @@ fn reads(value: &Value, out: &mut Vec<String>) {
 
 #[test]
 fn saved_macro_loads_without_upgrade_and_saves_back_unchanged() {
-    blockwork_core::init();
+    blockwork_model::init();
     let (mac, upgrade) = migrate::parse(&std::fs::read_to_string(fixture()).unwrap()).unwrap();
     let saved = migrate::to_value(&mac).unwrap();
     if std::env::var_os("BLESS").is_some() {

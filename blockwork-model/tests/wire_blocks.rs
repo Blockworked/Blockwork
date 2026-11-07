@@ -2,7 +2,7 @@
 //! unchanged. `fixtures/wire_blocks.json` holds one of each `InstructionDto`
 //! variant; a new block adds one there.
 
-use blockwork_core::frontend::{InstructionDto, dto_to_instruction, instruction_to_dto};
+use blockwork_model::frontend::{InstructionDto, dto_to_instruction, instruction_to_dto};
 use serde_json::Value;
 
 #[test]
@@ -53,7 +53,7 @@ fn the_fixture_has_every_block() {
 /// renames with a variable) must match `for_each_ref` in `block_kind.rs`.
 #[test]
 fn variable_dropdowns_match_the_backend_refs() {
-    use blockwork_core::macros::{BlockKind, RefKind};
+    use blockwork_model::macros::{BlockKind, RefKind};
     let qml = include_str!("../../blockwork-qt/qml/BlockCatalog.qml");
     let start = qml.find("registerVariableFields({").unwrap();
     let table = &qml[start..start + qml[start..].find("});").unwrap()];
@@ -183,7 +183,7 @@ fn the_catalog_covers_every_block() {
     for piece in pieces {
         let field = piece.split('"').next().unwrap();
         if field
-            .parse::<blockwork_core::macros::fields::FieldId>()
+            .parse::<blockwork_model::macros::fields::FieldId>()
             .is_err()
         {
             missing.push(format!("{field} (a value or box piece) is not a FieldId"));

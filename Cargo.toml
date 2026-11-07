@@ -6,6 +6,7 @@ members = [
     "blockwork-daemon",
     "blockwork-ffi",
     "blockwork-linux-bridge",
+    "blockwork-model",
     "blockwork-protocol",
     "blockwork-web",
 ]

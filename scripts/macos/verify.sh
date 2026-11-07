@@ -62,6 +62,5 @@ else:
 PY
 # The caller/test executable needs Accessibility and Screen Recording grants.
 # Run serially because window/input tests share the disposable desktop fixture.
-cargo test -p blockwork-core -p blockwork-ffi --no-default-features \
-    --features blockwork-core/system "$@" -- --include-ignored --test-threads=1 --nocapture \
+cargo test -p blockwork-core -p blockwork-ffi --no-default-features "$@" -- --include-ignored --test-threads=1 --nocapture \
     2>&1 | tee "$TEST_DIR/tests.log"

@@ -255,9 +255,8 @@ pub fn macro_to_dto(mac: &Macro) -> MacroDto {
                         name: var.name.clone(),
                         label: block_packs::variable_label(&var.name).into(),
                         value: match &var.value {
-                            #[cfg(feature = "system")]
                             crate::input::value::Evaluated::Text(text) => {
-                                crate::input::value::Evaluated::Text(crate::secrets::redact(text))
+                                crate::input::value::Evaluated::Text(crate::redact::redact(text))
                             }
                             _ => var.value.clone(),
                         },

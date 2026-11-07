@@ -1,6 +1,7 @@
 //! What a hotkey does when it fires.
 
 use super::*;
+use blockwork_core::macros::Run;
 
 pub(crate) fn handle_hotkey_action(state: &SharedState, app: &AppHandle, action: HotkeyAction) {
     match &action {
@@ -24,7 +25,9 @@ pub(crate) fn handle_hotkey_action(state: &SharedState, app: &AppHandle, action:
                 };
                 drop(s);
                 if let Some(mac) = mac {
-                    if let Some(reason) = mac.settings.blocked_by() {
+                    if let Some(reason) =
+                        blockwork_core::macros::conditions::blocked_by(&mac.settings)
+                    {
                         let source = blockwork_core::run_log::Source::for_macro(&mac.id, &mac.name);
                         blockwork_core::run_log::info(&source, format!("Hotkey ignored: {reason}"));
                         return;

@@ -1,6 +1,7 @@
 //! Saving, exporting and importing macros, and the capabilities a macro asks for.
 
 use super::*;
+use blockwork_core::config::MacroFiles;
 
 pub(crate) fn save_macro(state: &SharedState, app: &AppHandle) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;

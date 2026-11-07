@@ -1,6 +1,7 @@
 //! Macro library: selecting, creating, duplicating and deleting macros, and each macro's settings.
 
 use super::*;
+use blockwork_core::config::MacroFiles;
 
 pub(crate) fn select_macro(
     state: &SharedState,

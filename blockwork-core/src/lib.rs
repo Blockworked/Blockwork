@@ -1,65 +1,47 @@
-#[cfg(feature = "system")]
+//! Blockwork on this machine: running macros, their input backends,
+//! watchers, config, files, network, clipboard and the rest. The blocks and
+//! documents themselves are `blockwork_model`, re-exported here under the
+//! same paths.
+
+pub use blockwork_model::{
+    block_packs, capabilities, editing, frontend, hotkey_types, key_mapping, redact, text,
+};
+
 pub mod backoff;
-#[cfg(feature = "system")]
 pub mod battery;
-pub mod block_packs;
-#[cfg(feature = "system")]
 pub mod browser;
-pub mod capabilities;
-#[cfg(feature = "system")]
 pub mod clipboard;
-#[cfg(feature = "system")]
 pub mod config;
-#[cfg(all(feature = "system", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 pub mod dbus;
-#[cfg(feature = "system")]
 pub mod detect;
-pub mod editing;
-#[cfg(feature = "system")]
 pub mod files;
-#[cfg(feature = "system")]
 pub mod flatpak;
-pub mod frontend;
-#[cfg(feature = "system")]
 pub mod globals;
-pub mod hotkey_types;
-#[cfg(feature = "system")]
 pub mod http;
 pub mod input;
 #[cfg(feature = "ipc")]
 pub mod ipc;
-pub mod key_mapping;
-#[cfg(all(feature = "system", target_os = "linux"))]
+#[cfg(target_os = "linux")]
 pub mod kwin;
 pub mod macros;
-#[cfg(feature = "system")]
 pub mod notify;
-#[cfg(feature = "system")]
 pub mod permissions;
-#[cfg(feature = "system")]
 pub mod prompt;
-#[cfg(feature = "system")]
 pub mod recording;
-#[cfg(feature = "system")]
 pub mod run_log;
-#[cfg(feature = "system")]
 pub mod screen;
-#[cfg(feature = "system")]
 pub mod secrets;
-#[cfg(feature = "system")]
 pub mod shell;
-#[cfg(feature = "system")]
 pub mod system;
-pub mod text;
 #[cfg(all(feature = "updater", any(windows, target_os = "macos")))]
 pub mod updater;
-#[cfg(feature = "system")]
 pub mod window;
-#[cfg(feature = "system")]
 pub mod wine_bridge;
 
 /// Registers Blockwork's own value operators with blockstitch, so a saved
 /// macro using them evaluates. Every entry point calls it; twice is fine.
 pub fn init() {
     input::value::register_blockwork_operators();
+    redact::set_masker(secrets::redact);
 }

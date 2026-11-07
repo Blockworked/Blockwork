@@ -61,6 +61,7 @@ pub(crate) fn recording_countdown_secs() -> u8 {
 }
 
 use crate::state::{AppState, History, Page, RecordingPhase, SharedState, UpdateCheckState};
+use blockwork_core::config::MacroFiles;
 use blockwork_core::macros::runner::make_backend_or_unavailable;
 use blockwork_core::macros::thread_pool::ThreadPool;
 use blockwork_core::recording::QueueSignal;

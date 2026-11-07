@@ -1,4 +1,3 @@
-#![cfg(feature = "system")]
 //! Blockwork's reporters as blockstitch describes them, and the copy the
 //! editor's QML carries (`BLESS=1` rewrites it).
 

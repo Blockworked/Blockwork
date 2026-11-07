@@ -191,7 +191,7 @@ fn shipped_text_helpers_pack_runs() {
     crate::input::value::register_blockwork_operators();
     let path = concat!(
         env!("CARGO_MANIFEST_DIR"),
-        "/../blockwork-core/tests/fixtures/blocks/packs/text-helpers.json"
+        "/../blockwork-model/tests/fixtures/blocks/packs/text-helpers.json"
     );
     let pack = crate::block_packs::read_pack(&std::fs::read_to_string(path).unwrap()).unwrap();
     let id = |name: &str| {

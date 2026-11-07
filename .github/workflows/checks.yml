@@ -125,12 +125,11 @@ jobs:
       - name: FFI header is current
         run: git diff --exit-code blockwork-ffi/include
 
-      # The workspace build turns core's `system` feature on for everyone;
-      # the website's editor core builds without it.
-      - name: Web editor core without system features
+      # The website's editor links blockwork-model alone; built on its own
+      # so nothing from the workspace's other crates sneaks in.
+      - name: Web editor core on blockwork-model alone
         run: |
-          cargo check -p blockwork-core --no-default-features
-          cargo test -p blockwork-web
+          cargo test -p blockwork-model -p blockwork-web
 
       # After the build, which stages the Lucide icons the QML tests import.
       - name: QML tests

@@ -7,7 +7,7 @@ fn slugs_match_the_shared_fixture() {
         serde_json::from_str(include_str!("fixtures/slugs.json")).unwrap();
     for (text, expected) in cases {
         assert_eq!(
-            blockwork_core::block_packs::slug(&text),
+            blockwork_model::block_packs::slug(&text),
             expected,
             "{text:?}"
         );

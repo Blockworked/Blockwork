@@ -6,10 +6,12 @@
 mod wine_bridge;
 
 use blockwork_core::config;
+use blockwork_core::config::MacroFiles;
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::host_clock;
 use blockwork_core::macros::run_registry;
 use blockwork_core::macros::runner::{self, RunOptions};
+use blockwork_core::macros::Run;
 use blockwork_core::macros::{Instruction, Macro};
 use blockwork_core::recording;
 use std::ffi::{CStr, CString};

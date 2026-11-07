@@ -1,6 +1,6 @@
 //! Exercise the actual macOS app helpers against the disposable AppKit fixture.
 //! Set BW_LIVE_APP to the fixture's BlockworkTestWindow.app path.
-#[cfg(all(target_os = "macos", feature = "system"))]
+#[cfg(target_os = "macos")]
 fn main() -> Result<(), String> {
     use blockwork_core::system::{app_running, close_application, open_application};
     use core_foundation::runloop::{CFRunLoop, kCFRunLoopDefaultMode};
@@ -50,7 +50,7 @@ fn main() -> Result<(), String> {
     Ok(())
 }
 
-#[cfg(not(all(target_os = "macos", feature = "system")))]
+#[cfg(not(target_os = "macos"))]
 fn main() {
     eprintln!("This probe requires macOS and the system feature.");
 }

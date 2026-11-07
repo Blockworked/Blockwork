@@ -1,4 +1,4 @@
-//! One browser tab's macros. Canvas edits run through `blockwork_core::editing`,
+//! One browser tab's macros. Canvas edits run through `blockwork_model::editing`,
 //! as they do in the app; this file adds the tab's in-memory macro list, its
 //! key capture, preview and state, without disk, daemon or runner.
 
@@ -7,16 +7,16 @@ use std::collections::HashMap;
 use blockstitch_core::editor::{History, PathStep, ValueBuffers};
 use blockstitch_core::graph::{ListItem, resolve_list_reporters};
 use blockstitch_ffi::{Host, arg};
-use blockwork_core::editing;
-use blockwork_core::frontend::{InvalidFieldDto, KeyCaptureDto, macro_to_dto};
-use blockwork_core::input::key_names::{format_key_combo, match_key};
-use blockwork_core::input::types::{InputToken, MacroKey};
-use blockwork_core::input::value::{
+use blockwork_model::editing;
+use blockwork_model::frontend::{InvalidFieldDto, KeyCaptureDto, macro_to_dto};
+use blockwork_model::input::key_names::{format_key_combo, match_key};
+use blockwork_model::input::types::{InputToken, MacroKey};
+use blockwork_model::input::value::{
     Evaluated, Op, Value, has_side_effect_operator, is_pure_operator,
 };
-use blockwork_core::key_mapping::{web_code_to_macro_key, web_key_to_macro_key};
-use blockwork_core::macros::conditions::PowerCondition;
-use blockwork_core::macros::{
+use blockwork_model::key_mapping::{web_code_to_macro_key, web_key_to_macro_key};
+use blockwork_model::macros::conditions::PowerCondition;
+use blockwork_model::macros::{
     Instruction, InstructionKind, Macro, UndoSnapshot, clamp_speed, migrate,
 };
 use serde_json::{Value as Json, json};
@@ -40,11 +40,11 @@ pub struct Demo {
 impl Default for Demo {
     fn default() -> Self {
         // The pure text and date reporters; host ones stay unregistered.
-        blockwork_core::init();
+        blockwork_model::init();
         Demo {
             macros: Vec::new(),
             selected: None,
-            history: History::new(blockwork_core::macros::UNDO_LIMIT),
+            history: History::new(blockwork_model::macros::UNDO_LIMIT),
             buffers: ValueBuffers::new(),
             key_capture: None,
             standalone_key: None,
@@ -187,7 +187,7 @@ impl Demo {
                     .iter()
                     .position(|m| m.id == id)
                     .ok_or("Macro not found")?;
-                self.macros[index].settings.folder = blockwork_core::macros::clean_folder(&folder);
+                self.macros[index].settings.folder = blockwork_model::macros::clean_folder(&folder);
                 Ok(Json::Null)
             }
             "set_title" => {

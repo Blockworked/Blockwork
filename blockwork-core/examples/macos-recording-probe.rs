@@ -3,7 +3,7 @@
 //! scripts/macos/test-window.swift, and verifies delivery in that window's log.
 //! Normal Blockwork playback is tagged and deliberately excluded by recording.
 
-#[cfg(all(target_os = "macos", feature = "system"))]
+#[cfg(target_os = "macos")]
 fn main() -> Result<(), String> {
     use blockwork_core::window::{self, Action, MatchBy};
     use core_graphics::{
@@ -122,7 +122,7 @@ fn main() -> Result<(), String> {
     }
 }
 
-#[cfg(not(all(target_os = "macos", feature = "system")))]
+#[cfg(not(target_os = "macos"))]
 fn main() {
     eprintln!("This probe requires macOS and blockwork-core's system feature.");
 }

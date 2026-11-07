@@ -50,7 +50,7 @@ fn literal_names(arg: &str) -> Option<Vec<String>> {
 const DISPATCHERS: &[(&str, &str, usize)] = &[
     ("src/dispatch.rs", "        match cmd {", 12),
     (
-        "../blockwork-core/src/editing.rs",
+        "../blockwork-model/src/editing.rs",
         "    let result = match cmd {",
         8,
     ),

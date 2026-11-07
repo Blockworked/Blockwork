@@ -553,6 +553,7 @@ dependencies = [
  "base64 0.23.1",
  "bincode",
  "blockstitch-core",
+ "blockwork-model",
  "chrono",
  "core-foundation 0.10.1",
  "core-graphics",
@@ -630,6 +631,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "blockwork-model"
+version = "0.6.0"
+dependencies = [
+ "blockstitch-core",
+ "chrono",
+ "regex",
+ "serde",
+ "serde_json",
+ "sha2",
+ "uuid",
+]
+
+[[package]]
 name = "blockwork-protocol"
 version = "0.6.0"
 dependencies = [
@@ -675,7 +689,7 @@ version = "0.6.0"
 dependencies = [
  "blockstitch-core",
  "blockstitch-ffi",
- "blockwork-core",
+ "blockwork-model",
  "serde",
  "serde_json",
  "uuid",

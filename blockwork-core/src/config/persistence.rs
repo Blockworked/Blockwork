@@ -313,10 +313,13 @@ pub fn flush_saves() {
 /// Set once something was queued, so readers that never save skip the lock.
 static SAVES_STARTED: OnceLock<()> = OnceLock::new();
 
-impl Macro {
-    /// Queues a save on the save thread and returns at once; a later save of
-    /// the same macro replaces a queued one.
-    pub fn save_soon(&self) -> Result<(), String> {
+impl super::MacroFiles for Macro {
+    fn add(mut self) -> Result<(), String> {
+        self.ensure_id();
+        self.save()
+    }
+
+    fn save_soon(&self) -> Result<(), String> {
         let path = macro_file_path(&self.id)?;
         let saves = saves();
         let _ = SAVES_STARTED.set(());
@@ -325,7 +328,7 @@ impl Macro {
         Ok(())
     }
 
-    pub fn save(&self) -> Result<(), String> {
+    fn save(&self) -> Result<(), String> {
         let path = macro_file_path(&self.id)?;
         // Drop a queued older copy, and wait out one being written.
         let _writing = SAVES_STARTED.get().map(|_| {
@@ -342,7 +345,7 @@ impl Macro {
         Ok(())
     }
 
-    pub fn remove(self) -> Result<(), String> {
+    fn remove(self) -> Result<(), String> {
         flush_saves();
         let path = macro_file_path(&self.id)?;
         if path.exists() {
@@ -566,6 +569,7 @@ mod tests {
 
 #[cfg(test)]
 mod background_saves {
+    use super::super::MacroFiles;
     use super::*;
 
     #[test]

@@ -419,15 +419,13 @@ pub fn slug(text: &str) -> String {
     out.trim_end_matches('-').to_string()
 }
 
-/// The pack file's text; secret values are masked like an export. Needs the
-/// keyring, so it isn't in the headless build.
-#[cfg(feature = "system")]
+/// The pack file's text; secret values are masked like an export.
 pub fn write_pack(pack: &BlockPack) -> Result<String, String> {
     let mut content = pack.content.clone();
     export_details(&mut content, &pack.info);
     for var in &mut content.graph.variables {
         if let crate::input::value::Evaluated::Text(t) = &mut var.value {
-            *t = crate::secrets::redact(t);
+            *t = crate::redact::redact(t);
         }
     }
     let mut value = serde_json::to_value(&pack.info).map_err(|e| e.to_string())?;

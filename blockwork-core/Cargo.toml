@@ -8,50 +8,40 @@ rust-version.workspace = true
 name = "blockwork_core"
 
 [features]
-default = ["system", "ipc", "updater", "onnx", "gpu"]
-# Everything that runs a macro or touches the machine: the runner and its
-# input backends, watchers, config, files, network, clipboard, battery.
-# Without it the crate is the headless vocabulary - instructions, saved
-# macros and their migrations, block packs and the editor's frontend shape -
-# which is what the website's in-browser editor (blockwork-web) links.
-system = [
-    "dep:dirs", "dep:tokio", "dep:spin_sleep", "dep:bincode", "dep:starship-battery", "dep:arboard",
-    "dep:ureq", "dep:png", "dep:base64", "dep:libc",
-    "dep:evdev", "dep:x11rb", "dep:enigo", "dep:wayland-client", "dep:wayland-protocols", "dep:zbus",
-    "dep:windows-sys", "dep:core-graphics", "dep:core-foundation", "dep:foreign-types", "dep:security-framework", "dep:objc2", "dep:objc2-app-kit",
-]
+default = ["ipc", "updater", "onnx", "gpu"]
 # Loopback TCP control server; not needed by an embedder (e.g. via
 # blockwork-ffi) that calls into this crate directly and in-process.
-ipc = ["system", "tokio/rt", "tokio/rt-multi-thread", "tokio/macros", "tokio/net", "tokio/io-util", "tokio/time"]
+ipc = ["tokio/rt", "tokio/rt-multi-thread", "tokio/macros", "tokio/net", "tokio/io-util", "tokio/time"]
 # Self-update mechanism for the standalone desktop app; inappropriate for a
 # copy of this crate embedded inside another process (e.g. a game).
-updater = ["system", "dep:self_update", "dep:http"]
+updater = ["dep:self_update", "dep:http"]
 # Built-in object detection models (see src/detect/onnx.rs). Pure Rust, so
 # offline and Flatpak builds need no native runtime.
-onnx = ["system", "dep:tract-onnx"]
+onnx = ["dep:tract-onnx"]
 # Runs models on Apple Metal on macOS, or CUDA on Linux/Windows. Machines
 # without a usable GPU/runtime fall back to the CPU.
 gpu = ["onnx", "dep:tract-cuda", "dep:tract-metal"]
 
 [dependencies]
+blockwork-model = { path = "../blockwork-model" }
 blockstitch-core.workspace = true
 tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true
-dirs = { workspace = true, optional = true }
+dirs.workspace = true
 uuid.workspace = true
 rand.workspace = true
-tokio = { workspace = true, optional = true }
-spin_sleep = { workspace = true, optional = true }
-bincode = { workspace = true, optional = true }
-starship-battery = { workspace = true, optional = true }
-arboard = { workspace = true, optional = true }
+tokio.workspace = true
+spin_sleep.workspace = true
+bincode.workspace = true
+starship-battery.workspace = true
+arboard.workspace = true
 chrono.workspace = true
 # HTTP blocks (see src/http.rs).
-ureq = { workspace = true, optional = true }
+ureq.workspace = true
 # Screen images: captures, block images as PNG data: URIs (see src/screen/).
-png = { version = "0.18", optional = true }
-base64 = { workspace = true, optional = true }
+png = "0.18"
+base64.workspace = true
 # Regex text operators.
 regex.workspace = true
 tract-onnx = { version = "0.23.9", optional = true }
@@ -59,39 +49,39 @@ tract-onnx = { version = "0.23.9", optional = true }
 sha2 = "0.10.9"
 
 [target.'cfg(unix)'.dependencies]
-libc = { workspace = true, optional = true }
+libc.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
-evdev = { workspace = true, optional = true }
+evdev.workspace = true
 # Read-only cursor-position query via XWayland (see backend/x11_cursor.rs) -
 # not the removed XTest emission backend; core X11 protocol only.
-x11rb = { workspace = true, optional = true }
+x11rb.workspace = true
 # Keep Enigo on the portal; its X11 backend takes priority even on Wayland.
-enigo = { workspace = true, features = ["libei", "smol"], optional = true }
-wayland-client = { workspace = true, optional = true }
-wayland-protocols = { workspace = true, optional = true }
+enigo = { workspace = true, features = ["libei", "smol"] }
+wayland-client.workspace = true
+wayland-protocols.workspace = true
 # Desktop notifications over the session bus (see src/notify.rs).
-zbus = { workspace = true, optional = true }
+zbus.workspace = true
 # A runtime for zbus tasks on plain threads (see src/dbus.rs).
-tokio = { workspace = true, features = ["rt-multi-thread", "net", "time"], optional = true }
+tokio = { workspace = true, features = ["rt-multi-thread", "net", "time"] }
 
 [target.'cfg(any(target_os = "linux", windows))'.dependencies]
 tract-cuda = { version = "=0.23.9", optional = true }
 
 [target.'cfg(windows)'.dependencies]
-enigo = { workspace = true, optional = true }
-windows-sys = { workspace = true, optional = true }
+enigo.workspace = true
+windows-sys.workspace = true
 self_update = { workspace = true, optional = true }
 http = { workspace = true, optional = true }
 
 [target.'cfg(target_os = "macos")'.dependencies]
-objc2 = { version = "0.6", optional = true }
-objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSWorkspace", "NSRunningApplication", "NSEvent", "NSGraphicsContext", "NSScreen", "libc", "objc2-core-graphics"], optional = true }
+objc2 = "0.6"
+objc2-app-kit = { version = "0.3.2", default-features = false, features = ["std", "NSWorkspace", "NSRunningApplication", "NSEvent", "NSGraphicsContext", "NSScreen", "libc", "objc2-core-graphics"] }
 tract-metal = { version = "=0.23.9", optional = true }
-core-graphics = { workspace = true, optional = true }
-core-foundation = { workspace = true, optional = true }
-foreign-types = { workspace = true, optional = true }
+core-graphics.workspace = true
+core-foundation.workspace = true
+foreign-types.workspace = true
 # Secrets in the Keychain (see src/secrets.rs).
-security-framework = { workspace = true, optional = true }
+security-framework.workspace = true
 self_update = { workspace = true, optional = true }
 http = { workspace = true, optional = true }

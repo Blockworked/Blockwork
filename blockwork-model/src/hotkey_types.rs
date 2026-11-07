@@ -80,8 +80,7 @@ pub struct HotkeyBinding {
 
 /// Compare stored hotkey names using the physical keyboard translation of the
 /// current OS. Mac PC keyboards report PrintScreen/ScrollLock/Pause as F13–F15.
-#[cfg_attr(not(feature = "system"), allow(dead_code))]
-pub(crate) fn key_names_match(configured: &str, captured: &str) -> bool {
+pub fn key_names_match(configured: &str, captured: &str) -> bool {
     #[cfg(target_os = "macos")]
     fn canonical(name: &str) -> &str {
         match name {

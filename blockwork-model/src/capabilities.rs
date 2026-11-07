@@ -135,7 +135,7 @@ mod tests {
     use super::*;
 
     #[test]
-    fn every_block_capability_is_listed_and_every_checked_one_can_ask() {
+    fn every_block_capability_is_listed() {
         let kinds: HashSet<&str> = CAPABILITIES.iter().map(|(k, ..)| *k).collect();
         let blocks = every_block();
         assert!(!blocks.is_empty());
@@ -143,28 +143,7 @@ mod tests {
             for cap in block_capabilities(&kind) {
                 assert!(kinds.contains(cap), "{cap} has no label");
             }
-            #[cfg(feature = "system")]
-            for cap in checked_when_run(&kind) {
-                assert!(
-                    crate::permissions::GUARDED.iter().any(|(k, _)| *k == cap),
-                    "{cap} can't be asked about"
-                );
-            }
         }
-    }
-
-    /// Every Blockwork reporter's operator name, read from `input/value.rs`.
-    fn reporter_names() -> Vec<&'static str> {
-        let names: Vec<_> = include_str!("input/value.rs")
-            .lines()
-            .filter_map(|line| line.trim().strip_prefix("op: \"")?.split('"').next())
-            .collect();
-        assert!(
-            names.len() > 40,
-            "parsed only {} reporters from input/value.rs",
-            names.len()
-        );
-        names
     }
 
     /// Every block from the wire round-trip test's fixture.
@@ -177,72 +156,5 @@ mod tests {
             crate::frontend::dto_to_instruction(&dto).unwrap().kind
         });
         blocks.collect()
-    }
-
-    /// `capabilities.json` is this table for code outside Rust (the community
-    /// site's pack review). `BLESS=1 cargo test -p blockwork-core capabilities` rewrites it.
-    #[test]
-    fn the_exported_table_is_current() {
-        use serde_json::{Map, json};
-        let mut blocks = Map::new();
-        for kind in every_block() {
-            let mut caps: Vec<&str> = block_capabilities(&kind).to_vec();
-            if kind.info().role == Role::Trigger {
-                caps.push("triggers");
-            }
-            // The variant name, as a saved document spells it.
-            let name = match serde_json::to_value(&kind).unwrap() {
-                serde_json::Value::String(name) => name,
-                serde_json::Value::Object(map) => map.keys().next().unwrap().clone(),
-                other => panic!("unexpected kind shape {other}"),
-            };
-            if !caps.is_empty() {
-                blocks.insert(name, json!(caps));
-            }
-        }
-        let mut operators = Map::new();
-        for name in reporter_names() {
-            if let Some(cap) = operator_capability(name) {
-                operators.insert(name.to_string(), json!(cap));
-            }
-        }
-        let table = json!({
-            "capabilities": CAPABILITIES.iter().map(|(k, label, risky)| json!([k, label, risky])).collect::<Vec<_>>(),
-            "blocks": blocks,
-            "operators": operators,
-        });
-        let text = serde_json::to_string_pretty(&table).unwrap() + "\n";
-        let path = concat!(env!("CARGO_MANIFEST_DIR"), "/capabilities.json");
-        if std::env::var_os("BLESS").is_some() {
-            std::fs::write(path, &text).unwrap();
-        }
-        // A Windows checkout may have turned the file's line ends into CRLF.
-        let saved = std::fs::read_to_string(path)
-            .unwrap_or_default()
-            .replace("\r\n", "\n");
-        assert!(
-            saved == text,
-            "capabilities.json is out of date: rerun with BLESS=1"
-        );
-    }
-
-    #[test]
-    fn every_reporter_is_decided() {
-        let kinds: HashSet<&str> = CAPABILITIES.iter().map(|(k, ..)| *k).collect();
-        for name in reporter_names() {
-            match operator_capability(name) {
-                Some(cap) => {
-                    assert!(kinds.contains(cap), "{cap} has no label");
-                    assert!(
-                        !UNGUARDED_OPERATORS.contains(&name),
-                        "{name} is both guarded and unguarded"
-                    );
-                }
-                None => assert!(
-                    UNGUARDED_OPERATORS.contains(&name),
-                    "{name} needs an entry in operator_capability or UNGUARDED_OPERATORS"
-                ),
-            }
-        }
     }
 }

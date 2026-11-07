@@ -910,7 +910,7 @@ mod tests {
     fn installed_packs_stay_in_one_sorted_list_when_the_source_disappears() {
         use blockwork_core::macros::Macro;
         let root = std::path::Path::new(env!("CARGO_MANIFEST_DIR"))
-            .join("../blockwork-core/tests/fixtures/blocks");
+            .join("../blockwork-model/tests/fixtures/blocks");
         let index = block_packs::read_index(
             &std::fs::read_to_string(root.join("index.json")).unwrap(),
             "https://example.com/index.json",
@@ -1001,7 +1001,7 @@ mod tests {
     fn downloads_follow_the_url_rules() {
         let index = concat!(
             env!("CARGO_MANIFEST_DIR"),
-            "/../blockwork-core/tests/fixtures/blocks/index.json"
+            "/../blockwork-model/tests/fixtures/blocks/index.json"
         );
         assert!(fetch(index, true).is_ok(), "a local library the user added");
         assert!(fetch(&format!("file://{index}"), true).is_ok());

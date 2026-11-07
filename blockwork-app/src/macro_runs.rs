@@ -3,6 +3,7 @@
 
 use crate::state::{AppState, SharedState};
 use crate::{AppHandle, macros_thread, scheduled_run};
+use blockwork_core::macros::Run;
 use blockwork_core::macros::calls::MacroHost;
 use blockwork_core::macros::run_registry;
 use blockwork_core::macros::runner::RunOptions;

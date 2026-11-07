@@ -6,7 +6,9 @@ use crate::AppHandle;
 use crate::state::{SharedState, build_state_dto};
 use blockstitch_core::graph::ListDef;
 use blockstitch_core::graph::ListStore;
+use blockwork_core::config::MacroFiles;
 use blockwork_core::input::value::Evaluated;
+use blockwork_core::macros::Run;
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::runner::{VariableStore, run_fired_strand};
 use blockwork_core::macros::{Instruction, VariableDef, run_registry};
@@ -103,7 +105,7 @@ pub(crate) fn fire_with_input(
             )
         };
         // Conditions may ask the window system, so checked unlocked.
-        if settings.blocked_by().is_some() {
+        if blockwork_core::macros::conditions::blocked_by(&settings).is_some() {
             return;
         }
         run_log::run_event(&source, run_log::RunEvent::Fired, message);

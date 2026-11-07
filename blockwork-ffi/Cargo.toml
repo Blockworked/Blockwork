@@ -10,7 +10,7 @@ name = "blockwork_ffi"
 crate-type = ["staticlib", "rlib"]
 
 [dependencies]
-blockwork-core = { path = "../blockwork-core", default-features = false, features = ["system"] }
+blockwork-core = { path = "../blockwork-core", default-features = false }
 tracing.workspace = true
 tracing-subscriber.workspace = true
 serde.workspace = true

@@ -39,7 +39,6 @@ fn call(id: &str) -> InstructionKind {
 }
 
 #[test]
-#[cfg(feature = "system")]
 fn components_survive_pack_install_update_and_save() {
     let mut author = Macro::new("author".into(), String::new(), vec![]);
     let pieces = serde_json::from_value(serde_json::json!([
@@ -105,7 +104,6 @@ fn components_survive_pack_install_update_and_save() {
 }
 
 #[test]
-#[cfg(feature = "system")]
 fn input_defaults_survive_pack_updates_without_resetting_calls() {
     use crate::input::value::Evaluated;
     let mut author = Macro::new("author".into(), String::new(), vec![]);
@@ -191,7 +189,6 @@ fn input_defaults_survive_pack_updates_without_resetting_calls() {
 }
 
 #[test]
-#[cfg(feature = "system")]
 fn packs_take_dependencies_and_update_in_place() {
     let mut author = Macro::new("Author".into(), String::new(), Vec::new());
     let inner = make_block(
@@ -392,7 +389,6 @@ fn removing_packs_scrubs_nested_calls_and_preserves_shared_blocks() {
 }
 
 #[test]
-#[cfg(feature = "system")]
 fn pack_details_survive_export_install_and_save() {
     let mut author = Macro::new("Author".into(), String::new(), Vec::new());
     let id = make_block(&mut author, "wait seconds", Vec::new());
@@ -463,7 +459,6 @@ fn installed_implementations_stay_outside_editor_and_recording() {
 }
 
 #[test]
-#[cfg(feature = "system")]
 fn details_ids_use_author_and_block_name_without_changing_internal_ids() {
     assert_eq!(
         details_identifier("Example Author", "WaitSeconds"),
