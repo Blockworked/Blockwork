@@ -83,6 +83,8 @@ pub use document_rules::{
 };
 mod saved_shapes;
 
+mod info;
+pub use info::{BlockInfo, Role};
 mod kind;
 pub use kind::*;
 
@@ -311,6 +313,17 @@ impl From<MacroDe> for Macro {
 }
 
 impl Macro {
+    /// Whether a strand starts on its own, from a watcher. A signal header
+    /// doesn't count: only a run of this macro sends one.
+    pub fn has_triggers(&self) -> bool {
+        self.strands.iter().any(|st| {
+            st.instructions.first().is_some_and(|i| {
+                i.kind.info().role == Role::Trigger
+                    && !matches!(i.kind, InstructionKind::WhenSignal(_))
+            })
+        })
+    }
+
     pub fn new(name: String, description: String, mut code: Vec<Instruction>) -> Self {
         code.insert(0, Instruction::new(InstructionKind::WhenRan));
         Self {

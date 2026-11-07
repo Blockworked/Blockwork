@@ -73,34 +73,10 @@ impl BlockKind for InstructionKind {
     }
 
     /// True for "header" blocks (`WhenRan`, `BlockHeader`, and the event
-    /// entry points) - must be first in their strand, nothing may stack
-    /// above them, and they render with a flat top edge.
+    /// entry points, by their `Role`) - must be first in their strand,
+    /// nothing may stack above them, and they render with a flat top edge.
     fn is_header(&self) -> bool {
-        matches!(
-            self,
-            InstructionKind::WhenRan
-                | InstructionKind::BlockHeader(_)
-                | InstructionKind::WhenBatteryDischargedTo(_)
-                | InstructionKind::WhenBatteryChargedTo(_)
-                | InstructionKind::WhenTime(..)
-                | InstructionKind::WhenPowerPluggedIn
-                | InstructionKind::WhenPowerUnplugged
-                | InstructionKind::WhenClipboardChanged
-                | InstructionKind::WhenKey(..)
-                | InstructionKind::WhenWindow { .. }
-                | InstructionKind::WhenFileChanged(_)
-                | InstructionKind::WhenTyped { .. }
-                | InstructionKind::WhenApp { .. }
-                | InstructionKind::WhenIdle(_)
-                | InstructionKind::WhenScreenLock { .. }
-                | InstructionKind::WhenCron(_)
-                | InstructionKind::WhenNetwork { .. }
-                | InstructionKind::WhenUsb { .. }
-                | InstructionKind::WhenMouseButton { .. }
-                | InstructionKind::WhenAt(_)
-                | InstructionKind::WhenSignal(_)
-                | InstructionKind::WhenWebhook { .. }
-        )
+        matches!(self.info().role, Role::Header | Role::Trigger)
     }
 
     fn body(&self, slot: u8) -> Option<&Vec<Instruction>> {

@@ -209,11 +209,12 @@ fn run_instructions_with_lists(
     );
 }
 
-/// `run_block` routes each block to its category's file by naming it, and
-/// that file panics on a block it doesn't handle. The compiler can't see the
-/// two lists disagree, so this reads them from the source and compares.
+/// `run_block` sends each block to the file its `Role` names, and that file
+/// panics on a block it doesn't handle. The compiler can't see the two
+/// disagree, so this reads each file's arms and compares them with the table.
 #[test]
-fn run_block_routes_each_block_to_the_file_that_runs_it() {
+fn each_role_is_run_by_the_file_that_handles_its_blocks() {
+    use crate::macros::Role;
     use std::collections::{BTreeMap, BTreeSet};
     let variant = |line: &str| {
         let rest = line.trim().trim_start_matches('|').trim();
@@ -223,40 +224,29 @@ fn run_block_routes_each_block_to_the_file_that_runs_it() {
                 .collect::<String>()
         })
     };
-    // Each `module::run_*(` arm in `run_block`, and the variants it lists.
-    // A Windows checkout may have CRLF line ends.
-    let runner = include_str!("../../runner.rs").replace("\r\n", "\n");
-    let body = &runner[runner.find("\nfn run_block(").unwrap()..];
-    let body = &body[..body.find("\n}\n").unwrap()];
-    let mut routed: BTreeMap<String, BTreeSet<String>> = BTreeMap::new();
-    let mut pending = BTreeSet::new();
-    let mut lines = body.lines();
-    while let Some(line) = lines.next() {
-        if line.starts_with("            ")
-            && !line.starts_with("             ")
-            && let Some(v) = variant(line)
-        {
-            pending.insert(v);
-        }
-        if !pending.is_empty() && line.contains("=>") {
-            // The call sits on this line or within the next couple.
-            let arm: String = std::iter::once(line).chain(lines.clone().take(2)).collect();
-            let module = arm
-                .split("::run_")
-                .next()
-                .filter(|_| arm.contains("::run_"))
-                .and_then(|head| {
-                    head.rsplit(|c: char| !c.is_ascii_alphanumeric() && c != '_')
-                        .next()
-                });
-            if let Some(module) = module {
-                routed
-                    .entry(module.to_string())
-                    .or_default()
-                    .extend(std::mem::take(&mut pending));
-            }
-            pending.clear();
-        }
+    let fixtures: serde_json::Value =
+        serde_json::from_str(include_str!("../../../../tests/fixtures/wire_blocks.json")).unwrap();
+    let mut routed: BTreeMap<&str, BTreeSet<String>> = BTreeMap::new();
+    for block in fixtures.as_array().unwrap() {
+        let dto: crate::frontend::InstructionDto = serde_json::from_value(block.clone()).unwrap();
+        let kind = crate::frontend::dto_to_instruction(&dto).unwrap().kind;
+        let module = match kind.info().role {
+            Role::Control => "control",
+            Role::Data => "data",
+            Role::System => "system",
+            Role::Browser => "browser",
+            Role::Dialogs => "dialogs",
+            Role::Vision => "vision",
+            // Input runs tokens, not variants; the rest run nothing.
+            Role::Input | Role::Header | Role::Trigger | Role::Comment => continue,
+        };
+        // The variant name, as a saved document spells it.
+        let name = match serde_json::to_value(&kind).unwrap() {
+            serde_json::Value::String(name) => name,
+            serde_json::Value::Object(map) => map.keys().next().unwrap().clone(),
+            other => panic!("unexpected kind shape {other}"),
+        };
+        routed.entry(module).or_default().insert(name);
     }
     let sources = [
         ("control", include_str!("../control.rs")),
@@ -277,18 +267,15 @@ fn run_block_routes_each_block_to_the_file_that_runs_it() {
         let sent = routed.remove(module).unwrap_or_default();
         for v in sent.difference(&handled) {
             wrong.push(format!(
-                "{v}: run_block sends it to {module}.rs, which doesn't run it"
+                "{v}: its Role sends it to {module}.rs, which doesn't run it"
             ));
         }
         for v in handled.difference(&sent) {
             wrong.push(format!(
-                "{v}: {module}.rs runs it, but run_block doesn't send it there"
+                "{v}: {module}.rs runs it, but its Role sends it elsewhere"
             ));
         }
     }
-    assert!(
-        routed.is_empty() || routed.keys().all(|m| m == "input"),
-        "unchecked: {routed:?}"
-    );
+    assert!(routed.is_empty(), "unchecked: {routed:?}");
     assert!(wrong.is_empty(), "{}", wrong.join("\n"));
 }

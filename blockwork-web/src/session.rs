@@ -5,7 +5,7 @@
 use std::collections::HashMap;
 
 use blockstitch_core::editor::{History, PathStep, ValueBuffers};
-use blockstitch_core::graph::{BlockKind, ListItem, resolve_list_reporters};
+use blockstitch_core::graph::{ListItem, resolve_list_reporters};
 use blockstitch_ffi::{Host, arg};
 use blockwork_core::editing;
 use blockwork_core::frontend::{InvalidFieldDto, KeyCaptureDto, macro_to_dto};
@@ -441,12 +441,7 @@ impl Demo {
             .macros
             .iter()
             .map(|mac| {
-                let has_triggers = mac.strands.iter().any(|st| {
-                    st.instructions.first().is_some_and(|i| {
-                        i.kind.is_header()
-                            && !matches!(i.kind, InstructionKind::WhenRan | InstructionKind::BlockHeader(_) | InstructionKind::WhenSignal(_))
-                    })
-                });
+                let has_triggers = mac.has_triggers();
                 json!({ "id": mac.id, "name": mac.name, "folder": mac.settings.folder,
                         "always_listen": mac.settings.always_listen, "has_triggers": has_triggers, "restricted": false })
             })

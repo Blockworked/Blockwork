@@ -4,7 +4,8 @@ use crate::macros::backend::{InputBackend, create_backend};
 use crate::macros::host_clock;
 use crate::macros::priority::raise_current_thread_priority;
 use crate::macros::{
-    BlockKind, ImageMatch, ImagePick, Instruction, InstructionKind, LaunchOptions, Macro, Strand,
+    BlockKind, ImageMatch, ImagePick, Instruction, InstructionKind, LaunchOptions, Macro, Role,
+    Strand,
 };
 use blockstitch_core::graph::{
     ListItem, ListStore, is_list_reporter, list_index, resolve_list_reporter,
@@ -942,125 +943,46 @@ fn run_block(
             continue;
         }
 
-        match &ins.kind {
-            InstructionKind::Comment(_) => {}
-            InstructionKind::WhenRan => {}
-            InstructionKind::BlockHeader(_) => {}
-            // Header-only markers, same as `WhenRan`/`BlockHeader` - never
-            // actually reached (`run_with` excludes these strands
-            // from `entry_strands`, and the background watcher that fires
-            // them starts from `strand.instructions[1..]`). Handled here
-            // defensively so the match stays total.
-            InstructionKind::WhenBatteryDischargedTo(_) => {}
-            InstructionKind::WhenBatteryChargedTo(_) => {}
-            InstructionKind::WhenTime(..) => {}
-            InstructionKind::WhenPowerPluggedIn => {}
-            InstructionKind::WhenPowerUnplugged => {}
-            InstructionKind::WhenClipboardChanged => {}
-            InstructionKind::WhenKey(..) => {}
-            InstructionKind::WhenWindow { .. } => {}
-            InstructionKind::WhenFileChanged(_) => {}
-            InstructionKind::WhenTyped { .. } => {}
-            InstructionKind::WhenApp { .. } => {}
-            InstructionKind::WhenIdle(_) => {}
-            InstructionKind::WhenScreenLock { .. } => {}
-            InstructionKind::WhenCron(_) => {}
-            InstructionKind::WhenNetwork { .. } => {}
-            InstructionKind::WhenUsb { .. } => {}
-            InstructionKind::WhenMouseButton { .. } => {}
-            InstructionKind::WhenAt(_) => {}
-            InstructionKind::WhenSignal(_) => {}
-            InstructionKind::WhenWebhook { .. } => {}
-            InstructionKind::AskText { .. }
-            | InstructionKind::AskYesNo { .. }
-            | InstructionKind::AskChoice { .. }
-            | InstructionKind::ShowMessage { .. } => {
+        // `Header` and `Trigger` blocks are never reached: `run_with` leaves
+        // their strands out of `entry_strands`, and a watcher starts from the
+        // block after the header.
+        match ins.kind.info().role {
+            Role::Header | Role::Trigger | Role::Comment => {}
+            Role::Dialogs => {
                 if let Some(flow) = dialogs::run_dialog_block(ins, ctx, depth)? {
                     return Ok(flow);
                 }
             }
-            InstructionKind::SendSignal { .. }
-            | InstructionKind::WindowAction { .. }
-            | InstructionKind::MoveWindow { .. }
-            | InstructionKind::RunMacro { .. }
-            | InstructionKind::StopMacroNamed(_)
-            | InstructionKind::SetGlobal { .. }
-            | InstructionKind::ChangeGlobal { .. }
-            | InstructionKind::Log(_)
-            | InstructionKind::Notify { .. }
-            | InstructionKind::WriteFile { .. }
-            | InstructionKind::HttpRequest { .. }
-            | InstructionKind::Command(_)
-            | InstructionKind::CommandWait(_)
-            | InstructionKind::OpenApp { .. }
-            | InstructionKind::CloseApp { .. }
-            | InstructionKind::PasteText(_) => system::run_system_block(ins, ctx, depth)?,
-            InstructionKind::Wait(_)
-            | InstructionKind::WithLock { .. }
-            | InstructionKind::Return(_)
-            | InstructionKind::EscapeLoop
-            | InstructionKind::ContinueLoop
-            | InstructionKind::StopMacro
-            | InstructionKind::ThrowError(_)
-            | InstructionKind::TryCatch { .. }
-            | InstructionKind::Retry { .. }
-            | InstructionKind::WaitUntil { .. }
-            | InstructionKind::CallBlock { .. }
-            | InstructionKind::RunBranch(_)
-            | InstructionKind::If { .. }
-            | InstructionKind::IfElse { .. }
-            | InstructionKind::Repeat { .. }
-            | InstructionKind::Forever { .. }
-            | InstructionKind::While { .. } => {
-                match control::run_control_block(ins, ctx, depth, &mut deadline)? {
-                    control::Next::Go => {}
-                    control::Next::Stop => break,
-                    control::Next::Exit(flow) => return Ok(flow),
-                }
-            }
-            InstructionKind::FindImage { .. }
-            | InstructionKind::ClickImage { .. }
-            | InstructionKind::WaitForImage { .. }
-            | InstructionKind::DetectObjectsInWindow { .. }
-            | InstructionKind::WaitForDetection { .. }
-            | InstructionKind::AimStep { .. }
-            | InstructionKind::AimAtDetection { .. } => {
+            Role::System => system::run_system_block(ins, ctx, depth)?,
+            Role::Control => match control::run_control_block(ins, ctx, depth, &mut deadline)? {
+                control::Next::Go => {}
+                control::Next::Stop => break,
+                control::Next::Exit(flow) => return Ok(flow),
+            },
+            Role::Vision => {
                 if let Some(flow) = vision::run_screen_block(ins, ctx, depth)? {
                     return Ok(flow);
                 }
             }
-            InstructionKind::BrowserOpen { .. }
-            | InstructionKind::BrowserClick { .. }
-            | InstructionKind::BrowserType { .. }
-            | InstructionKind::BrowserWaitFor { .. }
-            | InstructionKind::BrowserScript { .. } => {
+            Role::Browser => {
                 if let Some(flow) = browser::run_browser_block(ins, ctx, depth)? {
                     return Ok(flow);
                 }
             }
-            InstructionKind::Token(_) if ctx.input_unavailable.is_some() => {
-                if !ctx.input_unavailable_reported {
-                    ctx.input_unavailable_reported = true;
-                    let reason = ctx.input_unavailable.clone().unwrap_or_default();
-                    soft_fail(ctx, &ins.id, "Input", reason)?;
-                }
-            }
-            InstructionKind::Token(token) => {
-                if let Some(flow) = input::run_token(token, ins, ctx, depth)? {
+            Role::Input => {
+                if let Some(reason) = &ctx.input_unavailable {
+                    if !ctx.input_unavailable_reported {
+                        ctx.input_unavailable_reported = true;
+                        let reason = reason.clone();
+                        soft_fail(ctx, &ins.id, "Input", reason)?;
+                    }
+                } else if let InstructionKind::Token(token) = &ins.kind
+                    && let Some(flow) = input::run_token(token, ins, ctx, depth)?
+                {
                     return Ok(flow);
                 }
             }
-            InstructionKind::SetVariable { .. }
-            | InstructionKind::ChangeVariable { .. }
-            | InstructionKind::SetClipboard { .. }
-            | InstructionKind::AddToList { .. }
-            | InstructionKind::DeleteOfList { .. }
-            | InstructionKind::DeleteAllOfList { .. }
-            | InstructionKind::ShiftList { .. }
-            | InstructionKind::InsertIntoList { .. }
-            | InstructionKind::ReplaceItemOfList { .. }
-            | InstructionKind::ReverseList { .. }
-            | InstructionKind::SplitIntoList { .. } => {
+            Role::Data => {
                 if let Some(flow) = data::run_data_block(ins, ctx, depth)? {
                     return Ok(flow);
                 }

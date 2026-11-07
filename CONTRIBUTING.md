@@ -65,33 +65,38 @@ refuses a file that isn't listed there, or a listed one that is missing.
 
 ## Adding a block
 
-The compiler catches most of these, since the runner, the capability table and
-the `BlockKind` impl match every kind, and the tests in `fields.rs` and
+The compiler catches most of these, since `InstructionKind::info` and the
+`BlockKind` impl match every kind, and the tests in `fields.rs` and
 `blockwork-core/tests/wire_blocks.rs` check the slot, variable and fixture lists against each
 other. The rest are listed so nothing is missed.
 
 1. `blockwork-core/src/macros/kind.rs`: add the `InstructionKind` variant with
    a doc comment. A field added to an existing block needs `#[serde(default)]`
    so older files still load.
-2. `blockwork-core/src/macros/block_kind.rs`: its nested bodies in
-   `body`/`body_mut`, any variable or list names it holds in `for_each_ref`,
-   and add it to `is_header` if it is a trigger.
-3. `blockwork-core/src/macros/fields.rs`: a `FieldId` per value slot, and
+2. `blockwork-core/src/macros/info.rs`: its row in `InstructionKind::info`,
+   which says what the block is and does in one place:
+   - its `Role`: `Header` or `Trigger` if it heads a strand (that is what
+     `is_header` reads), `Comment` if it does nothing, otherwise the runner
+     file that runs it (`Control`, `Data`, `Dialogs`, `Input`, `System`,
+     `Vision`, `Browser`);
+   - its capabilities (commands, network, screen, ...), which drive the
+     import review and the permission prompts for shared macros.
+
+   If it can do something, rerun `BLESS=1 cargo test -p blockwork-core
+   capabilities` to refresh `blockwork-core/capabilities.json`, then copy
+   that into the community site (`node scripts/sync-capabilities.js` there).
+3. `blockwork-core/src/macros/block_kind.rs`: its nested bodies in
+   `body`/`body_mut`, and any variable or list names it holds in
+   `for_each_ref`.
+4. `blockwork-core/src/macros/fields.rs`: a `FieldId` per value slot, and
    its slots in `slots_mut` (field id, value, type). That one list is what the
    canvas visits and what a drag or a typed edit resolves through. Add the
    field to `requires_integer` if it only takes whole numbers.
-4. `blockwork-core/src/macros/runner/`: what it does, in its category's file
-   (`control`, `input`, `data`, `dialogs`, `browser`, `vision`, `system`;
-   `apps.rs` holds helpers for the system blocks), and
-   its variant in that category's arm of `run_block` in `runner.rs`. Besides
-   routing, `run_block` only handles tracing, the debugger, stop flags and
-   call depth; a test fails if the arm and the file disagree.
-5. `blockwork-core/src/capabilities.rs`: what it can do (commands, network,
-   screen, ...), or add it to the arm that does nothing guarded. This drives
-   the import review and the permission prompts for shared macros. If it
-   can do something, rerun `BLESS=1 cargo test -p blockwork-core capabilities`
-   to refresh `blockwork-core/capabilities.json`, then copy that into the
-   community site (`node scripts/sync-capabilities.js` there).
+5. `blockwork-core/src/macros/runner/`: what it does, in the file its `Role`
+   names (`apps.rs` holds helpers for the system blocks). `run_block` in
+   `runner.rs` sends it there by its role and otherwise only handles tracing,
+   the debugger, stop flags and call depth; a test fails if a file's arms and
+   the roles disagree.
 6. `blockwork-core/src/frontend/instructions.rs`: its line in `wire_blocks!`,
    and a case in `blockwork-core/tests/fixtures/wire_blocks.json`.
 7. A trigger also needs a watcher in `blockwork-app` (see `watch/system.rs`)

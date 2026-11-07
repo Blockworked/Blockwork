@@ -3,7 +3,7 @@
 //! check for restricted macros (`permissions::require`).
 
 use crate::input::value::Value;
-use crate::macros::{BlockKind, InstructionKind, Macro};
+use crate::macros::{BlockKind, InstructionKind, Macro, Role};
 use std::collections::HashSet;
 
 /// Every capability, in display order: (kind, label, whether it deserves a warning).
@@ -35,88 +35,9 @@ pub const CAPABILITIES: [(&str, &str, bool); 13] = [
     ("globals", "Reads or changes global variables", false),
 ];
 
-/// What a block itself does. `OpenApp`'s command can be any shell string in a
-/// hand-edited file, so it counts as running commands.
+/// What a block itself does (its row in `InstructionKind::info`).
 pub fn block_capabilities(kind: &InstructionKind) -> &'static [&'static str] {
-    use InstructionKind as K;
-    match kind {
-        K::Command(_) | K::CommandWait(_) | K::OpenApp { .. } | K::CloseApp { .. } => &["commands"],
-        K::HttpRequest { .. } => &["network"],
-        K::WriteFile { .. } => &["files_write"],
-        K::WhenFileChanged(_) => &["files_read"],
-        K::Token(_) | K::WhenTyped { .. } | K::AimStep { .. } => &["input"],
-        K::PasteText(_) => &["input", "clipboard"],
-        K::SetClipboard(_) | K::WhenClipboardChanged => &["clipboard"],
-        K::WindowAction { .. }
-        | K::MoveWindow { .. }
-        | K::WhenWindow { .. }
-        | K::WhenApp { .. } => &["windows"],
-        K::RunMacro { .. } | K::StopMacroNamed(_) => &["macros"],
-        K::FindImage { .. }
-        | K::WaitForImage { .. }
-        | K::DetectObjectsInWindow { .. }
-        | K::WaitForDetection { .. } => &["screen"],
-        K::ClickImage { .. } | K::AimAtDetection { .. } => &["screen", "input"],
-        K::SetGlobal { .. } | K::ChangeGlobal { .. } => &["globals"],
-        K::BrowserOpen { .. }
-        | K::BrowserClick { .. }
-        | K::BrowserType { .. }
-        | K::BrowserWaitFor { .. }
-        | K::BrowserScript { .. } => &["browser"],
-        // Listed rather than `_` so a new block has to be decided here.
-        K::Wait { .. }
-        | K::Comment { .. }
-        | K::WhenRan
-        | K::WhenBatteryDischargedTo { .. }
-        | K::WhenBatteryChargedTo { .. }
-        | K::WhenTime { .. }
-        | K::WhenPowerPluggedIn
-        | K::WhenPowerUnplugged
-        | K::WhenKey { .. }
-        | K::WhenIdle { .. }
-        | K::WhenScreenLock { .. }
-        | K::WhenCron { .. }
-        | K::WhenNetwork { .. }
-        | K::WhenUsb { .. }
-        | K::WhenMouseButton { .. }
-        | K::WhenAt { .. }
-        | K::WhenSignal { .. }
-        | K::WhenWebhook { .. }
-        | K::SetVariable { .. }
-        | K::ChangeVariable { .. }
-        | K::AddToList { .. }
-        | K::DeleteOfList { .. }
-        | K::DeleteAllOfList { .. }
-        | K::ShiftList { .. }
-        | K::InsertIntoList { .. }
-        | K::ReplaceItemOfList { .. }
-        | K::ReverseList { .. }
-        | K::SplitIntoList { .. }
-        | K::BlockHeader { .. }
-        | K::CallBlock { .. }
-        | K::RunBranch { .. }
-        | K::Return { .. }
-        | K::If { .. }
-        | K::IfElse { .. }
-        | K::Repeat { .. }
-        | K::Forever { .. }
-        | K::While { .. }
-        | K::EscapeLoop
-        | K::ContinueLoop
-        | K::WaitUntil { .. }
-        | K::WithLock { .. }
-        | K::TryCatch { .. }
-        | K::ThrowError { .. }
-        | K::Retry { .. }
-        | K::StopMacro
-        | K::Notify { .. }
-        | K::Log { .. }
-        | K::AskText { .. }
-        | K::AskYesNo { .. }
-        | K::AskChoice { .. }
-        | K::ShowMessage { .. }
-        | K::SendSignal { .. } => &[],
-    }
+    kind.info().capabilities
 }
 
 /// Capabilities the runner doesn't ask a restricted macro about as a block
@@ -200,12 +121,7 @@ pub fn macro_capabilities(mac: &Macro) -> HashSet<&'static str> {
     let mut found = HashSet::new();
     mac.graph.walk_instructions(&mut |ins| {
         found.extend(block_capabilities(&ins.kind).iter().copied());
-        if ins.kind.is_header()
-            && !matches!(
-                ins.kind,
-                InstructionKind::WhenRan | InstructionKind::BlockHeader(_)
-            )
-        {
+        if ins.kind.info().role == Role::Trigger {
             found.insert("triggers");
         }
         let mut kind = ins.kind.clone();
@@ -271,12 +187,7 @@ mod tests {
         let mut blocks = Map::new();
         for kind in every_block() {
             let mut caps: Vec<&str> = block_capabilities(&kind).to_vec();
-            if kind.is_header()
-                && !matches!(
-                    kind,
-                    InstructionKind::WhenRan | InstructionKind::BlockHeader(_)
-                )
-            {
+            if kind.info().role == Role::Trigger {
                 caps.push("triggers");
             }
             // The variant name, as a saved document spells it.

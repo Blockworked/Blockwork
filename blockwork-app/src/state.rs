@@ -7,7 +7,7 @@ use crate::AppHandle;
 pub(crate) use blockstitch_core::editor::{History, InstrPath, PathStep, ValueBuffers};
 pub(crate) use blockstitch_core::graph::ListItem;
 pub(crate) use blockwork_core::input::value::Evaluated;
-pub(crate) use blockwork_core::macros::{InstructionKind, Macro};
+pub(crate) use blockwork_core::macros::Macro;
 use serde::{Deserialize, Serialize};
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
@@ -568,23 +568,12 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
 }
 
 fn library_entry(mac: &Macro) -> LibraryEntryDto {
-    use blockwork_core::macros::BlockKind;
     LibraryEntryDto {
         id: mac.id.clone(),
         name: mac.name.clone(),
         folder: mac.settings.folder.clone(),
         always_listen: mac.settings.always_listen,
-        has_triggers: mac.strands.iter().any(|st| {
-            st.instructions.first().is_some_and(|i| {
-                i.kind.is_header()
-                    && !matches!(
-                        i.kind,
-                        InstructionKind::WhenRan
-                            | InstructionKind::BlockHeader(_)
-                            | InstructionKind::WhenSignal(_)
-                    )
-            })
-        }),
+        has_triggers: mac.has_triggers(),
         restricted: blockwork_core::permissions::grants(&mac.id).is_some(),
     }
 }
@@ -600,7 +589,7 @@ mod tests {
     use super::*;
     use blockwork_core::frontend::{InstructionDto, dto_to_instruction, instruction_to_dto};
     use blockwork_core::input::value::Value;
-    use blockwork_core::macros::{Comment, Instruction};
+    use blockwork_core::macros::{Comment, Instruction, InstructionKind};
 
     #[test]
     fn community_definitions_are_read_only_and_bodies_are_not_sent_to_editor() {
