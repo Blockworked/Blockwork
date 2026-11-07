@@ -3,6 +3,7 @@
 //! Exits when the Windows-side heartbeat goes stale.
 
 use blockwork_core::config;
+use blockwork_core::macros::Run;
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::backend::evdev::EvdevBackend;
 use blockwork_core::macros::backend::evdev_mapping::{
