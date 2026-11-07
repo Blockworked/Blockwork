@@ -23,7 +23,8 @@ fn the_catalog_carries_the_current_table() {
         env!("CARGO_MANIFEST_DIR"),
         "/../blockwork-qt/qml/BlockCatalog.qml"
     );
-    let text = std::fs::read_to_string(path).unwrap();
+    // A Windows checkout may have turned the file's line ends into CRLF.
+    let text = std::fs::read_to_string(path).unwrap().replace("\r\n", "\n");
     let block = format!(
         "    readonly property var hostDescriptors: {}",
         render_descriptors_qml(&host_operator_descriptors(), "    ")
@@ -49,8 +50,8 @@ fn the_catalog_carries_the_current_table() {
 #[test]
 fn the_catalog_covers_every_reporter() {
     register_blockwork_operators();
-    let catalog = include_str!("../../blockwork-qt/qml/BlockCatalog.qml");
-    let help = include_str!("../../blockwork-qt/qml/BlockHelp.qml");
+    let catalog = include_str!("../../blockwork-qt/qml/BlockCatalog.qml").replace("\r\n", "\n");
+    let help = include_str!("../../blockwork-qt/qml/BlockHelp.qml").replace("\r\n", "\n");
     let between = |start: &str, end: &str| {
         let at = catalog.find(start).unwrap();
         &catalog[at..at + catalog[at..].find(end).unwrap()]
