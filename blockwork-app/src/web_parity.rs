@@ -136,8 +136,8 @@ fn script() -> Vec<(&'static str, Value)> {
         ),
         /* 9 */
         (
-            "set_value_kind",
-            json!({ "location": wait_field("$1", 1), "kind": "Add" }),
+            "put_value",
+            json!({ "location": wait_field("$1", 1), "value": { "kind": "Op", "op": "Add", "args": [num(9.0), num(0.0)] } }),
         ),
         /* 10 */
         (
@@ -213,8 +213,8 @@ fn script() -> Vec<(&'static str, Value)> {
         ),
         /* 26 */
         (
-            "reorder_instruction",
-            json!({ "strandId": "$1", "path": at(2), "direction": 1 }),
+            "set_comment_collapsed",
+            json!({ "commentId": "$19", "collapsed": false }),
         ),
         /* 27 */
         (
@@ -260,8 +260,8 @@ fn script() -> Vec<(&'static str, Value)> {
         /* 38 */ ("remove_comment", json!({ "commentId": "$19" })),
         /* 39 */
         (
-            "delete_instruction",
-            json!({ "strandId": "$1", "path": at(1), "x": 80, "y": 500 }),
+            "remove_instruction",
+            json!({ "strandId": "$1", "path": at(1) }),
         ),
         /* 40 */ ("remove_strand", json!({ "strandId": "$24" })),
         /* 41 */ ("set_title", json!({ "title": "Parity" })),
@@ -377,10 +377,10 @@ fn script() -> Vec<(&'static str, Value)> {
         /* 79 */ ("delete_signal", json!({ "name": "nope" })),
         /* 80 */
         (
-            "paste_instructions",
-            json!({ "x": 200, "y": 700, "instructions": [
+            "paste_fragment",
+            json!({ "x": 200, "y": 700, "fragment": { "instructions": [
                      { "id": "p1", "type": "Wait", "duration": num(1.0) },
-                     { "id": "p2", "type": "Wait", "duration": num(2.0) }] }),
+                     { "id": "p2", "type": "Wait", "duration": num(2.0) }], "comments": [] } }),
         ),
         /* 81 */
         (

@@ -17,14 +17,6 @@ impl Document for AppDoc<'_> {
         }
     }
 
-    fn variable_values(&self) -> HashMap<String, Evaluated> {
-        self.0
-            .variable_values
-            .lock()
-            .map(|g| g.clone())
-            .unwrap_or_default()
-    }
-
     fn variable_set(&mut self, name: &str, value: Option<Evaluated>) {
         if let Ok(mut store) = self.0.variable_values.lock() {
             match value {

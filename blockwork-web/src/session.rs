@@ -105,11 +105,6 @@ impl editing::Document for Demo {
         }
     }
 
-    /// Declared values: the page has no live store.
-    fn variable_values(&self) -> HashMap<String, Evaluated> {
-        Demo::variable_values(self)
-    }
-
     /// The app tidies signal names on every save; the page has no disk but
     /// keeps the same document.
     fn changed(&mut self) {

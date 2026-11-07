@@ -127,10 +127,6 @@ pub fn edit_reporter_branch(graph: &mut Graph, cmd: &str, args: &Json) -> Result
                 .map_err(String::from)?;
             Json::Null
         }
-        "reorder_instruction" => {
-            graph.reorder_instruction(&strand()?, &path()?, arg(args, "direction")?);
-            Json::Null
-        }
         "copy_instructions" => serde_json::to_value(crate::frontend::fragment_to_dto(
             &graph.copy_fragment(&strand()?, &path()?, arg(args, "count")?)?,
         ))

@@ -28,10 +28,6 @@ impl Backend {
         }
         match cmd {
             "get_state" => to_json(commands::get_state(&self.state)?),
-            "select_macro" => {
-                let index: usize = arg(&args, "index")?;
-                to_json(commands::select_macro(&self.state, &self.app, index)?)
-            }
             "new_macro" => to_json(commands::new_macro(&self.state, &self.app)?),
             "select_macro_by_id" => {
                 let id: String = arg(&args, "id")?;
@@ -497,14 +493,6 @@ impl Backend {
             "run_strand" => {
                 let strand_id: String = arg(&args, "strandId")?;
                 to_json(commands::run_strand(&self.state, &self.app, strand_id)?)
-            }
-            "set_global_speed_multiplier" => {
-                let multiplier: f64 = arg(&args, "multiplier")?;
-                to_json(commands::set_global_speed_multiplier(
-                    &self.state,
-                    &self.app,
-                    multiplier,
-                )?)
             }
             "start_recording" => to_json(commands::start_recording(&self.state, &self.app)?),
             "stop_recording" => to_json(commands::stop_recording(&self.state, &self.app)?),

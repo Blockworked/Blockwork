@@ -168,19 +168,6 @@ pub(super) fn run_open_macro(
     Ok(())
 }
 
-pub(crate) fn set_global_speed_multiplier(
-    state: &SharedState,
-    app: &AppHandle,
-    multiplier: f64,
-) -> Result<(), String> {
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    let clamped = clamp_speed(multiplier);
-    s.global_speed_multiplier = clamped;
-    config::update_settings(|settings| settings.global_speed_multiplier = Some(clamped));
-    emit_state_updated(app, &s);
-    Ok(())
-}
-
 // ─── Recording ─────────────────────────────────────────────────────────────
 
 /// Seeds the recorder's tracked cursor position from the real, current

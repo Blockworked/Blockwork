@@ -6,8 +6,6 @@
 //! has (disk, a live variable store) in that trait's hooks. [`dispatch`] takes
 //! the command names and camelCase arguments the QML sends.
 
-use std::collections::HashMap;
-
 use blockstitch_core::editor::{
     Created, EditCommand, EditError, EditOutcome, EditSession, History, PathStep, ValueBuffers,
     ValueDestination, ValueLocation, apply_buffer_effects, drop_strand_buffers,
@@ -42,8 +40,6 @@ pub struct Parts<'a> {
 /// defaults suit a host that has none.
 pub trait Document {
     fn parts(&mut self) -> Parts<'_>;
-    /// The values `set_value_kind` resolves variables against.
-    fn variable_values(&self) -> HashMap<String, Evaluated>;
     /// A variable now holds `value`, or is gone when it's `None`.
     fn variable_set(&mut self, _name: &str, _value: Option<Evaluated>) {}
     fn variable_renamed(&mut self, _old: &str, _new: &str) {}
@@ -68,14 +64,10 @@ pub const COMMANDS: &[&str] = &[
     "add_instruction",
     "edit_instruction",
     "remove_instruction",
-    "delete_instruction",
-    "reorder_instruction",
     "copy_instructions",
     "paste_fragment",
-    "paste_instructions",
     "duplicate_instruction",
     "edit_value_field",
-    "set_value_kind",
     "take_value",
     "put_value",
     "move_value",
@@ -251,21 +243,6 @@ pub fn dispatch<D: Document>(doc: &mut D, cmd: &str, args: &Json) -> Option<Resu
             );
             Ok(Json::Null)
         })(),
-        "delete_instruction" => (|| {
-            let (id, path): (String, Vec<PathStep>) = (arg(args, "strandId")?, arg(args, "path")?);
-            to_json(delete_instruction(
-                doc,
-                &id,
-                &path,
-                arg(args, "x")?,
-                arg(args, "y")?,
-            ))
-        })(),
-        "reorder_instruction" => (|| {
-            let (id, path): (String, Vec<PathStep>) = (arg(args, "strandId")?, arg(args, "path")?);
-            reorder_instruction(doc, &id, &path, arg(args, "direction")?);
-            Ok(Json::Null)
-        })(),
         "copy_instructions" => (|| {
             let (id, path): (String, Vec<PathStep>) = (arg(args, "strandId")?, arg(args, "path")?);
             let mac = doc.parts().open.ok_or(NO_MACRO)?;
@@ -275,15 +252,8 @@ pub fn dispatch<D: Document>(doc: &mut D, cmd: &str, args: &Json) -> Option<Resu
                 arg(args, "count")?,
             )?))
         })(),
-        "paste_fragment" | "paste_instructions" => (|| {
-            let fragment: FragmentDto = if cmd == "paste_fragment" {
-                arg(args, "fragment")?
-            } else {
-                FragmentDto {
-                    instructions: arg(args, "instructions")?,
-                    comments: Vec::new(),
-                }
-            };
+        "paste_fragment" => (|| {
+            let fragment: FragmentDto = arg(args, "fragment")?;
             to_json(paste_fragment(
                 doc,
                 arg(args, "x")?,
@@ -308,10 +278,6 @@ pub fn dispatch<D: Document>(doc: &mut D, cmd: &str, args: &Json) -> Option<Resu
             // Keystrokes into one field coalesce into one undo step; a
             // location that no longer resolves is quietly ignored.
             let _ = run_edit(doc, edit);
-            Ok(Json::Null)
-        })(),
-        "set_value_kind" => (|| {
-            set_value_kind(doc, &arg(args, "location")?, &arg::<String>(args, "kind")?)?;
             Ok(Json::Null)
         })(),
         "take_value" => (|| to_json(take_value(doc, &arg(args, "location")?)?))(),
@@ -784,56 +750,7 @@ pub fn edit_instruction<D: Document>(
     }
 }
 
-/// Deletes the block at `path`, splitting what was below it into a new
-/// strand at `(x, y)` in the same step. Returns that strand's id, if any.
-pub fn delete_instruction<D: Document>(
-    doc: &mut D,
-    strand_id: &str,
-    path: &[PathStep],
-    x: i32,
-    y: i32,
-) -> Option<String> {
-    let mut graph = graph_copy(doc).ok()?;
-    // Out of range isn't worth an error: the block just isn't there.
-    let new_id = graph.delete_instruction(strand_id, path, x, y).ok()?;
-    commit_graph(doc, graph);
-    new_id
-}
-
-/// Moves a block up or down. Either end of a list, or a swap past a header,
-/// does nothing and costs no undo step.
-pub fn reorder_instruction<D: Document>(
-    doc: &mut D,
-    strand_id: &str,
-    path: &[PathStep],
-    direction: i32,
-) {
-    let Ok(mut graph) = graph_copy(doc) else {
-        return;
-    };
-    if graph.reorder_instruction(strand_id, path, direction) {
-        commit_graph(doc, graph);
-    }
-}
-
 // ─── Values ─────────────────────────────────────────────────────────────────
-
-pub fn set_value_kind<D: Document>(
-    doc: &mut D,
-    location: &ValueLocation,
-    kind: &str,
-) -> Result<(), String> {
-    push_undo(doc);
-    let env = doc.variable_values();
-    let parts = doc.parts();
-    let result = match parts.open {
-        Some(mac) => mac.set_value_kind(location, kind, &env),
-        None => Ok(()),
-    };
-    prune_value_buffers(parts.buffers, location);
-    doc.changed();
-    result
-}
 
 /// Takes the value at `location` out and returns it: a slot falls back to
 /// what it was shadowing, a floating value is deleted.
@@ -1164,9 +1081,6 @@ mod tests {
                 history: &mut self.history,
                 buffers: &mut self.buffers,
             }
-        }
-        fn variable_values(&self) -> HashMap<String, Evaluated> {
-            HashMap::new()
         }
         fn changed(&mut self) {
             self.saves += 1;
