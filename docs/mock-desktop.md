@@ -8,7 +8,7 @@ containers and CI on Ubuntu 24.04, where there is no real session, no GPU
 and no `/dev/uinput`; fake input devices stand in for the keyboard and mouse.
 
 ```bash
-sudo scripts/mock-desktop.sh setup          # once: packages, Qt 6.10, kdotool, Plasma 6 root
+sudo scripts/mock-desktop.sh setup          # once: packages, Qt 6.12, kdotool, Plasma 6 root
 export QMAKE=/opt/qt6/bin/qmake6
 cargo build --release --workspace --exclude blockwork-linux-bridge
 
@@ -90,7 +90,7 @@ mock-input usb list
   position" is expected.
 - The desktop portal (GNOME's capture fallback) isn't set up.
 - `download.qt.io` is blocked in some sandboxes, which breaks both `aqt` and
-  CXX-Qt's `qt_minimal` download. `setup` installs Qt 6.10 from conda-forge
+  CXX-Qt's `qt_minimal` download. `setup` installs Qt 6.12 from conda-forge
   into `/opt/qt6` instead (`QT_PREFIX` changes that).
 
 ## Container quirks the script handles

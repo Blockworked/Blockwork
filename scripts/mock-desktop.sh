@@ -44,7 +44,7 @@ setup() {
     # The fake input broker injects into X11 with XTest.
     python3 -c 'import Xlib' 2>/dev/null || pip install -q --break-system-packages python-xlib \
         || apt-get install -y -qq python3-xlib
-    # Blockwork needs Qt 6.10+. download.qt.io (aqt, CXX-Qt's qt_minimal) is
+    # Blockwork needs Qt 6.10+ and CI uses 6.12.0. download.qt.io (aqt, CXX-Qt's qt_minimal) is
     # often blocked in sandboxes; conda-forge is not.
     if [[ ! -x $QT_PREFIX/bin/qmake6 ]]; then
         if ! command -v micromamba >/dev/null; then
@@ -52,7 +52,7 @@ setup() {
                 -o /usr/local/bin/micromamba
             chmod +x /usr/local/bin/micromamba
         fi
-        MAMBA_ROOT_PREFIX=${MAMBA_ROOT_PREFIX:-/opt/mamba} micromamba create -y -q -p "$QT_PREFIX" -c conda-forge "qt6-main>=6.10,<6.11"
+        MAMBA_ROOT_PREFIX=${MAMBA_ROOT_PREFIX:-/opt/mamba} micromamba create -y -q -p "$QT_PREFIX" -c conda-forge "qt6-main=6.12.0"
     fi
     command -v kdotool >/dev/null || cargo install --locked kdotool
     # File capabilities can't be raised in a container, so exec of the

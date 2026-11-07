@@ -32,7 +32,7 @@ in `Cargo.toml`. `just blockstitch-local` builds against a sibling checkout.
 
 ## Build and test
 
-You need Rust 1.91 or newer, [just](https://github.com/casey/just), Qt 6.10 or newer (CI tests 6.10.3; the website builds the editor with the Qt in `blockworked.com/qt-demo/sources.env`)
+You need Rust 1.91 or newer, [just](https://github.com/casey/just), Qt 6.10 or newer (CI and releases use 6.12.0; the website builds the editor with the Qt in `blockworked.com/qt-demo/sources.env`)
 (`qmake6` on PATH or `QMAKE` set; without one the build downloads a minimal
 Qt) and Python 3 for the QML tests. `just` leaves out
 `blockwork-linux-bridge`, which only builds on Linux; do the same with
