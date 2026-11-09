@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Tag releases (`0.x.y`, see `.github/workflows/release.yml`) publish the matching
 section below as the GitHub release notes, followed by the downloads table.
 
+## [0.6.1] - 2026-11-09
+
+### Fixed
+- The Minimize button now shows the correct icon.
+
 ## [0.6.0] - 2026-11-09
 
 ### Added
