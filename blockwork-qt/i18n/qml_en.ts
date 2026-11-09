@@ -36,7 +36,7 @@
     <message numerus="yes">
         <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="282"/>
         <source>%n entry(s)</source>
-        <translation type="unfinished">
+        <translation>
             <numerusform>%n entry</numerusform>
             <numerusform>%n entries</numerusform>
         </translation>
@@ -66,7 +66,7 @@
     <message numerus="yes">
         <location filename="../../../blockstitch/qml/Blockstitch/ListEditorCard.qml" line="252"/>
         <source>%n item(s)</source>
-        <translation type="unfinished">
+        <translation>
             <numerusform>%n item</numerusform>
             <numerusform>%n items</numerusform>
         </translation>
@@ -107,7 +107,7 @@
     <message numerus="yes">
         <location filename="../qml/RecordingSettingsDialog.qml" line="35"/>
         <source>%n second(s)</source>
-        <translation type="unfinished">
+        <translation>
             <numerusform>%n second</numerusform>
             <numerusform>%n seconds</numerusform>
         </translation>
