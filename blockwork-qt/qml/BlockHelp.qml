@@ -89,7 +89,7 @@ QtObject {
             Log: qsTr("Adds a line to the run log."),
             TryCatch: qsTr("Runs the first part. If a block in it fails, stops there and runs the 'on error' part, where 'error message' says what went wrong."),
             ThrowError: qsTr("Fails with this message. Ends the strand unless a try block catches it."),
-            Stop: qsTr("Stops all strands of this macro run, just this strand, or the other strands. Other macros keep running."),
+            Stop: qsTr("Stops all of this macro's strands (including ones other triggers started), just this strand, or its other strands. Other macros keep running."),
             WhenRan: qsTr("Runs this strand when the macro starts, from the Run button or the macro's hotkey. A macro can have several, and they all run side by side."),
             WhenBatteryDischargedTo: qsTr("Runs when the battery drops to this percentage or below. It won't run again until the battery charges back above it and drops again."),
             WhenBatteryChargedTo: qsTr("Runs when the battery charges to this percentage or above. It won't run again until the battery drops back below it and charges again."),

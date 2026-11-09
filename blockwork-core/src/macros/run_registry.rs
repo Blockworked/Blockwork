@@ -68,12 +68,20 @@ pub fn count() -> usize {
 
 /// Clears the stop flag of every run of `macro_id`, returning how many.
 pub fn stop_macro(macro_id: &str) -> usize {
+    stop_runs(macro_id, None)
+}
+
+/// [`stop_macro`], sparing the run whose flag is `keep`.
+pub fn stop_macro_except(macro_id: &str, keep: &Arc<Mutex<bool>>) -> usize {
+    stop_runs(macro_id, Some(keep))
+}
+
+fn stop_runs(macro_id: &str, keep: Option<&Arc<Mutex<bool>>>) -> usize {
     let mut cleared = 0;
     if let Ok(runs) = active_runs().lock() {
-        for (flag, _) in runs
-            .iter()
-            .filter(|(_, id)| !macro_id.is_empty() && id == macro_id)
-        {
+        for (flag, _) in runs.iter().filter(|(flag, id)| {
+            !macro_id.is_empty() && id == macro_id && !keep.is_some_and(|k| Arc::ptr_eq(k, flag))
+        }) {
             if let Ok(mut running) = flag.lock() {
                 *running = false;
                 cleared += 1;

@@ -192,3 +192,104 @@ fn stop_macro_stops_every_strand_of_the_run() {
         "stop macro didn't end the waiting strand"
     );
 }
+
+/// Each trigger fire is its own run, so a Stop in one has to reach the
+/// macro's strands that other fires started.
+fn fire_in_macro(macro_id: &str, instructions: Vec<Instruction>, vars: &VariableStore) -> bool {
+    let flag = crate::macros::run_registry::begin_macro_run(macro_id);
+    run_fired_strand(
+        crate::run_log::Source::for_macro(macro_id, "Fired"),
+        instructions,
+        noop_emulator(),
+        Some(Arc::clone(&flag)),
+        1.0,
+        Arc::clone(vars),
+        ListStore::default(),
+        Arc::new(HashMap::new()),
+        0,
+    );
+    crate::macros::run_registry::end_run(&flag);
+    *flag.lock().unwrap()
+}
+
+#[test]
+fn stop_in_a_fired_strand_reaches_strands_other_fires_started() {
+    for (id, scope) in [
+        ("stop-fired-others", StopScope::OtherStrands),
+        ("stop-fired-all", StopScope::All),
+    ] {
+        let vars = empty_vars();
+        let other = Arc::new(Mutex::new(None));
+        let start = Instant::now();
+        std::thread::scope(|s| {
+            s.spawn(|| {
+                let running = fire_in_macro(
+                    id,
+                    vec![
+                        Instruction::new(InstructionKind::Wait(Value::number(5_000.0))),
+                        set("looped", Value::number(1.0)),
+                    ],
+                    &vars,
+                );
+                *other.lock().unwrap() = Some(running);
+            });
+            // Let the long strand register and start waiting.
+            while !crate::macros::run_registry::is_running(id) {
+                std::thread::yield_now();
+            }
+            let stopper_running = fire_in_macro(
+                id,
+                vec![
+                    Instruction::new(InstructionKind::Stop { scope }),
+                    set("stopper", Value::number(1.0)),
+                ],
+                &vars,
+            );
+            assert_eq!(
+                stopper_running,
+                scope == StopScope::OtherStrands,
+                "{scope:?}"
+            );
+        });
+        assert!(start.elapsed() < Duration::from_secs(2), "{scope:?}");
+        assert_eq!(*other.lock().unwrap(), Some(false), "{scope:?}");
+        let vars = vars.lock().unwrap();
+        assert_eq!(vars.get("looped"), None, "{scope:?}");
+        assert_eq!(
+            vars.contains_key("stopper"),
+            scope == StopScope::OtherStrands,
+            "{scope:?}"
+        );
+    }
+}
+
+#[test]
+fn stop_in_a_fired_strand_leaves_other_macros_alone() {
+    let vars = empty_vars();
+    std::thread::scope(|s| {
+        s.spawn(|| {
+            fire_in_macro(
+                "stop-spared",
+                vec![
+                    Instruction::new(InstructionKind::Wait(Value::number(60.0))),
+                    set("spared", Value::number(1.0)),
+                ],
+                &vars,
+            );
+        });
+        while !crate::macros::run_registry::is_running("stop-spared") {
+            std::thread::yield_now();
+        }
+        fire_in_macro(
+            "stop-stopper",
+            vec![Instruction::new(InstructionKind::Stop {
+                scope: StopScope::OtherStrands,
+            })],
+            &vars,
+        );
+    });
+    assert_eq!(
+        vars.lock().unwrap().get("spared"),
+        Some(&Evaluated::Number(1.0))
+    );
+}

@@ -717,7 +717,7 @@ fn run_entries(mac: Macro, pick: impl Fn(&Strand) -> bool, options: RunOptions) 
         lists,
         offset: initial_offset,
     } = options;
-    let stop = StrandStop::new(stop_flag);
+    let stop = StrandStop::new(stop_flag, &mac.id);
     let run = StrandRun {
         source: Arc::new(crate::run_log::Source::for_macro(&mac.id, &mac.name)),
         emulator,
@@ -902,10 +902,11 @@ pub fn run_fired_strand(
     block_table: BlockTable,
     max_loop_iterations: u32,
 ) {
+    let stop = StrandStop::new(stop_flag, &source.macro_id).fork();
     let run = StrandRun {
         source: Arc::new(source),
         emulator,
-        stop_flag: Some(StrandStop::new(stop_flag).fork()),
+        stop_flag: Some(stop),
         speed_multiplier,
         variables,
         lists,
