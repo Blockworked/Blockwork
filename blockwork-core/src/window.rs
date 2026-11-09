@@ -5,11 +5,20 @@
 
 pub use crate::screen::Rect;
 
-#[derive(Debug, Clone, Default, PartialEq, Eq)]
+#[derive(Debug, Clone, Default, PartialEq)]
 pub struct ActiveWindow {
     pub title: String,
     /// App or process name (window class on Linux).
     pub app: String,
+}
+
+/// One top-level window for the agent `windows` list.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct WindowInfo {
+    pub title: String,
+    pub app: String,
+    pub rect: Rect,
+    pub focused: bool,
 }
 
 /// Which part of a window a pattern is matched against.
@@ -108,11 +117,16 @@ pub fn exists(pattern: &str) -> Result<bool, String> {
     linux::exists(pattern.trim())
 }
 
+#[cfg(target_os = "linux")]
+pub fn list() -> Result<Vec<WindowInfo>, String> {
+    linux::list()
+}
+
 #[cfg(windows)]
-pub use windows::{act, active, bounds, exists, place};
+pub use windows::{act, active, bounds, exists, list, place};
 
 #[cfg(target_os = "macos")]
-pub use macos::{act, active, bounds, exists, place};
+pub use macos::{act, active, bounds, exists, list, place};
 
 #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
 mod unsupported {
@@ -133,9 +147,12 @@ mod unsupported {
     pub fn exists(_: &str) -> Result<bool, String> {
         Err(MSG.into())
     }
+    pub fn list() -> Result<Vec<super::WindowInfo>, String> {
+        Err(MSG.into())
+    }
 }
 #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
-pub use unsupported::{act, active, bounds, exists, place};
+pub use unsupported::{act, active, bounds, exists, list, place};
 
 #[cfg(target_os = "linux")]
 mod linux;

@@ -87,6 +87,15 @@ macro_rules! wire_blocks {
             };
             Some(Instruction { id: id.clone(), kind })
         }
+
+        /// Every block name the wire tables know, in declaration order.
+        /// `agent_describe_blocks` serves this so clients never guess names.
+        pub const BLOCK_KINDS: &[&str] = &[
+            $(stringify!($unit),)*
+            $(stringify!($tup),)*
+            $(stringify!($nam),)*
+            $(stringify!($cus),)*
+        ];
     };
 }
 

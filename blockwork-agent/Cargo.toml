@@ -1,0 +1,20 @@
+[package]
+name = "blockwork-agent"
+version.workspace = true
+edition.workspace = true
+rust-version.workspace = true
+
+[lib]
+name = "blockwork_agent"
+path = "src/lib.rs"
+
+[[bin]]
+name = "blockwork-agent"
+path = "src/main.rs"
+
+[dependencies]
+blockwork-protocol = { path = "../blockwork-protocol" }
+serde.workspace = true
+serde_json.workspace = true
+libc.workspace = true
+tokio = { workspace = true, features = ["rt", "rt-multi-thread", "macros", "net", "io-util", "time", "sync"] }

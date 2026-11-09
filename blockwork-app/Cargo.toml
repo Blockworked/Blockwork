@@ -7,6 +7,7 @@ rust-version.workspace = true
 [dependencies]
 blockstitch-core.workspace = true
 blockwork-core = { path = "../blockwork-core" }
+blockwork-protocol = { path = "../blockwork-protocol" }
 tracing.workspace = true
 serde.workspace = true
 serde_json.workspace = true

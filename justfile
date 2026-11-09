@@ -11,6 +11,7 @@ export MACOSX_DEPLOYMENT_TARGET := env_var_or_default("MACOSX_DEPLOYMENT_TARGET"
 
 TARGET := if os() == "windows" { 'target\release\blockwork.exe' } else { "target/release/blockwork" }
 DAEMON := if os() == "windows" { 'target\release\blockwork-daemon.exe' } else { "target/release/blockwork-daemon" }
+AGENT := if os() == "windows" { 'target\release\blockwork-agent.exe' } else { "target/release/blockwork-agent" }
 
 LIBDIR := "/usr/lib/blockwork"
 
@@ -90,7 +91,9 @@ blockstitch-published commit="":
 install: build
     sudo install -Dm0755 {{TARGET}} {{LIBDIR}}/blockwork
     sudo install -Dm0755 {{DAEMON}} {{LIBDIR}}/blockwork-daemon
+    sudo install -Dm0755 {{AGENT}} {{LIBDIR}}/blockwork-agent
     sudo ln -sf {{LIBDIR}}/blockwork /usr/bin/blockwork
+    sudo ln -sf {{LIBDIR}}/blockwork-agent /usr/bin/blockwork-agent
     sudo install -Dm0644 res/blockwork.desktop /usr/share/applications/blockwork.desktop
     sudo install -Dm0644 res/icons/blockwork.png /usr/share/icons/hicolor/256x256/apps/blockwork.png
 

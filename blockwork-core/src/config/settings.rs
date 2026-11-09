@@ -95,6 +95,14 @@ pub struct AppSettings {
     /// "light", "dark", or None to follow the system appearance.
     #[serde(default)]
     pub color_scheme: Option<String>,
+    /// Agent channel opt-in for `blockwork-agent` (CLI/MCP). Persisted so a
+    /// tray daemon picks it up on handshake without a restart.
+    #[serde(default)]
+    pub agent_enabled: Option<bool>,
+    /// Input synthesis gate for agents. Separate from `agent_enabled`,
+    /// default off.
+    #[serde(default)]
+    pub agent_input_allowed: Option<bool>,
 }
 
 fn settings_path() -> Result<PathBuf, String> {

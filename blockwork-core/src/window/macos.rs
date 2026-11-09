@@ -341,6 +341,21 @@ pub fn exists(pattern: &str) -> Result<bool, String> {
     }
 }
 
+pub fn list() -> Result<Vec<crate::window::WindowInfo>, String> {
+    use crate::window::WindowInfo;
+    let active_pid = focused().map(|(_, _, pid)| pid).unwrap_or(0);
+    let ws = windows(false)?;
+    Ok(ws
+        .into_iter()
+        .map(|w| WindowInfo {
+            title: w.info.title,
+            app: w.info.app,
+            rect: w.rect,
+            focused: w.pid == active_pid,
+        })
+        .collect())
+}
+
 fn fullscreen(window: &CFType, enabled: bool, pattern: &str, by: MatchBy) -> Result<(), String> {
     let value = if enabled {
         CFBoolean::true_value()

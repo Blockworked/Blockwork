@@ -527,6 +527,17 @@ dependencies = [
 ]
 
 [[package]]
+name = "blockwork-agent"
+version = "0.6.0"
+dependencies = [
+ "blockwork-protocol",
+ "libc",
+ "serde",
+ "serde_json",
+ "tokio",
+]
+
+[[package]]
 name = "blockwork-app"
 version = "0.6.0"
 dependencies = [
@@ -534,6 +545,7 @@ dependencies = [
  "blockstitch-core",
  "blockstitch-ffi",
  "blockwork-core",
+ "blockwork-protocol",
  "blockwork-web",
  "chrono",
  "dirs 7.0.0",

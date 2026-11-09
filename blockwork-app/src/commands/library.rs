@@ -111,13 +111,97 @@ pub(crate) fn select_macro_by_id(
 }
 
 /// The freshest copy of macro `id`: the open one holds unsaved edits.
-pub(super) fn find_macro(s: &crate::state::AppState, id: &str) -> Result<Macro, String> {
+pub(crate) fn find_macro(s: &crate::state::AppState, id: &str) -> Result<Macro, String> {
     s.current_macro
         .as_ref()
         .filter(|m| m.id == id)
         .or_else(|| s.macros_list.iter().find(|m| m.id == id))
         .cloned()
         .ok_or_else(|| "Macro not found".to_string())
+}
+
+/// Per-id kernel: rename macro `id`. UI commands resolve the open id and call
+/// this; agent commands call it with an explicit id. No new semantics, only
+/// new addressing.
+pub(crate) fn rename_macro_by_id(
+    state: &SharedState,
+    app: &AppHandle,
+    id: &str,
+    name: String,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mut mac = find_macro(&s, id)?;
+    mac.name = name;
+    mac.save()?;
+    if let Some(open) = s.current_macro.as_mut().filter(|m| m.id == id) {
+        open.name = mac.name.clone();
+    }
+    *s.doc_revisions.entry(id.to_string()).or_insert(0) += 1;
+    refresh_macro_list(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Per-id kernel: write macro settings for `id` from a settings DTO.
+pub(crate) fn set_macro_settings_by_id(
+    state: &SharedState,
+    app: &AppHandle,
+    id: &str,
+    dto: blockwork_core::frontend::MacroSettingsDto,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    let mut mac = find_macro(&s, id)?;
+    apply_settings_dto(&mut mac, dto);
+    mac.save()?;
+    if let Some(open) = s.current_macro.as_mut().filter(|m| m.id == id) {
+        open.settings = mac.settings.clone();
+        open.speed_multiplier = mac.speed_multiplier;
+    }
+    *s.doc_revisions.entry(id.to_string()).or_insert(0) += 1;
+    refresh_macro_list(&mut s);
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+fn apply_settings_dto(mac: &mut Macro, dto: blockwork_core::frontend::MacroSettingsDto) {
+    mac.settings.always_listen = dto.always_listen;
+    mac.settings.max_run_secs = dto.max_run_secs;
+    mac.settings.max_loop_iterations = dto.max_loop_iterations;
+    mac.settings.only_in_window = dto.only_in_window.clone();
+    mac.settings.power = dto.power;
+    mac.settings.catch_up_missed = dto.catch_up_missed;
+    mac.settings.folder = blockwork_core::macros::clean_folder(&dto.folder);
+    mac.settings
+        .set_conditions(
+            &dto.only_in_window,
+            dto.power,
+            &dto.active_from,
+            &dto.active_until,
+            dto.active_days,
+        )
+        .unwrap_or_default();
+}
+
+/// Per-id kernel: save `mac` (already mutated) to disk, both lists and the
+/// open copy, bump revision.
+pub(crate) fn save_macro_by_id(
+    state: &SharedState,
+    app: &AppHandle,
+    mac: Macro,
+) -> Result<(), String> {
+    let id = mac.id.clone();
+    mac.save()?;
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    if let Some(entry) = s.macros_list.iter_mut().find(|m| m.id == id) {
+        *entry = mac.clone();
+    }
+    if let Some(open) = s.current_macro.as_mut().filter(|m| m.id == id) {
+        *open = mac.clone();
+    }
+    s.macro_strs = s.macros_list.iter().map(|m| m.name.clone()).collect();
+    *s.doc_revisions.entry(id.clone()).or_insert(0) += 1;
+    emit_state_updated(app, &s);
+    Ok(())
 }
 
 /// Saves a copy of macro `id` next to it and opens the copy.
