@@ -71,7 +71,7 @@
   </screenshots>
 
   <releases>
-    <release version="0.6.0" date="2026-10-21">
+    <release version="0.6.0" date="2026-11-09">
       <description>
         <p>A large feature release: macros can now react to what happens on the computer and see the screen.</p>
         <ul>
@@ -80,7 +80,10 @@
           <li>File, web, shell, notification and dialog blocks</li>
           <li>Error handling, a debugger with breakpoints, and an emergency stop hotkey</li>
           <li>Global variables, secrets kept in the system keyring, and macros that run other macros</li>
+          <li>Browser blocks through the new Blockwork browser extension for Chrome, Edge and Firefox</li>
           <li>A searchable macro library, shareable bundles and block packs, with a permission review on import</li>
+          <li>A community block library to browse, install and publish block packs</li>
+          <li>Text boxes with several lines, and a stop block for the whole macro, one strand or the others</li>
           <li>A translatable interface, a command line, and starter templates</li>
           <li>Smooth animations and scrolling, with an animation speed setting from instant to slow</li>
         </ul>

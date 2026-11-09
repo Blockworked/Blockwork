@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Tag releases (`0.x.y`, see `.github/workflows/release.yml`) publish the matching
 section below as the GitHub release notes, followed by the downloads table.
 
-## [0.6.0] - Unreleased
+## [0.6.0] - 2026-11-09
 
 ### Added
 - "Run strand" in a strand's right-click menu (on its top block): runs just that strand from the top, without waiting for its event.
@@ -56,7 +56,8 @@ section below as the GitHub release notes, followed by the downloads table.
 - Screen captures (image blocks and the region and point pickers on screen reporters) use a see-through overlay on every monitor. On Wayland they go through the desktop portal (KDE and GNOME may ask for permission once) or `grim` on wlroots desktops.
 - "Wait until" block that pauses until a condition is true, with a time limit.
 - Error handling:
-  - Try/on error, throw error, error message, stop macro.
+  - Try/on error, throw error, error message.
+  - A stop block that ends the whole macro, just its own strand, or the macro's other strands, including ones its other triggers started.
   - Retry block: runs its body again after a failure, up to N attempts.
   - Per-macro time limit and loop limit.
 - Emergency stop hotkey (Ctrl+Alt+Shift+Esc) that stops every run and pauses triggers until resumed.
@@ -150,6 +151,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - "Text on screen" and "average color" have a button that picks their x, y, width and height by dragging a region on screen, and "color at" one that picks its x and y with a click.
 - macOS builds for Intel Macs, alongside Apple Silicon.
 - Hotkeys and the stop-recording key can use F13-F24.
+- New macro asks for a title first and can set the macro's speed, limits, triggers, conditions and permissions before it's created (Advanced settings).
 
 ### Changed
 - Blockwork has its own typeface, Atkinson Hyperlegible Next, built into the
