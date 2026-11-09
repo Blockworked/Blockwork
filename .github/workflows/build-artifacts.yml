@@ -1,7 +1,10 @@
 name: Build Artifacts
 
 on:
+  # Branch pushes only; a tag push is a release and has its own workflow.
   push:
+    branches:
+      - "**"
   workflow_dispatch:
 
 env:
