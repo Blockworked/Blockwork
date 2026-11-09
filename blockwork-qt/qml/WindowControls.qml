@@ -1,6 +1,7 @@
 import QtQuick
 import QtQuick.Controls
 import com.blockworked.Blockstitch 1.0
+import com.blockworked.Blockwork 1.0 as Blockwork
 
 // Minimize / maximize / close for the frameless window (Linux and Windows).
 Row {
@@ -20,7 +21,7 @@ Row {
         Behavior on color { enabled: Motion.enabled; ColorAnimation { duration: Motion.quick } }
         HoverHandler { id: hover; cursorShape: Qt.PointingHandCursor }
         TapHandler { onTapped: control.activated() }
-        LucideIcon { anchors.centerIn: parent; width: 16; height: 16; name: control.iconName; color: Theme.text }
+        Blockwork.LucideIcon { anchors.centerIn: parent; width: 16; height: 16; name: control.iconName; color: Theme.text }
         ToolTip.visible: hover.hovered
         ToolTip.text: label
         Accessible.role: Accessible.Button
