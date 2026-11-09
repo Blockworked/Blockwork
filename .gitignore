@@ -42,3 +42,4 @@ AppDir/
 blockwork-qt/qml/Lucide/
 
 *.log
+android-fixture/
