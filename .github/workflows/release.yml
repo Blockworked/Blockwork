@@ -510,21 +510,11 @@ jobs:
 
   winget:
     name: Publish to winget
-    runs-on: windows-latest
     needs: [release]
-    env:
-      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
-
-    steps:
-      # Updates an existing package; the first version is submitted by hand
-      - name: Open winget-pkgs PR
-        if: env.WINGET_TOKEN != ''
-        uses: vedantmgoyal9/winget-releaser@main
-        with:
-          identifier: Blockworked.Blockwork
-          release-tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
-          installers-regex: '-setup\.exe$'
-          token: ${{ secrets.WINGET_TOKEN }}
+    uses: ./.github/workflows/winget.yml
+    with:
+      tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    secrets: inherit
 
   msstore:
     name: Submit to Microsoft Store

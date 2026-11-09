@@ -1,0 +1,37 @@
+name: Winget
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+    secrets:
+      WINGET_TOKEN:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to submit (e.g. 0.6.0)"
+        required: true
+        type: string
+
+jobs:
+  winget:
+    name: Open winget-pkgs PR
+    runs-on: windows-latest
+    env:
+      WINGET_TOKEN: ${{ secrets.WINGET_TOKEN }}
+
+    steps:
+      # Updates an existing package; the first version is submitted by hand
+      - name: Open winget-pkgs PR
+        if: env.WINGET_TOKEN != ''
+        uses: vedantmgoyal9/winget-releaser@main
+        with:
+          identifier: Blockworked.Blockwork
+          # The winget-pkgs fork lives on EthanRStokes, not the Blockworked org
+          fork-user: EthanRStokes
+          release-tag: ${{ inputs.tag }}
+          installers-regex: '-setup\.exe$'
+          token: ${{ secrets.WINGET_TOKEN }}
