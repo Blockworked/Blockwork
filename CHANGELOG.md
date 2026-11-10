@@ -50,7 +50,7 @@ section below as the GitHub release notes, followed by the downloads table.
   - Detect objects in a window with a local detector service, and wait for a detection.
   - Aim one step toward a point, or at a tracked detection.
   - "Window x/y/width/height/center" and "detection of" reporters.
-  - Detectors must run on this computer.
+  - Detectors must run on this computer. Models can run on the GPU through Metal on macOS.
 - Screen blocks, in a new Screen palette category:
   - Color at a point, average color of a region, colors match.
   - Text on screen (OCR): Windows/macOS built-ins, or Tesseract on Linux.
@@ -116,7 +116,6 @@ section below as the GitHub release notes, followed by the downloads table.
   - Choose what to allow in the import review or in Macro settings > Permissions; grants are kept outside the macro file.
 - Block library:
   - My Blocks > Browse lists shared block packs from library indexes set in Settings > Editor; the built-in one is https://community.blockworked.com.
-  - The built-in library can't be removed, and comes back for anyone who removed it in an earlier build.
   - Packs are checked against the SHA-256 their index pins, reviewed before they're added, and replace their older versions in place.
   - Packs published by the Blockworked team show a blue verified badge next to their publisher in Browse library. Only the built-in library can mark packs this way.
   - Right-click a custom block to share it, and the blocks it uses, as a `.blockpack` file.
@@ -188,9 +187,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Settings drop the description lines under Appearance, Start at system startup, Language, Time format, Block library, Start automatically and Secrets.
 - The welcome screen groups preferences and starter templates into panels that reflow on narrower windows. Cron syntax help opens from an info button beside the custom schedule field.
 - Clearing all blocks uses a Cancel/Delete confirmation popup and can be undone.
-- Legacy pack variables migrate to private pack state where possible. Variables used by the macro or shared by older packs stay shared so existing macros keep working.
 - macOS 13 or newer is required (Qt 6.10).
-- macOS window blocks use the Accessibility API directly instead of System Events, so they no longer need an Automation permission. Maximize fills the screen's usable area like on Windows and Linux instead of opening a fullscreen Space, and Restore puts the window back.
 - On macOS, "close app" closes only the chosen copy of the app. It asks the app to quit and force-closes it after three seconds, so a save prompt can't keep it open, matching Windows and Linux.
 - On macOS, horizontal scrolling goes the same way as on Windows and Linux (positive is right). Horizontal scrolls recorded on a Mac with an earlier build replay mirrored.
 - A key that can't be pressed shows as an error on its block (and can be caught by a try block) instead of being skipped silently. On macOS, F21-F24 and Select can't be pressed.
@@ -204,41 +201,27 @@ section below as the GitHub release notes, followed by the downloads table.
   grabbing an input device, preventing stuck input when Blockwork starts.
 - A mouse wheel no longer scrolls far too fast; each notch now moves the normal system step. Touchpad scrolling is unchanged.
 - Dragging inside a text field on the canvas selects text instead of also panning the canvas.
-- Dragging a tall block (like an HTTP request with its headers box) from the sidebar shows a drop preview of its real height and snaps where it will land, as dragging it on the canvas does.
 - Dragging a variable or other value out of a field shrinks the field back to its empty size straight away, instead of keeping a blank gap until the drop.
-- The recording target is now a red dot on the corner of its first block's icon, matching the Record button, and a breakpoint is a red bar at the left of its block, instead of dots poking out over the block's edges.
-- The "Choose macros to export" list scrolls like the app's other lists: smooth wheel and touchpad scrolling and the same scroll bar.
 - Ctrl+scroll zooms the canvas around the mouse pointer instead of pushing the view right and down, and mouse wheel zoom, the zoom buttons and reset now ease in (follows the animation speed setting).
 - The "when every day at" block saves its day, weekday, month and time again.
 - Dragging the canvas with the mouse stops where you let go instead of gliding on, and two-finger touchpad panning is smoothed slightly.
 - Every event block label now uses the same bold caption style; newer event blocks (when run, when file changes, when idle and others) were drawn in plain text while the older ones were bold.
 - Clicking Record during the countdown cancels the recording instead of starting the countdown over, and the Record button's label no longer gets cut off or overlaps its neighbours.
-- Images taken with the screen picker no longer catch the picker's own close animation (such as KDE's shattering windows) as stray lines and shapes.
-- Cancelling the screen picker (Cancel or Esc) brings the editor back instead of closing it.
 - Dropping blocks above a stack keeps the existing stack in place, with matching connectors and smoother branch previews.
 - Dragging a block over the sidebar keeps the canvas still, and dropping it there deletes it. Dragging a key input from the palette no longer pans the sidebar.
 - Custom block headers appear inside the visible canvas when created, and dragging blocks and parameters keeps their position and color until the edit lands.
 - List and dictionary editors stay fixed while the canvas pans or zooms, keep header drags through state updates, and preserve the current edit when adding an item.
 - Comment editing scrolls correctly, attached comments keep their connector lines, and comments drag from their header. Text context menus follow the app theme.
-- Renaming a variable updates both output fields of Find image, as well as nested reads and writes.
-- Browser scripts can wait up to two minutes for a result and stop promptly when the macro is stopped.
-- Wait until and Wait for image no longer allow conflicting "for up to" and "or error after" timeout options on the same block.
 - Windows x64 builds use the full Qt package required to bundle the app.
 - Releasing one Shift (or Control/Alt) while the other is still held no longer drops the modifier for hotkeys.
-- Reading text from a blank or single-color area returns nothing straight away instead of calling the OCR engine.
 - macOS:
   - Holding a hotkey runs its action once instead of once per key repeat, and the hotkey's key-up no longer reaches the focused app.
   - Recording keeps both scroll axes, extra mouse buttons, the real cursor position and hardware timestamps, and keeps right-side modifiers apart from left.
   - Typing and key presses keep non-US text, emoji and modifier order, and media keys work.
-  - Screen capture reads colors in sRGB, captures only the asked-for region and works on Retina and mixed-scale displays. Missing Screen Recording or Accessibility permission is reported instead of giving wrong results.
-  - Text recognition no longer hangs on a stalled Vision service; it falls back to a faster recognizer for a while and tries the accurate one again later.
-  - Window Focus and Restore work on windows that can't be minimized, and "window exists?" answers false instead of an error without Accessibility access.
   - The app picker lists system apps and apps in category folders like Utilities, with their icons.
   - Reopening the app shows the editor after it was closed to the tray.
-- Macro dialogs close when Blockwork's background process exits (Windows, macOS and Linux) instead of staying on screen.
-- Settings switches show a focus ring when reached with Tab.
-  - Detection models can run on the GPU through Metal.
   - Updates install correctly when the app is on a different drive from the download, and the app restarts after the old one has exited.
+- Settings switches show a focus ring when reached with Tab.
 - Release publishing waits for required builds and downloads to succeed, and lists only available packages. Creating a Microsoft Store test flight reports missing tester-group IDs before submitting it.
 
 ## [0.5.4] - 2026-09-20
