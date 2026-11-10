@@ -8,6 +8,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Tag releases (`0.x.y`, see `.github/workflows/release.yml`) publish the matching
 section below as the GitHub release notes, followed by the downloads table.
 
+## [UNRELEASED]
+
+### Fixed
+- Drag previews line up when moving blocks between branches of a bracket block.
+- Details opens for custom blocks inside fields, including If conditions.
+
 ## [0.6.1] - 2026-11-09
 
 ### Fixed

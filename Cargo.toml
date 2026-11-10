@@ -26,9 +26,9 @@ rust-version = "1.91"
 [workspace.dependencies]
 # One blockstitch commit for all three; change it with scripts/set-blockstitch-rev.js,
 # or build against a checkout with `just blockstitch-local`.
-blockstitch-qml = { git = "https://github.com/Blockworked/blockstitch", rev = "6a1aee2d6844987619c972b5cbc401627fe380af" }
-blockstitch-ffi = { git = "https://github.com/Blockworked/blockstitch", rev = "6a1aee2d6844987619c972b5cbc401627fe380af" }
-blockstitch-core = { git = "https://github.com/Blockworked/blockstitch", rev = "6a1aee2d6844987619c972b5cbc401627fe380af" }
+blockstitch-qml = { git = "https://github.com/Blockworked/blockstitch", rev = "bb87d7b81a7b5dc379536ed7d481ab25470ef73c" }
+blockstitch-ffi = { git = "https://github.com/Blockworked/blockstitch", rev = "bb87d7b81a7b5dc379536ed7d481ab25470ef73c" }
+blockstitch-core = { git = "https://github.com/Blockworked/blockstitch", rev = "bb87d7b81a7b5dc379536ed7d481ab25470ef73c" }
 tracing = "0.1.44"
 tracing-log = "0.2.0"
 tracing-subscriber = "0.3.23"
