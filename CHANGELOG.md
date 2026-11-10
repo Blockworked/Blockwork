@@ -11,8 +11,8 @@ section below as the GitHub release notes, followed by the downloads table.
 ## [UNRELEASED]
 
 ### Fixed
-- Blocks stay under the pointer while branches resize and no longer stutter on release.
-- Dropped blocks keep their hover outline while the editor updates.
+- Blocks stay under the pointer while branches resize; bracket shapes update in the same frame as a drop.
+- Blocks keep their blue outline when a drag ends.
 - Drag previews line up when moving blocks between branches of a bracket block.
 - Details opens for custom blocks inside fields, including If conditions.
 

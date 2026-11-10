@@ -87,6 +87,65 @@ Item {
         }
         function canvasBlock(page, id) { return all(page).find(o => o.instruction && o.instruction.id === id && o.paletteMode === false && o.width > 0); }
         function ghost(page) { return all(page).find(o => o.objectName === "paletteGhost"); }
+        function test_then_branch_release_first_frame_data() {
+            const rows = [];
+            for (const zoom of [1,1.8])
+                for (const attach of [false,true])
+                    for (const delay of [0,80])
+                        rows.push({tag:zoom+"_"+(attach ? "attach" : "detach")+"_"+delay,zoom:zoom,attach:attach,delay:delay});
+            return rows;
+        }
+        function test_then_branch_release_first_frame(data) {
+            const page = editor();
+            const moved = {id:"moved",type:"OpenApp",command:"audacity",name:"Audacity 4",icon:null};
+            const wrap = {id:"wrap",type:"IfElse",condition:{kind:"Bool",value:true},then_body:[moved],else_body:[]};
+            const mac = scene.macro("release",[{id:"source",x:-100,y:-100,instructions:[wrap]}]);
+            page.appState = scene.state(mac);
+            wait(100);
+            const canvas = all(page).find(o => o.isBlockCanvas);
+            canvas.setZoom(data.zoom);
+            const block = canvasBlock(page,"moved");
+            const outer = canvasBlock(page,"wrap");
+            const start = block.mapToItem(scene,65,25);
+            const end = outer.mapToItem(scene,65,outer.height+(data.attach ? -10 : 40));
+            mouseMove(scene,start.x,start.y);
+            mousePress(scene,start.x,start.y);
+            mouseMove(scene,start.x+10,start.y+10,10,Qt.LeftButton);
+            mouseMove(scene,end.x,end.y,30,Qt.LeftButton);
+            verify(canvas.dragging);
+            wait(180);
+            const overlay = all(page).find(o => o.objectName === "canvasDragGhost");
+            const copy = all(overlay).find(o => o.instruction && o.instruction.id === "moved");
+            verify(!!copy);
+            waitForRendering(canvas);
+            const before = grabImage(scene), edge = copy.mapToItem(scene,copy.width-1,25);
+            const beforeColor = before.pixel(Math.round(edge.x),Math.round(edge.y));
+            verify(beforeColor.b-beforeColor.r > 0.4,"the outgoing drag overlay must carry the outline into release: " + beforeColor);
+            mouseRelease(scene,end.x,end.y);
+            const call = scene.calls.find(c => c.command === "split_strand" || c.command === "merge_tail");
+            verify(!!call,"mouse release must submit the move");
+            const updated = JSON.parse(JSON.stringify(mac));
+            updated.strands[0].instructions[0].then_body = [];
+            if (call.command === "split_strand")
+                updated.strands.push({id:"detached",x:call.args.x,y:call.args.y,instructions:[moved]});
+            else
+                updated.strands[0].instructions.push(moved);
+            compare(call.command,data.attach ? "merge_tail" : "split_strand");
+            wait(data.delay);
+            page.appState = scene.state(updated);
+            waitForRendering(canvas);
+            const landed = canvasBlock(page,"moved");
+            const surface = all(outer).find(o => o.outlinePath !== undefined);
+            const writer = surface.writer(); surface.trace(writer);
+            const landedSurface = all(landed).find(o => o.outlinePath !== undefined);
+            verify(landedSurface.hovered,"the real mouse release must retain the dropped block outline");
+            const image = grabImage(scene), at = landed.mapToItem(scene,landed.width-1,25);
+            const color = image.pixel(Math.round(at.x),Math.round(at.y));
+            const landedWriter = landedSurface.writer(); landedSurface.trace(landedWriter);
+            compare(surface.outlinePath,writer.text(),"the first frame must draw the current source geometry");
+            compare(landedSurface.outlinePath,landedWriter.text(),"the first frame must draw the full dropped-block outline");
+            verify(color.b-color.r > 0.4,"the first frame must paint the hover outline: " + color);
+        }
         function test_variable_defaults_data() {
             return [
                 {tag: "set", type: "SetVariable", keys: ["name"]},
