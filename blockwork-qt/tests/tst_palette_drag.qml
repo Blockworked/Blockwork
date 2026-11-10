@@ -128,8 +128,11 @@ Item {
             updated.strands[0].instructions[0].then_body = [];
             if (call.command === "split_strand")
                 updated.strands.push({id:"detached",x:call.args.x,y:call.args.y,instructions:[moved]});
-            else
+            else {
+                compare(call.args.targetId,"source");
+                compare(call.args.targetPath,[{index:1}]);
                 updated.strands[0].instructions.push(moved);
+            }
             compare(call.command,data.attach ? "merge_tail" : "split_strand");
             wait(data.delay);
             page.appState = scene.state(updated);
@@ -145,6 +148,8 @@ Item {
             compare(surface.outlinePath,writer.text(),"the first frame must draw the current source geometry");
             compare(landedSurface.outlinePath,landedWriter.text(),"the first frame must draw the full dropped-block outline");
             verify(color.b-color.r > 0.4,"the first frame must paint the hover outline: " + color);
+            mouseMove(scene,scene.width-2,scene.height-2);
+            tryCompare(landedSurface,"hovered",false);
         }
         function test_variable_defaults_data() {
             return [
