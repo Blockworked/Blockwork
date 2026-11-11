@@ -24,12 +24,6 @@ ApplicationWindow {
         | (Qt.platform.os === "windows" ? Qt.WindowMinMaxButtonsHint | Qt.WindowSystemMenuHint : 0)) : Qt.Window
     color: customChrome ? "transparent" : Theme.window
     property real sidebarWidth: 348
-    // True while the window is being resized: the rounded-corner mask layer is
-    // skipped then, since rendering the whole UI offscreen every frame is slow.
-    property bool liveResizing: false
-    onWidthChanged: { liveResizing = true; resizeIdle.restart(); }
-    onHeightChanged: { liveResizing = true; resizeIdle.restart(); }
-    Timer { id: resizeIdle; interval: 140; onTriggered: root.liveResizing = false }
     property bool sidebarCollapsed: false
     property bool initialStateReceived: false
     readonly property bool uiReady: bridge.connected && initialStateReceived
@@ -159,11 +153,11 @@ ApplicationWindow {
         source: "qrc:/icons/window-shadow.png"
         border { left: 40; right: 40; top: 40; bottom: 40 }
     }
-    // Clipped to the rounded window shape on the frameless build.
+    // Keep the content clipped during moves and resizes, matching the outline.
     Item {
         id: frame
         anchors.fill: parent; anchors.margins: root.shadowMargin
-        layer.enabled: root.cornerRadius > 0 && !root.liveResizing
+        layer.enabled: root.cornerRadius > 0
         layer.smooth: true
         layer.effect: MultiEffect { maskEnabled: true; maskSource: frameMask; maskThresholdMin: 0.5; maskSpreadAtMin: 1.0 }
         Rectangle { anchors.fill: parent; color: Theme.window }
@@ -242,7 +236,7 @@ ApplicationWindow {
     Item {
         id: frameMask
         anchors.fill: frame; visible: false
-        layer.enabled: root.cornerRadius > 0 && !root.liveResizing; layer.smooth: true
+        layer.enabled: root.cornerRadius > 0; layer.smooth: true
         Rectangle { anchors.fill: parent; radius: root.cornerRadius; color: "black"; antialiasing: true }
     }
     Component {
