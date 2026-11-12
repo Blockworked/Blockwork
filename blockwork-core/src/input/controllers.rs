@@ -250,7 +250,11 @@ mod tests {
         };
         let mut two = one.clone();
         two.instance = 2;
-        assert!(select(&[one.clone()], "same").unwrap().is_some());
+        assert!(
+            select(std::slice::from_ref(&one), "same")
+                .unwrap()
+                .is_some()
+        );
         assert!(select(&[one.clone(), two.clone()], "same").is_err());
         assert!(select(&[one.clone(), two], "").is_err());
         assert!(select(&[one], "missing").unwrap().is_none());
