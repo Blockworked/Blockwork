@@ -9,9 +9,12 @@
 
 pub(crate) mod battery;
 pub(crate) mod clipboard;
+pub(crate) mod controllers;
 pub(crate) mod file;
 pub(crate) mod key;
 pub(crate) mod mouse;
+pub(crate) mod native_ui;
+pub(crate) mod startup;
 pub(crate) mod system;
 pub(crate) mod time;
 pub(crate) mod typed;
@@ -130,6 +133,34 @@ impl ReportOnce {
     fn reported(&self, what: &str) -> Option<&str> {
         self.0.get(what).map(String::as_str)
     }
+}
+
+/// Background configuration must not execute host reporters without a run context.
+pub(crate) fn header_value(
+    value: &blockwork_core::input::value::Value,
+    env: &HashMap<String, Evaluated>,
+) -> Result<blockwork_core::input::value::Value, String> {
+    use blockwork_core::input::value::Value;
+    fn safe(value: &Value) -> bool {
+        match value {
+            Value::Op { op, args, .. } => {
+                blockwork_core::capabilities::operator_capability(op.name()).is_none()
+                    && args.iter().all(safe)
+            }
+            Value::Call { .. } => false,
+            _ => true,
+        }
+    }
+    let value = value.resolve_vars(env);
+    if safe(&value) {
+        Ok(value)
+    } else {
+        Err("Trigger configuration cannot execute live reporters or custom calls".into())
+    }
+}
+pub(crate) fn permitted(mac: &Macro, capability: &str) -> bool {
+    blockwork_core::permissions::grants(&mac.id)
+        .is_none_or(|g| g.allowed.iter().any(|c| c == capability))
 }
 
 #[cfg(test)]

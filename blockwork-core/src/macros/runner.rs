@@ -68,6 +68,7 @@ enum Flow {
 /// isolated from its caller's.
 struct ExecCtx<'a> {
     emulator: Arc<Mutex<dyn InputBackend>>,
+    gamepad: Option<crate::input::virtual_gamepad::Lease>,
     stop_flag: Option<StrandStop>,
     speed_multiplier: f64,
     variables: VariableStore,
@@ -815,6 +816,7 @@ pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>, initial
     );
     {
         let mut ctx = ExecCtx {
+            gamepad: None,
             emulator: Arc::clone(&emulator),
             stop_flag,
             speed_multiplier,
@@ -1008,6 +1010,11 @@ fn run_block(
                     && let Some(flow) = input::run_token(token, ins, ctx, depth)?
                 {
                     return Ok(flow);
+                } else if !matches!(ins.kind, InstructionKind::Token(_))
+                    && let Err(error) = input::run_extended(ins, ctx, depth)
+                {
+                    ctx.gamepad = None;
+                    soft_fail(ctx, &ins.id, "Input", error)?;
                 }
             }
             Role::Data => {

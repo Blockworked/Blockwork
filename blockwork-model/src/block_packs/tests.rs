@@ -117,6 +117,7 @@ fn input_defaults_survive_pack_updates_without_resetting_calls() {
                 value_type: Default::default(),
                 default_value: Some(Evaluated::Text("example".into())),
                 multiline: false,
+                ui: None,
             },
         ],
         crate::macros::BlockShape::Normal,
@@ -165,6 +166,7 @@ fn input_defaults_survive_pack_updates_without_resetting_calls() {
             value_type: Default::default(),
             default_value: Some(Evaluated::Number(3.0)),
             multiline: false,
+            ui: None,
         });
     merge_into(&mut target, &pack, "");
     let call = target.strands.last().unwrap().instructions.first().unwrap();
@@ -578,4 +580,51 @@ fn only_the_built_in_library_marks_packs_official() {
         "older indexes without the field have no badge"
     );
     assert_eq!(official("https://example.com/index.json"), [false, false]);
+}
+
+#[test]
+fn menus_survive_pack_install_and_macro_save() {
+    let mut author = Macro::new("author".into(), String::new(), vec![]);
+    let pieces = serde_json::from_value(serde_json::json!([
+        {"kind":"Label", "id":"label", "text":"configured"},
+        {"kind":"Input", "id":"mode", "name":"mode", "ui":{"screen_only":true, "choices":[{"label":"Fast", "value":"fast"}]}},
+        {"kind":"Button", "id":"settings", "text":"Options", "title":"Configure", "inputs":["mode"]}
+    ])).unwrap();
+    let id = author.create_block(pieces, BlockShape::Normal, "#4C97FF".into(), 0, 0);
+    let pack = pack_from_macro(
+        &author,
+        std::slice::from_ref(&id),
+        PackInfo {
+            id: "menus".into(),
+            name: "Menus".into(),
+            ..PackInfo::default()
+        },
+    )
+    .unwrap();
+    let pack = read_pack(&write_pack(&pack).unwrap()).unwrap();
+    let mut target = Macro::new("target".into(), String::new(), vec![]);
+    merge_into(&mut target, &pack, "");
+    let saved = migrate::to_value(&target).unwrap();
+    assert_eq!(saved["format_version"], migrate::FORMAT_VERSION);
+    let (loaded, _) = migrate::from_value(saved).unwrap();
+    assert_eq!(
+        loaded.block_def(&id).unwrap().pieces,
+        pack.content.block_def(&id).unwrap().pieces
+    );
+    assert_eq!(
+        loaded
+            .block_def(&id)
+            .unwrap()
+            .input_defaults()
+            .collect::<Vec<_>>(),
+        [Value::text("fast")]
+    );
+    let mut bad: serde_json::Value = serde_json::from_str(&write_pack(&pack).unwrap()).unwrap();
+    bad["blocks"]["block_defs"][0]["pieces"][2]["inputs"] = serde_json::json!(["missing"]);
+    assert!(read_pack(&serde_json::to_string(&bad).unwrap()).is_err());
+    let def = &mut target.graph.block_defs[0];
+    if let BlockPiece::Button { inputs, .. } = &mut def.pieces[2] {
+        inputs[0] = "missing".into();
+    }
+    assert!(pack_from_macro(&target, std::slice::from_ref(&id), PackInfo::default()).is_err());
 }

@@ -44,11 +44,23 @@
     "FindImage": [
       "screen"
     ],
+    "GamepadButton": [
+      "input"
+    ],
+    "GamepadStick": [
+      "input"
+    ],
+    "GamepadTrigger": [
+      "input"
+    ],
     "HttpRequest": [
       "network"
     ],
     "MoveWindow": [
       "windows"
+    ],
+    "NativeUiAction": [
+      "ui_automation"
     ],
     "OpenApp": [
       "commands"
@@ -56,6 +68,9 @@
     "PasteText": [
       "input",
       "clipboard"
+    ],
+    "ResetGamepad": [
+      "input"
     ],
     "RunMacro": [
       "macros"
@@ -70,6 +85,12 @@
       "macros"
     ],
     "Token": [
+      "input"
+    ],
+    "TouchGesture": [
+      "input"
+    ],
+    "TouchSequence": [
       "input"
     ],
     "WaitForDetection": [
@@ -102,6 +123,18 @@
       "files_read",
       "triggers"
     ],
+    "WhenGamepadAxis": [
+      "input",
+      "triggers"
+    ],
+    "WhenGamepadButton": [
+      "input",
+      "triggers"
+    ],
+    "WhenGamepadConnection": [
+      "input",
+      "triggers"
+    ],
     "WhenIdle": [
       "triggers"
     ],
@@ -109,6 +142,10 @@
       "triggers"
     ],
     "WhenMouseButton": [
+      "triggers"
+    ],
+    "WhenNativeUiChanged": [
+      "ui_automation",
       "triggers"
     ],
     "WhenNetwork": [
@@ -124,6 +161,9 @@
       "triggers"
     ],
     "WhenSignal": [
+      "triggers"
+    ],
+    "WhenSystemStarts": [
       "triggers"
     ],
     "WhenTime": [
@@ -154,6 +194,11 @@
     [
       "commands",
       "Runs commands and opens or closes apps",
+      true
+    ],
+    [
+      "ui_automation",
+      "Reads or controls desktop apps through accessibility",
       true
     ],
     [
@@ -229,10 +274,17 @@
     "ElementExists": "browser",
     "ElementText": "browser",
     "FileExists": "files_read",
+    "GamepadAxisValue": "input",
+    "GamepadButtonDown": "input",
+    "GamepadConnected": "input",
     "GlobalVariable": "globals",
     "HttpGet": "network",
     "ListDirectory": "files_read",
     "MacroRunning": "macros",
+    "NativeUiEnabled": "ui_automation",
+    "NativeUiExists": "ui_automation",
+    "NativeUiText": "ui_automation",
+    "NativeUiValue": "ui_automation",
     "PageTitle": "browser",
     "PageUrl": "browser",
     "PixelColor": "screen",

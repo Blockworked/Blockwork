@@ -7,8 +7,13 @@ use crate::macros::{BlockKind, InstructionKind, Macro, Role};
 use std::collections::HashSet;
 
 /// Every capability, in display order: (kind, label, whether it deserves a warning).
-pub const CAPABILITIES: [(&str, &str, bool); 13] = [
+pub const CAPABILITIES: [(&str, &str, bool); 14] = [
     ("commands", "Runs commands and opens or closes apps", true),
+    (
+        "ui_automation",
+        "Reads or controls desktop apps through accessibility",
+        true,
+    ),
     ("secrets", "Reads your saved secrets", true),
     ("network", "Goes online", true),
     (
@@ -88,6 +93,8 @@ pub const UNGUARDED_OPERATORS: &[&str] = &[
 /// The capability a reporter needs, by operator name.
 pub fn operator_capability(op: &str) -> Option<&'static str> {
     Some(match op {
+        "NativeUiExists" | "NativeUiEnabled" | "NativeUiText" | "NativeUiValue" => "ui_automation",
+        "GamepadConnected" | "GamepadButtonDown" | "GamepadAxisValue" => "input",
         "ShellOutput" | "ShellSucceeded" => "commands",
         "HttpGet" => "network",
         "ReadFile" | "FileExists" | "ListDirectory" => "files_read",

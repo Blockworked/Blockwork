@@ -43,6 +43,12 @@ pub struct AppSettings {
     pub close_to_tray: Option<bool>,
     /// Launch the daemon in the background at login.
     pub start_at_startup: Option<bool>,
+    /// Installed startup entry format; old entries are upgraded once.
+    pub startup_entry_version: Option<u32>,
+    pub controller_input_enabled: Option<bool>,
+    pub controller_deadzone: Option<f64>,
+    pub virtual_gamepad_enabled: Option<bool>,
+    pub ui_automation_enabled: Option<bool>,
     /// False while the first-run welcome screen is still pending.
     pub onboarding_done: Option<bool>,
     /// Block palette layout: rail, chips, accordion, flyout or tiles.

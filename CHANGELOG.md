@@ -12,6 +12,9 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ### Added
 - Report a community pack, or someone else's comment on it, from its page in the Block library.
+- Custom blocks can have dropdown choices and buttons opening their own settings screens, including inputs shown only on those screens.
+- Built-in block menus and pickers use the same shared UI framework.
+- Saved macro format 6 preserves custom block menus; macros from earlier versions still load.
 
 ### Changed
 - The Text block spaces keystrokes 0.5 ms apart on Windows and macOS too, as it already did on Linux, so fast typing doesn't drop or merge characters.

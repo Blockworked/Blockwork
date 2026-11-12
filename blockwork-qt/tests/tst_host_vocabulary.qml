@@ -49,6 +49,29 @@ Item {
             compare(BlockRegistry.iconFor("WhenRan"), "play");
             compare(BlockRegistry.iconFor("If"), "git-branch");
         }
+        function test_model_and_usb_screens_use_the_shared_router() {
+            const page = createTemporaryObject(editorComponent, scene);
+            scene.calls = [];
+            const instruction = {id: "detect", type: "DetectObjectsInWindow", detector: {kind: "Text", value: "old"}, confidence: {kind: "Number", value: 75}};
+            verify(page.onPieceAction("pickModel", "strand", [{index: 0}], instruction));
+            const model = findChild(page, "detectionModelScreen");
+            verify(model);
+            tryCompare(model, "opened", true);
+            model.use("yolo-test");
+            compare(scene.calls[0].command, "edit_instruction");
+            compare(scene.calls[0].args.instruction.detector.value, "yolo-test");
+            compare(scene.calls[0].args.instruction.confidence.value, 75);
+            const location = {strand_id: "strand", index: [{index: 0}], field: "UsbPattern", path: []};
+            BlockRegistry.requestPick("pickUsb", location, {kind: "Text", value: "usb"});
+            const usb = findChild(page, "usbDeviceScreen");
+            verify(usb);
+            tryCompare(usb, "opened", true);
+            usb.use("1234:5678");
+            compare(scene.calls[1].command, "edit_value_field");
+            compare(scene.calls[1].args.location, location);
+            compare(scene.calls[1].args.text, "1234:5678");
+            wait(250);
+        }
         function test_every_block_icon_is_drawable() {
             const page = createTemporaryObject(editorComponent, scene);
             wait(50);

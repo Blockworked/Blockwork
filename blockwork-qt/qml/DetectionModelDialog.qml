@@ -8,6 +8,7 @@ import com.blockworked.Blockstitch 1.0
 // Picks the detection model an object-detection block runs: a bundled one,
 // an imported .onnx file, or a detector URL on this computer.
 AppDialog {
+    objectName: "detectionModelScreen"
     id: modelDialog; title: qsTr("Choose a detection model"); standardButtons: Dialog.Cancel
     required property Item page
     property var request: null

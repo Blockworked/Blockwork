@@ -5,6 +5,7 @@ import com.blockworked.Blockstitch 1.0
 
 // Picks the USB device a 'when USB device' block or reporter matches.
 AppDialog {
+    objectName: "usbDeviceScreen"
     id: usbDialog; title: qsTr("Choose a USB device"); standardButtons: Dialog.Cancel
     // The EditorPage this dialog edits: its macro and invoke().
     required property Item page
