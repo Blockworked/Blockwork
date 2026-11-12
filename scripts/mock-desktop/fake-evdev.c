@@ -10,8 +10,9 @@
 //   /sys/bus/usb/devices -> $FAKE_USB_DIR, a sysfs-like tree of fake USB
 //                           devices kept by `fake-input.py usb`.
 //
-// Capability ioctls are answered from $FAKE_EVDEV_DIR/eventN.conf and the held
-// keys (EVIOCGKEY) from eventN.held, both kept by the broker.
+// Capability ioctls are answered from $FAKE_EVDEV_DIR/eventN.conf (event, key,
+// rel and abs bits, properties, and "absN min max" ranges) and the held keys
+// (EVIOCGKEY) from eventN.held, both kept by the broker.
 //
 // Build: cc -shared -fPIC -O2 -o fake-evdev.so fake-evdev.c -ldl
 #define _GNU_SOURCE
@@ -193,15 +194,28 @@ static int evdev_ioctl(int fd, unsigned long req, void *arg) {
     if ((req >> 30) & 2) {                                         // any other read: zeroed buffer
         memset(arg, 0, size);
         if (nr >= 0x20 && nr < 0x40) {                             // EVIOCGBIT(ev)
-            static const char *keys[] = {"ev", "key", "rel"};
+            static const char *keys[] = {"ev", "key", "rel", "abs"};
             unsigned ev = nr - 0x20;
-            if (ev < 3 && conf_line(node, "conf", keys[ev], value, sizeof value) == 0)
+            if (ev < 4 && conf_line(node, "conf", keys[ev], value, sizeof value) == 0)
                 set_bits(arg, size, value);
             return (int)size;
         }
+        if (nr == 0x09) {                                          // EVIOCGPROP
+            if (conf_line(node, "conf", "prop", value, sizeof value) == 0) set_bits(arg, size, value);
+            return (int)size;
+        }
+        if (nr >= 0x40 && nr < 0x80) {                             // EVIOCGABS(axis): struct input_absinfo
+            char key[16];
+            int32_t info[6] = {0};
+            snprintf(key, sizeof key, "abs%u", nr - 0x40);
+            if (conf_line(node, "conf", key, value, sizeof value) == 0)
+                sscanf(value, "%d %d", &info[1], &info[2]);
+            memcpy(arg, info, size < sizeof info ? size : sizeof info);
+            return 0;
+        }
         if (nr == 0x18 && conf_line(node, "held", "", value, sizeof value) == 0)  // EVIOCGKEY
             set_bits(arg, size, value);
-        return nr >= 0x40 && nr < 0x80 ? 0 : (int)size;
+        return (int)size;
     }
     return 0;
 }
@@ -212,6 +226,12 @@ static int uinput_ioctl(int fd, unsigned long req, void *arg) {
     case 3: {                                                      // UI_DEV_SETUP: pass the name on
         char msg[96] = "SETUP ";
         snprintf(msg + 6, sizeof msg - 6, "%s", (const char *)arg + 8);
+        return send(fd, msg, strlen(msg), MSG_NOSIGNAL) < 0 ? -1 : 0;
+    }
+    case 4: {                                                      // UI_ABS_SETUP: log the axis range
+        const int32_t *abs = (const int32_t *)((const char *)arg + 4);
+        char msg[96];
+        snprintf(msg, sizeof msg, "ABS %u %d %d", *(const uint16_t *)arg, abs[1], abs[2]);
         return send(fd, msg, strlen(msg), MSG_NOSIGNAL) < 0 ? -1 : 0;
     }
     case 44:                                                       // UI_GET_SYSNAME

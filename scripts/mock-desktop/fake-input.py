@@ -2,7 +2,8 @@
 """Fake input devices for the mock desktop.
 
 Serves the sockets behind fake-evdev.so (see that file): a fake keyboard
-(/dev/input/event0), a fake mouse (/dev/input/event1) and /dev/uinput. What a
+(/dev/input/event0), a fake mouse (/dev/input/event1), a fake multitouch
+screen (/dev/input/event2, protocol B, axes 0 to 4095) and /dev/uinput. What a
 process writes to uinput is injected into the X server with XTest, the way the
 kernel would hand a real virtual device to the desktop, and logged. Events
 "typed" on the fake keyboard and mouse go to every process that opened the
@@ -20,6 +21,11 @@ without the KEY_/BTN_ prefix, or numbers):
     click [BUTTON]        click a mouse button (default left)
     move DX DY            relative mouse motion
     wheel N               scroll N notches (negative is down)
+    touch [--ms=MS] X,Y[;X,Y...] ...  touch screen frames, one argument per frame:
+                          each finger's position in screen fractions (0 to 1),
+                          MS apart (default 16); every finger lifts at the end
+    swipe X1 Y1 X2 Y2 [MS] [FINGERS]  a straight swipe in screen fractions
+    pinch X Y FROM TO [MS]            two fingers FROM to TO apart (fractions)
     status                grab state of the devices and uinput clients
     log [N]               the last N (default 20) lines of injected uinput events
     wait-grab [0|1] [S]   wait up to S seconds (default 10) for the devices to be grabbed (1) or released (0)
@@ -41,10 +47,16 @@ import sys
 import time
 
 EVENT = struct.Struct("qqHHi")
-EV_SYN, EV_KEY, EV_REL = 0, 1, 2
+EV_SYN, EV_KEY, EV_REL, EV_ABS = 0, 1, 2, 3
 REL_X, REL_Y, REL_HWHEEL, REL_WHEEL = 0, 1, 6, 8
 GRAB = 0xFFFF
 BUTTONS = {0x110: 1, 0x111: 3, 0x112: 2, 0x113: 8, 0x114: 9}
+ABS_X, ABS_Y, ABS_MT_SLOT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, ABS_MT_TRACKING_ID = 0, 1, 0x2F, 0x35, 0x36, 0x39
+BTN_TOUCH = 0x14A
+INPUT_PROP_DIRECT = 1
+TOUCH_MAX = 4095
+ABS_NAMES = {ABS_X: "x", ABS_Y: "y", ABS_MT_SLOT: "slot", ABS_MT_POSITION_X: "mt_x",
+             ABS_MT_POSITION_Y: "mt_y", ABS_MT_TRACKING_ID: "tracking_id"}
 
 DEVICES = {
     0: {
@@ -58,6 +70,15 @@ DEVICES = {
         "ev": [EV_SYN, EV_KEY, EV_REL],
         "key": list(BUTTONS),
         "rel": [REL_X, REL_Y, REL_HWHEEL, REL_WHEEL],
+    },
+    2: {
+        "name": "Fake Touchscreen",
+        "ev": [EV_SYN, EV_KEY, EV_ABS],
+        "key": [BTN_TOUCH],
+        "rel": [],
+        "abs": {a: (0, 9 if a == ABS_MT_SLOT else 65535 if a == ABS_MT_TRACKING_ID else TOUCH_MAX)
+                for a in (ABS_X, ABS_Y, ABS_MT_SLOT, ABS_MT_POSITION_X, ABS_MT_POSITION_Y, ABS_MT_TRACKING_ID)},
+        "prop": [INPUT_PROP_DIRECT],
     },
 }
 
@@ -172,8 +193,12 @@ class Broker:
             open(os.path.join(root, "devinput", f"event{node}"), "w").close()
             with open(os.path.join(root, f"event{node}.conf"), "w") as conf:
                 conf.write(f"name {dev['name']}\n")
-                for key in ("ev", "key", "rel"):
-                    conf.write(f"{key} {' '.join(map(str, dev[key]))}\n")
+                for key in ("ev", "key", "rel", "prop"):
+                    conf.write(f"{key} {' '.join(map(str, dev.get(key, [])))}\n")
+                axes = dev.get("abs", {})
+                conf.write(f"abs {' '.join(map(str, axes))}\n")
+                for axis, (low, high) in axes.items():
+                    conf.write(f"abs{axis} {low} {high}\n")
             self.write_held(node)
             self.listen(f"event{node}.sock", socket.SOCK_SEQPACKET, node)
         self.listen("uinput.sock", socket.SOCK_SEQPACKET, -1)
@@ -243,12 +268,19 @@ class Broker:
             state["name"] = data[6:].decode(errors="replace")
             self.log.write(f"{time.time():.3f} setup {state['name']}\n")
             return
+        if data.startswith(b"ABS "):
+            _, axis, low, high = data.decode().split()
+            name = ABS_NAMES.get(int(axis), axis)
+            self.log.write(f"{time.time():.3f} {state['name']} range {name} {low} {high}\n")
+            return
         for _, _, etype, code, value in EVENT.iter_unpack(data[: len(data) // EVENT.size * EVENT.size]):
             if etype == EV_SYN:
                 events, state["pending"] = state["pending"], []
                 self.x.apply(events)
+                stamp = time.time()
                 for e in events:
-                    self.log.write(f"{time.time():.3f} {state['name']} {describe(*e)}\n")
+                    self.log.write(f"{stamp:.3f} {state['name']} {describe(*e)}\n")
+                self.log.write(f"{stamp:.3f} {state['name']} sync\n")
             else:
                 state["pending"].append((etype, code, value))
 
@@ -269,6 +301,31 @@ class Broker:
                     self.drop(sock)
         if not self.grabbed(node):
             self.x.apply(events)
+
+    def touch(self, frames, delay):
+        """Protocol B frames on the fake touchscreen; fingers keep their slot."""
+        down = {}
+        ids = iter(range(100, 1 << 16))
+        for frame in frames + [[]]:
+            events = []
+            for slot in sorted(set(down) - set(range(len(frame)))):
+                events += [(EV_ABS, ABS_MT_SLOT, slot), (EV_ABS, ABS_MT_TRACKING_ID, -1)]
+                del down[slot]
+            for slot, (fx, fy) in enumerate(frame):
+                x, y = round(min(max(fx, 0), 1) * TOUCH_MAX), round(min(max(fy, 0), 1) * TOUCH_MAX)
+                events.append((EV_ABS, ABS_MT_SLOT, slot))
+                if slot not in down:
+                    events.append((EV_ABS, ABS_MT_TRACKING_ID, next(ids)))
+                if down.get(slot, (None, None))[0] != x:
+                    events.append((EV_ABS, ABS_MT_POSITION_X, x))
+                if down.get(slot, (None, None))[1] != y:
+                    events.append((EV_ABS, ABS_MT_POSITION_Y, y))
+                down[slot] = (x, y)
+            if frame:
+                events += [(EV_ABS, ABS_X, down[0][0]), (EV_ABS, ABS_Y, down[0][1])]
+            events.append((EV_KEY, BTN_TOUCH, int(bool(frame))))
+            self.emit(2, events)
+            time.sleep(delay)
 
     def command(self, args):
         if not args:
@@ -318,6 +375,33 @@ class Broker:
                 self.emit(1, [(EV_REL, REL_X, int(rest[0])), (EV_REL, REL_Y, int(rest[1]))])
             elif cmd == "wheel":
                 self.emit(1, [(EV_REL, REL_WHEEL, int(rest[0]))])
+            elif cmd == "touch":
+                delay = 0.016
+                if rest and rest[0].startswith("--ms="):
+                    delay = float(rest.pop(0).split("=", 1)[1]) / 1000
+                frames = [[tuple(float(v) for v in finger.split(",")) for finger in frame.split(";") if finger]
+                          for frame in rest]
+                self.touch(frames, delay)
+            elif cmd == "swipe":
+                x1, y1, x2, y2 = map(float, rest[:4])
+                ms = float(rest[4]) if len(rest) > 4 else 200
+                fingers = int(rest[5]) if len(rest) > 5 else 1
+                steps = max(2, round(ms / 16))
+                frames = []
+                for i in range(steps + 1):
+                    t = i / steps
+                    x, y = x1 + (x2 - x1) * t, y1 + (y2 - y1) * t
+                    frames.append([(x + 0.05 * f, y) for f in range(fingers)])
+                self.touch(frames, ms / 1000 / steps)
+            elif cmd == "pinch":
+                cx, cy, start, end = map(float, rest[:4])
+                ms = float(rest[4]) if len(rest) > 4 else 300
+                steps = max(2, round(ms / 16))
+                frames = []
+                for i in range(steps + 1):
+                    half = (start + (end - start) * i / steps) / 2
+                    frames.append([(cx - half, cy), (cx + half, cy)])
+                self.touch(frames, ms / 1000 / steps)
             elif cmd == "status":
                 lines = [f"event{n} ({d['name']}): {'grabbed' if self.grabbed(n) else 'free'}, "
                          f"{sum(1 for c in self.clients.values() if c['node'] == n)} open, held={sorted(self.held[n])}"
@@ -340,6 +424,8 @@ def describe(etype, code, value):
         return f"key {names[0] if names else code} {('up', 'down', 'repeat')[value] if value in (0, 1, 2) else value}"
     if etype == EV_REL:
         return f"rel {({0: 'x', 1: 'y', 6: 'hwheel', 8: 'wheel'}).get(code, code)} {value}"
+    if etype == EV_ABS:
+        return f"abs {ABS_NAMES.get(code, code)} {value}"
     return f"ev {etype} {code} {value}"
 
 
@@ -356,7 +442,7 @@ def control(root, args):
             if args[0] == "wait-grab":
                 status = send(root, ["status"])
                 want = (args[1] if len(args) > 1 else "1") == "1"
-                states = re.findall(r"event\d \([^)]*\): (\w+)", status)
+                states = re.findall(r"event[01] \([^)]*\): (\w+)", status)
                 if states and all((s == "grabbed") == want for s in states):
                     return 0
             else:

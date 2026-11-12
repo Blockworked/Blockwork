@@ -41,10 +41,11 @@ them (turn it off with `MOCK_INPUT=0`):
 - `scripts/mock-desktop/fake-evdev.c` is built into an `LD_PRELOAD` shim
   that every command inherits. It turns opening `/dev/uinput` or
   `/dev/input/eventN`, and listing `/dev/input`, into Unix sockets served
-  by the broker, and answers the evdev ioctls (capabilities, `EVIOCGKEY`,
-  `EVIOCGRAB`) itself. Other paths go to the real calls.
+  by the broker, and answers the evdev ioctls (capabilities, properties,
+  axis ranges, `EVIOCGKEY`, `EVIOCGRAB`) itself. Other paths go to the real calls.
 - `scripts/mock-desktop/fake-input.py` is the broker. It serves a fake
-  keyboard (`event0`) and mouse (`event1`). What a process writes to uinput
+  keyboard (`event0`), mouse (`event1`) and multitouch screen (`event2`:
+  protocol B, `INPUT_PROP_DIRECT`, axes 0 to 4095). What a process writes to uinput
   is logged and injected into X11 with XTest, the way the kernel would hand
   a virtual device to the desktop. Events "typed" on the fake devices go to
   whoever opened them, and to X11 directly while nobody holds a grab, as
@@ -65,7 +66,14 @@ scripts/mock-desktop.sh run x11 sh -c '
 ```
 
 `mock-input --help` lists the commands (`tap`, `combo`, `down`/`up`,
-`type`, `click`, `move`, `wheel`, `status`, `wait-grab`, `wait-log`).
+`type`, `click`, `move`, `wheel`, `touch`, `swipe`, `pinch`, `status`,
+`wait-grab`, `wait-log`). The touch commands take screen fractions:
+`mock-input swipe 0.1 0.5 0.9 0.5 300 2` is a 300 ms two-finger swipe, and
+`mock-input touch "0.2,0.5;0.8,0.5" "0.3,0.5;0.7,0.5"` gives each frame's
+fingers. The touchscreen is never grabbed, so `wait-grab` only watches the
+keyboard and mouse. `scripts/test-touch.sh` uses the same shim and broker on
+their own (no desktop) to record gestures from the fake screen and play
+touch paths into the fake uinput.
 `mock-input type` waits 50 ms between keys unless `--delay=MS` says
 otherwise. Absolute mouse moves need libei, which isn't faked.
 
