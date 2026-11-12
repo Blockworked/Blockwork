@@ -13,6 +13,13 @@
    "kind": "Number",
    "value": 2
   },
+  "speed": {
+   "mode": "Total",
+   "value": {
+    "kind": "Number",
+    "value": 500
+   }
+  },
   "id": "text"
  },
  {

@@ -42,8 +42,13 @@ Item {
         anchors.fill: parent; spacing: 0
         Rectangle {
             Layout.fillWidth: true; Layout.preferredHeight: 52; color: Theme.field; border.color: Theme.borderSoft
-            TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
+            TitleBarDrag { anchors.fill: parent; windowButtons: titleButtons; nativeButtons: macWindowButtons }
             RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                Item {
+                    id: macWindowButtons
+                    visible: Qt.platform.os === "osx"
+                    Layout.preferredWidth: 72; Layout.preferredHeight: 34
+                }
                 Image {
                     visible: Qt.platform.os !== "osx"
                     source: "qrc:/icons/blockwork.png"; sourceSize: Qt.size(40, 40)
@@ -52,7 +57,7 @@ Item {
                 }
                 Text { text: qsTr("Welcome to Blockwork"); color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold }
                 Item { Layout.fillWidth: true }
-                WindowControls { visible: Qt.platform.os !== "osx" }
+                WindowControls { id: titleButtons; visible: Qt.platform.os !== "osx" }
             }
         }
 

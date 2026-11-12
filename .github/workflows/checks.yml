@@ -94,6 +94,7 @@ jobs:
           sudo apt-get install -y --no-install-recommends \
             pkg-config \
             build-essential \
+            cmake \
             libssl-dev \
             libxdo-dev \
             libayatana-appindicator3-dev \
@@ -136,3 +137,6 @@ jobs:
         run: |
           scripts/fetch-blockstitch.sh ../blockstitch
           PATH="$(dirname "$QMAKE"):$PATH" python3 blockwork-qt/tests/run.py ../blockstitch
+
+      - name: Native window integration tests
+        run: PATH="$(dirname "$QMAKE"):$PATH" python3 blockwork-qt/window-tests/run.py

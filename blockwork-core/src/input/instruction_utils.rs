@@ -5,9 +5,12 @@ use crate::macros::{Instruction, InstructionKind};
 pub fn create_default_instruction(instruction_type: usize) -> Option<Instruction> {
     let kind = match instruction_type {
         0 => InstructionKind::Wait(Value::number(1000.0)),
-        1 => InstructionKind::Token(InputToken::Text(Value::Text {
-            value: "text".into(),
-        })),
+        1 => InstructionKind::Token(InputToken::Text(
+            Value::Text {
+                value: "text".into(),
+            }
+            .into(),
+        )),
         2 => InstructionKind::Token(InputToken::Key(
             Value::Text { value: "a".into() },
             Direction::Click,

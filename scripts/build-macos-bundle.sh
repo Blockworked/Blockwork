@@ -36,6 +36,8 @@ DIST="dist/$APP_NAME.app"
 rm -rf "$DIST"
 CONTENTS="$DIST/Contents"
 mkdir -p "$CONTENTS/MacOS" "$CONTENTS/Resources" "$CONTENTS/Frameworks"
+mkdir -p "$CONTENTS/Resources/licenses"
+cp res/licenses/QWindowKit-LICENSE "$CONTENTS/Resources/licenses/QWindowKit-LICENSE"
 
 echo "Assembling bundle at $DIST..."
 cp "$RELEASE_DIR/blockwork" "$CONTENTS/MacOS/$APP_NAME"

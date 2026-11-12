@@ -33,6 +33,8 @@ Remove-Item -LiteralPath $Destination -Recurse -Force -ErrorAction SilentlyConti
 New-Item -ItemType Directory -Path $Destination | Out-Null
 Copy-Item (Join-Path $release "blockwork.exe") $Destination
 Copy-Item (Join-Path $release "blockwork-daemon.exe") $Destination
+New-Item -ItemType Directory -Force -Path (Join-Path $Destination "licenses") | Out-Null
+Copy-Item (Join-Path $root "res/licenses/QWindowKit-LICENSE") (Join-Path $Destination "licenses/QWindowKit-LICENSE")
 
 & $deploy --release --no-translations --qmldir (Join-Path $root "blockwork-qt/qml") (Join-Path $Destination "blockwork.exe")
 if ($LASTEXITCODE -ne 0) { throw "windeployqt failed" }

@@ -18,7 +18,7 @@ default-members = [
 ]
 
 [workspace.package]
-version = "0.6.0"
+version = "0.6.2"
 edition = "2024"
 # tract (the detection models) needs 1.91; CI checks the workspace with it.
 rust-version = "1.91"

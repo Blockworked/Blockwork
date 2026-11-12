@@ -186,6 +186,85 @@ impl MacroKey {
     }
 }
 
+/// How a text block paces its typing: a delay for each character, or a
+/// total time for the whole string.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TextSpeedMode {
+    PerCharacter,
+    Total,
+}
+
+/// The text block's optional typing pace. `value` is in milliseconds.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+pub struct TextSpeed {
+    pub mode: TextSpeedMode,
+    pub value: Value,
+}
+
+impl TextSpeed {
+    /// Milliseconds between characters when typing `chars` characters.
+    pub fn per_character_ms(&self, ms: f64, chars: usize) -> f64 {
+        match self.mode {
+            TextSpeedMode::PerCharacter => ms,
+            TextSpeedMode::Total if chars == 0 => 0.0,
+            TextSpeedMode::Total => ms / chars as f64,
+        }
+    }
+}
+
+/// A text block's payload: the text, and optionally how fast to type it.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+#[serde(from = "TextTokenWire", into = "TextTokenWire")]
+pub struct TextToken {
+    pub text: Value,
+    pub speed: Option<TextSpeed>,
+}
+
+impl TextToken {
+    pub fn new(text: Value) -> Self {
+        Self { text, speed: None }
+    }
+}
+
+impl From<Value> for TextToken {
+    fn from(text: Value) -> Self {
+        Self::new(text)
+    }
+}
+
+// Saves from before typing speeds stored just the text value.
+#[derive(Serialize, Deserialize)]
+#[serde(untagged)]
+enum TextTokenWire {
+    Legacy(Value),
+    Current {
+        text: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        speed: Option<TextSpeed>,
+    },
+}
+
+impl From<TextTokenWire> for TextToken {
+    fn from(wire: TextTokenWire) -> Self {
+        match wire {
+            TextTokenWire::Legacy(text) => Self::new(text),
+            TextTokenWire::Current { text, speed } => Self { text, speed },
+        }
+    }
+}
+
+impl From<TextToken> for TextTokenWire {
+    fn from(token: TextToken) -> Self {
+        match token.speed {
+            Some(speed) => TextTokenWire::Current {
+                text: token.text,
+                speed: Some(speed),
+            },
+            None => TextTokenWire::Legacy(token.text),
+        }
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum MacroButton {
     Left,
@@ -211,7 +290,7 @@ pub enum InputToken {
     Button(MacroButton, Direction),
     MoveMouse(Value, Value, Coordinate),
     Scroll(Value, Axis),
-    Text(Value),
+    Text(TextToken),
     Raw(u16, Direction),
 }
 
@@ -265,5 +344,58 @@ mod key_token_tests {
         );
         let json = serde_json::to_string(&token).unwrap();
         assert_eq!(serde_json::from_str::<InputToken>(&json).unwrap(), token);
+    }
+}
+
+#[cfg(test)]
+mod text_token_tests {
+    use super::*;
+
+    #[test]
+    fn legacy_text_token_keeps_its_bare_shape() {
+        let token: InputToken =
+            serde_json::from_str(r#"{"Text":{"kind":"Text","value":"hello"}}"#).unwrap();
+        assert_eq!(token, InputToken::Text(Value::text("hello").into()));
+        assert_eq!(
+            serde_json::to_value(&token).unwrap(),
+            serde_json::json!({"Text":{"kind":"Text","value":"hello"}})
+        );
+    }
+
+    #[test]
+    fn text_token_with_speed_round_trips() {
+        let token = InputToken::Text(TextToken {
+            text: Value::text("hello"),
+            speed: Some(TextSpeed {
+                mode: TextSpeedMode::Total,
+                value: Value::number(1000.0),
+            }),
+        });
+        let json = serde_json::to_value(&token).unwrap();
+        assert_eq!(
+            json,
+            serde_json::json!({
+                "Text": {
+                    "text": {"kind": "Text", "value": "hello"},
+                    "speed": {"mode": "Total", "value": {"kind": "Number", "value": 1000.0}}
+                }
+            })
+        );
+        assert_eq!(serde_json::from_value::<InputToken>(json).unwrap(), token);
+    }
+
+    #[test]
+    fn total_text_speed_divides_evenly() {
+        let speed = TextSpeed {
+            mode: TextSpeedMode::Total,
+            value: Value::number(100.0),
+        };
+        assert_eq!(speed.per_character_ms(100.0, 4), 25.0);
+        assert_eq!(speed.per_character_ms(100.0, 0), 0.0);
+        let speed = TextSpeed {
+            mode: TextSpeedMode::PerCharacter,
+            value: Value::number(30.0),
+        };
+        assert_eq!(speed.per_character_ms(30.0, 4), 30.0);
     }
 }

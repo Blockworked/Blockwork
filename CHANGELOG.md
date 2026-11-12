@@ -10,6 +10,9 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ## [UNRELEASED]
 
+### Added
+- Optional typing speed on the Text block: wait per character, or give the whole text a total time divided evenly across it. Without it, typing runs at the normal input speed (Linux keeps a small 0.5 ms built-in gap).
+
 ### Fixed
 - Blocks stay under the pointer while branches resize; bracket shapes update in the same frame as a drop.
 - Blocks keep their blue outline when a drag ends.

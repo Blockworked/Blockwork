@@ -16,8 +16,12 @@ just
 
 Cargo fetches the Lucide icons (`lucide-qt`) from its tagged release. The Blockstitch core and native QML frontend
 are fetched from the same pinned Git revision, so their APIs stay in sync.
-The build uses an installed Qt 6.10 or newer when one is available; otherwise CXX-Qt's Qt
-Minimal integration downloads the required Qt SDK. Release packaging uses
+The desktop build fetches a pinned, checksum-verified QWindowKit archive into its
+build cache and compiles it automatically. It
+requires CMake 3.19+, a C++17 compiler, and a full Qt 6.10+ SDK with its CMake files
+and private development headers. Set `QMAKE` to that SDK's `qmake` if multiple Qt
+installations are present. The first build needs network access; offline builds
+can supply QWindowKit through `BLOCKWORK_QWINDOWKIT_SOURCE_DIR`. Release packaging uses
 `windeployqt`/`macdeployqt` to include the dynamic Qt runtime.
 
 ### Installation

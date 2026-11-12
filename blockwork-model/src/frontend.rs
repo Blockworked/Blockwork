@@ -5,7 +5,7 @@
 
 use crate::block_packs;
 use crate::input::schedule::TimeSchedule;
-use crate::input::types::{Axis, Coordinate, Direction, InputToken};
+use crate::input::types::{Axis, Coordinate, Direction, InputToken, TextToken};
 use crate::input::value::Value;
 use crate::input::{get_mouse_button_names, mouse_button_to_index};
 use crate::macros::{

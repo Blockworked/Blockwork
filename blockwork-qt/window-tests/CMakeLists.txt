@@ -1,0 +1,8 @@
+cmake_minimum_required(VERSION 3.19)
+project(BlockworkWindowTests LANGUAGES CXX)
+set(CMAKE_AUTOMOC ON)
+find_package(Qt6 REQUIRED COMPONENTS Quick QuickTest)
+set(QWINDOWKIT_INSTALL OFF CACHE BOOL "" FORCE)
+add_subdirectory(../native native)
+add_executable(blockwork-window-tests main.cpp)
+target_link_libraries(blockwork-window-tests PRIVATE Qt6::QuickTest QWKQuick)

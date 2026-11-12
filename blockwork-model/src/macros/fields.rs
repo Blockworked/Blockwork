@@ -16,6 +16,7 @@ pub enum FieldId {
     MoveMouseY,
     ScrollAmount,
     TextValue,
+    TextSpeed,
     KeyValue,
     SetVariableValue,
     ChangeVariableValue,
@@ -152,7 +153,12 @@ pub(crate) fn slots_mut<'a>(
                 f(F::MoveMouseY, y, Any);
             }
             InputToken::Scroll(amount, _) => f(F::ScrollAmount, amount, Any),
-            InputToken::Text(value) => f(F::TextValue, value, Any),
+            InputToken::Text(token) => {
+                f(F::TextValue, &mut token.text, Any);
+                if let Some(speed) = &mut token.speed {
+                    f(F::TextSpeed, &mut speed.value, Any);
+                }
+            }
             InputToken::Key(key, _) => f(F::KeyValue, key, Any),
             InputToken::Button(..) | InputToken::Raw(..) => {}
         },

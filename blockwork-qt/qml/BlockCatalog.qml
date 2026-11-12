@@ -382,7 +382,19 @@ QtObject {
     function inputRows(p) {
         const { label, value, direction, keyValue } = p;
         return {
-            Text: { head: [label(qsTr("Text")), value("TextValue", "text")] },
+            Text: {
+                head: [label(qsTr("Text")), value("TextValue", "text")],
+                components: [{
+                    key: "speed", label: qsTr("typing speed"), icon: "timer",
+                    fresh: () => ({ mode: "PerCharacter", value: numberValue(50) }),
+                    pieces: [
+                        label(qsTr("typing")),
+                        { kind: "dropdown", key: "speed", index: "mode",
+                          options: choices([["PerCharacter", qsTr("per character")], ["Total", qsTr("total time")]]) },
+                        Object.assign(value("TextSpeed", "speed"), { index: "value", unit: qsTr("ms") })
+                    ]
+                }]
+            },
             Key: { head: [label(qsTr("Key")), keyValue,
                 direction([["Click", qsTr("Click")], ["Press", qsTr("Press")], ["Release", qsTr("Release")]])] },
             Button: { head: [label(qsTr("Mouse button")),

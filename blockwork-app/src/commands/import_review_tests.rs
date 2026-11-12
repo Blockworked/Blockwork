@@ -24,7 +24,9 @@ fn lists_what_a_macro_can_do_including_nested_blocks_and_reporters() {
                 instructions: vec![
                     Instruction::new(InstructionKind::WhenFileChanged(Value::text("~/a"))),
                     nested,
-                    Instruction::new(InstructionKind::Token(InputToken::Text(Value::text("hi")))),
+                    Instruction::new(InstructionKind::Token(InputToken::Text(
+                        Value::text("hi").into(),
+                    ))),
                 ],
             }],
             ..MacroGraph::new()

@@ -45,7 +45,7 @@ macro_rules! wire_blocks {
         unit { $($unit:ident),* $(,)? }
         tuple { $($tup:ident ( $($(#[$tm:meta])* $tf:ident : $tt:ty),+ )),* $(,)? }
         named { $($(#[$nv:meta])* $nam:ident { $($(#[$nm:meta])* $nf:ident : $nt:ty),+ }),* $(,)? }
-        custom { $($cus:ident { $($(#[$cm:meta])* $cf:ident : $ct:ty),* }),* $(,)? }
+        custom { $($cus:ident { $($(#[$cm:meta])* $cf:ident : $ct:ty),* $(,)? }),* $(,)? }
         to_wire($ins:ident, $id:ident) { $($tp:pat $(if $tg:expr)? => $te:expr),* $(,)? }
         from_wire($dto:ident) { $($fp:pat => $fe:expr),* $(,)? }
     ) => {
@@ -176,7 +176,11 @@ wire_blocks! {
         BrowserScript { code: Value, variable: String },
     }
     custom {
-        Text { text: Value },
+        Text {
+            text: Value,
+            #[serde(default, skip_serializing_if = "Option::is_none")]
+            speed: Option<crate::input::types::TextSpeed>,
+        },
         Key { key: Value, direction: String },
         WhenKey { key: Value, direction: String },
         Button { button: String, direction: String },
@@ -227,7 +231,8 @@ wire_blocks! {
         InstructionKind::Token(token) => match token {
             InputToken::Text(t) => InstructionDto::Text {
                 id,
-                text: t.clone(),
+                text: t.text.clone(),
+                speed: t.speed.clone(),
             },
             InputToken::Key(k, d) => InstructionDto::Key {
                 id,
@@ -257,9 +262,12 @@ wire_blocks! {
         },
     }
     from_wire(dto) {
-        InstructionDto::Text { id, text } => (
+        InstructionDto::Text { id, text, speed } => (
             id,
-            InstructionKind::Token(InputToken::Text(text.clone())),
+            InstructionKind::Token(InputToken::Text(TextToken {
+                text: text.clone(),
+                speed: speed.clone(),
+            })),
         ),
         InstructionDto::Key { id, key, direction } => (
             id,

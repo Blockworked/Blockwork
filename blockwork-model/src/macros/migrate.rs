@@ -7,11 +7,11 @@ use serde_json::{Map, Value, json};
 
 /// The version this build writes; 1 is the format 0.6.0 first had, 2 split
 /// run command into one that waits and one that doesn't. Version 3 adds pack state,
-/// and version 4 adds Stop scopes. Bump it
+/// version 4 adds Stop scopes, and version 5 adds text typing speeds. Bump it
 /// with a new step in [`STEPS`] (a no-op one when old files load as they are)
 /// whenever a release adds block kinds or changes their fields, so an older
 /// Blockwork says the file is too new instead of turning blocks into notes.
-pub const FORMAT_VERSION: u64 = 4;
+pub const FORMAT_VERSION: u64 = 5;
 const VERSION_KEY: &str = "format_version";
 
 /// What loading had to change.
@@ -38,6 +38,7 @@ const STEPS: [Step; FORMAT_VERSION as usize] = [
     v1_run_command_waits,
     v2_pack_state,
     v3_stop_scopes,
+    v4_text_speeds,
 ];
 
 // StopMacro is migrated by InstructionKind's deserializer.
@@ -45,6 +46,9 @@ fn v3_stop_scopes(_: &mut Value, _: &mut Vec<String>) {}
 
 // Pack ownership is migrated by Macro's deserializer.
 fn v2_pack_state(_: &mut Value, _: &mut Vec<String>) {}
+
+// Text speeds are optional, so files without them load as they are.
+fn v4_text_speeds(_: &mut Value, _: &mut Vec<String>) {}
 
 pub fn parse(text: &str) -> Result<(Macro, Upgrade), String> {
     from_value(serde_json::from_str(text).map_err(|e| format!("not a macro file: {e}"))?)

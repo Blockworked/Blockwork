@@ -7,7 +7,11 @@ fn without_input_emulation_other_blocks_run_and_input_reports_once() {
     let _log = crate::run_log::TEST_LOCK
         .lock()
         .unwrap_or_else(|e| e.into_inner());
-    let text = || Instruction::new(InstructionKind::Token(InputToken::Text(Value::text("hi"))));
+    let text = || {
+        Instruction::new(InstructionKind::Token(InputToken::Text(
+            Value::text("hi").into(),
+        )))
+    };
     let first = text();
     let vars = empty_vars();
     run_fired_strand(
@@ -185,4 +189,60 @@ fn combo_letters_dont_add_shift() {
     let seen = seen.lock().unwrap();
     assert_eq!(seen.len(), 4);
     assert_eq!(seen[1], (MacroKey::Unicode('a'), Direction::Press));
+}
+
+#[test]
+fn typed_text_with_a_speed_sends_one_character_at_a_time() {
+    #[derive(Default)]
+    struct Typed(Arc<Mutex<Vec<String>>>);
+    impl InputBackend for Typed {
+        fn key(&mut self, _: MacroKey, _: Direction) -> Result<(), String> {
+            Ok(())
+        }
+        fn raw_keycode(&mut self, _: u16, _: Direction) -> Result<(), String> {
+            Ok(())
+        }
+        fn button(&mut self, _: MacroButton, _: Direction) -> Result<(), String> {
+            Ok(())
+        }
+        fn move_mouse_rel(&mut self, _: i32, _: i32) -> Result<(), String> {
+            Ok(())
+        }
+        fn move_mouse_abs(&mut self, _: i32, _: i32) -> Result<(), String> {
+            Ok(())
+        }
+        fn scroll(&mut self, _: i32, _: Axis) -> Result<(), String> {
+            Ok(())
+        }
+        fn text(&mut self, text: &str) -> Result<(), String> {
+            self.0.lock().unwrap().push(text.to_string());
+            Ok(())
+        }
+        fn cursor_pos(&self) -> Option<(i32, i32)> {
+            None
+        }
+    }
+    use crate::input::types::{TextSpeed, TextSpeedMode, TextToken};
+    let typed = Typed::default();
+    let seen = Arc::clone(&typed.0);
+    let text = |speed: Option<TextSpeed>| {
+        Instruction::new(InstructionKind::Token(InputToken::Text(TextToken {
+            text: Value::text("hi"),
+            speed,
+        })))
+    };
+    run_instructions(
+        vec![
+            text(Some(TextSpeed {
+                mode: TextSpeedMode::PerCharacter,
+                value: Value::number(0.0),
+            })),
+            text(None),
+        ],
+        Arc::new(Mutex::new(typed)),
+        None,
+        1.0,
+        empty_vars(),
+    );
+    assert_eq!(*seen.lock().unwrap(), ["h", "i", "hi"]);
 }

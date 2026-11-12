@@ -288,9 +288,20 @@ Item {
             // Collapse stages: 1 Record icon-only, 2 Run icon-only, 3 undo/redo/save in a menu.
             readonly property int tier: width < 700 ? 3 : (width < 780 ? 2 : (width < 860 ? 1 : 0))
             Layout.fillWidth: true; Layout.preferredHeight: 52; color: Theme.field; border.color: Theme.borderSoft
-            TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
+            TitleBarDrag {
+                anchors.fill: parent
+                nativeButtons: macWindowButtons
+                interactiveItems: [sidebarButton, libraryButton, macroMenuButton, runButton, recordControls,
+                    undoButton, redoButton, saveButton, editMenuButton, settingsButton]
+                windowButtons: titleButtons
+            }
             RowLayout {
                 anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                Item {
+                    id: macWindowButtons
+                    visible: Qt.platform.os === "osx"
+                    Layout.preferredWidth: 72; Layout.preferredHeight: 34
+                }
                 Image {
                     visible: Qt.platform.os !== "osx" && toolbar.tier < 3
                     source: "qrc:/icons/blockwork.png"; sourceSize: Qt.size(40, 40)
@@ -298,6 +309,7 @@ Item {
                     fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
                 }
                 StitchButton {
+                    id: sidebarButton
                     iconName: "panel-left"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro
                     ToolTip.visible: hovered; ToolTip.text: root.sidebarCollapsed ? qsTr("Show sidebar") : qsTr("Hide sidebar")
                     onClicked: { root.sidebarToggling = Motion.enabled; root.sidebarCollapsed = !root.sidebarCollapsed; }
@@ -361,12 +373,14 @@ Item {
                 }
                 Item { Layout.fillWidth: true }
                 StitchButton {
+                    id: runButton
                     implicitHeight: 34; iconName: "play"; iconFilled: true; iconColor: Theme.accent; text: toolbar.tier < 2 ? qsTr("Run") : ""
                     implicitWidth: toolbar.tier < 2 ? 76 : 34
                     enabled: appState.macro_selected !== null; ToolTip.visible: hovered && toolbar.tier >= 2; ToolTip.text: qsTr("Run macro")
                     onClicked: root.invoke("run_macro")
                 }
                 Row {
+                    id: recordControls
                     spacing: -1
                     StitchButton {
                         id: recordButton
@@ -389,9 +403,9 @@ Item {
                     }
                 }
                 Item { Layout.fillWidth: true }
-                StitchButton { visible: toolbar.tier < 3; iconName: "undo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_undo; ToolTip.visible: hovered; ToolTip.text: qsTr("Undo"); onClicked: root.invoke("undo") }
-                StitchButton { visible: toolbar.tier < 3; iconName: "redo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_redo; ToolTip.visible: hovered; ToolTip.text: qsTr("Redo"); onClicked: root.invoke("redo") }
-                StitchButton { visible: toolbar.tier < 3; iconName: "save"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro; ToolTip.visible: hovered; ToolTip.text: qsTr("Save macro"); onClicked: root.invoke("save_macro") }
+                StitchButton { id: undoButton; visible: toolbar.tier < 3; iconName: "undo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_undo; ToolTip.visible: hovered; ToolTip.text: qsTr("Undo"); onClicked: root.invoke("undo") }
+                StitchButton { id: redoButton; visible: toolbar.tier < 3; iconName: "redo"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: appState.can_redo; ToolTip.visible: hovered; ToolTip.text: qsTr("Redo"); onClicked: root.invoke("redo") }
+                StitchButton { id: saveButton; visible: toolbar.tier < 3; iconName: "save"; text: ""; implicitWidth: 34; implicitHeight: 34; enabled: !!root.macro; ToolTip.visible: hovered; ToolTip.text: qsTr("Save macro"); onClicked: root.invoke("save_macro") }
                 StitchButton {
                     id: editMenuButton
                     visible: toolbar.tier >= 3
@@ -411,8 +425,8 @@ Item {
                         StitchMenuItem { iconName: "save"; text: qsTr("Save macro"); enabled: !!root.macro; onTriggered: root.invoke("save_macro") }
                     }
                 }
-                StitchButton { iconName: "settings"; text: ""; implicitWidth: 34; implicitHeight: 34; ToolTip.visible: hovered; ToolTip.text: qsTr("Settings"); onClicked: root.invoke("open_settings") }
-                WindowControls { visible: Qt.platform.os !== "osx" }
+                StitchButton { id: settingsButton; iconName: "settings"; text: ""; implicitWidth: 34; implicitHeight: 34; ToolTip.visible: hovered; ToolTip.text: qsTr("Settings"); onClicked: root.invoke("open_settings") }
+                WindowControls { id: titleButtons; visible: Qt.platform.os !== "osx" }
             }
         }
         Rectangle {

@@ -7,21 +7,32 @@ import com.blockworked.Blockwork 1.0
 ApplicationWindow {
     id: root
     objectName: "blockworkMainWindow"
-    // Room around the frameless window for the drop shadow (KWin only shadows decorated windows).
-    // Windows snaps the native bounds, so transparent padding would leave a gap.
-    readonly property real shadowPadding: customChrome && Qt.platform.os !== "windows" ? 18 : 0
+    // Linux draws its shadow inside transparent surface margins.
+    readonly property real shadowPadding: customChrome ? 18 : 0
     readonly property real shadowMargin: visibility === Window.Windowed ? shadowPadding : 0
     width: 1220 + 2 * shadowPadding
     height: 850 + 2 * shadowPadding
     minimumWidth: 600 + 2 * shadowPadding
     minimumHeight: 640 + 2 * shadowPadding
-    visible: true
+    visible: windowChrome !== null && windowChrome.ready
     title: "Blockwork"
-    // macOS keeps its native title bar.
-    readonly property bool customChrome: Qt.platform.os !== "osx"
+    // Linux needs client-side corners and shadow; Windows and macOS use the native frame.
+    readonly property bool customChrome: Qt.platform.os === "linux"
+    readonly property var windowChrome: chromeLoader.item
+    Loader {
+        id: chromeLoader
+        source: "qrc:/window/WindowChrome.qml"
+        onLoaded: {
+            item.dark = Qt.binding(() => Theme.dark);
+            item.attach(root);
+        }
+        onStatusChanged: if (status === Loader.Error) {
+            console.error("Could not load QWindowKit window integration");
+            Qt.quit();
+        }
+    }
     readonly property real cornerRadius: customChrome && visibility === Window.Windowed ? 10 : 0
-    flags: customChrome ? (Qt.Window | Qt.FramelessWindowHint
-        | (Qt.platform.os === "windows" ? Qt.WindowMinMaxButtonsHint | Qt.WindowSystemMenuHint : 0)) : Qt.Window
+    flags: Qt.Window | Qt.WindowMinMaxButtonsHint | Qt.WindowCloseButtonHint | Qt.WindowSystemMenuHint
     color: customChrome ? "transparent" : Theme.window
     property real sidebarWidth: 348
     property bool sidebarCollapsed: false

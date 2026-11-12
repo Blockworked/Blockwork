@@ -84,18 +84,27 @@ Item {
         anchors.fill: parent; spacing: 0
         Rectangle {
             Layout.fillWidth: true; Layout.preferredHeight: 52; color: Theme.field; border.color: Theme.borderSoft
-            TitleBarDrag { anchors.fill: parent; visible: Qt.platform.os !== "osx" }
+            TitleBarDrag {
+                anchors.fill: parent
+                nativeButtons: macWindowButtons
+                interactiveItems: [backButton]; windowButtons: titleButtons
+            }
             RowLayout { anchors.fill: parent; anchors.leftMargin: 12; anchors.rightMargin: 12; spacing: 8
+                Item {
+                    id: macWindowButtons
+                    visible: Qt.platform.os === "osx"
+                    Layout.preferredWidth: 72; Layout.preferredHeight: 34
+                }
                 Image {
                     visible: Qt.platform.os !== "osx"
                     source: "qrc:/icons/blockwork.png"; sourceSize: Qt.size(40, 40)
                     Layout.preferredWidth: 20; Layout.preferredHeight: 20; Layout.rightMargin: 2
                     fillMode: Image.PreserveAspectFit; smooth: true; mipmap: true
                 }
-                StitchButton { iconName: "arrow-left"; text: qsTr("Back"); implicitHeight: 34; onClicked: root.invoke("close_settings") }
+                StitchButton { id: backButton; iconName: "arrow-left"; text: qsTr("Back"); implicitHeight: 34; onClicked: root.invoke("close_settings") }
                 Text { text: qsTr("Settings"); color: Theme.text; font.pixelSize: 17; font.weight: Font.Bold }
                 Item { Layout.fillWidth: true }
-                WindowControls { visible: Qt.platform.os !== "osx" }
+                WindowControls { id: titleButtons; visible: Qt.platform.os !== "osx" }
             }
         }
 

@@ -88,6 +88,20 @@ Item {
             }
             compare(wrong, []);
         }
+        function test_text_speed_component_is_optional() {
+            const page = createTemporaryObject(editorComponent, scene);
+            wait(50);
+            const row = BlockRegistry.row("Text");
+            const speed = row.components.find(component => component.key === "speed");
+            verify(!!speed);
+            const plain = {type: "Text", id: "text", text: {kind: "Text", value: "hi"}};
+            verify(!BlockRegistry.hasComponent(speed, plain));
+            const withSpeed = BlockRegistry.withComponent(speed, plain);
+            compare(withSpeed.speed, {mode: "PerCharacter", value: {kind: "Number", value: 50}});
+            verify(BlockRegistry.hasComponent(speed, withSpeed));
+            const removed = BlockRegistry.withoutComponent(speed, withSpeed);
+            verify(!("speed" in removed));
+        }
         function test_palette_reporters_start_from_the_core_defaults() {
             const page = createTemporaryObject(editorComponent, scene);
             wait(50);

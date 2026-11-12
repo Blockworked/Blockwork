@@ -44,6 +44,10 @@ test-qml blockstitch="../blockstitch" *filters="":
     [ -d "{{blockstitch}}/.git" ] || scripts/fetch-blockstitch.sh "{{blockstitch}}"
     python3 blockwork-qt/tests/run.py "{{blockstitch}}" {{filters}}
 
+# Window behavior through QWindowKit's real event filters.
+test-window *filters="":
+    python3 blockwork-qt/window-tests/run.py {{filters}}
+
 # Editor timings with a big macro (page, load, edit, drag, zoom), offscreen.
 # Prints PERF lines; pass a blockstitch checkout and optional test filters.
 bench-qml blockstitch="../blockstitch" *filters="":
@@ -90,6 +94,7 @@ blockstitch-published commit="":
 install: build
     sudo install -Dm0755 {{TARGET}} {{LIBDIR}}/blockwork
     sudo install -Dm0755 {{DAEMON}} {{LIBDIR}}/blockwork-daemon
+    sudo install -Dm0644 res/licenses/QWindowKit-LICENSE {{LIBDIR}}/licenses/QWindowKit-LICENSE
     sudo ln -sf {{LIBDIR}}/blockwork /usr/bin/blockwork
     sudo install -Dm0644 res/blockwork.desktop /usr/share/applications/blockwork.desktop
     sudo install -Dm0644 res/icons/blockwork.png /usr/share/icons/hicolor/256x256/apps/blockwork.png

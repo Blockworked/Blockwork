@@ -15,6 +15,19 @@ fn shift_is_pressed(keys: &[MacroKey]) -> bool {
         .any(|k| matches!(k, MacroKey::Shift | MacroKey::LShift | MacroKey::RShift))
 }
 
+/// Waits between typed characters, scaled by playback speed. Returns true if
+/// the run was stopped.
+fn wait_for_typing(ctx: &mut ExecCtx, ms: f64) -> bool {
+    let actual = (ms / ctx.speed_multiplier).max(0.0);
+    if host_clock::enabled() {
+        ctx.host_time_ms += actual;
+        let flag = ctx.stop_flag.clone();
+        let should_stop = move || flag.as_ref().is_some_and(stop_requested);
+        return !host_clock::wait_until(ctx.host_time_ms, &should_stop);
+    }
+    sleep_unless_stopped(ctx, ms)
+}
+
 /// Runs one input token. `Some(flow)` ends the strand with it; `None` goes
 /// on to the next block.
 pub(super) fn run_token(
@@ -24,14 +37,51 @@ pub(super) fn run_token(
     depth: u32,
 ) -> Result<Option<Flow>, String> {
     match token {
-        InputToken::Text(value) => {
-            let text = match ctx.resolve(value, depth).and_then(|v| v.eval_text()) {
+        InputToken::Text(token) => {
+            let text = match ctx.resolve(&token.text, depth).and_then(|v| v.eval_text()) {
                 Ok(t) => t,
                 Err(e) => {
                     soft_fail(ctx, &ins.id, "Type text", e)?;
                     return Ok(None);
                 }
             };
+            let speed = match &token.speed {
+                Some(speed) => {
+                    let ms = match ctx
+                        .resolve(&speed.value, depth)
+                        .and_then(|v| v.eval_number())
+                    {
+                        Ok(ms) => ms.max(0.0),
+                        Err(e) => {
+                            soft_fail(ctx, &ins.id, "Type text", e)?;
+                            return Ok(None);
+                        }
+                    };
+                    Some(speed.per_character_ms(ms, text.chars().count()))
+                }
+                None => None,
+            };
+            if let Some(delay_ms) = speed {
+                for c in text.chars() {
+                    let mut em = match ctx.emulator.lock() {
+                        Ok(guard) => guard,
+                        Err(err) => {
+                            warn!("Failed to lock emulator mutex: {}", err);
+                            return Ok(Some(Flow::Normal));
+                        }
+                    };
+                    let mut buf = [0; 4];
+                    let letter = c.encode_utf8(&mut buf);
+                    if let Err(err) = em.text(letter) {
+                        warn!("Failed to type text '{}': {}", letter, err);
+                    }
+                    drop(em);
+                    if delay_ms > 0.0 && wait_for_typing(ctx, delay_ms) {
+                        return Ok(Some(Flow::Normal));
+                    }
+                }
+                return Ok(None);
+            }
             let mut em = match ctx.emulator.lock() {
                 Ok(guard) => guard,
                 Err(err) => {

@@ -257,6 +257,42 @@ fn mouse_modifier_component_is_optional_and_preserves_saved_combos() {
 }
 
 #[test]
+fn text_speed_component_is_optional_and_round_trips() {
+    use crate::frontend::{InstructionDto, dto_to_instruction, instruction_to_dto};
+    use crate::input::types::{TextSpeed, TextSpeedMode};
+
+    let plain = InstructionKind::Token(InputToken::Text(Value::text("hi").into()));
+    assert_eq!(
+        serde_json::to_value(&plain).unwrap(),
+        serde_json::json!({"Token": {"Text": {"kind": "Text", "value": "hi"}}})
+    );
+    let legacy: InstructionKind = serde_json::from_value(
+        serde_json::json!({"Token": {"Text": {"kind": "Text", "value": "hi"}}}),
+    )
+    .unwrap();
+    assert_eq!(legacy, plain);
+    let dto = instruction_to_dto(&Instruction::new(plain.clone()));
+    assert!(serde_json::to_value(&dto).unwrap().get("speed").is_none());
+
+    let mut sped = Instruction::new(plain);
+    let InstructionKind::Token(InputToken::Text(token)) = &mut sped.kind else {
+        panic!()
+    };
+    token.speed = Some(TextSpeed {
+        mode: TextSpeedMode::Total,
+        value: Value::number(500.0),
+    });
+    let loaded: InstructionKind =
+        serde_json::from_str(&serde_json::to_string(&sped.kind).unwrap()).unwrap();
+    assert_eq!(loaded, sped.kind);
+    let dto: InstructionDto =
+        serde_json::from_str(&serde_json::to_string(&instruction_to_dto(&sped)).unwrap()).unwrap();
+    let mut loaded = dto_to_instruction(&dto).unwrap();
+    assert_eq!(loaded.kind, sped.kind);
+    assert!(fields::value_slot_mut(&mut loaded.kind, fields::FieldId::TextSpeed).is_some());
+}
+
+#[test]
 fn optional_wait_and_tolerance_components_round_trip() {
     use crate::frontend::{InstructionDto, dto_to_instruction, instruction_to_dto};
     for json in [
@@ -724,9 +760,12 @@ fn rename_variable_renames_declaration_and_every_reference() {
                     name: "x".to_string(),
                 },
             )),
-            Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var {
-                name: "x".to_string(),
-            }))),
+            Instruction::new(InstructionKind::Token(InputToken::Text(
+                Value::Var {
+                    name: "x".to_string(),
+                }
+                .into(),
+            ))),
         ],
     );
     mac.variables.push(VariableDef {
@@ -765,9 +804,12 @@ fn rename_variable_renames_declaration_and_every_reference() {
     );
     assert_eq!(
         strand.instructions[3],
-        Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var {
-            name: "y".to_string()
-        })))
+        Instruction::new(InstructionKind::Token(InputToken::Text(
+            Value::Var {
+                name: "y".to_string()
+            }
+            .into()
+        )))
     );
     assert_eq!(
         mac.floating_values[0].value,
@@ -785,15 +827,19 @@ fn rename_variable_rejects_an_undeclared_name_and_changes_nothing() {
         vec![Instruction::new(InstructionKind::Token(InputToken::Text(
             Value::Var {
                 name: "x".to_string(),
-            },
+            }
+            .into(),
         )))],
     );
     assert!(mac.rename_variable("x", "y").is_err());
     assert_eq!(
         mac.strands[0].instructions[1],
-        Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var {
-            name: "x".to_string()
-        })))
+        Instruction::new(InstructionKind::Token(InputToken::Text(
+            Value::Var {
+                name: "x".to_string()
+            }
+            .into()
+        )))
     );
 }
 

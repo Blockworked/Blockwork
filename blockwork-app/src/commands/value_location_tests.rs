@@ -758,7 +758,8 @@ fn remove_variable_removes_declaration_but_leaves_references() {
         vec![Instruction::new(InstructionKind::Token(InputToken::Text(
             Value::Var {
                 name: "score".to_string(),
-            },
+            }
+            .into(),
         )))],
     );
     mac.create_variable("score").unwrap();
@@ -766,9 +767,12 @@ fn remove_variable_removes_declaration_but_leaves_references() {
     assert!(mac.variables.is_empty());
     assert_eq!(
         mac.strands[0].instructions[1],
-        Instruction::new(InstructionKind::Token(InputToken::Text(Value::Var {
-            name: "score".to_string()
-        })))
+        Instruction::new(InstructionKind::Token(InputToken::Text(
+            Value::Var {
+                name: "score".to_string()
+            }
+            .into()
+        )))
     );
 }
 

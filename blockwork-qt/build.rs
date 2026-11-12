@@ -7,11 +7,13 @@ use std::path::Path;
 #[path = "build_support/translations.rs"]
 mod translation_catalogs;
 
+#[path = "build_support/qwindowkit.rs"]
+mod qwindowkit;
+
 fn main() {
+    let qwindowkit = qwindowkit::build();
     #[cfg(windows)]
     {
-        // Native snap styles in src/window_frame.cpp.
-        println!("cargo:rustc-link-lib=user32");
         // Explorer, taskbar grouping and the installer pick the exe's embedded
         // icon; the runtime title-bar/taskbar icon is set separately in
         // src/app_icon.cpp from the Qt resource below.
@@ -71,6 +73,14 @@ fn main() {
     // in C++) beside the editor's own resources; kept under /icons so its
     // resource path stays stable.
     let mut resources = QResources::new();
+    resources = resources.resource(QResource::new().prefix("/licenses").file(
+        QResourceFile::new("../res/licenses/QWindowKit-LICENSE").alias("QWindowKit-LICENSE"),
+    ));
+    resources = resources.resource(
+        QResource::new()
+            .prefix("/window")
+            .file(QResourceFile::new("qml/window/WindowChrome.qml").alias("WindowChrome.qml")),
+    );
     for (prefix, files) in qml.json["editor_resources"]
         .as_object()
         .expect("`editor_resources` must be an object")
@@ -126,6 +136,9 @@ fn main() {
                     cc.flag("/utf-8");
                 }
                 cc.include("src");
+                cc.include(qwindowkit.join("include/QWindowKit"));
+                cc.define("QWK_QUICK_STATIC", None);
+                cc.define("QWK_CORE_STATIC", None);
                 cc.file("src/qt_diagnostics.cpp");
                 cc.file("src/app_icon.cpp");
                 cc.file("src/application.cpp");
@@ -137,6 +150,7 @@ fn main() {
             })
             .build();
     }
+    qwindowkit::link(&qwindowkit);
 }
 
 /// Every compiled translation in i18n/, served as `:/i18n/qml_<code>.qm`.
