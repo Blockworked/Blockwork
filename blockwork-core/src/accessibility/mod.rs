@@ -1,6 +1,8 @@
 //! Bounded native UI queries. Selectors are resolved again for every operation.
 pub use crate::input::ui::{UiAction, UiScope, UiSelector};
 use serde::Serialize;
+
+/// One element a selector found, as the picker lists it.
 #[derive(Debug, Clone, Serialize)]
 pub struct UiNode {
     pub app: String,
@@ -37,6 +39,8 @@ pub struct UiPick {
     /// None when only the window was found.
     pub node: Option<UiNode>,
 }
+
+/// What a native UI reporter reads from the element.
 #[derive(Clone, Copy)]
 pub enum Query {
     Exists,
@@ -44,6 +48,8 @@ pub enum Query {
     Text,
     Value,
 }
+
+/// Native UI automation is opt-in; every entry point checks this first.
 pub fn enabled() -> Result<(), String> {
     if crate::config::load_settings()
         .ui_automation_enabled
@@ -54,6 +60,8 @@ pub fn enabled() -> Result<(), String> {
         Err("Native UI automation is disabled in Settings".into())
     }
 }
+
+/// Reads one property of the element `selector` names.
 pub fn query(
     selector: &UiSelector,
     query: Query,
@@ -62,6 +70,8 @@ pub fn query(
     selector.require_target()?;
     imp::query(selector, query)
 }
+
+/// Invokes, focuses or writes text or a value to the element.
 pub fn action(selector: &UiSelector, action: UiAction, value: &str) -> Result<(), String> {
     enabled()?;
     selector.require_target()?;
@@ -70,14 +80,20 @@ pub fn action(selector: &UiSelector, action: UiAction, value: &str) -> Result<()
     }
     imp::action(selector, action, value)
 }
+
+/// A counter that moves when the accessibility tree reports a change.
 pub fn event_revision() -> Result<u64, String> {
     enabled()?;
     imp::revision()
 }
+
+/// Every element `selector` matches, for the picker.
 pub fn inspect(selector: &UiSelector) -> Result<Vec<UiNode>, String> {
     enabled()?;
     imp::inspect(selector)
 }
+
+/// Names of the apps on the accessibility bus.
 pub fn applications() -> Result<Vec<String>, String> {
     enabled()?;
     imp::applications()
@@ -93,6 +109,8 @@ pub fn pick(x: f64, y: f64, ignore: &str) -> Result<Option<UiPick>, String> {
     enabled()?;
     imp::pick(x, y, ignore)
 }
+
+// AT-SPI on Linux; elsewhere every call reports the missing adapter.
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
 mod imp;

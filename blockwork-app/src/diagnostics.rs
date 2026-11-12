@@ -68,7 +68,7 @@ pub(crate) fn input() -> Value {
         },
         "controllers": {
             "input": settings.controller_input_enabled.unwrap_or(false),
-            "deadzone": settings.controller_deadzone.unwrap_or(0.12),
+            "deadzone": settings.stick_deadzone(),
             "found": controllers,
             "virtualOutput": settings.virtual_gamepad_enabled.unwrap_or(false),
             "virtualOutputSupported": cfg!(target_os = "linux"),

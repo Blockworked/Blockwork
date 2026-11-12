@@ -4,8 +4,15 @@ use crate::macros::backend::InputBackend;
 use crate::screen::Rect;
 use std::sync::{Arc, Mutex};
 use std::time::{Duration, Instant};
+
+/// Held by the one strand playing touch, so two never mix their contacts.
 static LEASE: Mutex<()> = Mutex::new(());
 
+/// How late a frame may land before playback gives up and lifts every finger.
+const MAX_LATENESS: Duration = Duration::from_millis(250);
+
+/// Checks every frame lands on `bounds` and, for normalized paths, maps
+/// 0..=NORMALIZED_MAX onto the monitor's pixels.
 pub fn map_to_screen(
     sequence: &TouchSequence,
     normalized: bool,
@@ -41,16 +48,20 @@ pub fn map_to_screen(
     }
     Ok(result)
 }
-struct Contacts(
-    Arc<Mutex<dyn InputBackend>>,
-    Option<crate::macros::backend::ResetHandle>,
-);
+
+/// Lifts every contact when playback ends, however it ends. The backend's
+/// reset handle is used when it has one, since it works without its lock.
+struct Contacts {
+    backend: Arc<Mutex<dyn InputBackend>>,
+    reset: Option<crate::macros::backend::ResetHandle>,
+}
+
 impl Drop for Contacts {
     fn drop(&mut self) {
-        let result = if let Some(reset) = &self.1 {
+        let result = if let Some(reset) = &self.reset {
             reset()
         } else {
-            self.0
+            self.backend
                 .lock()
                 .unwrap_or_else(|p| p.into_inner())
                 .cancel_touch()
@@ -60,6 +71,9 @@ impl Drop for Contacts {
         }
     }
 }
+
+/// Plays `sequence` on the backend at `speed`, checking `interrupted`
+/// between frames. Fingers are always lifted on return.
 pub fn play(
     sequence: &TouchSequence,
     backend: Arc<Mutex<dyn InputBackend>>,
@@ -85,7 +99,10 @@ pub fn play(
         .lock()
         .map_err(|e| e.to_string())?
         .touch_reset_handle();
-    let _contacts = Contacts(Arc::clone(&backend), reset);
+    let _contacts = Contacts {
+        backend: Arc::clone(&backend),
+        reset,
+    };
     let start = Instant::now();
     for frame in &sequence.frames {
         let deadline = start + Duration::from_secs_f64(frame.at_ms as f64 / 1000.0 / speed);
@@ -99,14 +116,14 @@ pub fn play(
             }
             std::thread::sleep((deadline - now).min(Duration::from_millis(5)));
         }
-        if deadline.elapsed() > Duration::from_millis(250) {
+        if deadline.elapsed() > MAX_LATENESS {
             return Err("Touch playback fell behind; contacts were released".into());
         }
         loop {
             if interrupted() {
                 return Err("Touch playback was interrupted".into());
             }
-            if deadline.elapsed() > Duration::from_millis(250) {
+            if deadline.elapsed() > MAX_LATENESS {
                 return Err("Touch backend was busy; contacts were released".into());
             }
             match backend.try_lock() {

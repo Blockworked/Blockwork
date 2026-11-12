@@ -168,10 +168,7 @@ fn initial_state(
         close_to_tray: settings.close_to_tray.unwrap_or(false),
         start_at_startup: settings.start_at_startup.unwrap_or(false),
         controller_input_enabled: settings.controller_input_enabled.unwrap_or(false),
-        controller_deadzone: settings
-            .controller_deadzone
-            .filter(|n| n.is_finite() && (0.0..=0.95).contains(n))
-            .unwrap_or(0.12),
+        controller_deadzone: settings.stick_deadzone(),
         virtual_gamepad_enabled: settings.virtual_gamepad_enabled.unwrap_or(false),
         ui_automation_enabled: settings.ui_automation_enabled.unwrap_or(false),
         onboarding_done: settings.onboarding_done.unwrap_or(true),

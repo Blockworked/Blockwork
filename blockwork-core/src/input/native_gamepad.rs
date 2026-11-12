@@ -5,7 +5,9 @@ use evdev::{
     uinput::VirtualDevice,
 };
 use std::sync::Mutex;
+
 static DEVICE: Mutex<Option<VirtualDevice>> = Mutex::new(None);
+
 fn key(button: GamepadButton) -> Option<KeyCode> {
     Some(match button {
         GamepadButton::South => KeyCode::BTN_SOUTH,
@@ -22,6 +24,7 @@ fn key(button: GamepadButton) -> Option<KeyCode> {
         _ => return None,
     })
 }
+
 pub fn prepare() -> Result<(), String> {
     if !crate::config::load_settings()
         .virtual_gamepad_enabled
@@ -41,7 +44,7 @@ pub fn prepare() -> Result<(), String> {
     }
     let mut builder = VirtualDevice::builder()
         .map_err(|e| format!("Virtual controller output needs /dev/uinput access: {e}"))?
-        .name("Blockwork Virtual Gamepad")
+        .name(crate::input::VIRTUAL_GAMEPAD_NAME)
         .with_keys(&keys)
         .map_err(|e| e.to_string())?;
     for (axis, min, max) in [
@@ -65,6 +68,7 @@ pub fn prepare() -> Result<(), String> {
     std::thread::sleep(std::time::Duration::from_millis(100));
     Ok(())
 }
+
 pub fn state(state: &GamepadState) -> Result<(), String> {
     state.validate()?;
     let mut device = DEVICE.lock().map_err(|e| e.to_string())?;
@@ -102,6 +106,7 @@ pub fn state(state: &GamepadState) -> Result<(), String> {
     }
     device.emit(&events).map_err(|e| e.to_string())
 }
+
 pub fn reset() -> Result<(), String> {
     if DEVICE.lock().unwrap_or_else(|p| p.into_inner()).is_none() {
         return Ok(());

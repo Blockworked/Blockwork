@@ -405,12 +405,13 @@ pub(crate) fn set_record_touch(
     app: &AppHandle,
     enabled: bool,
 ) -> Result<(), String> {
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.record_touch = enabled;
     recording::RECORD_TOUCH.store(enabled, Ordering::Relaxed);
-    config::update_settings(|settings| settings.record_touch = Some(enabled));
-    emit_state_updated(app, &s);
-    Ok(())
+    super::settings::save_setting(
+        state,
+        app,
+        |s| s.record_touch = enabled,
+        |settings| settings.record_touch = Some(enabled),
+    )
 }
 
 pub(crate) fn set_record_controller(
@@ -418,12 +419,13 @@ pub(crate) fn set_record_controller(
     app: &AppHandle,
     enabled: bool,
 ) -> Result<(), String> {
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.record_controller = enabled;
     recording::RECORD_CONTROLLER.store(enabled, Ordering::Relaxed);
-    config::update_settings(|settings| settings.record_controller = Some(enabled));
-    emit_state_updated(app, &s);
-    Ok(())
+    super::settings::save_setting(
+        state,
+        app,
+        |s| s.record_controller = enabled,
+        |settings| settings.record_controller = Some(enabled),
+    )
 }
 
 pub(crate) fn set_review_recordings(
@@ -431,9 +433,10 @@ pub(crate) fn set_review_recordings(
     app: &AppHandle,
     enabled: bool,
 ) -> Result<(), String> {
-    let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.review_recordings = enabled;
-    config::update_settings(|settings| settings.review_recordings = Some(enabled));
-    emit_state_updated(app, &s);
-    Ok(())
+    super::settings::save_setting(
+        state,
+        app,
+        |s| s.review_recordings = enabled,
+        |settings| settings.review_recordings = Some(enabled),
+    )
 }

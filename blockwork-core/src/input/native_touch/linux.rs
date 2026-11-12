@@ -1,16 +1,24 @@
-use crate::input::touch::TouchContact;
+//! Touch playback through a uinput touchscreen covering the one monitor.
+use crate::input::touch::{MAX_CONTACTS, TouchContact};
 use crate::screen::Rect;
 use evdev::{
     AbsInfo, AbsoluteAxisCode as Abs, AttributeSet, EventType, InputEvent, KeyCode, PropType,
     UinputAbsSetup, uinput::VirtualDevice,
 };
 use std::sync::Mutex;
+
+/// The virtual touchscreen, made on first use and remade when the monitor
+/// changes size or place.
 static STATE: Mutex<Option<Device>> = Mutex::new(None);
+
 struct Device {
     device: VirtualDevice,
+    /// The monitor the device covers, in desktop pixels.
     bounds: Rect,
+    /// Contacts currently down, so lifted fingers can be released.
     active: Vec<TouchContact>,
 }
+
 fn geometry() -> Result<Rect, String> {
     let monitors = crate::screen::monitors();
     if monitors.len() != 1 {
@@ -22,12 +30,34 @@ fn geometry() -> Result<Rect, String> {
     }
     Ok(bounds)
 }
+
 fn event(axis: Abs, value: i32) -> InputEvent {
     InputEvent::new(EventType::ABSOLUTE.0, axis.0, value)
 }
+
+fn key(code: KeyCode, down: bool) -> InputEvent {
+    InputEvent::new(EventType::KEY.0, code.0, i32::from(down))
+}
+
+/// Lifts every slot, whatever the kernel last saw, so nothing stays down.
+fn release_all() -> Vec<InputEvent> {
+    let mut events = vec![];
+    for slot in 0..MAX_CONTACTS as i32 {
+        events.extend([
+            event(Abs::ABS_MT_SLOT, slot),
+            event(Abs::ABS_MT_TRACKING_ID, -1),
+        ]);
+    }
+    events.push(key(KeyCode::BTN_TOUCH, false));
+    events.push(key(KeyCode::BTN_TOOL_FINGER, false));
+    events
+}
+
 fn same(a: Rect, b: Rect) -> bool {
     a.x == b.x && a.y == b.y && a.width == b.width && a.height == b.height
 }
+
+/// Makes the device for the current monitor, if it isn't there already.
 pub fn prepare() -> Result<(), String> {
     let bounds = geometry()?;
     let mut state = STATE.lock().map_err(|e| e.to_string())?;
@@ -42,7 +72,7 @@ pub fn prepare() -> Result<(), String> {
     props.insert(PropType::DIRECT);
     let mut builder = VirtualDevice::builder()
         .map_err(|e| format!("Native touch needs /dev/uinput access: {e}"))?
-        .name("Blockwork Virtual Touch")
+        .name(crate::input::VIRTUAL_TOUCH_NAME)
         .with_keys(&keys)
         .map_err(|e| e.to_string())?
         .with_properties(&props)
@@ -50,7 +80,7 @@ pub fn prepare() -> Result<(), String> {
     for (axis, maximum) in [
         (Abs::ABS_X, bounds.width as i32 - 1),
         (Abs::ABS_Y, bounds.height as i32 - 1),
-        (Abs::ABS_MT_SLOT, 9),
+        (Abs::ABS_MT_SLOT, MAX_CONTACTS as i32 - 1),
         (Abs::ABS_MT_TRACKING_ID, 65535),
         (Abs::ABS_MT_POSITION_X, bounds.width as i32 - 1),
         (Abs::ABS_MT_POSITION_Y, bounds.height as i32 - 1),
@@ -74,6 +104,8 @@ pub fn prepare() -> Result<(), String> {
     std::thread::sleep(std::time::Duration::from_millis(100));
     Ok(())
 }
+
+/// Sends one complete contact frame: fingers missing from `contacts` lift.
 pub fn frame(contacts: &[TouchContact]) -> Result<(), String> {
     let mut state = STATE.lock().map_err(|e| e.to_string())?;
     let state = state.as_mut().ok_or("Touch device wasn't initialized")?;
@@ -104,54 +136,27 @@ pub fn frame(contacts: &[TouchContact]) -> Result<(), String> {
         events.push(event(Abs::ABS_X, first.x - state.bounds.x as i32));
         events.push(event(Abs::ABS_Y, first.y - state.bounds.y as i32));
     }
-    events.push(InputEvent::new(
-        EventType::KEY.0,
-        KeyCode::BTN_TOUCH.0,
-        i32::from(!contacts.is_empty()),
-    ));
-    events.push(InputEvent::new(
-        EventType::KEY.0,
-        KeyCode::BTN_TOOL_FINGER.0,
-        i32::from(!contacts.is_empty()),
-    ));
+    events.push(key(KeyCode::BTN_TOUCH, !contacts.is_empty()));
+    events.push(key(KeyCode::BTN_TOOL_FINGER, !contacts.is_empty()));
     state.active = contacts.to_vec();
     state
         .device
         .emit(&events)
         .map_err(|e| format!("Native touch failed: {e}"))
 }
+
+/// Lifts every finger, even after a partial kernel write.
 pub fn cancel() -> Result<(), String> {
     let mut state = STATE.lock().unwrap_or_else(|p| p.into_inner());
     let Some(state) = state.as_mut() else {
         return Ok(());
     };
-    let mut events = vec![];
-    // Release every slot even after a partial kernel write.
-    for slot in 0..10 {
-        events.extend([
-            event(Abs::ABS_MT_SLOT, slot),
-            event(Abs::ABS_MT_TRACKING_ID, -1),
-        ]);
-    }
-    events.push(InputEvent::new(EventType::KEY.0, KeyCode::BTN_TOUCH.0, 0));
-    events.push(InputEvent::new(
-        EventType::KEY.0,
-        KeyCode::BTN_TOOL_FINGER.0,
-        0,
-    ));
     state.active.clear();
-    state.device.emit(&events).map_err(|e| e.to_string())
+    state.device.emit(&release_all()).map_err(|e| e.to_string())
 }
+
 impl Drop for Device {
     fn drop(&mut self) {
-        let mut events = vec![];
-        for slot in 0..10 {
-            events.extend([
-                event(Abs::ABS_MT_SLOT, slot),
-                event(Abs::ABS_MT_TRACKING_ID, -1),
-            ]);
-        }
-        events.push(InputEvent::new(EventType::KEY.0, KeyCode::BTN_TOUCH.0, 0));
-        let _ = self.device.emit(&events);
+        let _ = self.device.emit(&release_all());
     }
 }

@@ -3,16 +3,19 @@
 
 pub use blockwork_model::input::value::*;
 
+/// What a fresh native UI reporter points at: the focused window's Save button.
+const EXAMPLE_SELECTOR: &str = "scope=Focused;name=Save;role=push button";
+
 /// Blockwork's own operators, in blockstitch's extension shape. They read
-/// live system state, so none takes operands - see [`crate::battery`] and
-/// [`crate::clipboard`]. The wire names are what they serialized as before,
+/// live system state: battery and clipboard ones take no operands, native UI
+/// ones a selector, controller ones a profile (and a button or axis). The wire names are what they serialized as before,
 /// so saves keep loading.
 static OPERATORS: &[ExtOperator] = &[
     ExtOperator {
         kind: "NativeUiExists",
         op: "NativeUiExists",
         arity: 1,
-        default_args: || vec![Value::text("scope=Focused;name=Save;role=push button")],
+        default_args: || vec![Value::text(EXAMPLE_SELECTOR)],
         eval: |args| {
             crate::permissions::require("ui_automation")?;
             crate::accessibility::query(
@@ -25,7 +28,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "NativeUiEnabled",
         op: "NativeUiEnabled",
         arity: 1,
-        default_args: || vec![Value::text("scope=Focused;name=Save;role=push button")],
+        default_args: || vec![Value::text(EXAMPLE_SELECTOR)],
         eval: |args| {
             crate::permissions::require("ui_automation")?;
             crate::accessibility::query(
@@ -38,7 +41,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "NativeUiText",
         op: "NativeUiText",
         arity: 1,
-        default_args: || vec![Value::text("scope=Focused;name=Save;role=push button")],
+        default_args: || vec![Value::text(EXAMPLE_SELECTOR)],
         eval: |args| {
             crate::permissions::require("ui_automation")?;
             crate::accessibility::query(
@@ -51,7 +54,7 @@ static OPERATORS: &[ExtOperator] = &[
         kind: "NativeUiValue",
         op: "NativeUiValue",
         arity: 1,
-        default_args: || vec![Value::text("scope=Focused;name=Save;role=push button")],
+        default_args: || vec![Value::text(EXAMPLE_SELECTOR)],
         eval: |args| {
             crate::permissions::require("ui_automation")?;
             crate::accessibility::query(
@@ -109,9 +112,7 @@ static OPERATORS: &[ExtOperator] = &[
                 .unwrap_or(0.0);
             Ok(Evaluated::Number(crate::input::gamepad::deadzone(
                 value,
-                crate::config::load_settings()
-                    .controller_deadzone
-                    .unwrap_or(0.12),
+                crate::config::load_settings().stick_deadzone(),
             )))
         },
     },
