@@ -1,4 +1,4 @@
-//! Registers the daemon to launch at login, in `--background` mode (tray only,
+//! Registers the daemon to launch at login, in `--background --system-startup` mode (tray only,
 //! no editor window). One entry per OS: an XDG autostart file, a launchd agent,
 //! or an HKCU Run value. Flatpak goes through the Background portal.
 
@@ -25,7 +25,7 @@ fn install(exe: &Path) -> Result<(), String> {
     std::fs::create_dir_all(path.parent().unwrap()).map_err(|e| e.to_string())?;
     let entry = format!(
         "[Desktop Entry]\nType=Application\nName=Blockwork\nComment=Start Blockwork in the background\n\
-         Exec={} --background\nIcon=blockwork\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
+         Exec={} --background --system-startup\nIcon=blockwork\nTerminal=false\nX-GNOME-Autostart-enabled=true\n",
         quote_exec(exe)
     );
     std::fs::write(&path, entry).map_err(|e| format!("Failed to write {}: {e}", path.display()))
@@ -71,7 +71,7 @@ fn flatpak() -> bool {
 fn portal_request(autostart: bool, exe: &Path) -> Result<(), String> {
     // The wrapper script sets BLOCKWORK_UI_EXE so the tray can relaunch the UI.
     let script = format!(
-        "BLOCKWORK_UI_EXE=/app/bin/blockwork exec '{}' --background",
+        "BLOCKWORK_UI_EXE=/app/bin/blockwork exec '{}' --background --system-startup",
         exe.to_string_lossy().replace('\'', "'\\''")
     );
     let script = script.replace('\\', "\\\\").replace('\'', "\\'");
@@ -124,7 +124,7 @@ fn install(exe: &Path) -> Result<(), String> {
          <!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n\
          <plist version=\"1.0\"><dict>\n\
          <key>Label</key><string>{LABEL}</string>\n\
-         <key>ProgramArguments</key><array><string>{exe}</string><string>--background</string></array>\n\
+         <key>ProgramArguments</key><array><string>{exe}</string><string>--background</string><string>--system-startup</string></array>\n\
          <key>RunAtLoad</key><true/>\n\
          </dict></plist>\n"
     );
@@ -160,7 +160,7 @@ fn reg(args: &[&str]) -> Result<(), String> {
 
 #[cfg(windows)]
 fn install(exe: &Path) -> Result<(), String> {
-    let value = format!("\"{}\" --background", exe.display());
+    let value = format!("\"{}\" --background --system-startup", exe.display());
     reg(&[
         "add", RUN_KEY, "/v", ENTRY_NAME, "/t", "REG_SZ", "/d", &value, "/f",
     ])

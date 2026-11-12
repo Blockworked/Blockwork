@@ -792,6 +792,7 @@ fn input(id: &str, name: &str) -> BlockPiece {
         value_type: Default::default(),
         default_value: None,
         multiline: false,
+        ui: None,
     }
 }
 
@@ -996,6 +997,7 @@ fn reconcile_block_call_args_defaults_a_newly_added_bool_input_to_blank_bool() {
             value_type: InputValueType::Bool,
             default_value: None,
             multiline: false,
+            ui: None,
         },
     ];
     mac.reconcile_block_call_args(&id, &old_pieces, &new_pieces);

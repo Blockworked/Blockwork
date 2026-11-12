@@ -21,6 +21,8 @@ pub enum ClientMessage {
     /// already open (and has been asked to come to the front), so this one
     /// should exit.
     Hello,
+    /// OS autostart notification; does not open an editor connection.
+    SystemStartup,
     /// First message from a script client (the `blockwork run` command line)
     /// instead of `Hello`. It gets no state pushes, may only call
     /// [`SCRIPT_COMMANDS`], and doesn't count as an open window.

@@ -12,6 +12,9 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ### Added
 - Optional typing speed on the Text block: wait per character, or give the whole text a total time divided evenly across it. Without it, typing runs at the normal input speed (Linux keeps a small 0.5 ms built-in gap).
+- Custom blocks can have dropdown choices and buttons opening their own settings screens, including inputs shown only on those screens.
+- Built-in block menus and pickers use the same shared UI framework.
+- Saved macro format 6 preserves custom block menus; macros from earlier versions still load.
 
 ### Fixed
 - Blocks stay under the pointer while branches resize; bracket shapes update in the same frame as a drop.

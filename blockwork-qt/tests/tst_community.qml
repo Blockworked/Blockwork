@@ -103,7 +103,13 @@ Item {
             compare(dialog.editor.resultPieces()[2].default_value.value, "a");
             // Text edits can schedule a layout pass that moves the next row.
             verify(waitForRendering(defaults.contentItem));
-            mouseClick(named(rows.find(o => o.pieceName === "enabled"), "defaultBooleanValue"));
+            const booleanValue = named(rows.find(o => o.pieceName === "enabled"), "defaultBooleanValue");
+            const scroll = all(defaults.contentItem).find(o => o.contentY !== undefined && o.contentHeight !== undefined);
+            verify(!!scroll);
+            scroll.contentY = Math.max(0, Math.min(scroll.contentHeight - scroll.height,
+                booleanValue.mapToItem(scroll.contentItem, 0, 0).y - scroll.height / 2));
+            verify(waitForRendering(defaults.contentItem));
+            mouseClick(booleanValue);
             compare(dialog.editor.resultPieces()[3].default_value.value, false);
             dialog.editor.setInputDefault(1, "Number", "bad");
             verify(!dialog.editor.defaultsValid());

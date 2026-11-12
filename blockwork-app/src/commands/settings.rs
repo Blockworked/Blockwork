@@ -396,7 +396,10 @@ pub(crate) fn set_start_at_startup(
         state,
         app,
         |s| s.start_at_startup = enabled,
-        |settings| settings.start_at_startup = Some(enabled),
+        |settings| {
+            settings.start_at_startup = Some(enabled);
+            settings.startup_entry_version = Some(1);
+        },
     )
 }
 
@@ -489,4 +492,58 @@ pub(crate) fn apply_update(state: &SharedState, app: &AppHandle) -> Result<(), S
         });
     }
     Ok(())
+}
+
+pub(crate) fn set_controller_input_enabled(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    save_setting(
+        state,
+        app,
+        |s| s.controller_input_enabled = enabled,
+        |st| st.controller_input_enabled = Some(enabled),
+    )?;
+    blockwork_core::input::controllers::set_enabled(enabled);
+    Ok(())
+}
+pub(crate) fn set_controller_deadzone(
+    state: &SharedState,
+    app: &AppHandle,
+    value: f64,
+) -> Result<(), String> {
+    if !value.is_finite() || !(0.0..=0.95).contains(&value) {
+        return Err("Controller deadzone must be 0 to 0.95".into());
+    }
+    save_setting(
+        state,
+        app,
+        |s| s.controller_deadzone = value,
+        |st| st.controller_deadzone = Some(value),
+    )
+}
+pub(crate) fn set_virtual_gamepad_enabled(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    save_setting(
+        state,
+        app,
+        |s| s.virtual_gamepad_enabled = enabled,
+        |st| st.virtual_gamepad_enabled = Some(enabled),
+    )
+}
+pub(crate) fn set_ui_automation_enabled(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    save_setting(
+        state,
+        app,
+        |s| s.ui_automation_enabled = enabled,
+        |st| st.ui_automation_enabled = Some(enabled),
+    )
 }

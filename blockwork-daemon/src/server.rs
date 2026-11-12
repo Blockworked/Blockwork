@@ -120,6 +120,12 @@ async fn handle_connection(
     {
         Ok(Ok(Some(line))) => match serde_json::from_str(&line) {
             Ok(ClientMessage::Hello) => {}
+            Ok(ClientMessage::SystemStartup) => {
+                crate::BACKGROUND.store(true, Ordering::Relaxed);
+                backend.notify_system_startup();
+                writer_task.abort();
+                return false;
+            }
             Ok(ClientMessage::Script) => {
                 serve_script(&mut reader, backend, &tx, &mut writer_task).await;
                 drop(tx);
@@ -187,7 +193,7 @@ async fn handle_connection(
                     break;
                 }
             }
-            Ok(ClientMessage::Hello | ClientMessage::Script) => {}
+            Ok(ClientMessage::Hello | ClientMessage::Script | ClientMessage::SystemStartup) => {}
             Err(e) => tracing::warn!("Ignoring malformed message from the UI: {e}"),
         }
     }

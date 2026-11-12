@@ -1032,5 +1032,142 @@
   },
   "variable": "BrowserScript.variable",
   "id": "browserscript"
+ },
+ {
+  "type": "WhenSystemStarts",
+  "id": "whensystemstarts"
+ },
+ {
+  "type": "TouchGesture",
+  "id": "touchgesture",
+  "gesture": "Swipe",
+  "fingers": 2,
+  "x": {
+   "kind": "Number",
+   "value": 25
+  },
+  "y": {
+   "kind": "Number",
+   "value": 50
+  },
+  "end_x": {
+   "kind": "Number",
+   "value": 75
+  },
+  "end_y": {
+   "kind": "Number",
+   "value": 50
+  },
+  "duration": {
+   "kind": "Number",
+   "value": 500
+  },
+  "span": {
+   "kind": "Number",
+   "value": 10
+  },
+  "amount": {
+   "kind": "Number",
+   "value": 1.5
+  },
+  "normalized": true,
+  "monitor": 0
+ },
+ {
+  "type": "TouchSequence",
+  "id": "touchsequence",
+  "sequence": {
+   "kind": "Text",
+   "value": "{\"version\":1,\"frames\":[{\"at_ms\":0,\"contacts\":[{\"id\":0,\"x\":100,\"y\":100}]},{\"at_ms\":100,\"contacts\":[]}]}"
+  },
+  "normalized": false,
+  "monitor": 0
+ },
+ {
+  "type": "NativeUiAction",
+  "id": "nativeuiaction",
+  "selector": {
+   "kind": "Text",
+   "value": "app=Calculator;name=Plus;role=push button"
+  },
+  "action": "Invoke",
+  "value": {
+   "kind": "Text",
+   "value": ""
+  }
+ },
+ {
+  "type": "WhenGamepadButton",
+  "id": "whengamepadbutton",
+  "controller": {
+   "kind": "Text",
+   "value": ""
+  },
+  "button": "South",
+  "pressed": true
+ },
+ {
+  "type": "WhenGamepadConnection",
+  "id": "whengamepadconnection",
+  "controller": {
+   "kind": "Text",
+   "value": ""
+  },
+  "connected": true
+ },
+ {
+  "type": "WhenGamepadAxis",
+  "id": "whengamepadaxis",
+  "controller": {
+   "kind": "Text",
+   "value": ""
+  },
+  "axis": "LeftX",
+  "threshold": {
+   "kind": "Number",
+   "value": 0.5
+  },
+  "above": true
+ },
+ {
+  "type": "WhenNativeUiChanged",
+  "id": "whennativeuichanged",
+  "selector": {
+   "kind": "Text",
+   "value": "app=Calculator;name=Plus;role=push button"
+  },
+  "property": "Enabled"
+ },
+ {
+  "type": "GamepadButton",
+  "id": "gamepadbutton",
+  "button": "South",
+  "direction": "Press"
+ },
+ {
+  "type": "GamepadStick",
+  "id": "gamepadstick",
+  "stick": "Left",
+  "x": {
+   "kind": "Number",
+   "value": 0.3
+  },
+  "y": {
+   "kind": "Number",
+   "value": -0.7
+  }
+ },
+ {
+  "type": "GamepadTrigger",
+  "id": "gamepadtrigger",
+  "left": true,
+  "amount": {
+   "kind": "Number",
+   "value": 0.5
+  }
+ },
+ {
+  "type": "ResetGamepad",
+  "id": "resetgamepad"
  }
 ]

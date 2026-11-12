@@ -65,6 +65,28 @@ Item {
             compare(dialog.picked.length, 1);
             compare(dialog.picked[0], "bool");
         }
+        function test_menu_previews_use_shared_defaults_and_labels() {
+            const previous = scene.definitions;
+            const definition = {id: "menu", shape: "Normal", pieces: [
+                {kind: "Label", id: "label", text: "configure"},
+                {kind: "Input", id: "mode", name: "mode", ui: {choices: [{label: "Fast", value: "fast"}]}},
+                {kind: "Button", id: "options", text: "Options", title: "Configure", inputs: ["mode"]}
+            ]};
+            try {
+                scene.definitions = previous.concat([definition]);
+                library.share(definition);
+                const dialog = findChild(library, "sharePackDialog");
+                tryCompare(dialog, "opened", true);
+                const rows = findChild(dialog, "sharePackBlockRows");
+                tryCompare(rows, "count", 5);
+                const loader = findChild(rows.itemAt(4), "sharePackBlockPreview");
+                verify(loader.item);
+                compare(loader.item.instruction.args[0], {kind: "Text", value: "fast"});
+                compare(library.blockLabel(definition), "configure (mode) Options");
+            } finally {
+                scene.definitions = previous;
+            }
+        }
         function test_constrained_form_and_real_previews_data() {
             return [{tag: "desktop", width: 900, height: 760}, {tag: "small", width: 420, height: 540}];
         }

@@ -2,8 +2,11 @@
 //! the small value types their fields use.
 
 use super::Instruction;
+use crate::input::gamepad::{GamepadAxis, GamepadButton, GamepadStick};
 use crate::input::schedule::TimeSchedule;
+use crate::input::touch::TouchGestureKind;
 use crate::input::types::{Direction, InputToken, MacroButton};
+use crate::input::ui::{UiAction, UiProperty};
 use crate::input::value::Value;
 use serde::{Deserialize, Serialize};
 
@@ -96,6 +99,74 @@ pub enum InstructionKind {
     /// Marks a strand as an entry point (always at index 0): it runs as its
     /// own concurrent thread when the macro runs. A macro can have several.
     WhenRan,
+    /// Fired by the enabled OS startup entry once per login session.
+    WhenSystemStarts,
+    /// Virtual controller output, opt-in on a supported native backend.
+    GamepadButton {
+        button: GamepadButton,
+        direction: Direction,
+    },
+    GamepadStick {
+        stick: GamepadStick,
+        x: Value,
+        y: Value,
+    },
+    GamepadTrigger {
+        left: bool,
+        amount: Value,
+    },
+    ResetGamepad,
+    /// A coalesced change to a freshly resolved accessible element property.
+    WhenNativeUiChanged {
+        selector: Value,
+        property: UiProperty,
+    },
+    /// Physical controller triggers are opt-in and use stable logical controls.
+    WhenGamepadButton {
+        controller: Value,
+        button: GamepadButton,
+        pressed: bool,
+    },
+    WhenGamepadConnection {
+        controller: Value,
+        connected: bool,
+    },
+    WhenGamepadAxis {
+        controller: Value,
+        axis: GamepadAxis,
+        threshold: Value,
+        above: bool,
+    },
+    /// Resolves a fresh accessibility selector and controls its unique match.
+    NativeUiAction {
+        selector: Value,
+        action: UiAction,
+        value: Value,
+    },
+    /// A bounded multi-finger gesture on a target monitor.
+    TouchGesture {
+        gesture: TouchGestureKind,
+        fingers: u8,
+        x: Box<Value>,
+        y: Box<Value>,
+        end_x: Box<Value>,
+        end_y: Box<Value>,
+        duration: Box<Value>,
+        span: Box<Value>,
+        amount: Box<Value>,
+        #[serde(default)]
+        normalized: bool,
+        #[serde(default)]
+        monitor: u32,
+    },
+    /// Complete timed contact frames; absent contacts are released.
+    TouchSequence {
+        sequence: Box<Value>,
+        #[serde(default)]
+        normalized: bool,
+        #[serde(default)]
+        monitor: u32,
+    },
     /// Header-only marker (like `WhenRan`/`BlockHeader`) for a strand whose
     /// body should run whenever the system's battery charge drops to (or
     /// below) the given percentage. Unlike `WhenRan`, this is *not* an

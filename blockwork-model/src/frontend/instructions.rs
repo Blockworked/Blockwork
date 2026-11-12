@@ -7,7 +7,10 @@
 //! `tests/wire_blocks.rs` holds every block's round trip.
 
 use super::*;
+use crate::input::gamepad::{GamepadAxis, GamepadButton, GamepadStick};
 use crate::input::index_to_mouse_button;
+use crate::input::touch::TouchGestureKind;
+use crate::input::ui::{UiAction, UiProperty};
 use crate::macros::StopScope;
 
 /// One field's wire form: the same value for most types, the DTO list for a
@@ -93,6 +96,8 @@ macro_rules! wire_blocks {
 wire_blocks! {
     unit {
         WhenRan,
+        WhenSystemStarts,
+        ResetGamepad,
         WhenPowerPluggedIn,
         WhenPowerUnplugged,
         WhenClipboardChanged,
@@ -124,6 +129,16 @@ wire_blocks! {
         WhenAt(at: Value),
     }
     named {
+        GamepadButton {button:GamepadButton,direction:Direction},
+        GamepadStick {stick:GamepadStick,x:Value,y:Value},
+        GamepadTrigger {left:bool,amount:Value},
+        WhenNativeUiChanged {selector:Value,property:UiProperty},
+        WhenGamepadButton {controller:Value,button:GamepadButton,pressed:bool},
+        WhenGamepadConnection {controller:Value,connected:bool},
+        WhenGamepadAxis {controller:Value,axis:GamepadAxis,threshold:Value,above:bool},
+        NativeUiAction {selector: Value, action: UiAction, value: Value},
+        TouchGesture { gesture: TouchGestureKind, fingers: u8, x: Box<Value>, y: Box<Value>, end_x: Box<Value>, end_y: Box<Value>, duration: Box<Value>, span: Box<Value>, amount: Box<Value>, #[serde(default)] normalized: bool, #[serde(default)] monitor: u32 },
+        TouchSequence { sequence: Box<Value>, #[serde(default)] normalized: bool, #[serde(default)] monitor: u32 },
         #[serde(alias = "StopMacro")] Stop { #[serde(default)] scope: StopScope },
         OpenApp { command: String, name: String, icon: Option<String>, #[serde(default)] launch: LaunchOptions },
         CloseApp { command: String, name: String, icon: Option<String> },

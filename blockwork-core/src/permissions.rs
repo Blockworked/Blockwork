@@ -10,8 +10,12 @@ use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 
 /// Abilities that ask first, with what the prompt says the macro wants to do.
-pub const GUARDED: [(&str, &str); 11] = [
+pub const GUARDED: [(&str, &str); 12] = [
     ("commands", "run commands and open or close apps"),
+    (
+        "ui_automation",
+        "read or control desktop apps through accessibility",
+    ),
     ("network", "go online"),
     ("files_write", "write to files"),
     ("secrets", "read your saved secrets"),

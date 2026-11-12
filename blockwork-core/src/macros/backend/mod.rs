@@ -31,7 +31,32 @@ pub enum CaptureEvent {
     Scroll(i32, i32),
 }
 
+pub type ResetHandle = Arc<dyn Fn() -> Result<(), String> + Send + Sync>;
 pub trait InputBackend: Send + 'static {
+    fn gamepad_reset_handle(&self) -> Option<ResetHandle> {
+        None
+    }
+    fn touch_reset_handle(&self) -> Option<ResetHandle> {
+        None
+    }
+    fn ensure_gamepad_support(&mut self) -> Result<(), String> {
+        Err("Native virtual controller output isn't supported by this backend".into())
+    }
+    fn gamepad_state(&mut self, _: &crate::input::gamepad::GamepadState) -> Result<(), String> {
+        Err("Native virtual controller output isn't supported by this backend".into())
+    }
+    fn reset_gamepad(&mut self) -> Result<(), String> {
+        Ok(())
+    }
+    fn ensure_touch_support(&mut self) -> Result<(), String> {
+        Err("Native touch isn't supported by this input backend".into())
+    }
+    fn touch_frame(&mut self, _: &[crate::input::touch::TouchContact]) -> Result<(), String> {
+        Err("Native touch isn't supported by this input backend".into())
+    }
+    fn cancel_touch(&mut self) -> Result<(), String> {
+        Ok(())
+    }
     fn key(&mut self, key: MacroKey, dir: Direction) -> Result<(), String>;
     fn raw_keycode(&mut self, keycode: u16, dir: Direction) -> Result<(), String>;
     fn button(&mut self, button: MacroButton, dir: Direction) -> Result<(), String>;

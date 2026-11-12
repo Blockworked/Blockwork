@@ -11,6 +11,29 @@ pub(super) fn run_system_block(
     depth: u32,
 ) -> Result<(), String> {
     match &ins.kind {
+        InstructionKind::NativeUiAction {
+            selector,
+            action,
+            value,
+        } => {
+            let result = (|| {
+                let selector = crate::input::ui::UiSelector::parse(
+                    &ctx.resolve(selector, depth)?.eval_text()?,
+                )?;
+                let value = if matches!(
+                    action,
+                    crate::input::ui::UiAction::SetText | crate::input::ui::UiAction::SetValue
+                ) {
+                    ctx.resolve(value, depth)?.eval_text()?
+                } else {
+                    String::new()
+                };
+                crate::accessibility::action(&selector, *action, &value)
+            })();
+            if let Err(error) = result {
+                soft_fail(ctx, &ins.id, "Native UI", error)?;
+            }
+        }
         InstructionKind::SendSignal { name, wait } => {
             let name = match ctx.resolve(&name.value, depth).and_then(|v| v.eval_text()) {
                 Ok(name) => name,

@@ -12,6 +12,21 @@ use serde::{Deserialize, Serialize};
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum FieldId {
     WaitDuration,
+    TouchX,
+    TouchY,
+    TouchEndX,
+    TouchEndY,
+    TouchDuration,
+    TouchSpan,
+    TouchAmount,
+    TouchPaths,
+    NativeUiSelector,
+    NativeUiValue,
+    GamepadController,
+    GamepadThreshold,
+    GamepadX,
+    GamepadY,
+    GamepadTriggerValue,
     MoveMouseX,
     MoveMouseY,
     ScrollAmount,
@@ -178,6 +193,51 @@ pub(crate) fn slots_mut<'a>(
         InstructionKind::WhenTyped { text, .. } => f(F::TypedText, text, Any),
         InstructionKind::PasteText(v) => f(F::PasteValue, v, Any),
         InstructionKind::WhenApp { pattern, .. } => f(F::AppPattern, pattern, Any),
+        InstructionKind::GamepadStick { x, y, .. } => {
+            f(F::GamepadX, x, Any);
+            f(F::GamepadY, y, Any);
+        }
+        InstructionKind::GamepadTrigger { amount, .. } => f(F::GamepadTriggerValue, amount, Any),
+        InstructionKind::WhenGamepadButton { controller, .. }
+        | InstructionKind::WhenGamepadConnection { controller, .. } => {
+            f(F::GamepadController, controller, Any)
+        }
+        InstructionKind::WhenGamepadAxis {
+            controller,
+            threshold,
+            ..
+        } => {
+            f(F::GamepadController, controller, Any);
+            f(F::GamepadThreshold, threshold, Any);
+        }
+        InstructionKind::WhenNativeUiChanged { selector, .. } => {
+            f(F::NativeUiSelector, selector, Any)
+        }
+        InstructionKind::NativeUiAction {
+            selector, value, ..
+        } => {
+            f(F::NativeUiSelector, selector, Any);
+            f(F::NativeUiValue, value, Any);
+        }
+        InstructionKind::TouchGesture {
+            x,
+            y,
+            end_x,
+            end_y,
+            duration,
+            span,
+            amount,
+            ..
+        } => {
+            f(F::TouchX, x, Any);
+            f(F::TouchY, y, Any);
+            f(F::TouchEndX, end_x, Any);
+            f(F::TouchEndY, end_y, Any);
+            f(F::TouchDuration, duration, Any);
+            f(F::TouchSpan, span, Any);
+            f(F::TouchAmount, amount, Any);
+        }
+        InstructionKind::TouchSequence { sequence, .. } => f(F::TouchPaths, sequence, Any),
         InstructionKind::WhenIdle(v) => f(F::IdleMinutes, v, Any),
         InstructionKind::WhenCron(v) => f(F::CronExpression, v, Any),
         InstructionKind::WithLock { name, .. } => f(F::LockName, name, Any),
@@ -400,6 +460,9 @@ pub(crate) fn slots_mut<'a>(
         | InstructionKind::CommandWait(_)
         | InstructionKind::Comment(_)
         | InstructionKind::WhenRan
+        | InstructionKind::WhenSystemStarts
+        | InstructionKind::GamepadButton { .. }
+        | InstructionKind::ResetGamepad
         | InstructionKind::BlockHeader(_)
         | InstructionKind::EscapeLoop
         | InstructionKind::ContinueLoop

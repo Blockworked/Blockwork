@@ -9,6 +9,113 @@ pub use blockwork_model::input::value::*;
 /// so saves keep loading.
 static OPERATORS: &[ExtOperator] = &[
     ExtOperator {
+        kind: "NativeUiExists",
+        op: "NativeUiExists",
+        arity: 1,
+        default_args: || vec![Value::text("scope=Focused;name=Save;role=push button")],
+        eval: |args| {
+            crate::permissions::require("ui_automation")?;
+            crate::accessibility::query(
+                &crate::input::ui::UiSelector::parse(&args[0].as_text())?,
+                crate::accessibility::Query::Exists,
+            )
+        },
+    },
+    ExtOperator {
+        kind: "NativeUiEnabled",
+        op: "NativeUiEnabled",
+        arity: 1,
+        default_args: || vec![Value::text("scope=Focused;name=Save;role=push button")],
+        eval: |args| {
+            crate::permissions::require("ui_automation")?;
+            crate::accessibility::query(
+                &crate::input::ui::UiSelector::parse(&args[0].as_text())?,
+                crate::accessibility::Query::Enabled,
+            )
+        },
+    },
+    ExtOperator {
+        kind: "NativeUiText",
+        op: "NativeUiText",
+        arity: 1,
+        default_args: || vec![Value::text("scope=Focused;name=Save;role=push button")],
+        eval: |args| {
+            crate::permissions::require("ui_automation")?;
+            crate::accessibility::query(
+                &crate::input::ui::UiSelector::parse(&args[0].as_text())?,
+                crate::accessibility::Query::Text,
+            )
+        },
+    },
+    ExtOperator {
+        kind: "NativeUiValue",
+        op: "NativeUiValue",
+        arity: 1,
+        default_args: || vec![Value::text("scope=Focused;name=Save;role=push button")],
+        eval: |args| {
+            crate::permissions::require("ui_automation")?;
+            crate::accessibility::query(
+                &crate::input::ui::UiSelector::parse(&args[0].as_text())?,
+                crate::accessibility::Query::Value,
+            )
+        },
+    },
+    ExtOperator {
+        kind: "GamepadConnected",
+        op: "GamepadConnected",
+        arity: 1,
+        default_args: || vec![Value::text("")],
+        eval: |args| {
+            crate::permissions::require("input")?;
+            let controllers = crate::input::controllers::list()?;
+            Ok(Evaluated::Bool(
+                crate::input::controllers::select(&controllers, &args[0].as_text())?.is_some(),
+            ))
+        },
+    },
+    ExtOperator {
+        kind: "GamepadButtonDown",
+        op: "GamepadButtonDown",
+        arity: 2,
+        default_args: || vec![Value::text(""), Value::text("South")],
+        eval: |args| {
+            crate::permissions::require("input")?;
+            let control: crate::input::gamepad::GamepadButton =
+                serde_json::from_value(serde_json::json!(args[1].as_text()))
+                    .map_err(|_| "Unknown controller button")?;
+            let controllers = crate::input::controllers::list()?;
+            Ok(Evaluated::Bool(
+                crate::input::controllers::select(&controllers, &args[0].as_text())?
+                    .and_then(|g| g.buttons.get(&control))
+                    .copied()
+                    .unwrap_or(false),
+            ))
+        },
+    },
+    ExtOperator {
+        kind: "GamepadAxisValue",
+        op: "GamepadAxisValue",
+        arity: 2,
+        default_args: || vec![Value::text(""), Value::text("LeftX")],
+        eval: |args| {
+            crate::permissions::require("input")?;
+            let control: crate::input::gamepad::GamepadAxis =
+                serde_json::from_value(serde_json::json!(args[1].as_text()))
+                    .map_err(|_| "Unknown controller axis")?;
+            let controllers = crate::input::controllers::list()?;
+            let value = crate::input::controllers::select(&controllers, &args[0].as_text())?
+                .and_then(|g| g.axes.get(&control))
+                .copied()
+                .unwrap_or(0.0);
+            Ok(Evaluated::Number(crate::input::gamepad::deadzone(
+                value,
+                crate::config::load_settings()
+                    .controller_deadzone
+                    .unwrap_or(0.12),
+            )))
+        },
+    },
+    ExtOperator {
         kind: "BatteryPercentage",
         op: "BatteryPercentage",
         arity: 0,

@@ -166,6 +166,13 @@ fn initial_state(
         ipc_auto_start: settings.ipc_auto_start.unwrap_or(false),
         close_to_tray: settings.close_to_tray.unwrap_or(false),
         start_at_startup: settings.start_at_startup.unwrap_or(false),
+        controller_input_enabled: settings.controller_input_enabled.unwrap_or(false),
+        controller_deadzone: settings
+            .controller_deadzone
+            .filter(|n| n.is_finite() && (0.0..=0.95).contains(n))
+            .unwrap_or(0.12),
+        virtual_gamepad_enabled: settings.virtual_gamepad_enabled.unwrap_or(false),
+        ui_automation_enabled: settings.ui_automation_enabled.unwrap_or(false),
         onboarding_done: settings.onboarding_done.unwrap_or(true),
         palette_layout: settings
             .palette_layout
@@ -245,6 +252,12 @@ impl Backend {
         let app = AppHandle { events };
 
         let settings = config::load_settings();
+        if settings.start_at_startup == Some(true) && settings.startup_entry_version != Some(1) {
+            match autostart::set_enabled(true) {
+                Ok(()) => config::update_settings(|st| st.startup_entry_version = Some(1)),
+                Err(error) => tracing::warn!("Couldn't update startup entry: {error}"),
+            }
+        }
         // The Linux backend defers the libei portal until an absolute move is
         // selected, so startup itself remains silent.
         // Without input emulation macros still run; their input blocks
@@ -331,6 +344,8 @@ impl Backend {
         watch::typed::start(Arc::clone(&shared), app.clone());
         watch::system::start(Arc::clone(&shared), app.clone());
         watch::mouse::start(Arc::clone(&shared), app.clone());
+        watch::controllers::start(Arc::clone(&shared), app.clone());
+        watch::native_ui::start(Arc::clone(&shared), app.clone());
         webhook::start(Arc::clone(&shared), app.clone());
         browser_bridge::start(Arc::clone(&shared), app.clone());
 

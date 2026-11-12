@@ -51,8 +51,11 @@ impl InstructionKind {
         match self {
             K::WhenRan | K::BlockHeader(_) => of(Header, &[]),
             K::Comment(_) => of(Comment, &[]),
+            K::NativeUiAction { .. } => of(System, &["ui_automation"]),
+            K::WhenNativeUiChanged { .. } => of(Trigger, &["ui_automation"]),
 
-            K::WhenBatteryDischargedTo(_)
+            K::WhenSystemStarts
+            | K::WhenBatteryDischargedTo(_)
             | K::WhenBatteryChargedTo(_)
             | K::WhenTime(..)
             | K::WhenPowerPluggedIn
@@ -70,7 +73,10 @@ impl InstructionKind {
             K::WhenClipboardChanged => of(Trigger, &["clipboard"]),
             K::WhenWindow { .. } | K::WhenApp { .. } => of(Trigger, &["windows"]),
             K::WhenFileChanged(_) => of(Trigger, &["files_read"]),
-            K::WhenTyped { .. } => of(Trigger, &["input"]),
+            K::WhenTyped { .. }
+            | K::WhenGamepadButton { .. }
+            | K::WhenGamepadConnection { .. }
+            | K::WhenGamepadAxis { .. } => of(Trigger, &["input"]),
 
             K::Wait(_)
             | K::WithLock { .. }
@@ -106,7 +112,13 @@ impl InstructionKind {
                 of(Dialogs, &[])
             }
 
-            K::Token(_) => of(Input, &["input"]),
+            K::Token(_)
+            | K::TouchGesture { .. }
+            | K::TouchSequence { .. }
+            | K::GamepadButton { .. }
+            | K::GamepadStick { .. }
+            | K::GamepadTrigger { .. }
+            | K::ResetGamepad => of(Input, &["input"]),
 
             K::SendSignal { .. } | K::Log(_) | K::Notify { .. } => of(System, &[]),
             K::Command(_) | K::CommandWait(_) | K::OpenApp { .. } | K::CloseApp { .. } => {

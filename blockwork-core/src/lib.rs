@@ -7,6 +7,7 @@ pub use blockwork_model::{
     block_packs, capabilities, editing, frontend, hotkey_types, key_mapping, redact, text,
 };
 
+pub mod accessibility;
 pub mod backoff;
 pub mod battery;
 pub mod browser;

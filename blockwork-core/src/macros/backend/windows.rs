@@ -217,6 +217,21 @@ impl WinApiBackend {
 }
 
 impl InputBackend for WinApiBackend {
+    fn touch_reset_handle(&self) -> Option<super::ResetHandle> {
+        Some(Arc::new(crate::input::native_touch::cancel))
+    }
+    fn ensure_touch_support(&mut self) -> Result<(), String> {
+        crate::input::native_touch::prepare()
+    }
+    fn touch_frame(
+        &mut self,
+        contacts: &[crate::input::touch::TouchContact],
+    ) -> Result<(), String> {
+        crate::input::native_touch::frame(contacts)
+    }
+    fn cancel_touch(&mut self) -> Result<(), String> {
+        crate::input::native_touch::cancel()
+    }
     fn key(&mut self, key: MacroKey, dir: Direction) -> Result<(), String> {
         let key = macro_key_to_enigo_key(&key);
         self.enigo

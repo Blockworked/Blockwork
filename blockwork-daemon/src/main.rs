@@ -53,6 +53,17 @@ fn main() {
         Ok(listener) => listener,
         Err(e) if e.kind() == std::io::ErrorKind::AddrInUse => {
             tracing::info!("Another Blockwork daemon is already running");
+            if std::env::args().any(|arg| arg == "--system-startup") {
+                runtime.block_on(async {
+                    use tokio::io::AsyncWriteExt;
+                    if let Ok(mut connection) = blockwork_protocol::connect().await {
+                        let message = blockwork_protocol::encode(
+                            &blockwork_protocol::ClientMessage::SystemStartup,
+                        );
+                        let _ = connection.write_all(message.as_bytes()).await;
+                    }
+                });
+            }
             return;
         }
         Err(e) => {
@@ -70,6 +81,10 @@ fn main() {
         let _guard = runtime.enter();
         Backend::start(runtime.handle().clone())
     };
+
+    if std::env::args().any(|arg| arg == "--system-startup") {
+        backend.notify_system_startup();
+    }
 
     // Only macOS changes the loop before running it.
     #[cfg_attr(not(target_os = "macos"), allow(unused_mut))]

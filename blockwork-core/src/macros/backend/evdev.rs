@@ -1,7 +1,7 @@
 use std::collections::HashSet;
 use std::io;
 use std::sync::atomic::{AtomicBool, Ordering};
-use std::sync::{Condvar, Mutex, OnceLock};
+use std::sync::{Arc, Condvar, Mutex, OnceLock};
 
 use enigo::{Coordinate as EnigoCoordinate, Enigo, Mouse, Settings};
 use evdev::{
@@ -482,6 +482,33 @@ enum LibeiState {
 }
 
 impl InputBackend for EvdevBackend {
+    fn gamepad_reset_handle(&self) -> Option<super::ResetHandle> {
+        Some(Arc::new(crate::input::native_gamepad::reset))
+    }
+    fn touch_reset_handle(&self) -> Option<super::ResetHandle> {
+        Some(Arc::new(crate::input::native_touch::cancel))
+    }
+    fn ensure_gamepad_support(&mut self) -> Result<(), String> {
+        crate::input::native_gamepad::prepare()
+    }
+    fn gamepad_state(&mut self, state: &crate::input::gamepad::GamepadState) -> Result<(), String> {
+        crate::input::native_gamepad::state(state)
+    }
+    fn reset_gamepad(&mut self) -> Result<(), String> {
+        crate::input::native_gamepad::reset()
+    }
+    fn ensure_touch_support(&mut self) -> Result<(), String> {
+        crate::input::native_touch::prepare()
+    }
+    fn touch_frame(
+        &mut self,
+        contacts: &[crate::input::touch::TouchContact],
+    ) -> Result<(), String> {
+        crate::input::native_touch::frame(contacts)
+    }
+    fn cancel_touch(&mut self) -> Result<(), String> {
+        crate::input::native_touch::cancel()
+    }
     fn key(&mut self, key: MacroKey, dir: Direction) -> Result<(), String> {
         let (evdev_key, needs_shift) =
             macro_key_to_evdev(&key).ok_or_else(|| format!("no evdev mapping for {:?}", key))?;
@@ -733,7 +760,7 @@ pub(super) fn start_capture_thread(
         let mut deferred: Vec<evdev::Device> = Vec::new();
         for (path, mut device) in evdev::enumerate() {
             let name = device.name().unwrap_or("").to_owned();
-            if name == "macros-input" || is_touchpad(&device) {
+            if name == "macros-input" || name.starts_with("Blockwork Virtual ") || is_touchpad(&device) {
                 continue;
             }
             let has_keys = device
@@ -765,7 +792,7 @@ pub(super) fn start_capture_thread(
         let touchpads: Vec<_> = evdev::enumerate()
             .filter_map(|(path, device)| {
                 let name = device.name().unwrap_or("").to_owned();
-                if name == "macros-input" || !is_touchpad(&device) {
+                if name == "macros-input" || name.starts_with("Blockwork Virtual ") || !is_touchpad(&device) {
                     return None;
                 }
                 tracing::info!("evdev: reading {:?} ({}) non-exclusively as a touchpad", path, name);

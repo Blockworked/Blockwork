@@ -574,6 +574,7 @@ pub fn block_name(def: &blockstitch_core::graph::BlockDef) -> String {
         .iter()
         .map(|p| match p {
             BlockPiece::Label { text, .. } => text.trim().to_string(),
+            BlockPiece::Button { text, .. } => text.clone(),
             BlockPiece::Input { name, .. } | BlockPiece::Branch { name, .. } => format!("({name})"),
         })
         .filter(|w| !w.is_empty())
