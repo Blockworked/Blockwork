@@ -14,6 +14,7 @@ Item {
     function capturingAction(action){return !!appState.combo_capture&&appState.combo_capture.kind==="Named"&&JSON.stringify(appState.combo_capture.action)===JSON.stringify(action)}
 
     Rectangle { anchors.fill: parent; color: Theme.window }
+    InputDiagnosticsDialog { id: inputDiagnostics; objectName: "inputDiagnostics"; appBridge: root.appBridge }
 
     property int tab: 0
     // The newly picked tab's page fades in.
@@ -370,6 +371,9 @@ Item {
                             }
                             SettingsRow { title: qsTr("Native UI automation"); detail: qsTr("Read and control desktop app elements through Linux AT-SPI. Imported macros still need permission.")
                                 StitchSwitch { Accessible.name: qsTr("Native UI automation"); checked: appState.ui_automation_enabled === true; onToggled: checked => root.invoke("set_ui_automation_enabled", {enabled: checked}) }
+                            }
+                            SettingsRow { title: qsTr("Input diagnostics"); detail: qsTr("See which devices, permissions and services recording and playback can use, to copy into a bug report.")
+                                StitchButton { objectName: "openInputDiagnostics"; text: qsTr("Show"); iconName: "activity"; onClicked: inputDiagnostics.open() }
                             }
                         }
                         SettingsSection {

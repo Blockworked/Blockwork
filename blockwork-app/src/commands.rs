@@ -177,3 +177,5 @@ mod value_location_tests;
 
 #[cfg(test)]
 mod import_review_tests;
+#[cfg(test)]
+mod recording_review_tests;

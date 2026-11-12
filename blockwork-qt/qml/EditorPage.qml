@@ -836,6 +836,12 @@ Item {
         }
     }
     RecordingSettingsDialog { id: recordingSettings; page: root }
+    RecordingReviewDialog { id: recordingReview; objectName: "recordingReview"; page: root }
+    readonly property var pendingRecordingReview: appState.recording_review || null
+    onPendingRecordingReviewChanged: {
+        if (pendingRecordingReview) recordingReview.show(pendingRecordingReview);
+        else if (recordingReview.opened) recordingReview.close();
+    }
     DataNameDialog { id: variableDialog; objectName: "variableDialog"; fieldObjectName: "variableName"; page: root; kind: "variable" }
     AppDialog {
         id: variableValueDialog
@@ -1017,6 +1023,7 @@ Item {
         // Name slots share the same picker in instructions and reporters.
         BlockRegistry.pickHandler = (action, location, value, anchor) =>
             BlockUi.open(action, {kind: "value", location: location, value: value, anchor: anchor}, root.blockScreens);
+        if (pendingRecordingReview) recordingReview.show(pendingRecordingReview);
     }
     Connections {
         target: root.appBridge

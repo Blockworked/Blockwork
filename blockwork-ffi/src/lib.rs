@@ -175,6 +175,7 @@ pub extern "C" fn blockwork_start_recording() -> i32 {
     catch(|| {
         recording::reset_timing();
         recording::RECORDING_ACTIVE.store(true, Ordering::Relaxed);
+        recording::start_sources();
         0
     })
 }
@@ -187,6 +188,7 @@ pub extern "C" fn blockwork_start_recording() -> i32 {
 pub extern "C" fn blockwork_stop_recording() -> i32 {
     catch(|| {
         recording::RECORDING_ACTIVE.store(false, Ordering::Relaxed);
+        recording::finish_sources();
 
         let instructions: Vec<_> = match recording::get_recording_queue().lock() {
             Ok(mut queue) => queue.drain(..).collect(),
