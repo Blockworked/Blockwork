@@ -59,29 +59,32 @@ mod imp {
                 (COINIT_APARTMENTTHREADED | COINIT_DISABLE_OLE1DDE) as u32,
             )
         };
-        let mut hicon: HICON = std::ptr::null_mut();
         let edge = size.clamp(16, 256) as u32;
-        // SHDefExtractIcon resolves shortcuts to their target's icon.
-        let extracted = unsafe {
-            SHDefExtractIconW(wide.as_ptr(), 0, 0, &mut hicon, std::ptr::null_mut(), edge)
+        // Shortcuts go through the system image list, which hands back the
+        // target's icon without the shortcut arrow overlay.
+        let mut hicon = if is_shortcut(&path) {
+            system_icon(&wide, edge)
+        } else {
+            std::ptr::null_mut()
         };
-        if extracted < 0 {
-            hicon = std::ptr::null_mut();
-        }
         if hicon.is_null() {
-            let mut info = SHFILEINFOW::default();
-            let found = unsafe {
-                SHGetFileInfoW(
+            let mut extracted: HICON = std::ptr::null_mut();
+            let result = unsafe {
+                SHDefExtractIconW(
                     wide.as_ptr(),
                     0,
-                    &mut info,
-                    std::mem::size_of::<SHFILEINFOW>() as u32,
-                    SHGFI_ICON | SHGFI_LARGEICON,
+                    0,
+                    &mut extracted,
+                    std::ptr::null_mut(),
+                    edge,
                 )
             };
-            if found != 0 {
-                hicon = info.hIcon;
+            if result >= 0 {
+                hicon = extracted;
             }
+        }
+        if hicon.is_null() {
+            hicon = system_icon(&wide, edge);
         }
         if initialized >= 0 {
             unsafe { CoUninitialize() };
@@ -112,6 +115,114 @@ mod imp {
             "data:image/png;base64,{}",
             base64::engine::general_purpose::STANDARD.encode(&png)
         )
+    }
+
+    pub(super) fn is_shortcut(path: &str) -> bool {
+        std::path::Path::new(path)
+            .extension()
+            .and_then(|e| e.to_str())
+            .is_some_and(|e| {
+                ["lnk", "url", "appref-ms"]
+                    .iter()
+                    .any(|x| e.eq_ignore_ascii_case(x))
+            })
+    }
+
+    // IImageList's vtable up to GetIcon (commoncontrols.h order).
+    #[repr(C)]
+    struct ImageListVtbl {
+        query_interface: usize,
+        add_ref: usize,
+        release: unsafe extern "system" fn(*mut ImageList) -> u32,
+        add: usize,
+        replace_icon: usize,
+        set_overlay_image: usize,
+        replace: usize,
+        add_masked: usize,
+        draw: usize,
+        remove: usize,
+        get_icon: unsafe extern "system" fn(*mut ImageList, i32, u32, *mut HICON) -> i32,
+    }
+
+    #[repr(C)]
+    struct ImageList {
+        vtbl: *const ImageListVtbl,
+    }
+
+    const IID_IIMAGELIST: windows_sys::core::GUID =
+        windows_sys::core::GUID::from_u128(0x46eb5926_582e_4017_9fdf_e8998daa0950);
+    const ILD_TRANSPARENT: u32 = 1;
+
+    /// The file's icon from the shell's system image list, drawn without
+    /// overlays (no shortcut arrow). Null when the shell has none.
+    pub(super) fn system_icon(wide: &[u16], edge: u32) -> HICON {
+        let mut info = SHFILEINFOW::default();
+        let found = unsafe {
+            SHGetFileInfoW(
+                wide.as_ptr(),
+                0,
+                &mut info,
+                std::mem::size_of::<SHFILEINFOW>() as u32,
+                SHGFI_SYSICONINDEX,
+            )
+        };
+        if found == 0 {
+            return std::ptr::null_mut();
+        }
+        let index = info.iIcon;
+        if edge > 48 {
+            let jumbo = list_icon(SHIL_JUMBO as i32, index);
+            // Icons without a 256px frame come back as a 48px image in the
+            // corner of a 256px canvas; the 48px list looks better then.
+            if !jumbo.is_null() && !only_corner(jumbo, 48) {
+                return jumbo;
+            }
+            if !jumbo.is_null() {
+                unsafe { DestroyIcon(jumbo) };
+            }
+        }
+        list_icon(SHIL_EXTRALARGE as i32, index)
+    }
+
+    fn list_icon(list: i32, index: i32) -> HICON {
+        let mut images: *mut ImageList = std::ptr::null_mut();
+        let hr = unsafe {
+            SHGetImageList(
+                list,
+                &IID_IIMAGELIST,
+                std::ptr::addr_of_mut!(images) as *mut *mut core::ffi::c_void,
+            )
+        };
+        if hr < 0 || images.is_null() {
+            return std::ptr::null_mut();
+        }
+        let mut hicon: HICON = std::ptr::null_mut();
+        unsafe {
+            let vtbl = &*(*images).vtbl;
+            if (vtbl.get_icon)(images, index, ILD_TRANSPARENT, &mut hicon) < 0 {
+                hicon = std::ptr::null_mut();
+            }
+            (vtbl.release)(images);
+        }
+        hicon
+    }
+
+    /// True when every visible pixel sits in the top-left `edge` square.
+    fn only_corner(hicon: HICON, edge: u32) -> bool {
+        let Some((width, height, rgba)) = hicon_to_rgba(hicon) else {
+            return false;
+        };
+        if width <= edge && height <= edge {
+            return false;
+        }
+        rgba.as_chunks::<4>()
+            .0
+            .iter()
+            .enumerate()
+            .all(|(i, pixel)| {
+                let (x, y) = (i as u32 % width, i as u32 / width);
+                (x < edge && y < edge) || pixel[3] == 0
+            })
     }
 
     /// Converts an HICON to RGBA bytes. Icons without an alpha channel
@@ -244,6 +355,23 @@ mod tests {
         // A real PNG signature; QML's image loader accepts the same bytes.
         assert!(png.starts_with(&[0x89, b'P', b'N', b'G', b'\r', b'\n', 0x1a, b'\n']));
         assert!(png.len() > 100, "icon payload suspiciously small");
+    }
+
+    /// Shortcuts take the overlay-free system image list path.
+    #[test]
+    fn shortcut_uses_system_image_list() {
+        let dir = std::env::var_os("APPDATA")
+            .map(std::path::PathBuf::from)
+            .expect("APPDATA is set on Windows")
+            .join("Microsoft/Windows/Start Menu/Programs");
+        let shortcut = walk_for_shortcut(&dir).expect("a .lnk exists in the Start Menu");
+        let wide: Vec<u16> = std::os::windows::ffi::OsStrExt::encode_wide(shortcut.as_os_str())
+            .chain(std::iter::once(0))
+            .collect();
+        assert!(imp::is_shortcut(&shortcut.to_string_lossy()));
+        let icon = imp::system_icon(&wide, 64);
+        assert!(!icon.is_null());
+        unsafe { windows_sys::Win32::UI::WindowsAndMessaging::DestroyIcon(icon) };
     }
 
     fn walk_for_shortcut(dir: &std::path::Path) -> Option<std::path::PathBuf> {
