@@ -4,12 +4,23 @@ use crate::input::value::Value;
 use crate::macros::backend::{self, CaptureDecision, CaptureEvent, CaptureTimestamp};
 use crate::macros::{Instruction, InstructionKind};
 use std::collections::{HashSet, VecDeque};
-use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU64, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicU8, AtomicU32, AtomicU64, Ordering};
 use std::sync::{Mutex, OnceLock, RwLock};
 use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
+mod controller;
+pub mod review;
+pub mod touch;
+
 pub static RECORDING_ACTIVE: AtomicBool = AtomicBool::new(false);
+/// Touchscreen contacts are read without a grab and recorded as touch paths.
+pub static RECORD_TOUCH: AtomicBool = AtomicBool::new(false);
+/// Physical controller changes are recorded as virtual controller blocks.
+pub static RECORD_CONTROLLER: AtomicBool = AtomicBool::new(false);
+/// Spans (a touch gesture still down) replay as one block, so input that
+/// lands inside one replays right after it, without a wait of its own.
+static OPEN_SPANS: AtomicU32 = AtomicU32::new(0);
 /// Whether mouse movement is captured into the recording at all. Off by
 /// default - most recordings care about clicks/keys, and movement floods
 /// the instruction list with a token per pixel of travel.
@@ -370,6 +381,148 @@ pub fn reset_timing() {
     {
         *o = Duration::ZERO;
     }
+    OPEN_SPANS.store(0, Ordering::Relaxed);
+    if let Ok(mut samples) = sample_times().lock() {
+        samples.clear();
+    }
+}
+
+/// Starts the optional sources (touchscreens, controllers) for a recording
+/// that has just become active. Each stops by itself when it ends.
+pub fn start_sources() {
+    if RECORD_TOUCH.load(Ordering::Relaxed) {
+        touch::start();
+    }
+    if RECORD_CONTROLLER.load(Ordering::Relaxed) {
+        controller::start();
+    }
+}
+
+/// Closes what the sources still hold open (a finger still down, controller
+/// buttons still held) so the recording never ends mid-gesture.
+pub fn finish_sources() {
+    touch::finish_open();
+    controller::finish();
+}
+
+/// Waits are left out while a span is open: playback can't start this input
+/// before the span's block finishes anyway.
+fn waits_allowed() -> bool {
+    OPEN_SPANS.load(Ordering::Relaxed) == 0
+}
+
+/// Elapsed recording time for an event stamped with `Instant` by its source.
+fn elapsed_at(at: Instant) -> Duration {
+    let baseline = BASELINE_NOW.get_or_init(|| Mutex::new(None));
+    let Ok(mut baseline) = baseline.lock() else {
+        return Duration::ZERO;
+    };
+    let start = *baseline.get_or_insert(at);
+    at.saturating_duration_since(start)
+}
+
+/// Sampled controls whose last value replaces an earlier one inside one
+/// sample interval, like mouse movement.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+enum SampleKey {
+    LeftStick,
+    RightStick,
+    LeftTrigger,
+    RightTrigger,
+}
+
+fn sample_key(kind: &InstructionKind) -> Option<SampleKey> {
+    use crate::input::gamepad::GamepadStick;
+    match kind {
+        InstructionKind::GamepadStick { stick, .. } => Some(match stick {
+            GamepadStick::Left => SampleKey::LeftStick,
+            GamepadStick::Right => SampleKey::RightStick,
+        }),
+        InstructionKind::GamepadTrigger { left: true, .. } => Some(SampleKey::LeftTrigger),
+        InstructionKind::GamepadTrigger { left: false, .. } => Some(SampleKey::RightTrigger),
+        _ => None,
+    }
+}
+
+fn sample_times() -> &'static Mutex<std::collections::HashMap<SampleKey, Duration>> {
+    static TIMES: OnceLock<Mutex<std::collections::HashMap<SampleKey, Duration>>> = OnceLock::new();
+    TIMES.get_or_init(|| Mutex::new(std::collections::HashMap::new()))
+}
+
+const SAMPLE_INTERVAL: Duration = Duration::from_millis(16);
+
+/// Queues an instruction from a source other than the input hook, on the
+/// same timeline: a wait for the gap since the last recorded input, then the
+/// instruction. Returns its id, or `None` when nothing is recording.
+fn record_at(instr: Instruction, elapsed: Duration) -> Option<String> {
+    if !RECORDING_ACTIVE.load(Ordering::Relaxed) {
+        return None;
+    }
+    queue_at(instr, elapsed)
+}
+
+/// [`record_at`] without the active check, for closing what a source still
+/// holds after the stop key already ended the recording.
+fn queue_at(instr: Instruction, elapsed: Duration) -> Option<String> {
+    let last_elapsed = LAST_ELAPSED.get_or_init(|| Mutex::new(None));
+    let mut last = last_elapsed.lock().ok()?;
+    let mut q = get_recording_queue().lock().ok()?;
+    let id = instr.id.clone();
+    let key = sample_key(&instr.kind);
+    if let Some(key) = key {
+        let mut samples = sample_times().lock().ok()?;
+        let recent = samples
+            .get(&key)
+            .is_some_and(|at| elapsed.saturating_sub(*at) < SAMPLE_INTERVAL);
+        if recent
+            && let Some(back) = q.back_mut()
+            && sample_key(&back.kind) == Some(key)
+        {
+            back.kind = instr.kind;
+            *last = Some(elapsed.max(last.unwrap_or_default()));
+            return Some(back.id.clone());
+        }
+        samples.insert(key, elapsed);
+    }
+    if let Some(prev) = *last
+        && waits_allowed()
+    {
+        let ms = elapsed.saturating_sub(prev).as_secs_f64() * 1000.0;
+        if ms > 0.0 {
+            q.push_back(Instruction::new(InstructionKind::Wait(Value::number(ms))));
+        }
+    }
+    *last = Some(elapsed.max(last.unwrap_or_default()));
+    q.push_back(instr);
+    Some(id)
+}
+
+/// Opens a span: `placeholder` holds its place in the timeline from `start`
+/// until [`close_span`] gives it its final instruction.
+fn open_span(placeholder: Instruction, start: Duration) -> Option<String> {
+    let id = record_at(placeholder, start)?;
+    OPEN_SPANS.fetch_add(1, Ordering::Relaxed);
+    Some(id)
+}
+
+/// Replaces the span's placeholder (or removes it when `kind` is `None`).
+/// Whatever comes next waits from the span's end, since the block it became
+/// takes `length` to play.
+fn close_span(id: &str, kind: Option<InstructionKind>, start: Duration, length: Duration) {
+    let _ = OPEN_SPANS.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1));
+    if let Ok(mut q) = get_recording_queue().lock()
+        && let Some(index) = q.iter().position(|i| i.id == id)
+    {
+        match kind {
+            Some(kind) => q[index].kind = kind,
+            None => {
+                q.remove(index);
+            }
+        }
+    }
+    if let Ok(mut last) = LAST_ELAPSED.get_or_init(|| Mutex::new(None)).lock() {
+        *last = Some(last.unwrap_or_default().max(start + length));
+    }
 }
 
 /// Elapsed time since the session's first event, on whichever clock `ts` uses.
@@ -536,7 +689,7 @@ pub fn build_capture_callback()
                 let last_elapsed = LAST_ELAPSED.get_or_init(|| Mutex::new(None));
                 if let Ok(mut last) = last_elapsed.lock() {
                     let prev = *last;
-                    *last = Some(elapsed);
+                    *last = Some(elapsed.max(prev.unwrap_or_default()));
                     if let Ok(mut q) = get_recording_queue().lock() {
                         let is_mouse_move = matches!(
                             event_for_instruction,
@@ -568,7 +721,7 @@ pub fn build_capture_callback()
                                 } else {
                                     prev.map(|last| elapsed.saturating_sub(last))
                                 };
-                                if let Some(wait) = wait {
+                                if let Some(wait) = wait.filter(|_| waits_allowed()) {
                                     let wait = wait.saturating_sub(MOUSE_PLAYBACK_OVERHEAD);
                                     if !wait.is_zero() {
                                         q.push_back(Instruction::new(InstructionKind::Wait(
@@ -589,7 +742,7 @@ pub fn build_capture_callback()
                                 *last = instr;
                             }
                         } else {
-                            if let Some(prev_elapsed) = prev {
+                            if let Some(prev_elapsed) = prev.filter(|_| waits_allowed()) {
                                 let elapsed_ms =
                                     elapsed.saturating_sub(prev_elapsed).as_secs_f64() * 1000.0;
                                 if elapsed_ms > 0.0 {
@@ -752,5 +905,61 @@ mod tests {
         assert_eq!(held.update(&MacroKey::RShift, true), MOD_CTRL | MOD_SHIFT);
         assert_eq!(held.update(&MacroKey::LControl, false), MOD_SHIFT);
         assert_eq!(held.update(&MacroKey::RShift, false), 0);
+    }
+
+    #[test]
+    fn touch_spans_and_other_sources_share_one_timeline() {
+        use crate::input::touch::TouchContact;
+        let ms = Duration::from_millis;
+        let key = |name: &str| {
+            Instruction::new(InstructionKind::Token(InputToken::Key(
+                Value::text(name),
+                Direction::Press,
+            )))
+        };
+        reset_timing();
+        get_recording_queue().lock().unwrap().clear();
+        RECORDING_ACTIVE.store(true, Ordering::Relaxed);
+        record_at(key("A"), ms(100));
+        touch::record_frame(ms(200), vec![TouchContact { id: 0, x: 5, y: 5 }]);
+        // Inside the open gesture: replays right after it, so no wait.
+        record_at(key("B"), ms(250));
+        touch::record_frame(ms(300), vec![]);
+        record_at(key("C"), ms(400));
+        // A gesture still down when recording stops is closed, not lost.
+        touch::record_frame(ms(500), vec![TouchContact { id: 0, x: 5, y: 5 }]);
+        finish_sources();
+        RECORDING_ACTIVE.store(false, Ordering::Relaxed);
+        let queue: Vec<_> = get_recording_queue().lock().unwrap().drain(..).collect();
+        let shape: Vec<String> = queue
+            .iter()
+            .map(|i| match &i.kind {
+                InstructionKind::Wait(Value::Number { value }) => format!("wait {value}"),
+                InstructionKind::Token(InputToken::Key(Value::Text { value }, _)) => value.clone(),
+                InstructionKind::TouchSequence { sequence, .. } => {
+                    let Value::Text { value } = sequence.as_ref() else {
+                        return "bad".into();
+                    };
+                    let parsed = crate::input::touch::TouchSequence::parse(value).unwrap();
+                    format!("touch {}", parsed.frames.last().unwrap().at_ms)
+                }
+                other => format!("{other:?}"),
+            })
+            .collect();
+        assert_eq!(
+            shape,
+            [
+                "wait 100",
+                "A",
+                "wait 100",
+                "touch 100",
+                "B",
+                "wait 100",
+                "C",
+                "wait 100",
+                "touch 1"
+            ]
+        );
+        assert!(waits_allowed());
     }
 }

@@ -59,6 +59,16 @@ pub struct AppSettings {
     pub record_mouse_relative: Option<bool>,
     /// Whether mouse movement is captured into recordings at all.
     pub record_mouse_movement: Option<bool>,
+    /// Touchscreen contacts become touch paths in recordings (Linux).
+    #[serde(default)]
+    pub record_touch: Option<bool>,
+    /// Physical controller input becomes virtual controller blocks.
+    #[serde(default)]
+    pub record_controller: Option<bool>,
+    /// Stopping a recording opens a review before blocks are inserted;
+    /// on unless turned off.
+    #[serde(default)]
+    pub review_recordings: Option<bool>,
     /// Set once the emergency stop default was added to saved bindings.
     pub emergency_stop_seeded: Option<bool>,
     /// The local webhook server for `WhenWebhook` triggers; off by default.

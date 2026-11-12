@@ -15,6 +15,13 @@ section below as the GitHub release notes, followed by the downloads table.
 - Custom blocks can have dropdown choices and buttons opening their own settings screens, including inputs shown only on those screens.
 - Built-in block menus and pickers use the same shared UI framework.
 - Saved macro format 6 preserves custom block menus; macros from earlier versions still load.
+- When system starts header: runs once per login when Start at system startup is on ([docs](docs/system-startup.md)).
+- Touch gesture and touch paths blocks, with a multi-finger path editor; Linux (experimental) and Windows ([docs](docs/touch.md)).
+- Physical controller triggers and reporters, and on Linux a virtual controller for playback ([docs](docs/controllers.md)).
+- Native UI automation on Linux: read and control other apps' buttons, fields and sliders by selector ([docs](docs/native-ui.md)).
+- Recording can include touchscreen gestures and a controller, and opens a review before the blocks are added ([docs](docs/recording.md)).
+- Input diagnostics in Settings > Integrations, to copy into a bug report.
+- Starter templates: Controller to keyboard, Touch swipe and Startup notice.
 
 ### Fixed
 - Blocks stay under the pointer while branches resize; bracket shapes update in the same frame as a drop.

@@ -1,7 +1,9 @@
 use crate::input::touch::TouchContact;
 use std::sync::Mutex;
 use windows_sys::Win32::UI::Input::Pointer::*;
-use windows_sys::Win32::UI::WindowsAndMessaging::PT_TOUCH;
+use windows_sys::Win32::UI::WindowsAndMessaging::{
+    PT_TOUCH, TOUCH_MASK_CONTACTAREA, TOUCH_MASK_ORIENTATION, TOUCH_MASK_PRESSURE,
+};
 static STATE: Mutex<(bool, Vec<TouchContact>)> = Mutex::new((false, Vec::new()));
 fn info(point: TouchContact, flags: u32) -> POINTER_TOUCH_INFO {
     let mut info = POINTER_TOUCH_INFO::default();

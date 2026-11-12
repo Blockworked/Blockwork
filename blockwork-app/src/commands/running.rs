@@ -244,6 +244,7 @@ pub(super) fn begin_recording(s: &mut crate::state::AppState) {
     recording::reset_timing();
     seed_recording_mouse_pos(s);
     recording::RECORDING_ACTIVE.store(true, Ordering::Relaxed);
+    recording::start_sources();
 }
 
 /// Seconds the Record button counts down for, 0 to [`crate::MAX_RECORDING_COUNTDOWN`].
@@ -273,16 +274,26 @@ pub(crate) fn stop_recording(state: &SharedState, app: &AppHandle) -> Result<(),
 /// released, see `stop_recording_internal`.
 pub(super) fn stop_recording_impl(s: &mut crate::state::AppState) -> Option<Macro> {
     recording::RECORDING_ACTIVE.store(false, Ordering::Relaxed);
+    recording::finish_sources();
     s.recording_phase = RecordingPhase::Idle;
     // Cancel any in-progress countdown
     s.recording_countdown_generation = s.recording_countdown_generation.wrapping_add(1);
 
     let instructions: Vec<Instruction> = recording::get_recording_queue()
         .lock()
-        .unwrap()
+        .unwrap_or_else(|p| p.into_inner())
         .drain(..)
         .collect();
     if instructions.is_empty() {
+        return None;
+    }
+    if s.review_recordings {
+        let id = s.current_macro.as_ref()?.id.clone();
+        match &mut s.recording_review {
+            // A second recording into the same macro joins the pending review.
+            Some((pending, blocks)) if *pending == id => blocks.extend(instructions),
+            review => *review = Some((id, instructions)),
+        }
         return None;
     }
     push_undo(s);
@@ -341,6 +352,88 @@ pub(crate) fn toggle_record_mouse_movement(
     s.record_mouse_movement = enabled;
     recording::RECORD_MOUSE_MOVEMENT.store(enabled, Ordering::Relaxed);
     config::update_settings(|settings| settings.record_mouse_movement = Some(enabled));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+/// Inserts the reviewed recording into the macro it was recorded into,
+/// keeping what `options` keeps, as one undo step.
+pub(crate) fn apply_recording_review(
+    state: &SharedState,
+    app: &AppHandle,
+    options: recording::review::Options,
+) -> Result<usize, String> {
+    let (to_save, dto, count) = {
+        let mut s = state.lock().map_err(|e| e.to_string())?;
+        let Some((id, _)) = s.recording_review.as_ref() else {
+            return Err("There's no recording to review".into());
+        };
+        if s.current_macro.as_ref().map(|m| &m.id) != Some(id) {
+            return Err("Open the macro you recorded into to insert its blocks".into());
+        }
+        let (_, instructions) = s.recording_review.take().unwrap_or_default();
+        let instructions = recording::review::apply(instructions, &options);
+        let count = instructions.len();
+        let mut to_save = None;
+        if count > 0 {
+            push_undo(&mut s);
+            if let Some(mac) = s.current_macro.as_mut() {
+                mac.recording_target_mut().instructions.extend(instructions);
+                to_save = Some(mac.clone());
+            }
+            sync_open_macro_into_list(&mut s);
+        }
+        (to_save, build_state_dto(&s), count)
+    };
+    if let Some(mac) = to_save {
+        mac.save()?;
+    }
+    app.emit_state(&dto);
+    Ok(count)
+}
+
+/// Throws the reviewed recording away.
+pub(crate) fn discard_recording_review(state: &SharedState, app: &AppHandle) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.recording_review = None;
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_record_touch(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.record_touch = enabled;
+    recording::RECORD_TOUCH.store(enabled, Ordering::Relaxed);
+    config::update_settings(|settings| settings.record_touch = Some(enabled));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_record_controller(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.record_controller = enabled;
+    recording::RECORD_CONTROLLER.store(enabled, Ordering::Relaxed);
+    config::update_settings(|settings| settings.record_controller = Some(enabled));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
+pub(crate) fn set_review_recordings(
+    state: &SharedState,
+    app: &AppHandle,
+    enabled: bool,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.review_recordings = enabled;
+    config::update_settings(|settings| settings.review_recordings = Some(enabled));
     emit_state_updated(app, &s);
     Ok(())
 }

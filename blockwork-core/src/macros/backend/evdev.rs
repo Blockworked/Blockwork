@@ -1106,6 +1106,9 @@ fn try_grab(device: &mut evdev::Device) -> io::Result<bool> {
 /// `BTN_TOOL_DOUBLETAP`/`BTN_TOOL_TRIPLETAP` so a scroll or swipe doesn't
 /// get misread as a pointer drag.
 fn spawn_touchpad_reader(mut device: evdev::Device, tx: std::sync::mpsc::SyncSender<DeviceMsg>) {
+    // A touchscreen's contacts are recorded as touch paths when that's on;
+    // its pointer motion would only duplicate them.
+    let direct = device.properties().contains(PropType::DIRECT);
     std::thread::Builder::new()
         .name("evdev-touchpad-reader".into())
         .spawn(move || {
@@ -1127,7 +1130,16 @@ fn spawn_touchpad_reader(mut device: evdev::Device, tx: std::sync::mpsc::SyncSen
                     }
                 };
 
+                let skip = direct
+                    && crate::recording::RECORD_TOUCH.load(std::sync::atomic::Ordering::Relaxed)
+                    && crate::recording::RECORDING_ACTIVE
+                        .load(std::sync::atomic::Ordering::Relaxed);
                 for event in events {
+                    if skip {
+                        last_x = None;
+                        last_y = None;
+                        continue;
+                    }
                     match event.event_type() {
                         EventType::ABSOLUTE => match AbsoluteAxisCode(event.code()) {
                             AbsoluteAxisCode::ABS_X => x = Some(event.value()),

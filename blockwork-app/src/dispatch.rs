@@ -560,6 +560,30 @@ impl Backend {
                     enabled,
                 )?)
             }
+            "set_record_touch" => {
+                commands::set_record_touch(&self.state, &self.app, arg(&args, "enabled")?)
+                    .map(|_| Value::Null)
+            }
+            "set_record_controller" => {
+                commands::set_record_controller(&self.state, &self.app, arg(&args, "enabled")?)
+                    .map(|_| Value::Null)
+            }
+            "set_review_recordings" => {
+                commands::set_review_recordings(&self.state, &self.app, arg(&args, "enabled")?)
+                    .map(|_| Value::Null)
+            }
+            "apply_recording_review" => {
+                let options: Option<_> = arg(&args, "options")?;
+                to_json(commands::apply_recording_review(
+                    &self.state,
+                    &self.app,
+                    options.unwrap_or_default(),
+                )?)
+            }
+            "discard_recording_review" => {
+                commands::discard_recording_review(&self.state, &self.app).map(|_| Value::Null)
+            }
+            "input_diagnostics" => to_json(crate::diagnostics::input()),
             "open_settings" => to_json(commands::open_settings(&self.state, &self.app)?),
             "close_settings" => to_json(commands::close_settings(&self.state, &self.app)?),
             "start_combo_capture" => {

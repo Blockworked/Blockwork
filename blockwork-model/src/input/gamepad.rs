@@ -70,14 +70,20 @@ pub fn deadzone(value: f64, zone: f64) -> f64 {
         value.signum() * (value.abs() - zone) / (1.0 - zone)
     }
 }
-/// Hysteresis prevents noisy axes from repeatedly firing at a threshold.
+/// Hysteresis prevents noisy axes from repeatedly firing at a threshold. An
+/// axis counts as above from `threshold` and stays above until it falls to
+/// the release point, 0.05 below (or halfway down for thresholds under 0.1,
+/// so a small threshold still releases). Non-finite input is never above.
 pub fn above_threshold(previous: bool, value: f64, threshold: f64) -> bool {
-    value.abs()
-        >= if previous {
-            (threshold - 0.05).max(0.0)
-        } else {
-            threshold
-        }
+    if !value.is_finite() || !threshold.is_finite() {
+        return false;
+    }
+    let magnitude = value.abs();
+    if previous {
+        magnitude > threshold - (threshold * 0.5).min(0.05)
+    } else {
+        magnitude >= threshold
+    }
 }
 #[cfg(test)]
 mod tests {
@@ -90,6 +96,21 @@ mod tests {
         assert!(above_threshold(true, 0.48, 0.5));
         assert!(!above_threshold(false, 0.48, 0.5));
         assert!(!above_threshold(true, 0.40, 0.5));
+        assert!(!above_threshold(true, 0.45, 0.5));
+        // Small thresholds release halfway down instead of at zero.
+        assert!(above_threshold(false, 0.05, 0.05));
+        assert!(above_threshold(true, 0.03, 0.05));
+        assert!(!above_threshold(true, 0.0, 0.05));
+        // The full-scale threshold is reachable and releases.
+        assert!(above_threshold(false, 1.0, 1.0));
+        assert!(above_threshold(false, -1.0, 1.0));
+        assert!(!above_threshold(true, 0.95, 1.0));
+        assert!(!above_threshold(true, f64::NAN, 0.5));
+        assert!(!above_threshold(false, 0.9, f64::INFINITY));
+        // Deadzone output stays continuous at the zone's edge.
+        assert!(deadzone(0.1201, 0.12) < 0.001);
+        assert_eq!(deadzone(2.0, 0.12), 1.0);
+        assert_eq!(deadzone(0.5, 5.0), deadzone(0.5, 0.95));
     }
 }
 

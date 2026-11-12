@@ -14,6 +14,8 @@
     "ControllerPickerDialog.qml",
     "NativeUiPickerDialog.qml",
     "RecordingSettingsDialog.qml",
+    "RecordingReviewDialog.qml",
+    "InputDiagnosticsDialog.qml",
     "DataNameDialog.qml",
     "SignalsDialog.qml",
     "RenameSignalDialog.qml",

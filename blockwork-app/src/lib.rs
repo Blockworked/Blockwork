@@ -10,6 +10,7 @@ pub(crate) mod block_library;
 pub(crate) mod browser_bridge;
 pub(crate) mod commands;
 pub(crate) mod community;
+pub(crate) mod diagnostics;
 mod dispatch;
 pub(crate) mod installed_apps;
 pub(crate) mod macro_runs;
@@ -193,6 +194,10 @@ fn initial_state(
             true
         },
         record_mouse_movement: settings.record_mouse_movement.unwrap_or(false),
+        record_touch: settings.record_touch.unwrap_or(false),
+        record_controller: settings.record_controller.unwrap_or(false),
+        review_recordings: settings.review_recordings.unwrap_or(true),
+        recording_review: None,
         absolute_mouse_position_available,
         wayland_session,
         page: Page::Main,
@@ -303,6 +308,8 @@ impl Backend {
             recording::start_grab_thread();
             recording::RECORD_MOUSE_RELATIVE.store(s.record_mouse_relative, Ordering::Relaxed);
             recording::RECORD_MOUSE_MOVEMENT.store(s.record_mouse_movement, Ordering::Relaxed);
+            recording::RECORD_TOUCH.store(s.record_touch, Ordering::Relaxed);
+            recording::RECORD_CONTROLLER.store(s.record_controller, Ordering::Relaxed);
 
             let bindings = config::load_hotkey_bindings();
             recording::update_hotkey_table(bindings.clone());
