@@ -1,5 +1,7 @@
 //! Starter macros the user can pick when making a new one.
 
+use blockwork_core::input::gamepad::GamepadButton;
+use blockwork_core::input::touch::TouchGestureKind;
 use blockwork_core::input::types::{Direction, InputToken, MacroButton};
 use blockwork_core::input::value::{Op, Value};
 use blockwork_core::macros::{Instruction, InstructionKind, Macro};
@@ -16,6 +18,8 @@ pub(crate) struct TemplateDto {
 struct Template {
     info: TemplateDto,
     build: fn() -> Vec<Instruction>,
+    /// More strands, beside the first.
+    more: fn() -> Vec<Vec<Instruction>>,
     /// Keeps its key triggers working while another macro is open.
     always_listen: bool,
 }
@@ -28,7 +32,22 @@ fn wait(ms: f64) -> Instruction {
     ins(InstructionKind::Wait(Value::number(ms)))
 }
 
-fn templates() -> [Template; 4] {
+fn key(name: &str, direction: Direction) -> Instruction {
+    ins(InstructionKind::Token(InputToken::Key(
+        Value::text(name),
+        direction,
+    )))
+}
+
+fn when_south(pressed: bool) -> Instruction {
+    ins(InstructionKind::WhenGamepadButton {
+        controller: Value::text(""),
+        button: GamepadButton::South,
+        pressed,
+    })
+}
+
+fn templates() -> [Template; 7] {
     [
         Template {
             info: TemplateDto {
@@ -51,6 +70,7 @@ fn templates() -> [Template; 4] {
                     }),
                 ]
             },
+            more: Vec::new,
             always_listen: false,
         },
         Template {
@@ -71,6 +91,7 @@ fn templates() -> [Template; 4] {
                     ))),
                 ]
             },
+            more: Vec::new,
             always_listen: true,
         },
         Template {
@@ -109,6 +130,7 @@ fn templates() -> [Template; 4] {
                     }),
                 ]
             },
+            more: Vec::new,
             always_listen: false,
         },
         Template {
@@ -145,7 +167,69 @@ fn templates() -> [Template; 4] {
                     }),
                 ]
             },
+            more: Vec::new,
             always_listen: false,
+        },
+        Template {
+            info: TemplateDto {
+                id: "controller_to_keyboard",
+                name: "Controller to keyboard",
+                description: "Holds Space while a controller's bottom face button is held. Turn on controller input in Settings first.",
+                icon: "gamepad-2",
+            },
+            build: || vec![when_south(true), key("Space", Direction::Press)],
+            more: || vec![vec![when_south(false), key("Space", Direction::Release)]],
+            always_listen: true,
+        },
+        Template {
+            info: TemplateDto {
+                id: "touch_swipe",
+                name: "Swipe left",
+                description: "Swipes one finger right to left across the middle of your first screen. Needs touch output (Linux with uinput, or Windows).",
+                icon: "hand",
+            },
+            build: || {
+                let n = |v: f64| Box::new(Value::number(v));
+                vec![
+                    ins(InstructionKind::WhenRan),
+                    ins(InstructionKind::TouchGesture {
+                        gesture: TouchGestureKind::Swipe,
+                        fingers: 1,
+                        x: n(80.0),
+                        y: n(50.0),
+                        end_x: n(20.0),
+                        end_y: n(50.0),
+                        duration: n(300.0),
+                        span: n(0.0),
+                        amount: n(1.0),
+                        normalized: true,
+                        monitor: 0,
+                    }),
+                ]
+            },
+            more: Vec::new,
+            always_listen: false,
+        },
+        Template {
+            info: TemplateDto {
+                id: "startup_notice",
+                name: "At login",
+                description: "Runs once each time you log in. Turn on Start at system startup in Settings first.",
+                icon: "power",
+            },
+            build: || {
+                vec![
+                    ins(InstructionKind::WhenSystemStarts),
+                    ins(InstructionKind::Notify {
+                        title: Value::text("Blockwork is running"),
+                        message: Value::text(
+                            "Your startup macro ran. Add blocks under its header.",
+                        ),
+                    }),
+                ]
+            },
+            more: Vec::new,
+            always_listen: true,
         },
     ]
 }
@@ -166,6 +250,11 @@ pub(crate) fn build(id: &str) -> Result<Macro, String> {
         vec![],
     );
     mac.graph.strands[0].instructions = (template.build)();
+    for (index, instructions) in (template.more)().into_iter().enumerate() {
+        let mut strand = blockwork_core::macros::Strand::new(0, 160 * (index as i32 + 1));
+        strand.instructions = instructions;
+        mac.graph.strands.push(strand);
+    }
     mac.settings.always_listen = template.always_listen;
     Ok(mac)
 }
@@ -189,5 +278,15 @@ mod tests {
             );
         }
         assert!(build("nope").is_err());
+        // Two-strand templates keep both strands, each under its own header.
+        let pad = build("controller_to_keyboard").unwrap();
+        assert_eq!(pad.graph.strands.len(), 2);
+        assert!(
+            pad.graph
+                .strands
+                .iter()
+                .all(|s| s.instructions[0].is_header())
+        );
+        assert!(pad.settings.always_listen);
     }
 }

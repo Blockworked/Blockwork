@@ -14,7 +14,9 @@
 use self_update::Download;
 use self_update::backends::github::Update;
 use std::fs;
-use std::path::{Path, PathBuf};
+#[cfg(any(target_os = "macos", test))]
+use std::path::Path;
+use std::path::PathBuf;
 
 const REPO_OWNER: &str = "Blockworked";
 const REPO_NAME: &str = "blockwork";

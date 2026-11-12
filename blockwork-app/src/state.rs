@@ -96,6 +96,12 @@ pub(crate) struct AppState {
     pub(crate) recording_countdown_generation: u64,
     pub(crate) record_mouse_relative: bool,
     pub(crate) record_mouse_movement: bool,
+    pub(crate) record_touch: bool,
+    pub(crate) record_controller: bool,
+    pub(crate) review_recordings: bool,
+    /// Blocks from a stopped recording waiting on their review, with the id
+    /// of the macro they were recorded into.
+    pub(crate) recording_review: Option<(String, Vec<blockwork_core::macros::Instruction>)>,
     pub(crate) absolute_mouse_position_available: bool,
     pub(crate) wayland_session: bool,
     pub(crate) page: Page,
@@ -116,6 +122,15 @@ pub(crate) struct AppState {
 }
 
 // ─── Serializable DTO ──────────────────────────────────────────────────────
+
+/// A stopped recording waiting on its review; rows list the first
+/// [`blockwork_core::recording::review::PREVIEW_ROWS`] blocks.
+#[derive(Serialize, Clone)]
+pub(crate) struct RecordingReviewDto {
+    pub(crate) macro_name: String,
+    pub(crate) summary: blockwork_core::recording::review::Summary,
+    pub(crate) rows: Vec<blockwork_core::recording::review::Row>,
+}
 
 #[derive(Serialize, Clone)]
 pub(crate) struct StateDto {
@@ -143,6 +158,12 @@ pub(crate) struct StateDto {
     pub(crate) recording_countdown_secs: u8,
     pub(crate) record_mouse_relative: bool,
     pub(crate) record_mouse_movement: bool,
+    pub(crate) record_touch: bool,
+    pub(crate) record_controller: bool,
+    pub(crate) review_recordings: bool,
+    /// Whether this platform can record touchscreen contacts at all.
+    pub(crate) touch_recording_supported: bool,
+    pub(crate) recording_review: Option<RecordingReviewDto>,
     pub(crate) absolute_mouse_position_available: bool,
     pub(crate) wayland_session: bool,
     pub(crate) page: String,
@@ -514,6 +535,23 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         recording_countdown_secs: crate::recording_countdown_secs(),
         record_mouse_relative: s.record_mouse_relative,
         record_mouse_movement: s.record_mouse_movement,
+        record_touch: s.record_touch,
+        record_controller: s.record_controller,
+        review_recordings: s.review_recordings,
+        touch_recording_supported: cfg!(target_os = "linux"),
+        recording_review: s.recording_review.as_ref().map(|(id, instructions)| {
+            use blockwork_core::recording::review;
+            RecordingReviewDto {
+                macro_name: s
+                    .macros_list
+                    .iter()
+                    .find(|m| &m.id == id)
+                    .map(|m| m.name.clone())
+                    .unwrap_or_default(),
+                summary: review::summarize(instructions),
+                rows: review::rows(instructions),
+            }
+        }),
         absolute_mouse_position_available: s.absolute_mouse_position_available,
         wayland_session: s.wayland_session,
         page: match s.page {

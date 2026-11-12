@@ -103,9 +103,36 @@
     </message>
 </context>
 <context>
+    <name>RecordingReviewDialog</name>
+    <message numerus="yes">
+        <location filename="../qml/RecordingReviewDialog.qml" line="62"/>
+        <source>Touch with %n finger(s) for %1 ms</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/RecordingReviewDialog.qml" line="90"/>
+        <source>%n block(s) recorded into %1, taking %2 s to play.</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/RecordingReviewDialog.qml" line="121"/>
+        <source>Release %n key(s) or button(s) still held at the end</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>RecordingSettingsDialog</name>
     <message numerus="yes">
-        <location filename="../qml/RecordingSettingsDialog.qml" line="35"/>
+        <location filename="../qml/RecordingSettingsDialog.qml" line="39"/>
         <source>%n second(s)</source>
         <translation>
             <numerusform>%n second</numerusform>
@@ -143,7 +170,7 @@
 <context>
     <name>SettingsPage</name>
     <message numerus="yes">
-        <location filename="../qml/SettingsPage.qml" line="340"/>
+        <location filename="../qml/SettingsPage.qml" line="341"/>
         <source>%n pack(s)</source>
         <translation>
             <numerusform>%n pack</numerusform>

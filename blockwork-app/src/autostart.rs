@@ -2,7 +2,9 @@
 //! no editor window). One entry per OS: an XDG autostart file, a launchd agent,
 //! or an HKCU Run value. Flatpak goes through the Background portal.
 
-use std::path::{Path, PathBuf};
+use std::path::Path;
+#[cfg(not(windows))]
+use std::path::PathBuf;
 
 const ENTRY_NAME: &str = "blockwork";
 
