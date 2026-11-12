@@ -357,6 +357,21 @@ Item {
 
                     // Integrations
                     SettingsGrid { visible: root.tab === 3
+                        SettingsSection { title: qsTr("Input and native UI")
+                            SettingsRow { first: true; title: qsTr("Controller input"); detail: qsTr("Read physical controller buttons, sticks and connection events.")
+                                StitchSwitch { Accessible.name: qsTr("Controller input"); checked: appState.controller_input_enabled === true; onToggled: checked => root.invoke("set_controller_input_enabled", {enabled: checked}) }
+                            }
+                            SettingsRow { title: qsTr("Controller deadzone"); detail: qsTr("Ignore small stick movements near the center.")
+                                StitchSlider { from: 0; to: 0.95; stepSize: 0.01; width: 140; value: appState.controller_deadzone ?? 0.12; onMoved: root.invoke("set_controller_deadzone", {value: value}) }
+                                Label { text: Math.round((appState.controller_deadzone ?? 0.12)*100) + "%"; color: Theme.text }
+                            }
+                            SettingsRow { title: qsTr("Virtual controller output"); detail: qsTr("Create a virtual gamepad for playback. Currently requires Linux and /dev/uinput access.")
+                                StitchSwitch { Accessible.name: qsTr("Virtual controller output"); checked: appState.virtual_gamepad_enabled === true; onToggled: checked => root.invoke("set_virtual_gamepad_enabled", {enabled: checked}) }
+                            }
+                            SettingsRow { title: qsTr("Native UI automation"); detail: qsTr("Read and control desktop app elements through Linux AT-SPI. Imported macros still need permission.")
+                                StitchSwitch { Accessible.name: qsTr("Native UI automation"); checked: appState.ui_automation_enabled === true; onToggled: checked => root.invoke("set_ui_automation_enabled", {enabled: checked}) }
+                            }
+                        }
                         SettingsSection {
                             SettingsRow { first: true
                                 title: appState.ipc_active_port === null ? qsTr("TCP server stopped") : qsTr("TCP server listening on port %1").arg(appState.ipc_active_port)

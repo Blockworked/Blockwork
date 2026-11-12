@@ -307,6 +307,22 @@ pub unsafe extern "C" fn blockwork_sync_begin(id_utf8: *const c_char) -> i32 {
             });
         let Some(mac) = mac else { return -1 };
 
+        let mut unsupported = false;
+        mac.graph.walk_instructions(&mut |ins| {
+            unsupported |= matches!(
+                ins.kind,
+                blockwork_core::macros::InstructionKind::TouchGesture { .. }
+                    | blockwork_core::macros::InstructionKind::TouchSequence { .. }
+                    | blockwork_core::macros::InstructionKind::GamepadButton { .. }
+                    | blockwork_core::macros::InstructionKind::GamepadStick { .. }
+                    | blockwork_core::macros::InstructionKind::GamepadTrigger { .. }
+                    | blockwork_core::macros::InstructionKind::ResetGamepad
+            );
+        });
+        if unsupported {
+            return -4;
+        }
+
         // Stop the earlier run and wait for it to fully unwind, so its
         // trailing `finish` can't land on this run's clock.
         run_registry::stop_all();

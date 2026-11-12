@@ -44,6 +44,7 @@ png = "0.18"
 base64.workspace = true
 # Regex text operators.
 regex.workspace = true
+gilrs = "0.11.2"
 tract-onnx = { version = "0.23.9", optional = true }
 # Pins downloaded model files.
 sha2 = "0.10.9"
@@ -53,6 +54,9 @@ libc.workspace = true
 
 [target.'cfg(target_os = "linux")'.dependencies]
 evdev.workspace = true
+atspi = { version = "0.30", default-features = false, features = ["proxies"] }
+atspi-connection = { version = "0.14", default-features = false, features = ["wrappers"] }
+futures-lite = { version = "2", default-features = false, features = ["std"] }
 # Read-only cursor-position query via XWayland (see backend/x11_cursor.rs) -
 # not the removed XTest emission backend; core X11 protocol only.
 x11rb.workspace = true

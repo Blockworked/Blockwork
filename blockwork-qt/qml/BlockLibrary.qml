@@ -111,7 +111,7 @@ Item {
         shareDialog.open();
     }
     function blockLabel(def) {
-        return (def.pieces || []).map(p => p.kind === "Label" ? p.text : "(" + p.name + ")").join(" ");
+        return BlockRegistry.definitionLabel(def, true);
     }
     function localPath(url) {
         const text = decodeURIComponent(url.toString());
@@ -481,7 +481,7 @@ Item {
                                 id: preview
                                 objectName: "sharePackBlockPreview"
                                 readonly property bool reporter: blockRow.modelData.shape === "ReturnsValue" || blockRow.modelData.shape === "ReturnsBool"
-                                readonly property var args: (blockRow.modelData.pieces || []).filter(p => p.kind === "Input").map(p => p.default_value || {kind: "Number", value: 0})
+                                readonly property var args: BlockRegistry.freshCallArgs(blockRow.modelData)
                                 width: item ? item.implicitWidth : 0
                                 height: item ? item.implicitHeight : 0
                                 y: 4

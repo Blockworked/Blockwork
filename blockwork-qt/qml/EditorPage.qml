@@ -88,7 +88,7 @@ Item {
     function showDetails(type,fallback) {
         const def = blockDefById(type);
         if (def) {
-            const name = (def.pieces || []).map(p => p.kind === "Label" ? p.text : "(" + p.name + ")").join(" ");
+            const name = BlockRegistry.definitionLabel(def, true);
             const explainer = def.read_only ? qsTr("A community block from %1.").arg(def.pack_name) : fallback;
             detailsDialog.show(name, def.identifier || def.id, def.description || explainer || qsTr("A custom block defined in this macro."));
         } else detailsDialog.show(catalog.help.title(type),type,catalog.help.explainer(type)||fallback||qsTr("A Blockwork block."));
@@ -162,20 +162,47 @@ Item {
             root.invoke("edit_instruction", { strandId: location.strand_id, path: path, instruction: updated });
         }, value && value.kind === "Text" ? value.value : "");
     }
-    function onPieceAction(action, strandId, path, instruction) {
-        const request = { kind: "image", strandId: strandId, path: path, instruction: instruction };
-        if (action === "captureImage") root.startScreenPick(request);
-        else if (action === "loadImage") imageFileDialog.openFor(request);
-        else if (action === "pickModel") modelDialog.openFor(request);
-        else if (action === "pickUsb") usbDialog.openFor(request);
-        else if (action === "pickApp") root.openAppPicker(strandId, path, instruction);
-        else if (action === "launchOptions") launchDialog.openFor(request);
-        else if (action === "pickRegion") root.startScreenPick(Object.assign(request, { kind: "region" }));
-        else if (action === "clearRegion") {
-            const updated = JSON.parse(JSON.stringify(instruction || {}));
+    // Native adapters for the shared block UI. Custom settings forms use the
+    // same argument values and undo commands as these built-in screens.
+    readonly property var blockScreens: ({
+        pickController: request => controllerPicker.openFor(request),
+        pickNativeUi: request => nativeUiPicker.openFor(request),
+        touchPaths: request => touchPathsDialog.openFor(request),
+        touchPathsValue: request => root.openTouchPathsValue(request),
+        captureImage: request => root.startScreenPick(request),
+        loadImage: request => imageFileDialog.openFor(request),
+        pickModel: request => modelDialog.openFor(request),
+        pickUsb: request => usbDialog.openFor(request),
+        pickApp: request => request.palette ? root.openPaletteAppPicker(request.instruction)
+            : root.openAppPicker(request.strandId, request.path, request.instruction),
+        launchOptions: request => launchDialog.openFor(request),
+        pickRegion: request => root.startScreenPick(Object.assign({}, request, {kind: "region"})),
+        clearRegion: request => {
+            const updated = JSON.parse(JSON.stringify(request.instruction || {}));
             updated.region = "";
-            root.invoke("edit_instruction", { strandId: strandId, path: path, instruction: updated });
-        }
+            root.invoke("edit_instruction", {strandId: request.strandId, path: request.path, instruction: updated});
+        },
+        pickGlobal: request => globalPicker.openFor(name => root.invoke("put_value", {
+            location: request.location, value: root.textValue(name)
+        }), request.value && request.value.kind === "Text" ? request.value.value : ""),
+        pickSignal: request => root.pickSignal(request.location, request.value),
+        pickTime: request => timePicker.openFor(request.location, request.value, request.anchor),
+        pickDateTime: request => dateTimePicker.openFor(request.location, request.value, request.anchor),
+        pickSchedule: request => scheduleDialog.openFor(request.location, request.value),
+        pickScreenRegion: request => root.startScreenPick(Object.assign({}, request, {kind: "value", point: false})),
+        pickScreenPoint: request => root.startScreenPick(Object.assign({}, request, {kind: "value", point: true}))
+    })
+    function instructionForRequest(request) {
+        const current = canvas.instructionAt(canvas.strandById(request.strandId), request.path);
+        return current && current.id === request.instruction.id ? current : null;
+    }
+    function openTouchPathsValue(request) {
+        const location = request.location;
+        const instruction = canvas.instructionAt(canvas.strandById(location.strand_id), location.index);
+        if (instruction && instruction.type === "TouchSequence") touchPathsDialog.openFor({strandId: location.strand_id, path: location.index, instruction: instruction});
+    }
+    function onPieceAction(action, strandId, path, instruction) {
+        return BlockUi.open(action, {kind: "image", strandId: strandId, path: path, instruction: instruction}, blockScreens);
     }
     // ---- app picker ("Choose app" for OpenApp/CloseApp) ----
     property var appPickerRequest: null   // { strandId, path, instruction } for canvas, or { paletteType } for palette
@@ -573,13 +600,14 @@ Item {
                     onBrowseBlocksRequested: root.blockLibrary.browse()
                     onShareBlockRequested: definition => root.blockLibrary.share(definition)
                     onStandaloneKeyCaptureRequested: root.invoke("start_standalone_key_capture")
-                    onPieceActionRequested: (action, instruction) => { if (action === "pickApp") root.openPaletteAppPicker(instruction); }
+                    onPieceActionRequested: (action, instruction) => BlockUi.open(action, {palette: true, instruction: instruction}, root.blockScreens)
                     onDetailsRequested:(name,identifier,explainer)=>root.blockDefById(identifier)||name===identifier?root.showDetails(identifier,explainer):detailsDialog.show(name,identifier,explainer)
                     onValueActivated: value => dragController.addAt({ kind: "value", value: value }, 160, 140)
                 }
                 }
                 BlockCanvas {
                     id: canvas
+                    documentId: root.macro ? root.macro.id : ""
                     runningIds: root.runningIds
                     breakpointIds: appState.breakpoints || []
                     pausedIds: debugBar.paused.map(p => p.block_id)
@@ -728,6 +756,9 @@ Item {
             });
         }
     }
+    ControllerPickerDialog { id: controllerPicker; page: root }
+    NativeUiPickerDialog { id: nativeUiPicker; page: root }
+    TouchPathsDialog { id: touchPathsDialog; page: root }
     DetectionModelDialog { id: modelDialog; page: root; onFailed: message => pickError.show(message) }
     NamePicker {
         id: signalPicker
@@ -984,16 +1015,8 @@ Item {
         BlockRegistry.blockMenu = root.blockMenu();
         BlockRegistry.previewHandler = (key, value) => root.appBridge.previewValue(key, JSON.stringify(value));
         // Name slots share the same picker in instructions and reporters.
-        BlockRegistry.pickHandler = (action, location, value, anchor) => {
-            if (action === "pickUsb") usbDialog.openFor({ kind: "value", location: location, value: value });
-            else if (action === "pickGlobal") globalPicker.openFor(name => root.invoke("put_value", { location: location, value: root.textValue(name) }), value && value.kind === "Text" ? value.value : "");
-            else if (action === "pickSignal") root.pickSignal(location, value);
-            else if (action === "pickTime") timePicker.openFor(location, value, anchor);
-            else if (action === "pickDateTime") dateTimePicker.openFor(location, value, anchor);
-            else if (action === "pickSchedule") scheduleDialog.openFor(location, value);
-            else if (action === "pickScreenRegion" || action === "pickScreenPoint")
-                root.startScreenPick({ kind: "value", location: location, value: value, point: action === "pickScreenPoint" });
-        };
+        BlockRegistry.pickHandler = (action, location, value, anchor) =>
+            BlockUi.open(action, {kind: "value", location: location, value: value, anchor: anchor}, root.blockScreens);
     }
     Connections {
         target: root.appBridge

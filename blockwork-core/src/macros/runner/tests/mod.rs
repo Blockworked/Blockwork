@@ -116,6 +116,7 @@ fn macro_with_double_block(caller_instructions: Vec<Instruction>) -> Macro {
                         value_type: InputValueType::Any,
                         default_value: None,
                         multiline: false,
+                        ui: None,
                     },
                 ],
                 shape: BlockShape::ReturnsValue,

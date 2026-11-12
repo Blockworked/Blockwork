@@ -77,6 +77,38 @@ impl InstructionKind {
     pub fn trigger_label(&self) -> Option<String> {
         use InstructionKind as K;
         Some(match self {
+            K::WhenGamepadButton {
+                controller,
+                button,
+                pressed,
+            } => format!(
+                "when controller {} button {button:?} is {}",
+                show(controller),
+                if *pressed { "pressed" } else { "released" }
+            ),
+            K::WhenGamepadConnection {
+                controller,
+                connected,
+            } => format!(
+                "when controller {} {}",
+                show(controller),
+                if *connected {
+                    "connects"
+                } else {
+                    "disconnects"
+                }
+            ),
+            K::WhenGamepadAxis {
+                controller, axis, ..
+            } => format!(
+                "when controller {} axis {axis:?} crosses its threshold",
+                show(controller)
+            ),
+            K::WhenNativeUiChanged { selector, property } => format!(
+                "when native element {} {property:?} changes",
+                show(selector)
+            ),
+            K::WhenSystemStarts => "when system starts".into(),
             K::WhenBatteryDischargedTo(v) => format!("when battery drops to {}%", show(v)),
             K::WhenBatteryChargedTo(v) => format!("when battery charges to {}%", show(v)),
             K::WhenTime(schedule, time) => {

@@ -18,6 +18,10 @@ QtObject {
     readonly property BlockHelp help: BlockHelp {}
 
     function numberValue(n) { return { kind: "Number", value: n }; }
+    function nativeUiLabel(text) {
+        try { const selector=JSON.parse(text); return (selector.name || selector.id || selector.role || qsTr("Choose element")).slice(0, 90); }
+        catch (e) { return text.length > 90 ? text.slice(0,90) + "…" : text; }
+    }
     function textValue(t) { return { kind: "Text", value: t }; }
     function firstGlobalName() { return (page.appState.globals || []).length ? page.appState.globals[0].name : ""; }
     // A fresh block of this type: its prefab from register(), else
@@ -33,6 +37,13 @@ QtObject {
     // types, defaults), for BlockRegistry.freshValue.
     // BEGIN GENERATED operator descriptors (blockwork-core tests/operator_descriptors.rs; BLESS=1 rewrites)
     readonly property var hostDescriptors: [
+        {"kind":"NativeUiExists","op":"NativeUiExists","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"scope=Focused;name=Save;role=push button"}}],"host":true},
+        {"kind":"NativeUiEnabled","op":"NativeUiEnabled","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"scope=Focused;name=Save;role=push button"}}],"host":true},
+        {"kind":"NativeUiText","op":"NativeUiText","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"scope=Focused;name=Save;role=push button"}}],"host":true},
+        {"kind":"NativeUiValue","op":"NativeUiValue","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"scope=Focused;name=Save;role=push button"}}],"host":true},
+        {"kind":"GamepadConnected","op":"GamepadConnected","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":""}}],"host":true},
+        {"kind":"GamepadButtonDown","op":"GamepadButtonDown","arity":2,"args":[{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":"South"}}],"host":true},
+        {"kind":"GamepadAxisValue","op":"GamepadAxisValue","arity":2,"args":[{"type":"text","default":{"kind":"Text","value":""}},{"type":"text","default":{"kind":"Text","value":"LeftX"}}],"host":true},
         {"kind":"BatteryPercentage","op":"BatteryPercentage","arity":0,"args":[],"host":true},
         {"kind":"PluggedIn","op":"PluggedIn","arity":0,"args":[],"host":true},
         {"kind":"ClipboardText","op":"ClipboardText","arity":0,"args":[],"host":true},
@@ -102,8 +113,17 @@ QtObject {
     }
     // Blockwork's reporters: label pieces and result type, by operator. The
     // palette list above and BlockRegistry both come from this one table.
+    readonly property var gamepadButtonOptions: ["South", "East", "North", "West", "LeftShoulder", "RightShoulder", "LeftStick", "RightStick", "Select", "Start", "Mode", "DPadUp", "DPadDown", "DPadLeft", "DPadRight"].map(name => ({value: name,label: name}))
+    readonly property var gamepadAxisOptions: ["LeftX", "LeftY", "RightX", "RightY", "LeftTrigger", "RightTrigger"].map(name => ({value: name,label: name}))
     function operatorRows() {
         return {
+            GamepadConnected: {prefix: qsTr("controller"), suffix: qsTr("connected?"), result: "bool", pickArg: {index: 0, action: "pickController", icon: "gamepad-2"}},
+            GamepadButtonDown: {prefix: qsTr("controller"), infix: qsTr("button pressed"), result: "bool", enumArg: {index: 1, options: gamepadButtonOptions}, pickArg: {index: 0, action: "pickController", icon: "gamepad-2"}},
+            GamepadAxisValue: {prefix: qsTr("controller"), infix: qsTr("axis"), result: "number", enumArg: {index: 1, options: gamepadAxisOptions}, pickArg: {index: 0, action: "pickController", icon: "gamepad-2"}},
+            NativeUiExists: {prefix: qsTr("native element"), suffix: qsTr("exists?"), result: "bool", pickArg: {index: 0, action: "pickNativeUi", icon: "scan"}},
+            NativeUiEnabled: {prefix: qsTr("native element"), suffix: qsTr("enabled?"), result: "bool", pickArg: {index: 0, action: "pickNativeUi", icon: "scan"}},
+            NativeUiText: {prefix: qsTr("text of native element"), result: "text", pickArg: {index: 0, action: "pickNativeUi", icon: "scan"}},
+            NativeUiValue: {prefix: qsTr("value of native element"), result: "number", pickArg: {index: 0, action: "pickNativeUi", icon: "scan"}},
             BatteryPercentage: { prefix: qsTr("battery percentage"), result: "number" }, PluggedIn: { prefix: qsTr("plugged in?"), result: "bool" },
             ClipboardText: { prefix: qsTr("clipboard text"), result: "text" }, ClipboardHasImage: { prefix: qsTr("clipboard has image"), result: "bool" },
             ClipboardHasFiles: { prefix: qsTr("clipboard has files"), result: "bool" },
@@ -166,14 +186,18 @@ QtObject {
     // The palette's sections, in order. Statements come before reporters,
     // except where a section holds data: there the reporter comes first.
     readonly property var paletteSections: [
-        { category: "events", title: qsTr("Start"), items: ["WhenRan", "WhenSignal", "WhenWebhook"] },
+        { category: "events", title: qsTr("Start"), items: ["WhenRan", "WhenSystemStarts", "WhenSignal", "WhenWebhook"] },
         { category: "events", title: qsTr("Keyboard and mouse"), items: ["WhenKey", "WhenTyped", "WhenMouseButton"] },
+        { category: "events", title: qsTr("Controllers"), items: ["WhenGamepadButton", "WhenGamepadConnection", "WhenGamepadAxis"] },
         { category: "events", title: qsTr("Time"), items: ["WhenTime", "WhenAt", "WhenCron", "WhenIdle"] },
         { category: "events", title: qsTr("Apps and windows"), items: ["WhenApp", "WhenWindow"] },
         { category: "events", title: qsTr("Files and clipboard"), items: ["WhenFileChanged", "WhenClipboardChanged"] },
         { category: "events", title: qsTr("Computer"), items: ["WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenBatteryDischargedTo", "WhenBatteryChargedTo",
             "WhenScreenLock", "WhenNetwork", "WhenUsb"] },
         { category: "input", title: qsTr("Keyboard"), items: ["Text", "PasteText", "Key"] },
+        { category: "input", title: qsTr("Controller input"), items: ["GamepadConnected", "GamepadButtonDown", "GamepadAxisValue", "GamepadButton", "GamepadStick", "GamepadTrigger", "ResetGamepad"] },
+        { category: "system", title: qsTr("Native UI"), items: ["WhenNativeUiChanged", "NativeUiAction", "NativeUiExists", "NativeUiEnabled", "NativeUiText", "NativeUiValue"] },
+        { category: "input", title: qsTr("Touch"), items: ["TouchGesture", "TouchSequence"] },
         { category: "input", title: qsTr("Mouse"), items: ["Button", "MoveMouse", "Scroll", "MousePosition"] },
         { category: "control", title: qsTr("Waiting"), items: ["Wait", "WaitUntil"] },
         { category: "control", title: qsTr("Conditions"), items: ["If", "IfElse"] },
@@ -328,6 +352,14 @@ QtObject {
     function eventRows(p) {
         const { label, value, signalPieces, whenTimeHead, direction, keyValue } = p;
         return {
+            WhenNativeUiChanged: {shape: "header",icon:"scan",head:[label(qsTr("WHEN NATIVE ELEMENT")),Object.assign(value("NativeUiSelector","selector"),{pick:{action:"pickNativeUi",icon:"scan",display:t=>nativeUiLabel(t)}}),
+                {kind:"dropdown",key:"property",options:choices([["Exists",qsTr("existence")],["Enabled",qsTr("enabled state")],["Text",qsTr("text")],["Value",qsTr("value")]])},label(qsTr("CHANGES"))]},
+            WhenGamepadButton: {shape: "header",icon:"gamepad-2",head:[label(qsTr("WHEN CONTROLLER")),Object.assign(value("GamepadController","controller"),{pick:{action:"pickController",icon:"gamepad-2",display:t=>t || qsTr("Any single controller")}}),
+                {kind:"dropdown",key:"button",options:gamepadButtonOptions},{kind:"dropdown",key:"pressed",options:choices([["press",qsTr("pressed")],["release",qsTr("released")]]),encode:v=>v==="press",decode:v=>v ? "press" : "release"}]},
+            WhenGamepadConnection: {shape: "header",icon:"gamepad-2",head:[label(qsTr("WHEN CONTROLLER")),Object.assign(value("GamepadController","controller"),{pick:{action:"pickController",icon:"gamepad-2",display:t=>t || qsTr("Any single controller")}}),
+                {kind:"dropdown",key:"connected",options:choices([["in",qsTr("connects")],["out",qsTr("disconnects")]]),encode:v=>v==="in",decode:v=>v ? "in" : "out"}]},
+            WhenGamepadAxis: {shape: "header",icon:"gamepad-2",head:[label(qsTr("WHEN CONTROLLER")),Object.assign(value("GamepadController","controller"),{pick:{action:"pickController",icon:"gamepad-2",display:t=>t || qsTr("Any single controller")}}),
+                {kind:"dropdown",key:"axis",options:gamepadAxisOptions},{kind:"dropdown",key:"above",options:choices([["above",qsTr("rises above")],["below",qsTr("falls below")]]),encode:v=>v==="above",decode:v=>v ? "above" : "below"},value("GamepadThreshold","threshold")]},
             WhenBatteryDischargedTo: { shape: "header", head: [label(qsTr("WHEN BATTERY DISCHARGED TO")),
                 value("BatteryDischargeThreshold", "threshold"), label("%")] },
             WhenBatteryChargedTo: { shape: "header", head: [label(qsTr("WHEN BATTERY CHARGED TO")),
@@ -337,6 +369,7 @@ QtObject {
             WhenClipboardChanged: { shape: "header", head: [label(qsTr("WHEN CLIPBOARD CHANGES"))] },
             WhenKey: { shape: "header", head: [label(qsTr("WHEN")), keyValue,
                 direction([["Press", qsTr("Pressed")], ["Release", qsTr("Released")]])] },
+            WhenSystemStarts: { shape: "header", icon: "monitor", head: [label(qsTr("WHEN SYSTEM STARTS")), {kind: "label", text: qsTr("(enable system startup in Settings)"), when: () => !page.appState.start_at_startup}] },
             WhenRan: { shape: "header", icon: "play", head: [label(qsTr("WHEN RUN"))] },
             WhenAt: { shape: "header", icon: "clock", head: [label(qsTr("ONCE AT")),
                 Object.assign(value("AtTime", "at"), { pick: { action: "pickDateTime", icon: "calendar", display: t => Schedules.dateTimeLabel(t), tip: qsTr("Click to pick a date and time, or drop a reporter here") } })] },
@@ -395,6 +428,26 @@ QtObject {
                     ]
                 }]
             },
+            GamepadButton:{icon:"gamepad-2",head:[label(qsTr("virtual controller button")),{kind:"dropdown",key:"button",options:gamepadButtonOptions},direction([["Click",qsTr("click")],["Press",qsTr("press")],["Release",qsTr("release")]])]},
+            GamepadStick:{icon:"gamepad-2",head:[label(qsTr("virtual controller stick")),{kind:"dropdown",key:"stick",options:choices([["Left",qsTr("left")],["Right",qsTr("right")]])},label("x"),value("GamepadX","x"),label("y"),value("GamepadY","y")]},
+            GamepadTrigger:{icon:"gamepad-2",head:[label(qsTr("virtual controller trigger")),{kind:"dropdown",key:"left",options:choices([["left",qsTr("left")],["right",qsTr("right")]]),encode:v=>v==="left",decode:v=>v ? "left" : "right"},value("GamepadTriggerValue","amount")]},
+            ResetGamepad:{icon:"gamepad-2",head:[label(qsTr("reset virtual controller"))]},
+            TouchGesture: {icon: "hand", head: [label(qsTr("touch")),
+                {kind: "dropdown", key: "gesture", options: choices([["Tap", qsTr("tap")], ["LongPress", qsTr("long press")], ["Swipe", qsTr("swipe")], ["Pinch", qsTr("pinch")], ["Rotate", qsTr("rotate")]])},
+                {kind: "dropdown", key: "fingers", options: Array.from({length: 10}, (_, i) => ({value: String(i+1), label: qsTr("%1 fingers").arg(i+1)})), encode: v => Number(v), decode: v => String(v), when: i => i.gesture !== "Pinch" && i.gesture !== "Rotate"},
+                label(qsTr("at")), value("TouchX", "x"), value("TouchY", "y"),
+                Object.assign(label(qsTr("to")), {when: i => i.gesture === "Swipe"}),
+                Object.assign(value("TouchEndX", "end_x"), {when: i => i.gesture === "Swipe"}), Object.assign(value("TouchEndY", "end_y"), {when: i => i.gesture === "Swipe"}),
+                label(qsTr("over")), value("TouchDuration", "duration"), label(qsTr("ms")),
+                Object.assign(label(qsTr("spread")), {when: i => i.fingers > 1 || i.gesture === "Pinch" || i.gesture === "Rotate"}),
+                Object.assign(value("TouchSpan", "span"), {when: i => i.fingers > 1 || i.gesture === "Pinch" || i.gesture === "Rotate"}),
+                {kind: "label", text: qsTr("scale"), when: i => i.gesture === "Pinch"}, {kind: "label", text: qsTr("degrees"), when: i => i.gesture === "Rotate"},
+                Object.assign(value("TouchAmount", "amount"), {when: i => i.gesture === "Pinch" || i.gesture === "Rotate"}),
+                {kind: "dropdown", key: "normalized", options: choices([["percent", qsTr("percent of monitor")], ["pixels", qsTr("screen pixels")]]), encode: v => v === "percent", decode: v => v ? "percent" : "pixels"},
+                label(qsTr("monitor")), {kind: "dropdown", key: "monitor", options: Array.from({length: 8}, (_, i) => ({value: String(i), label: String(i+1)})), encode: v => Number(v), decode: v => String(v)}]},
+            TouchSequence: {icon: "hand", head: [label(qsTr("touch paths")), Object.assign(value("TouchPaths", "sequence"), {pick: {action: "touchPathsValue", icon: "hand", display: () => qsTr("Edit paths"), tip: qsTr("Edit finger positions and timing, or drop a reporter here")}}),
+                {kind: "dropdown", key: "normalized", options: choices([["percent", qsTr("normalized monitor coordinates")], ["pixels", qsTr("screen pixels")]]), encode: v => v === "percent", decode: v => v ? "percent" : "pixels"},
+                label(qsTr("monitor")), {kind: "dropdown", key: "monitor", options: Array.from({length: 8}, (_, i) => ({value: String(i), label: String(i+1)})), encode: v => Number(v), decode: v => String(v)}]},
             Key: { head: [label(qsTr("Key")), keyValue,
                 direction([["Click", qsTr("Click")], ["Press", qsTr("Press")], ["Release", qsTr("Release")]])] },
             Button: { head: [label(qsTr("Mouse button")),
@@ -455,6 +508,9 @@ QtObject {
     function systemRows(p) {
         const { label, commandField, value, box, launchSummary } = p;
         return {
+            NativeUiAction: {icon: "scan", head: [label(qsTr("native element")), Object.assign(value("NativeUiSelector", "selector"), {pick: {action: "pickNativeUi", icon: "scan", display: t => nativeUiLabel(t), tip: qsTr("Choose a desktop app element")}}),
+                {kind: "dropdown", key: "action", options: choices([["Invoke", qsTr("invoke")], ["SetText", qsTr("set text")], ["SetValue", qsTr("set value")], ["Focus", qsTr("focus")]])},
+                Object.assign(value("NativeUiValue", "value"), {when: i => i.action === "SetText" || i.action === "SetValue"})]},
             CloseApp: { head: [label(qsTr("Close app")),
                 { kind: "button", action: "pickApp", palette: true, image: "icon", icon: "square-x", text: i => i && i.name ? i.name : qsTr("Choose app...") }] },
             SetClipboard: { head: [label(qsTr("set clipboard to")), value("SetClipboardValue", "value")] },
@@ -585,6 +641,16 @@ QtObject {
             DetectObjectsInWindow: ["count_variable"], AimAtDetection: ["status_variable"]
         });
         BlockRegistry.registerPrefabs({
+            GamepadButton:{button:"South",direction:"Click"},
+            GamepadStick:{stick:"Left",x:numberValue(0),y:numberValue(0)},
+            GamepadTrigger:{left:true,amount:numberValue(0)},
+            WhenNativeUiChanged:{selector:textValue("scope=Focused;name=Save;role=push button"),property:"Enabled"},
+            WhenGamepadButton:{controller:textValue(""),button:"South",pressed:true},
+            WhenGamepadConnection:{controller:textValue(""),connected:true},
+            WhenGamepadAxis:{controller:textValue(""),axis:"LeftX",threshold:numberValue(0.5),above:true},
+            NativeUiAction: {selector: textValue("scope=Focused;name=Save;role=push button"),action: "Invoke",value: textValue("")},
+            TouchGesture: {gesture: "Swipe", fingers: 1, x: numberValue(25), y: numberValue(50), end_x: numberValue(75), end_y: numberValue(50), duration: numberValue(500), span: numberValue(10), amount: numberValue(1.5), normalized: true, monitor: 0},
+            TouchSequence: {sequence: textValue(JSON.stringify({version: 1, frames: [{at_ms: 0, contacts: [{id: 0, x: 250000, y: 500000}]}, {at_ms: 250, contacts: [{id: 0, x: 750000, y: 500000}]}, {at_ms: 251, contacts: []}]})), normalized: true, monitor: 0},
             Command: { command: "" },
             WhenBatteryDischargedTo: { threshold: numberValue(20) },
             WhenBatteryChargedTo: { threshold: numberValue(100) },
