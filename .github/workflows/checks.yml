@@ -114,6 +114,12 @@ jobs:
       - name: Tests
         run: cargo test --workspace --exclude blockwork-linux-bridge
 
+      # Records from a fake touchscreen and plays into a fake uinput.
+      - name: Touch on a fake touchscreen
+        run: |
+          sudo apt-get install -y --no-install-recommends xvfb xauth
+          scripts/test-touch.sh
+
       # The workspace's declared rust-version must really build it.
       - name: Minimum Rust version
         run: |
