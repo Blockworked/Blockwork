@@ -31,8 +31,13 @@ pub enum CaptureEvent {
     Scroll(i32, i32),
 }
 
+/// Releases a virtual device's held state without the backend's lock, so a
+/// cancelled strand can let go while another strand holds the backend.
 pub type ResetHandle = Arc<dyn Fn() -> Result<(), String> + Send + Sync>;
+
 pub trait InputBackend: Send + 'static {
+    // Virtual controller and touchscreen output. Backends without them keep
+    // these defaults, which refuse output and treat a reset as done.
     fn gamepad_reset_handle(&self) -> Option<ResetHandle> {
         None
     }

@@ -1,5 +1,6 @@
 //! Logical controls, independent of a platform's device IDs and button numbers.
 use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum GamepadButton {
     South,
@@ -18,6 +19,7 @@ pub enum GamepadButton {
     DPadLeft,
     DPadRight,
 }
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub enum GamepadAxis {
     LeftX,
@@ -27,11 +29,13 @@ pub enum GamepadAxis {
     LeftTrigger,
     RightTrigger,
 }
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum GamepadStick {
     Left,
     Right,
 }
+
 pub const BUTTONS: &[GamepadButton] = &[
     GamepadButton::South,
     GamepadButton::East,
@@ -70,6 +74,7 @@ pub fn deadzone(value: f64, zone: f64) -> f64 {
         value.signum() * (value.abs() - zone) / (1.0 - zone)
     }
 }
+
 /// Hysteresis prevents noisy axes from repeatedly firing at a threshold. An
 /// axis counts as above from `threshold` and stays above until it falls to
 /// the release point, 0.05 below (or halfway down for thresholds under 0.1,
@@ -85,6 +90,7 @@ pub fn above_threshold(previous: bool, value: f64, threshold: f64) -> bool {
         magnitude >= threshold
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -125,6 +131,7 @@ pub struct GamepadState {
     pub left_trigger: u16,
     pub right_trigger: u16,
 }
+
 impl GamepadState {
     pub fn validate(&self) -> Result<(), String> {
         if [self.left_x, self.left_y, self.right_x, self.right_y].contains(&i16::MIN)

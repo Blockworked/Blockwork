@@ -1,10 +1,24 @@
-use crate::input::touch::TouchContact;
+//! Touch playback through Windows pointer injection.
+use crate::input::touch::{MAX_CONTACTS, TouchContact};
 use std::sync::Mutex;
 use windows_sys::Win32::UI::Input::Pointer::*;
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     PT_TOUCH, TOUCH_MASK_CONTACTAREA, TOUCH_MASK_ORIENTATION, TOUCH_MASK_PRESSURE,
 };
-static STATE: Mutex<(bool, Vec<TouchContact>)> = Mutex::new((false, Vec::new()));
+
+struct State {
+    /// `InitializeTouchInjection` succeeded; it only needs to run once.
+    initialized: bool,
+    /// Contacts Windows thinks are down, released on cancel.
+    active: Vec<TouchContact>,
+}
+
+static STATE: Mutex<State> = Mutex::new(State {
+    initialized: false,
+    active: Vec::new(),
+});
+
+/// One injected pointer, with a small fixed contact area and pressure.
 fn info(point: TouchContact, flags: u32) -> POINTER_TOUCH_INFO {
     let mut info = POINTER_TOUCH_INFO::default();
     info.pointerInfo.pointerType = PT_TOUCH;
@@ -21,6 +35,7 @@ fn info(point: TouchContact, flags: u32) -> POINTER_TOUCH_INFO {
     info.pressure = 512;
     info
 }
+
 fn inject(points: &[POINTER_TOUCH_INFO]) -> Result<(), String> {
     if points.is_empty() {
         return Ok(());
@@ -33,29 +48,33 @@ fn inject(points: &[POINTER_TOUCH_INFO]) -> Result<(), String> {
     }
     Ok(())
 }
+
+/// Turns on touch injection for this process.
 pub fn prepare() -> Result<(), String> {
     let mut state = STATE.lock().map_err(|e| e.to_string())?;
-    if !state.0 {
-        if unsafe { InitializeTouchInjection(10, TOUCH_FEEDBACK_DEFAULT) } == 0 {
+    if !state.initialized {
+        if unsafe { InitializeTouchInjection(MAX_CONTACTS as u32, TOUCH_FEEDBACK_DEFAULT) } == 0 {
             return Err(format!(
                 "Windows native touch isn't available: {}",
                 std::io::Error::last_os_error()
             ));
         }
-        state.0 = true;
+        state.initialized = true;
     }
     Ok(())
 }
+
+/// Sends one complete contact frame: fingers missing from `contacts` lift.
 pub fn frame(contacts: &[TouchContact]) -> Result<(), String> {
     let mut state = STATE.lock().map_err(|e| e.to_string())?;
     let mut points = vec![];
-    for old in &state.1 {
+    for old in &state.active {
         if !contacts.iter().any(|p| p.id == old.id) {
             points.push(info(*old, POINTER_FLAG_UP));
         }
     }
     for point in contacts {
-        let flag = if state.1.iter().any(|old| old.id == point.id) {
+        let flag = if state.active.iter().any(|old| old.id == point.id) {
             POINTER_FLAG_UPDATE
         } else {
             POINTER_FLAG_DOWN
@@ -68,20 +87,22 @@ pub fn frame(contacts: &[TouchContact]) -> Result<(), String> {
     let result = inject(&points);
     // Keep the union on a partial failure so cancellation can release both sets.
     if result.is_ok() {
-        state.1 = contacts.to_vec();
+        state.active = contacts.to_vec();
     } else {
         for point in contacts {
-            if !state.1.iter().any(|old| old.id == point.id) {
-                state.1.push(*point);
+            if !state.active.iter().any(|old| old.id == point.id) {
+                state.active.push(*point);
             }
         }
     }
     result
 }
+
+/// Cancels every contact still down.
 pub fn cancel() -> Result<(), String> {
     let mut state = STATE.lock().unwrap_or_else(|p| p.into_inner());
     let mut error = None;
-    for point in state.1.drain(..) {
+    for point in state.active.drain(..) {
         if let Err(e) = inject(&[info(point, POINTER_FLAG_UP | POINTER_FLAG_CANCELED)]) {
             error = Some(e);
         }

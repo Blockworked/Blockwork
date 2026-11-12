@@ -5,7 +5,8 @@ use blockwork_core::config::AppSettings;
 
 /// Saves one setting and publishes the new state: `apply` updates the app's
 /// own copy (if it keeps one), `save` the settings file.
-fn save_setting(
+/// Applies a setting to the live state, saves it and publishes the state.
+pub(super) fn save_setting(
     state: &SharedState,
     app: &AppHandle,
     apply: impl FnOnce(&mut crate::state::AppState),

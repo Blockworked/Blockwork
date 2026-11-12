@@ -325,7 +325,7 @@ mod linux {
             .filter_map(|(_, device)| {
                 let name = device.name().unwrap_or("").to_owned();
                 let axes = device.supported_absolute_axes()?;
-                (!name.starts_with("Blockwork Virtual ")
+                (!crate::input::is_own_device(&name)
                     && device.properties().contains(PropType::DIRECT)
                     && axes.contains(Abs::ABS_MT_SLOT)
                     && axes.contains(Abs::ABS_MT_POSITION_X)

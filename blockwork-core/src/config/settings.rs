@@ -45,9 +45,13 @@ pub struct AppSettings {
     pub start_at_startup: Option<bool>,
     /// Installed startup entry format; old entries are upgraded once.
     pub startup_entry_version: Option<u32>,
+    /// Read physical controllers for triggers and reporters; off by default.
     pub controller_input_enabled: Option<bool>,
+    /// Stick deadzone for controller triggers, 0 to 0.95 (default 0.12).
     pub controller_deadzone: Option<f64>,
+    /// Let blocks drive the virtual controller (Linux uinput); off by default.
     pub virtual_gamepad_enabled: Option<bool>,
+    /// Let blocks read and act on other apps' UI (AT-SPI); off by default.
     pub ui_automation_enabled: Option<bool>,
     /// False while the first-run welcome screen is still pending.
     pub onboarding_done: Option<bool>,
@@ -118,6 +122,18 @@ fn settings_path() -> Result<PathBuf, String> {
     std::fs::create_dir_all(&p).map_err(|e| format!("Failed to create config dir: {e}"))?;
     p.push("settings.json");
     Ok(p)
+}
+
+/// Stick deadzone when none is saved.
+pub const DEFAULT_CONTROLLER_DEADZONE: f64 = 0.12;
+
+impl AppSettings {
+    /// The saved stick deadzone, or the default when unset or out of range.
+    pub fn stick_deadzone(&self) -> f64 {
+        self.controller_deadzone
+            .filter(|n| n.is_finite() && (0.0..=0.95).contains(n))
+            .unwrap_or(DEFAULT_CONTROLLER_DEADZONE)
+    }
 }
 
 pub fn load_settings() -> AppSettings {

@@ -1,5 +1,6 @@
 //! Persisted accessibility selectors contain descriptions, never live handles.
 use serde::{Deserialize, Serialize};
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 pub enum UiScope {
     #[default]
@@ -7,6 +8,7 @@ pub enum UiScope {
     App,
     Window,
 }
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Default, Serialize, Deserialize)]
 #[serde(default, deny_unknown_fields)]
 pub struct UiSelector {
@@ -17,6 +19,7 @@ pub struct UiSelector {
     pub role: String,
     pub id: String,
 }
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum UiAction {
     Invoke,
@@ -24,6 +27,7 @@ pub enum UiAction {
     SetValue,
     Focus,
 }
+
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum UiProperty {
     Exists,
@@ -31,6 +35,7 @@ pub enum UiProperty {
     Text,
     Value,
 }
+
 impl UiSelector {
     pub fn parse(text: &str) -> Result<Self, String> {
         if text.len() > 8192 {
@@ -98,6 +103,7 @@ impl UiSelector {
         }
     }
 }
+
 #[cfg(test)]
 mod tests {
     use super::*;

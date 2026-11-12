@@ -158,9 +158,7 @@ impl ControllerRecorder {
 static DIRTY: Mutex<Option<Duration>> = Mutex::new(None);
 
 pub(super) fn start() {
-    let zone = crate::config::load_settings()
-        .controller_deadzone
-        .unwrap_or(0.12);
+    let zone = crate::config::load_settings().stick_deadzone();
     let (baseline, subscription) = match controllers::subscribe() {
         Ok(found) => found,
         Err(error) => {

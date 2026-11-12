@@ -3,9 +3,13 @@ use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
 pub const MAX_CONTACTS: usize = 10;
+
 pub const MAX_FRAMES: usize = 40_000;
+
 pub const MAX_DURATION_MS: u32 = 600_000;
+
 pub const NORMALIZED_MAX: i32 = 1_000_000;
+
 pub const MAX_BYTES: usize = 2 * 1024 * 1024;
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
@@ -23,11 +27,13 @@ pub struct TouchContact {
     pub x: i32,
     pub y: i32,
 }
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TouchFrame {
     pub at_ms: u32,
     pub contacts: Vec<TouchContact>,
 }
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct TouchSequence {
     pub version: u32,
@@ -93,6 +99,7 @@ pub struct Gesture {
     pub span: f64,
     pub amount: f64,
 }
+
 impl Gesture {
     pub fn sequence(&self) -> Result<TouchSequence, String> {
         if ![

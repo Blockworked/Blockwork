@@ -9,6 +9,7 @@ use atspi_connection::AccessibilityConnection;
 use std::collections::{HashSet, VecDeque};
 use std::time::Duration;
 use zbus::{Connection, proxy::CacheProperties};
+
 fn bounded<T>(future: impl std::future::Future<Output = Result<T, String>>) -> Result<T, String> {
     let _runtime = crate::dbus::enter();
     futures_lite::future::block_on(async {
@@ -17,6 +18,7 @@ fn bounded<T>(future: impl std::future::Future<Output = Result<T, String>>) -> R
             .map_err(|_| "AT-SPI query timed out after 3 seconds".to_string())?
     })
 }
+
 async fn connect() -> Result<AccessibilityConnection, String> {
     let _ = atspi_connection::set_session_accessibility(true).await;
     if let Ok(address) = std::env::var("AT_SPI_BUS_ADDRESS") {
@@ -33,6 +35,7 @@ async fn connect() -> Result<AccessibilityConnection, String> {
             .map_err(|e| format!("AT-SPI accessibility bus unavailable: {e}"))
     }
 }
+
 async fn accessible<'a>(
     connection: &'a Connection,
     object: &'a ObjectRefOwned,
@@ -47,9 +50,11 @@ async fn accessible<'a>(
         .await
         .map_err(|e| e.to_string())
 }
+
 fn contains(value: &str, filter: &str) -> bool {
     filter.is_empty() || value.to_lowercase().contains(&filter.to_lowercase())
 }
+
 async fn find(
     connection: &AccessibilityConnection,
     selector: &UiSelector,
@@ -174,6 +179,7 @@ async fn find(
     }
     Ok(result)
 }
+
 fn unique(
     mut nodes: Vec<(ObjectRefOwned, UiNode)>,
 ) -> Result<Option<(ObjectRefOwned, UiNode)>, String> {
@@ -195,6 +201,7 @@ macro_rules! proxy {
             .map_err(|e| e.to_string())?
     };
 }
+
 pub fn applications() -> Result<Vec<String>, String> {
     bounded(async {
         let connection = connect().await?;
@@ -216,6 +223,7 @@ pub fn applications() -> Result<Vec<String>, String> {
         Ok(apps)
     })
 }
+
 pub fn inspect(selector: &UiSelector) -> Result<Vec<UiNode>, String> {
     bounded(async {
         let connection = connect().await?;
@@ -226,6 +234,7 @@ pub fn inspect(selector: &UiSelector) -> Result<Vec<UiNode>, String> {
             .collect())
     })
 }
+
 pub fn query(selector: &UiSelector, query: Query) -> Result<Evaluated, String> {
     bounded(async {
         let connection = connect().await?;
@@ -262,6 +271,7 @@ pub fn query(selector: &UiSelector, query: Query) -> Result<Evaluated, String> {
         }
     })
 }
+
 pub fn action(selector: &UiSelector, action: UiAction, value: &str) -> Result<(), String> {
     bounded(async {
         let connection = connect().await?;
@@ -323,8 +333,11 @@ pub fn action(selector: &UiSelector, action: UiAction, value: &str) -> Result<()
 }
 
 static EVENT_REVISION: std::sync::atomic::AtomicU64 = std::sync::atomic::AtomicU64::new(0);
+
 static EVENT_ERROR: std::sync::Mutex<Option<String>> = std::sync::Mutex::new(Some(String::new()));
+
 static EVENTS_STARTED: std::sync::Once = std::sync::Once::new();
+
 pub fn revision() -> Result<u64, String> {
     use std::sync::atomic::Ordering;
     EVENTS_STARTED.call_once(|| {

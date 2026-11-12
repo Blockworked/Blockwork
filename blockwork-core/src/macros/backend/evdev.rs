@@ -760,7 +760,7 @@ pub(super) fn start_capture_thread(
         let mut deferred: Vec<evdev::Device> = Vec::new();
         for (path, mut device) in evdev::enumerate() {
             let name = device.name().unwrap_or("").to_owned();
-            if name == "macros-input" || name.starts_with("Blockwork Virtual ") || is_touchpad(&device) {
+            if name == "macros-input" || crate::input::is_own_device(&name) || is_touchpad(&device) {
                 continue;
             }
             let has_keys = device
@@ -792,7 +792,7 @@ pub(super) fn start_capture_thread(
         let touchpads: Vec<_> = evdev::enumerate()
             .filter_map(|(path, device)| {
                 let name = device.name().unwrap_or("").to_owned();
-                if name == "macros-input" || name.starts_with("Blockwork Virtual ") || !is_touchpad(&device) {
+                if name == "macros-input" || crate::input::is_own_device(&name) || !is_touchpad(&device) {
                     return None;
                 }
                 tracing::info!("evdev: reading {:?} ({}) non-exclusively as a touchpad", path, name);

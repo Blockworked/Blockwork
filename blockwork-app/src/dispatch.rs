@@ -27,39 +27,6 @@ impl Backend {
             return result;
         }
         match cmd {
-            "set_controller_input_enabled" => commands::set_controller_input_enabled(
-                &self.state,
-                &self.app,
-                arg(&args, "enabled")?,
-            )
-            .map(|_| Value::Null),
-            "set_controller_deadzone" => {
-                commands::set_controller_deadzone(&self.state, &self.app, arg(&args, "value")?)
-                    .map(|_| Value::Null)
-            }
-            "set_virtual_gamepad_enabled" => commands::set_virtual_gamepad_enabled(
-                &self.state,
-                &self.app,
-                arg(&args, "enabled")?,
-            )
-            .map(|_| Value::Null),
-            "set_ui_automation_enabled" => {
-                commands::set_ui_automation_enabled(&self.state, &self.app, arg(&args, "enabled")?)
-                    .map(|_| Value::Null)
-            }
-            "list_game_controllers" => to_json(blockwork_core::input::controllers::list()?),
-            "native_ui_applications" => to_json(blockwork_core::accessibility::applications()?),
-            "native_ui_inspect" => {
-                let selector: String = arg(&args, "selector")?;
-                to_json(blockwork_core::accessibility::inspect(
-                    &blockwork_core::input::ui::UiSelector::parse(&selector)?,
-                )?)
-            }
-            "validate_touch_paths" => {
-                let sequence: String = arg(&args, "sequence")?;
-                let paths = blockwork_core::input::touch::TouchSequence::parse(&sequence)?;
-                to_json(paths)
-            }
             "get_state" => to_json(commands::get_state(&self.state)?),
             "new_macro" => {
                 let mac = blockwork_core::macros::creation::from_args(&args)?;
@@ -703,6 +670,40 @@ impl Backend {
                     &self.app,
                     layout,
                 )?)
+            }
+            // Controllers, native UI and touch.
+            "set_controller_input_enabled" => commands::set_controller_input_enabled(
+                &self.state,
+                &self.app,
+                arg(&args, "enabled")?,
+            )
+            .map(|_| Value::Null),
+            "set_controller_deadzone" => {
+                commands::set_controller_deadzone(&self.state, &self.app, arg(&args, "value")?)
+                    .map(|_| Value::Null)
+            }
+            "set_virtual_gamepad_enabled" => commands::set_virtual_gamepad_enabled(
+                &self.state,
+                &self.app,
+                arg(&args, "enabled")?,
+            )
+            .map(|_| Value::Null),
+            "set_ui_automation_enabled" => {
+                commands::set_ui_automation_enabled(&self.state, &self.app, arg(&args, "enabled")?)
+                    .map(|_| Value::Null)
+            }
+            "list_game_controllers" => to_json(blockwork_core::input::controllers::list()?),
+            "native_ui_applications" => to_json(blockwork_core::accessibility::applications()?),
+            "native_ui_inspect" => {
+                let selector: String = arg(&args, "selector")?;
+                to_json(blockwork_core::accessibility::inspect(
+                    &blockwork_core::input::ui::UiSelector::parse(&selector)?,
+                )?)
+            }
+            "validate_touch_paths" => {
+                let sequence: String = arg(&args, "sequence")?;
+                let paths = blockwork_core::input::touch::TouchSequence::parse(&sequence)?;
+                to_json(paths)
             }
             "set_start_at_startup" => {
                 let enabled: bool = arg(&args, "enabled")?;

@@ -6,8 +6,11 @@ use std::sync::{
     atomic::{AtomicBool, AtomicU64, Ordering},
 };
 use std::time::{Duration, Instant};
+
 static OWNER: Mutex<Option<u64>> = Mutex::new(None);
+
 static NEXT: AtomicU64 = AtomicU64::new(1);
+
 pub struct Lease {
     id: u64,
     backend: Arc<Mutex<dyn InputBackend>>,
@@ -17,6 +20,7 @@ pub struct Lease {
     state: GamepadState,
     cancelled: Arc<dyn Fn() -> bool + Send + Sync>,
 }
+
 fn release(
     id: u64,
     backend: &Arc<Mutex<dyn InputBackend>>,
@@ -40,6 +44,7 @@ fn release(
     }
     active.store(false, Ordering::Release);
 }
+
 impl Lease {
     pub fn acquire(
         backend: Arc<Mutex<dyn InputBackend>>,
@@ -139,6 +144,7 @@ impl Lease {
         }
     }
 }
+
 impl Drop for Lease {
     fn drop(&mut self) {
         self.quit.store(true, Ordering::Release);
