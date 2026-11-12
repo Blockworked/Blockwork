@@ -115,6 +115,17 @@ block starts. See [recording.md](recording.md).
 interface, but not yet qualified on enough real touchscreens and desktops.
 Settings > Integrations > Input diagnostics shows what this computer offers.
 
+## Testing
+
+`scripts/test-touch.sh` runs `blockwork-core/tests/touch_live.rs` against a
+fake multitouch screen and a fake `/dev/uinput` (see
+[mock-desktop.md](mock-desktop.md)), so it needs no kernel input devices:
+it records swipes, a pinch, a three-finger swipe and a tap, stops a
+recording mid-gesture, plays a two-finger path and checks every event the
+virtual touchscreen sends, and stops playback early to check that every
+finger is released. Real touchscreens and desktops still need checking by
+hand.
+
 ## For other implementations
 
 An adapter that reads or writes touch paths should:
