@@ -12,6 +12,7 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ### Added
 - Optional typing speed on the Text block: wait per character, or give the whole text a total time divided evenly across it. Without it, typing runs at the normal input speed (Linux keeps a small 0.5 ms built-in gap).
+- Search blocks also finds blocks by the words on them (labels and dropdown choices, such as "is pressed"), in any word order, and still finds something when a word has a typo.
 
 ### Fixed
 - Blocks stay under the pointer while branches resize; bracket shapes update in the same frame as a drop.
