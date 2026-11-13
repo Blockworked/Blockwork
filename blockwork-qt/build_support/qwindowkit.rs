@@ -40,6 +40,10 @@ pub fn build() -> PathBuf {
 
     config
         .out_dir(PathBuf::from(std::env::var_os("OUT_DIR").unwrap()).join("qwindowkit"))
+        // conf.cmake looks Qt up as "QT" first, which Qt6_DIR alone doesn't answer.
+        .define("QT_VERSION_MAJOR", "6")
+        .define("QT_DIR", &qt_cmake)
+        .define("CMAKE_PREFIX_PATH", Path::new(&libraries).join("cmake"))
         .define("Qt6_DIR", qt_cmake)
         .define("CMAKE_INSTALL_LIBDIR", "lib")
         .define("CMAKE_DEBUG_POSTFIX", "")

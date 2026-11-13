@@ -99,6 +99,7 @@ modules:
 
       - type: archive
         url: https://codeload.github.com/stdware/qwindowkit/tar.gz/2072958b04820e9e7629f6c40068dee0ce0e9915
+        archive-type: tar-gzip
         sha256: 82cf5292b7f39729f2d40f63cee340dd77aea3c402d04df735c23b76f98c822c
         dest: .flatpak-qwindowkit
 
