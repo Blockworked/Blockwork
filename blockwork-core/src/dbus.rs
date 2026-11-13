@@ -11,6 +11,15 @@ pub fn enter() -> Option<EnterGuard<'static>> {
     if Handle::try_current().is_ok() {
         return None;
     }
+    runtime().map(Runtime::enter)
+}
+
+/// The shared runtime itself, for connections that must outlive a caller's.
+pub fn handle() -> Option<Handle> {
+    runtime().map(|r| r.handle().clone())
+}
+
+fn runtime() -> Option<&'static Runtime> {
     static RUNTIME: OnceLock<Option<Runtime>> = OnceLock::new();
     RUNTIME
         .get_or_init(|| {
@@ -22,7 +31,6 @@ pub fn enter() -> Option<EnterGuard<'static>> {
                 .ok()
         })
         .as_ref()
-        .map(Runtime::enter)
 }
 
 #[cfg(test)]

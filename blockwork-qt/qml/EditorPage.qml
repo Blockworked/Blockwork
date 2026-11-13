@@ -128,7 +128,12 @@ Item {
     }
 
     // ---- screen picker: images for image blocks, points/regions for reporters ----
-    ScreenPicker { id: screenPicker; page: root; onFailed: message => pickError.show(message) }
+    ScreenPicker {
+        id: screenPicker; page: root
+        onFailed: message => pickError.show(message)
+        onElementList: (request, hint) => nativeUiPicker.openFor(request, hint)
+    }
+    function writeNativeUi(request, text, macroId) { return nativeUiPicker.write(request, text, macroId); }
     function startScreenPick(request) { screenPicker.startScreenPick(request); }
     function setBlockDetector(request, detector) {
         const updated = JSON.parse(JSON.stringify(request.instruction || {}));
@@ -166,7 +171,7 @@ Item {
     // same argument values and undo commands as these built-in screens.
     readonly property var blockScreens: ({
         pickController: request => controllerPicker.openFor(request),
-        pickNativeUi: request => nativeUiPicker.openFor(request),
+        pickNativeUi: request => screenPicker.startElementPick(request),
         touchPaths: request => touchPathsDialog.openFor(request),
         touchPathsValue: request => root.openTouchPathsValue(request),
         captureImage: request => root.startScreenPick(request),
@@ -757,7 +762,7 @@ Item {
         }
     }
     ControllerPickerDialog { id: controllerPicker; page: root }
-    NativeUiPickerDialog { id: nativeUiPicker; page: root }
+    NativeUiPickerDialog { id: nativeUiPicker; page: root; onPickOnScreen: request => screenPicker.startElementPick(request) }
     TouchPathsDialog { id: touchPathsDialog; page: root }
     DetectionModelDialog { id: modelDialog; page: root; onFailed: message => pickError.show(message) }
     NamePicker {

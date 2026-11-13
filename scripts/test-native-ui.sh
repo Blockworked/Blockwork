@@ -27,7 +27,7 @@ toolkit="$2"
 unset NO_AT_BRIDGE
 export BLOCKWORK_UI_FIXTURE="$toolkit"
 fixture="$(mktemp -d)"
-trap 'if [[ -n "${fixture_pid:-}" ]]; then kill "$fixture_pid" 2>/dev/null || true; wait "$fixture_pid" 2>/dev/null || true; fi; rm -rf "$fixture"' EXIT
+trap 'for pid in ${fixture_pid:-} ${wm_pid:-}; do kill "$pid" 2>/dev/null || true; wait "$pid" 2>/dev/null || true; done; rm -rf "$fixture"' EXIT
 if [[ "$toolkit" == gtk ]]; then
     export GTK_MODULES=atk-bridge
     # shellcheck disable=SC2046
@@ -40,5 +40,11 @@ else
         "$qml" "$root/blockwork-core/tests/fixtures/native-ui.qml" &
 fi
 fixture_pid=$!
+# A window manager makes the fixture the focused window, as on a desktop.
+if command -v openbox >/dev/null; then
+    openbox >/dev/null 2>&1 &
+    wm_pid=$!
+    export BLOCKWORK_UI_WM=1
+fi
 cd "$root"
 cargo test -p blockwork-core --test native_ui_live -- --ignored --nocapture --test-threads=1

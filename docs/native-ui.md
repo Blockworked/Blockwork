@@ -40,8 +40,34 @@ App and Window scopes need their filter. A selector needs at least one of
 
 A selector can also be JSON with the same keys (`{"app": "Calculator",
 "name": "Plus"}`), which allows semicolons in a value. Unknown keys are
-refused. The element picker (Pick element in the block) writes the most
-specific selector for what you choose.
+refused.
+
+The Focused scope means the window that has focus right now, as the app
+itself reports it, so it works on any desktop.
+
+## Picking an element
+
+The scan button in a native UI block hides the editor and covers the screen
+with the element picker. Point at a control in another app: it is outlined
+and named (role, app and window underneath). Click it to write a selector
+into the block, Escape or Cancel to stop, or **Search a list** to find it
+by app and name instead.
+
+The picker writes the shortest selector that finds the clicked element and
+nothing else: its ID if it has one, else its role and name, adding the
+window title only when the same control is in more than one window (titles
+often change, an open document's name for example). When nothing can tell
+it apart from a lookalike, such as two unnamed buttons, the list opens with
+that app and name so you can choose another, and says how many match. A
+window that describes none of its controls (many games and video surfaces)
+is outlined as a whole and opens the list too.
+
+To find which window is under the pointer the picker asks the window
+manager: X11, Sway, Hyprland and KDE Plasma (through a KWin script). On
+other Wayland desktops it falls back to the coordinates apps report
+themselves, which some toolkits get wrong there; the list always works. The
+overlay is see-through only where a compositor runs, so on a bare X11
+window manager use the list.
 
 ## Blocks
 
@@ -55,7 +81,9 @@ specific selector for what you choose.
 
 ## Safety rules
 
-- More than one match is an error, never a guess. Narrow the selector.
+- More than one match is an error, never a guess. If exactly one of the
+  matches is on screen (the others in a closed menu or a hidden tab), that
+  one is used. Otherwise narrow the selector.
 - Disabled elements refuse actions.
 - Password fields are never matched, listed or read.
 - **Set value** must be a finite number within the element's own minimum and
@@ -76,6 +104,9 @@ written yet; the blocks say so when run there.
 display and session bus, and runs `blockwork-core/tests/native_ui_live.rs`
 against it: queries, actions, events and every refusal above, then a stress
 pass (100 write/read pairs, four threads querying at once, the event counter
-under a burst). It needs Xvfb, `dbus-run-session`, at-spi2-core, GTK 3
+under a burst). The GTK run also scans the fixture window with the screen picker's hit
+test and checks the selectors it writes; with openbox installed the fixture
+is a focused, managed window, so the Focused scope is checked too. It needs
+Xvfb, `dbus-run-session`, at-spi2-core, GTK 3
 headers and a Qt 6 built with its AT-SPI bridge (distribution Qt is; the
 conda-forge build is not).

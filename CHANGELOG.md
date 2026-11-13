@@ -18,7 +18,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - When system starts header: runs once per login when Start at system startup is on ([docs](docs/system-startup.md)).
 - Touch gesture and touch paths blocks, with a multi-finger path editor; Linux (experimental) and Windows ([docs](docs/touch.md)).
 - Physical controller triggers and reporters, and on Linux a virtual controller for playback ([docs](docs/controllers.md)).
-- Native UI automation on Linux: read and control other apps' buttons, fields and sliders by selector ([docs](docs/native-ui.md)).
+- Native UI automation on Linux: read and control other apps' buttons, fields and sliders by selector. Pick an element by pointing at it on screen, or search a list ([docs](docs/native-ui.md)).
 - Recording can include touchscreen gestures and a controller, and opens a review before the blocks are added ([docs](docs/recording.md)).
 - Input diagnostics in Settings > Integrations, to copy into a bug report.
 - Starter templates: Controller to keyboard, Touch swipe and Startup notice.

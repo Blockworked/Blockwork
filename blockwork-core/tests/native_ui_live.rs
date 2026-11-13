@@ -197,3 +197,89 @@ fn native_ui_survives_rapid_actions_and_parallel_queries() {
     // The override is process-wide and set once, so the folder may be another test's.
     let _ = std::fs::remove_dir_all(directory);
 }
+
+#[test]
+#[ignore = "requires the isolated GTK or Qt fixture; use scripts/test-native-ui.sh"]
+fn picking_from_the_screen_finds_elements_and_writes_selectors() {
+    let (directory, app) = start();
+    let deadline = Instant::now() + Duration::from_secs(10);
+    let window = loop {
+        let list = blockwork_core::window::stacked().unwrap_or_default();
+        if let Some(w) = list.into_iter().find(|w| w.title.contains("fixture")) {
+            break w;
+        }
+        assert!(Instant::now() < deadline, "fixture window isn't on screen");
+        std::thread::sleep(Duration::from_millis(100));
+    };
+    // Scan the window for every element the picker can land on.
+    let mut points: Vec<(String, String, f64, f64)> = vec![];
+    let b = window.bounds;
+    let mut y = b.y + 3.0;
+    while y < b.y + b.height {
+        let mut x = b.x + 3.0;
+        while x < b.x + b.width {
+            if let Some(hit) = accessibility::element_at(x, y, "").unwrap() {
+                assert!(
+                    hit.x <= x && x < hit.x + hit.width && hit.y <= y && y < hit.y + hit.height,
+                    "{hit:?} doesn't cover {x},{y}"
+                );
+                if !points.iter().any(|p| p.0 == hit.name && p.1 == hit.role) {
+                    points.push((hit.name, hit.role, x, y));
+                }
+            }
+            x += 12.0;
+        }
+        y += 6.0;
+    }
+    let at = |name: &str| {
+        points
+            .iter()
+            .find(|p| p.0 == name)
+            .map(|p| (p.2, p.3))
+            .unwrap_or_else(|| panic!("never hovered {name}: {points:?}"))
+    };
+    for name in ["Activate", "Status", "Input", "Amount", "Disabled"] {
+        at(name);
+    }
+    assert!(
+        !points
+            .iter()
+            .any(|p| p.0.contains("Secret") || p.0.contains("protected")),
+        "a password field's name leaked: {points:?}"
+    );
+    let (x, y) = at("Activate");
+    let pick = accessibility::pick(x, y, "").unwrap().unwrap();
+    let node = pick.node.unwrap();
+    assert_eq!(node.matches, 1);
+    assert_eq!(
+        node.text,
+        format!("app={app}; name=Activate; role=push button")
+    );
+    assert_eq!(
+        accessibility::query(&UiSelector::parse(&node.text).unwrap(), Query::Exists).unwrap(),
+        Evaluated::Bool(true)
+    );
+    // Two identical buttons can't be told apart; the pick says so.
+    let (x, y) = at("Duplicate");
+    let node = accessibility::pick(x, y, "")
+        .unwrap()
+        .unwrap()
+        .node
+        .unwrap();
+    assert_eq!(node.matches, 2, "{node:?}");
+    // Ignoring the window by title finds nothing there.
+    assert!(
+        accessibility::element_at(x, y, &window.title)
+            .unwrap()
+            .is_none()
+    );
+    if std::env::var("BLOCKWORK_UI_WM").is_ok() {
+        let focused = UiSelector::parse("scope=Focused; name=Activate").unwrap();
+        assert_eq!(
+            accessibility::query(&focused, Query::Exists).unwrap(),
+            Evaluated::Bool(true)
+        );
+    }
+    eprintln!("picker points: {points:?}");
+    let _ = std::fs::remove_dir_all(directory);
+}
