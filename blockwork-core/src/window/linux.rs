@@ -1,4 +1,4 @@
-use super::{Action, ActiveWindow, MatchBy, Rect, no_match};
+use super::{Action, ActiveWindow, MatchBy, Rect, ScreenWindow, no_match};
 use crate::flatpak::host_command;
 
 enum Desktop {
@@ -105,6 +105,15 @@ pub(super) fn exists(pattern: &str) -> Result<bool, String> {
         Desktop::Sway => Ok(sway::find(pattern, MatchBy::Any).is_ok()),
         Desktop::Kde => Ok(kde::search(pattern, MatchBy::Any)?.is_some()),
         Desktop::X11 => Ok(x11::X11::connect()?.find(pattern, MatchBy::Any).is_ok()),
+    }
+}
+
+pub(super) fn stacked() -> Result<Vec<ScreenWindow>, String> {
+    match desktop()? {
+        Desktop::Hyprland => hypr::stacked(),
+        Desktop::Sway => sway::stacked(),
+        Desktop::Kde => kde::stacked(),
+        Desktop::X11 => x11::X11::connect()?.stacked(),
     }
 }
 
@@ -257,6 +266,58 @@ mod hypr {
         sized(x, y, w, h)
     }
 
+    /// Clients on a shown workspace, floating ones first, then by focus.
+    pub(super) fn stacked() -> Result<Vec<ScreenWindow>, String> {
+        let monitors = json("hyprctl", &["monitors", "-j"])?;
+        let mut shown = Vec::new();
+        for m in monitors.as_array().into_iter().flatten() {
+            for key in ["activeWorkspace", "specialWorkspace"] {
+                if let Some(id) = m
+                    .get(key)
+                    .and_then(|w| w.get("id"))
+                    .and_then(|i| i.as_i64())
+                    && id != 0
+                {
+                    shown.push(id);
+                }
+            }
+        }
+        let clients = json("hyprctl", &["clients", "-j"])?;
+        let mut list: Vec<&serde_json::Value> = clients
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|c| c.get("mapped").and_then(|m| m.as_bool()) != Some(false))
+            .filter(|c| {
+                c.get("workspace")
+                    .and_then(|w| w.get("id"))
+                    .and_then(|i| i.as_i64())
+                    .is_some_and(|id| shown.contains(&id))
+            })
+            .collect();
+        let rank = |c: &serde_json::Value| {
+            let floating = c.get("floating").and_then(|f| f.as_bool()) == Some(true);
+            let full = fullscreen(c) > 0;
+            let focus = c
+                .get("focusHistoryID")
+                .and_then(|f| f.as_i64())
+                .unwrap_or(i64::MAX);
+            (!full, !floating, focus)
+        };
+        list.sort_by_key(|c| rank(c));
+        Ok(list
+            .into_iter()
+            .filter_map(|c| {
+                Some(ScreenWindow {
+                    title: text(c, "title"),
+                    app: text(c, "class"),
+                    pid: c.get("pid").and_then(|p| p.as_u64()).unwrap_or(0) as u32,
+                    bounds: bounds(c).ok()?,
+                })
+            })
+            .collect())
+    }
+
     pub(super) fn place(
         client: &serde_json::Value,
         resize: bool,
@@ -316,6 +377,49 @@ pub(super) mod sway {
         let mut out = Vec::new();
         walk(&tree, "", &mut out);
         Ok(out)
+    }
+
+    /// Windows on shown workspaces: fullscreen, then floating (last drawn
+    /// on top), then tiled. `visible` can't be used, since the picker's own
+    /// fullscreen overlay hides everything under it.
+    pub(super) fn stacked() -> Result<Vec<ScreenWindow>, String> {
+        let workspaces = json("swaymsg", &["-t", "get_workspaces", "-r"])?;
+        let shown: Vec<String> = workspaces
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter(|w| w.get("visible").and_then(|v| v.as_bool()) == Some(true))
+            .map(|w| text(w, "name"))
+            .collect();
+        let tree = json("swaymsg", &["-t", "get_tree", "-r"])?;
+        let mut all = Vec::new();
+        walk(&tree, "", &mut all);
+        let mut list: Vec<(usize, serde_json::Value)> = all
+            .into_iter()
+            .filter(|n| shown.iter().any(|w| *w == text(n, "workspace")))
+            .enumerate()
+            .collect();
+        let rank = |i: usize, n: &serde_json::Value| {
+            let full = number(n, "fullscreen_mode") > 0.0;
+            let floating = n
+                .get("type")
+                .and_then(|t| t.as_str())
+                .is_some_and(|t| t == "floating_con");
+            (!full, !floating, std::cmp::Reverse(i))
+        };
+        list.sort_by_key(|(i, n)| rank(*i, n));
+        Ok(list
+            .into_iter()
+            .filter_map(|(_, n)| {
+                let info = info(&n);
+                Some(ScreenWindow {
+                    title: info.title,
+                    app: info.app,
+                    pid: n.get("pid").and_then(|p| p.as_u64()).unwrap_or(0) as u32,
+                    bounds: bounds(&n).ok()?,
+                })
+            })
+            .collect())
     }
 
     pub(super) fn info(node: &serde_json::Value) -> ActiveWindow {
@@ -507,6 +611,42 @@ pub(super) mod kde {
         parse_rect(&crate::kwin::script(&script)?)
     }
 
+    /// KWin's own stacking order, topmost first.
+    pub(super) fn stacked() -> Result<Vec<ScreenWindow>, String> {
+        let script = "const out = [];\n\
+             const list = workspace.stackingOrder;\n\
+             for (let i = list.length - 1; i >= 0; i--) {\n\
+               const w = list[i];\n\
+               if (!w || w.minimized || w.deleted || !(w.normalWindow || w.dialog || w.utility)) continue;\n\
+               const desks = w.desktops || [];\n\
+               if (!w.onAllDesktops && desks.length && desks.indexOf(workspace.currentDesktop) < 0) continue;\n\
+               const g = w.clientGeometry;\n\
+               out.push({title: w.caption, app: w.resourceClass, pid: w.pid, x: g.x, y: g.y, width: g.width, height: g.height});\n\
+             }\n\
+             reply(JSON.stringify(out));";
+        let reply: serde_json::Value = serde_json::from_str(&crate::kwin::script(script)?)
+            .map_err(|e| format!("unexpected KWin window list: {e}"))?;
+        Ok(reply
+            .as_array()
+            .into_iter()
+            .flatten()
+            .filter_map(|w| {
+                Some(ScreenWindow {
+                    title: text(w, "title"),
+                    app: text(w, "app"),
+                    pid: w.get("pid").and_then(|p| p.as_u64()).unwrap_or(0) as u32,
+                    bounds: sized(
+                        number(w, "x"),
+                        number(w, "y"),
+                        number(w, "width"),
+                        number(w, "height"),
+                    )
+                    .ok()?,
+                })
+            })
+            .collect())
+    }
+
     /// "x,y,width,height", as the client geometry script replies.
     pub(crate) fn parse_rect(text: &str) -> Result<Rect, String> {
         let n: Vec<f64> = text
@@ -541,7 +681,7 @@ pub(super) mod kde {
 }
 
 pub(super) mod x11 {
-    use super::{Action, ActiveWindow, MatchBy, Rect, no_match, sized};
+    use super::{Action, ActiveWindow, MatchBy, Rect, ScreenWindow, no_match, sized};
     use x11rb::connection::Connection;
     use x11rb::protocol::xproto::{AtomEnum, ClientMessageEvent, ConnectionExt, EventMask, Window};
     use x11rb::rust_connection::RustConnection;
@@ -638,6 +778,64 @@ pub(super) mod x11 {
                 .into_iter()
                 .find(|w| self.info(*w).matches(pattern, by))
                 .ok_or_else(|| no_match(pattern))
+        }
+
+        /// Mapped client windows, topmost first. Without a window manager's
+        /// stacking list, the root's own children (bottom to top) stand in.
+        pub(crate) fn stacked(&self) -> Result<Vec<ScreenWindow>, String> {
+            use x11rb::protocol::xproto::MapState;
+            let mut list = self
+                .windows_in("_NET_CLIENT_LIST_STACKING")
+                .unwrap_or_default();
+            if list.is_empty() {
+                list = self
+                    .conn
+                    .query_tree(self.root)
+                    .map_err(|e| e.to_string())?
+                    .reply()
+                    .map_err(|e| e.to_string())?
+                    .children;
+            }
+            let pid_atom = self.atom("_NET_WM_PID")?;
+            let hidden = self.atom("_NET_WM_STATE_HIDDEN").unwrap_or(0);
+            let state = self.atom("_NET_WM_STATE").unwrap_or(0);
+            let mut out = Vec::new();
+            for window in list.into_iter().rev() {
+                let viewable = self
+                    .conn
+                    .get_window_attributes(window)
+                    .ok()
+                    .and_then(|c| c.reply().ok())
+                    .is_some_and(|a| a.map_state == MapState::VIEWABLE);
+                if !viewable {
+                    continue;
+                }
+                let states = self
+                    .property(window, state, AtomEnum::ATOM.into())
+                    .unwrap_or_default();
+                if states
+                    .chunks_exact(4)
+                    .any(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]]) == hidden)
+                {
+                    continue;
+                }
+                let Ok(bounds) = self.bounds(window) else {
+                    continue;
+                };
+                let pid = self
+                    .property(window, pid_atom, AtomEnum::CARDINAL.into())
+                    .filter(|v| v.len() >= 4)
+                    .map(|v| u32::from_ne_bytes([v[0], v[1], v[2], v[3]]))
+                    .unwrap_or(0);
+                let info = self.info(window);
+                out.push(ScreenWindow {
+                    title: info.title,
+                    app: info.app,
+                    pid,
+                    bounds,
+                });
+            }
+            Ok(out)
         }
 
         /// An EWMH request to the window manager about `window`.

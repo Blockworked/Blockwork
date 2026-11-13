@@ -108,6 +108,30 @@ pub fn exists(pattern: &str) -> Result<bool, String> {
     linux::exists(pattern.trim())
 }
 
+/// A window on screen, for finding what is under a point.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ScreenWindow {
+    pub title: String,
+    pub app: String,
+    /// 0 when the compositor doesn't say.
+    pub pid: u32,
+    /// The client area, in screen coordinates.
+    pub bounds: Rect,
+}
+
+impl ScreenWindow {
+    pub fn contains(&self, x: f64, y: f64) -> bool {
+        let b = &self.bounds;
+        x >= b.x && y >= b.y && x < b.x + b.width && y < b.y + b.height
+    }
+}
+
+/// Every visible window on the current workspace(s), topmost first.
+#[cfg(target_os = "linux")]
+pub fn stacked() -> Result<Vec<ScreenWindow>, String> {
+    linux::stacked()
+}
+
 #[cfg(windows)]
 pub use windows::{act, active, bounds, exists, place};
 
