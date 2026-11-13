@@ -18,9 +18,22 @@ QtObject {
     readonly property BlockHelp help: BlockHelp {}
 
     function numberValue(n) { return { kind: "Number", value: n }; }
+    // "Save · Text Editor" for a selector, in either of its spellings.
     function nativeUiLabel(text) {
-        try { const selector=JSON.parse(text); return (selector.name || selector.id || selector.role || qsTr("Choose element")).slice(0, 90); }
-        catch (e) { return text.length > 90 ? text.slice(0,90) + "…" : text; }
+        text = String(text || "");
+        let selector = {};
+        try { selector = JSON.parse(text) || {}; }
+        catch (e) {
+            for (const part of text.split(";")) {
+                const at = part.indexOf("=");
+                if (at > 0) selector[part.slice(0, at).trim()] = part.slice(at + 1).trim();
+            }
+        }
+        const what = selector.name || selector.id || selector.role;
+        if (!what) return text ? (text.length > 90 ? text.slice(0, 90) + "…" : text) : qsTr("Choose element");
+        const where = selector.app || selector.window || qsTr("focused window");
+        const label = what + " · " + where;
+        return label.length > 90 ? label.slice(0, 90) + "…" : label;
     }
     function textValue(t) { return { kind: "Text", value: t }; }
     function firstGlobalName() { return (page.appState.globals || []).length ? page.appState.globals[0].name : ""; }

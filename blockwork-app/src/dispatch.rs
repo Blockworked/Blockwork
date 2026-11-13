@@ -55,6 +55,22 @@ impl Backend {
                     &blockwork_core::input::ui::UiSelector::parse(&selector)?,
                 )?)
             }
+            "native_ui_element_at" => {
+                let ignore: Option<String> = arg(&args, "ignore")?;
+                to_json(blockwork_core::accessibility::element_at(
+                    arg(&args, "x")?,
+                    arg(&args, "y")?,
+                    ignore.as_deref().unwrap_or_default(),
+                )?)
+            }
+            "native_ui_pick" => {
+                let ignore: Option<String> = arg(&args, "ignore")?;
+                to_json(blockwork_core::accessibility::pick(
+                    arg(&args, "x")?,
+                    arg(&args, "y")?,
+                    ignore.as_deref().unwrap_or_default(),
+                )?)
+            }
             "validate_touch_paths" => {
                 let sequence: String = arg(&args, "sequence")?;
                 let paths = blockwork_core::input::touch::TouchSequence::parse(&sequence)?;

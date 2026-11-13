@@ -11,6 +11,8 @@ Item {
     required property Item page
     // A pick went wrong; the page shows `message`.
     signal failed(var message)
+    // The element picker needs the list instead: `hint` is {app, name, notice} or null.
+    signal elementList(var request, var hint)
 
     // { kind: "image" | "region", strandId, path, instruction }, { kind: "value", location, value, point }
     property var pickRequest: null
@@ -42,6 +44,46 @@ Item {
         else if (savedVisibility === Window.FullScreen) win.showFullScreen();
         else win.showNormal();
         win.raise(); win.requestActivate();
+    }
+    // Picks another app's element for a native UI block, in the macro it was asked from.
+    property string elementMacro: ""
+    readonly property alias elementOverlay: elementOverlay
+    function startElementPick(request) {
+        const win = Window.window;
+        if (pickRequest || !win) return;
+        pickRequest = request;
+        elementMacro = page.macro ? page.macro.id : "";
+        savedVisibility = win.visibility;
+        win.hide();
+        picker.afterUnmap(() => {
+            elementOverlay.begin();
+            elementOverlay.automationOff = !(page.appState && page.appState.ui_automation_enabled === true);
+        });
+    }
+    ElementPickerOverlay {
+        id: elementOverlay
+        call: (command, args, done) => page.daemonCall(command, args, done)
+        onCanceled: { picker.pickRequest = null; picker.restoreWindow(); }
+        onTurnOnAutomation: page.invoke("set_ui_automation_enabled", { enabled: true })
+        onSearchInstead: {
+            const request = picker.pickRequest;
+            picker.pickRequest = null; picker.restoreWindow();
+            picker.elementList(request, null);
+        }
+        onPicked: pick => {
+            const request = picker.pickRequest;
+            picker.pickRequest = null; picker.restoreWindow();
+            const node = pick.node;
+            if (node && node.matches === 1) {
+                const problem = page.writeNativeUi(request, node.text, picker.elementMacro);
+                if (problem) picker.failed(problem);
+                return;
+            }
+            const hit = pick.hit;
+            picker.elementList(request, node
+                ? { app: node.app, name: node.name, notice: qsTr("%1 elements in %2 look the same as the one you clicked. Choose one that can be told apart, or give the element a name in its app.").arg(node.matches).arg(node.app) }
+                : { app: "", name: "", notice: qsTr("%1 doesn't describe that part of its window to Blockwork. If the app is listed, its elements may still be found here.").arg(hit.app || hit.window) });
+        }
     }
     ScreenOverlay {
         id: screenOverlay

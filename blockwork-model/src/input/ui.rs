@@ -90,6 +90,41 @@ impl UiSelector {
         }
         Ok(result)
     }
+    /// The readable `key=value; ...` form, or JSON when a value holds a
+    /// semicolon. Scope is left to what the filters imply, so it must be App
+    /// or Window here (a Focused selector is written with `scope=Focused`).
+    pub fn to_text(&self) -> String {
+        let fields = [
+            ("app", &self.app),
+            ("window", &self.window),
+            ("name", &self.name),
+            ("role", &self.role),
+            ("id", &self.id),
+        ];
+        let plain = fields
+            .iter()
+            .all(|(_, v)| !v.contains(';') && v.trim() == v.as_str());
+        if !plain {
+            return serde_json::to_string(self).unwrap_or_default();
+        }
+        let mut parts = vec![];
+        let implied = if !self.window.is_empty() {
+            UiScope::Window
+        } else if !self.app.is_empty() {
+            UiScope::App
+        } else {
+            UiScope::Focused
+        };
+        if self.scope != implied && !(self.scope == UiScope::App && implied == UiScope::Window) {
+            parts.push(format!("scope={:?}", self.scope));
+        }
+        for (key, value) in fields {
+            if !value.is_empty() {
+                parts.push(format!("{key}={value}"));
+            }
+        }
+        parts.join("; ")
+    }
     pub fn require_target(&self) -> Result<(), String> {
         if self.name.is_empty() && self.role.is_empty() && self.id.is_empty() {
             Err("Choose an element by name, role or accessible ID".into())
@@ -121,6 +156,25 @@ mod tests {
         );
         assert!(
             UiSelector::parse(r#"{"name":"Save; as","role":"push button","extra":1}"#).is_err()
+        );
+        for text in [
+            "app=Calculator; name=Plus; role=push button",
+            "window=Preferences; name=Dark mode",
+            "scope=Focused; name=Save",
+            "scope=App; app=Editor; window=Doc; id=save",
+            r#"{"scope":"App","app":"A","window":"","name":"Save; as","role":"","id":""}"#,
+        ] {
+            let selector = UiSelector::parse(text).unwrap();
+            let again = UiSelector::parse(&selector.to_text()).unwrap();
+            assert_eq!(selector.app, again.app);
+            assert_eq!(selector.name, again.name);
+            assert_eq!(selector.window, again.window);
+        }
+        assert_eq!(
+            UiSelector::parse("scope=App; app=Editor; name=Save")
+                .unwrap()
+                .to_text(),
+            "app=Editor; name=Save"
         );
     }
 }

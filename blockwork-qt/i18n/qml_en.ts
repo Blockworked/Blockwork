@@ -45,7 +45,7 @@
 <context>
     <name>EditorPage</name>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="489"/>
+        <location filename="../qml/EditorPage.qml" line="494"/>
         <source>Paused before &quot;%1&quot; (%n strand(s) waiting)</source>
         <translation>
             <numerusform>Paused before &quot;%1&quot; (%n strand waiting)</numerusform>
@@ -53,7 +53,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="643"/>
+        <location filename="../qml/EditorPage.qml" line="648"/>
         <source>Delete %n block(s)</source>
         <translation>
             <numerusform>Delete %n block</numerusform>
@@ -107,25 +107,25 @@
     <message numerus="yes">
         <location filename="../qml/RecordingReviewDialog.qml" line="62"/>
         <source>Touch with %n finger(s) for %1 ms</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Touch with %n finger for %1 ms</numerusform>
+            <numerusform>Touch with %n fingers for %1 ms</numerusform>
         </translation>
     </message>
     <message numerus="yes">
         <location filename="../qml/RecordingReviewDialog.qml" line="90"/>
         <source>%n block(s) recorded into %1, taking %2 s to play.</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>%n block recorded into %1, taking %2 s to play.</numerusform>
+            <numerusform>%n blocks recorded into %1, taking %2 s to play.</numerusform>
         </translation>
     </message>
     <message numerus="yes">
         <location filename="../qml/RecordingReviewDialog.qml" line="121"/>
         <source>Release %n key(s) or button(s) still held at the end</source>
-        <translation type="unfinished">
-            <numerusform></numerusform>
-            <numerusform></numerusform>
+        <translation>
+            <numerusform>Release %n key or button still held at the end</numerusform>
+            <numerusform>Release %n keys or buttons still held at the end</numerusform>
         </translation>
     </message>
 </context>
