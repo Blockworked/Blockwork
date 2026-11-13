@@ -62,4 +62,38 @@ Get-ChildItem -LiteralPath (Join-Path $qtRoot "bin") -Filter '*.dll' -File |
   Where-Object { $_.Name -notmatch 'd\.dll$' } |
   Copy-Item -Destination $Destination -Force
 
+# The MSVC runtime (vcruntime140, msvcp140, ...) isn't on every Windows
+# install, so ship it app-local. Visual Studio's redist folder has the DLLs.
+function Find-CompilerRuntime([string]$Arch) {
+  $roots = @()
+  if ($env:VCToolsRedistDir) { $roots += $env:VCToolsRedistDir }
+  $vswhere = Join-Path ${env:ProgramFiles(x86)} "Microsoft Visual Studio/Installer/vswhere.exe"
+  if (Test-Path $vswhere) {
+    $vs = & $vswhere -latest -products * -requires Microsoft.VisualStudio.Component.VC.Tools.x86.x64 -property installationPath
+    if ($vs) {
+      Get-ChildItem -LiteralPath (Join-Path $vs "VC/Redist/MSVC") -Directory -ErrorAction SilentlyContinue |
+        Where-Object { $_.Name -match '^\d+(\.\d+)+$' } |
+        Sort-Object { [version]$_.Name } -Descending |
+        ForEach-Object { $roots += $_.FullName }
+    }
+  }
+  foreach ($candidate in $roots) {
+    $crt = Get-ChildItem -LiteralPath (Join-Path $candidate $Arch) -Directory -Filter 'Microsoft.VC*.CRT' -ErrorAction SilentlyContinue |
+      Select-Object -First 1
+    if ($crt) { return $crt.FullName }
+  }
+  return $null
+}
+
+$crtArch = if ($Target -like "aarch64-*") { "arm64" } else { "x64" }
+$crtDir = Find-CompilerRuntime $crtArch
+if ($crtDir) {
+  Get-ChildItem -LiteralPath $crtDir -Filter '*.dll' -File | Copy-Item -Destination $Destination -Force
+  Write-Host "Bundled MSVC runtime from $crtDir"
+} elseif ($env:GITHUB_ACTIONS) {
+  throw "MSVC runtime DLLs for $crtArch were not found; the build would not start on a clean Windows install"
+} else {
+  Write-Warning "MSVC runtime DLLs for $crtArch were not found; the staged app needs the Visual C++ Redistributable installed"
+}
+
 Write-Host "Staged Qt application at $Destination"

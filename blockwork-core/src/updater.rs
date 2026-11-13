@@ -18,11 +18,6 @@ use std::path::{Path, PathBuf};
 
 const REPO_OWNER: &str = "Blockworked";
 const REPO_NAME: &str = "blockwork";
-// Must match the artifact_name values produced by .github/workflows/release.yml.
-#[cfg(windows)]
-const ASSET_NAME: &str = "blockwork-windows-x86_64.exe";
-#[cfg(windows)]
-const INSTALLER_ASSET_NAME: &str = "blockwork-windows-x86_64-setup.exe";
 
 #[derive(Debug, Clone)]
 pub struct UpdateInfo {
@@ -40,10 +35,19 @@ fn macos_asset_name() -> String {
     )
 }
 
+/// Installer for the current architecture, e.g. `blockwork-windows-arm64-setup.exe`.
+#[cfg(any(windows, test))]
+fn windows_installer_name() -> String {
+    format!(
+        "blockwork-windows-{}-setup.exe",
+        release_arch_name(std::env::consts::ARCH)
+    )
+}
+
 /// Release arch naming follows .github/workflows/release.yml, which uses
 /// Go-style names: `std::env::consts::ARCH` is `aarch64` on Apple Silicon,
 /// but that artifact is named `blockwork-macos-arm64`.
-#[cfg(any(target_os = "macos", test))]
+#[cfg(any(target_os = "macos", windows, test))]
 fn release_arch_name(rust_arch: &str) -> &str {
     match rust_arch {
         "aarch64" => "arm64",
@@ -73,8 +77,6 @@ fn build_updater(current_version: &str) -> Result<Update, String> {
         .show_download_progress(false)
         .show_output(false)
         .no_confirm(true);
-    #[cfg(windows)]
-    configure.bin_path_in_archive(ASSET_NAME);
     configure.build().map_err(|err| err.to_string())
 }
 
@@ -122,15 +124,16 @@ pub fn apply_update(current_version: &str) -> Result<PathBuf, String> {
     let release = releases
         .latest()
         .ok_or_else(|| "no releases found".to_string())?;
+    let installer_name = windows_installer_name();
     let installer_asset = release
         .assets()
         .iter()
-        .find(|asset| asset.name() == INSTALLER_ASSET_NAME)
-        .ok_or_else(|| format!("no '{INSTALLER_ASSET_NAME}' asset in the latest release"))?;
+        .find(|asset| asset.name() == installer_name)
+        .ok_or_else(|| format!("no '{installer_name}' asset in the latest release"))?;
 
     let temp_dir = std::env::temp_dir().join("blockwork-update");
     fs::create_dir_all(&temp_dir).map_err(|err| err.to_string())?;
-    let installer_path = temp_dir.join(INSTALLER_ASSET_NAME);
+    let installer_path = temp_dir.join(&installer_name);
     let mut installer_file = fs::File::create(&installer_path).map_err(|err| err.to_string())?;
 
     // GitHub's API asset endpoint returns a JSON description instead of binary content
@@ -590,6 +593,15 @@ mod tests {
                 release_arch_name(std::env::consts::ARCH)
             )
         );
+    }
+
+    #[test]
+    fn windows_installer_name_matches_release_artifact() {
+        let expected = match std::env::consts::ARCH {
+            "aarch64" => "blockwork-windows-arm64-setup.exe",
+            _ => "blockwork-windows-x86_64-setup.exe",
+        };
+        assert_eq!(windows_installer_name(), expected);
     }
 
     #[test]
