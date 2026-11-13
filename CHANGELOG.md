@@ -18,6 +18,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Blocks keep their blue outline when a drag ends.
 - Drag previews line up when moving blocks between branches of a bracket block.
 - Details opens for custom blocks inside fields, including If conditions.
+- A trigger that fires again while its macro is still running (a hotkey toggle around a forever loop) now sees the variables the running strands set, so a second press can switch the toggle off.
 
 ## [0.6.1] - 2026-11-09
 
