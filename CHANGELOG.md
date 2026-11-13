@@ -19,6 +19,8 @@ section below as the GitHub release notes, followed by the downloads table.
 - Drag previews line up when moving blocks between branches of a bracket block.
 - Details opens for custom blocks inside fields, including If conditions.
 - A trigger that fires again while its macro is still running (a hotkey toggle around a forever loop) now sees the variables the running strands set, so a second press can switch the toggle off.
+- The portable Windows zip unzips to one Blockwork folder that runs on a clean install: it now carries the Microsoft Visual C++ runtime beside the Qt runtime, and every release build checks that the unzipped exe starts.
+- The Windows updater downloads the installer for the PC's own architecture, so Windows on Arm updates to the arm64 build.
 
 ## [0.6.1] - 2026-11-09
 

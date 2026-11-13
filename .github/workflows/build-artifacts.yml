@@ -111,7 +111,7 @@ jobs:
         shell: pwsh
         run: |
           ./scripts/deploy-qt-windows.ps1 -Target ${{ matrix.target }}
-          Compress-Archive -Path "dist/windows-${{ matrix.target }}/*" -DestinationPath "${{ matrix.artifact_name }}" -Force
+          ./scripts/package-portable-windows.ps1 -Target ${{ matrix.target }} -Output "${{ matrix.artifact_name }}"
 
       - name: Upload artifact
         if: runner.os == 'Windows'
