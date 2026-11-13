@@ -80,6 +80,8 @@ pub(crate) fn fire_with_input(
             .map(|list| (list.name.clone(), list.items.clone()))
             .collect(),
     ));
+    // A run with its own input keeps its own stores, so two can't swap inputs.
+    let shared = input.is_none();
     std::thread::spawn(move || {
         // Looked up here, off the watcher's thread, which may hold the lock.
         let (source, max_secs, max_loops, block_table, settings) = {
@@ -109,6 +111,11 @@ pub(crate) fn fire_with_input(
             return;
         }
         run_log::run_event(&source, run_log::RunEvent::Fired, message);
+        let (variables, lists) = if shared {
+            live_stores::join(&macro_id, variables, lists)
+        } else {
+            (variables, lists)
+        };
         let run_flag = run_registry::begin_macro_run(&macro_id);
         let done = limit_run(&source, &run_flag, max_secs);
         run_fired_strand(
@@ -130,7 +137,105 @@ pub(crate) fn fire_with_input(
             vars.insert(name, value);
         }
         persist_fired_variables(&shared_state, &app, &macro_id, &variables, &lists);
+        if shared {
+            live_stores::leave(&macro_id);
+        }
     });
+}
+
+/// Variables and lists of a macro's fired runs that are still going. A
+/// trigger that fires while another run of the same macro is in flight (a
+/// toggle hotkey pressed again while its loop runs) joins that run's stores
+/// rather than starting from the saved values, which the other run hasn't
+/// written back yet.
+mod live_stores {
+    use super::{ListStore, VariableStore};
+    use std::collections::HashMap;
+    use std::sync::{Arc, Mutex, OnceLock};
+
+    struct Live {
+        variables: VariableStore,
+        lists: ListStore,
+        runs: usize,
+    }
+
+    fn live() -> &'static Mutex<HashMap<String, Live>> {
+        static LIVE: OnceLock<Mutex<HashMap<String, Live>>> = OnceLock::new();
+        LIVE.get_or_init(Default::default)
+    }
+
+    /// The stores to run `macro_id` with: those of a run already in flight,
+    /// or `fresh` when there is none. Pair with [`leave`].
+    pub(super) fn join(
+        macro_id: &str,
+        variables: VariableStore,
+        lists: ListStore,
+    ) -> (VariableStore, ListStore) {
+        let Ok(mut live) = live().lock() else {
+            return (variables, lists);
+        };
+        let entry = live.entry(macro_id.to_string()).or_insert(Live {
+            variables,
+            lists,
+            runs: 0,
+        });
+        entry.runs += 1;
+        (Arc::clone(&entry.variables), Arc::clone(&entry.lists))
+    }
+
+    /// Ends one [`join`]; the last run out drops the stores.
+    pub(super) fn leave(macro_id: &str) {
+        let Ok(mut live) = live().lock() else { return };
+        if let Some(entry) = live.get_mut(macro_id) {
+            entry.runs = entry.runs.saturating_sub(1);
+            if entry.runs == 0 {
+                live.remove(macro_id);
+            }
+        }
+    }
+
+    #[cfg(test)]
+    mod tests {
+        use super::*;
+        use blockwork_core::input::value::Evaluated;
+
+        fn stores(toggle: bool) -> (VariableStore, ListStore) {
+            let vars = HashMap::from([("toggle".to_string(), Evaluated::Bool(toggle))]);
+            (Arc::new(Mutex::new(vars)), Arc::default())
+        }
+
+        #[test]
+        fn a_second_fire_sees_the_running_one_s_variables() {
+            let id = "live-stores-test";
+            let (first, first_lists) = {
+                let (v, l) = stores(false);
+                join(id, v, l)
+            };
+            first
+                .lock()
+                .unwrap()
+                .insert("toggle".into(), Evaluated::Bool(true));
+            let (second, _) = {
+                let (v, l) = stores(false);
+                join(id, v, l)
+            };
+            assert!(Arc::ptr_eq(&first, &second));
+            assert_eq!(
+                second.lock().unwrap().get("toggle"),
+                Some(&Evaluated::Bool(true))
+            );
+            leave(id);
+            leave(id);
+            // Once both ended, the next fire starts from what it's given.
+            let (third, third_lists) = {
+                let (v, l) = stores(false);
+                join(id, v, l)
+            };
+            assert!(!Arc::ptr_eq(&first, &third));
+            assert!(!Arc::ptr_eq(&first_lists, &third_lists));
+            leave(id);
+        }
+    }
 }
 
 /// Stops the run behind `flag` once it has lasted `secs` seconds (0 means
