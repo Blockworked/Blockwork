@@ -3,7 +3,7 @@
         "type": "git",
         "url": "https://github.com/blockworked/blockstitch",
         "commit": "23f26f682f729094710ed4e29efb6ac13980841f",
-        "dest": "flatpak-cargo/git/blockstitch-b99e4ea"
+        "dest": "flatpak-cargo/git/blockstitch-23f26f6"
     },
     {
         "type": "git",
@@ -618,7 +618,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-b99e4ea/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-23f26f6/crates/blockstitch-core\" \"cargo/vendor/blockstitch-core\""
         ]
     },
     {
@@ -636,7 +636,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-b99e4ea/crates/blockstitch-ffi\" \"cargo/vendor/blockstitch-ffi\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-23f26f6/crates/blockstitch-ffi\" \"cargo/vendor/blockstitch-ffi\""
         ]
     },
     {
@@ -654,7 +654,7 @@
     {
         "type": "shell",
         "commands": [
-            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-b99e4ea/.\" \"cargo/vendor/blockstitch-qml\""
+            "cp -r --reflink=auto \"flatpak-cargo/git/blockstitch-23f26f6/.\" \"cargo/vendor/blockstitch-qml\""
         ]
     },
     {
