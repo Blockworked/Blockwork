@@ -23,6 +23,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - A trigger that fires again while its macro is still running (a hotkey toggle around a forever loop) now sees the variables the running strands set, so a second press can switch the toggle off.
 - The portable Windows zip unzips to one Blockwork folder that runs on a clean install: it now carries the Microsoft Visual C++ runtime beside the Qt runtime, and every release build checks that the unzipped exe starts.
 - The Windows updater downloads the installer for the PC's own architecture, so Windows on Arm updates to the arm64 build.
+- Number fields (such as the typing speed's milliseconds or the numbers in Add and Divide) no longer show the bigger text box button, since they can't hold more than one line.
 
 ## [0.6.1] - 2026-11-09
 
