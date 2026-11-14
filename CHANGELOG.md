@@ -8,7 +8,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Tag releases (`0.x.y`, see `.github/workflows/release.yml`) publish the matching
 section below as the GitHub release notes, followed by the downloads table.
 
-## [UNRELEASED]
+## [0.6.2] - 2026-11-14
 
 ### Added
 - Optional typing speed on the Text block: wait per character, or give the whole text a total time divided evenly across it. Without it, typing runs at the normal input speed (Linux keeps a small 0.5 ms built-in gap).
@@ -21,7 +21,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Drag previews line up when moving blocks between branches of a bracket block.
 - Details opens for custom blocks inside fields, including If conditions.
 - A trigger that fires again while its macro is still running (a hotkey toggle around a forever loop) now sees the variables the running strands set, so a second press can switch the toggle off.
-- The portable Windows zip unzips to one Blockwork folder that runs on a clean install: it now carries the Microsoft Visual C++ runtime beside the Qt runtime, and every release build checks that the unzipped exe starts.
+- The portable Windows zip unzips to one Blockwork folder that runs on a clean install.
 - The Windows updater downloads the installer for the PC's own architecture, so Windows on Arm updates to the arm64 build.
 - Number fields (such as the typing speed's milliseconds or the numbers in Add and Divide) no longer show the bigger text box button, since they can't hold more than one line.
 
