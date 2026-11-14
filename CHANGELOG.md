@@ -15,6 +15,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Search blocks also finds blocks by the words on them (labels and dropdown choices, such as "is pressed"), in any word order, and still finds something when a word has a typo.
 
 ### Fixed
+- The editor only works with a background service from its own build. A different one is asked to quit and replaced, and one from 0.6.1 or earlier (say, an installed copy started at login) is waited out with a note to quit it from the tray. Before, a newer editor could talk to an older service that silently dropped what it didn't know, such as the Text block's typing speed.
 - Windows: two-finger touchpad scrolling and pinch zoom on the canvas and palette follow the fingers like on Linux, instead of gliding behind each small step.
 - Blocks stay under the pointer while branches resize; bracket shapes update in the same frame as a drop.
 - Blocks keep their blue outline when a drag ends.

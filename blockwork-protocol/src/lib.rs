@@ -25,6 +25,9 @@ pub enum ClientMessage {
     /// instead of `Hello`. It gets no state pushes, may only call
     /// [`SCRIPT_COMMANDS`], and doesn't count as an open window.
     Script,
+    /// Asks the daemon to quit, sent by a UI whose [`BUILD`] differs from the
+    /// daemon's so it can start its own.
+    Shutdown,
     /// Runs a backend command; answered by a reply with the same `id`.
     Call {
         id: u64,
@@ -54,7 +57,15 @@ pub struct DaemonMessage<'a> {
     pub data: Option<serde_json::Value>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub error: Option<String>,
+    /// The daemon's [`BUILD`], on hello. Daemons before 0.6.2 leave it out.
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub build: Option<String>,
 }
+
+/// Which build this is: the package version plus the git commit when built
+/// from a checkout. A UI only talks to a daemon from the same build, since
+/// the two share instruction shapes that change between versions.
+pub const BUILD: &str = env!("BLOCKWORK_BUILD");
 
 #[derive(Serialize, Deserialize, Debug, Clone, Copy, PartialEq, Eq)]
 #[serde(rename_all = "snake_case")]
@@ -80,12 +91,14 @@ impl<'a> DaemonMessage<'a> {
             payload: None,
             data: None,
             error: None,
+            build: None,
         }
     }
 
     pub fn hello(accepted: bool) -> Self {
         DaemonMessage {
             accepted: Some(accepted),
+            build: Some(BUILD.to_owned()),
             ..Self::new(DaemonMessageKind::Hello)
         }
     }
@@ -276,6 +289,21 @@ mod tests {
             parse(&encode(&DaemonMessage::focus())).kind,
             DaemonMessageKind::Focus
         );
+    }
+
+    #[test]
+    fn hello_names_the_build_and_old_ones_dont() {
+        let line = encode(&DaemonMessage::hello(true));
+        let hello = parse(&line);
+        assert_eq!(hello.build.as_deref(), Some(BUILD));
+        assert!(BUILD.starts_with(env!("CARGO_PKG_VERSION")));
+        // What a 0.6.1 daemon says.
+        let old = parse("{\"type\":\"hello\",\"accepted\":true}\n");
+        assert_eq!((old.accepted, old.build), (Some(true), None));
+        assert!(matches!(
+            serde_json::from_str::<ClientMessage>(encode(&ClientMessage::Shutdown).trim()),
+            Ok(ClientMessage::Shutdown)
+        ));
     }
 }
 

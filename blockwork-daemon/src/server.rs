@@ -187,6 +187,10 @@ async fn handle_connection(
                     break;
                 }
             }
+            Ok(ClientMessage::Shutdown) => {
+                tracing::info!("A UI from another build asked the daemon to quit");
+                backend.request_quit();
+            }
             Ok(ClientMessage::Hello | ClientMessage::Script) => {}
             Err(e) => tracing::warn!("Ignoring malformed message from the UI: {e}"),
         }
@@ -330,6 +334,44 @@ mod tests {
         assert_eq!(message.kind, DaemonMessageKind::Quit);
         *clients.ui.lock().unwrap() = None;
         assert!(!clients.close_ui());
+    }
+
+    #[tokio::test]
+    async fn a_ui_from_another_build_can_stop_the_daemon() {
+        let dir = std::env::temp_dir().join(format!(
+            "blockwork-daemon-shutdown-test-{}",
+            std::process::id()
+        ));
+        let backend = Backend::for_tests(dir);
+        let mut events = backend.subscribe();
+        let clients = Clients::default();
+        let (ours, theirs) = tokio::io::duplex(1 << 20);
+        let server = handle_connection(1, Box::new(theirs), &backend, &clients);
+        let client = async {
+            let (reader, mut writer) = tokio::io::split(ours);
+            let mut reader = BufReader::new(reader);
+            writer
+                .write_all(encode(&ClientMessage::Hello).as_bytes())
+                .await
+                .unwrap();
+            let hello = next(&mut reader).await;
+            let hello: DaemonMessage<'_> = serde_json::from_str(&hello).unwrap();
+            assert_eq!(hello.build.as_deref(), Some(blockwork_protocol::BUILD));
+            writer
+                .write_all(encode(&ClientMessage::Shutdown).as_bytes())
+                .await
+                .unwrap();
+            loop {
+                match tokio::time::timeout(std::time::Duration::from_secs(10), events.recv())
+                    .await
+                    .expect("no quit")
+                {
+                    Ok(Event::Quit) => break,
+                    _ => continue,
+                }
+            }
+        };
+        tokio::join!(server, client);
     }
 
     async fn next(reader: &mut BufReader<tokio::io::ReadHalf<tokio::io::DuplexStream>>) -> String {

@@ -81,7 +81,10 @@ pub fn spawn(requests: tokio::sync::mpsc::UnboundedReceiver<Request>, events: Ev
                 .expect("failed to start UI IPC runtime");
             if let Err(error) = runtime.block_on(run(requests, &events)) {
                 let _ = events.send(Event::Error(error.to_string()));
-                let _ = events.send(Event::Quit);
+                // A mismatched daemon stays on screen to be read.
+                if error.kind() != io::ErrorKind::Unsupported {
+                    let _ = events.send(Event::Quit);
+                }
             }
         })
         .expect("failed to start UI IPC thread");
@@ -91,26 +94,9 @@ async fn run(
     mut requests: tokio::sync::mpsc::UnboundedReceiver<Request>,
     events: &EventSink,
 ) -> io::Result<()> {
-    let connection = connect_or_spawn(false).await?;
-    let (reader, mut writer) = tokio::io::split(connection);
-    let mut reader = BufReader::new(reader);
-    writer
-        .write_all(encode(&ClientMessage::Hello).as_bytes())
-        .await?;
-
-    let line = tokio::time::timeout(
-        blockwork_protocol::HANDSHAKE_TIMEOUT,
-        blockwork_protocol::read_line(&mut reader),
-    )
-    .await??
-    .ok_or_else(|| io::Error::other("daemon closed during handshake"))?;
-    let hello: DaemonMessage = serde_json::from_str(&line).map_err(io::Error::other)?;
-    if hello.kind != DaemonMessageKind::Hello || hello.accepted != Some(true) {
-        return Err(io::Error::new(
-            io::ErrorKind::AlreadyExists,
-            "another Blockwork window is already open",
-        ));
-    }
+    let (mut reader, mut writer) = connect_matching(events).await?;
+    // Clears a "quit the old daemon" notice left from waiting.
+    let _ = events.send(Event::Error(String::new()));
     let _ = events.send(Event::Connected);
     let mut next_id = 1_u64;
     let mut pending_apps_id: Option<u64> = None;
@@ -229,6 +215,95 @@ async fn run(
                 }
             }
         }
+    }
+}
+
+type Reader = BufReader<tokio::io::ReadHalf<blockwork_protocol::Connection>>;
+type Writer = tokio::io::WriteHalf<blockwork_protocol::Connection>;
+
+/// Says hello to a daemon from this same build, starting it first if needed.
+/// A daemon from another build is asked to quit so this one can start its
+/// own, since they disagree about what blocks hold (a newer field would be
+/// dropped on every edit). One too old to be asked is waited out.
+async fn connect_matching(events: &EventSink) -> io::Result<(Reader, Writer)> {
+    let mut replaced = 0;
+    let mut told_to_quit_old = false;
+    loop {
+        let connection = connect_or_spawn(false).await?;
+        let (reader, mut writer) = tokio::io::split(connection);
+        let mut reader = BufReader::new(reader);
+        writer
+            .write_all(encode(&ClientMessage::Hello).as_bytes())
+            .await?;
+        let line = tokio::time::timeout(
+            blockwork_protocol::HANDSHAKE_TIMEOUT,
+            blockwork_protocol::read_line(&mut reader),
+        )
+        .await??
+        .ok_or_else(|| io::Error::other("daemon closed during handshake"))?;
+        let hello: DaemonMessage = serde_json::from_str(&line).map_err(io::Error::other)?;
+        if hello.kind != DaemonMessageKind::Hello || hello.accepted != Some(true) {
+            return Err(io::Error::new(
+                io::ErrorKind::AlreadyExists,
+                "another Blockwork window is already open",
+            ));
+        }
+        match hello.build.as_deref() {
+            Some(build) if build == blockwork_protocol::BUILD => return Ok((reader, writer)),
+            Some(build) => {
+                if replaced == 2 {
+                    return Err(io::Error::new(
+                        io::ErrorKind::Unsupported,
+                        format!(
+                            "The Blockwork background service is from another build ({build}, this window is {}). \
+                         Build the whole workspace so blockwork-daemon matches.",
+                            blockwork_protocol::BUILD
+                        ),
+                    ));
+                }
+                replaced += 1;
+                eprintln!(
+                    "[blockwork-qt] daemon is build {build}, this UI is {}; replacing it",
+                    blockwork_protocol::BUILD
+                );
+                writer
+                    .write_all(encode(&ClientMessage::Shutdown).as_bytes())
+                    .await?;
+                // Read until it hangs up (it sends `quit` on the way out).
+                let _ = tokio::time::timeout(SPAWN_TIMEOUT, async {
+                    while let Ok(Some(_)) = blockwork_protocol::read_line(&mut reader).await {}
+                })
+                .await;
+            }
+            None => {
+                if !told_to_quit_old {
+                    told_to_quit_old = true;
+                    eprintln!("[blockwork-qt] an older daemon without a build stamp is running");
+                    let _ = events.send(Event::Error(
+                        "An older Blockwork is running in the background. Quit it from its tray icon \
+                         and this window will carry on."
+                            .into(),
+                    ));
+                }
+                drop((reader, writer));
+                tokio::time::sleep(Duration::from_secs(2)).await;
+            }
+        }
+        wait_until_gone().await;
+    }
+}
+
+/// Waits for the daemon socket to stop answering, after asking it to quit or
+/// while an old one is still up. Gives up after [`SPAWN_TIMEOUT`] so the
+/// caller can say hello again.
+async fn wait_until_gone() {
+    let deadline = Instant::now() + SPAWN_TIMEOUT;
+    while Instant::now() < deadline {
+        match blockwork_protocol::connect().await {
+            Ok(connection) => drop(connection),
+            Err(_) => return,
+        }
+        tokio::time::sleep(Duration::from_millis(250)).await;
     }
 }
 
