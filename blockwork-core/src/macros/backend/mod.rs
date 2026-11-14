@@ -31,6 +31,27 @@ pub enum CaptureEvent {
     Scroll(i32, i32),
 }
 
+/// Gap between typed characters. Apps (browsers especially) can drop or
+/// coalesce keystrokes that arrive back to back.
+#[cfg(any(target_os = "linux", windows, target_os = "macos"))]
+pub(crate) const INTER_CHAR_DELAY: std::time::Duration = std::time::Duration::from_micros(500);
+
+/// Types `s` one character at a time, `INTER_CHAR_DELAY` apart.
+#[cfg(any(target_os = "linux", windows, target_os = "macos"))]
+pub(crate) fn type_chars(
+    s: &str,
+    mut one: impl FnMut(char) -> Result<(), String>,
+) -> Result<(), String> {
+    let mut chars = s.chars().peekable();
+    while let Some(c) = chars.next() {
+        one(c)?;
+        if chars.peek().is_some() {
+            std::thread::sleep(INTER_CHAR_DELAY);
+        }
+    }
+    Ok(())
+}
+
 pub trait InputBackend: Send + 'static {
     fn key(&mut self, key: MacroKey, dir: Direction) -> Result<(), String>;
     fn raw_keycode(&mut self, keycode: u16, dir: Direction) -> Result<(), String>;

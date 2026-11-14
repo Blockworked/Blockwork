@@ -716,15 +716,15 @@ impl InputBackend for MacosBackend {
     }
 
     fn text(&mut self, s: &str) -> Result<(), String> {
-        for c in s.chars() {
+        super::type_chars(s, |c| {
             let mut bytes = [0; 4];
             let text = c.encode_utf8(&mut bytes);
             let down = self.unicode_event(text, true)?;
             let up = self.unicode_event(text, false)?;
             self.post(down);
             self.post(up);
-        }
-        Ok(())
+            Ok(())
+        })
     }
 
     fn cursor_pos(&self) -> Option<(i32, i32)> {

@@ -318,7 +318,12 @@ impl InputBackend for WinApiBackend {
     }
 
     fn text(&mut self, s: &str) -> Result<(), String> {
-        self.enigo.text(s).map_err(|e| e.to_string())
+        super::type_chars(s, |c| {
+            let mut buf = [0; 4];
+            self.enigo
+                .text(c.encode_utf8(&mut buf))
+                .map_err(|e| e.to_string())
+        })
     }
 
     fn cursor_pos(&self) -> Option<(i32, i32)> {

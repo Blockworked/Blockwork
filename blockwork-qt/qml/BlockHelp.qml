@@ -99,7 +99,7 @@ QtObject {
             WhenClipboardChanged: qsTr("Runs whenever the clipboard changes, by you or by another program. Read the new contents with the clipboard text block."),
             WhenKey: qsTr("Runs when a key or key combo (like Control+Shift+K) is pressed or released, in any app. Click counts as press."),
             Wait: qsTr("Pauses this strand for the given number of milliseconds (1000 is one second). Other strands keep running."),
-            Text: qsTr("Types the text as keystrokes into whatever app has focus. Without the typing speed option, no delay is added: typing goes at full speed, except on Linux where keystrokes are spaced about 0.5 ms apart. Add the option to wait per character, or give the whole text a total time divided evenly across it. For long text, a paste block is faster and more reliable."),
+            Text: qsTr("Types the text as keystrokes into whatever app has focus. Without the typing speed option, typing goes at full speed, with keystrokes spaced about 0.5 ms apart so apps don't drop any. Add the option to wait per character, or give the whole text a total time divided evenly across it. For long text, a paste block is faster and more reliable."),
             Key: qsTr("Presses, releases or clicks (press then release) a key or key combo like Control+C. Use press and release separately to hold a key down while other blocks run."),
             Button: qsTr("Presses, releases or clicks a mouse button where the pointer is now. Pair it with a move mouse block to click somewhere specific."),
             MoveMouse: qsTr("Moves the mouse pointer. Absolute goes to that screen position; relative moves it by that many pixels from where it is."),

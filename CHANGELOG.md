@@ -8,6 +8,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 Tag releases (`0.x.y`, see `.github/workflows/release.yml`) publish the matching
 section below as the GitHub release notes, followed by the downloads table.
 
+## [Unreleased]
+
+### Changed
+- The Text block spaces keystrokes 0.5 ms apart on Windows and macOS too, as it already did on Linux, so fast typing doesn't drop or merge characters.
+
 ## [0.6.2] - 2026-11-14
 
 ### Added
