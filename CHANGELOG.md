@@ -15,6 +15,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Search blocks also finds blocks by the words on them (labels and dropdown choices, such as "is pressed"), in any word order, and still finds something when a word has a typo.
 
 ### Fixed
+- Windows: two-finger touchpad scrolling and pinch zoom on the canvas and palette follow the fingers like on Linux, instead of gliding behind each small step.
 - Blocks stay under the pointer while branches resize; bracket shapes update in the same frame as a drop.
 - Blocks keep their blue outline when a drag ends.
 - Drag previews line up when moving blocks between branches of a bracket block.
