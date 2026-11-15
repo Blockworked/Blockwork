@@ -261,16 +261,38 @@ QtObject {
     }
     // Shared pieces of the controller, native UI and touch blocks.
     readonly property string exampleNativeUiSelector: "scope=Focused;name=Save;role=push button"
-    readonly property var gamepadButtonOptions: ["South", "East", "North", "West", "LeftShoulder", "RightShoulder", "LeftStick", "RightStick",
-        "Select", "Start", "Mode", "DPadUp", "DPadDown", "DPadLeft", "DPadRight"].map(name => ({ value: name, label: name }))
-    readonly property var gamepadAxisOptions: ["LeftX", "LeftY", "RightX", "RightY", "LeftTrigger", "RightTrigger"].map(name => ({ value: name, label: name }))
+    // Buttons by position, with the Xbox and PlayStation names people know them by.
+    readonly property var gamepadButtonOptions: choices([
+        ["South", qsTr("bottom (A / Cross)")], ["East", qsTr("right (B / Circle)")],
+        ["North", qsTr("top (Y / Triangle)")], ["West", qsTr("left (X / Square)")],
+        ["LeftShoulder", qsTr("left bumper")], ["RightShoulder", qsTr("right bumper")],
+        ["LeftStick", qsTr("left stick click")], ["RightStick", qsTr("right stick click")],
+        ["Select", qsTr("back / select")], ["Start", qsTr("start")], ["Mode", qsTr("home / guide")],
+        ["DPadUp", qsTr("D-pad up")], ["DPadDown", qsTr("D-pad down")],
+        ["DPadLeft", qsTr("D-pad left")], ["DPadRight", qsTr("D-pad right")]])
+    readonly property var gamepadAxisOptions: choices([
+        ["LeftX", qsTr("left stick x")], ["LeftY", qsTr("left stick y")],
+        ["RightX", qsTr("right stick x")], ["RightY", qsTr("right stick y")],
+        ["LeftTrigger", qsTr("left trigger")], ["RightTrigger", qsTr("right trigger")]])
+    // A saved profile is "<id>:<name>"; the block shows the name.
+    function controllerName(profile) {
+        profile = String(profile || "");
+        return profile.length ? profile.slice(profile.indexOf(":") + 1) : qsTr("any controller");
+    }
     function controllerPickArg() { return { index: 0, action: "pickController", icon: "gamepad-2" }; }
-    function nativeUiPickArg() { return { index: 0, action: "pickNativeUi", icon: "scan" }; }
-    function controllerPick() { return { action: "pickController", icon: "gamepad-2", display: t => t || qsTr("Any single controller") }; }
+    function nativeUiPickArg() { return { index: 0, action: "pickNativeUi", icon: "square-mouse-pointer" }; }
+    function controllerPick() { return { action: "pickController", icon: "gamepad-2", display: t => controllerName(t) }; }
     function nativeUiPick(tip) {
-        const pick = { action: "pickNativeUi", icon: "scan", display: t => nativeUiLabel(t) };
+        const pick = { action: "pickNativeUi", icon: "square-mouse-pointer", display: t => nativeUiLabel(t) };
         if (tip) pick.tip = tip;
         return pick;
+    }
+    // Shown on a trigger whose setting is off, since it would never fire.
+    function controllerInputHint() {
+        return { kind: "label", text: qsTr("(controller input is off in Settings)"), when: () => page.appState.controller_input_enabled !== true };
+    }
+    function nativeUiHint() {
+        return { kind: "label", text: qsTr("(native UI automation is off in Settings)"), when: () => page.appState.ui_automation_enabled !== true };
     }
     // Pinch and rotate always use two fingers; only a swipe has an end point.
     function touchTwoFinger(i) { return i.gesture === "Pinch" || i.gesture === "Rotate"; }
@@ -321,7 +343,7 @@ QtObject {
         const errorTimeoutComponent = { key: "error_timeout", conflicts: ["timeout"], label: qsTr("or error after"), icon: "timer", fresh: () => numberValue(10000), pieces: [
             label(qsTr("or error after")), value("WaitErrorTimeout", "error_timeout"), label(qsTr("ms"))
         ] };
-        const toleranceComponent = { key: "tolerance", label: qsTr("within %"), icon: "scan", fresh: () => numberValue(10), pieces: [
+        const toleranceComponent = { key: "tolerance", label: qsTr("within %"), icon: "target", fresh: () => numberValue(10), pieces: [
             label(qsTr("within")), value("ImageTolerance", "tolerance"), label("%")
         ] };
         // The image blocks' optional components, added from the block's "+".
@@ -389,23 +411,23 @@ QtObject {
     function eventRows(p) {
         const { label, value, signalPieces, whenTimeHead, direction, keyValue } = p;
         return {
-            WhenNativeUiChanged: { shape: "header", icon: "scan", head: [label(qsTr("WHEN NATIVE ELEMENT")),
+            WhenNativeUiChanged: { shape: "header", icon: "square-mouse-pointer", head: [label(qsTr("WHEN NATIVE ELEMENT")),
                 Object.assign(value("NativeUiSelector", "selector"), { pick: nativeUiPick() }),
                 { kind: "dropdown", key: "property", options: choices([["Exists", qsTr("existence")], ["Enabled", qsTr("enabled state")],
                     ["Text", qsTr("text")], ["Value", qsTr("value")]]) },
-                label(qsTr("CHANGES"))] },
+                label(qsTr("CHANGES")), nativeUiHint()] },
             WhenGamepadButton: { shape: "header", icon: "gamepad-2", head: [label(qsTr("WHEN CONTROLLER")),
                 Object.assign(value("GamepadController", "controller"), { pick: controllerPick() }),
                 { kind: "dropdown", key: "button", options: gamepadButtonOptions },
-                boolChoice("pressed", ["press", qsTr("pressed")], ["release", qsTr("released")])] },
+                boolChoice("pressed", ["press", qsTr("pressed")], ["release", qsTr("released")]), controllerInputHint()] },
             WhenGamepadConnection: { shape: "header", icon: "gamepad-2", head: [label(qsTr("WHEN CONTROLLER")),
                 Object.assign(value("GamepadController", "controller"), { pick: controllerPick() }),
-                boolChoice("connected", ["in", qsTr("connects")], ["out", qsTr("disconnects")])] },
+                boolChoice("connected", ["in", qsTr("connects")], ["out", qsTr("disconnects")]), controllerInputHint()] },
             WhenGamepadAxis: { shape: "header", icon: "gamepad-2", head: [label(qsTr("WHEN CONTROLLER")),
                 Object.assign(value("GamepadController", "controller"), { pick: controllerPick() }),
                 { kind: "dropdown", key: "axis", options: gamepadAxisOptions },
                 boolChoice("above", ["above", qsTr("rises above")], ["below", qsTr("falls below")]),
-                value("GamepadThreshold", "threshold")] },
+                value("GamepadThreshold", "threshold"), controllerInputHint()] },
             WhenBatteryDischargedTo: { shape: "header", head: [label(qsTr("WHEN BATTERY DISCHARGED TO")),
                 value("BatteryDischargeThreshold", "threshold"), label("%")] },
             WhenBatteryChargedTo: { shape: "header", head: [label(qsTr("WHEN BATTERY CHARGED TO")),
@@ -416,10 +438,10 @@ QtObject {
             WhenKey: { shape: "header", head: [label(qsTr("WHEN")), keyValue,
                 direction([["Press", qsTr("Pressed")], ["Release", qsTr("Released")]])] },
             WhenSystemStarts: { shape: "header", icon: "monitor", head: [label(qsTr("WHEN SYSTEM STARTS")),
-                { kind: "label", text: qsTr("(enable system startup in Settings)"), when: () => !page.appState.start_at_startup }] },
+                { kind: "label", text: qsTr("(system startup is off in Settings)"), when: () => !page.appState.start_at_startup }] },
             WhenRan: { shape: "header", icon: "play", head: [label(qsTr("WHEN RUN"))] },
             WhenAt: { shape: "header", icon: "clock", head: [label(qsTr("ONCE AT")),
-                Object.assign(value("AtTime", "at"), { pick: { action: "pickDateTime", icon: "calendar", display: t => Schedules.dateTimeLabel(t), tip: qsTr("Click to pick a date and time, or drop a reporter here") } })] },
+                Object.assign(value("AtTime", "at"), { pick: { action: "pickDateTime", icon: "clock", display: t => Schedules.dateTimeLabel(t), tip: qsTr("Click to pick a date and time, or drop a reporter here") } })] },
             WhenSignal: { shape: "header", icon: "corner-down-right", head: [label(qsTr("WHEN I RECEIVE")), ...signalPieces] },
             WhenWebhook: { shape: "header", icon: "link", head: [label(qsTr("WHEN WEBHOOK")), value("WebhookPath", "path"), label(qsTr("IS CALLED, BODY IN")),
                 { kind: "dropdown", key: "variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
@@ -437,8 +459,8 @@ QtObject {
             WhenScreenLock: { shape: "header", icon: "lock", head: [label(qsTr("WHEN SCREEN IS")),
                 { kind: "dropdown", key: "locked", options: [{ value: "locked", label: qsTr("locked") }, { value: "unlocked", label: qsTr("unlocked") }],
                   encode: v => v === "locked", decode: v => v ? "locked" : "unlocked" }] },
-            WhenCron: { shape: "header", icon: "calendar-clock", head: [label(qsTr("ON SCHEDULE")),
-                Object.assign(value("CronExpression", "expression"), { pick: { action: "pickSchedule", icon: "calendar-clock", display: t => Schedules.scheduleLabel(t), tip: qsTr("Click to choose when it runs, or drop a reporter here") } })] },
+            WhenCron: { shape: "header", icon: "history", head: [label(qsTr("ON SCHEDULE")),
+                Object.assign(value("CronExpression", "expression"), { pick: { action: "pickSchedule", icon: "history", display: t => Schedules.scheduleLabel(t), tip: qsTr("Click to choose when it runs, or drop a reporter here") } })] },
             WhenTime: { shape: "header", icon: "clock", head: whenTimeHead },
             WhenNetwork: { shape: "header", icon: "radio", head: [label(qsTr("WHEN NETWORK")),
                 { kind: "dropdown", key: "connected", options: [{ value: "on", label: qsTr("connects") }, { value: "off", label: qsTr("disconnects") }],
@@ -487,7 +509,7 @@ QtObject {
             TouchGesture: { icon: "hand", head: [label(qsTr("touch")),
                 { kind: "dropdown", key: "gesture", options: choices([["Tap", qsTr("tap")], ["LongPress", qsTr("long press")],
                     ["Swipe", qsTr("swipe")], ["Pinch", qsTr("pinch")], ["Rotate", qsTr("rotate")]]) },
-                { kind: "dropdown", key: "fingers", options: Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: qsTr("%1 fingers").arg(i + 1) })),
+                { kind: "dropdown", key: "fingers", options: Array.from({ length: 10 }, (_, i) => ({ value: String(i + 1), label: qsTr("%n finger(s)", "", i + 1) })),
                     encode: v => Number(v), decode: v => String(v), when: i => !touchTwoFinger(i) },
                 label(qsTr("at")), value("TouchX", "x"), value("TouchY", "y"),
                 Object.assign(label(qsTr("to")), { when: touchSwipe }),
@@ -497,12 +519,12 @@ QtObject {
                 Object.assign(value("TouchSpan", "span"), { when: i => i.fingers > 1 || touchTwoFinger(i) }),
                 { kind: "label", text: qsTr("scale"), when: i => i.gesture === "Pinch" }, { kind: "label", text: qsTr("degrees"), when: i => i.gesture === "Rotate" },
                 Object.assign(value("TouchAmount", "amount"), { when: touchTwoFinger }),
-                boolChoice("normalized", ["percent", qsTr("percent of monitor")], ["pixels", qsTr("screen pixels")]),
+                boolChoice("normalized", ["percent", qsTr("in % of")], ["pixels", qsTr("in pixels of")]),
                 label(qsTr("monitor")), touchMonitorDropdown()] },
             TouchSequence: { icon: "hand", head: [label(qsTr("touch paths")),
                 Object.assign(value("TouchPaths", "sequence"), { pick: { action: "touchPathsValue", icon: "hand", display: () => qsTr("Edit paths"),
                     tip: qsTr("Edit finger positions and timing, or drop a reporter here") } }),
-                boolChoice("normalized", ["percent", qsTr("normalized monitor coordinates")], ["pixels", qsTr("screen pixels")]),
+                boolChoice("normalized", ["percent", qsTr("in % of")], ["pixels", qsTr("in pixels of")]),
                 label(qsTr("monitor")), touchMonitorDropdown()] },
             Key: { head: [label(qsTr("Key")), keyValue,
                 direction([["Click", qsTr("Click")], ["Press", qsTr("Press")], ["Release", qsTr("Release")]])] },
@@ -564,7 +586,7 @@ QtObject {
     function systemRows(p) {
         const { label, commandField, value, box, launchSummary } = p;
         return {
-            NativeUiAction: { icon: "scan", head: [label(qsTr("native element")),
+            NativeUiAction: { icon: "square-mouse-pointer", head: [label(qsTr("native element")),
                 Object.assign(value("NativeUiSelector", "selector"), { pick: nativeUiPick(qsTr("Choose a desktop app element")) }),
                 { kind: "dropdown", key: "action", options: choices([["Invoke", qsTr("invoke")], ["SetText", qsTr("set text")],
                     ["SetValue", qsTr("set value")], ["Focus", qsTr("focus")]]) },

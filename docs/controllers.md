@@ -23,10 +23,16 @@ macro works with different brands:
 - Axes: `LeftX`, `LeftY`, `RightX`, `RightY` from -1 to 1, and
   `LeftTrigger`, `RightTrigger` from 0 to 1.
 
+The blocks show these names in words, with the Xbox and PlayStation names
+for the face buttons: `South` is "bottom (A / Cross)", `East` "right (B /
+Circle)", `North` "top (Y / Triangle)" and `West` "left (X / Square)". Saved
+macros keep the names above.
+
 ## Choosing a controller
 
 A block's controller slot holds a **profile**: the controller's model id and
-name. An empty slot means "the only controller connected". The controller
+name. An empty slot, shown as "any controller", means the only controller
+connected. The controller
 picker lists what's connected now. If two identical controllers are
 connected, a profile matches both, and the block reports an error instead of
 guessing; disconnect one, or pick by another profile. Blockwork's own virtual

@@ -125,7 +125,8 @@ AppDialog {
                         const x = 8 + point.x / xmax * (width - 16), y = 8 + point.y / ymax * (height - 16);
                         ctx.strokeStyle = colors[point.id % 10]; ctx.fillStyle = ctx.strokeStyle; ctx.lineWidth = 2;
                         if (last[point.id]) { ctx.beginPath(); ctx.moveTo(last[point.id].x, last[point.id].y); ctx.lineTo(x,y); ctx.stroke(); }
-                        ctx.beginPath(); ctx.arc(x,y,2,0,Math.PI*2); ctx.fill(); last[point.id] = {x:x,y:y};
+                        // A bigger dot where a finger goes down, so the direction shows.
+                        ctx.beginPath(); ctx.arc(x,y,last[point.id] ? 2 : 5,0,Math.PI*2); ctx.fill(); last[point.id] = {x:x,y:y};
                     }
                     for (const id of Object.keys(last)) if (!active.has(Number(id))) delete last[id];
                 }
@@ -173,13 +174,20 @@ AppDialog {
                         Label { text: qsTr("Finger %1").arg(contact.modelData.id + 1); color: Theme.textDim; Layout.preferredWidth: 90 }
                         Repeater {
                             model: ["x", "y"]
-                            delegate: StitchTextField {
+                            delegate: RowLayout {
+                                id: axis
                                 required property string modelData
                                 Layout.fillWidth: true
-                                Accessible.name: modelData.toUpperCase()
-                                text: String(contact.modelData[modelData] / (root.normalized ? 10000 : 1))
-                                onTextEdited: root.check(frame.index + ":" + contact.index + ":" + modelData, text, root.normalized ? 10000 : 1, false)
-                                onEditingFinished: root.point(frame.index, contact.index, modelData, text, frame.modelData)
+                                spacing: 4
+                                Label { text: axis.modelData; color: Theme.textDim }
+                                StitchTextField {
+                                    Layout.fillWidth: true
+                                    Accessible.name: axis.modelData.toUpperCase()
+                                    text: String(contact.modelData[axis.modelData] / (root.normalized ? 10000 : 1))
+                                    onTextEdited: root.check(frame.index + ":" + contact.index + ":" + axis.modelData, text, root.normalized ? 10000 : 1, false)
+                                    onEditingFinished: root.point(frame.index, contact.index, axis.modelData, text, frame.modelData)
+                                }
+                                Label { visible: root.normalized; text: "%"; color: Theme.textDim }
                             }
                         }
                         StitchButton { iconName: "x"; onClicked: root.removeContact(frame.index, contact.index) }

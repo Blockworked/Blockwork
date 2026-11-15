@@ -18,7 +18,16 @@ AppDialog {
     property bool busy: false
     property int serial: 0
     function openFor(req) { request=req; macroId=page.macro ? page.macro.id : ""; controllers=[]; errorText=""; open(); refresh(); }
+    readonly property bool inputOn: page.appState.controller_input_enabled === true
+    function turnOn() {
+        page.invoke("set_controller_input_enabled", {enabled: true});
+        errorText = "";
+    }
+    onInputOnChanged: if (visible) refresh()
+    // Keep the list current while open, so a controller plugged in now shows up.
+    Timer { interval: 1500; repeat: true; running: root.visible && root.inputOn; onTriggered: if (!root.busy) root.refresh() }
     function refresh() {
+        if (!inputOn) { controllers = []; errorText = ""; return; }
         const ticket=++serial; busy=true;
         page.daemonCall("list_game_controllers", {}, (result,error) => {
             if (ticket !== serial || !root.visible) return;
@@ -34,11 +43,18 @@ AppDialog {
     onClosed: serial++
     contentItem: ColumnLayout {
         spacing: 10
-        Label { Layout.fillWidth: true; text: qsTr("Enable Controller input in Settings first. Profiles stay stable across reconnects; identical connected profiles cannot be distinguished safely."); color:Theme.textDim;wrapMode:Text.WordWrap }
+        Label { Layout.fillWidth: true; text: qsTr("The block keeps working after the controller is unplugged and plugged back in. Two identical controllers can't be told apart, so connect only one of them."); color:Theme.textDim;wrapMode:Text.WordWrap }
+        // Controller input is off: offer to turn it on here rather than send the user to Settings.
+        RowLayout {
+            Layout.fillWidth:true;visible:!root.inputOn
+            Label {Layout.fillWidth:true;text:qsTr("Controller input is off, so Blockwork can't see any controllers.");color:Theme.warning;wrapMode:Text.WordWrap}
+            StitchButton {objectName:"turnOnControllerInput";text:qsTr("Turn on");primary:true;onClicked:root.turnOn()}
+        }
         RowLayout {
             Layout.fillWidth:true
-            StitchButton {text:qsTr("Refresh");enabled:!root.busy;onClicked:root.refresh()}
-            StitchButton {text:qsTr("Any single controller");onClicked:root.choose("")}
+            StitchButton {text:qsTr("Refresh");iconName:"refresh-cw";enabled:!root.busy && root.inputOn;onClicked:root.refresh()}
+            StitchButton {text:qsTr("Any controller");onClicked:root.choose("")}
+            Label {Layout.fillWidth:true;text:qsTr("Uses whichever one is connected.");color:Theme.textDim;elide:Text.ElideRight}
         }
         StitchListView {
             Layout.fillWidth:true;Layout.fillHeight:true;clip:true;spacing:8
@@ -59,7 +75,7 @@ AppDialog {
                 }
             }
         }
-        Label {visible:!root.busy && !root.controllers.length && !root.errorText.length;text:qsTr("No controllers connected.");color:Theme.textDim}
+        Label {visible:root.inputOn && !root.busy && !root.controllers.length && !root.errorText.length;text:qsTr("No controllers connected. Plug one in, then press Refresh.");color:Theme.textDim}
         Label {Layout.fillWidth:true;visible:text.length>0;text:root.errorText;color:Theme.danger;wrapMode:Text.WordWrap}
     }
 }

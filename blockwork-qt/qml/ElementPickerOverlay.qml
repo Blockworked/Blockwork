@@ -209,7 +209,7 @@ Item {
                         Row {
                             spacing: 10
                             anchors.horizontalCenter: parent.horizontalCenter
-                            LucideIcon { name: "scan"; width: 16; height: 16; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
+                            LucideIcon { name: "square-mouse-pointer"; width: 16; height: 16; color: Theme.accent; anchors.verticalCenter: parent.verticalCenter }
                             Text {
                                 anchors.verticalCenter: parent.verticalCenter
                                 text: root.automationOff ? qsTr("Picking elements needs native UI automation, which is off")

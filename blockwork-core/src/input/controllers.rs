@@ -47,7 +47,7 @@ struct Hub {
 
 static HUB: OnceLock<Arc<Hub>> = OnceLock::new();
 
-const DISABLED: &str = "Controller input is disabled in Settings";
+const DISABLED: &str = "Controller input is off; turn it on in Settings > Integrations";
 
 /// Ordered changes for one reader. A full queue drops events and sets
 /// [`Subscription::overflowed`].
@@ -273,7 +273,12 @@ pub fn select<'a>(
         .filter(|g| profile.is_empty() || g.profile == profile);
     let found = matching.next();
     if matching.next().is_some() {
-        return Err("More than one controller matches this profile; disconnect the identical device or choose another profile".into());
+        return Err(if profile.is_empty() {
+            "More than one controller is connected; choose one with the block's controller button"
+        } else {
+            "Two identical controllers are connected; unplug one of them"
+        }
+        .into());
     }
     Ok(found)
 }

@@ -215,7 +215,7 @@ fn templates() -> [Template; 7] {
                 id: "startup_notice",
                 name: "At login",
                 description: "Runs once each time you log in. Turn on Start at system startup in Settings first.",
-                icon: "power",
+                icon: "monitor",
             },
             build: || {
                 vec![

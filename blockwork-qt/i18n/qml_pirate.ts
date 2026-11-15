@@ -214,7 +214,7 @@
         <location filename="../qml/BlockCatalog.qml" line="163"/>
         <location filename="../qml/BlockCatalog.qml" line="165"/>
         <location filename="../qml/BlockCatalog.qml" line="167"/>
-        <location filename="../qml/BlockCatalog.qml" line="314"/>
+        <location filename="../qml/BlockCatalog.qml" line="360"/>
         <source>x</source>
         <translation type="unfinished"></translation>
     </message>
@@ -229,141 +229,141 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="323"/>
-        <location filename="../qml/BlockCatalog.qml" line="391"/>
-        <location filename="../qml/BlockCatalog.qml" line="531"/>
-        <location filename="../qml/BlockCatalog.qml" line="533"/>
-        <location filename="../qml/BlockCatalog.qml" line="535"/>
-        <location filename="../qml/BlockCatalog.qml" line="550"/>
-        <location filename="../qml/BlockCatalog.qml" line="576"/>
-        <location filename="../qml/BlockCatalog.qml" line="577"/>
-        <location filename="../qml/BlockCatalog.qml" line="591"/>
-        <location filename="../qml/BlockCatalog.qml" line="607"/>
-        <location filename="../qml/BlockCatalog.qml" line="626"/>
+        <location filename="../qml/BlockCatalog.qml" line="369"/>
+        <location filename="../qml/BlockCatalog.qml" line="447"/>
+        <location filename="../qml/BlockCatalog.qml" line="598"/>
+        <location filename="../qml/BlockCatalog.qml" line="600"/>
+        <location filename="../qml/BlockCatalog.qml" line="602"/>
+        <location filename="../qml/BlockCatalog.qml" line="617"/>
+        <location filename="../qml/BlockCatalog.qml" line="643"/>
+        <location filename="../qml/BlockCatalog.qml" line="644"/>
+        <location filename="../qml/BlockCatalog.qml" line="658"/>
+        <location filename="../qml/BlockCatalog.qml" line="674"/>
+        <location filename="../qml/BlockCatalog.qml" line="693"/>
         <source>(no variable)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="258"/>
+        <location filename="../qml/BlockCatalog.qml" line="304"/>
         <source>left button</source>
         <translation>port button</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="258"/>
+        <location filename="../qml/BlockCatalog.qml" line="304"/>
         <source>right button</source>
         <translation>starboard button</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="258"/>
+        <location filename="../qml/BlockCatalog.qml" line="304"/>
         <source>middle button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="259"/>
+        <location filename="../qml/BlockCatalog.qml" line="305"/>
         <source>back button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="259"/>
+        <location filename="../qml/BlockCatalog.qml" line="305"/>
         <source>forward button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="259"/>
+        <location filename="../qml/BlockCatalog.qml" line="305"/>
         <source>wheel up</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="259"/>
+        <location filename="../qml/BlockCatalog.qml" line="305"/>
         <source>wheel down</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="260"/>
+        <location filename="../qml/BlockCatalog.qml" line="306"/>
         <source>wheel left</source>
         <translation>wheel to port</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="260"/>
+        <location filename="../qml/BlockCatalog.qml" line="306"/>
         <source>wheel right</source>
         <translation>wheel to starboard</translation>
     </message>
     <message>
         <location filename="../qml/BlockCatalog.qml" line="148"/>
         <location filename="../qml/BlockCatalog.qml" line="164"/>
-        <location filename="../qml/BlockCatalog.qml" line="262"/>
+        <location filename="../qml/BlockCatalog.qml" line="308"/>
         <source>window</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/BlockCatalog.qml" line="168"/>
-        <location filename="../qml/BlockCatalog.qml" line="262"/>
+        <location filename="../qml/BlockCatalog.qml" line="308"/>
         <source>app</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="264"/>
+        <location filename="../qml/BlockCatalog.qml" line="310"/>
         <source>match number</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="265"/>
+        <location filename="../qml/BlockCatalog.qml" line="311"/>
         <source>match nearest the mouse</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="265"/>
+        <location filename="../qml/BlockCatalog.qml" line="311"/>
         <source>match nearest</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="266"/>
+        <location filename="../qml/BlockCatalog.qml" line="312"/>
         <source>closest first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="266"/>
+        <location filename="../qml/BlockCatalog.qml" line="312"/>
         <source>best first</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="267"/>
+        <location filename="../qml/BlockCatalog.qml" line="313"/>
         <source>largest first</source>
         <translation>biggest first</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="282"/>
+        <location filename="../qml/BlockCatalog.qml" line="328"/>
         <source>capture image</source>
         <translation>capture picture</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="291"/>
+        <location filename="../qml/BlockCatalog.qml" line="337"/>
         <source>region %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="291"/>
+        <location filename="../qml/BlockCatalog.qml" line="337"/>
         <source>whole window</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="297"/>
-        <location filename="../qml/BlockCatalog.qml" line="298"/>
+        <location filename="../qml/BlockCatalog.qml" line="343"/>
+        <location filename="../qml/BlockCatalog.qml" line="344"/>
         <source>or error after</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="300"/>
+        <location filename="../qml/BlockCatalog.qml" line="346"/>
         <source>within %</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="306"/>
+        <location filename="../qml/BlockCatalog.qml" line="352"/>
         <source>in region %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="319"/>
+        <location filename="../qml/BlockCatalog.qml" line="365"/>
         <source>match</source>
         <translation type="unfinished"></translation>
     </message>
@@ -417,7 +417,7 @@
     </message>
     <message>
         <location filename="../qml/BlockCatalog.qml" line="146"/>
-        <location filename="../qml/BlockCatalog.qml" line="279"/>
+        <location filename="../qml/BlockCatalog.qml" line="325"/>
         <source>command</source>
         <translation>command</translation>
     </message>
@@ -470,9 +470,9 @@
         <location filename="../qml/BlockCatalog.qml" line="163"/>
         <location filename="../qml/BlockCatalog.qml" line="165"/>
         <location filename="../qml/BlockCatalog.qml" line="167"/>
-        <location filename="../qml/BlockCatalog.qml" line="315"/>
-        <location filename="../qml/BlockCatalog.qml" line="566"/>
-        <location filename="../qml/BlockCatalog.qml" line="599"/>
+        <location filename="../qml/BlockCatalog.qml" line="361"/>
+        <location filename="../qml/BlockCatalog.qml" line="633"/>
+        <location filename="../qml/BlockCatalog.qml" line="666"/>
         <source>y</source>
         <translation type="unfinished"></translation>
     </message>
@@ -498,7 +498,7 @@
         <location filename="../qml/BlockCatalog.qml" line="163"/>
         <location filename="../qml/BlockCatalog.qml" line="165"/>
         <location filename="../qml/BlockCatalog.qml" line="167"/>
-        <location filename="../qml/BlockCatalog.qml" line="566"/>
+        <location filename="../qml/BlockCatalog.qml" line="633"/>
         <source>height</source>
         <translation type="unfinished"></translation>
     </message>
@@ -509,7 +509,7 @@
     </message>
     <message>
         <location filename="../qml/BlockCatalog.qml" line="156"/>
-        <location filename="../qml/BlockCatalog.qml" line="301"/>
+        <location filename="../qml/BlockCatalog.qml" line="347"/>
         <source>within</source>
         <translation type="unfinished"></translation>
     </message>
@@ -535,8 +535,8 @@
     </message>
     <message>
         <location filename="../qml/BlockCatalog.qml" line="162"/>
-        <location filename="../qml/BlockCatalog.qml" line="460"/>
-        <location filename="../qml/BlockCatalog.qml" line="463"/>
+        <location filename="../qml/BlockCatalog.qml" line="523"/>
+        <location filename="../qml/BlockCatalog.qml" line="528"/>
         <source>monitor</source>
         <translation type="unfinished"></translation>
     </message>
@@ -604,31 +604,31 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="133"/>
+        <location filename="../qml/BlockCatalog.qml" line="131"/>
+        <location filename="../qml/BlockCatalog.qml" line="132"/>
         <location filename="../qml/BlockCatalog.qml" line="134"/>
-        <location filename="../qml/BlockCatalog.qml" line="135"/>
         <source>controller</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="133"/>
+        <location filename="../qml/BlockCatalog.qml" line="131"/>
         <source>connected?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="134"/>
+        <location filename="../qml/BlockCatalog.qml" line="132"/>
         <source>button pressed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="135"/>
+        <location filename="../qml/BlockCatalog.qml" line="134"/>
         <source>axis</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/BlockCatalog.qml" line="136"/>
         <location filename="../qml/BlockCatalog.qml" line="137"/>
-        <location filename="../qml/BlockCatalog.qml" line="524"/>
+        <location filename="../qml/BlockCatalog.qml" line="589"/>
         <source>native element</source>
         <translation type="unfinished"></translation>
     </message>
@@ -686,8 +686,8 @@
         <location filename="../qml/BlockCatalog.qml" line="179"/>
         <location filename="../qml/BlockCatalog.qml" line="180"/>
         <location filename="../qml/BlockCatalog.qml" line="181"/>
-        <location filename="../qml/BlockCatalog.qml" line="586"/>
-        <location filename="../qml/BlockCatalog.qml" line="595"/>
+        <location filename="../qml/BlockCatalog.qml" line="653"/>
+        <location filename="../qml/BlockCatalog.qml" line="662"/>
         <source>in</source>
         <translation type="unfinished"></translation>
     </message>
@@ -695,8 +695,8 @@
         <location filename="../qml/BlockCatalog.qml" line="179"/>
         <location filename="../qml/BlockCatalog.qml" line="180"/>
         <location filename="../qml/BlockCatalog.qml" line="186"/>
-        <location filename="../qml/BlockCatalog.qml" line="588"/>
-        <location filename="../qml/BlockCatalog.qml" line="596"/>
+        <location filename="../qml/BlockCatalog.qml" line="655"/>
+        <location filename="../qml/BlockCatalog.qml" line="663"/>
         <source>with</source>
         <translation type="unfinished"></translation>
     </message>
@@ -719,7 +719,7 @@
         <location filename="../qml/BlockCatalog.qml" line="182"/>
         <location filename="../qml/BlockCatalog.qml" line="184"/>
         <location filename="../qml/BlockCatalog.qml" line="190"/>
-        <location filename="../qml/BlockCatalog.qml" line="602"/>
+        <location filename="../qml/BlockCatalog.qml" line="669"/>
         <source>of</source>
         <translation>o&apos;</translation>
     </message>
@@ -741,9 +741,9 @@
     </message>
     <message>
         <location filename="../qml/BlockCatalog.qml" line="184"/>
-        <location filename="../qml/BlockCatalog.qml" line="452"/>
-        <location filename="../qml/BlockCatalog.qml" line="509"/>
         <location filename="../qml/BlockCatalog.qml" line="515"/>
+        <location filename="../qml/BlockCatalog.qml" line="574"/>
+        <location filename="../qml/BlockCatalog.qml" line="580"/>
         <source>to</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1014,57 +1014,177 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="332"/>
+        <location filename="../qml/BlockCatalog.qml" line="266"/>
+        <source>bottom (A / Cross)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="266"/>
+        <source>right (B / Circle)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="267"/>
+        <source>top (Y / Triangle)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="267"/>
+        <source>left (X / Square)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="268"/>
+        <source>left bumper</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="268"/>
+        <source>right bumper</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="269"/>
+        <source>left stick click</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="269"/>
+        <source>right stick click</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="270"/>
+        <source>back / select</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="270"/>
+        <source>start</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="270"/>
+        <source>home / guide</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="271"/>
+        <source>D-pad up</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="271"/>
+        <source>D-pad down</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="272"/>
+        <source>D-pad left</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="272"/>
+        <source>D-pad right</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="274"/>
+        <source>left stick x</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="274"/>
+        <source>left stick y</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="275"/>
+        <source>right stick x</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="275"/>
+        <source>right stick y</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="276"/>
+        <source>left trigger</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="276"/>
+        <source>right trigger</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="280"/>
+        <source>any controller</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="292"/>
+        <source>(controller input is off in Settings)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="295"/>
+        <source>(native UI automation is off in Settings)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="378"/>
         <source>every day</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="332"/>
+        <location filename="../qml/BlockCatalog.qml" line="378"/>
         <source>every week on</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="332"/>
+        <location filename="../qml/BlockCatalog.qml" line="378"/>
         <source>every month on day</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="332"/>
+        <location filename="../qml/BlockCatalog.qml" line="378"/>
         <source>every year on</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="341"/>
+        <location filename="../qml/BlockCatalog.qml" line="387"/>
         <source>Monday</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="341"/>
+        <location filename="../qml/BlockCatalog.qml" line="387"/>
         <source>Tuesday</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="341"/>
+        <location filename="../qml/BlockCatalog.qml" line="387"/>
         <source>Wednesday</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="342"/>
+        <location filename="../qml/BlockCatalog.qml" line="388"/>
         <source>Thursday</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="342"/>
+        <location filename="../qml/BlockCatalog.qml" line="388"/>
         <source>Friday</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="342"/>
+        <location filename="../qml/BlockCatalog.qml" line="388"/>
         <source>Saturday</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="341"/>
+        <location filename="../qml/BlockCatalog.qml" line="387"/>
         <source>Sunday</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1099,266 +1219,266 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="350"/>
-        <location filename="../qml/BlockCatalog.qml" line="451"/>
+        <location filename="../qml/BlockCatalog.qml" line="396"/>
+        <location filename="../qml/BlockCatalog.qml" line="514"/>
         <source>at</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="351"/>
+        <location filename="../qml/BlockCatalog.qml" line="397"/>
         <source>Click to pick a time, or drop a reporter here</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="510"/>
+        <location filename="../qml/BlockCatalog.qml" line="575"/>
         <source>change</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="386"/>
+        <location filename="../qml/BlockCatalog.qml" line="442"/>
         <source>WHEN RUN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="387"/>
+        <location filename="../qml/BlockCatalog.qml" line="443"/>
         <source>ONCE AT</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="388"/>
+        <location filename="../qml/BlockCatalog.qml" line="444"/>
         <source>Click to pick a date and time, or drop a reporter here</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="389"/>
+        <location filename="../qml/BlockCatalog.qml" line="445"/>
         <source>WHEN I RECEIVE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="390"/>
+        <location filename="../qml/BlockCatalog.qml" line="446"/>
         <source>WHEN WEBHOOK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="390"/>
+        <location filename="../qml/BlockCatalog.qml" line="446"/>
         <source>IS CALLED, BODY IN</source>
         <translation>BE CALLED, BODY IN</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="484"/>
+        <location filename="../qml/BlockCatalog.qml" line="549"/>
         <source>send signal</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="485"/>
-        <location filename="../qml/BlockCatalog.qml" line="495"/>
+        <location filename="../qml/BlockCatalog.qml" line="550"/>
+        <location filename="../qml/BlockCatalog.qml" line="560"/>
         <source>and continue</source>
         <translation>an&apos; carry on</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="485"/>
-        <location filename="../qml/BlockCatalog.qml" line="495"/>
-        <location filename="../qml/BlockCatalog.qml" line="543"/>
+        <location filename="../qml/BlockCatalog.qml" line="550"/>
+        <location filename="../qml/BlockCatalog.qml" line="560"/>
+        <location filename="../qml/BlockCatalog.qml" line="610"/>
         <source>and wait</source>
         <translation>an&apos; wait</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="530"/>
+        <location filename="../qml/BlockCatalog.qml" line="597"/>
         <source>ask</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="530"/>
+        <location filename="../qml/BlockCatalog.qml" line="597"/>
         <source>default</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="514"/>
-        <location filename="../qml/BlockCatalog.qml" line="531"/>
-        <location filename="../qml/BlockCatalog.qml" line="533"/>
-        <location filename="../qml/BlockCatalog.qml" line="535"/>
+        <location filename="../qml/BlockCatalog.qml" line="579"/>
+        <location filename="../qml/BlockCatalog.qml" line="598"/>
+        <location filename="../qml/BlockCatalog.qml" line="600"/>
+        <location filename="../qml/BlockCatalog.qml" line="602"/>
         <source>into</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="532"/>
+        <location filename="../qml/BlockCatalog.qml" line="599"/>
         <source>ask yes or no</source>
         <translation>ask aye or nay</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="534"/>
+        <location filename="../qml/BlockCatalog.qml" line="601"/>
         <source>choose from</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="534"/>
+        <location filename="../qml/BlockCatalog.qml" line="601"/>
         <source>asking</source>
         <translation>askin&apos;</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="536"/>
+        <location filename="../qml/BlockCatalog.qml" line="603"/>
         <source>show message</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="392"/>
+        <location filename="../qml/BlockCatalog.qml" line="448"/>
         <source>WHEN WINDOW</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="392"/>
-        <location filename="../qml/BlockCatalog.qml" line="412"/>
+        <location filename="../qml/BlockCatalog.qml" line="448"/>
+        <location filename="../qml/BlockCatalog.qml" line="468"/>
         <source>IS</source>
         <translation>BE</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="393"/>
+        <location filename="../qml/BlockCatalog.qml" line="449"/>
         <source>focused</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="393"/>
+        <location filename="../qml/BlockCatalog.qml" line="449"/>
         <source>unfocused</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="395"/>
+        <location filename="../qml/BlockCatalog.qml" line="451"/>
         <source>WHEN FILE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="369"/>
-        <location filename="../qml/BlockCatalog.qml" line="395"/>
+        <location filename="../qml/BlockCatalog.qml" line="418"/>
+        <location filename="../qml/BlockCatalog.qml" line="451"/>
         <source>CHANGES</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="396"/>
+        <location filename="../qml/BlockCatalog.qml" line="452"/>
         <source>WHEN I TYPE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="396"/>
+        <location filename="../qml/BlockCatalog.qml" line="452"/>
         <source>THEN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="397"/>
+        <location filename="../qml/BlockCatalog.qml" line="453"/>
         <source>erase it</source>
         <translation>scrub it</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="397"/>
+        <location filename="../qml/BlockCatalog.qml" line="453"/>
         <source>keep it</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="399"/>
+        <location filename="../qml/BlockCatalog.qml" line="455"/>
         <source>WHEN APP</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="400"/>
+        <location filename="../qml/BlockCatalog.qml" line="456"/>
         <source>starts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="400"/>
+        <location filename="../qml/BlockCatalog.qml" line="456"/>
         <source>exits</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="402"/>
+        <location filename="../qml/BlockCatalog.qml" line="458"/>
         <source>WHEN IDLE FOR</source>
         <translation>WHEN IDLE FER</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="402"/>
+        <location filename="../qml/BlockCatalog.qml" line="458"/>
         <source>MINUTES</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="403"/>
+        <location filename="../qml/BlockCatalog.qml" line="459"/>
         <source>WHEN SCREEN IS</source>
         <translation>WHEN SCREEN BE</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="404"/>
+        <location filename="../qml/BlockCatalog.qml" line="460"/>
         <source>locked</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="404"/>
+        <location filename="../qml/BlockCatalog.qml" line="460"/>
         <source>unlocked</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="406"/>
+        <location filename="../qml/BlockCatalog.qml" line="462"/>
         <source>ON SCHEDULE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="407"/>
+        <location filename="../qml/BlockCatalog.qml" line="463"/>
         <source>Click to choose when it runs, or drop a reporter here</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="409"/>
+        <location filename="../qml/BlockCatalog.qml" line="465"/>
         <source>WHEN NETWORK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="373"/>
-        <location filename="../qml/BlockCatalog.qml" line="410"/>
+        <location filename="../qml/BlockCatalog.qml" line="425"/>
+        <location filename="../qml/BlockCatalog.qml" line="466"/>
         <source>connects</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="373"/>
-        <location filename="../qml/BlockCatalog.qml" line="410"/>
+        <location filename="../qml/BlockCatalog.qml" line="425"/>
+        <location filename="../qml/BlockCatalog.qml" line="466"/>
         <source>disconnects</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="412"/>
+        <location filename="../qml/BlockCatalog.qml" line="468"/>
         <source>WHEN USB DEVICE</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="413"/>
+        <location filename="../qml/BlockCatalog.qml" line="469"/>
         <source>plugged in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="413"/>
+        <location filename="../qml/BlockCatalog.qml" line="469"/>
         <source>unplugged</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="330"/>
-        <location filename="../qml/BlockCatalog.qml" line="383"/>
-        <location filename="../qml/BlockCatalog.qml" line="420"/>
+        <location filename="../qml/BlockCatalog.qml" line="376"/>
+        <location filename="../qml/BlockCatalog.qml" line="438"/>
+        <location filename="../qml/BlockCatalog.qml" line="476"/>
         <source>WHEN</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="305"/>
+        <location filename="../qml/BlockCatalog.qml" line="351"/>
         <source>search region</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="306"/>
+        <location filename="../qml/BlockCatalog.qml" line="352"/>
         <source>in a region (pick it)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="310"/>
-        <location filename="../qml/BlockCatalog.qml" line="318"/>
+        <location filename="../qml/BlockCatalog.qml" line="356"/>
+        <location filename="../qml/BlockCatalog.qml" line="364"/>
         <source>which match</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="321"/>
+        <location filename="../qml/BlockCatalog.qml" line="367"/>
         <source>count matches</source>
         <translation type="unfinished"></translation>
     </message>
@@ -1374,851 +1494,843 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="358"/>
+        <location filename="../qml/BlockCatalog.qml" line="404"/>
         <source>custom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="422"/>
+        <location filename="../qml/BlockCatalog.qml" line="478"/>
         <source>is pressed</source>
         <translation>be pressed</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="422"/>
+        <location filename="../qml/BlockCatalog.qml" line="478"/>
         <source>is released</source>
         <translation>be released</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="418"/>
+        <location filename="../qml/BlockCatalog.qml" line="474"/>
         <source>WITH KEYS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="513"/>
+        <location filename="../qml/BlockCatalog.qml" line="578"/>
         <source>split</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="512"/>
-        <location filename="../qml/BlockCatalog.qml" line="513"/>
-        <location filename="../qml/BlockCatalog.qml" line="516"/>
+        <location filename="../qml/BlockCatalog.qml" line="577"/>
+        <location filename="../qml/BlockCatalog.qml" line="578"/>
+        <location filename="../qml/BlockCatalog.qml" line="581"/>
         <source>by</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="475"/>
+        <location filename="../qml/BlockCatalog.qml" line="540"/>
         <source>paste</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="539"/>
+        <location filename="../qml/BlockCatalog.qml" line="606"/>
         <source>Open app</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="528"/>
-        <location filename="../qml/BlockCatalog.qml" line="540"/>
+        <location filename="../qml/BlockCatalog.qml" line="595"/>
+        <location filename="../qml/BlockCatalog.qml" line="607"/>
         <source>Choose app...</source>
         <translation>Pick an app...</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="542"/>
-        <location filename="../qml/BlockCatalog.qml" line="543"/>
+        <location filename="../qml/BlockCatalog.qml" line="609"/>
+        <location filename="../qml/BlockCatalog.qml" line="610"/>
         <source>Run command</source>
         <translation>Run yer command</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="487"/>
+        <location filename="../qml/BlockCatalog.qml" line="552"/>
         <source>with lock</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="545"/>
+        <location filename="../qml/BlockCatalog.qml" line="612"/>
         <source>write</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="545"/>
+        <location filename="../qml/BlockCatalog.qml" line="612"/>
         <source>append</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="547"/>
+        <location filename="../qml/BlockCatalog.qml" line="614"/>
         <source>to file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="507"/>
-        <location filename="../qml/BlockCatalog.qml" line="550"/>
-        <location filename="../qml/BlockCatalog.qml" line="626"/>
+        <location filename="../qml/BlockCatalog.qml" line="572"/>
+        <location filename="../qml/BlockCatalog.qml" line="617"/>
+        <location filename="../qml/BlockCatalog.qml" line="693"/>
         <source>set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="416"/>
+        <location filename="../qml/BlockCatalog.qml" line="472"/>
         <source>with keys</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="551"/>
+        <location filename="../qml/BlockCatalog.qml" line="618"/>
         <source>to response of</source>
         <translation>to response o&apos;</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="554"/>
+        <location filename="../qml/BlockCatalog.qml" line="621"/>
         <source>headers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="555"/>
+        <location filename="../qml/BlockCatalog.qml" line="622"/>
         <source>notify</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="555"/>
+        <location filename="../qml/BlockCatalog.qml" line="622"/>
         <source>saying</source>
         <translation>sayin&apos;</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="556"/>
+        <location filename="../qml/BlockCatalog.qml" line="623"/>
         <source>log</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="488"/>
+        <location filename="../qml/BlockCatalog.qml" line="553"/>
         <source>on error</source>
         <translation>on blunder</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="488"/>
+        <location filename="../qml/BlockCatalog.qml" line="553"/>
         <source>try</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="489"/>
+        <location filename="../qml/BlockCatalog.qml" line="554"/>
         <source>throw error</source>
         <translation>throw blunder</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="497"/>
+        <location filename="../qml/BlockCatalog.qml" line="562"/>
         <source>stop macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="492"/>
+        <location filename="../qml/BlockCatalog.qml" line="557"/>
         <source>try up to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="492"/>
+        <location filename="../qml/BlockCatalog.qml" line="557"/>
         <source>times,</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="493"/>
+        <location filename="../qml/BlockCatalog.qml" line="558"/>
         <source>ms apart</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="525"/>
-        <location filename="../qml/BlockCatalog.qml" line="558"/>
+        <location filename="../qml/BlockCatalog.qml" line="592"/>
+        <location filename="../qml/BlockCatalog.qml" line="625"/>
         <source>focus</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="558"/>
+        <location filename="../qml/BlockCatalog.qml" line="625"/>
         <source>minimize</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="558"/>
+        <location filename="../qml/BlockCatalog.qml" line="625"/>
         <source>maximize</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="558"/>
+        <location filename="../qml/BlockCatalog.qml" line="625"/>
         <source>restore</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="558"/>
+        <location filename="../qml/BlockCatalog.qml" line="625"/>
         <source>close</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="561"/>
+        <location filename="../qml/BlockCatalog.qml" line="628"/>
         <source>move</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="561"/>
+        <location filename="../qml/BlockCatalog.qml" line="628"/>
         <source>resize</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="564"/>
+        <location filename="../qml/BlockCatalog.qml" line="631"/>
         <source>to x</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="564"/>
+        <location filename="../qml/BlockCatalog.qml" line="631"/>
         <source>to width</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="494"/>
+        <location filename="../qml/BlockCatalog.qml" line="559"/>
         <source>run macro</source>
         <translation>launch macro</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="515"/>
+        <location filename="../qml/BlockCatalog.qml" line="580"/>
         <source>set global</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="515"/>
-        <location filename="../qml/BlockCatalog.qml" line="516"/>
+        <location filename="../qml/BlockCatalog.qml" line="580"/>
+        <location filename="../qml/BlockCatalog.qml" line="581"/>
         <source>(no global variable)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="516"/>
+        <location filename="../qml/BlockCatalog.qml" line="581"/>
         <source>change global</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="499"/>
-        <location filename="../qml/BlockCatalog.qml" line="583"/>
-        <location filename="../qml/BlockCatalog.qml" line="592"/>
+        <location filename="../qml/BlockCatalog.qml" line="564"/>
+        <location filename="../qml/BlockCatalog.qml" line="650"/>
+        <location filename="../qml/BlockCatalog.qml" line="659"/>
         <source>wait until</source>
         <translation>wait till</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="294"/>
-        <location filename="../qml/BlockCatalog.qml" line="295"/>
-        <location filename="../qml/BlockCatalog.qml" line="625"/>
+        <location filename="../qml/BlockCatalog.qml" line="340"/>
+        <location filename="../qml/BlockCatalog.qml" line="341"/>
+        <location filename="../qml/BlockCatalog.qml" line="692"/>
         <source>for up to</source>
         <translation>fer up to</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="295"/>
-        <location filename="../qml/BlockCatalog.qml" line="298"/>
-        <location filename="../qml/BlockCatalog.qml" line="440"/>
-        <location filename="../qml/BlockCatalog.qml" line="454"/>
-        <location filename="../qml/BlockCatalog.qml" line="483"/>
-        <location filename="../qml/BlockCatalog.qml" line="597"/>
-        <location filename="../qml/BlockCatalog.qml" line="625"/>
+        <location filename="../qml/BlockCatalog.qml" line="341"/>
+        <location filename="../qml/BlockCatalog.qml" line="344"/>
+        <location filename="../qml/BlockCatalog.qml" line="496"/>
+        <location filename="../qml/BlockCatalog.qml" line="517"/>
+        <location filename="../qml/BlockCatalog.qml" line="548"/>
+        <location filename="../qml/BlockCatalog.qml" line="664"/>
+        <location filename="../qml/BlockCatalog.qml" line="692"/>
         <source>ms</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="575"/>
+        <location filename="../qml/BlockCatalog.qml" line="642"/>
         <source>find</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="575"/>
+        <location filename="../qml/BlockCatalog.qml" line="642"/>
         <source>put x in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="577"/>
+        <location filename="../qml/BlockCatalog.qml" line="644"/>
         <source>y in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="444"/>
-        <location filename="../qml/BlockCatalog.qml" line="579"/>
+        <location filename="../qml/BlockCatalog.qml" line="502"/>
+        <location filename="../qml/BlockCatalog.qml" line="646"/>
         <source>click</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="445"/>
-        <location filename="../qml/BlockCatalog.qml" line="446"/>
-        <location filename="../qml/BlockCatalog.qml" line="580"/>
+        <location filename="../qml/BlockCatalog.qml" line="504"/>
+        <location filename="../qml/BlockCatalog.qml" line="507"/>
+        <location filename="../qml/BlockCatalog.qml" line="647"/>
         <source>left</source>
         <translation>port</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="445"/>
-        <location filename="../qml/BlockCatalog.qml" line="446"/>
-        <location filename="../qml/BlockCatalog.qml" line="580"/>
+        <location filename="../qml/BlockCatalog.qml" line="504"/>
+        <location filename="../qml/BlockCatalog.qml" line="507"/>
+        <location filename="../qml/BlockCatalog.qml" line="647"/>
         <source>right</source>
         <translation>starboard</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="580"/>
+        <location filename="../qml/BlockCatalog.qml" line="647"/>
         <source>middle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="581"/>
+        <location filename="../qml/BlockCatalog.qml" line="648"/>
         <source>on</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="584"/>
-        <location filename="../qml/BlockCatalog.qml" line="593"/>
-        <location filename="../qml/BlockCatalog.qml" line="623"/>
+        <location filename="../qml/BlockCatalog.qml" line="651"/>
+        <location filename="../qml/BlockCatalog.qml" line="660"/>
+        <location filename="../qml/BlockCatalog.qml" line="690"/>
         <source>appears</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="584"/>
-        <location filename="../qml/BlockCatalog.qml" line="593"/>
-        <location filename="../qml/BlockCatalog.qml" line="623"/>
+        <location filename="../qml/BlockCatalog.qml" line="651"/>
+        <location filename="../qml/BlockCatalog.qml" line="660"/>
+        <location filename="../qml/BlockCatalog.qml" line="690"/>
         <source>disappears</source>
         <translation>vanishes</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="586"/>
+        <location filename="../qml/BlockCatalog.qml" line="653"/>
         <source>detect</source>
         <translation>spy</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="588"/>
-        <location filename="../qml/BlockCatalog.qml" line="596"/>
+        <location filename="../qml/BlockCatalog.qml" line="655"/>
+        <location filename="../qml/BlockCatalog.qml" line="663"/>
         <source>at least</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="588"/>
+        <location filename="../qml/BlockCatalog.qml" line="655"/>
         <source>% into</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="323"/>
-        <location filename="../qml/BlockCatalog.qml" line="591"/>
+        <location filename="../qml/BlockCatalog.qml" line="369"/>
+        <location filename="../qml/BlockCatalog.qml" line="658"/>
         <source>count in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="490"/>
+        <location filename="../qml/BlockCatalog.qml" line="555"/>
         <source>stop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="491"/>
+        <location filename="../qml/BlockCatalog.qml" line="556"/>
         <source>all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="491"/>
+        <location filename="../qml/BlockCatalog.qml" line="556"/>
         <source>this strand</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="491"/>
+        <location filename="../qml/BlockCatalog.qml" line="556"/>
         <source>other strands in macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="369"/>
-        <location filename="../qml/BlockCatalog.qml" line="547"/>
+        <location filename="../qml/BlockCatalog.qml" line="417"/>
+        <location filename="../qml/BlockCatalog.qml" line="614"/>
         <source>text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="368"/>
+        <location filename="../qml/BlockCatalog.qml" line="414"/>
         <source>WHEN NATIVE ELEMENT</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="369"/>
+        <location filename="../qml/BlockCatalog.qml" line="416"/>
         <source>existence</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="369"/>
+        <location filename="../qml/BlockCatalog.qml" line="416"/>
         <source>enabled state</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="369"/>
+        <location filename="../qml/BlockCatalog.qml" line="417"/>
         <source>value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="370"/>
-        <location filename="../qml/BlockCatalog.qml" line="372"/>
-        <location filename="../qml/BlockCatalog.qml" line="374"/>
+        <location filename="../qml/BlockCatalog.qml" line="419"/>
+        <location filename="../qml/BlockCatalog.qml" line="423"/>
+        <location filename="../qml/BlockCatalog.qml" line="426"/>
         <source>WHEN CONTROLLER</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="370"/>
-        <location filename="../qml/BlockCatalog.qml" line="372"/>
-        <location filename="../qml/BlockCatalog.qml" line="374"/>
-        <source>Any single controller</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockCatalog.qml" line="371"/>
+        <location filename="../qml/BlockCatalog.qml" line="422"/>
         <source>pressed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="371"/>
+        <location filename="../qml/BlockCatalog.qml" line="422"/>
         <source>released</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="375"/>
+        <location filename="../qml/BlockCatalog.qml" line="429"/>
         <source>rises above</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="375"/>
+        <location filename="../qml/BlockCatalog.qml" line="429"/>
         <source>falls below</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="385"/>
+        <location filename="../qml/BlockCatalog.qml" line="440"/>
         <source>WHEN SYSTEM STARTS</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="385"/>
-        <source>(enable system startup in Settings)</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockCatalog.qml" line="434"/>
+        <location filename="../qml/BlockCatalog.qml" line="490"/>
         <source>typing speed</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="437"/>
+        <location filename="../qml/BlockCatalog.qml" line="493"/>
         <source>typing</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="439"/>
+        <location filename="../qml/BlockCatalog.qml" line="495"/>
         <source>per character</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="439"/>
+        <location filename="../qml/BlockCatalog.qml" line="495"/>
         <source>total time</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="444"/>
+        <location filename="../qml/BlockCatalog.qml" line="500"/>
         <source>virtual controller button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="444"/>
+        <location filename="../qml/BlockCatalog.qml" line="502"/>
         <source>press</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="444"/>
+        <location filename="../qml/BlockCatalog.qml" line="502"/>
         <source>release</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="445"/>
+        <location filename="../qml/BlockCatalog.qml" line="503"/>
         <source>virtual controller stick</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="446"/>
+        <location filename="../qml/BlockCatalog.qml" line="506"/>
         <source>virtual controller trigger</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="447"/>
+        <location filename="../qml/BlockCatalog.qml" line="508"/>
         <source>reset virtual controller</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="448"/>
+        <location filename="../qml/BlockCatalog.qml" line="509"/>
         <source>touch</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="449"/>
+        <location filename="../qml/BlockCatalog.qml" line="510"/>
         <source>tap</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="449"/>
+        <location filename="../qml/BlockCatalog.qml" line="510"/>
         <source>long press</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="449"/>
+        <location filename="../qml/BlockCatalog.qml" line="511"/>
         <source>swipe</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="449"/>
+        <location filename="../qml/BlockCatalog.qml" line="511"/>
         <source>pinch</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="449"/>
+        <location filename="../qml/BlockCatalog.qml" line="511"/>
         <source>rotate</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="450"/>
-        <source>%1 fingers</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockCatalog.qml" line="454"/>
+        <location filename="../qml/BlockCatalog.qml" line="517"/>
         <source>over</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="455"/>
+        <location filename="../qml/BlockCatalog.qml" line="518"/>
         <source>spread</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="457"/>
+        <location filename="../qml/BlockCatalog.qml" line="520"/>
         <source>scale</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="457"/>
+        <location filename="../qml/BlockCatalog.qml" line="520"/>
         <source>degrees</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="459"/>
-        <source>percent of monitor</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockCatalog.qml" line="459"/>
-        <location filename="../qml/BlockCatalog.qml" line="462"/>
-        <source>screen pixels</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockCatalog.qml" line="461"/>
+        <location filename="../qml/BlockCatalog.qml" line="524"/>
         <source>touch paths</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="461"/>
+        <location filename="../qml/BlockCatalog.qml" line="525"/>
         <source>Edit paths</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="461"/>
+        <location filename="../qml/BlockCatalog.qml" line="526"/>
         <source>Edit finger positions and timing, or drop a reporter here</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="462"/>
-        <source>normalized monitor coordinates</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockCatalog.qml" line="524"/>
+        <location filename="../qml/BlockCatalog.qml" line="590"/>
         <source>Choose a desktop app element</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="525"/>
+        <location filename="../qml/BlockCatalog.qml" line="591"/>
         <source>invoke</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="525"/>
+        <location filename="../qml/BlockCatalog.qml" line="591"/>
         <source>set text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="525"/>
+        <location filename="../qml/BlockCatalog.qml" line="592"/>
         <source>set value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="553"/>
+        <location filename="../qml/BlockCatalog.qml" line="620"/>
         <source>body</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="597"/>
+        <location filename="../qml/BlockCatalog.qml" line="664"/>
         <source>% for up to</source>
         <translation>% fer up to</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="598"/>
+        <location filename="../qml/BlockCatalog.qml" line="665"/>
         <source>aim from center of</source>
         <translation>aim from center o&apos;</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="599"/>
+        <location filename="../qml/BlockCatalog.qml" line="666"/>
         <source>toward x</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="600"/>
-        <location filename="../qml/BlockCatalog.qml" line="604"/>
+        <location filename="../qml/BlockCatalog.qml" line="667"/>
+        <location filename="../qml/BlockCatalog.qml" line="671"/>
         <source>gain</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="600"/>
-        <location filename="../qml/BlockCatalog.qml" line="604"/>
+        <location filename="../qml/BlockCatalog.qml" line="667"/>
+        <location filename="../qml/BlockCatalog.qml" line="671"/>
         <source>max step</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="601"/>
-        <location filename="../qml/BlockCatalog.qml" line="605"/>
+        <location filename="../qml/BlockCatalog.qml" line="668"/>
+        <location filename="../qml/BlockCatalog.qml" line="672"/>
         <source>deadzone</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="602"/>
+        <location filename="../qml/BlockCatalog.qml" line="669"/>
         <source>aim at item</source>
         <translation>aim at cargo</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="605"/>
+        <location filename="../qml/BlockCatalog.qml" line="672"/>
         <source>hold</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="606"/>
+        <location filename="../qml/BlockCatalog.qml" line="673"/>
         <source>ms, up to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="606"/>
+        <location filename="../qml/BlockCatalog.qml" line="673"/>
         <source>ms, result in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="615"/>
+        <location filename="../qml/BlockCatalog.qml" line="682"/>
         <source>open</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="616"/>
+        <location filename="../qml/BlockCatalog.qml" line="683"/>
         <source>in this tab</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="616"/>
+        <location filename="../qml/BlockCatalog.qml" line="683"/>
         <source>in a new tab</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="618"/>
+        <location filename="../qml/BlockCatalog.qml" line="685"/>
         <source>click element</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="620"/>
+        <location filename="../qml/BlockCatalog.qml" line="687"/>
         <source>type</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="620"/>
+        <location filename="../qml/BlockCatalog.qml" line="687"/>
         <source>into element</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="622"/>
+        <location filename="../qml/BlockCatalog.qml" line="689"/>
         <source>wait until element</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="627"/>
+        <location filename="../qml/BlockCatalog.qml" line="694"/>
         <source>to result of JavaScript</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="685"/>
+        <location filename="../qml/BlockCatalog.qml" line="752"/>
         <source>What&apos;s your name?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="686"/>
+        <location filename="../qml/BlockCatalog.qml" line="753"/>
         <source>Continue?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="687"/>
+        <location filename="../qml/BlockCatalog.qml" line="754"/>
         <source>Pick one</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="688"/>
-        <location filename="../qml/BlockCatalog.qml" line="706"/>
+        <location filename="../qml/BlockCatalog.qml" line="755"/>
+        <location filename="../qml/BlockCatalog.qml" line="773"/>
         <source>Done!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="701"/>
-        <location filename="../qml/BlockCatalog.qml" line="735"/>
+        <location filename="../qml/BlockCatalog.qml" line="768"/>
+        <location filename="../qml/BlockCatalog.qml" line="802"/>
         <source>Hello!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="707"/>
+        <location filename="../qml/BlockCatalog.qml" line="774"/>
         <source>checkpoint</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="709"/>
+        <location filename="../qml/BlockCatalog.qml" line="776"/>
         <source>something went wrong</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="376"/>
+        <location filename="../qml/BlockCatalog.qml" line="431"/>
         <source>WHEN BATTERY DISCHARGED TO</source>
         <translation>WHEN BATTERY DRAINED TO</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="378"/>
+        <location filename="../qml/BlockCatalog.qml" line="433"/>
         <source>WHEN BATTERY CHARGED TO</source>
         <translation>WHEN BATTERY FILLED TO</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="380"/>
+        <location filename="../qml/BlockCatalog.qml" line="435"/>
         <source>WHEN POWER PLUGGED IN</source>
         <translation>WHEN MOORED TO SHORE POWER</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="381"/>
+        <location filename="../qml/BlockCatalog.qml" line="436"/>
         <source>WHEN POWER UNPLUGGED</source>
         <translation>WHEN CAST OFF FROM SHORE POWER</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="382"/>
+        <location filename="../qml/BlockCatalog.qml" line="437"/>
         <source>WHEN CLIPBOARD CHANGES</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="483"/>
+        <location filename="../qml/BlockCatalog.qml" line="548"/>
         <source>Wait</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/BlockCatalog.qml" line="229"/>
-        <location filename="../qml/BlockCatalog.qml" line="432"/>
+        <location filename="../qml/BlockCatalog.qml" line="488"/>
         <source>Text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="464"/>
+        <location filename="../qml/BlockCatalog.qml" line="529"/>
         <source>Key</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="465"/>
-        <location filename="../qml/BlockCatalog.qml" line="469"/>
+        <location filename="../qml/BlockCatalog.qml" line="530"/>
+        <location filename="../qml/BlockCatalog.qml" line="534"/>
         <source>Click</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="465"/>
-        <location filename="../qml/BlockCatalog.qml" line="469"/>
+        <location filename="../qml/BlockCatalog.qml" line="530"/>
+        <location filename="../qml/BlockCatalog.qml" line="534"/>
         <source>Press</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="465"/>
-        <location filename="../qml/BlockCatalog.qml" line="469"/>
+        <location filename="../qml/BlockCatalog.qml" line="530"/>
+        <location filename="../qml/BlockCatalog.qml" line="534"/>
         <source>Release</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="384"/>
+        <location filename="../qml/BlockCatalog.qml" line="439"/>
         <source>Pressed</source>
         <translation>Mashed</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="384"/>
+        <location filename="../qml/BlockCatalog.qml" line="439"/>
         <source>Released</source>
         <translation>Let go</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="466"/>
+        <location filename="../qml/BlockCatalog.qml" line="441"/>
+        <source>(system startup is off in Settings)</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/BlockCatalog.qml" line="512"/>
+        <source>%n finger(s)</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="522"/>
+        <location filename="../qml/BlockCatalog.qml" line="527"/>
+        <source>in % of</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="522"/>
+        <location filename="../qml/BlockCatalog.qml" line="527"/>
+        <source>in pixels of</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="531"/>
         <source>Mouse button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="467"/>
+        <location filename="../qml/BlockCatalog.qml" line="532"/>
         <source>Left</source>
         <translation>Port</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="467"/>
+        <location filename="../qml/BlockCatalog.qml" line="532"/>
         <source>Right</source>
         <translation>Starboard</translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="467"/>
+        <location filename="../qml/BlockCatalog.qml" line="532"/>
         <source>Middle</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="468"/>
+        <location filename="../qml/BlockCatalog.qml" line="533"/>
         <source>Side</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="468"/>
+        <location filename="../qml/BlockCatalog.qml" line="533"/>
         <source>Extra</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="470"/>
+        <location filename="../qml/BlockCatalog.qml" line="535"/>
         <source>Move mouse</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="471"/>
+        <location filename="../qml/BlockCatalog.qml" line="536"/>
         <source>Relative</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="471"/>
+        <location filename="../qml/BlockCatalog.qml" line="536"/>
         <source>Absolute</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="473"/>
+        <location filename="../qml/BlockCatalog.qml" line="538"/>
         <source>Scroll</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="473"/>
+        <location filename="../qml/BlockCatalog.qml" line="538"/>
         <source>amount</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="474"/>
+        <location filename="../qml/BlockCatalog.qml" line="539"/>
         <source>Vertical</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="474"/>
+        <location filename="../qml/BlockCatalog.qml" line="539"/>
         <source>Horizontal</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="527"/>
+        <location filename="../qml/BlockCatalog.qml" line="594"/>
         <source>Close app</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="529"/>
+        <location filename="../qml/BlockCatalog.qml" line="596"/>
         <source>set clipboard to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="638"/>
+        <location filename="../qml/BlockCatalog.qml" line="705"/>
         <source>Recording target</source>
         <translation>Recordin&apos; target</translation>
     </message>
@@ -2808,6 +2920,101 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/BlockHelp.qml" line="93"/>
+        <source>Taps, long-presses, swipes, pinches or rotates on a touchscreen. Positions are percentages of the monitor (0 to 100) or screen pixels. Spread is how far apart the fingers are, in pixels. Pinch and rotate always use two fingers. Works on Windows, and on Linux with access to /dev/uinput (one monitor, experimental).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="94"/>
+        <source>Plays recorded or hand-made finger paths, up to ten fingers at once. Edit paths shows each moment as a frame listing the fingers still touching; the last frame lifts them all. Stopping or pausing the macro lifts every finger.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="95"/>
+        <source>Runs when a button, field or other element in another app changes: appears or disappears, becomes enabled or disabled, or changes its text or value. Pick the element with the scan button. Needs Native UI automation in Settings (Linux only). Password fields are never read.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="96"/>
+        <source>Presses, focuses, types into or sets the value of a button, field or slider in another app. Pick the element with the scan button. If more than one element matches, the block fails rather than guess. Needs Native UI automation in Settings (Linux only). Password fields are refused.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="97"/>
+        <source>Whether exactly one element in another app matches. Needs Native UI automation in Settings (Linux only).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="98"/>
+        <source>Whether the element can be used right now (not greyed out).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="99"/>
+        <source>The element&apos;s text, such as a label or the contents of a field. Password fields are never read.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="100"/>
+        <source>The element&apos;s number, such as a slider&apos;s position or a spin box&apos;s value.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="101"/>
+        <source>Runs when a controller button is pressed or released. A button already held when the macro starts listening doesn&apos;t count. Needs Controller input in Settings.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="102"/>
+        <source>Runs when the controller is plugged in or unplugged. Needs Controller input in Settings.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="103"/>
+        <source>Runs when a stick or trigger moves past the threshold (0.05 to 1), in either direction. Small wobbles near the threshold don&apos;t fire it again. Needs Controller input in Settings.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="104"/>
+        <source>Presses, releases or clicks a button on Blockwork&apos;s virtual controller, which games see as a real one. A click holds the button for 50 ms. Stopping or pausing the macro releases everything. Needs Virtual controller output in Settings (Linux only).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="105"/>
+        <source>Moves a virtual controller stick. x and y go from -1 to 1; 0, 0 is the centre and positive y is up. Needs Virtual controller output in Settings (Linux only).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="106"/>
+        <source>Presses a virtual controller trigger from 0 (released) to 1 (fully pressed). Needs Virtual controller output in Settings (Linux only).</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="107"/>
+        <source>Lets go of every virtual controller button, centres both sticks and releases both triggers.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="108"/>
+        <source>Whether the controller is plugged in. With any controller, true when exactly one is connected. Needs Controller input in Settings.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="109"/>
+        <source>Whether a controller button is held down. Needs Controller input in Settings.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="110"/>
+        <source>Where a stick is, from -1 to 1, or how far a trigger is pressed, from 0 to 1. Movement inside the deadzone set in Settings reads as 0.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="111"/>
+        <source>Runs once each time you log in to your computer. Needs Start at system startup in Settings. Opening Blockwork yourself doesn&apos;t run it; use Run strand from the block&apos;s menu to try it. Only runs in the open macro or in macros set to Always listen.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/BlockHelp.qml" line="121"/>
         <source>Types the text as keystrokes into whatever app has focus. Without the typing speed option, no delay is added: typing goes at full speed, except on Linux where keystrokes are spaced about 0.5 ms apart. Add the option to wait per character, or give the whole text a total time divided evenly across it. For long text, a paste block is faster and more reliable.</source>
         <translation type="unfinished"></translation>
@@ -2910,101 +3117,6 @@
     <message>
         <location filename="../qml/BlockHelp.qml" line="92"/>
         <source>Stops all of this macro&apos;s strands (including ones other triggers started), just this strand, or its other strands. Other macros keep running.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="93"/>
-        <source>Sends a real touch tap, long press, multi-finger swipe, pinch or rotation. Positions use screen pixels or percentages of the chosen monitor. Pinch and rotation use two fingers; spread is the distance between fingers. Requires native touch support: Linux uinput with one monitor (experimental), or Windows 8 and later. macOS and synchronous embedding hosts are unsupported.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="94"/>
-        <source>Edits timed contact paths for up to ten fingers. Each frame lists all contacts still down; the final frame must release them. Paths are checked before playback and released on stop, pause, monitor changes or failure. Normalized path coordinates use 0 to 1000000 on each axis.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="95"/>
-        <source>Runs when an accessible element property changes. Linux AT-SPI events are coalesced; the first query establishes a baseline. Requires Native UI automation in Settings and permission. Text history is not retained; password elements are excluded. Use existence changes for elements that appear or disappear.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="96"/>
-        <source>Invokes or focuses a desktop app element, sets editable text, or sets a numeric value. Requires Native UI automation in Settings and Linux AT-SPI. Selectors resolve fresh; ambiguous matches and password fields are refused. Windows and macOS adapters are not yet available.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="97"/>
-        <source>Whether a unique native desktop element matches the selector. Requires Linux AT-SPI and Native UI automation in Settings. Service errors are reported separately from no match.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="98"/>
-        <source>Whether the matching native element is enabled and sensitive.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="99"/>
-        <source>Reads the matching native element&apos;s text through accessibility, up to 65536 characters. Password elements are excluded.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="100"/>
-        <source>Reads the matching native element&apos;s numeric value, such as a slider or spin box.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="101"/>
-        <source>Runs when a logical controller button is pressed or released. Requires Controller input in Settings and permission to use input. Already-held buttons establish a baseline; they do not fire on enabling the trigger.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="102"/>
-        <source>Runs when the chosen physical controller connects or disconnects. Stable profiles survive reconnects; ambiguous identical profiles are refused.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="103"/>
-        <source>Runs when the absolute value of a controller axis crosses a threshold from 0.05 to 1, after the configured deadzone. Hysteresis prevents small fluctuations from firing repeatedly.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="104"/>
-        <source>Presses, releases or clicks a logical virtual controller button. A click holds it for 50 ms. Requires Virtual controller output in Settings and Linux uinput. One strand owns the controller until it ends; stopping, pausing or an injection failure releases every control. Native output on Windows/macOS and synchronous embedding hosts is unsupported.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="105"/>
-        <source>Sets both axes of a virtual controller stick from -1 to 1. Positive Y points upward. Requires Linux uinput and Virtual controller output in Settings.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="106"/>
-        <source>Sets a virtual controller trigger from 0 (released) to 1 (fully pressed). Requires Linux uinput and Virtual controller output in Settings.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="107"/>
-        <source>Releases all buttons, centers both sticks and releases both triggers for this strand&apos;s virtual controller. It does not reset a controller owned by another strand.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="108"/>
-        <source>Whether the selected physical controller is connected. Enable Controller input in Settings. An empty profile selects the only connected controller; identical profiles are refused as ambiguous.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="109"/>
-        <source>Whether a logical controller button is held. Requires Controller input in Settings.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="110"/>
-        <source>A controller stick axis from -1 to 1, or trigger from 0 to 1, after the configured deadzone.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="111"/>
-        <source>Runs once when Blockwork starts at login. Requires Start at system startup in Settings. Opening Blockwork or restarting the daemon does not fire it. A macro must be selected or set to Always listen.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -5193,43 +5305,58 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ControllerPickerDialog.qml" line="29"/>
+        <location filename="../qml/ControllerPickerDialog.qml" line="38"/>
         <source>The macro changed. Reopen the controller picker.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ControllerPickerDialog.qml" line="30"/>
+        <location filename="../qml/ControllerPickerDialog.qml" line="39"/>
         <source>Stop recording before changing this input.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ControllerPickerDialog.qml" line="37"/>
-        <source>Enable Controller input in Settings first. Profiles stay stable across reconnects; identical connected profiles cannot be distinguished safely.</source>
+        <location filename="../qml/ControllerPickerDialog.qml" line="46"/>
+        <source>The block keeps working after the controller is unplugged and plugged back in. Two identical controllers can&apos;t be told apart, so connect only one of them.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ControllerPickerDialog.qml" line="40"/>
-        <source>Refresh</source>
+        <location filename="../qml/ControllerPickerDialog.qml" line="50"/>
+        <source>Controller input is off, so Blockwork can&apos;t see any controllers.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ControllerPickerDialog.qml" line="41"/>
-        <source>Any single controller</source>
+        <location filename="../qml/ControllerPickerDialog.qml" line="51"/>
+        <source>Turn on</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../qml/ControllerPickerDialog.qml" line="56"/>
+        <source>Any controller</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/ControllerPickerDialog.qml" line="57"/>
+        <source>Uses whichever one is connected.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/ControllerPickerDialog.qml" line="78"/>
+        <source>No controllers connected. Plug one in, then press Refresh.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/ControllerPickerDialog.qml" line="55"/>
+        <source>Refresh</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/ControllerPickerDialog.qml" line="72"/>
         <source>Identical profiles connected; unplug one.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ControllerPickerDialog.qml" line="58"/>
+        <location filename="../qml/ControllerPickerDialog.qml" line="74"/>
         <source>Choose</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/ControllerPickerDialog.qml" line="62"/>
-        <source>No controllers connected.</source>
         <translation type="unfinished"></translation>
     </message>
 </context>
@@ -6273,27 +6400,127 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/InputDiagnosticsDialog.qml" line="19"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="20"/>
+        <source>Recording keys and mouse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="20"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="21"/>
+        <source>Working</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="20"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="21"/>
+        <source>Not available</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="21"/>
+        <source>Playing keys and mouse</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="23"/>
+        <source>Touch playback</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="23"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="30"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="33"/>
+        <source>Not supported on this system</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="24"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="31"/>
+        <source>Ready</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="24"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="31"/>
+        <source>Needs write access to /dev/uinput</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="26"/>
+        <source>Controller input</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="27"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="31"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="34"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="35"/>
+        <source>Off in Settings</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="28"/>
+        <source>%n controller(s) connected</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="30"/>
+        <source>Virtual controller</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="33"/>
+        <source>Native UI automation</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="34"/>
+        <source>%n app(s) visible</source>
+        <translation type="unfinished">
+            <numerusform></numerusform>
+            <numerusform></numerusform>
+        </translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="35"/>
+        <source>Start at system startup</source>
+        <translation type="unfinished">Set sail at system startup</translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="35"/>
+        <source>On</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="44"/>
         <source>Diagnostics aren&apos;t available here.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/InputDiagnosticsDialog.qml" line="39"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="67"/>
         <source>Which input devices, permissions and services Blockwork can use right now. It doesn&apos;t include your macros or anything you typed.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/InputDiagnosticsDialog.qml" line="49"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="84"/>
+        <source>Details</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="93"/>
         <source>Checking…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/InputDiagnosticsDialog.qml" line="56"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="100"/>
         <source>Copy</source>
         <translation type="unfinished">Copy</translation>
     </message>
     <message>
-        <location filename="../qml/InputDiagnosticsDialog.qml" line="57"/>
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="101"/>
         <source>Check again</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7488,52 +7715,52 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="51"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="69"/>
         <source>Wait %1 ms</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="52"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="70"/>
         <source>Press key %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="53"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="71"/>
         <source>Release key %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="54"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="72"/>
         <source>Type %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="55"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="73"/>
         <source>Press mouse %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="56"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="74"/>
         <source>Release mouse %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="57"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="75"/>
         <source>Click mouse %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="58"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="76"/>
         <source>Scroll %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="59"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="77"/>
         <source>Move mouse to %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/RecordingReviewDialog.qml" line="62"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="80"/>
         <source>Touch with %n finger(s) for %1 ms</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -7541,72 +7768,72 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="62"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="80"/>
         <source>Touch paths</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="64"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="82"/>
         <source>Press controller %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="65"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="83"/>
         <source>Release controller %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="66"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="84"/>
         <source>Reset controller</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="66"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="84"/>
         <source>Controller %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="72"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="90"/>
         <source>Keys</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="73"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="91"/>
         <source>Mouse buttons</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="74"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="92"/>
         <source>Scrolling</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="75"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="93"/>
         <source>Mouse movement</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="76"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="94"/>
         <source>Touch</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="77"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="95"/>
         <source>Controller</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="82"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="100"/>
         <source>Insert blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="83"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="101"/>
         <source>Discard</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/RecordingReviewDialog.qml" line="90"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="108"/>
         <source>%n block(s) recorded into %1, taking %2 s to play.</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -7614,37 +7841,37 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="99"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="117"/>
         <source>%1 (%2)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="106"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="124"/>
         <source>Keep the timing between inputs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="109"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="127"/>
         <source>Skip the %1 s before the first input</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="115"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="133"/>
         <source>Shorten waits longer than</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="116"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="134"/>
         <source>Seconds</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="117"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="135"/>
         <source>seconds</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/RecordingReviewDialog.qml" line="121"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="139"/>
         <source>Release %n key(s) or button(s) still held at the end</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -7652,7 +7879,7 @@
         </translation>
     </message>
     <message>
-        <location filename="../qml/RecordingReviewDialog.qml" line="143"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="163"/>
         <source>Showing the first %1 blocks.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8241,6 +8468,11 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
+        <location filename="../qml/SettingsPage.qml" line="167"/>
+        <source>Hotkeys work as soon as you log in, and &quot;when system starts&quot; blocks run.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
         <location filename="../qml/SettingsPage.qml" line="179"/>
         <source>Time format</source>
         <translation type="unfinished"></translation>
@@ -8427,13 +8659,7 @@
     </message>
     <message>
         <location filename="../qml/SettingsPage.qml" line="362"/>
-        <location filename="../qml/SettingsPage.qml" line="363"/>
         <source>Controller input</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/SettingsPage.qml" line="362"/>
-        <source>Read physical controller buttons, sticks and connection events.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -8448,24 +8674,12 @@
     </message>
     <message>
         <location filename="../qml/SettingsPage.qml" line="369"/>
-        <location filename="../qml/SettingsPage.qml" line="370"/>
         <source>Virtual controller output</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/SettingsPage.qml" line="369"/>
-        <source>Create a virtual gamepad for playback. Currently requires Linux and /dev/uinput access.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../qml/SettingsPage.qml" line="372"/>
-        <location filename="../qml/SettingsPage.qml" line="373"/>
         <source>Native UI automation</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/SettingsPage.qml" line="372"/>
-        <source>Read and control desktop app elements through Linux AT-SPI. Imported macros still need permission.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -8606,6 +8820,21 @@
     <message>
         <location filename="../qml/SettingsPage.qml" line="476"/>
         <source>New token</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="362"/>
+        <source>Let macros react to a game controller&apos;s buttons and sticks, and to it being plugged in.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="369"/>
+        <source>Let macros press buttons on a virtual gamepad that games see as a real one. Linux only, with access to /dev/uinput.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/SettingsPage.qml" line="372"/>
+        <source>Let macros read and press buttons, fields and sliders in other apps. Linux only. Imported macros still need your permission.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -9065,62 +9294,62 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="134"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="135"/>
         <source>Positions are percentages of the selected monitor.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="134"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="135"/>
         <source>Positions are screen pixels.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="152"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="153"/>
         <source>Frame %1 at</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="157"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="158"/>
         <source>Frame time in milliseconds</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="161"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="162"/>
         <source>ms</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="163"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="164"/>
         <source>Add finger</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="173"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="174"/>
         <source>Finger %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="188"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="196"/>
         <source>Release all fingers</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="191"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="199"/>
         <source>Enter valid numbers before applying.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="194"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="202"/>
         <source>Add frame</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="196"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="204"/>
         <source>Cancel</source>
         <translation type="unfinished">Belay that</translation>
     </message>
     <message>
-        <location filename="../qml/TouchPathsDialog.qml" line="197"/>
+        <location filename="../qml/TouchPathsDialog.qml" line="205"/>
         <source>Apply</source>
         <translation type="unfinished"></translation>
     </message>

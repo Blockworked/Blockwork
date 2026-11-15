@@ -13,6 +13,17 @@
     </message>
 </context>
 <context>
+    <name>BlockCatalog</name>
+    <message numerus="yes">
+        <location filename="../qml/BlockCatalog.qml" line="512"/>
+        <source>%n finger(s)</source>
+        <translation>
+            <numerusform>%n finger</numerusform>
+            <numerusform>%n fingers</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>BlockLibrary</name>
     <message numerus="yes">
         <location filename="../qml/BlockLibrary.qml" line="289"/>
@@ -62,6 +73,25 @@
     </message>
 </context>
 <context>
+    <name>InputDiagnosticsDialog</name>
+    <message numerus="yes">
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="28"/>
+        <source>%n controller(s) connected</source>
+        <translation>
+            <numerusform>%n controller connected</numerusform>
+            <numerusform>%n controllers connected</numerusform>
+        </translation>
+    </message>
+    <message numerus="yes">
+        <location filename="../qml/InputDiagnosticsDialog.qml" line="34"/>
+        <source>%n app(s) visible</source>
+        <translation>
+            <numerusform>%n app visible</numerusform>
+            <numerusform>%n apps visible</numerusform>
+        </translation>
+    </message>
+</context>
+<context>
     <name>ListEditorCard</name>
     <message numerus="yes">
         <location filename="../../../blockstitch/qml/Blockstitch/ListEditorCard.qml" line="252"/>
@@ -105,7 +135,7 @@
 <context>
     <name>RecordingReviewDialog</name>
     <message numerus="yes">
-        <location filename="../qml/RecordingReviewDialog.qml" line="62"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="80"/>
         <source>Touch with %n finger(s) for %1 ms</source>
         <translation>
             <numerusform>Touch with %n finger for %1 ms</numerusform>
@@ -113,7 +143,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/RecordingReviewDialog.qml" line="90"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="108"/>
         <source>%n block(s) recorded into %1, taking %2 s to play.</source>
         <translation>
             <numerusform>%n block recorded into %1, taking %2 s to play.</numerusform>
@@ -121,7 +151,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/RecordingReviewDialog.qml" line="121"/>
+        <location filename="../qml/RecordingReviewDialog.qml" line="139"/>
         <source>Release %n key(s) or button(s) still held at the end</source>
         <translation>
             <numerusform>Release %n key or button still held at the end</numerusform>

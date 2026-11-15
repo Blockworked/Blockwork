@@ -586,6 +586,7 @@ dependencies = [
  "blockwork-web",
  "chrono",
  "dirs 7.0.0",
+ "lucide-qt",
  "serde",
  "serde_json",
  "sha2",

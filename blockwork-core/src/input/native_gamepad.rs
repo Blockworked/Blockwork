@@ -30,7 +30,9 @@ pub fn prepare() -> Result<(), String> {
         .virtual_gamepad_enabled
         .unwrap_or(false)
     {
-        return Err("Virtual controller output is disabled in Settings".into());
+        return Err(
+            "Virtual controller output is off; turn it on in Settings > Integrations".into(),
+        );
     }
     let mut device = DEVICE.lock().map_err(|e| e.to_string())?;
     if device.is_some() {

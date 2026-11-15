@@ -57,7 +57,7 @@ pub fn enabled() -> Result<(), String> {
     {
         Ok(())
     } else {
-        Err("Native UI automation is disabled in Settings".into())
+        Err("Native UI automation is off; turn it on in Settings > Integrations".into())
     }
 }
 

@@ -45,6 +45,24 @@ AppDialog {
         reviewData = next;
         if (fresh) { resetChoices(); open(); }
     }
+    // A controller button's name as the blocks show it.
+    function buttonName(button) {
+        const option = page.catalog.gamepadButtonOptions.find(o => o.value === button);
+        return option ? option.label : button;
+    }
+    // Whether a row's kind of input is still ticked, so its blocks are inserted.
+    function kept(row) {
+        switch (row.source) {
+        case "wait": return keepWaits;
+        case "key": return keepKeys;
+        case "button": return keepButtons;
+        case "scroll": return keepScrolls;
+        case "movement": return keepMovement;
+        case "touch": return keepTouch;
+        case "controller": return keepController;
+        default: return true;
+        }
+    }
     function rowText(row) {
         const detail = row.detail;
         switch (row.source) {
@@ -61,8 +79,8 @@ AppDialog {
             const parts = detail.split("|");
             return parts.length === 2 ? qsTr("Touch with %n finger(s) for %1 ms", "", Number(parts[0])).arg(parts[1]) : qsTr("Touch paths");
         }
-        case "controller": return row.direction === "press" ? qsTr("Press controller %1").arg(detail)
-                                : row.direction === "release" ? qsTr("Release controller %1").arg(detail)
+        case "controller": return row.direction === "press" ? qsTr("Press controller %1").arg(buttonName(detail))
+                                : row.direction === "release" ? qsTr("Release controller %1").arg(buttonName(detail))
                                 : detail === "reset" ? qsTr("Reset controller") : qsTr("Controller %1").arg(detail);
         default: return detail;
         }
@@ -133,7 +151,9 @@ AppDialog {
                     required property var modelData
                     width: rows.width; elide: Text.ElideRight
                     text: review.rowText(modelData)
-                    color: modelData.source === "wait" ? Theme.textDim : Theme.text
+                    // Rows left out by the choices above stay listed, struck through.
+                    color: modelData.source === "wait" || !review.kept(modelData) ? Theme.textDim : Theme.text
+                    font.strikeout: !review.kept(modelData)
                     font.pixelSize: 12; topPadding: 2; bottomPadding: 2
                 }
             }

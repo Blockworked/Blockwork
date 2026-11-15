@@ -164,7 +164,7 @@ Item {
                             SettingsRow { title: qsTr("Close to tray"); detail: qsTr("Keep hotkeys and schedules active after closing the editor.")
                                 StitchSwitch { checked: appState.close_to_tray; onToggled: checked => root.invoke("set_close_to_tray", { enabled: checked }) }
                             }
-                            SettingsRow { title: qsTr("Start at system startup")
+                            SettingsRow { title: qsTr("Start at system startup"); detail: qsTr("Hotkeys work as soon as you log in, and \"when system starts\" blocks run.")
                                 StitchSwitch { checked: appState.start_at_startup === true; onToggled: checked => root.invoke("set_start_at_startup", { enabled: checked }) }
                             }
                             SettingsRow { title: qsTr("Language")
@@ -359,21 +359,21 @@ Item {
                     // Integrations
                     SettingsGrid { visible: root.tab === 3
                         SettingsSection { title: qsTr("Input and native UI")
-                            SettingsRow { first: true; title: qsTr("Controller input"); detail: qsTr("Read physical controller buttons, sticks and connection events.")
-                                StitchSwitch { Accessible.name: qsTr("Controller input"); checked: appState.controller_input_enabled === true; onToggled: checked => root.invoke("set_controller_input_enabled", {enabled: checked}) }
+                            SettingsRow { first: true; title: qsTr("Controller input"); detail: qsTr("Let macros react to a game controller's buttons and sticks, and to it being plugged in.")
+                                StitchSwitch { checked: appState.controller_input_enabled === true; onToggled: checked => root.invoke("set_controller_input_enabled", {enabled: checked}) }
                             }
                             SettingsRow { title: qsTr("Controller deadzone"); detail: qsTr("Ignore small stick movements near the center.")
-                                StitchSlider { from: 0; to: 0.95; stepSize: 0.01; width: 140; value: appState.controller_deadzone ?? 0.12; onMoved: root.invoke("set_controller_deadzone", {value: value}) }
+                                StitchSlider { enabled: appState.controller_input_enabled === true; from: 0; to: 0.95; stepSize: 0.01; width: 140; value: appState.controller_deadzone ?? 0.12; onMoved: root.invoke("set_controller_deadzone", {value: value}) }
                                 Label { text: Math.round((appState.controller_deadzone ?? 0.12)*100) + "%"; color: Theme.text }
                             }
-                            SettingsRow { title: qsTr("Virtual controller output"); detail: qsTr("Create a virtual gamepad for playback. Currently requires Linux and /dev/uinput access.")
-                                StitchSwitch { Accessible.name: qsTr("Virtual controller output"); checked: appState.virtual_gamepad_enabled === true; onToggled: checked => root.invoke("set_virtual_gamepad_enabled", {enabled: checked}) }
+                            SettingsRow { title: qsTr("Virtual controller output"); detail: qsTr("Let macros press buttons on a virtual gamepad that games see as a real one. Linux only, with access to /dev/uinput.")
+                                StitchSwitch { checked: appState.virtual_gamepad_enabled === true; onToggled: checked => root.invoke("set_virtual_gamepad_enabled", {enabled: checked}) }
                             }
-                            SettingsRow { title: qsTr("Native UI automation"); detail: qsTr("Read and control desktop app elements through Linux AT-SPI. Imported macros still need permission.")
-                                StitchSwitch { Accessible.name: qsTr("Native UI automation"); checked: appState.ui_automation_enabled === true; onToggled: checked => root.invoke("set_ui_automation_enabled", {enabled: checked}) }
+                            SettingsRow { title: qsTr("Native UI automation"); detail: qsTr("Let macros read and press buttons, fields and sliders in other apps. Linux only. Imported macros still need your permission.")
+                                StitchSwitch { checked: appState.ui_automation_enabled === true; onToggled: checked => root.invoke("set_ui_automation_enabled", {enabled: checked}) }
                             }
                             SettingsRow { title: qsTr("Input diagnostics"); detail: qsTr("See which devices, permissions and services recording and playback can use, to copy into a bug report.")
-                                StitchButton { objectName: "openInputDiagnostics"; text: qsTr("Show"); iconName: "activity"; onClicked: inputDiagnostics.open() }
+                                StitchButton { objectName: "openInputDiagnostics"; text: qsTr("Show"); iconName: "gauge"; onClicked: inputDiagnostics.open() }
                             }
                         }
                         SettingsSection {

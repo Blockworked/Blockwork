@@ -72,7 +72,7 @@ AppDialog {
             Layout.fillWidth:true
             StitchComboBox {id:application;objectName:"nativeUiApplication";Layout.fillWidth:true;model:root.applications;displayText:currentIndex<0 ? qsTr("Choose an app") : currentText;enabled:!root.busy;onActivated:root.inspect()}
             StitchButton {iconName:"refresh-cw";text:qsTr("Refresh");enabled:!root.busy;onClicked:root.refreshApplications()}
-            StitchButton {objectName:"nativeUiPickOnScreen";iconName:"scan";text:qsTr("Pick on screen");onClicked:{const req=root.request;root.reject();root.pickOnScreen(req);}}
+            StitchButton {objectName:"nativeUiPickOnScreen";iconName: "square-mouse-pointer";text:qsTr("Pick on screen");onClicked:{const req=root.request;root.reject();root.pickOnScreen(req);}}
         }
         StitchTextField {id:filter;objectName:"nativeUiNameFilter";Layout.fillWidth:true;placeholderText:qsTr("Filter by name, then press Enter");enabled:application.currentIndex>=0;onAccepted:root.inspect()}
         StitchListView {
