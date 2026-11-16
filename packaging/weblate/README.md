@@ -38,8 +38,12 @@ translate.example.com {
 Without a public IP, a Cloudflare Tunnel or Tailscale Funnel pointed at
 `127.0.0.1:8080` does the same job.
 
-Updating: `docker compose pull && docker compose up -d`. Back up the
-`weblate-data` and `postgres-data` volumes.
+Updating: `docker compose pull && docker compose up -d`. Back up Weblate's
+PostgreSQL database with a logical dump and coordinate it with a backup of
+`weblate-data` using Weblate's supported backup procedure. Include Compose
+configuration, secrets, and SSH keys in an encrypted off-site backup. A copy
+of the live `postgres-data` directory alone is not a verified database backup.
+Test recovery on an isolated instance before relying on the backups.
 
 ## Adding Blockwork
 
