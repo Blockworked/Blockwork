@@ -24,12 +24,6 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/ActivityPanel.qml" line="72"/>
-        <source>MMM d</source>
-        <comment>date format for older log entries</comment>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
         <location filename="../qml/ActivityPanel.qml" line="79"/>
         <source>Running - %1</source>
         <translation type="unfinished"></translation>
