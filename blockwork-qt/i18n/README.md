@@ -42,8 +42,9 @@ messages. Keep protocol values, enum keys, HTTP methods, model class names,
 code samples, URLs, file paths, icons, language autonyms and the Blockwork
 brand literal unchanged. Translate the display label separately from its
 stored value. File filter descriptions are translatable; their wildcard
-patterns must stay unchanged. Date-format codes in help text must also stay
-unchanged.
+patterns must stay unchanged. Keep date and time format patterns (such as
+`MMM d`, `yyyy-MM-dd` and `hh:mm:ss`) as non-translatable literals. Date-format
+codes in help text must also stay unchanged.
 
 Use `AppDialog` for application dialogs so their standard buttons follow the
 selected language. Use its `acceptText` property for a custom OK label.
