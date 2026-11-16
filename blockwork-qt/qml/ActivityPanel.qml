@@ -69,7 +69,7 @@ Rectangle {
         if (s < 60) return qsTr("%1s ago").arg(s);
         if (s < 3600) return qsTr("%1m ago").arg(Math.floor(s / 60));
         if (s < 86400) return qsTr("%1h ago").arg(Math.floor(s / 3600));
-        return Qt.locale().toString(new Date(ms), qsTr("MMM d", "date format for older log entries"));
+        return Qt.locale().toString(new Date(ms), "MMM d");
     }
     function elapsed(ms) {
         const s = Math.max(0, Math.floor((now - ms) / 1000));
