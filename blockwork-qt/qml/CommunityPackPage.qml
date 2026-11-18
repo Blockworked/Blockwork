@@ -50,6 +50,8 @@ ColumnLayout {
             page.view = { loading: true };
             page.detail = { loading: false, detail: null, error: "" };
             commentBox.text = "";
+            page.reportedPack = "";
+            page.reportedComment = 0;
         }
     }
 
@@ -138,6 +140,12 @@ ColumnLayout {
                     page.pack.source && !page.pack.community ? qsTr("from %1").arg(page.pack.source) : ""
                 ].filter(f => f)
             }
+            Text {
+                objectName: "packReportResult"
+                visible: page.reportedPack === page.pack.id && !page.reporting && text !== ""
+                color: page.reportTask.error ? Theme.danger : Theme.textDim; font.pixelSize: 12
+                text: page.reportTask.error || page.reportTask.message || ""
+            }
         }
         Row {
             spacing: 6
@@ -152,6 +160,22 @@ ColumnLayout {
             }
             StitchButton { visible: page.installed; text: qsTr("Settings"); iconName: "settings"; onClicked: page.host.showPackData(page.pack.id) }
             StitchButton { visible: page.installed; text: qsTr("Remove"); iconName: "trash-2"; onClicked: page.host.confirmRemove(page.pack.id, page.pack.name) }
+            StitchButton {
+                id: reportPack
+                objectName: "packReport"
+                visible: !!page.site && page.host.community.signed_in && !!page.site.can_report
+                enabled: !page.reporting
+                iconName: "flag"; Accessible.name: qsTr("Report this pack")
+                ToolTip.visible: hovered; ToolTip.delay: 400; ToolTip.text: qsTr("Report this pack")
+                onClicked: reportMenu.popup(reportPack, reportPack.width - reportMenu.width, reportPack.height + 4)
+                StitchMenu {
+                    id: reportMenu
+                    StitchMenuItem { text: qsTr("Spam"); onTriggered: page.report(0, "Spam") }
+                    StitchMenuItem { text: qsTr("Harmful or malicious"); onTriggered: page.report(0, "Harmful or malicious") }
+                    StitchMenuItem { text: qsTr("Copied from someone else"); onTriggered: page.report(0, "Copied from someone else") }
+                    StitchMenuItem { text: qsTr("Something else"); onTriggered: page.report(0, "Something else") }
+                }
+            }
             StitchButton {
                 visible: page.pack.page !== ""
                 iconName: "external-link"; Accessible.name: qsTr("Open on the website")
@@ -388,6 +412,20 @@ ColumnLayout {
                                 CommunityParts.Pill { visible: comment.modelData.pack_author; text: qsTr("author") }
                                 Text { text: page.browser.date(comment.modelData.created); color: Theme.textDim; font.pixelSize: 12 }
                                 Item { Layout.fillWidth: true }
+                                Text {
+                                    visible: page.reportedComment === comment.modelData.id && !page.reporting && text !== ""
+                                    color: page.reportTask.error ? Theme.danger : Theme.textDim; font.pixelSize: 12
+                                    text: page.reportTask.error || (page.reportTask.message ? qsTr("Reported") : "")
+                                }
+                                StitchButton {
+                                    objectName: "commentReport"
+                                    visible: page.host.community.signed_in && !!comment.modelData.can_report && page.reportedComment !== comment.modelData.id
+                                    flat: true; implicitHeight: 28; iconName: "flag"
+                                    text: qsTr("Report")
+                                    ToolTip.visible: hovered; ToolTip.delay: 400; ToolTip.text: qsTr("Report this comment as spam or abuse")
+                                    enabled: !page.reporting
+                                    onClicked: page.report(comment.modelData.id, "spam")
+                                }
                                 StitchButton {
                                     visible: comment.modelData.can_delete
                                     flat: true; implicitHeight: 28; iconName: "trash-2"
@@ -459,6 +497,17 @@ ColumnLayout {
                 Item { implicitHeight: 8 }
             }
         }
+    }
+
+    // Reporting: one at a time, and the answer shows beside what was reported.
+    readonly property var reportTask: host.community.tasks.report || ({})
+    readonly property bool reporting: !!reportTask.running
+    property string reportedPack: ""
+    property int reportedComment: 0
+    function report(commentId, reason) {
+        reportedPack = commentId ? "" : pack.id;
+        reportedComment = commentId;
+        host.invoke("community_report", commentId ? { packId: pack.id, id: commentId, reason: reason } : { packId: pack.id, reason: reason });
     }
 
     // Clears the box once the comment it held is posted.

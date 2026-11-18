@@ -287,6 +287,13 @@ impl Backend {
                 arg(&args, "packId")?,
                 arg(&args, "id")?,
             )?),
+            "community_report" => to_json(crate::community::report(
+                &self.state,
+                &self.app,
+                arg(&args, "packId")?,
+                arg::<Option<u64>>(&args, "id")?,
+                arg::<Option<String>>(&args, "reason")?.unwrap_or_default(),
+            )?),
             "community_my_packs" => to_json(crate::community::my_packs(
                 &self.state,
                 &self.app,

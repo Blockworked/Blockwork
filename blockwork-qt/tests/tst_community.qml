@@ -15,6 +15,10 @@ Item {
         {id:"community",identifier:"Alice_Community",shape:"Normal",pieces:[{kind:"Label",text:"community block"}],read_only:true,pack_name:"Command helpers",packs:[{id:"commands",name:"Command helpers"},{id:"text",name:"Text helpers"}]},
         {id:"reporter",identifier:"Alice_Reporter",shape:"ReturnsValue",pieces:[{kind:"Label",text:"community reporter"}],read_only:true,pack_name:"Text helpers",packs:[{id:"text",name:"Text helpers"}]}
     ]
+    property var community: ({ site: "https://community.example", signed_in: false, user: { name: "", avatar: "", page: "" }, sign_in_url: "", revision: 0, tasks: {} })
+    property var site: ({ versions: [], can_comment: true, can_report: true, comments: [
+        { id: 7, author: "Bob", avatar: "", official: false, pack_author: false, mine: false, can_delete: false, can_report: true, body: "spam spam", created: 0 },
+        { id: 8, author: "Me", avatar: "", official: false, pack_author: false, mine: true, can_delete: true, can_report: false, body: "mine", created: 0 }] })
     property var pack: ({key:"example#pack",id:"pack",name:"Example pack",version:"1.0",description:"An example pack",author:"Alice",blocks:["community block"],installed:"1.0",available:false,update:false,official:false})
     QtObject {
         id: bridge
@@ -22,7 +26,12 @@ Item {
         property string replyKey: ""
         property string replyError: ""
         property string replyJson: "null"
-        function callCommand(key, command, args) { scene.invoked = command; scene.args = JSON.parse(args); }
+        function callCommand(key, command, args) {
+            scene.invoked = command; scene.args = JSON.parse(args);
+            if (command === "community_pack") Qt.callLater(() => {
+                replyKey = key; replyError = ""; replyJson = JSON.stringify({ loading: false, error: "", detail: scene.site }); replySerial++;
+            });
+        }
     }
     PalettePanel {
         id: palette; width: 360; height: 700
@@ -31,7 +40,7 @@ Item {
     }
     BlockLibrary {
         id: library
-        appState: ({current_macro:{id:"macro",block_defs:scene.definitions},block_library:{loaded:true,loading:false,packs:[scene.pack],sources:[],fetching:"",error:""}})
+        appState: ({current_macro:{id:"macro",block_defs:scene.definitions},block_library:{loaded:true,loading:false,packs:[scene.pack],sources:[],fetching:"",error:""},community:scene.community})
         invoke: scene.invoke
         appBridge: bridge
         macroFiles: null
@@ -288,6 +297,41 @@ Item {
             mouseClick(confirm, confirm.width / 2, confirm.height / 2);
             compare(scene.invoked, "remove_block_pack");
             compare(scene.args.packId, "pack");
+        }
+        function visibleNamed(name) {
+            return all(scene).concat(all(Overlay.overlay)).filter(o => o.objectName === name && o.visible);
+        }
+        function test_report_comments_and_packs() {
+            scene.pack = Object.assign({}, scene.pack, { community: true, page: "https://community.example/packs/pack" });
+            scene.community = Object.assign({}, scene.community, { signed_in: true, user: { name: "Me", avatar: "", page: "" } });
+            library.browse();
+            const browser = findChild(library, "blockLibraryBrowser");
+            browser.showPack("example#pack", "comments");
+            tryVerify(() => visibleNamed("packReport").length === 1);
+            // Someone else's comment can be reported, your own can't.
+            compare(visibleNamed("commentReport").length, 1);
+            const flag = visibleNamed("commentReport")[0];
+            mouseClick(flag, flag.width / 2, flag.height / 2);
+            compare(scene.invoked, "community_report");
+            compare(scene.args.packId, "pack");
+            compare(scene.args.id, 7);
+            compare(scene.args.reason, "spam");
+            const packFlag = visibleNamed("packReport")[0];
+            mouseClick(packFlag, packFlag.width / 2, packFlag.height / 2);
+            wait(50);
+            const spam = all(Overlay.overlay).find(o => o.text === "Harmful or malicious" && o.visible);
+            verify(!!spam);
+            mouseClick(spam, spam.width / 2, spam.height / 2);
+            compare(scene.invoked, "community_report");
+            compare(scene.args.reason, "Harmful or malicious");
+            verify(scene.args.id === undefined);
+            // Signed out, there's nothing to report with.
+            scene.community = Object.assign({}, scene.community, { signed_in: false });
+            wait(50);
+            compare(visibleNamed("commentReport").length, 0);
+            compare(visibleNamed("packReport").length, 0);
+            browser.close();
+            scene.pack = Object.assign({}, scene.pack, { community: false, page: "" });
         }
     }
 }

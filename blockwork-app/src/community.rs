@@ -686,6 +686,25 @@ pub(crate) fn delete_comment(
     })
 }
 
+/// Reports a comment (`id`) or, with no id, the pack itself, for moderators to look at.
+pub(crate) fn report(
+    state: &SharedState,
+    app: &AppHandle,
+    pack_id: String,
+    id: Option<u64>,
+    reason: String,
+) -> Result<(), String> {
+    spawn_task(state, app, "report", move || {
+        let path = match id {
+            Some(id) => format!("/api/v1/comments/{id}/report"),
+            None => format!("/api/v1/packs/{}/report", percent_encode(&pack_id)),
+        };
+        let bytes = serde_json::to_vec(&json!({ "reason": reason })).map_err(|e| e.to_string())?;
+        call("POST", &path, Some(("application/json", bytes)), true)?;
+        Ok("Thanks, we'll take a look".into())
+    })
+}
+
 // My packs and sharing
 
 /// The account's packs, with each upload's review status.
