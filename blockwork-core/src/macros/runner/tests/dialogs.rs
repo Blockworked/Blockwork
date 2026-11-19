@@ -121,15 +121,16 @@ fn restricted_macros_ask_before_globals_files_and_input() {
 }
 
 #[test]
-fn window_saves_its_values_and_buttons_start_their_strands() {
+fn window_saves_its_values_and_buttons_run_their_blocks() {
     install_test_dialogs();
-    let window = |label: &str, close: bool| {
+    let button = |label: &str, close: bool, var: &str| {
         Instruction::new(InstructionKind::WindowButton {
             label: Value::text(label),
             close,
+            body: vec![set(var, Value::Var { name: "who".into() })],
         })
     };
-    let mut mac = Macro::new(
+    let mac = Macro::new(
         "Window".into(),
         String::new(),
         vec![
@@ -148,29 +149,26 @@ fn window_saves_its_values_and_buttons_start_their_strands() {
                     }),
                     // Other blocks inside are skipped.
                     set("skipped", Value::number(1.0)),
-                    window("Apply", false),
-                    window("Done", true),
+                    button("Apply", false, "applied"),
+                    button("Done", true, "done"),
                 ],
             }),
-            set("after", Value::number(1.0)),
+            // A closing button's blocks run before the ones after the window.
+            set(
+                "after",
+                Value::Var {
+                    name: "done".into(),
+                },
+            ),
         ],
     );
-    for (y, label, var) in [(200, "apply", "applied"), (400, "Done", "done")] {
-        mac.graph.strands.push(Strand::with_instructions(
-            0,
-            y,
-            vec![
-                Instruction::new(InstructionKind::WhenWindowButton(Value::text(label))),
-                set(var, Value::Var { name: "who".into() }),
-            ],
-        ));
-    }
     let vars = empty_vars();
     mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
     let vars = vars.lock().unwrap();
+    let typed = Some(&Evaluated::Text("typed".into()));
     assert_eq!(vars.get("loud"), Some(&Evaluated::Bool(true)));
-    assert_eq!(vars.get("applied"), Some(&Evaluated::Text("typed".into())));
-    assert_eq!(vars.get("done"), Some(&Evaluated::Text("typed".into())));
-    assert_eq!(vars.get("after"), Some(&Evaluated::Number(1.0)));
+    assert_eq!(vars.get("applied"), typed);
+    assert_eq!(vars.get("done"), typed);
+    assert_eq!(vars.get("after"), typed);
     assert_eq!(vars.get("skipped"), None);
 }

@@ -240,9 +240,6 @@
       "windows",
       "triggers"
     ],
-    "WhenWindowButton": [
-      "triggers"
-    ],
     "WindowAction": [
       "windows"
     ],

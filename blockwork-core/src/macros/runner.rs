@@ -412,41 +412,30 @@ fn paste_text(ctx: &ExecCtx, text: String) -> Result<(), String> {
 /// Custom block bodies keyed by block id, shared read-only by a run's strands.
 pub type BlockTable = Arc<HashMap<String, BlockRuntime>>;
 
-/// Block table key prefix for `WhenSignal` and `WhenWindowButton` strands;
-/// can't clash with a block id.
+/// Block table key prefix for `WhenSignal` strands; can't clash with a block id.
 const SIGNAL_KEY: &str = "\u{1}signal:";
 
-/// This run's strands only it starts (`WhenSignal`, `WhenWindowButton`):
-/// each one's resolved name or label for which `name_of` gives a value, and
-/// its body.
-fn run_started_bodies(
-    ctx: &mut ExecCtx,
-    depth: u32,
-    name_of: fn(&InstructionKind) -> Option<&Value>,
-) -> Vec<(String, Vec<Instruction>)> {
+/// The bodies of this run's `WhenSignal` strands listening for `name`.
+fn signal_bodies(ctx: &mut ExecCtx, name: &str, depth: u32) -> Vec<Vec<Instruction>> {
     let table = Arc::clone(&ctx.block_table);
     let mut keys: Vec<_> = table.keys().filter(|k| k.starts_with(SIGNAL_KEY)).collect();
     keys.sort();
     keys.into_iter()
         .filter_map(|key| {
             let body = &table[key].body;
-            let name = name_of(&body.first()?.kind)?;
-            let name = ctx.resolve(name, depth).and_then(|v| v.eval_text()).ok()?;
-            Some((name.trim().to_string(), body[1..].to_vec()))
+            let Some(InstructionKind::WhenSignal(listens)) = body.first().map(|i| &i.kind) else {
+                return None;
+            };
+            let listens = ctx
+                .resolve(&listens.value, depth)
+                .and_then(|v| v.eval_text())
+                .ok()?;
+            listens
+                .trim()
+                .eq_ignore_ascii_case(name.trim())
+                .then(|| body[1..].to_vec())
         })
         .collect()
-}
-
-/// The bodies of this run's `WhenSignal` strands listening for `name`.
-fn signal_bodies(ctx: &mut ExecCtx, name: &str, depth: u32) -> Vec<Vec<Instruction>> {
-    run_started_bodies(ctx, depth, |kind| match kind {
-        InstructionKind::WhenSignal(listens) => Some(&listens.value),
-        _ => None,
-    })
-    .into_iter()
-    .filter(|(listens, _)| listens.eq_ignore_ascii_case(name.trim()))
-    .map(|(_, body)| body)
-    .collect()
 }
 
 /// What a strand this run starts (a signal's, a window button's) shares
@@ -693,7 +682,7 @@ impl Run for Macro {
         for (index, strand) in self.graph.strands.iter().enumerate() {
             if matches!(
                 strand.instructions.first().map(|i| &i.kind),
-                Some(InstructionKind::WhenSignal(_) | InstructionKind::WhenWindowButton(_))
+                Some(InstructionKind::WhenSignal(_))
             ) {
                 let runtime = BlockRuntime {
                     input_names: Vec::new(),

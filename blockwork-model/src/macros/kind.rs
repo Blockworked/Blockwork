@@ -659,7 +659,7 @@ pub enum InstructionKind {
     ShowMessage(Value),
     /// Opens a window built from the `Window*` control blocks in `body`
     /// and waits until it's closed. Its controls read and write variables,
-    /// and its buttons start `WhenWindowButton` strands.
+    /// and its buttons run the blocks inside them.
     ShowWindow {
         title: Value,
         body: Vec<Instruction>,
@@ -680,17 +680,16 @@ pub enum InstructionKind {
         list: String,
         name: String,
     },
-    /// Inside `ShowWindow`: a button; with `close`, clicking it also closes
-    /// the window.
+    /// Inside `ShowWindow`: a button that runs `body` when clicked. With
+    /// `close` it also closes the window, and `body` runs before the blocks
+    /// after the window; without, `body` runs alongside the open window.
     WindowButton {
         label: Value,
         close: bool,
+        body: Vec<Instruction>,
     },
     /// Inside `ShowWindow`: a line of text.
     WindowNote(Value),
-    /// Header for a strand a `ShowWindow` button with this label starts,
-    /// sharing that run's variables.
-    WhenWindowButton(Value),
     /// Header for a strand fired once at a date and time, like `2026-12-24 18:00`.
     WhenAt(Value),
     /// Header for a strand started by a `SendSignal` of the same name in this macro.

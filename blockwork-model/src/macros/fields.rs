@@ -360,8 +360,7 @@ pub(crate) fn slots_mut<'a>(
         | InstructionKind::WindowCheckbox { label, .. }
         | InstructionKind::WindowChoice { label, .. }
         | InstructionKind::WindowButton { label, .. }
-        | InstructionKind::WindowNote(label)
-        | InstructionKind::WhenWindowButton(label) => f(F::WindowLabel, label, Any),
+        | InstructionKind::WindowNote(label) => f(F::WindowLabel, label, Any),
         InstructionKind::WhenAt(v) => f(F::AtTime, v, Any),
         InstructionKind::WhenWebhook { path, .. } => f(F::WebhookPath, path, Any),
         InstructionKind::BrowserOpen { url, .. } => f(F::BrowserUrl, url, Any),
