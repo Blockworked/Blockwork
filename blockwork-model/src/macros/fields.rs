@@ -101,6 +101,8 @@ pub enum FieldId {
     AskPrompt,
     AskDefault,
     MessageText,
+    WindowTitle,
+    WindowLabel,
     AtTime,
     SignalName,
     WebhookPath,
@@ -353,6 +355,13 @@ pub(crate) fn slots_mut<'a>(
             f(F::AskPrompt, prompt, Any)
         }
         InstructionKind::ShowMessage(v) => f(F::MessageText, v, Any),
+        InstructionKind::ShowWindow { title, .. } => f(F::WindowTitle, title, Any),
+        InstructionKind::WindowTextBox { label, .. }
+        | InstructionKind::WindowCheckbox { label, .. }
+        | InstructionKind::WindowChoice { label, .. }
+        | InstructionKind::WindowButton { label, .. }
+        | InstructionKind::WindowNote(label)
+        | InstructionKind::WhenWindowButton(label) => f(F::WindowLabel, label, Any),
         InstructionKind::WhenAt(v) => f(F::AtTime, v, Any),
         InstructionKind::WhenWebhook { path, .. } => f(F::WebhookPath, path, Any),
         InstructionKind::BrowserOpen { url, .. } => f(F::BrowserUrl, url, Any),

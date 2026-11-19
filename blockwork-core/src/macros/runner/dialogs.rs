@@ -57,6 +57,150 @@ fn move_box(title: &str, place: TooltipPlace, at: (f64, f64)) {
     }
 }
 
+/// The window control a block inside `ShowWindow` stands for, if it is one.
+fn control(
+    ctx: &mut ExecCtx,
+    ins: &Instruction,
+    depth: u32,
+) -> Result<Option<crate::prompt::Control>, String> {
+    let current = |ctx: &ExecCtx, name: &str| {
+        ctx.variables
+            .lock()
+            .ok()
+            .and_then(|vars| vars.get(name).cloned())
+    };
+    let control = |kind: &str, label: String| crate::prompt::Control {
+        kind: kind.into(),
+        label,
+        name: String::new(),
+        value: serde_json::Value::Null,
+        options: Vec::new(),
+        close: false,
+    };
+    Ok(Some(match &ins.kind {
+        InstructionKind::WindowTextBox { label, name } => crate::prompt::Control {
+            name: name.clone(),
+            value: current(ctx, name)
+                .map(|v| v.as_text())
+                .unwrap_or_default()
+                .into(),
+            ..control("text", ctx.resolve(label, depth)?.eval_text()?)
+        },
+        InstructionKind::WindowCheckbox { label, name } => crate::prompt::Control {
+            name: name.clone(),
+            value: current(ctx, name).is_some_and(|v| v.as_bool()).into(),
+            ..control("check", ctx.resolve(label, depth)?.eval_text()?)
+        },
+        InstructionKind::WindowChoice { label, list, name } => crate::prompt::Control {
+            name: name.clone(),
+            value: current(ctx, name)
+                .map(|v| v.as_text())
+                .unwrap_or_default()
+                .into(),
+            options: ctx
+                .lists
+                .lock()
+                .ok()
+                .and_then(|lists| {
+                    lists
+                        .get(list)
+                        .map(|items| items.iter().map(|i| i.evaluated().as_text()).collect())
+                })
+                .unwrap_or_default(),
+            ..control("choice", ctx.resolve(label, depth)?.eval_text()?)
+        },
+        InstructionKind::WindowButton { label, close } => crate::prompt::Control {
+            close: *close,
+            ..control("button", ctx.resolve(label, depth)?.eval_text()?)
+        },
+        InstructionKind::WindowNote(text) => {
+            control("note", ctx.resolve(text, depth)?.eval_text()?)
+        }
+        _ => return Ok(None),
+    }))
+}
+
+/// A window's value as a variable value.
+fn evaluated(value: &serde_json::Value) -> Option<Evaluated> {
+    Some(match value {
+        serde_json::Value::Bool(b) => Evaluated::Bool(*b),
+        serde_json::Value::Number(n) => Evaluated::Number(n.as_f64()?),
+        serde_json::Value::String(s) => Evaluated::Text(s.clone()),
+        _ => return None,
+    })
+}
+
+/// Shows the window `body` describes until it's closed. Values go back
+/// into their variables on every click and on closing, and a clicked
+/// button starts the `WhenWindowButton` strands with its label.
+fn show_window(
+    ins: &Instruction,
+    ctx: &mut ExecCtx,
+    depth: u32,
+    title: &Value,
+    body: &[Instruction],
+) -> Result<(), String> {
+    let built = (|| {
+        let title = ctx.resolve(title, depth)?.eval_text()?;
+        let mut request = crate::prompt::Request::new(crate::prompt::Kind::Window, &title, "");
+        for child in body {
+            request.controls.extend(control(ctx, child, depth)?);
+        }
+        Ok::<_, String>(request)
+    })();
+    let request = match built {
+        Ok(request) => request,
+        Err(e) => return soft_fail(ctx, &ins.id, "Show window", e),
+    };
+    let names: Vec<String> = request
+        .controls
+        .iter()
+        .filter(|c| !c.name.is_empty())
+        .map(|c| c.name.clone())
+        .collect();
+    let buttons = run_started_bodies(ctx, depth, |kind| match kind {
+        InstructionKind::WhenWindowButton(label) => Some(label),
+        _ => None,
+    });
+    let spawner = Spawner::of(ctx);
+    let threads = Mutex::new(Vec::new());
+    let variables = Arc::clone(&ctx.variables);
+    let save = |reply: &crate::prompt::Reply| {
+        let Ok(mut vars) = variables.lock() else {
+            return;
+        };
+        for name in &names {
+            if let Some(value) = reply.values.get(name).and_then(evaluated) {
+                vars.insert(name.clone(), value);
+            }
+        }
+    };
+    let clicked = |reply: &crate::prompt::Reply| {
+        save(reply);
+        for (label, body) in &buttons {
+            if label.eq_ignore_ascii_case(reply.text.trim())
+                && let Some(thread) = spawner.spawn(format!("button_{label}"), body.clone())
+                && let Ok(mut threads) = threads.lock()
+            {
+                threads.push(thread);
+            }
+        }
+    };
+    let flag = ctx.stop_flag.clone();
+    let stopped = || flag.as_ref().is_some_and(stop_requested);
+    let shown = crate::prompt::show_window(&request, &stopped, &clicked);
+    match shown {
+        // A button that closes the window counts as a click too.
+        Ok(reply) if reply.answer == "ok" => clicked(&reply),
+        Ok(reply) => save(&reply),
+        Err(_) if stopped() => {}
+        Err(e) => soft_fail(ctx, &ins.id, "Show window", e)?,
+    }
+    ctx.signal_threads
+        .extend(threads.into_inner().unwrap_or_default());
+    Ok(())
+}
+
 /// Runs one dialog block. `Some(flow)` ends the strand with it; `None` goes on to the next block.
 pub(super) fn run_dialog_block(
     ins: &Instruction,
@@ -232,6 +376,7 @@ pub(super) fn run_dialog_block(
                 Err(e) => soft_fail(ctx, &ins.id, "Show message", e)?,
             }
         }
+        InstructionKind::ShowWindow { title, body } => show_window(ins, ctx, depth, title, body)?,
         _ => unreachable!("run_dialog_block got another block"),
     }
     Ok(None)

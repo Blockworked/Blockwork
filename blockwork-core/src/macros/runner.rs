@@ -412,30 +412,92 @@ fn paste_text(ctx: &ExecCtx, text: String) -> Result<(), String> {
 /// Custom block bodies keyed by block id, shared read-only by a run's strands.
 pub type BlockTable = Arc<HashMap<String, BlockRuntime>>;
 
-/// Block table key prefix for `WhenSignal` strands; can't clash with a block id.
+/// Block table key prefix for `WhenSignal` and `WhenWindowButton` strands;
+/// can't clash with a block id.
 const SIGNAL_KEY: &str = "\u{1}signal:";
 
-/// The bodies of this run's `WhenSignal` strands listening for `name`.
-fn signal_bodies(ctx: &mut ExecCtx, name: &str, depth: u32) -> Vec<Vec<Instruction>> {
+/// This run's strands only it starts (`WhenSignal`, `WhenWindowButton`):
+/// each one's resolved name or label for which `name_of` gives a value, and
+/// its body.
+fn run_started_bodies(
+    ctx: &mut ExecCtx,
+    depth: u32,
+    name_of: fn(&InstructionKind) -> Option<&Value>,
+) -> Vec<(String, Vec<Instruction>)> {
     let table = Arc::clone(&ctx.block_table);
     let mut keys: Vec<_> = table.keys().filter(|k| k.starts_with(SIGNAL_KEY)).collect();
     keys.sort();
     keys.into_iter()
         .filter_map(|key| {
             let body = &table[key].body;
-            let Some(InstructionKind::WhenSignal(listens)) = body.first().map(|i| &i.kind) else {
-                return None;
-            };
-            let listens = ctx
-                .resolve(&listens.value, depth)
-                .and_then(|v| v.eval_text())
-                .ok()?;
-            listens
-                .trim()
-                .eq_ignore_ascii_case(name.trim())
-                .then(|| body[1..].to_vec())
+            let name = name_of(&body.first()?.kind)?;
+            let name = ctx.resolve(name, depth).and_then(|v| v.eval_text()).ok()?;
+            Some((name.trim().to_string(), body[1..].to_vec()))
         })
         .collect()
+}
+
+/// The bodies of this run's `WhenSignal` strands listening for `name`.
+fn signal_bodies(ctx: &mut ExecCtx, name: &str, depth: u32) -> Vec<Vec<Instruction>> {
+    run_started_bodies(ctx, depth, |kind| match kind {
+        InstructionKind::WhenSignal(listens) => Some(&listens.value),
+        _ => None,
+    })
+    .into_iter()
+    .filter(|(listens, _)| listens.eq_ignore_ascii_case(name.trim()))
+    .map(|(_, body)| body)
+    .collect()
+}
+
+/// What a strand this run starts (a signal's, a window button's) shares
+/// with it, copied so the strand can start later.
+struct Spawner {
+    source: Arc<crate::run_log::Source>,
+    emulator: Arc<Mutex<dyn InputBackend>>,
+    stop_flag: Option<StrandStop>,
+    speed_multiplier: f64,
+    variables: VariableStore,
+    lists: ListStore,
+    dicts: DictStore,
+    block_table: BlockTable,
+    max_loop_iterations: u32,
+}
+
+impl Spawner {
+    fn of(ctx: &ExecCtx) -> Self {
+        Spawner {
+            source: Arc::clone(&ctx.source),
+            emulator: Arc::clone(&ctx.emulator),
+            stop_flag: ctx.stop_flag.clone(),
+            speed_multiplier: ctx.speed_multiplier,
+            variables: Arc::clone(&ctx.variables),
+            lists: Arc::clone(&ctx.lists),
+            dicts: Arc::clone(&ctx.dicts),
+            block_table: Arc::clone(&ctx.block_table),
+            max_loop_iterations: u32::try_from(ctx.max_loop_iterations).unwrap_or(u32::MAX),
+        }
+    }
+
+    /// Runs `body` on a thread of its own named `name`.
+    fn spawn(&self, name: String, body: Vec<Instruction>) -> Option<std::thread::JoinHandle<()>> {
+        let run = StrandRun {
+            source: Arc::clone(&self.source),
+            emulator: Arc::clone(&self.emulator),
+            stop_flag: self.stop_flag.as_ref().map(StrandStop::fork),
+            speed_multiplier: self.speed_multiplier,
+            variables: Arc::clone(&self.variables),
+            lists: Arc::clone(&self.lists),
+            dicts: Arc::clone(&self.dicts),
+            block_table: Arc::clone(&self.block_table),
+            max_loop_iterations: self.max_loop_iterations,
+        };
+        std::thread::Builder::new()
+            .name(name)
+            .stack_size(STRAND_STACK_SIZE)
+            .spawn(move || run_strand(run, body, Duration::ZERO))
+            .inspect_err(|e| warn!("Failed to start a strand: {e}"))
+            .ok()
+    }
 }
 
 /// `bash -c command`, for the run command blocks.
@@ -631,7 +693,7 @@ impl Run for Macro {
         for (index, strand) in self.graph.strands.iter().enumerate() {
             if matches!(
                 strand.instructions.first().map(|i| &i.kind),
-                Some(InstructionKind::WhenSignal(_))
+                Some(InstructionKind::WhenSignal(_) | InstructionKind::WhenWindowButton(_))
             ) {
                 let runtime = BlockRuntime {
                     input_names: Vec::new(),

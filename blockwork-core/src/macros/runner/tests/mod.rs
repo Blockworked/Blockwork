@@ -167,16 +167,49 @@ fn bump(name: &str) -> Instruction {
 }
 
 /// Answers dialogs by their message: "cancel" cancels, permissions are denied.
+/// A window gets "typed" in its text boxes, its checkboxes ticked and its
+/// last choice picked, then each button clicked in order.
 fn install_test_dialogs() {
     use crate::prompt::{Kind, Reply};
     crate::prompt::set_handler(Arc::new(
-        |request: &crate::prompt::Request, _stopped: &dyn Fn() -> bool| {
+        |request: &crate::prompt::Request,
+         _stopped: &dyn Fn() -> bool,
+         on_click: &dyn Fn(&Reply)| {
             let reply = |answer: &str, text: &str| {
                 Ok(Reply {
                     answer: answer.into(),
                     text: text.into(),
+                    ..Reply::default()
                 })
             };
+            if request.kind == Kind::Window {
+                let mut values = serde_json::Map::new();
+                for c in &request.controls {
+                    let value = match c.kind.as_str() {
+                        "text" => serde_json::json!("typed"),
+                        "check" => serde_json::json!(true),
+                        "choice" => serde_json::json!(c.options.last()),
+                        _ => continue,
+                    };
+                    values.insert(c.name.clone(), value);
+                }
+                for c in request.controls.iter().filter(|c| c.kind == "button") {
+                    let click = Reply {
+                        answer: if c.close { "ok" } else { "click" }.into(),
+                        text: c.label.clone(),
+                        values: values.clone(),
+                    };
+                    if c.close {
+                        return Ok(click);
+                    }
+                    on_click(&click);
+                }
+                return Ok(Reply {
+                    answer: "cancel".into(),
+                    values,
+                    ..Reply::default()
+                });
+            }
             match request.kind {
                 _ if request.message == "cancel" => reply("cancel", ""),
                 Kind::Text => reply("ok", &format!("{}!", request.default)),
@@ -188,6 +221,7 @@ fn install_test_dialogs() {
                 Kind::Folder => reply("ok", "/tmp"),
                 Kind::Tooltip => reply("ok", ""),
                 Kind::Menu => reply("ok", &request.options[0]),
+                Kind::Window => unreachable!(),
             }
         },
     ));

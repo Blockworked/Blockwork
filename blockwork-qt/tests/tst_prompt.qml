@@ -15,6 +15,7 @@ Item {
         when: windowShown
         property var bridge
         SignalSpy { id: replies; target: tests.bridge; signalName: "finished" }
+        SignalSpy { id: sent; target: tests.bridge; signalName: "sent" }
         function initTestCase() {
             bridge = findChild(dialog, "promptBridge");
             verify(bridge !== null);
@@ -23,6 +24,7 @@ Item {
             bridge.parentRunning = true;
             dialog.answered = false;
             replies.clear();
+            sent.clear();
         }
         function control(name) {
             function walk(item) {
@@ -53,6 +55,33 @@ Item {
             tryCompare(replies, "count", 1);
             compare(replies.signalArguments[0][0], answer);
             compare(replies.signalArguments[0][1], text);
+        }
+        function test_window_controls_send_values_on_each_click() {
+            configure("window", {controls: [
+                {kind: "note", label: "Fill this in"},
+                {kind: "text", label: "Name", name: "who", value: "Ann"},
+                {kind: "check", label: "Loud", name: "loud", value: false},
+                {kind: "choice", label: "Color", name: "color", value: "Blue", options: ["Red", "Blue"]},
+                {kind: "button", label: "Apply"},
+                {kind: "button", label: "Done", close: true}]});
+            const name = control("promptFormText_1");
+            compare(name.text, "Ann");
+            name.forceActiveFocus();
+            name.selectAll();
+            keyClick(Qt.Key_B);
+            compare(control("promptFormChoice_3").currentText, "Blue");
+            mouseClick(control("promptFormCheck_2"));
+            mouseClick(control("promptFormButton_Apply"));
+            tryCompare(sent, "count", 1);
+            compare(sent.signalArguments[0][0], "click");
+            compare(sent.signalArguments[0][1], "Apply");
+            compare(sent.signalArguments[0][2], JSON.stringify({who: "b", loud: true, color: "Blue"}));
+            compare(dialog.answered, false);
+            mouseClick(control("promptFormButton_Done"));
+            tryCompare(sent, "count", 2);
+            compare(sent.signalArguments[1][0], "ok");
+            compare(sent.signalArguments[1][1], "Done");
+            compare(replies.count, 0);
         }
         function test_text_keyboard_and_return() {
             configure("text");

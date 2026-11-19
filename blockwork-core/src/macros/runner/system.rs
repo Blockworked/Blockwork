@@ -42,45 +42,11 @@ pub(super) fn run_system_block(
                     return Ok(());
                 }
             };
-            let mut threads = Vec::new();
-            for body in signal_bodies(ctx, &name, depth) {
-                let (source, emulator, stop_flag) = (
-                    Arc::clone(&ctx.source),
-                    Arc::clone(&ctx.emulator),
-                    ctx.stop_flag.as_ref().map(StrandStop::fork),
-                );
-                let (variables, lists, dicts, table) = (
-                    Arc::clone(&ctx.variables),
-                    Arc::clone(&ctx.lists),
-                    Arc::clone(&ctx.dicts),
-                    Arc::clone(&ctx.block_table),
-                );
-                let (speed, loops) = (
-                    ctx.speed_multiplier,
-                    u32::try_from(ctx.max_loop_iterations).unwrap_or(u32::MAX),
-                );
-                let spawned = std::thread::Builder::new()
-                    .name(format!("signal_{name}"))
-                    .stack_size(STRAND_STACK_SIZE)
-                    .spawn(move || {
-                        let run = StrandRun {
-                            source,
-                            emulator,
-                            stop_flag,
-                            speed_multiplier: speed,
-                            variables,
-                            lists,
-                            dicts,
-                            block_table: table,
-                            max_loop_iterations: loops,
-                        };
-                        run_strand(run, body, Duration::ZERO)
-                    });
-                match spawned {
-                    Ok(thread) => threads.push(thread),
-                    Err(e) => warn!("Failed to start a signal strand: {e}"),
-                }
-            }
+            let spawner = Spawner::of(ctx);
+            let threads: Vec<_> = signal_bodies(ctx, &name, depth)
+                .into_iter()
+                .filter_map(|body| spawner.spawn(format!("signal_{name}"), body))
+                .collect();
             if *wait {
                 for thread in threads {
                     let _ = thread.join();

@@ -1,8 +1,9 @@
 //! Shows macro dialogs by starting `blockwork --prompt`, which reads the
 //! request on stdin and prints the answer, so they work with the editor closed.
+//! A window prints a line per button click before its answer.
 
 use blockwork_app::prompt::{Reply, Request};
-use std::io::{Read, Write};
+use std::io::{BufRead, Write};
 use std::process::{Command, Stdio};
 use std::sync::{Arc, mpsc};
 use std::time::Duration;
@@ -11,7 +12,11 @@ pub(crate) fn install() {
     blockwork_app::prompt::set_handler(Arc::new(show));
 }
 
-fn show(request: &Request, stopped: &dyn Fn() -> bool) -> Result<Reply, String> {
+fn show(
+    request: &Request,
+    stopped: &dyn Fn() -> bool,
+    on_click: &dyn Fn(&Reply),
+) -> Result<Reply, String> {
     let program = crate::server::ui_program().ok_or("can't find the Blockwork window program")?;
     let mut child = Command::new(&program)
         .arg("--prompt")
@@ -32,24 +37,22 @@ fn show(request: &Request, stopped: &dyn Fn() -> bool) -> Result<Reply, String> 
         let _ = stdin.write_all(request.as_bytes());
     }
     let (tx, rx) = mpsc::channel();
-    if let Some(mut stdout) = child.stdout.take() {
+    if let Some(stdout) = child.stdout.take() {
         std::thread::spawn(move || {
-            let mut text = String::new();
-            let _ = stdout.read_to_string(&mut text);
-            let _ = tx.send(text);
+            for line in std::io::BufReader::new(stdout).lines() {
+                let Ok(line) = line else { break };
+                if let Ok(reply) = serde_json::from_str::<Reply>(line.trim()) {
+                    let _ = tx.send(reply);
+                }
+            }
         });
     }
     loop {
         match rx.recv_timeout(Duration::from_millis(100)) {
-            Ok(text) => {
+            Ok(reply) if reply.answer == "click" => on_click(&reply),
+            Ok(reply) => {
                 let _ = child.wait();
-                let line = text
-                    .lines()
-                    .rev()
-                    .find(|l| l.trim_start().starts_with('{'))
-                    .unwrap_or_default();
-                return serde_json::from_str(line)
-                    .map_err(|_| "the dialog closed without an answer".to_string());
+                return Ok(reply);
             }
             Err(mpsc::RecvTimeoutError::Disconnected) => {
                 let _ = child.wait();

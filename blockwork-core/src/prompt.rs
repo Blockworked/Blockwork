@@ -21,6 +21,27 @@ pub enum Kind {
     Tooltip,
     /// `options` as a menu at the mouse.
     Menu,
+    /// A window of `controls` that stays open until closed; each button
+    /// click is reported while it's open.
+    Window,
+}
+
+/// One control in a [`Kind::Window`]: `text`, `check`, `choice`, `button`
+/// or `note`.
+#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+pub struct Control {
+    pub kind: String,
+    pub label: String,
+    /// The variable it reads and writes; empty for buttons and notes.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub name: String,
+    #[serde(default)]
+    pub value: serde_json::Value,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub options: Vec<String>,
+    /// A button that also closes the window.
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub close: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -52,6 +73,8 @@ pub struct Request {
     /// How long a tooltip stays, in ms.
     #[serde(default, skip_serializing_if = "Option::is_none")]
     pub duration_ms: Option<f64>,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub controls: Vec<Control>,
 }
 
 impl Request {
@@ -69,22 +92,29 @@ impl Request {
             x: None,
             y: None,
             duration_ms: None,
+            controls: Vec::new(),
         }
     }
 }
 
 /// `answer` is the button: `ok`, `cancel`, `yes`, `no`, `deny`, `once` or
-/// `always`. Closing the window counts as `cancel`.
+/// `always`. Closing the window counts as `cancel`. A [`Kind::Window`]
+/// sends `click` for each button click while it stays open, with the
+/// button's label in `text` and every control's value in `values`.
 #[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Reply {
     pub answer: String,
     #[serde(default)]
     pub text: String,
+    #[serde(default, skip_serializing_if = "serde_json::Map::is_empty")]
+    pub values: serde_json::Map<String, serde_json::Value>,
 }
 
 /// Shows a dialog and blocks until it's answered, or fails once `stopped`
-/// turns true.
-pub type Handler = dyn Fn(&Request, &dyn Fn() -> bool) -> Result<Reply, String> + Send + Sync;
+/// turns true. Replies sent before the last (a window's clicks) go to
+/// the third argument.
+pub type Handler =
+    dyn Fn(&Request, &dyn Fn() -> bool, &dyn Fn(&Reply)) -> Result<Reply, String> + Send + Sync;
 
 static HANDLER: RwLock<Option<Arc<Handler>>> = RwLock::new(None);
 /// One dialog at a time, so parallel strands don't stack windows.
@@ -114,7 +144,23 @@ pub fn ask(request: &Request, stopped: &dyn Fn() -> bool) -> Result<Reply, Strin
             }
         }
     };
-    handler(request, stopped)
+    handler(request, stopped, &|_| {})
+}
+
+/// Shows a [`Kind::Window`] until it's closed, passing each click to
+/// `on_click`. Windows don't wait their turn behind other dialogs, so a
+/// button's strand can still ask something while the window is open.
+pub fn show_window(
+    request: &Request,
+    stopped: &dyn Fn() -> bool,
+    on_click: &dyn Fn(&Reply),
+) -> Result<Reply, String> {
+    let handler = HANDLER
+        .read()
+        .ok()
+        .and_then(|h| h.clone())
+        .ok_or_else(|| "dialogs aren't available here".to_string())?;
+    handler(request, stopped, on_click)
 }
 
 /// Counts tooltips shown, so a newer one (or hiding) closes the one before.
@@ -151,7 +197,7 @@ pub fn show_tooltip(
                 TOOLTIP.load(std::sync::atomic::Ordering::SeqCst) != generation
                     || shown.elapsed().as_secs_f64() > limit
             };
-            let _ = handler(&request, &replaced);
+            let _ = handler(&request, &replaced, &|_| {});
         })
         .map_err(|e| e.to_string())?;
     std::thread::Builder::new()
