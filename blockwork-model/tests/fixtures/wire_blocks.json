@@ -1510,5 +1510,19 @@
   "id": "showmenu",
   "list": "ShowMenu.list",
   "name": "ShowMenu.name"
+ },
+ {
+  "type": "WithInputBlocked",
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child_blocked",
+    "duration": {
+     "kind": "Number",
+     "value": 1
+    }
+   }
+  ],
+  "id": "withinputblocked"
  }
 ]

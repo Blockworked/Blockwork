@@ -51,6 +51,13 @@ pub(super) fn run_control_block(
                 return Ok(Next::Exit(flow));
             }
         }
+        InstructionKind::WithInputBlocked { body } => {
+            let _blocked = crate::recording::key_rules::block_all_input();
+            let flow = run_block(body, ctx, depth, Instant::now())?;
+            if flow != Flow::Normal {
+                return Ok(Next::Exit(flow));
+            }
+        }
         InstructionKind::Return(value) => {
             let resolved = ctx.resolve(value, depth)?;
             return Ok(Next::Exit(Flow::Return(resolved.eval()?)));

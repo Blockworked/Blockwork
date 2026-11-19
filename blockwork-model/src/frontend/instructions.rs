@@ -181,6 +181,7 @@ wire_blocks! {
         WhenApp { pattern: Value, started: bool },
         WhenScreenLock { locked: bool },
         WithLock { name: Value, body: Vec<InstructionDto> },
+        WithInputBlocked { body: Vec<InstructionDto> },
         SplitIntoList { text: Value, separator: Value, name: String },
         SetDictKey { name: String, key: Value, value: Value },
         DeleteDictKey { name: String, key: Value },

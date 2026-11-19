@@ -134,7 +134,9 @@ impl InstructionKind {
             | K::GamepadStick { .. }
             | K::GamepadTrigger { .. }
             | K::ResetGamepad => of(Input, &["input"]),
-            K::WaitForKey { .. } | K::ReadKeys { .. } => of(Control, &["input"]),
+            K::WaitForKey { .. } | K::ReadKeys { .. } | K::WithInputBlocked { .. } => {
+                of(Control, &["input"])
+            }
             K::WaitForApp { .. } => of(Control, &["windows"]),
             K::WaitForClipboard { .. } => of(Control, &["clipboard"]),
 
