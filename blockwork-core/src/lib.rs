@@ -21,6 +21,7 @@ pub mod flatpak;
 pub mod globals;
 pub mod http;
 pub mod input;
+pub mod inspect;
 #[cfg(feature = "ipc")]
 pub mod ipc;
 #[cfg(target_os = "linux")]
