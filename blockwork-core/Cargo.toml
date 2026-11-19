@@ -64,6 +64,8 @@ x11rb.workspace = true
 enigo = { workspace = true, features = ["libei", "smol"] }
 wayland-client.workspace = true
 wayland-protocols.workspace = true
+# Keyboard layouts for typed-text triggers (see src/input/layout.rs).
+xkbcommon = "0.9"
 # Desktop notifications over the session bus (see src/notify.rs).
 zbus.workspace = true
 # A runtime for zbus tasks on plain threads (see src/dbus.rs).

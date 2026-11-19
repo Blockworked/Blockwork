@@ -6,6 +6,8 @@ pub use blockwork_model::input::*;
 pub mod controllers;
 pub mod cron;
 pub mod instruction_utils;
+pub mod key_repeat;
+pub mod layout;
 #[cfg(target_os = "linux")]
 pub mod native_gamepad;
 #[cfg(any(target_os = "linux", windows))]
