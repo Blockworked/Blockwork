@@ -752,6 +752,115 @@ pub enum InstructionKind {
         code: Value,
         variable: String,
     },
+    /// Copies a file or folder to `to` (or with `move_file`, moves it).
+    /// A folder as `to` keeps the name.
+    CopyFile {
+        path: Value,
+        to: Value,
+        move_file: bool,
+    },
+    /// Deletes a file, or a folder and everything in it.
+    DeleteFile(Value),
+    /// Makes a folder, and any missing folders above it.
+    MakeFolder(Value),
+    /// Asks for a file (or with `folder`, a folder) and puts its path in
+    /// variable `name`. Cancelling is an error, like the other dialogs.
+    AskFile {
+        prompt: Value,
+        folder: bool,
+        name: String,
+    },
+    /// Pauses until a program whose name contains `pattern` is running (or
+    /// with `running` false, isn't), failing after `timeout` ms.
+    WaitForApp {
+        pattern: Value,
+        running: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout: Option<Value>,
+    },
+    /// Ends the process with this ID.
+    KillProcess(Value),
+    /// Sets the output volume, from 0 to 100.
+    SetVolume(Value),
+    /// Mutes, unmutes or toggles the sound output.
+    SetMute {
+        mode: MuteMode,
+    },
+    /// Plays a sound file; with `wait`, until it ends.
+    PlaySound {
+        path: Value,
+        #[serde(default, skip_serializing_if = "is_false")]
+        wait: bool,
+    },
+    /// Locks the screen, sleeps, logs out, restarts or shuts down.
+    Power {
+        action: PowerAction,
+    },
+    /// Looks for the first pixel within `tolerance` percent of `color` (an
+    /// exact match without it), reading rows top to bottom, and puts its
+    /// screen position in two variables, -1 if there's none.
+    FindColor {
+        color: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        tolerance: Option<Value>,
+        x_variable: String,
+        y_variable: String,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        region: Option<String>,
+    },
+    /// Pauses until the clipboard changes, failing after `timeout` ms.
+    WaitForClipboard {
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout: Option<Value>,
+    },
+    /// Keeps a copy of the clipboard (text, image or files) for this run.
+    SaveClipboard,
+    /// Puts back what `SaveClipboard` kept.
+    RestoreClipboard,
+    /// Makes later screen coordinates in this strand count from the top
+    /// left of a matching window's content (or with `window` false, the
+    /// screen's): moving the mouse, reading colors and text, and the
+    /// search regions and results of the find blocks.
+    UseCoordinates {
+        window: bool,
+        pattern: Value,
+        #[serde(default = "match_by_title")]
+        by: String,
+    },
+    /// Changes a matching window's opacity (0 to 100), title, or monitor
+    /// (from 1).
+    SetWindow {
+        setting: WindowSetting,
+        pattern: Value,
+        #[serde(default = "match_by_title")]
+        by: String,
+        value: Value,
+    },
+    /// Shows text in a small box near the mouse or in a corner of the
+    /// screen for `duration` ms, and moves on straight away. Empty text
+    /// hides the box.
+    ShowTooltip {
+        text: Value,
+        place: TooltipPlace,
+        duration: Value,
+    },
+    /// Shows list `list` as a menu at the mouse and puts the item picked
+    /// in variable `name`. Closing the menu is like cancelling a dialog.
+    ShowMenu {
+        list: String,
+        name: String,
+    },
+    /// Reads what the user types into variable `name` until one of
+    /// `end_keys` (key names split by commas) is pressed, `count`
+    /// characters are typed, or `timeout` ms pass.
+    ReadKeys {
+        name: String,
+        end_keys: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        count: Option<Value>,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout: Option<Value>,
+    },
 }
 
 impl InstructionKind {
@@ -784,6 +893,43 @@ fn match_by_title() -> String {
 
 fn is_false(value: &bool) -> bool {
     !*value
+}
+
+/// What a `SetWindow` block changes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum WindowSetting {
+    Opacity,
+    Title,
+    Monitor,
+}
+
+/// Where a `ShowTooltip` box goes.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TooltipPlace {
+    Mouse,
+    TopLeft,
+    TopRight,
+    BottomLeft,
+    BottomRight,
+    Center,
+}
+
+/// What a `SetMute` block does to the sound output.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum MuteMode {
+    Mute,
+    Unmute,
+    Toggle,
+}
+
+/// What a `Power` block does to the computer.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum PowerAction {
+    Lock,
+    Sleep,
+    LogOut,
+    Restart,
+    ShutDown,
 }
 
 /// Where a `WhenTyped` abbreviation has to sit among the words typed.

@@ -517,6 +517,14 @@ pub fn act(action: Action, pattern: &str, by: MatchBy) -> Result<(), String> {
             unzoom(&window)
         }
         Action::Close => perform(&attribute(&window, "AXCloseButton")?, "AXPress"),
+        Action::Hide => set(&app, "AXHidden", &yes),
+        Action::Show => {
+            set(&app, "AXHidden", &CFBoolean::false_value().as_CFType())?;
+            unminimize(&window)
+        }
+        Action::AlwaysOnTop | Action::NotOnTop => {
+            Err("macOS doesn't let other apps keep a window on top".into())
+        }
     }
 }
 

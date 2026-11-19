@@ -119,9 +119,13 @@ impl InstructionKind {
             | K::DictFromJson { .. } => of(Data, &[]),
             K::SetClipboard(_) => of(Data, &["clipboard"]),
 
-            K::AskText { .. } | K::AskYesNo { .. } | K::AskChoice { .. } | K::ShowMessage(_) => {
-                of(Dialogs, &[])
-            }
+            K::AskText { .. }
+            | K::AskYesNo { .. }
+            | K::AskChoice { .. }
+            | K::AskFile { .. }
+            | K::ShowMenu { .. }
+            | K::ShowTooltip { .. }
+            | K::ShowMessage(_) => of(Dialogs, &[]),
 
             K::Token(_)
             | K::TouchGesture { .. }
@@ -130,23 +134,35 @@ impl InstructionKind {
             | K::GamepadStick { .. }
             | K::GamepadTrigger { .. }
             | K::ResetGamepad => of(Input, &["input"]),
-            K::WaitForKey { .. } => of(Control, &["input"]),
+            K::WaitForKey { .. } | K::ReadKeys { .. } => of(Control, &["input"]),
+            K::WaitForApp { .. } => of(Control, &["windows"]),
+            K::WaitForClipboard { .. } => of(Control, &["clipboard"]),
 
             K::SendSignal { .. } | K::Log(_) | K::Notify { .. } => of(System, &[]),
             K::Command(_) | K::CommandWait(_) | K::OpenApp { .. } | K::CloseApp { .. } => {
                 of(System, &["commands"])
             }
             K::HttpRequest { .. } => of(System, &["network"]),
-            K::WriteFile { .. } => of(System, &["files_write"]),
+            K::WriteFile { .. } | K::CopyFile { .. } | K::DeleteFile(_) | K::MakeFolder(_) => {
+                of(System, &["files_write"])
+            }
+            K::KillProcess(_) | K::Power { .. } => of(System, &["commands"]),
+            K::SetVolume(_) | K::SetMute { .. } => of(System, &[]),
+            K::PlaySound { .. } => of(System, &["files_read"]),
+            K::SaveClipboard | K::RestoreClipboard => of(Data, &["clipboard"]),
             K::PasteText(_) => of(System, &["input", "clipboard"]),
-            K::WindowAction { .. } | K::MoveWindow { .. } => of(System, &["windows"]),
+            K::WindowAction { .. } | K::MoveWindow { .. } | K::SetWindow { .. } => {
+                of(System, &["windows"])
+            }
+            K::UseCoordinates { .. } => of(Control, &["windows"]),
             K::RunMacro { .. } | K::StopMacroNamed(_) => of(System, &["macros"]),
             K::SetGlobal { .. } | K::ChangeGlobal { .. } => of(System, &["globals"]),
 
             K::FindImage { .. }
             | K::WaitForImage { .. }
             | K::DetectObjectsInWindow { .. }
-            | K::WaitForDetection { .. } => of(Vision, &["screen"]),
+            | K::WaitForDetection { .. }
+            | K::FindColor { .. } => of(Vision, &["screen"]),
             K::ClickImage { .. } | K::AimAtDetection { .. } => of(Vision, &["screen", "input"]),
             K::AimStep { .. } => of(Vision, &["input"]),
 

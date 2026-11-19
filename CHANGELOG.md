@@ -18,7 +18,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - When system starts header: runs once per login when Start at system startup is on ([docs](docs/system-startup.md)).
 - Touch gesture and touch paths blocks, with a multi-finger path editor; Linux (experimental) and Windows ([docs](docs/touch.md)).
 - Physical controller triggers and reporters, and on Linux a virtual controller for playback ([docs](docs/controllers.md)).
-- Native UI automation on Linux: read and control other apps' buttons, fields and sliders by selector. Pick an element by pointing at it on screen, or search a list ([docs](docs/native-ui.md)).
+- Native UI automation on Linux and Windows: read and control other apps' buttons, fields and sliders by selector. Pick an element by pointing at it on screen, or search a list ([docs](docs/native-ui.md)).
 - Recording can include touchscreen gestures and a controller, and opens a review before the blocks are added ([docs](docs/recording.md)).
 - Input diagnostics in Settings > Integrations, to copy into a bug report.
 - Starter templates: Controller to keyboard, Touch swipe and Startup notice.
@@ -29,6 +29,16 @@ section below as the GitHub release notes, followed by the downloads table.
 - Typed text triggers can match in any case and only at the start of a word or as a whole word; the key that ends the word is kept. On Linux and Windows they read your keyboard layout instead of assuming US.
 - For each loops over a list's items, a dict's keys, the parts of a split text, or the files in a folder.
 - Dicts: named collections of values looked up by key, with an editor on the canvas, blocks to set, delete and clear keys or fill a dict from JSON, and reporters to read them.
+- File blocks: copy or move, delete and make folder, a file's size or time changed, and Ask for a file or folder with the system's file picker.
+- App and process blocks: wait for an app to open or close, the process ID of an app, end a process by ID, and the exit code of a command.
+- Sound blocks: set the volume, mute or unmute, play a sound file, and volume and muted reporters.
+- Computer info reporter (user name, computer name, system and version, home folder, display scale), an environment variable reporter, and a block to lock the screen, sleep, log out, restart or shut down.
+- Find color: the first spot on screen (or in a region) with a color, within a tolerance.
+- Clipboard blocks: wait until the clipboard changes, and save the whole clipboard (text, image or files) to put it back later.
+- Read typing: puts what you type in a variable until an end key, a number of characters or a time limit.
+- Window blocks: keep a window on top, hide and show it, set its transparency or title, and move it to another monitor. Windows can be matched by exact title or a regex too, and reporters list open windows and give a window's process ID.
+- Use coordinates block: mouse, pixel, region and image positions after it count from a window's corner instead of the screen's.
+- Show tooltip: a small note near the mouse or in a screen corner for a set time. Show menu: a list at the mouse to pick from.
 
 ### Changed
 - The Text block spaces keystrokes 0.5 ms apart on Windows and macOS too, as it already did on Linux, so fast typing doesn't drop or merge characters.

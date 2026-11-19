@@ -369,7 +369,7 @@ Item {
                             SettingsRow { title: qsTr("Virtual controller output"); detail: qsTr("Create a virtual gamepad for playback. Currently requires Linux and /dev/uinput access.")
                                 StitchSwitch { Accessible.name: qsTr("Virtual controller output"); checked: appState.virtual_gamepad_enabled === true; onToggled: checked => root.invoke("set_virtual_gamepad_enabled", {enabled: checked}) }
                             }
-                            SettingsRow { title: qsTr("Native UI automation"); detail: qsTr("Read and control desktop app elements through Linux AT-SPI. Imported macros still need permission.")
+                            SettingsRow { title: qsTr("Native UI automation"); detail: qsTr("Read and control desktop app elements through accessibility (AT-SPI on Linux, UI Automation on Windows). Imported macros still need permission.")
                                 StitchSwitch { Accessible.name: qsTr("Native UI automation"); checked: appState.ui_automation_enabled === true; onToggled: checked => root.invoke("set_ui_automation_enabled", {enabled: checked}) }
                             }
                             SettingsRow { title: qsTr("Input diagnostics"); detail: qsTr("See which devices, permissions and services recording and playback can use, to copy into a bug report.")

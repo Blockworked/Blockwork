@@ -272,6 +272,95 @@ pub(super) fn run_system_block(
                 soft_fail(ctx, &ins.id, "Paste", e)?;
             }
         }
+        InstructionKind::SetWindow {
+            setting,
+            pattern,
+            by,
+            value,
+        } => {
+            let done = (|| {
+                let pattern = ctx.resolve(pattern, depth)?.eval_text()?;
+                let value = ctx.resolve(value, depth)?.eval_text()?;
+                crate::window::set(*setting, &pattern, by.parse()?, &value)
+            })();
+            if let Err(e) = done {
+                soft_fail(ctx, &ins.id, "Set window", e)?;
+            }
+        }
+        InstructionKind::CopyFile {
+            path,
+            to,
+            move_file,
+        } => {
+            let done = (|| {
+                let path = ctx.resolve(path, depth)?.eval_text()?;
+                let to = ctx.resolve(to, depth)?.eval_text()?;
+                if *move_file {
+                    crate::files::move_path(&path, &to)
+                } else {
+                    crate::files::copy(&path, &to)
+                }
+            })();
+            if let Err(e) = done {
+                let block = if *move_file { "Move file" } else { "Copy file" };
+                soft_fail(ctx, &ins.id, block, e)?;
+            }
+        }
+        InstructionKind::DeleteFile(path) => {
+            let done = ctx
+                .resolve(path, depth)
+                .and_then(|v| v.eval_text())
+                .and_then(|p| crate::files::delete(&p));
+            if let Err(e) = done {
+                soft_fail(ctx, &ins.id, "Delete file", e)?;
+            }
+        }
+        InstructionKind::MakeFolder(path) => {
+            let done = ctx
+                .resolve(path, depth)
+                .and_then(|v| v.eval_text())
+                .and_then(|p| crate::files::make_folder(&p));
+            if let Err(e) = done {
+                soft_fail(ctx, &ins.id, "Make folder", e)?;
+            }
+        }
+        InstructionKind::KillProcess(pid) => {
+            let done = ctx
+                .resolve(pid, depth)
+                .and_then(|v| v.eval_number())
+                .and_then(crate::system::kill);
+            if let Err(e) = done {
+                soft_fail(ctx, &ins.id, "End process", e)?;
+            }
+        }
+        InstructionKind::SetVolume(volume) => {
+            let done = ctx
+                .resolve(volume, depth)
+                .and_then(|v| v.eval_number())
+                .and_then(crate::sound::set_volume);
+            if let Err(e) = done {
+                soft_fail(ctx, &ins.id, "Set volume", e)?;
+            }
+        }
+        InstructionKind::SetMute { mode } => {
+            if let Err(e) = crate::sound::set_muted(*mode) {
+                soft_fail(ctx, &ins.id, "Mute", e)?;
+            }
+        }
+        InstructionKind::PlaySound { path, wait } => {
+            let done = ctx
+                .resolve(path, depth)
+                .and_then(|v| v.eval_text())
+                .and_then(|p| crate::sound::play(&p, *wait));
+            if let Err(e) = done {
+                soft_fail(ctx, &ins.id, "Play sound", e)?;
+            }
+        }
+        InstructionKind::Power { action } => {
+            if let Err(e) = crate::system::power(*action) {
+                soft_fail(ctx, &ins.id, "Power", e)?;
+            }
+        }
         _ => unreachable!("run_block only sends system blocks here"),
     }
     Ok(())

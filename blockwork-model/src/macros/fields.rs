@@ -113,6 +113,17 @@ pub enum FieldId {
     AimDeadzone,
     AimIndex,
     AimSettle,
+    FilePath,
+    FileTarget,
+    ProcessId,
+    Volume,
+    SoundPath,
+    ColorValue,
+    EndKeys,
+    ReadCount,
+    WindowValue,
+    TooltipText,
+    TooltipDuration,
 }
 
 impl FieldId {
@@ -216,6 +227,55 @@ pub(crate) fn slots_mut<'a>(
         }
         InstructionKind::WaitForKey { key, timeout, .. } => {
             f(F::KeyValue, key, Any);
+            if let Some(v) = timeout {
+                f(F::WaitTimeout, v, Any);
+            }
+        }
+        InstructionKind::CopyFile { path, to, .. } => {
+            f(F::FilePath, path, Any);
+            f(F::FileTarget, to, Any);
+        }
+        InstructionKind::DeleteFile(v) | InstructionKind::MakeFolder(v) => f(F::FilePath, v, Any),
+        InstructionKind::AskFile { prompt, .. } => f(F::AskPrompt, prompt, Any),
+        InstructionKind::WaitForApp {
+            pattern, timeout, ..
+        } => {
+            f(F::AppPattern, pattern, Any);
+            if let Some(v) = timeout {
+                f(F::WaitTimeout, v, Any);
+            }
+        }
+        InstructionKind::UseCoordinates { pattern, .. } => f(F::WindowPattern, pattern, Any),
+        InstructionKind::SetWindow { pattern, value, .. } => {
+            f(F::WindowPattern, pattern, Any);
+            f(F::WindowValue, value, Any);
+        }
+        InstructionKind::ShowTooltip { text, duration, .. } => {
+            f(F::TooltipText, text, Any);
+            f(F::TooltipDuration, duration, Any);
+        }
+        InstructionKind::KillProcess(v) => f(F::ProcessId, v, Any),
+        InstructionKind::SetVolume(v) => f(F::Volume, v, Any),
+        InstructionKind::PlaySound { path, .. } => f(F::SoundPath, path, Any),
+        InstructionKind::FindColor {
+            color, tolerance, ..
+        } => {
+            f(F::ColorValue, color, Any);
+            if let Some(v) = tolerance {
+                f(F::ImageTolerance, v, Any);
+            }
+        }
+        InstructionKind::WaitForClipboard { timeout: Some(v) } => f(F::WaitTimeout, v, Any),
+        InstructionKind::ReadKeys {
+            end_keys,
+            count,
+            timeout,
+            ..
+        } => {
+            f(F::EndKeys, end_keys, Any);
+            if let Some(v) = count {
+                f(F::ReadCount, v, Any);
+            }
             if let Some(v) = timeout {
                 f(F::WaitTimeout, v, Any);
             }
@@ -543,6 +603,12 @@ pub(crate) fn slots_mut<'a>(
         | InstructionKind::ClearDict { .. }
         | InstructionKind::ForEachItem { .. }
         | InstructionKind::ForEachKey { .. }
+        | InstructionKind::WaitForClipboard { timeout: None }
+        | InstructionKind::SaveClipboard
+        | InstructionKind::RestoreClipboard
+        | InstructionKind::SetMute { .. }
+        | InstructionKind::Power { .. }
+        | InstructionKind::ShowMenu { .. }
         | InstructionKind::RunBranch(_) => {}
     }
 }

@@ -34,6 +34,7 @@ pub mod run_log;
 pub mod screen;
 pub mod secrets;
 pub mod shell;
+pub mod sound;
 pub mod system;
 #[cfg(all(feature = "updater", any(windows, target_os = "macos")))]
 pub mod updater;

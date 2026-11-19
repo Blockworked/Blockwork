@@ -22,7 +22,7 @@ pub(super) fn find_picked_image(
 ) -> Result<(Option<(f64, f64)>, usize), String> {
     let tolerance = optional_number(ctx, depth, search.tolerance, 10.0)?;
     let needle = crate::screen::image::load_cached(search.image)?;
-    let region = crate::detect::parse_region(search.region.unwrap_or(""))?;
+    let region = screen_region(search.region.unwrap_or(""))?;
     if search.pick.is_none() && !count {
         let at = crate::screen::find_image_in(&needle, tolerance, region)?;
         return Ok((at, at.map_or(0, |_| 1)));
@@ -35,15 +35,31 @@ pub(super) fn find_picked_image(
                 let (x, y) = crate::screen::cursor()?;
                 MatchTarget::Near(x as f64, y as f64)
             }
-            ImagePick::NearPoint => MatchTarget::Near(
-                ctx.resolve(&m.near_x, depth)?.eval_number()?,
-                ctx.resolve(&m.near_y, depth)?.eval_number()?,
-            ),
+            ImagePick::NearPoint => {
+                let (ox, oy) = crate::screen::origin()?;
+                MatchTarget::Near(
+                    ctx.resolve(&m.near_x, depth)?.eval_number()? + ox,
+                    ctx.resolve(&m.near_y, depth)?.eval_number()? + oy,
+                )
+            }
         },
     };
     let matches = crate::screen::find_image_all(&needle, tolerance, region)?;
     let picked = pick_match(&matches, target)?;
     Ok((picked.map(|m| (m.x, m.y)), matches.len()))
+}
+
+/// A saved `x,y,width,height` search region, in screen coordinates.
+fn screen_region(text: &str) -> Result<Option<crate::screen::Rect>, String> {
+    crate::detect::parse_region(text)?
+        .map(crate::screen::from_origin)
+        .transpose()
+}
+
+/// A screen point in the strand's coordinates (see `UseCoordinates`).
+fn to_origin((x, y): (f64, f64)) -> Result<(f64, f64), String> {
+    let (ox, oy) = crate::screen::origin()?;
+    Ok((x - ox, y - oy))
 }
 
 /// Which of several matches an image block wants, with its numbers resolved.
@@ -439,7 +455,9 @@ pub(super) fn run_screen_block(
                 region: region.as_deref(),
             };
             let count_variable = count_variable.as_deref().unwrap_or("");
-            match find_picked_image(ctx, depth, &search, !count_variable.is_empty()) {
+            let found = find_picked_image(ctx, depth, &search, !count_variable.is_empty())
+                .and_then(|(at, count)| Ok((at.map(to_origin).transpose()?, count)));
+            match found {
                 Ok((at, count)) => {
                     let (x, y) = at.map_or((-1.0, -1.0), |(x, y)| (x.round(), y.round()));
                     set_variable(ctx, x_variable, Evaluated::Number(x));
@@ -447,6 +465,30 @@ pub(super) fn run_screen_block(
                     set_variable(ctx, count_variable, Evaluated::Number(count as f64));
                 }
                 Err(e) => soft_fail(ctx, &ins.id, "Find image", e)?,
+            }
+        }
+        InstructionKind::FindColor {
+            color,
+            tolerance,
+            x_variable,
+            y_variable,
+            region,
+        } => {
+            let found = (|| {
+                let color = crate::screen::parse_color(&ctx.resolve(color, depth)?.eval_text()?)?;
+                let tolerance = optional_number(ctx, depth, tolerance.as_ref(), 0.0)?;
+                let region = screen_region(region.as_deref().unwrap_or(""))?;
+                crate::screen::find_color(color, tolerance, region)?
+                    .map(to_origin)
+                    .transpose()
+            })();
+            match found {
+                Ok(at) => {
+                    let (x, y) = at.map_or((-1.0, -1.0), |(x, y)| (x.floor(), y.floor()));
+                    set_variable(ctx, x_variable, Evaluated::Number(x));
+                    set_variable(ctx, y_variable, Evaluated::Number(y));
+                }
+                Err(e) => soft_fail(ctx, &ins.id, "Find color", e)?,
             }
         }
         InstructionKind::ClickImage {
@@ -491,7 +533,7 @@ pub(super) fn run_screen_block(
                 let tolerance = optional_number(ctx, depth, tolerance.as_ref(), 10.0)?;
                 let timeout = optional_number(ctx, depth, timeout.as_ref(), 0.0)?;
                 let error_timeout = optional_number(ctx, depth, error_timeout.as_ref(), 0.0)?;
-                let region = crate::detect::parse_region(region.as_deref().unwrap_or(""))?;
+                let region = screen_region(region.as_deref().unwrap_or(""))?;
                 Ok::<_, String>((
                     crate::screen::image::load_cached(image)?,
                     tolerance,

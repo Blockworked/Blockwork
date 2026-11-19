@@ -184,6 +184,10 @@ fn install_test_dialogs() {
                 Kind::Choice => reply("ok", &request.options[1]),
                 Kind::Message => reply("ok", ""),
                 Kind::Permission => reply("deny", ""),
+                Kind::File => reply("ok", "/tmp/picked.txt"),
+                Kind::Folder => reply("ok", "/tmp"),
+                Kind::Tooltip => reply("ok", ""),
+                Kind::Menu => reply("ok", &request.options[0]),
             }
         },
     ));

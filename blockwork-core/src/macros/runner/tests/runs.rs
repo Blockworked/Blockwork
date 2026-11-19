@@ -402,3 +402,81 @@ fn lock_blocks_run_their_body_and_give_up_when_stopped() {
     );
     assert_eq!(vars.lock().unwrap().get("ran"), None);
 }
+
+#[test]
+fn file_blocks_copy_move_and_delete() {
+    crate::input::value::register_blockwork_operators();
+    let dir = std::env::temp_dir().join(format!("bw-file-blocks-{}", std::process::id()));
+    let _ = std::fs::remove_dir_all(&dir);
+    let p = |rest: &str| Value::text(dir.join(rest).to_string_lossy());
+    let vars = empty_vars();
+    run_instructions(
+        vec![
+            Instruction::new(InstructionKind::MakeFolder(p("box"))),
+            Instruction::new(InstructionKind::WriteFile {
+                path: p("box/a.txt"),
+                text: Value::text("hi"),
+                append: false,
+            }),
+            Instruction::new(InstructionKind::CopyFile {
+                path: p("box/a.txt"),
+                to: p("b.txt"),
+                move_file: false,
+            }),
+            Instruction::new(InstructionKind::CopyFile {
+                path: p("b.txt"),
+                to: p("c.txt"),
+                move_file: true,
+            }),
+            Instruction::new(InstructionKind::DeleteFile(p("box"))),
+            set(
+                "size",
+                Value::op(
+                    Op::from_name("FileInfo"),
+                    vec![Value::text("size"), p("c.txt")],
+                ),
+            ),
+        ],
+        noop_emulator(),
+        None,
+        1.0,
+        Arc::clone(&vars),
+    );
+    assert!(!dir.join("box").exists() && !dir.join("b.txt").exists());
+    assert_eq!(std::fs::read_to_string(dir.join("c.txt")).unwrap(), "hi");
+    assert_eq!(
+        vars.lock().unwrap().get("size"),
+        Some(&Evaluated::Number(2.0))
+    );
+    let _ = std::fs::remove_dir_all(&dir);
+}
+
+#[test]
+fn wait_for_app_and_read_typing_give_up_after_their_limits() {
+    let vars = empty_vars();
+    let started = Instant::now();
+    run_instructions(
+        vec![
+            Instruction::new(InstructionKind::WaitForApp {
+                pattern: Value::text("no-such-program-anywhere"),
+                running: false,
+                timeout: Some(Value::number(5000.0)),
+            }),
+            Instruction::new(InstructionKind::ReadKeys {
+                name: "typed".into(),
+                end_keys: Value::text("Return"),
+                count: None,
+                timeout: Some(Value::number(100.0)),
+            }),
+        ],
+        noop_emulator(),
+        None,
+        1.0,
+        Arc::clone(&vars),
+    );
+    assert!(started.elapsed() < Duration::from_secs(3));
+    assert_eq!(
+        vars.lock().unwrap().get("typed"),
+        Some(&Evaluated::Text(String::new()))
+    );
+}

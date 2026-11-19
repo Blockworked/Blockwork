@@ -38,7 +38,16 @@
     "CommandWait": [
       "commands"
     ],
+    "CopyFile": [
+      "files_write"
+    ],
+    "DeleteFile": [
+      "files_write"
+    ],
     "DetectObjectsInWindow": [
+      "screen"
+    ],
+    "FindColor": [
       "screen"
     ],
     "FindImage": [
@@ -59,6 +68,12 @@
     "HttpRequest": [
       "network"
     ],
+    "KillProcess": [
+      "commands"
+    ],
+    "MakeFolder": [
+      "files_write"
+    ],
     "MoveWindow": [
       "windows"
     ],
@@ -72,6 +87,15 @@
       "input",
       "clipboard"
     ],
+    "PlaySound": [
+      "files_read"
+    ],
+    "Power": [
+      "commands"
+    ],
+    "ReadKeys": [
+      "input"
+    ],
     "RemapKey": [
       "input",
       "triggers"
@@ -79,14 +103,23 @@
     "ResetGamepad": [
       "input"
     ],
+    "RestoreClipboard": [
+      "clipboard"
+    ],
     "RunMacro": [
       "macros"
+    ],
+    "SaveClipboard": [
+      "clipboard"
     ],
     "SetClipboard": [
       "clipboard"
     ],
     "SetGlobal": [
       "globals"
+    ],
+    "SetWindow": [
+      "windows"
     ],
     "StopMacroNamed": [
       "macros"
@@ -99,6 +132,15 @@
     ],
     "TouchSequence": [
       "input"
+    ],
+    "UseCoordinates": [
+      "windows"
+    ],
+    "WaitForApp": [
+      "windows"
+    ],
+    "WaitForClipboard": [
+      "clipboard"
     ],
     "WaitForDetection": [
       "screen"
@@ -277,15 +319,18 @@
   "operators": {
     "ActiveWindowApp": "windows",
     "ActiveWindowTitle": "windows",
+    "AppPid": "windows",
     "AppRunning": "windows",
     "AverageColor": "screen",
     "ClipboardHasFiles": "clipboard",
     "ClipboardHasImage": "clipboard",
     "ClipboardText": "clipboard",
+    "CommandExitCode": "commands",
     "ElementCount": "browser",
     "ElementExists": "browser",
     "ElementText": "browser",
     "FileExists": "files_read",
+    "FileInfo": "files_read",
     "GamepadAxisValue": "input",
     "GamepadButtonDown": "input",
     "GamepadConnected": "input",
@@ -307,6 +352,8 @@
     "ShellOutput": "commands",
     "ShellSucceeded": "commands",
     "WindowExists": "windows",
-    "WindowInfo": "windows"
+    "WindowInfo": "windows",
+    "WindowList": "windows",
+    "WindowPid": "windows"
   }
 }

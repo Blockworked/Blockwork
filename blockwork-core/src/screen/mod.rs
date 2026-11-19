@@ -271,6 +271,31 @@ pub fn find_image_all(
         .collect())
 }
 
+/// The screen point of the first pixel within `tolerance` percent of
+/// `color` (see [`color_distance`]), on screen or in `region` of it, reading
+/// rows top to bottom.
+pub fn find_color(
+    color: [u8; 3],
+    tolerance: f64,
+    region: Option<Rect>,
+) -> Result<Option<(f64, f64)>, String> {
+    let shot = search_area(region)?;
+    Ok(first_color(&shot.image, color, tolerance)
+        .map(|(px, py)| shot.to_screen(px as f64 + 0.5, py as f64 + 0.5)))
+}
+
+/// The image pixel of the first match, in reading order.
+fn first_color(image: &Image, color: [u8; 3], tolerance: f64) -> Option<(u32, u32)> {
+    let width = image.width.max(1) as usize;
+    image
+        .rgba
+        .as_chunks::<4>()
+        .0
+        .iter()
+        .position(|px| color_distance([px[0], px[1], px[2]], color) <= tolerance)
+        .map(|i| ((i % width) as u32, (i / width) as u32))
+}
+
 fn search_area(region: Option<Rect>) -> Result<Arc<Shot>, String> {
     match region {
         Some(rect) => area(rect).map(Arc::new),
@@ -358,6 +383,62 @@ pub fn desktop() -> Result<Rect, String> {
     })
 }
 
+thread_local! {
+    /// The window this strand's coordinates count from (`UseCoordinates`),
+    /// with the last place it was seen and when.
+    static ORIGIN: std::cell::RefCell<Option<Origin>> = const { std::cell::RefCell::new(None) };
+}
+
+struct Origin {
+    pattern: String,
+    by: crate::window::MatchBy,
+    seen: Option<(Instant, (f64, f64))>,
+}
+
+/// How long a window's position is reused before asking again.
+const ORIGIN_FOR: Duration = Duration::from_millis(250);
+
+/// Makes this thread's coordinates count from a window's top left, or
+/// with `None`, from the screen's.
+pub fn set_origin(window: Option<(String, crate::window::MatchBy)>) {
+    ORIGIN.with(|o| {
+        *o.borrow_mut() = window.map(|(pattern, by)| Origin {
+            pattern,
+            by,
+            seen: None,
+        })
+    });
+}
+
+/// The screen point this thread's coordinates count from.
+pub fn origin() -> Result<(f64, f64), String> {
+    ORIGIN.with(|o| {
+        let mut o = o.borrow_mut();
+        let Some(origin) = o.as_mut() else {
+            return Ok((0.0, 0.0));
+        };
+        if let Some((at, point)) = origin.seen
+            && at.elapsed() < ORIGIN_FOR
+        {
+            return Ok(point);
+        }
+        let bounds = crate::window::bounds(&origin.pattern, origin.by)?;
+        let point = (bounds.x, bounds.y);
+        origin.seen = Some((Instant::now(), point));
+        Ok(point)
+    })
+}
+
+/// A rectangle in this thread's coordinates, moved to screen coordinates.
+pub fn from_origin(rect: Rect) -> Result<Rect, String> {
+    let (ox, oy) = origin()?;
+    Ok(Rect {
+        x: rect.x + ox,
+        y: rect.y + oy,
+        ..rect
+    })
+}
+
 /// The mouse cursor's screen position.
 pub fn cursor() -> Result<(i32, i32), String> {
     platform::cursor()
@@ -404,6 +485,22 @@ pub fn color_distance(a: [u8; 3], b: [u8; 3]) -> f64 {
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn first_color_reads_rows_in_order() {
+        let mut rgba = vec![0u8; 3 * 2 * 4];
+        // (2, 0) is near red, (1, 1) is exactly red.
+        rgba[2 * 4..2 * 4 + 3].copy_from_slice(&[250, 5, 0]);
+        rgba[(3 + 1) * 4..(3 + 1) * 4 + 3].copy_from_slice(&[255, 0, 0]);
+        let image = Image {
+            width: 3,
+            height: 2,
+            rgba,
+        };
+        assert_eq!(first_color(&image, [255, 0, 0], 0.0), Some((1, 1)));
+        assert_eq!(first_color(&image, [255, 0, 0], 5.0), Some((2, 0)));
+        assert_eq!(first_color(&image, [0, 0, 255], 5.0), None);
+    }
 
     #[test]
     fn colors_parse_and_compare() {

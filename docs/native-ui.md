@@ -2,7 +2,8 @@
 
 Blockwork can read and control other apps' buttons, fields and sliders
 through the desktop's accessibility interface instead of the mouse. On Linux
-that is AT-SPI, which GTK and Qt apps (and most others) provide. It is off
+that is AT-SPI, which GTK and Qt apps (and most others) provide; on Windows it
+is UI Automation, which nearly every app provides. It is off
 until **Native UI automation** is turned on in Settings > Integrations, and an
 imported macro also needs the UI automation permission.
 
@@ -94,8 +95,13 @@ window manager use the list.
 
 ## Platforms
 
-Linux only. Windows UI Automation and macOS accessibility adapters aren't
-written yet; the blocks say so when run there.
+Linux (AT-SPI) and Windows (UI Automation). Both walk the same kind of tree
+and share the matching code in `accessibility/common.rs`, so a selector means
+the same thing on each; only the role names differ (`push button` on Linux,
+`button` on Windows). On Windows the app is the program's name (`notepad`),
+like the window blocks use, and each UI Automation call gives up after 3
+seconds. A macOS accessibility adapter isn't written yet; the blocks say so
+when run there.
 
 ## Testing
 

@@ -834,6 +834,8 @@ pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>, initial
         max_loop_iterations,
     } = run;
     let _detach = host_clock::enabled().then(|| Defer(Some(host_clock::detach)));
+    // Each strand starts out in screen coordinates (see `UseCoordinates`).
+    crate::screen::set_origin(None);
     raise_current_thread_priority();
     // Priority-raise happens first (its latency shouldn't eat into the
     // offset), then anchor "now" for this strand's Wait chain, backdated by

@@ -27,6 +27,11 @@ fn ask_blocks_put_answers_in_variables_and_cancel_stops() {
                 name: "pick".into(),
             }),
             Instruction::new(InstructionKind::ShowMessage(Value::text("Done"))),
+            Instruction::new(InstructionKind::AskFile {
+                prompt: Value::text("Which file?"),
+                folder: false,
+                name: "file".into(),
+            }),
             Instruction::new(InstructionKind::AskText {
                 prompt: Value::text("cancel"),
                 default: Value::text(""),
@@ -44,6 +49,10 @@ fn ask_blocks_put_answers_in_variables_and_cancel_stops() {
     assert_eq!(vars.get("name"), Some(&Evaluated::Text("Ada!".into())));
     assert_eq!(vars.get("sure"), Some(&Evaluated::Bool(true)));
     assert_eq!(vars.get("pick"), Some(&Evaluated::Text("blue".into())));
+    assert_eq!(
+        vars.get("file"),
+        Some(&Evaluated::Text("/tmp/picked.txt".into()))
+    );
     assert_eq!(vars.get("never"), None);
     assert_eq!(vars.get("after"), None, "cancel stopped the run");
 }

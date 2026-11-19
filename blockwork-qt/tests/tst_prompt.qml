@@ -94,6 +94,35 @@ Item {
             bridge.parentRunning = false;
             reply("cancel", "");
         }
+        function test_file_path_typed() {
+            configure("file");
+            const field = control("promptPath");
+            tryCompare(field, "activeFocus", true);
+            verify(control("promptBrowse") !== null);
+            keyClick(Qt.Key_Return);
+            compare(replies.count, 0);
+            field.text = "/tmp/notes.txt";
+            keyClick(Qt.Key_Return);
+            reply("ok", "/tmp/notes.txt");
+        }
+        function test_menu_keyboard_picks_second() {
+            configure("menu", {options: ["Copy", "Paste"], x: 40, y: 40});
+            const list = control("promptMenu");
+            tryCompare(list, "activeFocus", true);
+            keyClick(Qt.Key_Down);
+            keyClick(Qt.Key_Return);
+            reply("ok", "Paste");
+        }
+        function test_tooltip_closes_after_its_time() {
+            bridge.requestJson = JSON.stringify({kind: "tooltip", title: "tip", message: "Saved!", duration_ms: 200, default: "BottomRight"});
+            compare(control("promptTooltip").text, "Saved!");
+            reply("ok", "");
+            verify(dialog.width < 440);
+        }
+        function test_local_path_from_url() {
+            compare(dialog.localPath("file:///home/me/My%20File.txt"), "/home/me/My File.txt");
+            compare(dialog.localPath("file:///C:/Users/me/a.txt"), "C:/Users/me/a.txt");
+        }
         function test_text_cancel() {
             configure("text", {default: "unchanged"});
             mouseClick(control("promptButton_cancel"));

@@ -103,6 +103,8 @@ wire_blocks! {
         WhenClipboardChanged,
         EscapeLoop,
         ContinueLoop,
+        SaveClipboard,
+        RestoreClipboard,
     }
     tuple {
         Wait(duration: Value),
@@ -127,6 +129,10 @@ wire_blocks! {
         WhenCron(expression: Value),
         ShowMessage(message: Value),
         WhenAt(at: Value),
+        DeleteFile(path: Value),
+        MakeFolder(path: Value),
+        KillProcess(pid: Value),
+        SetVolume(volume: Value),
     }
     named {
         GamepadButton {button:GamepadButton,direction:Direction},
@@ -198,6 +204,19 @@ wire_blocks! {
         BrowserClick { selector: Value, #[serde(default, skip_serializing_if = "Option::is_none")] nth: Option<Value> },
         BrowserType { text: Value, selector: Value, #[serde(default, skip_serializing_if = "Option::is_none")] nth: Option<Value> },
         BrowserWaitFor { selector: Value, appear: bool, timeout: Value },
+        CopyFile { path: Value, to: Value, move_file: bool },
+        AskFile { prompt: Value, folder: bool, name: String },
+        WaitForApp { pattern: Value, running: bool, #[serde(default, skip_serializing_if = "Option::is_none")] timeout: Option<Value> },
+        SetMute { mode: crate::macros::MuteMode },
+        PlaySound { path: Value, #[serde(default, skip_serializing_if = "std::ops::Not::not")] wait: bool },
+        Power { action: crate::macros::PowerAction },
+        FindColor { color: Value, #[serde(default, skip_serializing_if = "Option::is_none")] tolerance: Option<Value>, x_variable: String, y_variable: String, #[serde(default, skip_serializing_if = "Option::is_none")] region: Option<String> },
+        WaitForClipboard { #[serde(default, skip_serializing_if = "Option::is_none")] timeout: Option<Value> },
+        UseCoordinates { window: bool, pattern: Value, #[serde(default = "match_by_title")] by: String },
+        SetWindow { setting: crate::macros::WindowSetting, pattern: Value, #[serde(default = "match_by_title")] by: String, value: Value },
+        ShowTooltip { text: Value, place: crate::macros::TooltipPlace, duration: Value },
+        ShowMenu { list: String, name: String },
+        ReadKeys { name: String, end_keys: Value, #[serde(default, skip_serializing_if = "Option::is_none")] count: Option<Value>, #[serde(default, skip_serializing_if = "Option::is_none")] timeout: Option<Value> },
         BrowserScript { code: Value, variable: String },
     }
     custom {

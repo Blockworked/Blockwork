@@ -88,6 +88,10 @@ pub const UNGUARDED_OPERATORS: &[&str] = &[
     "ParseDate",
     "DatePart",
     "LastError",
+    "SystemInfo",
+    "EnvVar",
+    "Volume",
+    "Muted",
 ];
 
 /// The capability a reporter needs, by operator name.
@@ -95,13 +99,12 @@ pub fn operator_capability(op: &str) -> Option<&'static str> {
     Some(match op {
         "NativeUiExists" | "NativeUiEnabled" | "NativeUiText" | "NativeUiValue" => "ui_automation",
         "GamepadConnected" | "GamepadButtonDown" | "GamepadAxisValue" | "KeyHeld" => "input",
-        "ShellOutput" | "ShellSucceeded" => "commands",
+        "ShellOutput" | "ShellSucceeded" | "CommandExitCode" => "commands",
         "HttpGet" => "network",
-        "ReadFile" | "FileExists" | "ListDirectory" => "files_read",
+        "ReadFile" | "FileExists" | "ListDirectory" | "FileInfo" => "files_read",
         "ClipboardText" | "ClipboardHasImage" | "ClipboardHasFiles" => "clipboard",
-        "ActiveWindowTitle" | "ActiveWindowApp" | "WindowExists" | "WindowInfo" | "AppRunning" => {
-            "windows"
-        }
+        "ActiveWindowTitle" | "ActiveWindowApp" | "WindowExists" | "WindowInfo" | "AppRunning"
+        | "AppPid" | "WindowList" | "WindowPid" => "windows",
         "MacroRunning" => "macros",
         "PixelColor" | "AverageColor" | "ScreenText" => "screen",
         "GlobalVariable" => "globals",

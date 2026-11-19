@@ -5,6 +5,10 @@ use super::*;
 
 /// How often `WaitForKey` looks at the held keys, in ms.
 const KEY_POLL_MS: f64 = 5.0;
+/// How often `WaitForApp` lists the running programs, in ms.
+const APP_POLL_MS: f64 = 250.0;
+/// How often `WaitForClipboard` reads the clipboard, in ms.
+const CLIPBOARD_POLL_MS: f64 = 200.0;
 
 /// What `run_block` does after a flow block.
 pub(super) enum Next {
@@ -176,6 +180,165 @@ pub(super) fn run_control_block(
                     break;
                 }
             }
+        }
+        InstructionKind::UseCoordinates {
+            window,
+            pattern,
+            by,
+        } => {
+            let origin = if *window {
+                let pattern = ctx.resolve(pattern, depth).and_then(|v| v.eval_text());
+                match pattern.and_then(|p| Ok((p, by.parse::<crate::window::MatchBy>()?))) {
+                    Ok(origin) => Some(origin),
+                    Err(e) => {
+                        soft_fail(ctx, &ins.id, "Use coordinates", e)?;
+                        return Ok(Next::Go);
+                    }
+                }
+            } else {
+                None
+            };
+            crate::screen::set_origin(origin);
+        }
+        InstructionKind::WaitForApp {
+            pattern,
+            running,
+            timeout,
+        } => {
+            let setup = (|| {
+                let pattern = ctx.resolve(pattern, depth)?.eval_text()?;
+                Ok::<_, String>((pattern, optional_number(ctx, depth, timeout.as_ref(), 0.0)?))
+            })();
+            let (pattern, timeout) = match setup {
+                Ok(setup) => setup,
+                Err(e) => {
+                    soft_fail(ctx, &ins.id, "Wait for app", e)?;
+                    return Ok(Next::Go);
+                }
+            };
+            let message = if *running {
+                "Wait for app: not running"
+            } else {
+                "Wait for app: still running"
+            };
+            let started = Instant::now();
+            loop {
+                match crate::system::app_running(&pattern) {
+                    Ok(now) if now == *running => break,
+                    Ok(_) => {}
+                    Err(e) => {
+                        soft_fail(ctx, &ins.id, "Wait for app", e)?;
+                        break;
+                    }
+                }
+                if wait_limit_reached(ctx, &ins.id, started, 0.0, timeout, message)? {
+                    break;
+                }
+                if sleep_unless_stopped(ctx, APP_POLL_MS * ctx.speed_multiplier) {
+                    return Ok(Next::Stop);
+                }
+            }
+        }
+        InstructionKind::WaitForClipboard { timeout } => {
+            let timeout = match optional_number(ctx, depth, timeout.as_ref(), 0.0) {
+                Ok(timeout) => timeout,
+                Err(e) => {
+                    soft_fail(ctx, &ins.id, "Wait for clipboard", e)?;
+                    return Ok(Next::Go);
+                }
+            };
+            let before = crate::clipboard::fingerprint();
+            let started = Instant::now();
+            while crate::clipboard::fingerprint() == before {
+                if wait_limit_reached(
+                    ctx,
+                    &ins.id,
+                    started,
+                    0.0,
+                    timeout,
+                    "Wait for clipboard: unchanged",
+                )? {
+                    break;
+                }
+                if sleep_unless_stopped(ctx, CLIPBOARD_POLL_MS * ctx.speed_multiplier) {
+                    return Ok(Next::Stop);
+                }
+            }
+        }
+        InstructionKind::ReadKeys {
+            name,
+            end_keys,
+            count,
+            timeout,
+        } => {
+            let setup = (|| {
+                let ends = ctx.resolve(end_keys, depth)?.eval_text()?;
+                let ends: Vec<_> = ends
+                    .split(',')
+                    .map(crate::input::key_names::parse_trigger_combo)
+                    .filter(|combo| !combo.is_empty())
+                    .collect();
+                let count = optional_number(ctx, depth, count.as_ref(), 0.0)?;
+                let timeout = optional_number(ctx, depth, timeout.as_ref(), 0.0)?;
+                if ends.is_empty() && count <= 0.0 && timeout <= 0.0 {
+                    return Err("give an end key, a number of characters or a time limit".into());
+                }
+                Ok::<_, String>((ends, count, timeout))
+            })();
+            let (ends, count, timeout) = match setup {
+                Ok(setup) => setup,
+                Err(e) => {
+                    soft_fail(ctx, &ins.id, "Read typing", e)?;
+                    return Ok(Next::Go);
+                }
+            };
+            let keys = crate::recording::subscribe_key_events();
+            let mut buffer = crate::input::typed::TypedBuffer::default();
+            let mut text = String::new();
+            let mut held: Vec<MacroKey> = Vec::new();
+            let started = Instant::now();
+            loop {
+                if ctx.stop_flag.as_ref().is_some_and(stop_requested) {
+                    return Ok(Next::Stop);
+                }
+                if count > 0.0 && text.chars().count() as f64 >= count {
+                    break;
+                }
+                let left = if timeout > 0.0 {
+                    let left =
+                        timeout / ctx.speed_multiplier - started.elapsed().as_secs_f64() * 1000.0;
+                    if left <= 0.0 {
+                        break;
+                    }
+                    left
+                } else {
+                    f64::MAX
+                };
+                let wait = STOP_POLL_INTERVAL.min(Duration::from_secs_f64(left / 1000.0));
+                let Ok(event) = keys.recv_timeout(wait) else {
+                    continue;
+                };
+                // Held keys come from the events, so a quick tap still counts.
+                held.retain(|k| *k != event.key);
+                if event.pressed {
+                    held.push(event.key.clone());
+                    let ended = ends.iter().any(|combo| {
+                        combo.last().is_some_and(|last| last.matches(&event.key))
+                            && crate::input::key_names::combo_held(combo, &held, true)
+                    });
+                    if ended {
+                        break;
+                    }
+                }
+                if event.pressed && matches!(event.key, MacroKey::Backspace) {
+                    text.pop();
+                } else if buffer.key(&event.key, event.pressed)
+                    && let Some(c) = buffer.text().chars().last()
+                {
+                    text.push(c);
+                }
+            }
+            set_variable(ctx, name, Evaluated::Text(text));
         }
         InstructionKind::WaitForKey {
             key,

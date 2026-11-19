@@ -17,17 +17,242 @@ pub fn app_matches(names: &[String], pattern: &str) -> bool {
     !pattern.is_empty() && names.iter().any(|n| n.to_lowercase().contains(&pattern))
 }
 
+fn process_names() -> Result<Vec<String>, String> {
+    Ok(process_list()?.into_iter().map(|(_, name)| name).collect())
+}
+
+/// The ID of the oldest-started program whose name contains `pattern`
+/// (the lowest ID), if one is running.
+pub fn app_pid(pattern: &str) -> Result<Option<u32>, String> {
+    let pattern = pattern.trim().to_lowercase();
+    if pattern.is_empty() {
+        return Ok(None);
+    }
+    Ok(process_list()?
+        .into_iter()
+        .filter(|(pid, name)| *pid != 0 && name.to_lowercase().contains(&pattern))
+        .map(|(pid, _)| pid)
+        .min())
+}
+
+/// Ends the process with this ID.
+pub fn kill(pid: f64) -> Result<(), String> {
+    if pid.fract() != 0.0 || pid < 1.0 || pid > u32::MAX as f64 {
+        return Err(format!("{pid} isn't a process ID"));
+    }
+    let pid = pid as u32;
+    if pid == std::process::id() {
+        return Err("that's Blockwork itself".into());
+    }
+    kill_pid(pid)
+}
+
+#[cfg(unix)]
+fn kill_pid(pid: u32) -> Result<(), String> {
+    if crate::flatpak::is_flatpak() {
+        let ok = crate::flatpak::host_command("kill")
+            .arg(pid.to_string())
+            .status()
+            .is_ok_and(|s| s.success());
+        return if ok {
+            Ok(())
+        } else {
+            Err(format!("couldn't end process {pid}"))
+        };
+    }
+    // SAFETY: plain signal send; no memory is shared.
+    if unsafe { libc::kill(pid as libc::pid_t, libc::SIGTERM) } == 0 {
+        Ok(())
+    } else {
+        Err(format!(
+            "couldn't end process {pid}: {}",
+            std::io::Error::last_os_error()
+        ))
+    }
+}
+
+#[cfg(windows)]
+fn kill_pid(pid: u32) -> Result<(), String> {
+    use windows_sys::Win32::Foundation::CloseHandle;
+    use windows_sys::Win32::System::Threading::{OpenProcess, PROCESS_TERMINATE, TerminateProcess};
+    // SAFETY: the handle is checked and closed here.
+    unsafe {
+        let handle = OpenProcess(PROCESS_TERMINATE, 0, pid);
+        if handle.is_null() {
+            return Err(format!(
+                "couldn't end process {pid}: {}",
+                std::io::Error::last_os_error()
+            ));
+        }
+        let ended = TerminateProcess(handle, 1) != 0;
+        CloseHandle(handle);
+        if ended {
+            Ok(())
+        } else {
+            Err(format!("couldn't end process {pid}"))
+        }
+    }
+}
+
+#[cfg(not(any(unix, windows)))]
+fn kill_pid(_: u32) -> Result<(), String> {
+    Err("ending programs isn't supported on this system".into())
+}
+
+/// The commands that lock, sleep, log out, restart or shut down, in the
+/// order to try them.
+fn power_commands(action: blockwork_model::macros::PowerAction) -> Vec<Vec<String>> {
+    use blockwork_model::macros::PowerAction as P;
+    let list = |items: &[&[&str]]| {
+        items
+            .iter()
+            .map(|c| c.iter().map(|s| s.to_string()).collect())
+            .collect()
+    };
+    if cfg!(windows) {
+        return list(match action {
+            P::Lock => &[&["rundll32.exe", "user32.dll,LockWorkStation"]],
+            P::Sleep => &[&["rundll32.exe", "powrprof.dll,SetSuspendState", "0,1,0"]],
+            P::LogOut => &[&["shutdown", "/l"]],
+            P::Restart => &[&["shutdown", "/r", "/t", "0"]],
+            P::ShutDown => &[&["shutdown", "/s", "/t", "0"]],
+        });
+    }
+    if cfg!(target_os = "macos") {
+        let tell = |what: &str| format!("tell application \"System Events\" to {what}");
+        return match action {
+            P::Lock => list(&[&["pmset", "displaysleepnow"]]),
+            P::Sleep => list(&[&["pmset", "sleepnow"]]),
+            P::LogOut => vec![vec!["osascript".into(), "-e".into(), tell("log out")]],
+            P::Restart => vec![vec!["osascript".into(), "-e".into(), tell("restart")]],
+            P::ShutDown => vec![vec!["osascript".into(), "-e".into(), tell("shut down")]],
+        };
+    }
+    let session = std::env::var("XDG_SESSION_ID").unwrap_or_default();
+    match action {
+        P::Lock => {
+            let mut commands = list(&[&["loginctl", "lock-session"]]);
+            if !session.is_empty() {
+                commands.insert(0, vec!["loginctl".into(), "lock-session".into(), session]);
+            }
+            commands
+        }
+        P::Sleep => list(&[&["systemctl", "suspend"]]),
+        P::LogOut => {
+            let mut commands = list(&[
+                &["qdbus", "org.kde.Shutdown", "/Shutdown", "logout"],
+                &["gnome-session-quit", "--logout", "--no-prompt"],
+            ]);
+            if !session.is_empty() {
+                commands.push(vec!["loginctl".into(), "terminate-session".into(), session]);
+            }
+            commands
+        }
+        P::Restart => list(&[&["systemctl", "reboot"]]),
+        P::ShutDown => list(&[&["systemctl", "poweroff"]]),
+    }
+}
+
+/// Locks the screen, sleeps, logs out, restarts or shuts down.
+pub fn power(action: blockwork_model::macros::PowerAction) -> Result<(), String> {
+    let mut last = String::from("no command to run");
+    for command in power_commands(action) {
+        #[cfg(not(windows))]
+        let mut process = crate::flatpak::host_command(&command[0]);
+        #[cfg(windows)]
+        let mut process = {
+            use std::os::windows::process::CommandExt;
+            let mut process = std::process::Command::new(&command[0]);
+            process.creation_flags(0x0800_0000);
+            process
+        };
+        match process
+            .args(&command[1..])
+            .stdin(std::process::Stdio::null())
+            .output()
+        {
+            Ok(out) if out.status.success() => return Ok(()),
+            Ok(out) => last = String::from_utf8_lossy(&out.stderr).trim().to_string(),
+            Err(e) => last = format!("{}: {e}", command[0]),
+        }
+    }
+    Err(last)
+}
+
+/// One fact about the computer by name: `user name`, `computer name`,
+/// `system`, `system version`, `home folder` or `display scale`.
+pub fn info(what: &str) -> Result<String, String> {
+    Ok(match what {
+        "user name" => std::env::var("USER")
+            .or_else(|_| std::env::var("USERNAME"))
+            .unwrap_or_default(),
+        "computer name" => computer_name(),
+        "system" => match std::env::consts::OS {
+            "macos" => "macOS".into(),
+            "windows" => "Windows".into(),
+            "linux" => "Linux".into(),
+            other => other.into(),
+        },
+        "system version" => system_version(),
+        "home folder" => dirs::home_dir()
+            .map(|p| p.to_string_lossy().into_owned())
+            .unwrap_or_default(),
+        "display scale" => crate::screen::capture()?.scale.to_string(),
+        other => return Err(format!("unknown computer info '{other}'")),
+    })
+}
+
+fn computer_name() -> String {
+    if let Ok(name) = std::env::var("COMPUTERNAME") {
+        return name;
+    }
+    #[cfg(unix)]
+    {
+        let mut buf = [0u8; 256];
+        // SAFETY: the buffer is large enough and its length is passed.
+        if unsafe { libc::gethostname(buf.as_mut_ptr().cast(), buf.len()) } == 0 {
+            let end = buf.iter().position(|&b| b == 0).unwrap_or(buf.len());
+            return String::from_utf8_lossy(&buf[..end]).into_owned();
+        }
+    }
+    String::new()
+}
+
+fn system_version() -> String {
+    let run = |program: &str, args: &[&str]| {
+        std::process::Command::new(program)
+            .args(args)
+            .output()
+            .map(|o| String::from_utf8_lossy(&o.stdout).trim().to_string())
+            .unwrap_or_default()
+    };
+    if cfg!(target_os = "macos") {
+        return run("sw_vers", &["-productVersion"]);
+    }
+    if cfg!(windows) {
+        return run("cmd", &["/C", "ver"]);
+    }
+    let release = std::fs::read_to_string("/etc/os-release")
+        .or_else(|_| std::fs::read_to_string("/run/host/os-release"))
+        .unwrap_or_default();
+    release
+        .lines()
+        .find_map(|l| l.strip_prefix("PRETTY_NAME="))
+        .map(|v| v.trim_matches('"').to_string())
+        .unwrap_or_else(|| run("uname", &["-sr"]))
+}
+
 /// Whether a program whose name contains `pattern` is running.
 pub fn app_running(pattern: &str) -> Result<bool, String> {
     Ok(app_matches(&running_apps()?, pattern))
 }
 
 #[cfg(target_os = "linux")]
-fn process_names() -> Result<Vec<String>, String> {
+fn process_list() -> Result<Vec<(u32, String)>, String> {
     if crate::flatpak::is_flatpak() {
         // The sandbox has its own process list.
         let out = crate::flatpak::host_command("ps")
-            .args(["-eo", "comm=,args="])
+            .args(["-eo", "pid=,comm=,args="])
             .output()
             .map_err(|e| format!("couldn't list programs: {e}"))?;
         let text = String::from_utf8_lossy(&out.stdout);
@@ -35,52 +260,52 @@ fn process_names() -> Result<Vec<String>, String> {
             .lines()
             .flat_map(|line| {
                 let mut parts = line.split_whitespace();
+                let pid = parts.next().and_then(|p| p.parse().ok()).unwrap_or(0);
                 let comm = parts.next().unwrap_or_default().to_string();
                 let exe = parts.next().map(basename).unwrap_or_default();
-                [comm, exe]
+                [(pid, comm), (pid, exe)]
             })
-            .filter(|n| !n.is_empty())
+            .filter(|(_, n)| !n.is_empty())
             .collect());
     }
     let dir = std::fs::read_dir("/proc").map_err(|e| format!("couldn't list programs: {e}"))?;
     let mut names = Vec::new();
     for entry in dir.flatten() {
         let path = entry.path();
-        if !entry
-            .file_name()
-            .to_string_lossy()
-            .bytes()
-            .all(|b| b.is_ascii_digit())
-        {
+        let Ok(pid) = entry.file_name().to_string_lossy().parse::<u32>() else {
             continue;
-        }
+        };
         if let Ok(comm) = std::fs::read_to_string(path.join("comm")) {
-            names.push(comm.trim().to_string());
+            names.push((pid, comm.trim().to_string()));
         }
         // comm is cut to 15 characters; the command line has the full name.
         if let Ok(cmdline) = std::fs::read(path.join("cmdline"))
             && let Some(first) = cmdline.split(|&b| b == 0).next()
             && !first.is_empty()
         {
-            names.push(basename(&String::from_utf8_lossy(first)));
+            names.push((pid, basename(&String::from_utf8_lossy(first))));
         }
     }
     Ok(names)
 }
 
 #[cfg(target_os = "macos")]
-fn process_names() -> Result<Vec<String>, String> {
+fn process_list() -> Result<Vec<(u32, String)>, String> {
     let out = std::process::Command::new("ps")
-        .args(["-axo", "comm="])
+        .args(["-axo", "pid=,comm="])
         .output()
         .map_err(|e| format!("couldn't list programs: {e}"))?;
     let text = String::from_utf8_lossy(&out.stdout);
     let mut names = Vec::new();
-    for path in text.lines() {
-        names.push(basename(path));
+    for line in text.lines() {
+        let line = line.trim_start();
+        let (pid, path) = line.split_once(' ').unwrap_or((line, ""));
+        let pid = pid.parse().unwrap_or(0);
+        let path = path.trim_start();
+        names.push((pid, basename(path)));
         // "/Applications/Visual Studio Code.app/..." is also "Visual Studio Code".
         if let Some(app) = path.split('/').find_map(|part| part.strip_suffix(".app")) {
-            names.push(app.to_string());
+            names.push((pid, app.to_string()));
         }
     }
     Ok(names)
@@ -164,7 +389,7 @@ pub fn close_application(command: &str, name: &str) -> std::io::Result<()> {
 }
 
 #[cfg(windows)]
-fn process_names() -> Result<Vec<String>, String> {
+fn process_list() -> Result<Vec<(u32, String)>, String> {
     use windows_sys::Win32::Foundation::{CloseHandle, INVALID_HANDLE_VALUE};
     use windows_sys::Win32::System::Diagnostics::ToolHelp::{
         CreateToolhelp32Snapshot, PROCESSENTRY32W, Process32FirstW, Process32NextW,
@@ -186,7 +411,7 @@ fn process_names() -> Result<Vec<String>, String> {
                 .position(|&c| c == 0)
                 .unwrap_or(entry.szExeFile.len());
             let name = String::from_utf16_lossy(&entry.szExeFile[..len]);
-            names.push(strip_exe(&name).to_string());
+            names.push((entry.th32ProcessID, strip_exe(&name).to_string()));
             more = Process32NextW(snapshot, &mut entry) != 0;
         }
         CloseHandle(snapshot);
@@ -195,7 +420,7 @@ fn process_names() -> Result<Vec<String>, String> {
 }
 
 #[cfg(not(any(target_os = "linux", target_os = "macos", windows)))]
-fn process_names() -> Result<Vec<String>, String> {
+fn process_list() -> Result<Vec<(u32, String)>, String> {
     Err("listing programs isn't supported on this system".into())
 }
 
