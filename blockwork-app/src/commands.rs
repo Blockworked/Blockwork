@@ -153,6 +153,7 @@ mod editing;
 mod files;
 mod hotkey_actions;
 mod library;
+mod runnable;
 mod running;
 mod settings;
 pub(crate) use debugging::*;
@@ -160,6 +161,7 @@ pub(crate) use editing::*;
 pub(crate) use files::*;
 pub(crate) use hotkey_actions::*;
 pub(crate) use library::*;
+pub(crate) use runnable::export_runnable;
 pub(crate) use running::*;
 pub(crate) use settings::*;
 
