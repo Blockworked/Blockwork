@@ -1,10 +1,15 @@
 use super::{Action, ActiveWindow, MatchBy, Rect, ScreenWindow, no_match};
 use crate::flatpak::host_command;
 
+mod cosmic;
+pub(super) mod gnome;
+
 enum Desktop {
     Hyprland,
     Sway,
     Kde,
+    Gnome,
+    Cosmic,
     X11,
 }
 
@@ -23,7 +28,13 @@ fn desktop() -> Result<Desktop, String> {
     if env("XDG_CURRENT_DESKTOP").to_uppercase().contains("KDE") {
         return Ok(Desktop::Kde);
     }
-    Err("window info isn't available on this Wayland desktop (supported: Hyprland, Sway, KDE with kdotool, or X11)".into())
+    if env("XDG_CURRENT_DESKTOP").to_uppercase().contains("COSMIC") {
+        return Ok(Desktop::Cosmic);
+    }
+    if env("XDG_CURRENT_DESKTOP").to_uppercase().contains("GNOME") {
+        return Ok(Desktop::Gnome);
+    }
+    Err("window info isn't available on this Wayland desktop (supported: Hyprland, Sway, KDE with kdotool, GNOME with the Blockwork extension, COSMIC, or X11)".into())
 }
 
 pub(super) fn active() -> Result<ActiveWindow, String> {
@@ -31,6 +42,10 @@ pub(super) fn active() -> Result<ActiveWindow, String> {
         Desktop::Hyprland => Ok(hypr::info(&hypr::active()?)),
         Desktop::Sway => Ok(sway::active()?.map(|n| sway::info(&n)).unwrap_or_default()),
         Desktop::Kde => kde::info(&kde::active()?),
+        Desktop::Gnome => Ok(gnome::active()?
+            .map(|w| gnome::info(&w))
+            .unwrap_or_default()),
+        Desktop::Cosmic => cosmic::active(),
         Desktop::X11 => {
             let x = x11::X11::connect()?;
             Ok(x.active()?.map(|w| x.info(w)).unwrap_or_default())
@@ -43,6 +58,8 @@ pub(super) fn act(action: Action, pattern: &str, by: MatchBy) -> Result<(), Stri
         Desktop::Hyprland => hypr::act(action, &hypr::find(pattern, by)?),
         Desktop::Sway => sway::act(action, &sway::find(pattern, by)?),
         Desktop::Kde => kde::act(action, &kde::find(pattern, by)?),
+        Desktop::Gnome => gnome::act(action, &gnome::find(pattern, by)?),
+        Desktop::Cosmic => cosmic::act(action, pattern, by),
         Desktop::X11 => {
             let x = x11::X11::connect()?;
             let w = x.find(pattern, by)?;
@@ -59,6 +76,8 @@ pub(super) fn set_opacity(pattern: &str, by: MatchBy, opacity: f64) -> Result<()
             &kde::find(pattern, by)?,
             &format!("w.opacity = {opacity:.3};"),
         ),
+        Desktop::Gnome => gnome::set_opacity(&gnome::find(pattern, by)?, opacity),
+        Desktop::Cosmic => Err("COSMIC doesn't let apps change a window's transparency".into()),
         Desktop::X11 => {
             let x = x11::X11::connect()?;
             let w = x.find(pattern, by)?;
@@ -82,7 +101,7 @@ pub(super) fn set_title(pattern: &str, by: MatchBy, title: &str) -> Result<(), S
             let w = x.find(pattern, by)?;
             x.set_title(w, title)
         }
-        Desktop::Hyprland | Desktop::Kde => {
+        Desktop::Hyprland | Desktop::Kde | Desktop::Gnome | Desktop::Cosmic => {
             Err("this desktop doesn't let other apps rename windows".into())
         }
     }
@@ -98,6 +117,8 @@ pub(super) fn place(
     match desktop()? {
         Desktop::Hyprland => hypr::place(&hypr::find(pattern, by)?, resize, a, b),
         Desktop::Sway => sway::place(&sway::find(pattern, by)?, resize, a, b),
+        Desktop::Gnome => gnome::place(&gnome::find(pattern, by)?, resize, a, b),
+        Desktop::Cosmic => Err("COSMIC doesn't let apps move or resize windows".into()),
         Desktop::Kde => {
             let id = kde::find(pattern, by)?;
             let (a, b) = (a.to_string(), b.to_string());
@@ -125,6 +146,8 @@ pub(super) fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
         Desktop::Hyprland => hypr::bounds(&hypr::find(pattern, by)?),
         Desktop::Sway => sway::bounds(&sway::find(pattern, by)?),
         Desktop::Kde => kde::bounds(&kde::find(pattern, by)?),
+        Desktop::Gnome => gnome::bounds(&gnome::find(pattern, by)?),
+        Desktop::Cosmic => cosmic::bounds(pattern, by),
         Desktop::X11 => {
             let x = x11::X11::connect()?;
             let w = x.find(pattern, by)?;
@@ -141,6 +164,8 @@ pub(super) fn exists(pattern: &str) -> Result<bool, String> {
         Desktop::Hyprland => Ok(hypr::find(pattern, MatchBy::Any).is_ok()),
         Desktop::Sway => Ok(sway::find(pattern, MatchBy::Any).is_ok()),
         Desktop::Kde => Ok(kde::search(pattern, MatchBy::Any)?.is_some()),
+        Desktop::Gnome => gnome::exists(pattern),
+        Desktop::Cosmic => cosmic::exists(pattern),
         Desktop::X11 => Ok(x11::X11::connect()?.find(pattern, MatchBy::Any).is_ok()),
     }
 }
@@ -150,6 +175,8 @@ pub(super) fn stacked() -> Result<Vec<ScreenWindow>, String> {
         Desktop::Hyprland => hypr::stacked(),
         Desktop::Sway => sway::stacked(),
         Desktop::Kde => kde::stacked(),
+        Desktop::Gnome => gnome::stacked(),
+        Desktop::Cosmic => cosmic::stacked(),
         Desktop::X11 => x11::X11::connect()?.stacked(),
     }
 }

@@ -609,6 +609,9 @@ impl Backend {
                 commands::discard_recording_review(&self.state, &self.app).map(|_| Value::Null)
             }
             "input_diagnostics" => to_json(crate::diagnostics::input()),
+            "install_gnome_extension" => {
+                to_json(blockwork_core::window::install_gnome_extension()?)
+            }
             "open_settings" => to_json(commands::open_settings(&self.state, &self.app)?),
             "close_settings" => to_json(commands::close_settings(&self.state, &self.app)?),
             "start_combo_capture" => {

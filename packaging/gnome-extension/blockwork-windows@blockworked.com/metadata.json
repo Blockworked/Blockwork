@@ -1,0 +1,8 @@
+{
+  "uuid": "blockwork-windows@blockworked.com",
+  "name": "Blockwork windows",
+  "description": "Lets Blockwork macros see, move and focus your windows on GNOME, which doesn't let apps do that on their own.",
+  "url": "https://blockworked.com",
+  "shell-version": ["45", "46", "47", "48", "49"],
+  "version": 1
+}

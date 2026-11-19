@@ -170,6 +170,15 @@ pub fn stacked() -> Result<Vec<ScreenWindow>, String> {
     linux::stacked()
 }
 
+/// Installs the GNOME Shell extension window control needs on GNOME
+/// Wayland; says what to do next.
+pub fn install_gnome_extension() -> Result<String, String> {
+    #[cfg(target_os = "linux")]
+    return linux::gnome::install();
+    #[cfg(not(target_os = "linux"))]
+    Err("the GNOME extension is only for Linux".into())
+}
+
 /// Changes a matching window's opacity (0 to 100), title, or monitor
 /// (counting from 1, in the order of the monitor reporters).
 pub fn set(

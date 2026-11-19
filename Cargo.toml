@@ -44,7 +44,7 @@ libc = "0.2"
 evdev = "0.13.2"
 x11rb = { version = "0.14", default-features = false, features = ["randr"] }
 wayland-client = "0.31.15"
-wayland-protocols = { version = "0.32.13", features = ["client", "unstable"] }
+wayland-protocols = { version = "0.32.13", features = ["client", "unstable", "staging"] }
 bincode = { version = "2", features = ["serde"] }
 memmap2 = "0.9"
 windows-sys = { version = "0.61.2", features = [

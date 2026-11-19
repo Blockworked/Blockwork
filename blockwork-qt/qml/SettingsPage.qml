@@ -375,6 +375,13 @@ Item {
                             SettingsRow { title: qsTr("Input diagnostics"); detail: qsTr("See which devices, permissions and services recording and playback can use, to copy into a bug report.")
                                 StitchButton { objectName: "openInputDiagnostics"; text: qsTr("Show"); iconName: "activity"; onClicked: inputDiagnostics.open() }
                             }
+                            SettingsRow { visible: Qt.platform.os === "linux"; title: qsTr("GNOME window extension"); detail: root.gnomeExtensionNote || qsTr("GNOME on Wayland only lets window blocks see and move windows through a small Shell extension. Install it, then log out and back in.")
+                                StitchButton { objectName: "installGnomeExtension"; text: qsTr("Install"); iconName: "download"; onClicked: root.withReply("install_gnome_extension", note => root.gnomeExtensionNote = ({
+                                        running: qsTr("Installed and running."),
+                                        log_out: qsTr("Installed. Log out and back in to start it."),
+                                        turn_on: qsTr("Installed. Log out and back in, then turn on \"Blockwork windows\" in the Extensions app.")
+                                    })[note] || note, error => root.gnomeExtensionNote = error) }
+                            }
                         }
                         SettingsSection {
                             SettingsRow { first: true
@@ -714,21 +721,24 @@ Item {
     // fetched when copied or shown.
     property int callSeq: 0
     property var callbacks: ({})
-    function withReply(command, done) {
+    property string gnomeExtensionNote: ""
+    function withReply(command, done, failed) {
         if (!appBridge) return;
         const key = "settings" + (++callSeq);
-        callbacks[key] = done;
+        callbacks[key] = { done: done, failed: failed };
         appBridge.callCommand(key, command, "{}");
     }
     function withWebhookToken(done) { withReply("webhook_token", done) }
     Connections {
         target: root.appBridge
         function onReplySerialChanged() {
-            const key = root.appBridge.replyKey, done = root.callbacks[key];
-            if (!done) return;
+            const key = root.appBridge.replyKey, call = root.callbacks[key];
+            if (!call) return;
             delete root.callbacks[key];
-            const token = root.appBridge.replyError ? "" : JSON.parse(root.appBridge.replyJson || "null");
-            if (token) done(token);
+            const error = root.appBridge.replyError;
+            if (error) { if (call.failed) call.failed(error); return; }
+            const token = JSON.parse(root.appBridge.replyJson || "null");
+            if (token) call.done(token);
         }
     }
 

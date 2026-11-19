@@ -64,6 +64,9 @@ x11rb.workspace = true
 enigo = { workspace = true, features = ["libei", "smol"] }
 wayland-client.workspace = true
 wayland-protocols.workspace = true
+# Generates COSMIC's window protocols (see src/window/linux/cosmic.rs).
+wayland-scanner = "0.31.11"
+wayland-backend = "0.3.17"
 # Keyboard layouts for typed-text triggers (see src/input/layout.rs).
 xkbcommon = "0.9"
 # Desktop notifications over the session bus (see src/notify.rs).
