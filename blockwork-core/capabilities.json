@@ -69,6 +69,10 @@
       "input",
       "clipboard"
     ],
+    "RemapKey": [
+      "input",
+      "triggers"
+    ],
     "ResetGamepad": [
       "input"
     ],
@@ -98,6 +102,9 @@
     ],
     "WaitForImage": [
       "screen"
+    ],
+    "WaitForKey": [
+      "input"
     ],
     "WhenApp": [
       "windows",
@@ -139,9 +146,11 @@
       "triggers"
     ],
     "WhenKey": [
+      "input",
       "triggers"
     ],
     "WhenMouseButton": [
+      "input",
       "triggers"
     ],
     "WhenNativeUiChanged": [
@@ -279,6 +288,7 @@
     "GamepadConnected": "input",
     "GlobalVariable": "globals",
     "HttpGet": "network",
+    "KeyHeld": "input",
     "ListDirectory": "files_read",
     "MacroRunning": "macros",
     "NativeUiEnabled": "ui_automation",

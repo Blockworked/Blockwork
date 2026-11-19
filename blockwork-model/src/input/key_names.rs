@@ -55,6 +55,7 @@ pub fn string_to_key(key_str: &str) -> Result<MacroKey, &'static str> {
         "LeftControl" => Ok(MacroKey::LControl),
         "RightControl" => Ok(MacroKey::RControl),
         "LeftAlt" | "Option" => Ok(MacroKey::Option),
+        "RightAlt" => Ok(MacroKey::AltGr),
         "VolumeDown" => Ok(MacroKey::VolumeDown),
         "VolumeMute" => Ok(MacroKey::VolumeMute),
         "VolumeUp" => Ok(MacroKey::VolumeUp),
@@ -196,6 +197,111 @@ pub fn match_key(key: &MacroKey) -> MacroKey {
     }
 }
 
+/// The keys to press, in order, for a combo like `Control+C`: plain Shift is
+/// the left one, and letters in a combo are the bare key (Shift is only
+/// added when the combo names it). Released in reverse order.
+pub fn keys_to_press(text: &str) -> Vec<MacroKey> {
+    let mut keys: Vec<MacroKey> = parse_key_combo(text)
+        .into_iter()
+        .map(|key| match key {
+            MacroKey::Shift => MacroKey::LShift,
+            key => key,
+        })
+        .collect();
+    if keys.len() > 1 {
+        for key in &mut keys {
+            if let MacroKey::Unicode(c) = key {
+                *c = c.to_ascii_lowercase();
+            }
+        }
+    }
+    keys
+}
+
+/// Which side of the keyboard a modifier is on, when a combo names one.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum Side {
+    Left,
+    Right,
+}
+
+/// One key of a trigger's combo. `side` is set when the combo names a left
+/// or right modifier (`RightControl`, `LeftShift`), which then only matches
+/// that physical key; a plain `Control` matches either.
+#[derive(Debug, Clone, PartialEq)]
+pub struct ComboKey {
+    pub key: MacroKey,
+    pub side: Option<Side>,
+}
+
+/// The side a physical key reports, for modifiers that have two.
+fn physical_side(key: &MacroKey) -> Option<Side> {
+    match key {
+        MacroKey::LShift | MacroKey::LControl | MacroKey::LMenu | MacroKey::Option => {
+            Some(Side::Left)
+        }
+        MacroKey::RShift | MacroKey::RControl | MacroKey::AltGr => Some(Side::Right),
+        _ => None,
+    }
+}
+
+/// Parses a trigger's combo like `parse_key_combo`, keeping which side a
+/// modifier named `Left...` or `Right...` is on.
+pub fn parse_trigger_combo(text: &str) -> Vec<ComboKey> {
+    let mut parts: Vec<String> = Vec::new();
+    let mut current = String::new();
+    for c in text.chars() {
+        if c == '+' && !current.is_empty() {
+            parts.push(std::mem::take(&mut current));
+        } else {
+            current.push(c);
+        }
+    }
+    if !current.is_empty() {
+        parts.push(current);
+    }
+    parts
+        .iter()
+        .filter_map(|part| {
+            let key = parse_key_name(part)?;
+            let name = part.trim();
+            let side = if !key.is_modifier() {
+                None
+            } else if name.starts_with("Left") || name == "LMenu" || name == "Option" {
+                // "Shift" is saved as LShift too, so only the spelled-out
+                // name picks a side.
+                Some(Side::Left)
+            } else if name.starts_with("Right") || name == "AltGr" {
+                Some(Side::Right)
+            } else {
+                None
+            };
+            Some(ComboKey {
+                key: match_key(&key),
+                side,
+            })
+        })
+        .collect()
+}
+
+impl ComboKey {
+    /// Whether a physical key, as the capture callback reports it, is this one.
+    pub fn matches(&self, physical: &MacroKey) -> bool {
+        match_key(physical) == self.key
+            && self
+                .side
+                .is_none_or(|side| physical_side(physical) == Some(side))
+    }
+}
+
+/// Whether the physical keys `held` make up `combo`: every combo key is
+/// held, and unless `extra_keys` allows more, nothing else is.
+pub fn combo_held(combo: &[ComboKey], held: &[MacroKey], extra_keys: bool) -> bool {
+    !combo.is_empty()
+        && combo.iter().all(|c| held.iter().any(|h| c.matches(h)))
+        && (extra_keys || held.iter().all(|h| combo.iter().any(|c| c.matches(h))))
+}
+
 #[cfg(test)]
 mod combo_tests {
     use super::*;
@@ -246,6 +352,33 @@ mod combo_tests {
             );
         }
         assert_eq!(parse_key_name("PrintScreen"), Some(MacroKey::PrintScr));
+    }
+
+    #[test]
+    fn a_sided_modifier_only_matches_that_side() {
+        let right = parse_trigger_combo("RightControl+k");
+        let k = MacroKey::Unicode('k');
+        assert!(combo_held(&right, &[MacroKey::RControl, k.clone()], false));
+        assert!(!combo_held(&right, &[MacroKey::LControl, k.clone()], false));
+        let either = parse_trigger_combo("Control+k");
+        assert!(combo_held(&either, &[MacroKey::LControl, k.clone()], false));
+        assert!(combo_held(&either, &[MacroKey::RControl, k.clone()], false));
+        let shift = parse_trigger_combo("Shift+k");
+        assert!(combo_held(&shift, &[MacroKey::RShift, k.clone()], false));
+        let left_shift = parse_trigger_combo("LeftShift+k");
+        assert!(!combo_held(&left_shift, &[MacroKey::RShift, k], false));
+    }
+
+    #[test]
+    fn extra_keys_may_be_held_only_when_allowed() {
+        let combo = parse_trigger_combo("Control+k");
+        let held = [MacroKey::LControl, MacroKey::LShift, MacroKey::Unicode('K')];
+        assert!(!combo_held(&combo, &held, false));
+        assert!(combo_held(&combo, &held, true));
+        assert!(
+            !combo_held(&combo, &[MacroKey::LControl], true),
+            "k missing"
+        );
     }
 
     #[test]

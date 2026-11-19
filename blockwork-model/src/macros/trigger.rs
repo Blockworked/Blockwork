@@ -1,6 +1,6 @@
 //! Plain-text names for trigger headers, for the run log's "Trigger fired" line.
 
-use super::InstructionKind;
+use super::{InstructionKind, KeyGestureKind};
 use crate::input::schedule::{TimeSchedule, Weekday};
 use crate::input::types::{Direction, MacroButton};
 use crate::input::value::Value;
@@ -123,13 +123,22 @@ impl InstructionKind {
             K::WhenPowerPluggedIn => "when power is plugged in".into(),
             K::WhenPowerUnplugged => "when power is unplugged".into(),
             K::WhenClipboardChanged => "when clipboard changes".into(),
-            K::WhenKey(key, dir) => {
-                let dir = if *dir == Direction::Release {
-                    "released"
-                } else {
-                    "pressed"
+            K::WhenKey {
+                key,
+                direction,
+                gesture,
+                ..
+            } => {
+                let dir = match (gesture.as_ref().map(|g| g.kind), direction) {
+                    (Some(KeyGestureKind::Double), _) => "pressed twice",
+                    (Some(KeyGestureKind::Hold), _) => "held",
+                    (None, Direction::Release) => "released",
+                    (None, _) => "pressed",
                 };
                 format!("when key {} is {dir}", key_combo(key))
+            }
+            K::RemapKey { from, to, .. } => {
+                format!("remap key {} to {}", key_combo(from), key_combo(to))
             }
             K::WhenWindow { pattern, focused } => {
                 format!(
@@ -179,6 +188,7 @@ impl InstructionKind {
                 button: b,
                 pressed,
                 modifiers,
+                ..
             } => {
                 let with = match modifiers {
                     Some(Value::Text { value }) if value.trim().is_empty() => String::new(),
@@ -213,7 +223,7 @@ mod tests {
 
     #[test]
     fn names_the_trigger() {
-        let key = InstructionKind::WhenKey(Value::text("F8"), Direction::Press);
+        let key = InstructionKind::when_key(Value::text("F8"), Direction::Press);
         assert_eq!(
             fired_message(Some(&key)),
             "Trigger fired: when key \"F8\" is pressed"
@@ -240,18 +250,33 @@ mod tests {
             "when idle for 5 minutes"
         );
         assert_eq!(fired_message(None), "Trigger fired");
-        let r = InstructionKind::WhenKey(Value::text("r"), Direction::Release);
+        let r = InstructionKind::when_key(Value::text("r"), Direction::Release);
         assert_eq!(r.trigger_label().unwrap(), "when key \"R\" is released");
-        let combo = InstructionKind::WhenKey(Value::text("Control++"), Direction::Press);
+        let combo = InstructionKind::when_key(Value::text("Control++"), Direction::Press);
         assert_eq!(
             combo.trigger_label().unwrap(),
             "when key \"Control++\" is pressed"
         );
-        let combo = InstructionKind::WhenKey(Value::text("Control+Alt+o"), Direction::Press);
+        let combo = InstructionKind::when_key(Value::text("Control+Alt+o"), Direction::Press);
         assert_eq!(
             combo.trigger_label().unwrap(),
             "when key \"Control+Alt+O\" is pressed"
         );
         assert_eq!(InstructionKind::WhenRan.trigger_label(), None);
+        let double = InstructionKind::WhenKey {
+            key: Value::text("Escape"),
+            direction: Direction::Press,
+            block: false,
+            extra_keys: false,
+            gesture: Some(super::super::KeyGesture {
+                kind: KeyGestureKind::Double,
+                ms: Value::number(400.0),
+            }),
+            only_when: None,
+        };
+        assert_eq!(
+            double.trigger_label().unwrap(),
+            "when key \"Escape\" is pressed twice"
+        );
     }
 }

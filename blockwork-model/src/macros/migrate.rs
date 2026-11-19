@@ -8,7 +8,8 @@ use serde_json::{Map, Value, json};
 /// The version this build writes; 1 is the format 0.6.0 first had, 2 split
 /// run command into one that waits and one that doesn't. Version 3 adds pack state,
 /// version 4 adds Stop scopes, and version 5 adds text typing speeds.
-/// Version 6 adds custom block menus and native input blocks. Bump it
+/// Version 6 adds custom block menus, native input blocks, and key
+/// blocking and remapping. Bump it
 /// with a new step in [`STEPS`] (a no-op one when old files load as they are)
 /// whenever a release adds block kinds or changes their fields, so an older
 /// Blockwork says the file is too new instead of turning blocks into notes.

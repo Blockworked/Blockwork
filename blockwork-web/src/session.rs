@@ -10,19 +10,18 @@ use blockstitch_ffi::{Host, arg};
 use blockwork_model::editing;
 use blockwork_model::frontend::{InvalidFieldDto, KeyCaptureDto, macro_to_dto};
 use blockwork_model::input::key_names::{format_key_combo, match_key};
-use blockwork_model::input::types::{InputToken, MacroKey};
+use blockwork_model::input::types::MacroKey;
 use blockwork_model::input::value::{
     Evaluated, Op, Value, has_side_effect_operator, is_pure_operator,
 };
 use blockwork_model::key_mapping::{web_code_to_macro_key, web_key_to_macro_key};
 use blockwork_model::macros::conditions::PowerCondition;
-use blockwork_model::macros::{
-    Instruction, InstructionKind, Macro, UndoSnapshot, clamp_speed, migrate,
-};
+use blockwork_model::macros::fields::key_slot_mut;
+use blockwork_model::macros::{Macro, UndoSnapshot, clamp_speed, migrate};
 use serde_json::{Value as Json, json};
 
 enum KeyCapture {
-    Strand(String, Vec<PathStep>),
+    Strand(String, Vec<PathStep>, Option<String>),
     Standalone,
 }
 
@@ -253,7 +252,11 @@ impl Demo {
 
             // Key capture: the page's key events, named as the app names them.
             "start_key_capture" => {
-                self.key_capture = Some(KeyCapture::Strand(arg(a, "strandId")?, arg(a, "path")?));
+                self.key_capture = Some(KeyCapture::Strand(
+                    arg(a, "strandId")?,
+                    arg(a, "path")?,
+                    arg(a, "field")?,
+                ));
                 Ok(Json::Null)
             }
             "start_standalone_key_capture" => {
@@ -391,14 +394,11 @@ impl Demo {
         }
         let text = format_key_combo(&combo);
         match self.key_capture.take() {
-            Some(KeyCapture::Strand(strand_id, path)) => {
+            Some(KeyCapture::Strand(strand_id, path, field)) => {
                 if let Some(mac) = self.open_mut()
-                    && let Some(Instruction {
-                        kind:
-                            InstructionKind::Token(InputToken::Key(value, _))
-                            | InstructionKind::WhenKey(value, _),
-                        ..
-                    }) = mac.instruction_at_mut(&strand_id, &path)
+                    && let Some(value) = mac
+                        .instruction_at_mut(&strand_id, &path)
+                        .and_then(|ins| key_slot_mut(&mut ins.kind, field.as_deref()))
                 {
                     *value = Value::Text { value: text };
                 }
@@ -421,15 +421,17 @@ impl Demo {
             })
             .collect();
         let key_capture = self.key_capture.as_ref().map(|target| match target {
-            KeyCapture::Strand(strand_id, index) => KeyCaptureDto {
+            KeyCapture::Strand(strand_id, index, field) => KeyCaptureDto {
                 kind: "Strand".into(),
                 strand_id: Some(strand_id.clone()),
                 index: Some(index.clone()),
+                field: field.clone(),
             },
             KeyCapture::Standalone => KeyCaptureDto {
                 kind: "Standalone".into(),
                 strand_id: None,
                 index: None,
+                field: None,
             },
         });
         let library: Vec<Json> = self

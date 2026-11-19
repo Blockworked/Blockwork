@@ -344,6 +344,7 @@ impl Backend {
 
         // ── Background key-event watcher (see watch/key.rs) ──────────────
         watch::key::start(Arc::clone(&shared), app.clone());
+        watch::key_rules::start(Arc::clone(&shared));
 
         watch::window::start(Arc::clone(&shared), app.clone());
 

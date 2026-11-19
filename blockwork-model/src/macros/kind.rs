@@ -204,10 +204,44 @@ pub enum InstructionKind {
     /// clipboard's contents change. Edge-triggered like the other watcher
     /// headers, but with no threshold to recover past - any change fires it.
     WhenClipboardChanged,
-    /// Header-only marker driven by the key watcher (`watch::key` in the
-    /// desktop app): fires the body when the key combo in the value is
-    /// pressed or released. `Click` is treated as `Press`.
-    WhenKey(Value, Direction),
+    /// Header driven by the key watcher (`watch::key` in the desktop app):
+    /// fires the body when the key combo in `key` is pressed or released.
+    /// `Click` is treated as `Press`. Files before key blocking saved it as
+    /// `[key, direction]` (see `saved_shapes`).
+    WhenKey {
+        key: Value,
+        direction: Direction,
+        /// Keeps the combo's key from reaching other apps.
+        #[serde(default, skip_serializing_if = "is_false")]
+        block: bool,
+        /// Also fires while other keys are held besides the combo's.
+        #[serde(default, skip_serializing_if = "is_false")]
+        extra_keys: bool,
+        /// Fires on a double press or a long press instead of every press.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        gesture: Option<KeyGesture>,
+        /// Only fires (and only blocks) while this is true.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        only_when: Option<Value>,
+    },
+    /// Header that turns one key into another while the macro listens: the
+    /// `from` key is blocked and `to` is pressed and released in its place,
+    /// with any other held keys still applying. Blocks under it run on each
+    /// press, like a trigger.
+    RemapKey {
+        from: Value,
+        to: Value,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        only_when: Option<Value>,
+    },
+    /// Pauses until the key combo in `key` is pressed (or released), or the
+    /// optional timeout in ms runs out, which is an error.
+    WaitForKey {
+        key: Value,
+        pressed: bool,
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        timeout: Option<Value>,
+    },
     /// Launches an installed application, chosen via the desktop app's "Open
     /// App" picker (`blockwork-app`'s `installed_apps` module lists candidates).
     /// `command` is the already-resolved, platform-specific launch string
@@ -483,6 +517,16 @@ pub enum InstructionKind {
     WhenTyped {
         text: Value,
         erase: bool,
+        /// Matches whatever the case of the letters typed.
+        #[serde(default, skip_serializing_if = "is_false")]
+        ignore_case: bool,
+        /// Only fires at the start of a word, or for a whole word once a
+        /// space, Enter or punctuation follows it.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        word: Option<TypedWord>,
+        /// Only fires while this is true.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        only_when: Option<Value>,
     },
     /// Pastes text through the clipboard, then puts the old clipboard back.
     PasteText(Value),
@@ -530,6 +574,12 @@ pub enum InstructionKind {
         pressed: bool,
         #[serde(default, skip_serializing_if = "Option::is_none")]
         modifiers: Option<Value>,
+        /// Keeps the click (or scroll) from reaching other apps.
+        #[serde(default, skip_serializing_if = "is_false")]
+        block: bool,
+        /// Only fires (and only blocks) while this is true.
+        #[serde(default, skip_serializing_if = "Option::is_none")]
+        only_when: Option<Value>,
     },
     /// Asks for text in a dialog and puts the answer in variable `name`.
     /// Cancelling is an error.
@@ -657,6 +707,18 @@ pub enum InstructionKind {
 }
 
 impl InstructionKind {
+    /// A plain `WhenKey`: no blocking, gesture or condition.
+    pub fn when_key(key: Value, direction: Direction) -> Self {
+        InstructionKind::WhenKey {
+            key,
+            direction,
+            block: false,
+            extra_keys: false,
+            gesture: None,
+            only_when: None,
+        }
+    }
+
     /// Blocks edited as free text, whose keystrokes make one undo step.
     pub fn edits_as_text(&self) -> bool {
         matches!(
@@ -670,6 +732,33 @@ impl InstructionKind {
 
 fn match_by_title() -> String {
     "Title".into()
+}
+
+fn is_false(value: &bool) -> bool {
+    !*value
+}
+
+/// Where a `WhenTyped` abbreviation has to sit among the words typed.
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum TypedWord {
+    /// Typed right after a space, Enter, punctuation or a fresh start.
+    Start,
+    /// A whole word: as `Start`, and a space, Enter or punctuation after it.
+    Whole,
+}
+
+/// A `WhenKey` that waits for a double press, or for the combo to be held.
+#[derive(Debug, Clone, PartialEq, Hash, Serialize, Deserialize)]
+pub struct KeyGesture {
+    pub kind: KeyGestureKind,
+    /// The most time between the two presses, or how long to hold, in ms.
+    pub ms: Value,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
+pub enum KeyGestureKind {
+    Double,
+    Hold,
 }
 
 pub(crate) fn first_match() -> Value {

@@ -55,7 +55,8 @@ pub(crate) enum ComboCapture {
 /// `AppState::pending_standalone_key` instead.
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) enum KeyCaptureTarget {
-    Strand(String, InstrPath),
+    /// The strand, the block's path and the key slot's field, if given.
+    Strand(String, InstrPath, Option<String>),
     Standalone,
 }
 
@@ -464,15 +465,17 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
         .collect();
 
     let key_capture = s.key_capture.as_ref().map(|target| match target {
-        KeyCaptureTarget::Strand(strand_id, index) => KeyCaptureDto {
+        KeyCaptureTarget::Strand(strand_id, index, field) => KeyCaptureDto {
             kind: "Strand".to_string(),
             strand_id: Some(strand_id.clone()),
             index: Some(index.clone()),
+            field: field.clone(),
         },
         KeyCaptureTarget::Standalone => KeyCaptureDto {
             kind: "Standalone".to_string(),
             strand_id: None,
             index: None,
+            field: None,
         },
     });
 
@@ -632,6 +635,7 @@ fn library_entry(mac: &Macro) -> LibraryEntryDto {
 
 pub(crate) fn emit_state_updated(app: &AppHandle, s: &AppState) {
     blockwork_core::recording::set_hotkeys_suspended(s.combo_capture.is_some());
+    crate::watch::key_rules::refresh(s);
     let dto = build_state_dto(s);
     app.emit_state(&dto);
 }

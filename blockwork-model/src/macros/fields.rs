@@ -89,6 +89,10 @@ pub enum FieldId {
     SplitSeparator,
     UsbPattern,
     MouseModifiers,
+    OnlyWhen,
+    KeyGestureMs,
+    RemapFrom,
+    RemapTo,
     AskPrompt,
     AskDefault,
     MessageText,
@@ -181,7 +185,37 @@ pub(crate) fn slots_mut<'a>(
         InstructionKind::Return(v) => f(F::ReturnValue, v, Any),
         InstructionKind::WhenBatteryDischargedTo(v) => f(F::BatteryDischargeThreshold, v, Any),
         InstructionKind::WhenBatteryChargedTo(v) => f(F::BatteryChargeThreshold, v, Any),
-        InstructionKind::WhenKey(v, _) => f(F::KeyValue, v, Any),
+        InstructionKind::WhenKey {
+            key,
+            gesture,
+            only_when,
+            ..
+        } => {
+            f(F::KeyValue, key, Any);
+            if let Some(gesture) = gesture {
+                f(F::KeyGestureMs, &mut gesture.ms, Any);
+            }
+            if let Some(v) = only_when {
+                f(F::OnlyWhen, v, Bool);
+            }
+        }
+        InstructionKind::RemapKey {
+            from,
+            to,
+            only_when,
+        } => {
+            f(F::RemapFrom, from, Any);
+            f(F::RemapTo, to, Any);
+            if let Some(v) = only_when {
+                f(F::OnlyWhen, v, Bool);
+            }
+        }
+        InstructionKind::WaitForKey { key, timeout, .. } => {
+            f(F::KeyValue, key, Any);
+            if let Some(v) = timeout {
+                f(F::WaitTimeout, v, Any);
+            }
+        }
         InstructionKind::SetClipboard(v) => f(F::SetClipboardValue, v, Any),
         InstructionKind::SetVariable(_, v) => f(F::SetVariableValue, v, Any),
         InstructionKind::ChangeVariable(_, v) => f(F::ChangeVariableValue, v, Any),
@@ -190,7 +224,14 @@ pub(crate) fn slots_mut<'a>(
         InstructionKind::ThrowError(v) => f(F::ErrorMessage, v, Any),
         InstructionKind::WhenFileChanged(v) => f(F::WatchedFilePath, v, Any),
         InstructionKind::WhenWindow { pattern, .. } => f(F::WindowPattern, pattern, Any),
-        InstructionKind::WhenTyped { text, .. } => f(F::TypedText, text, Any),
+        InstructionKind::WhenTyped {
+            text, only_when, ..
+        } => {
+            f(F::TypedText, text, Any);
+            if let Some(v) = only_when {
+                f(F::OnlyWhen, v, Bool);
+            }
+        }
         InstructionKind::PasteText(v) => f(F::PasteValue, v, Any),
         InstructionKind::WhenApp { pattern, .. } => f(F::AppPattern, pattern, Any),
         InstructionKind::GamepadStick { x, y, .. } => {
@@ -321,9 +362,16 @@ pub(crate) fn slots_mut<'a>(
             f(F::GlobalName, name, Any);
             f(F::GlobalValue, other, Any);
         }
-        InstructionKind::WhenMouseButton { modifiers, .. } => {
+        InstructionKind::WhenMouseButton {
+            modifiers,
+            only_when,
+            ..
+        } => {
             if let Some(v) = modifiers {
                 f(F::MouseModifiers, v, Any);
+            }
+            if let Some(v) = only_when {
+                f(F::OnlyWhen, v, Bool);
             }
         }
         InstructionKind::WaitUntil {
@@ -512,6 +560,26 @@ pub(crate) fn blank_field_value(
             .nth(index),
         _ => None,
     }
+}
+
+/// The key slot a key capture writes into: `field` names it (as the editor
+/// sends it), or a block's only key slot without one. `None` when the block
+/// has no such slot.
+pub fn key_slot_mut<'a>(
+    kind: &'a mut InstructionKind,
+    field: Option<&str>,
+) -> Option<&'a mut Value> {
+    let field = match field.filter(|f| !f.is_empty()) {
+        Some(name) => name.parse().ok()?,
+        None => FieldId::KeyValue,
+    };
+    if !matches!(
+        field,
+        FieldId::KeyValue | FieldId::RemapFrom | FieldId::RemapTo
+    ) {
+        return None;
+    }
+    value_slot_mut(kind, field)
 }
 
 #[cfg(test)]

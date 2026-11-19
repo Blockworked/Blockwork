@@ -94,7 +94,7 @@
 <context>
     <name>PalettePanel</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="791"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="939"/>
         <source>%n block(s)</source>
         <translation>
             <numerusform>%n block</numerusform>

@@ -161,6 +161,9 @@ pub struct KeyCaptureDto {
     pub kind: String,
     pub strand_id: Option<String>,
     pub index: Option<InstrPath>,
+    /// Which key slot of the block, when it has more than one.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub field: Option<String>,
 }
 
 /// Copied blocks and the notes pinned to them, as the editor's copy buffer

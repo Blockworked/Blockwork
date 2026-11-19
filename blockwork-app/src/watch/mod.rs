@@ -12,6 +12,7 @@ pub(crate) mod clipboard;
 pub(crate) mod controllers;
 pub(crate) mod file;
 pub(crate) mod key;
+pub(crate) mod key_rules;
 pub(crate) mod mouse;
 pub(crate) mod native_ui;
 pub(crate) mod startup;
@@ -24,7 +25,7 @@ use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
 use blockstitch_core::graph::ListDef;
-use blockwork_core::input::value::Evaluated;
+use blockwork_core::input::value::{Evaluated, Value};
 use blockwork_core::macros::backend::InputBackend;
 use blockwork_core::macros::trigger::fired_message;
 use blockwork_core::macros::{Instruction, Macro, Strand, VariableDef};
@@ -158,6 +159,57 @@ pub(crate) fn header_value(
         Err("Trigger configuration cannot execute live reporters or custom calls".into())
     }
 }
+/// A trigger's "only when" condition, copied out of the state lock so it
+/// can be checked after the lock is released (it may ask the window system).
+pub(crate) struct OnlyWhen {
+    macro_id: String,
+    name: String,
+    allowed: bool,
+    condition: Value,
+}
+
+impl OnlyWhen {
+    /// `None` when the trigger has no condition. A shared macro's condition
+    /// that needs a permission it wasn't given never holds.
+    pub(crate) fn of(mac: &Macro, condition: Option<&Value>) -> Option<Self> {
+        let condition = condition?;
+        fn needs(value: &Value, out: &mut Vec<&'static str>) {
+            match value {
+                Value::Op { op, args, .. } => {
+                    out.extend(blockwork_core::capabilities::operator_capability(op.name()));
+                    args.iter().for_each(|a| needs(a, out));
+                }
+                Value::Call { args, .. } => args.iter().for_each(|a| needs(a, out)),
+                _ => {}
+            }
+        }
+        let mut capabilities = Vec::new();
+        needs(condition, &mut capabilities);
+        Some(Self {
+            macro_id: mac.id.clone(),
+            name: mac.name.clone(),
+            allowed: capabilities.iter().all(|c| permitted(mac, c)),
+            condition: condition.resolve_vars(&variable_env(mac)),
+        })
+    }
+
+    /// Whether the condition is true now. Its reporters run as the macro.
+    pub(crate) fn holds(&self) -> bool {
+        if !self.allowed {
+            return false;
+        }
+        let source = Arc::new(run_log::Source::for_macro(&self.macro_id, &self.name));
+        // A stopped scope: anything still undecided is refused, not asked.
+        let _scope = blockwork_core::permissions::enter(source, Some(Arc::new(Mutex::new(false))));
+        self.condition.eval().is_ok_and(|v| v.as_bool())
+    }
+}
+
+/// Whether an optional condition holds; true without one.
+pub(crate) fn holds(condition: &Option<OnlyWhen>) -> bool {
+    condition.as_ref().is_none_or(OnlyWhen::holds)
+}
+
 pub(crate) fn permitted(mac: &Macro, capability: &str) -> bool {
     blockwork_core::permissions::grants(&mac.id)
         .is_none_or(|g| g.allowed.iter().any(|c| c == capability))

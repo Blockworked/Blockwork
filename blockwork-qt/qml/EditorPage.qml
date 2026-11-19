@@ -671,7 +671,7 @@ Item {
                         if (existing) { if (existing.collapsed) root.invoke("set_comment_collapsed", { commentId: existing.id, collapsed: false }); }
                         else root.invoke("create_attached_comment", { instructionId: instruction.id, dx: 48, dy: 18, text: "" });
                     }
-                    onKeyCaptureRequested:(strandId,path)=>root.invoke("start_key_capture",{strandId:strandId,path:path})
+                    onKeyCaptureRequested:(strandId,path,field)=>root.invoke("start_key_capture",{strandId:strandId,path:path,field:field||null})
                     onPieceActionRequested:(action,strandId,path,instruction)=>root.onPieceAction(action,strandId,path,instruction)
                     onDetailsRequested:type=>root.showDetails(type)
                     onCanvasNoteRequested: (x, y) => root.invoke("create_comment", { x: x, y: y, text: "" })

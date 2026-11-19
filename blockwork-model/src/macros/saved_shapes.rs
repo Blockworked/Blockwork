@@ -84,6 +84,12 @@ impl<'de> Deserialize<'de> for InstructionKind {
         if value == serde_json::json!("StopMacro") {
             value = serde_json::json!({"Stop": {"scope": "All"}});
         }
+        // WhenKey was `[key, direction]` before it could block the key.
+        if let Some(old) = value.get("WhenKey").and_then(|v| v.as_array())
+            && let [key, direction] = old.as_slice()
+        {
+            value = serde_json::json!({"WhenKey": {"key": key, "direction": direction}});
+        }
         InstructionKind::deserialize(value).map_err(serde::de::Error::custom)
     }
 }

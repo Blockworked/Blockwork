@@ -60,13 +60,13 @@ impl InstructionKind {
             | K::WhenTime(..)
             | K::WhenPowerPluggedIn
             | K::WhenPowerUnplugged
-            | K::WhenKey(..)
+            | K::WhenKey { block: false, .. }
             | K::WhenIdle(_)
             | K::WhenScreenLock { .. }
             | K::WhenCron(_)
             | K::WhenNetwork { .. }
             | K::WhenUsb { .. }
-            | K::WhenMouseButton { .. }
+            | K::WhenMouseButton { block: false, .. }
             | K::WhenAt(_)
             | K::WhenSignal(_)
             | K::WhenWebhook { .. } => of(Trigger, &[]),
@@ -74,6 +74,9 @@ impl InstructionKind {
             K::WhenWindow { .. } | K::WhenApp { .. } => of(Trigger, &["windows"]),
             K::WhenFileChanged(_) => of(Trigger, &["files_read"]),
             K::WhenTyped { .. }
+            | K::WhenKey { block: true, .. }
+            | K::WhenMouseButton { block: true, .. }
+            | K::RemapKey { .. }
             | K::WhenGamepadButton { .. }
             | K::WhenGamepadConnection { .. }
             | K::WhenGamepadAxis { .. } => of(Trigger, &["input"]),
@@ -119,6 +122,7 @@ impl InstructionKind {
             | K::GamepadStick { .. }
             | K::GamepadTrigger { .. }
             | K::ResetGamepad => of(Input, &["input"]),
+            K::WaitForKey { .. } => of(Control, &["input"]),
 
             K::SendSignal { .. } | K::Log(_) | K::Notify { .. } => of(System, &[]),
             K::Command(_) | K::CommandWait(_) | K::OpenApp { .. } | K::CloseApp { .. } => {

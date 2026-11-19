@@ -38,7 +38,49 @@
    "value": 4
   },
   "direction": "Release",
-  "id": "whenkey"
+  "id": "whenkey",
+  "block": true,
+  "extra_keys": true,
+  "gesture": {
+   "kind": "Hold",
+   "ms": {
+    "kind": "Number",
+    "value": 501
+   }
+  },
+  "only_when": {
+   "kind": "Number",
+   "value": 502
+  }
+ },
+ {
+  "type": "RemapKey",
+  "from": {
+   "kind": "Number",
+   "value": 503
+  },
+  "to": {
+   "kind": "Number",
+   "value": 504
+  },
+  "only_when": {
+   "kind": "Number",
+   "value": 505
+  },
+  "id": "remapkey"
+ },
+ {
+  "type": "WaitForKey",
+  "key": {
+   "kind": "Number",
+   "value": 506
+  },
+  "pressed": false,
+  "timeout": {
+   "kind": "Number",
+   "value": 507
+  },
+  "id": "waitforkey"
  },
  {
   "type": "Button",
@@ -692,7 +734,13 @@
    "value": 77
   },
   "erase": true,
-  "id": "whentyped"
+  "id": "whentyped",
+  "ignore_case": true,
+  "word": "Whole",
+  "only_when": {
+   "kind": "Number",
+   "value": 508
+  }
  },
  {
   "type": "PasteText",
@@ -785,7 +833,12 @@
    "kind": "Number",
    "value": 87
   },
-  "id": "whenmousebutton"
+  "id": "whenmousebutton",
+  "block": true,
+  "only_when": {
+   "kind": "Number",
+   "value": 509
+  }
  },
  {
   "type": "AskText",

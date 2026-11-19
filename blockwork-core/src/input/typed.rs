@@ -69,6 +69,9 @@ impl TypedBuffer {
                 return false;
             }
             MacroKey::Space => ' ',
+            // Kept, so a whole-word abbreviation can end with them.
+            MacroKey::Return => '\n',
+            MacroKey::Tab => '\t',
             MacroKey::Unicode(c) => self.apply_shift(*c),
             MacroKey::Numpad0 => '0',
             MacroKey::Numpad1 => '1',

@@ -1,7 +1,7 @@
 //! Fires `WhenMouseButton` strands on physical mouse button presses and
 //! releases (and scrolls). Scoped like the other watchers.
 
-use super::{Target, variable_env};
+use super::{OnlyWhen, Target, holds, variable_env};
 use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
@@ -19,7 +19,7 @@ pub(crate) fn start(shared_state: SharedState, app: AppHandle) {
 
 /// Modifier bits of a combo like `Control+Shift`; `None` when it names a
 /// key that isn't a modifier.
-fn modifier_bits(combo: &str) -> Option<u8> {
+pub(crate) fn modifier_bits(combo: &str) -> Option<u8> {
     parse_key_combo(combo)
         .iter()
         .map(match_key)
@@ -48,6 +48,8 @@ fn run(
                         button,
                         pressed,
                         modifiers,
+                        only_when,
+                        ..
                     }) = strand.instructions.first().map(|i| &i.kind)
                     else {
                         continue;
@@ -63,13 +65,19 @@ fn run(
                     if !combo.trim().is_empty() && modifier_bits(&combo) != Some(event.modifiers) {
                         continue;
                     }
-                    fires.push(Target::new(mac, strand));
+                    fires.push((
+                        Target::new(mac, strand),
+                        OnlyWhen::of(mac, only_when.as_ref()),
+                    ));
                 }
             }
             (emulator, s.global_speed_multiplier)
         };
-        for target in fires {
-            target.fire(&emulator, speed_multiplier, &shared_state, &app);
+        // Conditions may ask the window system, so checked unlocked.
+        for (target, condition) in fires {
+            if holds(&condition) {
+                target.fire(&emulator, speed_multiplier, &shared_state, &app);
+            }
         }
     }
 }

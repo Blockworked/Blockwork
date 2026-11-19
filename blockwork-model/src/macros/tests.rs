@@ -235,8 +235,11 @@ fn mouse_modifier_component_is_optional_and_preserves_saved_combos() {
             button: MacroButton::Back,
             pressed: true,
             modifiers: modifiers.clone(),
+            block: false,
+            only_when: None,
         });
         let json = serde_json::to_value(&ins.kind).unwrap();
+        assert!(json["WhenMouseButton"].get("block").is_none());
         assert_eq!(
             json["WhenMouseButton"].get("modifiers").is_some(),
             modifiers.is_some()
@@ -1052,4 +1055,17 @@ fn stop_scopes_round_trip_and_legacy_stop_defaults_to_all() {
         let dto = serde_json::from_value::<InstructionDto>(json).unwrap();
         assert_eq!(dto_to_instruction(&dto).unwrap(), ins);
     }
+}
+
+#[test]
+fn a_key_trigger_saved_before_blocking_still_loads() {
+    let old = serde_json::json!({"WhenKey": [{"kind": "Text", "value": "F8"}, "Press"]});
+    let loaded: InstructionKind = serde_json::from_value(old).unwrap();
+    assert_eq!(
+        loaded,
+        InstructionKind::when_key(Value::text("F8"), crate::input::types::Direction::Press)
+    );
+    let json = serde_json::to_value(&loaded).unwrap();
+    assert!(json["WhenKey"].get("block").is_none(), "{json}");
+    assert!(json["WhenKey"].get("only_when").is_none(), "{json}");
 }
