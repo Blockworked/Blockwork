@@ -401,6 +401,7 @@ Item {
                         StitchMenuItem { iconName: "sparkles"; text: qsTr("New from template..."); onTriggered: templateDialog.open() }
                         StitchMenuItem { iconName: "copy"; text: qsTr("Duplicate macro"); enabled: !!root.macro; onTriggered: root.invoke("duplicate_macro", { id: root.macro.id }) }
                         StitchMenuItem { iconName: "upload"; text: qsTr("Export..."); enabled: !!root.macro && !!root.macroFiles; onTriggered: root.macroFiles.exportMacro(root.macro.id) }
+                        StitchMenuItem { iconName: "play"; text: qsTr("Export as runnable…"); visible: Qt.platform.os !== "wasm" && Qt.platform.os !== "android"; height: visible ? implicitHeight : 0; enabled: !!root.macro && !!root.macroFiles; onTriggered: root.macroFiles.exportRunnable(root.macro.id) }
                         StitchMenuItem { iconName: "crosshair"; text: qsTr("Inspector…"); visible: Qt.platform.os !== "wasm"; height: visible ? implicitHeight : 0; onTriggered: { inspector.show(); inspector.raise(); } }
                         StitchMenuItem { iconName: "circle-dot"; text: qsTr("Clear breakpoints"); enabled: (appState.breakpoints || []).length > 0; onTriggered: root.invoke("clear_breakpoints") }
                         StitchMenuItem { iconName: "octagon"; text: qsTr("Emergency stop"); danger: true; onTriggered: root.invoke("emergency_stop") }

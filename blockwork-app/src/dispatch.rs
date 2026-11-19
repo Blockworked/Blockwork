@@ -480,6 +480,14 @@ impl Backend {
                 let name: String = arg(&args, "name")?;
                 to_json(crate::macro_runs::run_named(&self.state, &self.app, &name)?)
             }
+            "run_macro_file" => {
+                let path: String = arg(&args, "path")?;
+                to_json(crate::macro_runs::run_file(&self.state, &self.app, &path)?)
+            }
+            "macro_running" => {
+                let id: String = arg(&args, "id")?;
+                to_json(crate::macro_runs::running(&id))
+            }
             "stop_macro_named" => {
                 let name: String = arg(&args, "name")?;
                 to_json(crate::macro_runs::stop_named(&self.state, &name)?)
@@ -507,6 +515,11 @@ impl Backend {
                 let macro_id: String = arg(&args, "macroId")?;
                 let path: String = arg(&args, "path")?;
                 to_json(commands::export_macro(macro_id, path)?)
+            }
+            "export_runnable" => {
+                let macro_id: String = arg(&args, "macroId")?;
+                let folder: String = arg(&args, "folder")?;
+                to_json(commands::export_runnable(macro_id, folder)?)
             }
             "import_macro" => {
                 let path: String = arg(&args, "path")?;

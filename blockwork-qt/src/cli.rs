@@ -13,6 +13,7 @@ Usage:
   blockwork                    Open the editor
   blockwork list               List macros (* = running)
   blockwork run <name> [--wait]  Run a macro; --wait returns when it ends
+  blockwork run <file> [--wait]  Run a macro file without adding it to the library
   blockwork stop <name>        Stop every run of a macro";
 
 /// The command line's subcommand, if it has one: the window isn't opened then.
@@ -76,6 +77,20 @@ async fn run(args: &[String]) -> io::Result<()> {
         }
         "run" => {
             let name = name()?;
+            let file = std::path::Path::new(&name);
+            if file.is_file() {
+                let path = std::fs::canonicalize(file)?;
+                let mut daemon = Daemon::connect().await?;
+                let id = daemon
+                    .call("run_macro_file", json!({ "path": path.to_string_lossy() }))
+                    .await?;
+                if args.iter().any(|a| a == "--wait") {
+                    while daemon.call("macro_running", json!({ "id": id })).await? == true {
+                        tokio::time::sleep(Duration::from_millis(200)).await;
+                    }
+                }
+                return Ok(());
+            }
             let mut daemon = Daemon::connect().await?;
             daemon
                 .call("run_macro_named", json!({ "name": name }))

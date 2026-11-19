@@ -38,6 +38,8 @@ section below as the GitHub release notes, followed by the downloads table.
 - Read typing: puts what you type in a variable until an end key, a number of characters or a time limit.
 - Inspector (in the editor's menu): shows the window, app and process under the mouse, the mouse in screen and window coordinates, the pixel color and the native UI element, each ready to copy.
 - When tray item is clicked: adds an item to the Blockwork icon's tray menu that runs the blocks below it.
+- `blockwork run <file>` runs a macro or bundle file through the background service without opening the editor or adding it to your library.
+- Export as runnable (in the editor's menu): a folder with the macro and a launcher that runs it without the editor. On Windows, macOS and AppImage it carries its own copy of Blockwork, so it runs on computers without Blockwork installed.
 - With keyboard and mouse blocked: runs its blocks while your own keyboard and mouse can't reach any app; the emergency stop hotkey still works.
 - Window blocks: keep a window on top, hide and show it, set its transparency or title, and move it to another monitor. Windows can be matched by exact title or a regex too, and reporters list open windows and give a window's process ID.
 - Use coordinates block: mouse, pixel, region and image positions after it count from a window's corner instead of the screen's.

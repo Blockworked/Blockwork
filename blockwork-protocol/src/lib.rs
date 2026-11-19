@@ -37,7 +37,13 @@ pub enum ClientMessage {
 }
 
 /// What a [`ClientMessage::Script`] connection may call.
-pub const SCRIPT_COMMANDS: [&str; 3] = ["list_macros", "run_macro_named", "stop_macro_named"];
+pub const SCRIPT_COMMANDS: [&str; 5] = [
+    "list_macros",
+    "run_macro_named",
+    "run_macro_file",
+    "macro_running",
+    "stop_macro_named",
+];
 
 /// A message from the daemon to the UI. Kept as one flat struct rather than
 /// a tagged enum so `payload` can stay a borrowed [`RawValue`]: the state

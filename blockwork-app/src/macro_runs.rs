@@ -56,6 +56,30 @@ pub(crate) fn start(
         .find(|m| m.id == id)
         .cloned()
         .ok_or("macro not found")?;
+    let saved = if is_open { Saved::Open } else { Saved::Library };
+    start_macro(&mut s, state, app, mac, saved, reason)
+}
+
+/// Where a run's variables are kept once it ends.
+#[derive(Clone, Copy, PartialEq)]
+enum Saved {
+    /// The open macro: its live stores, saved like an editor run.
+    Open,
+    /// A macro in the library, saved back to it.
+    Library,
+    /// A macro from a file that isn't in the library: nowhere.
+    Nowhere,
+}
+
+fn start_macro(
+    s: &mut AppState,
+    state: &SharedState,
+    app: &AppHandle,
+    mac: blockwork_core::macros::Macro,
+    saved: Saved,
+    reason: &str,
+) -> Result<Arc<AtomicBool>, String> {
+    let is_open = saved == Saved::Open;
     let emulator = s
         .emulator
         .clone()
@@ -107,12 +131,14 @@ pub(crate) fn start(
                 },
             );
             run_registry::end_run(&run_flag);
-            if is_open {
-                macros_thread::persist_variables(&state, &app, &id, &variables, &lists, &dicts);
-            } else {
-                scheduled_run::persist_fired_variables(
+            match saved {
+                Saved::Open => {
+                    macros_thread::persist_variables(&state, &app, &id, &variables, &lists, &dicts)
+                }
+                Saved::Library => scheduled_run::persist_fired_variables(
                     &state, &app, &id, &variables, &lists, &dicts,
-                );
+                ),
+                Saved::Nowhere => {}
             }
             done.store(true, Ordering::Relaxed);
         }
@@ -154,4 +180,61 @@ pub(crate) fn run_named(state: &SharedState, app: &AppHandle, name: &str) -> Res
 pub(crate) fn stop_named(state: &SharedState, name: &str) -> Result<usize, String> {
     let id = id_for(state, name)?;
     Ok(run_registry::stop_macro(&id))
+}
+
+/// Runs the first macro in a macro or bundle file without adding it to the
+/// library. Returns the run's id, for `macro_running`.
+pub(crate) fn run_file(state: &SharedState, app: &AppHandle, path: &str) -> Result<String, String> {
+    let file = blockwork_core::config::persistence::read_import_file(std::path::Path::new(path))?;
+    let mut mac = file
+        .macros
+        .into_iter()
+        .next()
+        .ok_or("This file holds no macros")?;
+    // A fresh id, so the run never touches a library macro with the same one.
+    mac.id = uuid::Uuid::new_v4().to_string();
+    let id = mac.id.clone();
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    start_macro(
+        &mut s,
+        state,
+        app,
+        mac,
+        Saved::Nowhere,
+        "Started from a file on the command line",
+    )?;
+    Ok(id)
+}
+
+/// Whether the macro with this id is running, for `blockwork run file --wait`.
+pub(crate) fn running(id: &str) -> bool {
+    run_registry::is_running(id)
+}
+
+#[cfg(test)]
+mod tests {
+    use blockwork_core::macros::Macro;
+
+    #[test]
+    fn run_file_reads_the_macro_and_keeps_it_out_of_the_library() {
+        let dir = std::env::temp_dir().join(format!("blockwork-runfile-{}", uuid::Uuid::new_v4()));
+        let backend = crate::Backend::for_tests(dir.clone());
+        std::fs::create_dir_all(&dir).unwrap();
+        let path = dir.join("hello.macro");
+        let mac = Macro::new("Hello".into(), "".into(), vec![]);
+        blockwork_core::config::write_macro_file(&path, &mac).unwrap();
+        let not_macro = dir.join("notes.txt");
+        std::fs::write(&not_macro, "hi").unwrap();
+
+        assert!(
+            super::run_file(&backend.state, &backend.app, &not_macro.to_string_lossy()).is_err()
+        );
+        // The test backend has no input emulator, so the run stops there,
+        // after the file was read.
+        let err =
+            super::run_file(&backend.state, &backend.app, &path.to_string_lossy()).unwrap_err();
+        assert!(err.contains("input emulation"), "{err}");
+        assert!(backend.state.lock().unwrap().macros_list.is_empty());
+        let _ = std::fs::remove_dir_all(dir);
+    }
 }

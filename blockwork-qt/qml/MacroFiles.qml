@@ -43,6 +43,11 @@ Item {
             exportDialog.open();
         });
     }
+    // A folder with the macro and a launcher that runs it without the editor.
+    function exportRunnable(macroId) {
+        runnableDialog.macroId = macroId;
+        runnableDialog.open();
+    }
     // Several macros in one .blockwork file; the daemon adds macros they run.
     function exportBundle(macroIds, name) {
         bundlePicker.bundleName = name;
@@ -97,6 +102,20 @@ Item {
         defaultSuffix: "macro"
         nameFilters: [qsTr("Blockwork macros (*.macro)")]
         onAccepted: root.daemonCall("export_macro", { macroId: macroId, path: root.localPath(selectedFile) }, () => {})
+    }
+    FolderDialog {
+        id: runnableDialog
+        property string macroId: ""
+        title: qsTr("Choose where to put the runnable macro")
+        currentFolder: StandardPaths.writableLocation(StandardPaths.DocumentsLocation)
+        onAccepted: root.daemonCall("export_runnable", { macroId: macroId, folder: root.localPath(selectedFolder) }, made => {
+            exported.title = qsTr("Runnable macro exported");
+            exported.message = (made.portable
+                ? qsTr("Open %1 to run the macro without the editor. The folder has its own copy of Blockwork, so it also works on a computer without Blockwork.")
+                : qsTr("Open %1 to run the macro without the editor. It uses the Blockwork installed on this computer."))
+                .arg(made.launcher);
+            exported.open();
+        })
     }
     AppDialog {
         id: bundlePicker
@@ -169,6 +188,7 @@ Item {
         defaultSuffix: "blockwork"
         nameFilters: [qsTr("Blockwork bundles (*.blockwork)")]
         onAccepted: root.daemonCall("export_bundle", { macroIds: macroIds, name: bundleName, path: root.localPath(selectedFile) }, count => {
+            exported.title = qsTr("Bundle exported");
             exported.message = qsTr("Exported %n macro(s), including any macros they run.", "", count);
             exported.open();
         })
@@ -177,7 +197,7 @@ Item {
         id: exported
         title: qsTr("Bundle exported"); standardButtons: Dialog.Ok
         property string message: ""
-        Text { width: 380; wrapMode: Text.WordWrap; text: exported.message; color: Theme.text; font.pixelSize: 13 }
+        Text { width: 380; wrapMode: Text.WrapAtWordBoundaryOrAnywhere; text: exported.message; color: Theme.text; font.pixelSize: 13 }
     }
     AppDialog {
         id: failed
