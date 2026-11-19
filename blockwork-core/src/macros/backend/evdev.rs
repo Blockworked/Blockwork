@@ -189,6 +189,8 @@ fn build_virtual_device() -> io::Result<VirtualDevice> {
         KeyCode::KEY_F22,
         KeyCode::KEY_F23,
         KeyCode::KEY_F24,
+        // Tapped by remaps to keep a lone Meta release from opening a launcher.
+        KeyCode::KEY_UNKNOWN,
         KeyCode::KEY_KP0,
         KeyCode::KEY_KP1,
         KeyCode::KEY_KP2,

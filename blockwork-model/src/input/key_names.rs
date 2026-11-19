@@ -176,7 +176,53 @@ pub fn parse_key_combo(text: &str) -> Vec<MacroKey> {
     if !current.is_empty() {
         parts.push(current);
     }
-    parts.iter().filter_map(|p| parse_key_name(p)).collect()
+    expand_aliases(parts)
+        .iter()
+        .filter_map(|p| parse_key_name(p))
+        .collect()
+}
+
+/// The Copilot key on Windows laptops is really Shift+Meta+F23.
+pub const COPILOT: &str = "Copilot";
+const COPILOT_KEYS: [&str; 3] = ["Shift", "Meta", "F23"];
+
+/// Combo parts with key names that stand for several keys spelled out.
+fn expand_aliases(parts: Vec<String>) -> Vec<String> {
+    parts
+        .into_iter()
+        .flat_map(|p| {
+            if p.trim().eq_ignore_ascii_case(COPILOT) {
+                COPILOT_KEYS.iter().map(|k| k.to_string()).collect()
+            } else {
+                vec![p]
+            }
+        })
+        .collect()
+}
+
+/// A key no app uses, tapped so a Meta release on its own doesn't open the
+/// start menu (Windows: an unassigned virtual key) or launcher (Linux:
+/// KEY_UNKNOWN). macOS has no such menu.
+pub const MENU_MASK_KEY: Option<MacroKey> = if cfg!(windows) {
+    Some(MacroKey::Other(0xE8))
+} else if cfg!(target_os = "linux") {
+    Some(MacroKey::Other(240))
+} else {
+    None
+};
+
+/// For the Copilot key's combo, the modifiers it holds down before its F23,
+/// which a rule taking the key also has to take back; empty otherwise.
+pub fn copilot_modifiers(combo: &[ComboKey]) -> Vec<ComboKey> {
+    let is = |key: MacroKey| combo.iter().any(|c| c.key == match_key(&key));
+    if combo.len() != 3 || !is(MacroKey::Shift) || !is(MacroKey::Meta) || !is(MacroKey::F23) {
+        return Vec::new();
+    }
+    combo
+        .iter()
+        .filter(|c| c.key != MacroKey::F23)
+        .cloned()
+        .collect()
 }
 
 /// Folds left/right and case variants together so a physical key event
@@ -260,7 +306,7 @@ pub fn parse_trigger_combo(text: &str) -> Vec<ComboKey> {
     if !current.is_empty() {
         parts.push(current);
     }
-    parts
+    expand_aliases(parts)
         .iter()
         .filter_map(|part| {
             let key = parse_key_name(part)?;
@@ -352,6 +398,21 @@ mod combo_tests {
             );
         }
         assert_eq!(parse_key_name("PrintScreen"), Some(MacroKey::PrintScr));
+    }
+
+    #[test]
+    fn copilot_is_shift_meta_f23() {
+        assert_eq!(
+            parse_key_combo("Copilot"),
+            vec![MacroKey::LShift, MacroKey::Meta, MacroKey::F23]
+        );
+        assert_eq!(copilot_modifiers(&parse_trigger_combo("copilot")).len(), 2);
+        assert_eq!(
+            copilot_modifiers(&parse_trigger_combo("Shift+Meta+F23")).len(),
+            2
+        );
+        assert!(copilot_modifiers(&parse_trigger_combo("Meta+F23")).is_empty());
+        assert!(copilot_modifiers(&parse_trigger_combo("Control+Shift+Meta+F23")).is_empty());
     }
 
     #[test]
