@@ -8,7 +8,7 @@ use crate::input::key_names::{ComboKey, combo_held, copilot_modifiers};
 use crate::input::types::{MacroButton, MacroKey};
 use crate::macros::backend::{CaptureDecision, CaptureEvent};
 use std::collections::HashSet;
-use std::sync::atomic::{AtomicBool, Ordering};
+use std::sync::atomic::{AtomicBool, AtomicUsize, Ordering};
 use std::sync::mpsc::{Receiver, Sender, channel};
 use std::sync::{Arc, Mutex, OnceLock, RwLock};
 
@@ -115,6 +115,28 @@ fn send_remap(event: RemapEvent) {
     }
 }
 
+/// How many strands are inside a "with input blocked" block.
+static BLOCKING_ALL: AtomicUsize = AtomicUsize::new(0);
+
+/// Keeps the physical keyboard and mouse from every app until dropped.
+/// Keys already held still release, so nothing sticks.
+pub struct InputBlocked(());
+
+pub fn block_all_input() -> InputBlocked {
+    BLOCKING_ALL.fetch_add(1, Ordering::SeqCst);
+    InputBlocked(())
+}
+
+impl Drop for InputBlocked {
+    fn drop(&mut self) {
+        BLOCKING_ALL.fetch_sub(1, Ordering::SeqCst);
+    }
+}
+
+pub fn input_blocked() -> bool {
+    BLOCKING_ALL.load(Ordering::Relaxed) > 0
+}
+
 /// Physical keys and buttons held now, and which of them a rule took.
 #[derive(Default)]
 struct State {
@@ -202,6 +224,23 @@ fn scroll_button(h: i32, v: i32) -> Option<MacroButton> {
 /// Whether an armed rule takes this press or scroll. `mods` is the modifier
 /// bits held, for button rules. Call [`observe`] first.
 pub(super) fn decide(event: &CaptureEvent, mods: u8) -> CaptureDecision {
+    if input_blocked() {
+        let mut s = state();
+        match event {
+            CaptureEvent::KeyPress(key) => {
+                s.blocked_keys.insert(key.clone());
+            }
+            CaptureEvent::ButtonPress(button) => {
+                s.blocked_buttons.insert(button.clone());
+            }
+            // Releases of keys pressed before the block began go through.
+            CaptureEvent::KeyRelease(_) | CaptureEvent::ButtonRelease(_) => {
+                return CaptureDecision::Passthrough;
+            }
+            _ => {}
+        }
+        return CaptureDecision::Suppress;
+    }
     let Ok(table) = rules().try_read() else {
         return CaptureDecision::Passthrough;
     };
@@ -353,7 +392,7 @@ mod tests {
         assert!(pass(step(CaptureEvent::KeyPress(MacroKey::LControl))));
         assert!(pass(step(CaptureEvent::KeyPress(k.clone()))));
         assert!(combo_is_held(&parse_trigger_combo("Control+k")));
-        assert!(pass(step(CaptureEvent::KeyRelease(k))));
+        assert!(pass(step(CaptureEvent::KeyRelease(k.clone()))));
         assert!(pass(step(CaptureEvent::KeyRelease(MacroKey::LControl))));
         assert!(held_keys().is_empty());
 
@@ -397,6 +436,19 @@ mod tests {
             .is_empty()
         );
         set_rules(Vec::new());
+
+        // Blocking all input takes every press and move, but lets keys
+        // held from before release, and keeps a taken press's release.
+        assert!(pass(step(CaptureEvent::KeyPress(MacroKey::LShift))));
+        let blocked = block_all_input();
+        assert!(!pass(step(CaptureEvent::KeyPress(k.clone()))));
+        assert!(!pass(step(CaptureEvent::MouseMoveRel(3, 4))));
+        assert!(!pass(step(CaptureEvent::Scroll(0, 1))));
+        assert!(pass(step(CaptureEvent::KeyRelease(MacroKey::LShift))));
+        drop(blocked);
+        assert!(!input_blocked());
+        assert!(!pass(step(CaptureEvent::KeyRelease(k.clone()))));
+        assert!(pass(step(CaptureEvent::MouseMoveRel(3, 4))));
 
         // Buttons pair their release; scrolls have none.
         set_rules(vec![

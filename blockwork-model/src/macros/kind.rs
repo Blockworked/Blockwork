@@ -549,6 +549,11 @@ pub enum InstructionKind {
         name: Value,
         body: Vec<Instruction>,
     },
+    /// Runs `body` with the physical keyboard and mouse kept from every
+    /// app; the emergency stop hotkey still works.
+    WithInputBlocked {
+        body: Vec<Instruction>,
+    },
     /// Header for a strand fired on a cron schedule, like `*/15 9-17 * * mon-fri`.
     WhenCron(Value),
     /// Replaces the list `name` with `text` cut at every `separator`.

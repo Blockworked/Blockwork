@@ -52,6 +52,7 @@ QtObject {
             WhenIdle: qsTr("Runs once you haven't touched the keyboard or mouse for this many minutes. Fires again after the next idle stretch."),
             WhenScreenLock: qsTr("Runs when the screen locks or unlocks."),
             WhenCron: qsTr("Runs on a schedule, like every 15 minutes on weekdays or 9:00 on the 1st of each month. Click the schedule to choose it. Underneath it's cron (minute hour day month weekday, like '0 9 * * mon-fri'), so you can also type one under Custom or drop a reporter that gives one."),
+            WithInputBlocked: qsTr("Runs its blocks while your keyboard and mouse can't reach any app, so a fast sequence of clicks and keys isn't interrupted. Blocks inside still type and click. Keys already held when it starts still release, and the emergency stop hotkey always works. On Linux touchpads aren't blocked."),
             WithLock: qsTr("Runs its body while holding a named lock. Only one strand, in any macro, can be inside a lock with the same name at a time; others wait their turn. Use it so two macros don't type over each other."),
             AppRunning: qsTr("Whether a program whose name contains the text is running."),
             IdleSeconds: qsTr("How many seconds since the last keyboard or mouse input."),

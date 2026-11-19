@@ -605,6 +605,7 @@ pub(crate) fn slots_mut<'a>(
         | InstructionKind::ForEachKey { .. }
         | InstructionKind::WaitForClipboard { timeout: None }
         | InstructionKind::SaveClipboard
+        | InstructionKind::WithInputBlocked { .. }
         | InstructionKind::RestoreClipboard
         | InstructionKind::SetMute { .. }
         | InstructionKind::Power { .. }

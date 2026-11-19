@@ -120,6 +120,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::TryCatch { catch_body, .. }, 1) => Some(catch_body),
             (InstructionKind::Retry { body, .. }, 0) => Some(body),
             (InstructionKind::WithLock { body, .. }, 0) => Some(body),
+            (InstructionKind::WithInputBlocked { body }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get(slot as usize),
             _ => None,
         }
@@ -141,6 +142,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::TryCatch { catch_body, .. }, 1) => Some(catch_body),
             (InstructionKind::Retry { body, .. }, 0) => Some(body),
             (InstructionKind::WithLock { body, .. }, 0) => Some(body),
+            (InstructionKind::WithInputBlocked { body }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get_mut(slot as usize),
             _ => None,
         }
