@@ -34,6 +34,8 @@ finish-args:
   - --talk-name=org.freedesktop.secrets
   # KDE: fast window captures (ScreenShot2) and window client geometry (scripts).
   - --talk-name=org.kde.KWin
+  # GNOME: window list and actions through the Blockwork windows Shell extension.
+  - --talk-name=com.blockworked.Windows
   # File blocks and the file-change trigger work on the user's files.
   - --filesystem=home
 

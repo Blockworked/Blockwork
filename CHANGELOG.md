@@ -39,6 +39,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Window blocks: keep a window on top, hide and show it, set its transparency or title, and move it to another monitor. Windows can be matched by exact title or a regex too, and reporters list open windows and give a window's process ID.
 - Use coordinates block: mouse, pixel, region and image positions after it count from a window's corner instead of the screen's.
 - Show tooltip: a small note near the mouse or in a screen corner for a set time. Show menu: a list at the mouse to pick from.
+- Window blocks work on GNOME on Wayland through a small Shell extension (install it in Settings > Integrations) and on COSMIC, which allows focusing, minimizing, maximizing and closing ([docs](docs/linux-windows.md)).
 
 ### Changed
 - The Text block spaces keystrokes 0.5 ms apart on Windows and macOS too, as it already did on Linux, so fast typing doesn't drop or merge characters.
