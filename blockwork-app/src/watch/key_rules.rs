@@ -21,10 +21,6 @@ use std::time::{Duration, Instant};
 
 /// How often conditions are re-checked.
 const ARM_INTERVAL: Duration = Duration::from_millis(100);
-/// Held remap keys repeat like a held key would, where the system doesn't
-/// repeat injected keys itself (it does on Linux).
-const REPEAT_DELAY: Duration = Duration::from_millis(500);
-const REPEAT_EVERY: Duration = Duration::from_millis(33);
 
 /// What arms one rule: the macro's settings and the block's own condition.
 struct Arming {
@@ -199,7 +195,10 @@ fn arm_forever() {
 fn press_remaps(shared_state: SharedState, rx: std::sync::mpsc::Receiver<RemapEvent>) {
     // The keys held down for a remap, and when the last one repeats next.
     let mut down: Option<(Vec<MacroKey>, Instant)> = None;
+    // Held remap keys repeat like a held key would, at the system's own
+    // rate, where the system doesn't repeat injected keys itself (Linux does).
     let repeats = !cfg!(target_os = "linux");
+    let (mut repeat_delay, mut repeat_every) = (Duration::ZERO, Duration::ZERO);
     loop {
         let event = match down.as_ref().filter(|_| repeats) {
             Some((_, due)) => rx.recv_timeout(due.saturating_duration_since(Instant::now())),
@@ -219,7 +218,11 @@ fn press_remaps(shared_state: SharedState, rx: std::sync::mpsc::Receiver<RemapEv
         match event {
             Ok(RemapEvent::Press(keys)) => {
                 keys.iter().for_each(|k| send(k, Direction::Press));
-                down = Some((keys, Instant::now() + REPEAT_DELAY));
+                // Read per press, so a changed setting applies right away.
+                if repeats {
+                    (repeat_delay, repeat_every) = blockwork_core::input::key_repeat::settings();
+                }
+                down = Some((keys, Instant::now() + repeat_delay));
             }
             Ok(RemapEvent::Release(keys)) => {
                 keys.iter().rev().for_each(|k| send(k, Direction::Release));
@@ -232,7 +235,7 @@ fn press_remaps(shared_state: SharedState, rx: std::sync::mpsc::Receiver<RemapEv
                     if let Some(last) = keys.last() {
                         send(last, Direction::Press);
                     }
-                    *due = Instant::now() + REPEAT_EVERY;
+                    *due = Instant::now() + repeat_every;
                 }
             }
             Err(RecvTimeoutError::Disconnected) => return,

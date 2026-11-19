@@ -1,5 +1,6 @@
 //! What the user just typed, rebuilt from raw key events for `WhenTyped`.
-//! Assumes a US layout for shifted symbols.
+//! Characters come from the keyboard layout where it can be read (see
+//! `layout`), and from a US layout otherwise.
 
 use crate::input::types::MacroKey;
 
@@ -10,6 +11,7 @@ const MAX_LEN: usize = 64;
 pub struct TypedBuffer {
     text: String,
     shift: bool,
+    alt_gr: bool,
     // Ctrl/Alt/Meta held: the keys are shortcuts, not typing.
     command: u8,
     caps_lock: bool,
@@ -29,6 +31,10 @@ impl TypedBuffer {
         match key {
             MacroKey::Shift | MacroKey::LShift | MacroKey::RShift => {
                 self.shift = pressed;
+                return false;
+            }
+            MacroKey::AltGr => {
+                self.alt_gr = pressed;
                 return false;
             }
             MacroKey::Control
@@ -58,6 +64,20 @@ impl TypedBuffer {
             // A shortcut like Ctrl+A or Ctrl+V changes the text unpredictably.
             self.clear();
             return false;
+        }
+        let mods = crate::input::layout::Mods {
+            shift: self.shift,
+            alt_gr: self.alt_gr,
+            caps_lock: self.caps_lock,
+        };
+        if !matches!(key, MacroKey::CapsLock)
+            && let Some(typed) = crate::input::layout::char_for(key, mods)
+        {
+            // A dead key types nothing yet; the next key completes it.
+            if let Some(c) = typed {
+                self.push(c);
+            }
+            return typed.is_some();
         }
         let c = match key {
             MacroKey::CapsLock => {
@@ -101,11 +121,15 @@ impl TypedBuffer {
                 return false;
             }
         };
+        self.push(c);
+        true
+    }
+
+    fn push(&mut self, c: char) {
         self.text.push(c);
         if self.text.chars().count() > MAX_LEN {
             self.text.remove(0);
         }
-        true
     }
 
     fn apply_shift(&self, c: char) -> char {
