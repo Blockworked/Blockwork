@@ -241,6 +241,7 @@ Item {
                             RowLayout { Layout.fillWidth: true; Layout.topMargin: 16; spacing: 8
                                 StitchButton { iconName: "play"; text: qsTr("Replay welcome tour"); onClicked: root.invoke("set_onboarding_done", { done: false }) }
                                 Item { Layout.fillWidth: true }
+                                StitchButton { iconName: "external-link"; text: qsTr("Donate"); onClicked: Qt.openUrlExternally("https://blockworked.com/donate") }
                             }
                         }
                     }
