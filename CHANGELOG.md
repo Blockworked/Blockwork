@@ -23,7 +23,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Input diagnostics in Settings > Integrations, to copy into a bug report.
 - Starter templates: Controller to keyboard, Touch swipe and Startup notice.
 - Key and mouse button triggers can block the input from reaching other apps ("and block it"). Key triggers can also fire on a double press or a long hold, ignore other keys held with them, and tell left and right modifiers apart (LeftControl, RightShift).
-- Remap key block: turns one key or combo into another while Blockwork runs, with optional blocks to run on each press. A held remapped key repeats at the system's key repeat rate.
+- Remap key block: turns one key or combo into another while Blockwork runs, with optional blocks to run on each press. A held remapped key repeats at the system's key repeat rate. The Copilot key can be remapped or blocked too, without opening the start menu.
 - Only when: key, mouse button and typed text triggers can carry their own condition, so they fire (and block) only while it is true.
 - Key held reporter and Wait for key block.
 - Typed text triggers can match in any case and only at the start of a word or as a whole word; the key that ends the word is kept. On Linux and Windows they read your keyboard layout instead of assuming US.

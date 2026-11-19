@@ -4,7 +4,7 @@
 //! without waiting: the app rebuilds it when macros change, and arms each
 //! rule from its conditions on another thread.
 
-use crate::input::key_names::{ComboKey, combo_held};
+use crate::input::key_names::{ComboKey, combo_held, copilot_modifiers};
 use crate::input::types::{MacroButton, MacroKey};
 use crate::macros::backend::{CaptureDecision, CaptureEvent};
 use std::collections::HashSet;
@@ -45,15 +45,29 @@ pub struct Rule {
     /// Whether the rule's conditions hold right now. Kept up to date by the
     /// app, since the capture callback can't wait for the window system.
     pub armed: Arc<AtomicBool>,
+    /// Modifiers the key holds down on its own before it arrives (the
+    /// Copilot key's Shift and Meta), taken back when the rule fires.
+    lift: Vec<ComboKey>,
 }
 
 impl Rule {
     pub fn new(input: RuleInput, action: RuleAction) -> Self {
+        let lift = match &input {
+            RuleInput::Keys { combo, .. } => copilot_modifiers(combo),
+            RuleInput::Button { .. } => Vec::new(),
+        };
         Self {
             input,
             action,
             armed: Arc::new(AtomicBool::new(true)),
+            lift,
         }
+    }
+
+    /// Leaves held modifiers alone, for when nothing could release them.
+    pub fn without_lift(mut self) -> Self {
+        self.lift.clear();
+        self
     }
 }
 
@@ -62,6 +76,9 @@ impl Rule {
 pub enum RemapEvent {
     Press(Vec<MacroKey>),
     Release(Vec<MacroKey>),
+    /// Release these keys, which other apps saw go down, without letting a
+    /// lone Meta release open the start menu or launcher.
+    Lift(Vec<MacroKey>),
 }
 
 static RULES: OnceLock<RwLock<Vec<Rule>>> = OnceLock::new();
@@ -208,15 +225,29 @@ pub(super) fn decide(event: &CaptureEvent, mods: u8) -> CaptureDecision {
             }) else {
                 return CaptureDecision::Passthrough;
             };
+            // Their physical releases come later and are kept back too.
+            let lift: Vec<MacroKey> = s
+                .keys
+                .iter()
+                .filter(|k| *k != key && rule.lift.iter().any(|c| c.matches(k)))
+                .cloned()
+                .collect();
+            s.blocked_keys.extend(lift.iter().cloned());
             match &rule.action {
                 RuleAction::Block => {
                     s.blocked_keys.insert(key.clone());
+                    drop(s);
                 }
                 RuleAction::Remap(to) => {
                     s.remapped.push((key.clone(), to.clone()));
                     drop(s);
-                    send_remap(RemapEvent::Press(to.clone()));
                 }
+            }
+            if !lift.is_empty() {
+                send_remap(RemapEvent::Lift(lift));
+            }
+            if let RuleAction::Remap(to) = &rule.action {
+                send_remap(RemapEvent::Press(to.clone()));
             }
             CaptureDecision::Suppress
         }
@@ -325,6 +356,47 @@ mod tests {
         assert!(pass(step(CaptureEvent::KeyRelease(k))));
         assert!(pass(step(CaptureEvent::KeyRelease(MacroKey::LControl))));
         assert!(held_keys().is_empty());
+
+        // The Copilot key holds Shift and Meta before its F23. A remap of
+        // it takes them back and keeps their releases from other apps.
+        set_rules(vec![Rule::new(
+            RuleInput::Keys {
+                combo: parse_trigger_combo("Copilot"),
+                extra_keys: false,
+            },
+            RuleAction::Remap(vec![MacroKey::RControl]),
+        )]);
+        assert!(pass(step(CaptureEvent::KeyPress(MacroKey::LShift))));
+        assert!(pass(step(CaptureEvent::KeyPress(MacroKey::Meta))));
+        assert!(!pass(step(CaptureEvent::KeyPress(MacroKey::F23))));
+        assert_eq!(
+            remaps.try_recv(),
+            Ok(RemapEvent::Lift(vec![MacroKey::LShift, MacroKey::Meta]))
+        );
+        assert_eq!(
+            remaps.try_recv(),
+            Ok(RemapEvent::Press(vec![MacroKey::RControl]))
+        );
+        assert!(!pass(step(CaptureEvent::KeyRelease(MacroKey::F23))));
+        assert_eq!(
+            remaps.try_recv(),
+            Ok(RemapEvent::Release(vec![MacroKey::RControl]))
+        );
+        assert!(!pass(step(CaptureEvent::KeyRelease(MacroKey::Meta))));
+        assert!(!pass(step(CaptureEvent::KeyRelease(MacroKey::LShift))));
+        // Shift+Meta+F23 typed into a key field is the same key.
+        assert!(
+            !Rule::new(
+                RuleInput::Keys {
+                    combo: parse_trigger_combo("Shift+Meta+F23"),
+                    extra_keys: false,
+                },
+                RuleAction::Block,
+            )
+            .lift
+            .is_empty()
+        );
+        set_rules(Vec::new());
 
         // Buttons pair their release; scrolls have none.
         set_rules(vec![

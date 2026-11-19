@@ -92,7 +92,9 @@ fn rule_of(kind: &InstructionKind, mac: &Macro, can_remap: bool) -> Option<Rule>
     {
         return None;
     }
-    Some(Rule::new(input, action))
+    let rule = Rule::new(input, action);
+    // Taking back held modifiers needs a way to release them.
+    Some(if can_remap { rule } else { rule.without_lift() })
 }
 
 fn only_when(kind: &InstructionKind) -> Option<&blockwork_core::input::value::Value> {
@@ -223,6 +225,15 @@ fn press_remaps(shared_state: SharedState, rx: std::sync::mpsc::Receiver<RemapEv
                     (repeat_delay, repeat_every) = blockwork_core::input::key_repeat::settings();
                 }
                 down = Some((keys, Instant::now() + repeat_delay));
+            }
+            Ok(RemapEvent::Lift(keys)) => {
+                // Another key between Meta's press and release keeps the
+                // start menu or launcher shut.
+                if let Some(mask) = blockwork_core::input::key_names::MENU_MASK_KEY {
+                    send(&mask, Direction::Press);
+                    send(&mask, Direction::Release);
+                }
+                keys.iter().rev().for_each(|k| send(k, Direction::Release));
             }
             Ok(RemapEvent::Release(keys)) => {
                 keys.iter().rev().for_each(|k| send(k, Direction::Release));
