@@ -70,7 +70,6 @@ impl InstructionKind {
             | K::WhenMouseButton { block: false, .. }
             | K::WhenAt(_)
             | K::WhenSignal(_)
-            | K::WhenWindowButton(_)
             | K::WhenWebhook { .. } => of(Trigger, &[]),
             K::WhenClipboardChanged => of(Trigger, &["clipboard"]),
             K::WhenWindow { .. } | K::WhenApp { .. } => of(Trigger, &["windows"]),

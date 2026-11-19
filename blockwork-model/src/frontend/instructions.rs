@@ -130,7 +130,6 @@ wire_blocks! {
         WhenCron(expression: Value),
         ShowMessage(message: Value),
         WindowNote(text: Value),
-        WhenWindowButton(label: Value),
         WhenAt(at: Value),
         DeleteFile(path: Value),
         MakeFolder(path: Value),
@@ -224,7 +223,7 @@ wire_blocks! {
         WindowTextBox { label: Value, name: String },
         WindowCheckbox { label: Value, name: String },
         WindowChoice { label: Value, list: String, name: String },
-        WindowButton { label: Value, close: bool },
+        WindowButton { label: Value, close: bool, body: Vec<InstructionDto> },
         ReadKeys { name: String, end_keys: Value, #[serde(default, skip_serializing_if = "Option::is_none")] count: Option<Value>, #[serde(default, skip_serializing_if = "Option::is_none")] timeout: Option<Value> },
         BrowserScript { code: Value, variable: String },
     }

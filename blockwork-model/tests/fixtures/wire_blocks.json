@@ -1575,7 +1575,17 @@
      "kind": "Text",
      "value": "Go"
     },
-    "close": true
+    "close": true,
+    "body": [
+     {
+      "type": "Wait",
+      "id": "child_button_wait",
+      "duration": {
+       "kind": "Number",
+       "value": 1
+      }
+     }
+    ]
    },
    {
     "type": "WindowNote",
@@ -1587,13 +1597,5 @@
    }
   ],
   "id": "showwindow"
- },
- {
-  "type": "WhenWindowButton",
-  "label": {
-   "kind": "Text",
-   "value": "Go"
-  },
-  "id": "whenwindowbutton"
  }
 ]

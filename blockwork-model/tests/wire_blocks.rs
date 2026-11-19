@@ -228,9 +228,7 @@ fn every_trigger_has_a_label_and_a_watcher() {
         if ins.kind.trigger_label().is_none() {
             missing.push(format!("{ty}: no trigger_label in macros/trigger.rs"));
         }
-        // A window's buttons start these from the runner, not a watcher.
-        let run_started = ty == "WhenWindowButton";
-        if !run_started && !sources.contains(&format!("InstructionKind::{ty}")) {
+        if !sources.contains(&format!("InstructionKind::{ty}")) {
             missing.push(format!("{ty}: no watcher in blockwork-app names it"));
         }
     }

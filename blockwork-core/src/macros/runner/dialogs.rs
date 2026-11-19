@@ -109,7 +109,7 @@ fn control(
                 .unwrap_or_default(),
             ..control("choice", ctx.resolve(label, depth)?.eval_text()?)
         },
-        InstructionKind::WindowButton { label, close } => crate::prompt::Control {
+        InstructionKind::WindowButton { label, close, .. } => crate::prompt::Control {
             close: *close,
             ..control("button", ctx.resolve(label, depth)?.eval_text()?)
         },
@@ -131,26 +131,45 @@ fn evaluated(value: &serde_json::Value) -> Option<Evaluated> {
 }
 
 /// Shows the window `body` describes until it's closed. Values go back
-/// into their variables on every click and on closing, and a clicked
-/// button starts the `WhenWindowButton` strands with its label.
+/// into their variables on every click and on closing. A button that keeps
+/// the window open runs its blocks alongside it; one that closes it runs
+/// them before the blocks after the window.
 fn show_window(
     ins: &Instruction,
     ctx: &mut ExecCtx,
     depth: u32,
     title: &Value,
     body: &[Instruction],
-) -> Result<(), String> {
+) -> Result<Option<Flow>, String> {
+    // Each button's label and blocks; a click names the first button with
+    // its label.
+    let mut buttons: Vec<(String, Vec<Instruction>)> = Vec::new();
     let built = (|| {
         let title = ctx.resolve(title, depth)?.eval_text()?;
         let mut request = crate::prompt::Request::new(crate::prompt::Kind::Window, &title, "");
         for child in body {
-            request.controls.extend(control(ctx, child, depth)?);
+            let Some(control) = control(ctx, child, depth)? else {
+                continue;
+            };
+            if let InstructionKind::WindowButton { body, .. } = &child.kind {
+                buttons.push((control.label.clone(), body.clone()));
+            }
+            request.controls.push(control);
         }
         Ok::<_, String>(request)
     })();
     let request = match built {
         Ok(request) => request,
-        Err(e) => return soft_fail(ctx, &ins.id, "Show window", e),
+        Err(e) => {
+            soft_fail(ctx, &ins.id, "Show window", e)?;
+            return Ok(None);
+        }
+    };
+    let body_of = |label: &str| {
+        buttons
+            .iter()
+            .find(|(l, _)| l == label)
+            .map(|(_, body)| body.clone())
     };
     let names: Vec<String> = request
         .controls
@@ -158,10 +177,6 @@ fn show_window(
         .filter(|c| !c.name.is_empty())
         .map(|c| c.name.clone())
         .collect();
-    let buttons = run_started_bodies(ctx, depth, |kind| match kind {
-        InstructionKind::WhenWindowButton(label) => Some(label),
-        _ => None,
-    });
     let spawner = Spawner::of(ctx);
     let threads = Mutex::new(Vec::new());
     let variables = Arc::clone(&ctx.variables);
@@ -177,28 +192,38 @@ fn show_window(
     };
     let clicked = |reply: &crate::prompt::Reply| {
         save(reply);
-        for (label, body) in &buttons {
-            if label.eq_ignore_ascii_case(reply.text.trim())
-                && let Some(thread) = spawner.spawn(format!("button_{label}"), body.clone())
-                && let Ok(mut threads) = threads.lock()
-            {
-                threads.push(thread);
-            }
+        if let Some(body) = body_of(&reply.text)
+            && let Some(thread) = spawner.spawn(format!("button_{}", reply.text), body)
+            && let Ok(mut threads) = threads.lock()
+        {
+            threads.push(thread);
         }
     };
     let flag = ctx.stop_flag.clone();
     let stopped = || flag.as_ref().is_some_and(stop_requested);
     let shown = crate::prompt::show_window(&request, &stopped, &clicked);
-    match shown {
-        // A button that closes the window counts as a click too.
-        Ok(reply) if reply.answer == "ok" => clicked(&reply),
-        Ok(reply) => save(&reply),
-        Err(_) if stopped() => {}
-        Err(e) => soft_fail(ctx, &ins.id, "Show window", e)?,
-    }
+    let closed_by = match shown {
+        Ok(reply) => {
+            save(&reply);
+            (reply.answer == "ok")
+                .then(|| body_of(&reply.text))
+                .flatten()
+        }
+        Err(_) if stopped() => None,
+        Err(e) => {
+            soft_fail(ctx, &ins.id, "Show window", e)?;
+            None
+        }
+    };
     ctx.signal_threads
         .extend(threads.into_inner().unwrap_or_default());
-    Ok(())
+    if let Some(body) = closed_by {
+        let flow = run_block(&body, ctx, depth, Instant::now())?;
+        if flow != Flow::Normal {
+            return Ok(Some(flow));
+        }
+    }
+    Ok(None)
 }
 
 /// Runs one dialog block. `Some(flow)` ends the strand with it; `None` goes on to the next block.
@@ -376,7 +401,11 @@ pub(super) fn run_dialog_block(
                 Err(e) => soft_fail(ctx, &ins.id, "Show message", e)?,
             }
         }
-        InstructionKind::ShowWindow { title, body } => show_window(ins, ctx, depth, title, body)?,
+        InstructionKind::ShowWindow { title, body } => {
+            if let Some(flow) = show_window(ins, ctx, depth, title, body)? {
+                return Ok(Some(flow));
+            }
+        }
         _ => unreachable!("run_dialog_block got another block"),
     }
     Ok(None)

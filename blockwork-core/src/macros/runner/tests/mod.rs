@@ -168,7 +168,8 @@ fn bump(name: &str) -> Instruction {
 
 /// Answers dialogs by their message: "cancel" cancels, permissions are denied.
 /// A window gets "typed" in its text boxes, its checkboxes ticked and its
-/// last choice picked, then each button clicked in order.
+/// last choice picked, then each button clicked in order up to the first
+/// that closes it.
 fn install_test_dialogs() {
     use crate::prompt::{Kind, Reply};
     crate::prompt::set_handler(Arc::new(

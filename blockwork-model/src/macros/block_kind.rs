@@ -125,6 +125,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::WithLock { body, .. }, 0) => Some(body),
             (InstructionKind::WithInputBlocked { body }, 0) => Some(body),
             (InstructionKind::ShowWindow { body, .. }, 0) => Some(body),
+            (InstructionKind::WindowButton { body, .. }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get(slot as usize),
             _ => None,
         }
@@ -148,6 +149,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::WithLock { body, .. }, 0) => Some(body),
             (InstructionKind::WithInputBlocked { body }, 0) => Some(body),
             (InstructionKind::ShowWindow { body, .. }, 0) => Some(body),
+            (InstructionKind::WindowButton { body, .. }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get_mut(slot as usize),
             _ => None,
         }
