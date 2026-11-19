@@ -75,6 +75,8 @@ pub struct MacroDto {
     pub pack_exports: Vec<block_packs::PackExport>,
     /// Macro-scoped lists, including their literal items for the list editor.
     pub lists: Vec<ListDto>,
+    /// Macro-scoped dicts with their entries, for the dict editor.
+    pub dicts: Vec<crate::macros::DictDef>,
     pub signals: Vec<String>,
     /// User-defined custom blocks ("My Blocks").
     pub block_defs: Vec<BlockDefinitionDto>,
@@ -269,6 +271,7 @@ pub fn macro_to_dto(mac: &Macro) -> MacroDto {
             })
             .collect(),
         lists: mac.lists.iter().map(list_to_dto).collect(),
+        dicts: mac.graph.dicts.clone(),
         signals: mac.signals.clone(),
         block_defs: mac
             .block_defs

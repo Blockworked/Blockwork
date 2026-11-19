@@ -205,6 +205,7 @@ fn fire_in_macro(macro_id: &str, instructions: Vec<Instruction>, vars: &Variable
         1.0,
         Arc::clone(vars),
         ListStore::default(),
+        Default::default(),
         Arc::new(HashMap::new()),
         0,
     );

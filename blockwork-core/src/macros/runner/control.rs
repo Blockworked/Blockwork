@@ -341,7 +341,116 @@ pub(super) fn run_control_block(
                 }
             }
         }
+        InstructionKind::ForEachItem {
+            list,
+            variable,
+            body,
+        } => {
+            let items = ctx
+                .lists
+                .lock()
+                .ok()
+                .and_then(|lists| lists.get(list).cloned())
+                .unwrap_or_default();
+            let items = items.iter().map(|item| match item {
+                ListItem::Number(n) => Evaluated::Number(*n),
+                ListItem::Text(t) => Evaluated::Text(t.clone()),
+            });
+            return run_each(ins, ctx, depth, variable, body, items.collect());
+        }
+        InstructionKind::ForEachKey {
+            dict,
+            variable,
+            body,
+        } => {
+            let keys = ctx
+                .dicts
+                .lock()
+                .ok()
+                .and_then(|dicts| dicts.get(dict).cloned())
+                .unwrap_or_default();
+            let mut seen = std::collections::HashSet::new();
+            let keys = keys
+                .into_iter()
+                .filter(|entry| seen.insert(entry.key.clone()))
+                .map(|entry| Evaluated::Text(entry.key));
+            return run_each(ins, ctx, depth, variable, body, keys.collect());
+        }
+        InstructionKind::ForEachPart {
+            text,
+            separator,
+            variable,
+            body,
+        } => {
+            let parts = ctx
+                .resolve(text, depth)
+                .and_then(|v| v.eval_text())
+                .and_then(|text| {
+                    Ok(crate::text::split(
+                        &text,
+                        &ctx.resolve(separator, depth)?.eval_text()?,
+                    ))
+                });
+            match parts {
+                Ok(parts) => {
+                    let parts = parts.into_iter().map(Evaluated::Text).collect();
+                    return run_each(ins, ctx, depth, variable, body, parts);
+                }
+                Err(e) => soft_fail(ctx, &ins.id, "For each part", e)?,
+            }
+        }
+        InstructionKind::ForEachFile {
+            folder,
+            variable,
+            body,
+        } => {
+            let paths = ctx
+                .resolve(folder, depth)
+                .and_then(|v| v.eval_text())
+                .and_then(|folder| crate::files::list_paths(&folder));
+            match paths {
+                Ok(paths) => {
+                    let paths = paths.into_iter().map(Evaluated::Text).collect();
+                    return run_each(ins, ctx, depth, variable, body, paths);
+                }
+                Err(e) => soft_fail(ctx, &ins.id, "For each file", e)?,
+            }
+        }
         _ => unreachable!("run_block only sends flow blocks here"),
+    }
+    Ok(Next::Go)
+}
+
+/// Runs a for-each loop's `body` once per value, with `variable` set to it
+/// first. Stops, loop limits and escape/continue work as in `Repeat`.
+fn run_each(
+    ins: &Instruction,
+    ctx: &mut ExecCtx,
+    depth: u32,
+    variable: &str,
+    body: &[Instruction],
+    values: Vec<Evaluated>,
+) -> Result<Next, String> {
+    let mut iterations = 0;
+    for value in values {
+        if let Some(flag) = &ctx.stop_flag
+            && stop_requested(flag)
+        {
+            break;
+        }
+        if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
+            break;
+        }
+        if !variable.is_empty()
+            && let Ok(mut vars) = ctx.variables.lock()
+        {
+            vars.insert(variable.to_string(), value);
+        }
+        match run_block(body, ctx, depth, Instant::now())? {
+            Flow::Normal | Flow::Continue => {}
+            Flow::Break => break,
+            flow @ Flow::Return(_) => return Ok(Next::Exit(flow)),
+        }
     }
     Ok(Next::Go)
 }

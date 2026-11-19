@@ -48,6 +48,10 @@ pub fn check_loop_control(
             InstructionKind::Repeat { .. }
                 | InstructionKind::Forever { .. }
                 | InstructionKind::While { .. }
+                | InstructionKind::ForEachItem { .. }
+                | InstructionKind::ForEachKey { .. }
+                | InstructionKind::ForEachPart { .. }
+                | InstructionKind::ForEachFile { .. }
         ) {
             return Ok(());
         }
@@ -56,10 +60,7 @@ pub fn check_loop_control(
         };
         list = body;
     }
-    Err(
-        "An Escape Loop/Continue Loop block can only be used inside a Repeat/Forever/While loop"
-            .to_string(),
-    )
+    Err("An Escape Loop/Continue Loop block can only be used inside a loop".to_string())
 }
 
 #[cfg(test)]

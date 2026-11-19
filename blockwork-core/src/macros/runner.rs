@@ -9,7 +9,8 @@ use crate::macros::{
     StopScope, Strand,
 };
 use blockstitch_core::graph::{
-    ListItem, ListStore, is_list_reporter, list_index, resolve_list_reporter,
+    DictStore, ListItem, ListStore, is_dict_reporter, is_list_reporter, list_index,
+    resolve_dict_reporter, resolve_list_reporter,
 };
 use spin_sleep::{SpinSleeper, SpinStrategy};
 use std::collections::HashMap;
@@ -73,6 +74,7 @@ struct ExecCtx<'a> {
     speed_multiplier: f64,
     variables: VariableStore,
     lists: ListStore,
+    dicts: DictStore,
     block_table: BlockTable,
     pressed_keys: &'a mut Vec<MacroKey>,
     /// Mouse buttons held by this strand, tracked and cleaned up like
@@ -149,6 +151,21 @@ fn resolve_calls_and_params(value: &Value, ctx: &mut ExecCtx, depth: u32) -> Res
                 .map(|lists| lists.clone())
                 .unwrap_or_default();
             resolve_list_reporter(&name, args, &lists)
+        }
+        Value::Op { op, args, .. } if is_dict_reporter(op) => {
+            let args = args
+                .iter()
+                .map(|arg| resolve_calls_and_params(arg, ctx, depth))
+                .collect::<Result<Vec<_>, _>>()?;
+            let Op::Ext(name) = op else {
+                unreachable!("validated by is_dict_reporter")
+            };
+            let dicts = ctx
+                .dicts
+                .lock()
+                .map(|dicts| dicts.clone())
+                .unwrap_or_default();
+            resolve_dict_reporter(name, args, &dicts)
         }
         Value::Op { op, args, saved } => {
             let args = args
@@ -498,6 +515,8 @@ pub struct RunOptions {
     /// The run's lists; `None` starts from the macro's saved lists. A host
     /// passes its own to save what the run changed.
     pub lists: Option<ListStore>,
+    /// The run's dicts, like `lists`.
+    pub dicts: Option<DictStore>,
     /// Pretends the run started this long ago, so a run that starts late
     /// (a synced start) keeps its waits on the intended schedule.
     pub offset: Duration,
@@ -512,6 +531,7 @@ impl RunOptions {
             speed_multiplier: 1.0,
             variables,
             lists: None,
+            dicts: None,
             offset: Duration::ZERO,
         }
     }
@@ -529,6 +549,9 @@ pub trait Run {
 
     /// A fresh list store holding the macro's saved lists.
     fn list_store(&self) -> ListStore;
+
+    /// A fresh dict store holding the macro's saved dicts.
+    fn dict_store(&self) -> DictStore;
 
     /// Builds the custom block table from this macro's `BlockHeader` strands.
     fn block_table(&self) -> BlockTable;
@@ -572,6 +595,7 @@ impl Run for Macro {
 
     fn run_and_save(self, mut options: RunOptions) -> Result<(), String> {
         let lists = Arc::clone(options.lists.get_or_insert_with(|| self.list_store()));
+        let dicts = Arc::clone(options.dicts.get_or_insert_with(|| self.dict_store()));
         let variables = Arc::clone(&options.variables);
         let mut saved = self.clone();
         self.run_with(options);
@@ -580,6 +604,9 @@ impl Run for Macro {
         }
         if let Ok(values) = lists.lock() {
             saved.sync_lists_from(&values);
+        }
+        if let Ok(values) = dicts.lock() {
+            saved.sync_dicts_from(&values);
         }
         saved.save()
     }
@@ -591,6 +618,10 @@ impl Run for Macro {
                 .map(|list| (list.name.clone(), list.items.clone()))
                 .collect(),
         ))
+    }
+
+    fn dict_store(&self) -> DictStore {
+        Arc::new(Mutex::new(self.graph.dict_values()))
     }
 
     fn block_table(&self) -> BlockTable {
@@ -716,6 +747,7 @@ fn run_entries(mac: Macro, pick: impl Fn(&Strand) -> bool, options: RunOptions) 
         speed_multiplier,
         variables,
         lists,
+        dicts,
         offset: initial_offset,
     } = options;
     let stop = StrandStop::new(stop_flag, &mac.id);
@@ -726,6 +758,7 @@ fn run_entries(mac: Macro, pick: impl Fn(&Strand) -> bool, options: RunOptions) 
         speed_multiplier,
         variables,
         lists: lists.unwrap_or_else(|| mac.list_store()),
+        dicts: dicts.unwrap_or_else(|| mac.dict_store()),
         block_table: mac.block_table(),
         max_loop_iterations: mac.settings.max_loop_iterations,
     };
@@ -779,6 +812,7 @@ pub(super) struct StrandRun {
     pub(super) speed_multiplier: f64,
     pub(super) variables: VariableStore,
     pub(super) lists: ListStore,
+    pub(super) dicts: DictStore,
     pub(super) block_table: BlockTable,
     pub(super) max_loop_iterations: u32,
 }
@@ -795,6 +829,7 @@ pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>, initial
         speed_multiplier,
         variables,
         lists,
+        dicts,
         block_table,
         max_loop_iterations,
     } = run;
@@ -822,6 +857,7 @@ pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>, initial
             speed_multiplier,
             variables,
             lists,
+            dicts,
             block_table,
             pressed_keys: &mut pressed_keys,
             pressed_buttons: &mut pressed_buttons,
@@ -885,6 +921,7 @@ pub fn run_instructions(
         speed_multiplier,
         variables,
         Arc::new(Mutex::new(HashMap::new())),
+        Arc::new(Mutex::new(HashMap::new())),
         Arc::new(HashMap::new()),
         0,
     );
@@ -901,6 +938,7 @@ pub fn run_fired_strand(
     speed_multiplier: f64,
     variables: VariableStore,
     lists: ListStore,
+    dicts: DictStore,
     block_table: BlockTable,
     max_loop_iterations: u32,
 ) {
@@ -912,6 +950,7 @@ pub fn run_fired_strand(
         speed_multiplier,
         variables,
         lists,
+        dicts,
         block_table,
         max_loop_iterations,
     };

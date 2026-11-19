@@ -45,6 +45,7 @@ QtObject {
         return fresh;
     }
     readonly property var listInstructionTypes: ["AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList", "InsertIntoList", "ReplaceItemOfList", "ReverseList", "SplitIntoList"]
+    readonly property var dictInstructionTypes: ["SetDictKey", "DeleteDictKey", "ClearDict", "DictFromJson"]
 
     // Blockwork's reporters as blockstitch-core describes them (arity, slot
     // types, defaults), for BlockRegistry.freshValue.
@@ -216,7 +217,8 @@ QtObject {
         { category: "input", title: qsTr("Mouse"), items: ["Button", "MoveMouse", "Scroll", "MousePosition"] },
         { category: "control", title: qsTr("Waiting"), items: ["Wait", "WaitUntil"] },
         { category: "control", title: qsTr("Conditions"), items: ["If", "IfElse"] },
-        { category: "control", title: qsTr("Loops"), items: ["Repeat", "Forever", "While", "EscapeLoop", "ContinueLoop"] },
+        { category: "control", title: qsTr("Loops"), items: ["Repeat", "Forever", "While", "ForEachItem", "ForEachKey", "ForEachPart",
+            "ForEachFile", "EscapeLoop", "ContinueLoop"] },
         { category: "control", title: qsTr("Errors"), items: ["TryCatch", "Retry", "ThrowError", "LastError"] },
         { category: "control", title: qsTr("Stopping"), items: ["Stop", "Return"] },
         { category: "control", title: qsTr("Other macros"), items: ["RunMacro", "StopMacroNamed", "MacroRunning"] },
@@ -226,6 +228,8 @@ QtObject {
         { category: "data", title: qsTr("Lists"), action: "makeList", items: ["@lists", "ListItem", "ListItemNumber", "ListAmount", "ListLength",
             "ListContains", "ListItemExists", "ListIsEmpty", "ListAsJson", "AddToList", "DeleteOfList", "DeleteAllOfList", "ShiftList",
             "InsertIntoList", "ReplaceItemOfList", "ReverseList", "SplitIntoList"] },
+        { category: "data", title: qsTr("Dicts"), action: "makeDict", items: ["@dicts", "DictValue", "DictHasKey", "DictSize", "DictKeys",
+            "DictAsJson", "DictIsEmpty", "SetDictKey", "DeleteDictKey", "ClearDict", "DictFromJson"] },
         { category: "data", title: qsTr("Secrets"), items: ["Secret"] },
         { category: "operators", title: qsTr("Math"), items: ["Add", "Sub", "Mul", "Div", "Mod", "Round", "Math", "Random", "FormatNumber"] },
         { category: "operators", title: qsTr("Text"), items: ["Join", "Join3", "NewLine", "Tab", "Length", "LetterOf", "IndexOf", "LastIndexOf",
@@ -396,7 +400,7 @@ QtObject {
                 { key: "gesture", label: qsTr("double or long press"), icon: "timer",
                   fresh: () => ({ kind: "Double", ms: numberValue(400) }), pieces: [
                     { kind: "dropdown", key: "gesture", index: "kind",
-                      options: choices([["Double", qsTr("PRESSED TWICE WITHIN")], ["Hold", qsTr("HELD FOR")]]) },
+                      options: choices([["Double", qsTr("Twice within")], ["Hold", qsTr("Held for")]]) },
                     Object.assign(value("KeyGestureMs", "gesture"), { index: "ms", unit: qsTr("ms") })
                 ] },
                 onlyWhenComponent
@@ -419,7 +423,7 @@ QtObject {
             WhenTyped: { shape: "header", icon: "type", components: [
                 flagComponent("ignore_case", qsTr("in any case"), "type"),
                 { key: "word", label: qsTr("word position"), icon: "text-select", fresh: "Whole", pieces: [
-                    { kind: "dropdown", key: "word", options: choices([["Start", qsTr("AT A WORD'S START")], ["Whole", qsTr("AS A WHOLE WORD")]]) }
+                    { kind: "dropdown", key: "word", options: choices([["Start", qsTr("At a word's start")], ["Whole", qsTr("As a whole word")]]) }
                 ] },
                 onlyWhenComponent
             ], head: [label(qsTr("WHEN I TYPE")), value("TypedText", "text"), label(qsTr("THEN")),
@@ -515,6 +519,14 @@ QtObject {
                 { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
                   encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
             WithLock: { icon: "lock", mouths: ["body"], head: [label(qsTr("with lock")), value("LockName", "name")] },
+            ForEachItem: { icon: "list", mouths: ["body"], head: [label(qsTr("for each item of")), { kind: "dropdown", key: "list", options: "lists" },
+                label(qsTr("as")), { kind: "dropdown", key: "variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            ForEachKey: { icon: "book-key", mouths: ["body"], head: [label(qsTr("for each key of")), { kind: "dropdown", key: "dict", options: "dicts" },
+                label(qsTr("as")), { kind: "dropdown", key: "variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            ForEachPart: { icon: "scissors", mouths: ["body"], head: [label(qsTr("for each part of")), value("SplitText", "text"), label(qsTr("split by")),
+                value("SplitSeparator", "separator"), label(qsTr("as")), { kind: "dropdown", key: "variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            ForEachFile: { icon: "folder-open", mouths: ["body"], head: [label(qsTr("for each file in")), value("EachFolder", "folder"),
+                label(qsTr("as")), { kind: "dropdown", key: "variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
             TryCatch: { icon: "circle-alert", mouths: ["body", "catch_body"], separators: [qsTr("on error")], head: [label(qsTr("try"))] },
             ThrowError: { shape: "cap", icon: "triangle-alert", head: [label(qsTr("throw error")), value("ErrorMessage", "message")] },
             Stop: { shape: i => i.scope === "OtherStrands" ? "stack" : "cap", icon: "octagon", head: [label(qsTr("stop")),
@@ -548,6 +560,11 @@ QtObject {
                 label(qsTr("by")), value("ChangeVariableValue", "value")] },
             SplitIntoList: { icon: "scissors", head: [label(qsTr("split")), value("SplitText", "text"), label(qsTr("by")), value("SplitSeparator", "separator"),
                 label(qsTr("into")), { kind: "dropdown", key: "name", options: "lists" }] },
+            SetDictKey: { icon: "book-key", head: [label(qsTr("set key")), value("DictKey", "key"), label(qsTr("of")), { kind: "dropdown", key: "name", options: "dicts" },
+                label(qsTr("to")), value("DictEntryValue", "value")] },
+            DeleteDictKey: { icon: "eraser", head: [label(qsTr("delete key")), value("DictKey", "key"), label(qsTr("of")), { kind: "dropdown", key: "name", options: "dicts" }] },
+            ClearDict: { icon: "trash-2", head: [label(qsTr("clear dict")), { kind: "dropdown", key: "name", options: "dicts" }] },
+            DictFromJson: { icon: "braces", head: [label(qsTr("fill dict")), { kind: "dropdown", key: "name", options: "dicts" }, label(qsTr("from JSON")), value("DictJson", "text")] },
             SetGlobal: { icon: "variable", head: [label(qsTr("set global")), { kind: "value", field: "GlobalName", key: "name", options: () => page.globalChoices(), placeholder: qsTr("(no global variable)") }, label(qsTr("to")), value("GlobalValue", "value")] },
             ChangeGlobal: { icon: "variable", head: [label(qsTr("change global")), { kind: "value", field: "GlobalName", key: "name", options: () => page.globalChoices(), placeholder: qsTr("(no global variable)") }, label(qsTr("by")), value("GlobalValue", "by")] }
         };
@@ -687,7 +704,8 @@ QtObject {
             WhenWebhook: ["variable"], AskText: ["name"], AskYesNo: ["name"], AskChoice: ["name"],
             HttpRequest: ["variable"], BrowserScript: ["variable"],
             FindImage: ["x_variable", "y_variable", "count_variable"],
-            DetectObjectsInWindow: ["count_variable"], AimAtDetection: ["status_variable"]
+            DetectObjectsInWindow: ["count_variable"], AimAtDetection: ["status_variable"],
+            ForEachItem: ["variable"], ForEachKey: ["variable"], ForEachPart: ["variable"], ForEachFile: ["variable"]
         });
         BlockRegistry.registerPrefabs({
             GamepadButton:{button:"South",direction:"Click"},
@@ -736,6 +754,14 @@ QtObject {
             WhenUsb: { pattern: textValue(""), connected: true },
             WhenMouseButton: { button: "Back", pressed: true },
             SplitIntoList: () => ({ text: textValue("a,b,c"), separator: textValue(","), name: page.firstListName() }),
+            SetDictKey: () => ({ name: page.firstDictName(), key: textValue("key"), value: textValue("value") }),
+            DeleteDictKey: () => ({ name: page.firstDictName(), key: textValue("key") }),
+            ClearDict: () => ({ name: page.firstDictName() }),
+            DictFromJson: () => ({ text: textValue('{"key": "value"}'), name: page.firstDictName() }),
+            ForEachItem: () => ({ list: page.firstListName(), variable: page.firstVariableName(), body: [] }),
+            ForEachKey: () => ({ dict: page.firstDictName(), variable: page.firstVariableName(), body: [] }),
+            ForEachPart: () => ({ text: textValue("a,b,c"), separator: textValue(","), variable: page.firstVariableName(), body: [] }),
+            ForEachFile: () => ({ folder: textValue("~"), variable: page.firstVariableName(), body: [] }),
             PasteText: { text: textValue(qsTr("Hello!")) },
             WithLock: { name: textValue("keyboard"), body: [] },
             WriteFile: { path: textValue("~/notes.txt"), text: textValue("hello"), append: true },

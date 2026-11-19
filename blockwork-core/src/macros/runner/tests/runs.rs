@@ -373,6 +373,7 @@ fn lock_blocks_run_their_body_and_give_up_when_stopped() {
             1.0,
             worker_vars,
             Arc::new(Mutex::new(HashMap::new())),
+            Default::default(),
             Arc::new(HashMap::new()),
             0,
         );

@@ -407,6 +407,25 @@ fn script() -> Vec<(&'static str, Value)> {
         ),
         /* 86 */ ("clear_instructions", json!({})),
         /* 87 */ ("undo", json!({})),
+        /* 88 */ ("create_dict", json!({ "name": "prices" })),
+        /* 89 */
+        (
+            "set_dict_entries",
+            json!({ "name": "prices", "entries": [{ "key": "tea", "value": num(3.0) }, { "key": "note", "value": { "kind": "Text", "value": "hot" } }] }),
+        ),
+        /* 90 */
+        (
+            "set_dict_editor_state",
+            json!({ "name": "prices", "visible": true, "x": 60, "y": 70 }),
+        ),
+        /* 91 */
+        (
+            "rename_dict",
+            json!({ "oldName": "prices", "newName": "costs" }),
+        ),
+        /* 92 */ ("undo", json!({})),
+        /* 93 */ ("redo", json!({})),
+        /* 94 */ ("delete_dict", json!({ "name": "costs" })),
     ]
 }
 
@@ -527,6 +546,11 @@ fn web_preview_matches_the_app_for_pure_reporters() {
             "set_list_items",
             json!({ "name": "items", "items": [num(4.0), text("b")] }),
         ),
+        ("create_dict", json!({ "name": "prices" })),
+        (
+            "set_dict_entries",
+            json!({ "name": "prices", "entries": [{ "key": "tea", "value": num(3.0) }] }),
+        ),
     ];
     for (command, args) in setup {
         runtime
@@ -558,6 +582,9 @@ fn web_preview_matches_the_app_for_pure_reporters() {
         op("FormatDate", vec![num(0.0), text("%Y")]),
         op("Not", vec![json!({ "kind": "Bool" })]),
         op("Add", vec![text("x"), num(1.0)]),
+        op("DictValue", vec![text("tea"), text("prices")]),
+        op("DictSize", vec![text("prices")]),
+        op("ListItem", vec![num(2.0), text("items")]),
     ];
     for value in values {
         let from_app =

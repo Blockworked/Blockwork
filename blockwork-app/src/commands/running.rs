@@ -121,7 +121,7 @@ pub(super) fn run_open_macro(
     app: &AppHandle,
     strand: Option<String>,
 ) -> Result<(), String> {
-    let (mac, emulator, is_looping, speed_multiplier, variables, lists) = {
+    let (mac, emulator, is_looping, speed_multiplier, variables, lists, dicts) = {
         let s = state.lock().map_err(|e| e.to_string())?;
         let mac = s.current_macro.clone();
         let emulator = s.emulator.as_ref().map(Arc::clone);
@@ -130,6 +130,7 @@ pub(super) fn run_open_macro(
             mac.as_ref().map_or(1.0, |m| m.speed_multiplier) * s.global_speed_multiplier;
         let variables = Arc::clone(&s.variable_values);
         let lists = Arc::clone(&s.list_values);
+        let dicts = Arc::clone(&s.dict_values);
         (
             mac,
             emulator,
@@ -137,6 +138,7 @@ pub(super) fn run_open_macro(
             speed_multiplier,
             variables,
             lists,
+            dicts,
         )
     };
 
@@ -150,6 +152,7 @@ pub(super) fn run_open_macro(
             speed_multiplier,
             variables,
             lists,
+            dicts,
             strand,
         };
         let single_run_task =

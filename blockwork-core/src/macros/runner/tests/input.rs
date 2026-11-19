@@ -22,6 +22,7 @@ fn without_input_emulation_other_blocks_run_and_input_reports_once() {
         1.0,
         Arc::clone(&vars),
         Arc::new(Mutex::new(HashMap::new())),
+        Default::default(),
         Arc::new(HashMap::new()),
         0,
     );
@@ -97,6 +98,7 @@ fn keyboard_backend_failures_are_visible_and_catchable_after_combo_release() {
         1.0,
         Arc::clone(&vars),
         Arc::new(Mutex::new(HashMap::new())),
+        Default::default(),
         Arc::new(HashMap::new()),
         0,
     );

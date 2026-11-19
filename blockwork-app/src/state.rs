@@ -72,6 +72,8 @@ pub(crate) struct AppState {
     pub(crate) variable_values: Arc<Mutex<HashMap<String, Evaluated>>>,
     /// Live macro-wide list values, parallel to `variable_values`.
     pub(crate) list_values: Arc<Mutex<HashMap<String, Vec<ListItem>>>>,
+    /// Live macro-wide dict values, parallel to `list_values`.
+    pub(crate) dict_values: blockstitch_core::graph::DictStore,
     pub(crate) thread_pool: ThreadPool,
     pub(crate) is_looping: Arc<Mutex<bool>>,
     pub(crate) global_speed_multiplier: f64,

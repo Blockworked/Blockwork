@@ -44,6 +44,9 @@
     "FindImage": [
       "screen"
     ],
+    "ForEachFile": [
+      "files_read"
+    ],
     "GamepadButton": [
       "input"
     ],

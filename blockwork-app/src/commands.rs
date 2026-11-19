@@ -108,6 +108,15 @@ pub(crate) fn sync_list_values(s: &mut crate::state::AppState) {
     if let Ok(mut store) = s.list_values.lock() {
         *store = values;
     }
+    // Dicts change in the same places lists do.
+    let dicts = s
+        .current_macro
+        .as_ref()
+        .map(|mac| mac.graph.dict_values())
+        .unwrap_or_default();
+    if let Ok(mut store) = s.dict_values.lock() {
+        *store = dicts;
+    }
 }
 
 pub(crate) fn auto_save(s: &mut crate::state::AppState) {

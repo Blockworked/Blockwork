@@ -61,10 +61,14 @@ pub(crate) fn start(
         .clone()
         .ok_or("input emulation isn't available")?;
     let speed = mac.speed_multiplier * s.global_speed_multiplier;
-    let (variables, lists) = if is_open {
-        (Arc::clone(&s.variable_values), Arc::clone(&s.list_values))
+    let (variables, lists, dicts) = if is_open {
+        (
+            Arc::clone(&s.variable_values),
+            Arc::clone(&s.list_values),
+            Arc::clone(&s.dict_values),
+        )
     } else {
-        (mac.variable_store(), mac.list_store())
+        (mac.variable_store(), mac.list_store(), mac.dict_store())
     };
     let thread_name = format!("called_{}", mac.name);
     let done = Arc::new(AtomicBool::new(false));
@@ -88,6 +92,7 @@ pub(crate) fn start(
                 stop_flag: Some(Arc::clone(&run_flag)),
                 speed_multiplier: speed,
                 lists: Some(Arc::clone(&lists)),
+                dicts: Some(Arc::clone(&dicts)),
                 ..RunOptions::new(emulator, Arc::clone(&variables))
             });
             limit.store(true, Ordering::Relaxed);
@@ -103,9 +108,11 @@ pub(crate) fn start(
             );
             run_registry::end_run(&run_flag);
             if is_open {
-                macros_thread::persist_variables(&state, &app, &id, &variables, &lists);
+                macros_thread::persist_variables(&state, &app, &id, &variables, &lists, &dicts);
             } else {
-                scheduled_run::persist_fired_variables(&state, &app, &id, &variables, &lists);
+                scheduled_run::persist_fired_variables(
+                    &state, &app, &id, &variables, &lists, &dicts,
+                );
             }
             done.store(true, Ordering::Relaxed);
         }

@@ -285,7 +285,11 @@ fn needs_app(value: &Value) -> bool {
         Value::Op { op, args, .. } => {
             // Not the registry: a native build with `system` unified in has
             // the machine's reporters registered too.
-            matches!(op, Op::Ext(name) if !is_pure_operator(name)) || args.iter().any(needs_app)
+            // List and dict reporters read the document, which the web has.
+            let reads_document = blockstitch_core::graph::is_list_reporter(op)
+                || blockstitch_core::graph::is_dict_reporter(op);
+            matches!(op, Op::Ext(name) if !is_pure_operator(name) && !reads_document)
+                || args.iter().any(needs_app)
         }
         Value::Call { args, .. } => args.iter().any(needs_app),
         _ => false,
@@ -377,7 +381,13 @@ impl Demo {
                     .collect()
             })
             .unwrap_or_default();
-        resolve_list_reporters(&value.resolve_vars(&self.variable_values()), &lists)?.eval_text()
+        let dicts = self
+            .open()
+            .map(|mac| mac.graph.dict_values())
+            .unwrap_or_default();
+        let resolved =
+            resolve_list_reporters(&value.resolve_vars(&self.variable_values()), &lists)?;
+        blockstitch_core::graph::resolve_dict_reporters(&resolved, &dicts)?.eval_text()
     }
 
     fn key_capture_event(&mut self, keys: &[(String, String)]) {

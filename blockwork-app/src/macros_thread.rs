@@ -1,6 +1,6 @@
 use crate::AppHandle;
 use crate::state::{SharedState, build_state_dto};
-use blockstitch_core::graph::ListStore;
+use blockstitch_core::graph::{DictStore, ListStore};
 use blockwork_core::config::MacroFiles;
 use blockwork_core::macros::Macro;
 use blockwork_core::macros::Run;
@@ -21,6 +21,7 @@ pub(crate) fn persist_variables(
     macro_id: &str,
     variables: &VariableStore,
     lists: &ListStore,
+    dicts: &DictStore,
 ) {
     let (mac_to_save, dto) = {
         let Ok(mut s) = shared_state.lock() else {
@@ -37,6 +38,9 @@ pub(crate) fn persist_variables(
         }
         if let Ok(values) = lists.lock() {
             mac.sync_lists_from(&values);
+        }
+        if let Ok(values) = dicts.lock() {
+            mac.sync_dicts_from(&values);
         }
         (mac.clone(), build_state_dto(&s))
     };
@@ -59,6 +63,7 @@ pub(crate) struct RunRequest {
     pub(crate) speed_multiplier: f64,
     pub(crate) variables: VariableStore,
     pub(crate) lists: ListStore,
+    pub(crate) dicts: DictStore,
     /// Just this strand, from its top block; `None` runs the whole macro.
     pub(crate) strand: Option<String>,
 }
@@ -75,6 +80,7 @@ pub(crate) fn into_single_run_task(
         speed_multiplier,
         variables,
         lists,
+        dicts,
         strand,
     } = request;
     move || {
@@ -95,6 +101,7 @@ pub(crate) fn into_single_run_task(
             stop_flag: Some(Arc::clone(&run_flag)),
             speed_multiplier,
             lists: Some(Arc::clone(&lists)),
+            dicts: Some(Arc::clone(&dicts)),
             ..RunOptions::new(emulator, Arc::clone(&variables))
         };
         match strand {
@@ -116,7 +123,7 @@ pub(crate) fn into_single_run_task(
             },
         );
         run_registry::end_run(&run_flag);
-        persist_variables(&shared_state, &app, &macro_id, &variables, &lists);
+        persist_variables(&shared_state, &app, &macro_id, &variables, &lists, &dicts);
         if let Ok(mut stopped) = stop_flag.lock() {
             *stopped = false;
         }

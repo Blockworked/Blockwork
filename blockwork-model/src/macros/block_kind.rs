@@ -55,6 +55,20 @@ macro_rules! for_each_ref {
             | InstructionKind::ReplaceItemOfList { name, .. }
             | InstructionKind::ReverseList { name }
             | InstructionKind::SplitIntoList { name, .. } => $f(RefKind::List, name),
+            InstructionKind::SetDictKey { name, .. }
+            | InstructionKind::DeleteDictKey { name, .. }
+            | InstructionKind::ClearDict { name }
+            | InstructionKind::DictFromJson { name, .. } => $f(RefKind::Dict, name),
+            InstructionKind::ForEachItem { list, variable, .. } => {
+                $f(RefKind::List, list);
+                $f(RefKind::Variable, variable);
+            }
+            InstructionKind::ForEachKey { dict, variable, .. } => {
+                $f(RefKind::Dict, dict);
+                $f(RefKind::Variable, variable);
+            }
+            InstructionKind::ForEachPart { variable, .. }
+            | InstructionKind::ForEachFile { variable, .. } => $f(RefKind::Variable, variable),
             _ => {}
         }
     };
@@ -87,6 +101,10 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Repeat { body, .. }, 0) => Some(body),
             (InstructionKind::Forever { body }, 0) => Some(body),
             (InstructionKind::While { body, .. }, 0) => Some(body),
+            (InstructionKind::ForEachItem { body, .. }, 0) => Some(body),
+            (InstructionKind::ForEachKey { body, .. }, 0) => Some(body),
+            (InstructionKind::ForEachPart { body, .. }, 0) => Some(body),
+            (InstructionKind::ForEachFile { body, .. }, 0) => Some(body),
             (InstructionKind::TryCatch { body, .. }, 0) => Some(body),
             (InstructionKind::TryCatch { catch_body, .. }, 1) => Some(catch_body),
             (InstructionKind::Retry { body, .. }, 0) => Some(body),
@@ -104,6 +122,10 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Repeat { body, .. }, 0) => Some(body),
             (InstructionKind::Forever { body }, 0) => Some(body),
             (InstructionKind::While { body, .. }, 0) => Some(body),
+            (InstructionKind::ForEachItem { body, .. }, 0) => Some(body),
+            (InstructionKind::ForEachKey { body, .. }, 0) => Some(body),
+            (InstructionKind::ForEachPart { body, .. }, 0) => Some(body),
+            (InstructionKind::ForEachFile { body, .. }, 0) => Some(body),
             (InstructionKind::TryCatch { body, .. }, 0) => Some(body),
             (InstructionKind::TryCatch { catch_body, .. }, 1) => Some(catch_body),
             (InstructionKind::Retry { body, .. }, 0) => Some(body),

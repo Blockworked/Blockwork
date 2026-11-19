@@ -62,6 +62,21 @@ pub fn list_dir(path: &str) -> Result<String, String> {
     Ok(names.join("\n"))
 }
 
+/// Full paths of a folder's entries, sorted by name.
+pub fn list_paths(path: &str) -> Result<Vec<String>, String> {
+    let full = check(path)?;
+    let mut paths: Vec<_> = std::fs::read_dir(&full)
+        .map_err(|e| format!("couldn't list {}: {e}", full.display()))?
+        .filter_map(|entry| entry.ok())
+        .map(|entry| entry.path())
+        .collect();
+    paths.sort();
+    Ok(paths
+        .into_iter()
+        .map(|p| p.to_string_lossy().into_owned())
+        .collect())
+}
+
 /// What the file watcher compares between polls; `None` if it's missing.
 pub fn stamp(path: &str) -> Option<(SystemTime, u64)> {
     let meta = std::fs::metadata(expand(path)).ok()?;

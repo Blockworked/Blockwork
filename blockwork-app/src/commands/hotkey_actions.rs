@@ -42,6 +42,7 @@ pub(crate) fn handle_hotkey_action(state: &SharedState, app: &AppHandle, action:
                             .map(|list| (list.name.clone(), list.items.clone()))
                             .collect(),
                     ));
+                    let dicts = mac.dict_store();
                     let request = macros_thread::RunRequest {
                         mac,
                         emulator,
@@ -49,6 +50,7 @@ pub(crate) fn handle_hotkey_action(state: &SharedState, app: &AppHandle, action:
                         speed_multiplier,
                         variables,
                         lists,
+                        dicts,
                         strand: None,
                     };
                     run_macro_task(request, shared_state, app.clone());

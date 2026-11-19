@@ -49,9 +49,10 @@ pub(super) fn run_system_block(
                     Arc::clone(&ctx.emulator),
                     ctx.stop_flag.as_ref().map(StrandStop::fork),
                 );
-                let (variables, lists, table) = (
+                let (variables, lists, dicts, table) = (
                     Arc::clone(&ctx.variables),
                     Arc::clone(&ctx.lists),
+                    Arc::clone(&ctx.dicts),
                     Arc::clone(&ctx.block_table),
                 );
                 let (speed, loops) = (
@@ -69,6 +70,7 @@ pub(super) fn run_system_block(
                             speed_multiplier: speed,
                             variables,
                             lists,
+                            dicts,
                             block_table: table,
                             max_loop_iterations: loops,
                         };
