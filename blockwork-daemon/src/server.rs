@@ -260,7 +260,7 @@ async fn forward_events(
             },
             Ok(Event::Quit) => encode(&DaemonMessage::quit()),
             Ok(Event::Trace(active)) => encode(&DaemonMessage::trace(active)),
-            Ok(Event::CloseToTray(_)) => continue,
+            Ok(Event::CloseToTray(_) | Event::TrayItems(_)) => continue,
             // Fell behind: intermediate states are moot, send the latest.
             Err(RecvError::Lagged(_)) => {
                 send_state_snapshot(&backend, &tx);

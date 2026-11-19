@@ -1524,5 +1524,13 @@
    }
   ],
   "id": "withinputblocked"
+ },
+ {
+  "type": "WhenTrayItem",
+  "label": {
+   "kind": "Text",
+   "value": "Say hi"
+  },
+  "id": "whentrayitem"
  }
 ]

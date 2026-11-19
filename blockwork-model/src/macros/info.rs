@@ -62,6 +62,7 @@ impl InstructionKind {
             | K::WhenPowerUnplugged
             | K::WhenKey { block: false, .. }
             | K::WhenIdle(_)
+            | K::WhenTrayItem(_)
             | K::WhenScreenLock { .. }
             | K::WhenCron(_)
             | K::WhenNetwork { .. }

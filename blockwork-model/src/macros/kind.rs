@@ -539,6 +539,9 @@ pub enum InstructionKind {
     /// Header for a strand fired once there has been no keyboard or mouse
     /// input for the given number of minutes.
     WhenIdle(Value),
+    /// Header: adds an item with this label to the tray menu; clicking it
+    /// runs the strand.
+    WhenTrayItem(Value),
     /// Header for a strand fired when the screen locks (or unlocks).
     WhenScreenLock {
         locked: bool,

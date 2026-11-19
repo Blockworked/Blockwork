@@ -155,6 +155,7 @@ impl InstructionKind {
                 if *started { "starts" } else { "exits" }
             ),
             K::WhenIdle(minutes) => format!("when idle for {} minutes", show(minutes)),
+            K::WhenTrayItem(label) => format!("when tray item {} is clicked", show(label)),
             K::WhenScreenLock { locked } => format!(
                 "when screen is {}",
                 if *locked { "locked" } else { "unlocked" }

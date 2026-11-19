@@ -28,6 +28,8 @@ use tao::event_loop::{ControlFlow, EventLoopBuilder, EventLoopProxy};
 #[derive(Debug)]
 pub(crate) enum MainThreadEvent {
     SetTrayVisible(bool),
+    SetTrayItems(Vec<blockwork_app::TrayItem>),
+    RunTrayItem(String),
     OpenUi,
     ToggleUi,
     Quit,
@@ -111,7 +113,14 @@ fn main() {
     ));
 
     let mut tray = tray::Tray::new(proxy.clone());
-    tray.set_visible(backend.close_to_tray() || BACKGROUND.load(Ordering::Relaxed));
+    tray.set_items(backend.tray_items());
+    // Whether "close to tray" is on; the tray also shows while macros add
+    // items to it.
+    let mut close_to_tray = backend.close_to_tray();
+    let show_tray = |tray: &mut tray::Tray, close_to_tray: bool| {
+        tray.set_visible(close_to_tray || BACKGROUND.load(Ordering::Relaxed) || tray.has_items())
+    };
+    show_tray(&mut tray, close_to_tray);
 
     // Hold the runtime for the life of the process: the event loop below
     // never returns, and dropping it would stop every backend task.
@@ -130,8 +139,14 @@ fn main() {
         if let tao::event::Event::UserEvent(event) = event {
             match event {
                 MainThreadEvent::SetTrayVisible(visible) => {
-                    tray.set_visible(visible || BACKGROUND.load(Ordering::Relaxed))
+                    close_to_tray = visible;
+                    show_tray(&mut tray, close_to_tray);
                 }
+                MainThreadEvent::SetTrayItems(items) => {
+                    tray.set_items(items);
+                    show_tray(&mut tray, close_to_tray);
+                }
+                MainThreadEvent::RunTrayItem(id) => backend.run_tray_item(&id),
                 MainThreadEvent::OpenUi => {
                     if !clients.focus_ui() {
                         server::spawn_ui();
@@ -163,6 +178,9 @@ async fn forward_backend_events(
         match events.recv().await {
             Ok(Event::CloseToTray(visible)) => {
                 let _ = proxy.send_event(MainThreadEvent::SetTrayVisible(visible));
+            }
+            Ok(Event::TrayItems(items)) => {
+                let _ = proxy.send_event(MainThreadEvent::SetTrayItems(items));
             }
             Ok(Event::Quit) => {
                 // Give each connection a moment to deliver its `quit` line

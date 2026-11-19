@@ -126,6 +126,7 @@ wire_blocks! {
         StopMacroNamed(target: Value),
         PasteText(text: Value),
         WhenIdle(minutes: Value),
+        WhenTrayItem(label: Value),
         WhenCron(expression: Value),
         ShowMessage(message: Value),
         WhenAt(at: Value),

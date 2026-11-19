@@ -638,6 +638,7 @@ fn library_entry(mac: &Macro) -> LibraryEntryDto {
 pub(crate) fn emit_state_updated(app: &AppHandle, s: &AppState) {
     blockwork_core::recording::set_hotkeys_suspended(s.combo_capture.is_some());
     crate::watch::key_rules::refresh(s);
+    crate::watch::tray::refresh(app, s);
     let dto = build_state_dto(s);
     app.emit_state(&dto);
 }
