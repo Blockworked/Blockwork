@@ -18,6 +18,7 @@ pub(crate) mod native_ui;
 pub(crate) mod startup;
 pub(crate) mod system;
 pub(crate) mod time;
+pub(crate) mod tray;
 pub(crate) mod typed;
 pub(crate) mod window;
 

@@ -1,7 +1,9 @@
-//! The tray icon shown while "close to tray" is enabled: left click toggles the
-//! editor, right click shows the Open/Quit menu.
+//! The tray icon shown while "close to tray" is enabled or a macro adds tray
+//! items: left click toggles the editor, right click shows the macros' items
+//! and Open/Quit.
 
 use crate::MainThreadEvent;
+use blockwork_app::TrayItem;
 use tao::event_loop::EventLoopProxy;
 #[cfg(not(target_os = "linux"))]
 use tray_icon::menu::{Menu, MenuEvent, MenuItem, PredefinedMenuItem};
@@ -14,10 +16,13 @@ use tray_icon::{
 const OPEN_ID: &str = "open";
 #[cfg(not(target_os = "linux"))]
 const QUIT_ID: &str = "quit";
+#[cfg(not(target_os = "linux"))]
+const ITEM_PREFIX: &str = "item:";
 
 pub(crate) struct Tray {
     icon: Option<BuiltTray>,
     proxy: EventLoopProxy<MainThreadEvent>,
+    items: Vec<TrayItem>,
 }
 
 /// Held only so the tray icon lives as long as `Tray`; dropping it removes
@@ -37,10 +42,14 @@ impl Tray {
         {
             let menu_proxy = proxy.clone();
             MenuEvent::set_event_handler(Some(move |event: MenuEvent| {
-                let action = match event.id().as_ref() {
+                let id = event.id().as_ref();
+                let action = match id {
                     OPEN_ID => MainThreadEvent::OpenUi,
                     QUIT_ID => MainThreadEvent::Quit,
-                    _ => return,
+                    _ => match id.strip_prefix(ITEM_PREFIX) {
+                        Some(item) => MainThreadEvent::RunTrayItem(item.to_string()),
+                        None => return,
+                    },
                 };
                 let _ = menu_proxy.send_event(action);
             }));
@@ -56,7 +65,33 @@ impl Tray {
                 }
             }));
         }
-        Tray { icon: None, proxy }
+        Tray {
+            icon: None,
+            proxy,
+            items: Vec::new(),
+        }
+    }
+
+    pub(crate) fn has_items(&self) -> bool {
+        !self.items.is_empty()
+    }
+
+    /// Replaces the macros' items in the menu.
+    pub(crate) fn set_items(&mut self, items: Vec<TrayItem>) {
+        self.items = items;
+        match &self.icon {
+            #[cfg(not(target_os = "linux"))]
+            Some(BuiltTray::Native(icon)) => match menu(&self.items) {
+                Ok(menu) => icon.set_menu(Some(Box::new(menu))),
+                Err(e) => tracing::warn!("Failed to update the tray menu: {e}"),
+            },
+            #[cfg(target_os = "linux")]
+            Some(BuiltTray::Linux(tray)) => {
+                let items = self.items.clone();
+                tray.handle.update(move |notifier| notifier.items = items);
+            }
+            None => {}
+        }
     }
 
     pub(crate) fn set_visible(&mut self, visible: bool) {
@@ -67,7 +102,7 @@ impl Tray {
         if self.icon.is_some() {
             return;
         }
-        match build(self.proxy.clone()) {
+        match build(self.proxy.clone(), &self.items) {
             Ok(icon) => self.icon = Some(icon),
             Err(e) => tracing::warn!("Failed to create tray icon: {e}"),
         }
@@ -75,24 +110,34 @@ impl Tray {
 }
 
 #[cfg(not(target_os = "linux"))]
-fn menu() -> Result<Menu, Box<dyn std::error::Error>> {
+fn menu(items: &[TrayItem]) -> Result<Menu, Box<dyn std::error::Error>> {
     let menu = Menu::new();
+    for item in items {
+        let id = format!("{ITEM_PREFIX}{}", item.id);
+        menu.append(&MenuItem::with_id(id, &item.label, true, None))?;
+    }
+    if !items.is_empty() {
+        menu.append(&PredefinedMenuItem::separator())?;
+    }
     menu.append(&MenuItem::with_id(OPEN_ID, "Open", true, None))?;
     menu.append(&PredefinedMenuItem::separator())?;
     menu.append(&MenuItem::with_id(QUIT_ID, "Quit", true, None))?;
     Ok(menu)
 }
 
-fn build(_proxy: EventLoopProxy<MainThreadEvent>) -> Result<BuiltTray, Box<dyn std::error::Error>> {
+fn build(
+    _proxy: EventLoopProxy<MainThreadEvent>,
+    items: &[TrayItem],
+) -> Result<BuiltTray, Box<dyn std::error::Error>> {
     #[cfg(target_os = "linux")]
     {
-        LinuxTray::new(_proxy).map(BuiltTray::Linux)
+        LinuxTray::new(_proxy, items.to_vec()).map(BuiltTray::Linux)
     }
 
     #[cfg(not(target_os = "linux"))]
     Ok(BuiltTray::Native(
         TrayIconBuilder::new()
-            .with_menu(Box::new(menu()?))
+            .with_menu(Box::new(menu(items)?))
             .with_menu_on_left_click(false)
             .with_tooltip("Blockwork")
             .with_icon(icon()?)
@@ -124,7 +169,10 @@ struct LinuxTray {
 
 #[cfg(target_os = "linux")]
 impl LinuxTray {
-    fn new(proxy: EventLoopProxy<MainThreadEvent>) -> Result<Self, Box<dyn std::error::Error>> {
+    fn new(
+        proxy: EventLoopProxy<MainThreadEvent>,
+        items: Vec<TrayItem>,
+    ) -> Result<Self, Box<dyn std::error::Error>> {
         use ksni::blocking::TrayMethods;
 
         let (mut data, width, height) = icon_rgba()?;
@@ -133,6 +181,7 @@ impl LinuxTray {
         }
         let notifier = LinuxNotifier {
             proxy,
+            items,
             icon: ksni::Icon {
                 width: width as i32,
                 height: height as i32,
@@ -158,6 +207,7 @@ impl Drop for LinuxTray {
 #[cfg(target_os = "linux")]
 struct LinuxNotifier {
     proxy: EventLoopProxy<MainThreadEvent>,
+    items: Vec<TrayItem>,
     icon: ksni::Icon,
 }
 
@@ -200,7 +250,27 @@ impl ksni::Tray for LinuxNotifier {
             }
             .into()
         };
-        vec![
+        let mut menu: Vec<ksni::MenuItem<Self>> = self
+            .items
+            .iter()
+            .map(|item| {
+                let id = item.id.clone();
+                StandardItem {
+                    label: item.label.clone(),
+                    activate: Box::new(move |notifier: &mut Self| {
+                        let _ = notifier
+                            .proxy
+                            .send_event(MainThreadEvent::RunTrayItem(id.clone()));
+                    }),
+                    ..Default::default()
+                }
+                .into()
+            })
+            .collect();
+        if !menu.is_empty() {
+            menu.push(ksni::MenuItem::Separator);
+        }
+        menu.extend([
             open("Open".into()),
             ksni::MenuItem::Separator,
             StandardItem {
@@ -211,6 +281,7 @@ impl ksni::Tray for LinuxNotifier {
                 ..Default::default()
             }
             .into(),
-        ]
+        ]);
+        menu
     }
 }

@@ -223,6 +223,9 @@
     "WhenTime": [
       "triggers"
     ],
+    "WhenTrayItem": [
+      "triggers"
+    ],
     "WhenTyped": [
       "input",
       "triggers"

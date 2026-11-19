@@ -74,6 +74,7 @@ use tokio::sync::broadcast;
 
 pub use blockwork_core::config::{flush_saves, migrate_legacy_app_id};
 pub use blockwork_core::run_log;
+pub use watch::tray::TrayItem;
 
 /// Something the backend tells whoever is hosting it.
 #[derive(Clone, Debug)]
@@ -82,6 +83,8 @@ pub enum Event {
     State(Arc<str>),
     /// "Close to tray" was toggled, so the host should show/hide its tray icon.
     CloseToTray(bool),
+    /// The tray menu items live macros add (`WhenTrayItem` strands) changed.
+    TrayItems(Vec<TrayItem>),
     /// The blocks running strands are on right now (`trace::snapshot`).
     Trace(serde_json::Value),
     /// The app should shut down entirely (e.g. an update was just applied).

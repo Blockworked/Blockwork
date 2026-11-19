@@ -82,6 +82,7 @@ pub enum FieldId {
     BrowserCode,
     AppPattern,
     IdleMinutes,
+    TrayLabel,
     LockName,
     CronExpression,
     ScheduleTime,
@@ -344,6 +345,7 @@ pub(crate) fn slots_mut<'a>(
         }
         InstructionKind::TouchSequence { sequence, .. } => f(F::TouchPaths, sequence, Any),
         InstructionKind::WhenIdle(v) => f(F::IdleMinutes, v, Any),
+        InstructionKind::WhenTrayItem(v) => f(F::TrayLabel, v, Any),
         InstructionKind::WhenCron(v) => f(F::CronExpression, v, Any),
         InstructionKind::WithLock { name, .. } => f(F::LockName, name, Any),
         InstructionKind::WhenUsb { pattern, .. } => f(F::UsbPattern, pattern, Any),

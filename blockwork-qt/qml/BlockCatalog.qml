@@ -223,7 +223,7 @@ QtObject {
     // The palette's sections, in order. Statements come before reporters,
     // except where a section holds data: there the reporter comes first.
     readonly property var paletteSections: [
-        { category: "events", title: qsTr("Start"), items: ["WhenRan", "WhenSystemStarts", "WhenSignal", "WhenWebhook"] },
+        { category: "events", title: qsTr("Start"), items: ["WhenRan", "WhenTrayItem", "WhenSystemStarts", "WhenSignal", "WhenWebhook"] },
         { category: "events", title: qsTr("Keyboard and mouse"), items: ["WhenKey", "RemapKey", "WhenTyped", "WhenMouseButton"] },
         { category: "events", title: qsTr("Controllers"), items: ["WhenGamepadButton", "WhenGamepadConnection", "WhenGamepadAxis"] },
         { category: "events", title: qsTr("Time"), items: ["WhenTime", "WhenAt", "WhenCron", "WhenIdle"] },
@@ -459,6 +459,7 @@ QtObject {
             WhenApp: { shape: "header", icon: "app-window", head: [label(qsTr("WHEN APP")), value("AppPattern", "pattern"),
                 { kind: "dropdown", key: "started", options: [{ value: "starts", label: qsTr("starts") }, { value: "exits", label: qsTr("exits") }],
                   encode: v => v === "starts", decode: v => v ? "starts" : "exits" }] },
+            WhenTrayItem: { shape: "header", icon: "menu", head: [label(qsTr("WHEN TRAY ITEM")), value("TrayLabel", "label"), label(qsTr("IS CLICKED"))] },
             WhenIdle: { shape: "header", icon: "moon", head: [label(qsTr("WHEN IDLE FOR")), value("IdleMinutes", "minutes"), label(qsTr("MINUTES"))] },
             WhenScreenLock: { shape: "header", icon: "lock", head: [label(qsTr("WHEN SCREEN IS")),
                 { kind: "dropdown", key: "locked", options: [{ value: "locked", label: qsTr("locked") }, { value: "unlocked", label: qsTr("unlocked") }],
@@ -847,6 +848,7 @@ QtObject {
             WhenTyped: { text: textValue(";addr"), erase: true },
             WhenApp: { pattern: textValue("firefox"), started: true },
             WhenIdle: { minutes: numberValue(5) },
+            WhenTrayItem: { label: textValue(qsTr("Run my macro")) },
             WhenScreenLock: { locked: true },
             WhenCron: { expression: textValue("0 9 * * mon-fri") },
             WhenTime: { schedule: { kind: "Daily" }, time: textValue("09:00") },
