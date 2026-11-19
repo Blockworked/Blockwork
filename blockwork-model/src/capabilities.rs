@@ -94,7 +94,7 @@ pub const UNGUARDED_OPERATORS: &[&str] = &[
 pub fn operator_capability(op: &str) -> Option<&'static str> {
     Some(match op {
         "NativeUiExists" | "NativeUiEnabled" | "NativeUiText" | "NativeUiValue" => "ui_automation",
-        "GamepadConnected" | "GamepadButtonDown" | "GamepadAxisValue" => "input",
+        "GamepadConnected" | "GamepadButtonDown" | "GamepadAxisValue" | "KeyHeld" => "input",
         "ShellOutput" | "ShellSucceeded" => "commands",
         "HttpGet" => "network",
         "ReadFile" | "FileExists" | "ListDirectory" => "files_read",

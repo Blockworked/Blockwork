@@ -85,6 +85,9 @@ fn templates() -> [Template; 7] {
                     ins(InstructionKind::WhenTyped {
                         text: Value::text(";thx"),
                         erase: true,
+                        ignore_case: false,
+                        word: None,
+                        only_when: None,
                     }),
                     ins(InstructionKind::PasteText(Value::text(
                         "Thanks for reaching out! I'll get back to you soon.",

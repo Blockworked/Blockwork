@@ -169,7 +169,9 @@ wire_blocks! {
         FindImage { image: String, #[serde(default, skip_serializing_if = "Option::is_none")] tolerance: Option<Value>, x_variable: String, y_variable: String, #[serde(default, skip_serializing_if = "Option::is_none")] pick: Option<crate::macros::ImageMatch>, #[serde(default, skip_serializing_if = "Option::is_none")] region: Option<String>, #[serde(default, skip_serializing_if = "Option::is_none")] count_variable: Option<String> },
         ClickImage { image: String, #[serde(default, skip_serializing_if = "Option::is_none")] tolerance: Option<Value>, button: crate::input::types::MacroButton, #[serde(default, skip_serializing_if = "Option::is_none")] pick: Option<crate::macros::ImageMatch>, #[serde(default, skip_serializing_if = "Option::is_none")] region: Option<String> },
         WaitForImage { image: String, #[serde(default, skip_serializing_if = "Option::is_none")] tolerance: Option<Value>, appear: bool, #[serde(default, skip_serializing_if = "Option::is_none")] timeout: Option<Value>, #[serde(default, skip_serializing_if = "Option::is_none")] region: Option<String>, #[serde(default, skip_serializing_if = "Option::is_none")] error_timeout: Option<Value> },
-        WhenTyped { text: Value, erase: bool },
+        WhenTyped { text: Value, erase: bool, #[serde(default, skip_serializing_if = "std::ops::Not::not")] ignore_case: bool, #[serde(default, skip_serializing_if = "Option::is_none")] word: Option<crate::macros::TypedWord>, #[serde(default, skip_serializing_if = "Option::is_none")] only_when: Option<Value> },
+        RemapKey { from: Value, to: Value, #[serde(default, skip_serializing_if = "Option::is_none")] only_when: Option<Value> },
+        WaitForKey { key: Value, pressed: bool, #[serde(default, skip_serializing_if = "Option::is_none")] timeout: Option<Value> },
         WhenApp { pattern: Value, started: bool },
         WhenScreenLock { locked: bool },
         WithLock { name: Value, body: Vec<InstructionDto> },
@@ -197,21 +199,25 @@ wire_blocks! {
             speed: Option<crate::input::types::TextSpeed>,
         },
         Key { key: Value, direction: String },
-        WhenKey { key: Value, direction: String },
+        WhenKey { key: Value, direction: String, #[serde(default, skip_serializing_if = "std::ops::Not::not")] block: bool, #[serde(default, skip_serializing_if = "std::ops::Not::not")] extra_keys: bool, #[serde(default, skip_serializing_if = "Option::is_none")] gesture: Option<crate::macros::KeyGesture>, #[serde(default, skip_serializing_if = "Option::is_none")] only_when: Option<Value> },
         Button { button: String, direction: String },
         MoveMouse { x: Value, y: Value, coordinate: String },
         Scroll { amount: Value, axis: String },
         CallBlock { block_id: String, args: Vec<Value> },
         BranchCallBlock { block_id: String, args: Vec<Value>, branches: Vec<Vec<InstructionDto>> },
-        WhenMouseButton { button: String, pressed: bool, #[serde(default, skip_serializing_if = "Option::is_none")] modifiers: Option<Value> },
+        WhenMouseButton { button: String, pressed: bool, #[serde(default, skip_serializing_if = "Option::is_none")] modifiers: Option<Value>, #[serde(default, skip_serializing_if = "std::ops::Not::not")] block: bool, #[serde(default, skip_serializing_if = "Option::is_none")] only_when: Option<Value> },
         WhenSignal { #[serde(default)] expression: bool, name: Value },
         SendSignal { #[serde(default)] expression: bool, name: Value, wait: bool },
     }
     to_wire(ins, id) {
-        InstructionKind::WhenKey(key, direction) => InstructionDto::WhenKey {
+        InstructionKind::WhenKey { key, direction, block, extra_keys, gesture, only_when } => InstructionDto::WhenKey {
             id,
             key: key.clone(),
             direction: direction_to_str(direction).to_string(),
+            block: *block,
+            extra_keys: *extra_keys,
+            gesture: gesture.clone(),
+            only_when: only_when.clone(),
         },
         InstructionKind::CallBlock {
             block_id,
@@ -235,11 +241,13 @@ wire_blocks! {
                 .map(|branch| branch.iter().map(instruction_to_dto).collect())
                 .collect(),
         },
-        InstructionKind::WhenMouseButton { button, pressed, modifiers } => InstructionDto::WhenMouseButton {
+        InstructionKind::WhenMouseButton { button, pressed, modifiers, block, only_when } => InstructionDto::WhenMouseButton {
             id,
             button: get_mouse_button_names()[mouse_button_to_index(button)].to_string(),
             pressed: *pressed,
             modifiers: modifiers.clone(),
+            block: *block,
+            only_when: only_when.clone(),
         },
         InstructionKind::WhenSignal(name) => InstructionDto::WhenSignal { id, name: name.value.clone(), expression: name.expression },
         InstructionKind::SendSignal { name, wait } => InstructionDto::SendSignal { id, name: name.value.clone(), expression: name.expression, wait: *wait },
@@ -288,9 +296,16 @@ wire_blocks! {
             id,
             InstructionKind::Token(InputToken::Key(key.clone(), str_to_direction(direction))),
         ),
-        InstructionDto::WhenKey { id, key, direction } => (
+        InstructionDto::WhenKey { id, key, direction, block, extra_keys, gesture, only_when } => (
             id,
-            InstructionKind::WhenKey(key.clone(), str_to_direction(direction)),
+            InstructionKind::WhenKey {
+                key: key.clone(),
+                direction: str_to_direction(direction),
+                block: *block,
+                extra_keys: *extra_keys,
+                gesture: gesture.clone(),
+                only_when: only_when.clone(),
+            },
         ),
         InstructionDto::Button {
             id,
@@ -351,7 +366,7 @@ wire_blocks! {
                     .collect(),
             },
         ),
-        InstructionDto::WhenMouseButton { id, button, pressed, modifiers } => {
+        InstructionDto::WhenMouseButton { id, button, pressed, modifiers, block, only_when } => {
             let index = get_mouse_button_names().iter().position(|&n| n == button.as_str())?;
             (
                 id,
@@ -359,6 +374,8 @@ wire_blocks! {
                     button: index_to_mouse_button(index),
                     pressed: *pressed,
                     modifiers: modifiers.clone(),
+                    block: *block,
+                    only_when: only_when.clone(),
                 },
             )
         },

@@ -1,14 +1,14 @@
 //! Text expansion: fires `WhenTyped` strands when what the user just typed
 //! ends with their abbreviation. Scoped like the other watchers.
 
-use super::{Target, variable_env};
+use super::{OnlyWhen, Target, holds, variable_env};
 use crate::AppHandle;
 use crate::scheduled_run;
 use crate::state::SharedState;
 use blockwork_core::input::typed::TypedBuffer;
 use blockwork_core::input::types::{Direction, InputToken};
 use blockwork_core::input::value::Value;
-use blockwork_core::macros::{Instruction, InstructionKind};
+use blockwork_core::macros::{Instruction, InstructionKind, TypedWord};
 use blockwork_core::recording;
 use std::sync::Arc;
 
@@ -34,6 +34,53 @@ fn erase(count: usize) -> Vec<Instruction> {
         )))
     }))
     .collect()
+}
+
+/// Characters that end a word, for the word options.
+fn ends_word(c: char) -> bool {
+    c.is_whitespace() || c.is_ascii_punctuation()
+}
+
+/// Whether what was typed ends with `abbreviation` as `word` asks. `Some`
+/// holds the character typed after a whole word (to type again once the
+/// abbreviation is erased), or `None` when nothing follows it.
+fn typed_match(
+    typed: &str,
+    abbreviation: &str,
+    ignore_case: bool,
+    word: Option<TypedWord>,
+) -> Option<Option<char>> {
+    if abbreviation.is_empty() {
+        return None;
+    }
+    let (typed, abbreviation) = if ignore_case {
+        (typed.to_lowercase(), abbreviation.to_lowercase())
+    } else {
+        (typed.to_string(), abbreviation.to_string())
+    };
+    let (rest, end) = match word {
+        Some(TypedWord::Whole) => {
+            let end = typed.chars().last().filter(|c| ends_word(*c))?;
+            (&typed[..typed.len() - end.len_utf8()], Some(end))
+        }
+        _ => (typed.as_str(), None),
+    };
+    let before = rest.strip_suffix(abbreviation.as_str())?;
+    // Typing just started (or the caret moved) counts as a word's start.
+    if word.is_some() && before.chars().last().is_some_and(|c| !ends_word(c)) {
+        return None;
+    }
+    Some(end)
+}
+
+/// Types `c` again: the space, Enter or punctuation that ended a whole word.
+fn retype(c: char) -> Instruction {
+    let token = match c {
+        '\n' => InputToken::Key(Value::text("Enter"), Direction::Click),
+        '\t' => InputToken::Key(Value::text("Tab"), Direction::Click),
+        c => InputToken::Text(Value::text(c.to_string()).into()),
+    };
+    Instruction::new(InstructionKind::Token(token))
 }
 
 fn run(
@@ -67,6 +114,9 @@ fn run(
                     let Some(InstructionKind::WhenTyped {
                         text,
                         erase: erase_it,
+                        ignore_case,
+                        word,
+                        only_when,
                     }) = strand.instructions.first().map(|i| &i.kind)
                     else {
                         continue;
@@ -74,16 +124,22 @@ fn run(
                     let Ok(text) = text.resolve_vars(&env).eval_text() else {
                         continue;
                     };
-                    if !typed.ends_with(&text) {
+                    let Some(end) = typed_match(typed.text(), &text, *ignore_case, *word) else {
                         continue;
-                    }
+                    };
                     let mut body = if *erase_it {
-                        erase(text.chars().count())
+                        erase(text.chars().count() + usize::from(end.is_some()))
                     } else {
                         Vec::new()
                     };
                     body.extend_from_slice(&strand.instructions[1..]);
-                    fires.push(Target::with_body(mac, strand, body));
+                    if *erase_it && let Some(end) = end {
+                        body.push(retype(end));
+                    }
+                    fires.push((
+                        Target::with_body(mac, strand, body),
+                        OnlyWhen::of(mac, only_when.as_ref()),
+                    ));
                 }
             }
             (emulator, s.global_speed_multiplier)
@@ -93,8 +149,11 @@ fn run(
         }
         // The expansion's own output isn't typing to match again.
         typed.clear();
-        for target in fires {
-            target.fire(&emulator, speed_multiplier, &shared_state, &app);
+        // Conditions may ask the window system, so checked unlocked.
+        for (target, condition) in fires {
+            if holds(&condition) {
+                target.fire(&emulator, speed_multiplier, &shared_state, &app);
+            }
         }
     }
 }
@@ -102,6 +161,50 @@ fn run(
 #[cfg(test)]
 mod tests {
     use super::*;
+
+    #[test]
+    fn word_options_decide_where_an_abbreviation_may_sit() {
+        assert_eq!(typed_match("say brb", "brb", false, None), Some(None));
+        assert_eq!(typed_match("xbrb", "brb", false, None), Some(None));
+        assert_eq!(
+            typed_match("xbrb", "brb", false, Some(TypedWord::Start)),
+            None
+        );
+        assert_eq!(
+            typed_match("ok brb", "brb", false, Some(TypedWord::Start)),
+            Some(None)
+        );
+        assert_eq!(
+            typed_match("brb", "brb", false, Some(TypedWord::Start)),
+            Some(None)
+        );
+        assert_eq!(
+            typed_match("ok brb", "brb", false, Some(TypedWord::Whole)),
+            None
+        );
+        assert_eq!(
+            typed_match("ok brb.", "brb", false, Some(TypedWord::Whole)),
+            Some(Some('.'))
+        );
+        assert_eq!(
+            typed_match("ok brb\n", "brb", false, Some(TypedWord::Whole)),
+            Some(Some('\n'))
+        );
+        assert_eq!(
+            typed_match("ok xbrb ", "brb", false, Some(TypedWord::Whole)),
+            None
+        );
+    }
+
+    #[test]
+    fn ignoring_case_matches_any_letters() {
+        assert_eq!(typed_match("BRB", "brb", false, None), None);
+        assert_eq!(typed_match("BRB", "brb", true, None), Some(None));
+        assert_eq!(
+            typed_match("Brb ", "bRb", true, Some(TypedWord::Whole)),
+            Some(Some(' '))
+        );
+    }
 
     #[test]
     fn erasing_waits_then_backspaces_once_per_character() {

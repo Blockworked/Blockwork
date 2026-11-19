@@ -3,6 +3,9 @@
 
 use super::*;
 
+/// How often `WaitForKey` looks at the held keys, in ms.
+const KEY_POLL_MS: f64 = 5.0;
+
 /// What `run_block` does after a flow block.
 pub(super) enum Next {
     /// Goes on to the next block.
@@ -171,6 +174,42 @@ pub(super) fn run_control_block(
                 }
                 if sleep_unless_stopped(ctx, CONDITION_POLL_MS * ctx.speed_multiplier) {
                     break;
+                }
+            }
+        }
+        InstructionKind::WaitForKey {
+            key,
+            pressed,
+            timeout,
+        } => {
+            let setup = (|| {
+                let text = ctx.resolve(key, depth)?.eval_text()?;
+                let combo = crate::input::key_names::parse_trigger_combo(&text);
+                if combo.is_empty() {
+                    return Err(format!("no key in '{text}'"));
+                }
+                Ok((combo, optional_number(ctx, depth, timeout.as_ref(), 0.0)?))
+            })();
+            let (combo, timeout) = match setup {
+                Ok(setup) => setup,
+                Err(e) => {
+                    soft_fail(ctx, &ins.id, "Wait for key", e)?;
+                    return Ok(Next::Go);
+                }
+            };
+            let message = if *pressed {
+                "Wait for key: not pressed"
+            } else {
+                "Wait for key: still held"
+            };
+            let started = Instant::now();
+            while crate::recording::key_rules::combo_is_held(&combo) != *pressed {
+                if wait_limit_reached(ctx, &ins.id, started, 0.0, timeout, message)? {
+                    break;
+                }
+                // Short polls, so a quick tap isn't missed between them.
+                if sleep_unless_stopped(ctx, KEY_POLL_MS * ctx.speed_multiplier) {
+                    return Ok(Next::Stop);
                 }
             }
         }

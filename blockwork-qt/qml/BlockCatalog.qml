@@ -81,6 +81,7 @@ QtObject {
         {"kind":"ColorsMatch","op":"ColorsMatch","arity":3,"args":[{"type":"text","default":{"kind":"Text","value":"#ffffff"}},{"type":"text","default":{"kind":"Text","value":"#fafafa"}},{"type":"number","default":{"kind":"Number","value":10.0}}],"host":true},
         {"kind":"ScreenText","op":"ScreenText","arity":4,"args":[{"type":"number","default":{"kind":"Number","value":0.0}},{"type":"number","default":{"kind":"Number","value":0.0}},{"type":"number","default":{"kind":"Number","value":400.0}},{"type":"number","default":{"kind":"Number","value":100.0}}],"host":true},
         {"kind":"MousePosition","op":"MousePosition","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"x"}}],"host":true},
+        {"kind":"KeyHeld","op":"KeyHeld","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"Shift"}}],"host":true},
         {"kind":"ScreenSize","op":"ScreenSize","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"width"}}],"host":true},
         {"kind":"MonitorCount","op":"MonitorCount","arity":0,"args":[],"host":true},
         {"kind":"MonitorInfo","op":"MonitorInfo","arity":2,"args":[{"type":"number","default":{"kind":"Number","value":1.0}},{"type":"text","default":{"kind":"Text","value":"width"}}],"host":true},
@@ -156,6 +157,7 @@ QtObject {
             ColorsMatch: { infix: [qsTr("matches"), qsTr("within")], suffix: "%", result: "bool" },
             ScreenText: { prefix: qsTr("text on screen at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text",
                 pickOp: { action: "pickScreenRegion", icon: "square-dashed", tip: qsTr("Drag out a region on screen") } },
+            KeyHeld: { prefix: qsTr("key"), suffix: qsTr("held?"), result: "bool" },
             MousePosition: { prefix: qsTr("mouse"), result: "number", enumArg: { index: 0, options: [{ value: "x", label: qsTr("x") }, { value: "y", label: qsTr("y") }] } },
             ScreenSize: { prefix: qsTr("screen"), result: "number", enumArg: { index: 0, options: [{ value: "width", label: qsTr("width") }, { value: "height", label: qsTr("height") }] } },
             MonitorCount: { prefix: qsTr("number of monitors"), result: "number" },
@@ -200,14 +202,14 @@ QtObject {
     // except where a section holds data: there the reporter comes first.
     readonly property var paletteSections: [
         { category: "events", title: qsTr("Start"), items: ["WhenRan", "WhenSystemStarts", "WhenSignal", "WhenWebhook"] },
-        { category: "events", title: qsTr("Keyboard and mouse"), items: ["WhenKey", "WhenTyped", "WhenMouseButton"] },
+        { category: "events", title: qsTr("Keyboard and mouse"), items: ["WhenKey", "RemapKey", "WhenTyped", "WhenMouseButton"] },
         { category: "events", title: qsTr("Controllers"), items: ["WhenGamepadButton", "WhenGamepadConnection", "WhenGamepadAxis"] },
         { category: "events", title: qsTr("Time"), items: ["WhenTime", "WhenAt", "WhenCron", "WhenIdle"] },
         { category: "events", title: qsTr("Apps and windows"), items: ["WhenApp", "WhenWindow"] },
         { category: "events", title: qsTr("Files and clipboard"), items: ["WhenFileChanged", "WhenClipboardChanged"] },
         { category: "events", title: qsTr("Computer"), items: ["WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenBatteryDischargedTo", "WhenBatteryChargedTo",
             "WhenScreenLock", "WhenNetwork", "WhenUsb"] },
-        { category: "input", title: qsTr("Keyboard"), items: ["Text", "PasteText", "Key"] },
+        { category: "input", title: qsTr("Keyboard"), items: ["Text", "PasteText", "Key", "KeyHeld", "WaitForKey"] },
         { category: "input", title: qsTr("Controller input"), items: ["GamepadConnected", "GamepadButtonDown", "GamepadAxisValue", "GamepadButton", "GamepadStick", "GamepadTrigger", "ResetGamepad"] },
         { category: "system", title: qsTr("Native UI"), items: ["WhenNativeUiChanged", "NativeUiAction", "NativeUiExists", "NativeUiEnabled", "NativeUiText", "NativeUiValue"] },
         { category: "input", title: qsTr("Touch"), items: ["TouchGesture", "TouchSequence"] },
@@ -359,11 +361,19 @@ QtObject {
         };
         const direction = (pairs) => ({ kind: "dropdown", key: "direction", options: choices(pairs) });
         const keyValue = { kind: "value", field: "KeyValue", key: "key", keyCapture: true };
-        return { label, commandField, imagePieces, value, box, signalPieces, regionPieces, timeoutComponent, errorTimeoutComponent, toleranceComponent, regionComponent, pickComponent, browserMatchComponent, countComponent, whenTimeHead, launchSummary, direction, keyValue };
+        // Input triggers' "only when": they fire (and block) only while it's true.
+        const onlyWhenComponent = { key: "only_when", label: qsTr("only when"), icon: "filter", fresh: () => ({ kind: "Bool" }), pieces: [
+            label(qsTr("ONLY WHEN")), { kind: "value", field: "OnlyWhen", key: "only_when", bool: true }
+        ] };
+        // A switch with nothing to fill in: on while the instruction's flag is true.
+        const flagComponent = (key, text, icon) => ({ key: key, label: text, icon: icon, fresh: true,
+            present: i => !!i && i[key] === true, pieces: [label(text.toUpperCase())] });
+        return { onlyWhenComponent, flagComponent, label, commandField, imagePieces, value, box, signalPieces, regionPieces, timeoutComponent, errorTimeoutComponent, toleranceComponent, regionComponent, pickComponent, browserMatchComponent, countComponent, whenTimeHead, launchSummary, direction, keyValue };
     }
     // Triggers (the When... headers).
     function eventRows(p) {
-        const { label, value, signalPieces, whenTimeHead, direction, keyValue } = p;
+        const { label, value, signalPieces, whenTimeHead, direction, keyValue, onlyWhenComponent, flagComponent } = p;
+        const blockComponent = flagComponent("block", qsTr("and block it"), "hand");
         return {
             WhenNativeUiChanged: {shape: "header",icon:"scan",head:[label(qsTr("WHEN NATIVE ELEMENT")),Object.assign(value("NativeUiSelector","selector"),{pick:{action:"pickNativeUi",icon:"scan",display:t=>nativeUiLabel(t)}}),
                 {kind:"dropdown",key:"property",options:choices([["Exists",qsTr("existence")],["Enabled",qsTr("enabled state")],["Text",qsTr("text")],["Value",qsTr("value")]])},label(qsTr("CHANGES"))]},
@@ -380,8 +390,21 @@ QtObject {
             WhenPowerPluggedIn: { shape: "header", head: [label(qsTr("WHEN POWER PLUGGED IN"))] },
             WhenPowerUnplugged: { shape: "header", head: [label(qsTr("WHEN POWER UNPLUGGED"))] },
             WhenClipboardChanged: { shape: "header", head: [label(qsTr("WHEN CLIPBOARD CHANGES"))] },
-            WhenKey: { shape: "header", head: [label(qsTr("WHEN")), keyValue,
+            WhenKey: { shape: "header", components: [
+                blockComponent,
+                flagComponent("extra_keys", qsTr("even with other keys held"), "keyboard"),
+                { key: "gesture", label: qsTr("double or long press"), icon: "timer",
+                  fresh: () => ({ kind: "Double", ms: numberValue(400) }), pieces: [
+                    { kind: "dropdown", key: "gesture", index: "kind",
+                      options: choices([["Double", qsTr("PRESSED TWICE WITHIN")], ["Hold", qsTr("HELD FOR")]]) },
+                    Object.assign(value("KeyGestureMs", "gesture"), { index: "ms", unit: qsTr("ms") })
+                ] },
+                onlyWhenComponent
+            ], head: [label(qsTr("WHEN")), keyValue,
                 direction([["Press", qsTr("Pressed")], ["Release", qsTr("Released")]])] },
+            RemapKey: { shape: "header", icon: "arrow-right", components: [onlyWhenComponent], head: [label(qsTr("REMAP")),
+                { kind: "value", field: "RemapFrom", key: "from", keyCapture: true }, label(qsTr("TO")),
+                { kind: "value", field: "RemapTo", key: "to", keyCapture: true }] },
             WhenSystemStarts: { shape: "header", icon: "monitor", head: [label(qsTr("WHEN SYSTEM STARTS")), {kind: "label", text: qsTr("(enable system startup in Settings)"), when: () => !page.appState.start_at_startup}] },
             WhenRan: { shape: "header", icon: "play", head: [label(qsTr("WHEN RUN"))] },
             WhenAt: { shape: "header", icon: "clock", head: [label(qsTr("ONCE AT")),
@@ -393,7 +416,13 @@ QtObject {
                 { kind: "dropdown", key: "focused", options: [{ value: "focused", label: qsTr("focused") }, { value: "unfocused", label: qsTr("unfocused") }],
                   encode: v => v === "focused", decode: v => v ? "focused" : "unfocused" }] },
             WhenFileChanged: { shape: "header", icon: "file", head: [label(qsTr("WHEN FILE")), value("WatchedFilePath", "path"), label(qsTr("CHANGES"))] },
-            WhenTyped: { shape: "header", icon: "type", head: [label(qsTr("WHEN I TYPE")), value("TypedText", "text"), label(qsTr("THEN")),
+            WhenTyped: { shape: "header", icon: "type", components: [
+                flagComponent("ignore_case", qsTr("in any case"), "type"),
+                { key: "word", label: qsTr("word position"), icon: "text-select", fresh: "Whole", pieces: [
+                    { kind: "dropdown", key: "word", options: choices([["Start", qsTr("AT A WORD'S START")], ["Whole", qsTr("AS A WHOLE WORD")]]) }
+                ] },
+                onlyWhenComponent
+            ], head: [label(qsTr("WHEN I TYPE")), value("TypedText", "text"), label(qsTr("THEN")),
                 { kind: "dropdown", key: "erase", options: [{ value: "erase", label: qsTr("erase it") }, { value: "keep", label: qsTr("keep it") }],
                   encode: v => v === "erase", decode: v => v ? "erase" : "keep" }] },
             WhenApp: { shape: "header", icon: "app-window", head: [label(qsTr("WHEN APP")), value("AppPattern", "pattern"),
@@ -413,6 +442,7 @@ QtObject {
                 { kind: "dropdown", key: "connected", options: [{ value: "in", label: qsTr("plugged in") }, { value: "out", label: qsTr("unplugged") }],
                   encode: v => v === "in", decode: v => v ? "in" : "out" }] },
             WhenMouseButton: { shape: "header", icon: "mouse", components: [
+                blockComponent, onlyWhenComponent,
                 { key: "modifiers", label: qsTr("with keys"), icon: "keyboard", fresh: () => textValue("Control"),
                   present: i => !!i && !!i.modifiers && (i.modifiers.kind !== "Text" || i.modifiers.value.trim().length > 0), pieces: [
                     label(qsTr("WITH KEYS")), value("MouseModifiers", "modifiers")
@@ -478,7 +508,7 @@ QtObject {
 
     // Waiting, errors, other macros, signals and locks.
     function controlRows(p) {
-        const { label, value, signalPieces, timeoutComponent, errorTimeoutComponent } = p;
+        const { label, value, signalPieces, timeoutComponent, errorTimeoutComponent, keyValue } = p;
         return {
             Wait: { head: [label(qsTr("Wait")), Object.assign(value("WaitDuration", "duration"), { unit: qsTr("ms") })] },
             SendSignal: { icon: "navigation", head: [label(qsTr("send signal")), ...signalPieces,
@@ -495,6 +525,12 @@ QtObject {
                 { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
                   encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
             StopMacroNamed: { icon: "square", head: [label(qsTr("stop macro")), value("MacroTarget", "target")] },
+            WaitForKey: { icon: "keyboard", components: [{ key: "timeout", label: qsTr("or error after"), icon: "timer", fresh: () => numberValue(10000), pieces: [
+                    label(qsTr("or error after")), value("WaitTimeout", "timeout"), label(qsTr("ms"))
+                ] }],
+                head: [label(qsTr("wait until key")), keyValue,
+                    { kind: "dropdown", key: "pressed", options: choices([["down", qsTr("is pressed")], ["up", qsTr("is released")]]),
+                      encode: v => v === "down", decode: v => v ? "down" : "up" }] },
             WaitUntil: { icon: "loader", components: [timeoutComponent, errorTimeoutComponent],
                 head: [label(qsTr("wait until")), { kind: "value", field: "Condition", key: "condition", bool: true }] }
         };
@@ -671,6 +707,8 @@ QtObject {
             Text: { text: textValue("text") },
             Key: () => ({ key: textValue(page.sidebarKey), direction: "Click" }),
             WhenKey: () => ({ key: textValue(page.sidebarKey), direction: "Press" }),
+            RemapKey: { from: textValue("CapsLock"), to: textValue("Escape") },
+            WaitForKey: () => ({ key: textValue(page.sidebarKey), pressed: true }),
             Button: { button: "Left", direction: "Click" },
             MoveMouse: { x: numberValue(0), y: numberValue(0), coordinate: "Relative" },
             Scroll: { amount: numberValue(4), axis: "Vertical" },

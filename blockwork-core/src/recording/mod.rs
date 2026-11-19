@@ -10,6 +10,7 @@ use std::time::{Duration, Instant, SystemTime};
 use tokio::sync::mpsc::{self, UnboundedReceiver, UnboundedSender};
 
 mod controller;
+pub mod key_rules;
 pub mod review;
 pub mod touch;
 
@@ -75,6 +76,7 @@ fn update_held_modifier(key: &MacroKey, pressed: bool) {
 // the equivalent transitions and never loses key-ups.
 #[cfg_attr(not(windows), allow(dead_code))]
 pub fn reset_held_mods() {
+    key_rules::reset_held();
     let mut held = HELD_MODIFIER_KEYS
         .get_or_init(|| Mutex::new(HeldModifiers::default()))
         .lock()
@@ -625,6 +627,8 @@ pub fn build_capture_callback()
     Box::new(move |event: CaptureEvent, ts: CaptureTimestamp| {
         note_input(&event);
         broadcast_button_event(&event);
+        // A key or button a rule took on its press keeps its release.
+        let paired = key_rules::observe(&event);
         match &event {
             CaptureEvent::KeyPress(key) => {
                 broadcast_key_event(key, true);
@@ -757,7 +761,7 @@ pub fn build_capture_callback()
                 }
             }
 
-            return CaptureDecision::Passthrough;
+            return paired.unwrap_or(CaptureDecision::Passthrough);
         }
 
         // Hotkey detection (only when not recording), against the physical
@@ -780,7 +784,14 @@ pub fn build_capture_callback()
             }
         }
 
-        CaptureDecision::Passthrough
+        if let Some(decision) = paired {
+            return decision;
+        }
+        // While the UI captures a new combo, every key has to reach it.
+        if HOTKEYS_SUSPENDED.load(Ordering::Relaxed) {
+            return CaptureDecision::Passthrough;
+        }
+        key_rules::decide(&event, HELD_MODS.load(Ordering::Relaxed))
     })
 }
 

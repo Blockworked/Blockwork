@@ -3,15 +3,17 @@
 use super::*;
 use blockwork_core::config::MacroFiles;
 use blockwork_core::macros::Run;
+use blockwork_core::macros::fields::key_slot_mut;
 
 pub(crate) fn start_key_capture(
     state: &SharedState,
     app: &AppHandle,
     strand_id: String,
     path: Vec<PathStep>,
+    field: Option<String>,
 ) -> Result<(), String> {
     let mut s = state.lock().map_err(|e| e.to_string())?;
-    s.key_capture = Some(KeyCaptureTarget::Strand(strand_id, path));
+    s.key_capture = Some(KeyCaptureTarget::Strand(strand_id, path, field));
     emit_state_updated(app, &s);
     Ok(())
 }
@@ -57,19 +59,17 @@ pub(crate) fn key_capture_event(
         return Ok(());
     };
     match target {
-        KeyCaptureTarget::Strand(strand_id, path) => {
+        KeyCaptureTarget::Strand(strand_id, path, field) => {
             let captured = s.current_macro.as_mut().is_some_and(|mac| {
-                match mac.instruction_at_mut(&strand_id, &path) {
-                    Some(Instruction {
-                        kind:
-                            InstructionKind::Token(InputToken::Key(value, _))
-                            | InstructionKind::WhenKey(value, _),
-                        ..
-                    }) => {
+                let slot = mac
+                    .instruction_at_mut(&strand_id, &path)
+                    .and_then(|ins| key_slot_mut(&mut ins.kind, field.as_deref()));
+                match slot {
+                    Some(value) => {
                         *value = Value::Text { value: text };
                         true
                     }
-                    _ => false,
+                    None => false,
                 }
             });
             if captured {

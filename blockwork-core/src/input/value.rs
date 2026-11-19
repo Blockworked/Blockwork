@@ -379,6 +379,22 @@ static OPERATORS: &[ExtOperator] = &[
         },
     },
     ExtOperator {
+        kind: "KeyHeld",
+        op: "KeyHeld",
+        arity: 1,
+        default_args: || vec![Value::text("Shift")],
+        eval: |args| {
+            crate::permissions::require("input")?;
+            let combo = crate::input::key_names::parse_trigger_combo(&args[0].as_text());
+            if combo.is_empty() {
+                return Err(format!("no key in '{}'", args[0].as_text()));
+            }
+            Ok(Evaluated::Bool(crate::recording::key_rules::combo_is_held(
+                &combo,
+            )))
+        },
+    },
+    ExtOperator {
         kind: "ScreenSize",
         op: "ScreenSize",
         arity: 1,

@@ -534,11 +534,13 @@ impl Backend {
             "start_key_capture" => {
                 let strand_id: String = arg(&args, "strandId")?;
                 let path: Vec<PathStep> = arg(&args, "path")?;
+                let field: Option<String> = arg(&args, "field")?;
                 to_json(commands::start_key_capture(
                     &self.state,
                     &self.app,
                     strand_id,
                     path,
+                    field,
                 )?)
             }
             "start_standalone_key_capture" => to_json(commands::start_standalone_key_capture(
