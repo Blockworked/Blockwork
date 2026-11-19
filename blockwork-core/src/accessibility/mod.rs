@@ -93,17 +93,23 @@ pub fn pick(x: f64, y: f64, ignore: &str) -> Result<Option<UiPick>, String> {
     enabled()?;
     imp::pick(x, y, ignore)
 }
+#[cfg_attr(not(any(target_os = "linux", windows)), allow(dead_code))]
+mod common;
 #[cfg(target_os = "linux")]
 #[path = "linux.rs"]
 mod imp;
-#[cfg(not(target_os = "linux"))]
+#[cfg(windows)]
+#[path = "windows.rs"]
+mod imp;
+#[cfg(not(any(target_os = "linux", windows)))]
 mod imp {
     use super::*;
     pub fn revision() -> Result<u64, String> {
         Err(unsupported())
     }
     fn unsupported() -> String {
-        "Native UI automation currently requires Linux AT-SPI; Windows UI Automation and macOS accessibility adapters are not available".into()
+        "Native UI automation works on Linux and Windows; it isn't available on this system yet"
+            .into()
     }
     pub fn query(_: &UiSelector, _: Query) -> Result<crate::input::value::Evaluated, String> {
         Err(unsupported())

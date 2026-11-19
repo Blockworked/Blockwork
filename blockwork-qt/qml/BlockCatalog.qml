@@ -66,10 +66,12 @@ QtObject {
         {"kind":"ReadFile","op":"ReadFile","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"~/notes.txt"}}],"host":true},
         {"kind":"FileExists","op":"FileExists","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"~/notes.txt"}}],"host":true},
         {"kind":"ListDirectory","op":"ListDirectory","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"~"}}],"host":true},
+        {"kind":"FileInfo","op":"FileInfo","arity":2,"args":[{"type":"text","default":{"kind":"Text","value":"size"}},{"type":"text","default":{"kind":"Text","value":"~/notes.txt"}}],"host":true},
         {"kind":"HttpGet","op":"HttpGet","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"https://example.com"}}],"host":true},
         {"kind":"JsonGet","op":"JsonGet","arity":2,"args":[{"type":"text","default":{"kind":"Text","value":"name"}},{"type":"text","default":{"kind":"Text","value":"{\"name\": \"Blockwork\"}"}}],"host":true},
         {"kind":"ShellOutput","op":"ShellOutput","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"echo hello"}}],"host":true},
         {"kind":"ShellSucceeded","op":"ShellSucceeded","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"true"}}],"host":true},
+        {"kind":"CommandExitCode","op":"CommandExitCode","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"true"}}],"host":true},
         {"kind":"ActiveWindowTitle","op":"ActiveWindowTitle","arity":0,"args":[],"host":true},
         {"kind":"ActiveWindowApp","op":"ActiveWindowApp","arity":0,"args":[],"host":true},
         {"kind":"WindowExists","op":"WindowExists","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"Firefox"}}],"host":true},
@@ -87,6 +89,13 @@ QtObject {
         {"kind":"MonitorCount","op":"MonitorCount","arity":0,"args":[],"host":true},
         {"kind":"MonitorInfo","op":"MonitorInfo","arity":2,"args":[{"type":"number","default":{"kind":"Number","value":1.0}},{"type":"text","default":{"kind":"Text","value":"width"}}],"host":true},
         {"kind":"AppRunning","op":"AppRunning","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"firefox"}}],"host":true},
+        {"kind":"WindowList","op":"WindowList","arity":0,"args":[],"host":true},
+        {"kind":"WindowPid","op":"WindowPid","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"Firefox"}}],"host":true},
+        {"kind":"AppPid","op":"AppPid","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"firefox"}}],"host":true},
+        {"kind":"SystemInfo","op":"SystemInfo","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"user name"}}],"host":true},
+        {"kind":"EnvVar","op":"EnvVar","arity":1,"args":[{"type":"text","default":{"kind":"Text","value":"HOME"}}],"host":true},
+        {"kind":"Volume","op":"Volume","arity":0,"args":[],"host":true},
+        {"kind":"Muted","op":"Muted","arity":0,"args":[],"host":true},
         {"kind":"IdleSeconds","op":"IdleSeconds","arity":0,"args":[],"host":true},
         {"kind":"ScreenLocked","op":"ScreenLocked","arity":0,"args":[],"host":true},
         {"kind":"NetworkConnected","op":"NetworkConnected","arity":0,"args":[],"host":true},
@@ -143,11 +152,16 @@ QtObject {
             ClipboardText: { prefix: qsTr("clipboard text"), result: "text" }, ClipboardHasImage: { prefix: qsTr("clipboard has image"), result: "bool" },
             ClipboardHasFiles: { prefix: qsTr("clipboard has files"), result: "bool" },
             ReadFile: { prefix: qsTr("contents of file"), result: "text" }, FileExists: { prefix: qsTr("file"), suffix: qsTr("exists?"), result: "bool" },
-            ListDirectory: { prefix: qsTr("files in folder"), result: "text" }, HttpGet: { prefix: qsTr("fetch"), result: "text" },
+            ListDirectory: { prefix: qsTr("files in folder"), result: "text" },
+            FileInfo: { infix: qsTr("of file"), result: "number",
+                enumArg: { index: 0, options: choices([["size", qsTr("size in bytes")], ["modified", qsTr("time changed")]]) } }, HttpGet: { prefix: qsTr("fetch"), result: "text" },
             JsonGet: { prefix: qsTr("get"), infix: qsTr("from JSON"), result: "text" },
             ShellOutput: { prefix: qsTr("output of command"), result: "text" }, ShellSucceeded: { prefix: qsTr("command"), suffix: qsTr("succeeds?"), result: "bool" },
+            CommandExitCode: { prefix: qsTr("exit code of command"), result: "number" },
             ActiveWindowTitle: { prefix: qsTr("active window title"), result: "text" }, ActiveWindowApp: { prefix: qsTr("active app"), result: "text" },
             WindowExists: { prefix: qsTr("window"), suffix: qsTr("exists?"), result: "bool" },
+            WindowList: { prefix: qsTr("window titles"), result: "text" },
+            WindowPid: { prefix: qsTr("process ID of window"), result: "number" },
             LastError: { prefix: qsTr("error message"), result: "text" },
             MacroRunning: { prefix: qsTr("macro"), suffix: qsTr("is running?"), result: "bool" },
             GlobalVariable: { prefix: qsTr("global"), result: "text", enumArg: { index: 0, options: () => page.globalChoices() } },
@@ -169,6 +183,13 @@ QtObject {
             Detection: { infix: qsTr("of detection"), result: "text",
                 enumArg: { index: 0, options: choices([["center x", qsTr("center x")], ["center y", qsTr("center y")], ["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")], ["score", qsTr("score")], ["label", qsTr("label")], ["id", qsTr("id")]]) } },
             AppRunning: { prefix: qsTr("app"), suffix: qsTr("is running?"), result: "bool" },
+            AppPid: { prefix: qsTr("process ID of app"), result: "number" },
+            SystemInfo: { prefix: qsTr("computer"), result: "text",
+                enumArg: { index: 0, options: choices([["user name", qsTr("user name")], ["computer name", qsTr("name")], ["system", qsTr("system")],
+                    ["system version", qsTr("system version")], ["home folder", qsTr("home folder")], ["display scale", qsTr("display scale")]]) } },
+            EnvVar: { prefix: qsTr("environment variable"), result: "text" },
+            Volume: { prefix: qsTr("volume"), result: "number" },
+            Muted: { prefix: qsTr("sound muted?"), result: "bool" },
             IdleSeconds: { prefix: qsTr("seconds idle"), result: "number" },
             ScreenLocked: { prefix: qsTr("screen is locked?"), result: "bool" },
             NetworkConnected: { prefix: qsTr("online?"), result: "bool" },
@@ -210,7 +231,7 @@ QtObject {
         { category: "events", title: qsTr("Files and clipboard"), items: ["WhenFileChanged", "WhenClipboardChanged"] },
         { category: "events", title: qsTr("Computer"), items: ["WhenPowerPluggedIn", "WhenPowerUnplugged", "WhenBatteryDischargedTo", "WhenBatteryChargedTo",
             "WhenScreenLock", "WhenNetwork", "WhenUsb"] },
-        { category: "input", title: qsTr("Keyboard"), items: ["Text", "PasteText", "Key", "KeyHeld", "WaitForKey"] },
+        { category: "input", title: qsTr("Keyboard"), items: ["Text", "PasteText", "Key", "KeyHeld", "WaitForKey", "ReadKeys"] },
         { category: "input", title: qsTr("Controller input"), items: ["GamepadConnected", "GamepadButtonDown", "GamepadAxisValue", "GamepadButton", "GamepadStick", "GamepadTrigger", "ResetGamepad"] },
         { category: "system", title: qsTr("Native UI"), items: ["WhenNativeUiChanged", "NativeUiAction", "NativeUiExists", "NativeUiEnabled", "NativeUiText", "NativeUiValue"] },
         { category: "input", title: qsTr("Touch"), items: ["TouchGesture", "TouchSequence"] },
@@ -237,15 +258,19 @@ QtObject {
         { category: "operators", title: qsTr("Comparisons and logic"), items: ["Eq", "Neq", "Gt", "Lt", "Gte", "Lte", "And", "Or", "Not", "True", "False"] },
         { category: "operators", title: qsTr("Dates and times"), items: ["CurrentTime", "Timestamp", "FormatDate", "ParseDate", "DatePart"] },
         { category: "system", title: qsTr("Apps and commands"), items: ["OpenApp", "CloseApp", "Command", "CommandWait", "AppRunning",
-            "ShellOutput", "ShellSucceeded"] },
-        { category: "system", title: qsTr("Windows"), items: ["WindowAction", "MoveWindow", "ActiveWindowTitle", "ActiveWindowApp", "WindowExists", "WindowInfo"] },
-        { category: "system", title: qsTr("Clipboard"), items: ["ClipboardText", "ClipboardHasImage", "ClipboardHasFiles", "SetClipboard"] },
-        { category: "system", title: qsTr("Files"), items: ["WriteFile", "ReadFile", "FileExists", "ListDirectory"] },
+            "WaitForApp", "AppPid", "KillProcess", "ShellOutput", "ShellSucceeded", "CommandExitCode"] },
+        { category: "system", title: qsTr("Windows"), items: ["WindowAction", "MoveWindow", "SetWindow", "UseCoordinates", "ActiveWindowTitle", "ActiveWindowApp", "WindowExists",
+            "WindowInfo", "WindowList", "WindowPid"] },
+        { category: "system", title: qsTr("Clipboard"), items: ["ClipboardText", "ClipboardHasImage", "ClipboardHasFiles", "SetClipboard",
+            "WaitForClipboard", "SaveClipboard", "RestoreClipboard"] },
+        { category: "system", title: qsTr("Files"), items: ["WriteFile", "ReadFile", "FileExists", "ListDirectory", "CopyFile", "DeleteFile", "MakeFolder", "FileInfo"] },
         { category: "system", title: qsTr("Web"), items: ["HttpRequest", "HttpGet", "JsonGet"] },
-        { category: "system", title: qsTr("Messages and dialogs"), items: ["Notify", "ShowMessage", "AskText", "AskYesNo", "AskChoice", "Log"] },
-        { category: "system", title: qsTr("Computer"), items: ["PluggedIn", "BatteryPercentage", "IdleSeconds", "ScreenLocked", "NetworkConnected", "UsbConnected"] },
+        { category: "system", title: qsTr("Messages and dialogs"), items: ["Notify", "ShowMessage", "ShowTooltip", "AskText", "AskYesNo", "AskChoice", "AskFile", "ShowMenu", "Log"] },
+        { category: "system", title: qsTr("Computer"), items: ["PluggedIn", "BatteryPercentage", "IdleSeconds", "ScreenLocked", "NetworkConnected", "UsbConnected",
+            "SystemInfo", "EnvVar", "Power"] },
+        { category: "system", title: qsTr("Sound"), items: ["SetVolume", "SetMute", "PlaySound", "Volume", "Muted"] },
         { category: "screen", title: qsTr("Images"), items: ["FindImage", "ClickImage", "WaitForImage"] },
-        { category: "screen", title: qsTr("Colors and text"), items: ["PixelColor", "AverageColor", "ColorsMatch", "ScreenText"] },
+        { category: "screen", title: qsTr("Colors and text"), items: ["PixelColor", "AverageColor", "ColorsMatch", "FindColor", "ScreenText"] },
         { category: "screen", title: qsTr("Monitors"), items: ["ScreenSize", "MonitorCount", "MonitorInfo"] },
         { category: "screen", title: qsTr("Object detection"), items: ["DetectObjectsInWindow", "WaitForDetection", "Detection", "AimStep", "AimAtDetection"] },
         { category: "browser", title: qsTr("Tabs"), items: ["BrowserOpen", "BrowserConnected", "PageUrl", "PageTitle"] },
@@ -265,7 +290,8 @@ QtObject {
         ["Back", qsTr("back button")], ["Forward", qsTr("forward button")], ["ScrollUp", qsTr("wheel up")], ["ScrollDown", qsTr("wheel down")],
         ["ScrollLeft", qsTr("wheel left")], ["ScrollRight", qsTr("wheel right")]].map(b => ({ value: b[0], label: b[1] }))
     // Which part of a window the window blocks match against.
-    readonly property var windowMatchOptions: [{ value: "Title", label: qsTr("window") }, { value: "App", label: qsTr("app") }]
+    readonly property var windowMatchOptions: [{ value: "Title", label: qsTr("window") }, { value: "App", label: qsTr("app") },
+        { value: "Exact", label: qsTr("window titled exactly") }, { value: "Regex", label: qsTr("window matching regex") }]
     // How a detect block orders its results list.
     readonly property var imagePickOptions: [{ value: "Nth", label: qsTr("match number") },
         { value: "NearMouse", label: qsTr("match nearest the mouse") }, { value: "NearPoint", label: qsTr("match nearest") }]
@@ -513,6 +539,9 @@ QtObject {
     // Waiting, errors, other macros, signals and locks.
     function controlRows(p) {
         const { label, value, signalPieces, timeoutComponent, errorTimeoutComponent, keyValue } = p;
+        // A wait's limit that ends the strand with an error, kept in "timeout".
+        const errorAfter = () => ({ key: "timeout", label: qsTr("or error after"), icon: "timer", fresh: () => numberValue(10000), pieces: [
+            label(qsTr("or error after")), value("WaitTimeout", "timeout"), label(qsTr("ms"))] });
         return {
             Wait: { head: [label(qsTr("Wait")), Object.assign(value("WaitDuration", "duration"), { unit: qsTr("ms") })] },
             SendSignal: { icon: "navigation", head: [label(qsTr("send signal")), ...signalPieces,
@@ -537,6 +566,17 @@ QtObject {
                 { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
                   encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
             StopMacroNamed: { icon: "square", head: [label(qsTr("stop macro")), value("MacroTarget", "target")] },
+            WaitForApp: { icon: "app-window", components: [errorAfter()], head: [label(qsTr("wait until app")), value("AppPattern", "pattern"),
+                { kind: "dropdown", key: "running", options: choices([["running", qsTr("is running")], ["closed", qsTr("has closed")]]),
+                  encode: v => v === "running", decode: v => v ? "running" : "closed" }] },
+            WaitForClipboard: { icon: "clipboard-check", components: [errorAfter()], head: [label(qsTr("wait until the clipboard changes"))] },
+            ReadKeys: { icon: "keyboard", components: [
+                { key: "count", label: qsTr("or after some characters"), icon: "hash", fresh: () => numberValue(5), pieces: [
+                    label(qsTr("or after")), value("ReadCount", "count"), label(qsTr("characters"))] },
+                { key: "timeout", label: qsTr("or after a time"), icon: "timer", fresh: () => numberValue(10000), pieces: [
+                    label(qsTr("or after")), value("WaitTimeout", "timeout"), label(qsTr("ms"))] }
+            ], head: [label(qsTr("read typing into")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") },
+                label(qsTr("until key")), value("EndKeys", "end_keys")] },
             WaitForKey: { icon: "keyboard", components: [{ key: "timeout", label: qsTr("or error after"), icon: "timer", fresh: () => numberValue(10000), pieces: [
                     label(qsTr("or error after")), value("WaitTimeout", "timeout"), label(qsTr("ms"))
                 ] }],
@@ -572,8 +612,28 @@ QtObject {
 
     // Apps, windows, clipboard, files, web and dialogs.
     function systemRows(p) {
-        const { label, commandField, value, box, launchSummary } = p;
+        const { label, commandField, value, box, launchSummary, flagComponent } = p;
         return {
+            CopyFile: { icon: "copy", head: [
+                { kind: "dropdown", key: "move_file", options: choices([["copy", qsTr("copy")], ["move", qsTr("move")]]),
+                  encode: v => v === "move", decode: v => v ? "move" : "copy" },
+                label(qsTr("file")), value("FilePath", "path"), label(qsTr("to")), value("FileTarget", "to")] },
+            DeleteFile: { icon: "trash-2", head: [label(qsTr("delete file")), value("FilePath", "path")] },
+            MakeFolder: { icon: "folder-plus", head: [label(qsTr("make folder")), value("FilePath", "path")] },
+            AskFile: { icon: "folder-open", head: [label(qsTr("ask for a")),
+                { kind: "dropdown", key: "folder", options: choices([["file", qsTr("file")], ["folder", qsTr("folder")]]),
+                  encode: v => v === "folder", decode: v => v ? "folder" : "file" },
+                value("AskPrompt", "prompt"), label(qsTr("into")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
+            KillProcess: { icon: "square-x", head: [label(qsTr("end process")), value("ProcessId", "pid")] },
+            SetVolume: { icon: "volume-2", head: [label(qsTr("set volume to")), Object.assign(value("Volume", "volume"), { unit: "%" })] },
+            SetMute: { icon: "volume-1", head: [{ kind: "dropdown", key: "mode",
+                options: choices([["Mute", qsTr("mute sound")], ["Unmute", qsTr("unmute sound")], ["Toggle", qsTr("toggle mute")]]) }] },
+            PlaySound: { icon: "music", components: [flagComponent("wait", qsTr("and wait until done"), "timer")],
+                head: [label(qsTr("play sound")), value("SoundPath", "path")] },
+            Power: { icon: "moon", head: [{ kind: "dropdown", key: "action", options: choices([["Lock", qsTr("lock the screen")], ["Sleep", qsTr("sleep")],
+                ["LogOut", qsTr("log out")], ["Restart", qsTr("restart")], ["ShutDown", qsTr("shut down")]]) }] },
+            SaveClipboard: { icon: "save", head: [label(qsTr("save clipboard"))] },
+            RestoreClipboard: { icon: "clipboard-paste", head: [label(qsTr("restore saved clipboard"))] },
             NativeUiAction: {icon: "scan", head: [label(qsTr("native element")), Object.assign(value("NativeUiSelector", "selector"), {pick: {action: "pickNativeUi", icon: "scan", display: t => nativeUiLabel(t), tip: qsTr("Choose a desktop app element")}}),
                 {kind: "dropdown", key: "action", options: choices([["Invoke", qsTr("invoke")], ["SetText", qsTr("set text")], ["SetValue", qsTr("set value")], ["Focus", qsTr("focus")]])},
                 Object.assign(value("NativeUiValue", "value"), {when: i => i.action === "SetText" || i.action === "SetValue"})]},
@@ -608,8 +668,24 @@ QtObject {
             Notify: { icon: "message-square", head: [label(qsTr("notify")), value("NotifyTitle", "title"), box("NotifyMessage", "message", qsTr("saying"))] },
             Log: { icon: "list", head: [label(qsTr("log")), value("LogValue", "value")] },
             WindowAction: { icon: "app-window", head: [
-                { kind: "dropdown", key: "action", options: choices([["Focus", qsTr("focus")], ["Minimize", qsTr("minimize")], ["Maximize", qsTr("maximize")], ["Restore", qsTr("restore")], ["Close", qsTr("close")]]) },
+                { kind: "dropdown", key: "action", options: choices([["Focus", qsTr("focus")], ["Minimize", qsTr("minimize")], ["Maximize", qsTr("maximize")], ["Restore", qsTr("restore")], ["Close", qsTr("close")],
+                    ["AlwaysOnTop", qsTr("keep on top")], ["NotOnTop", qsTr("stop keeping on top")], ["Hide", qsTr("hide")], ["Show", qsTr("show")]]) },
                 { kind: "dropdown", key: "by", options: windowMatchOptions }, value("WindowPattern", "pattern")] },
+            SetWindow: { icon: "app-window", head: [label(qsTr("set")),
+                { kind: "dropdown", key: "setting", options: choices([["Opacity", qsTr("opacity %")], ["Title", qsTr("title")], ["Monitor", qsTr("monitor")]]) },
+                label(qsTr("of")), { kind: "dropdown", key: "by", options: windowMatchOptions }, value("WindowPattern", "pattern"),
+                label(qsTr("to")), value("WindowValue", "value")] },
+            UseCoordinates: { icon: "crosshair", head: [label(qsTr("use coordinates of")),
+                { kind: "dropdown", key: "window", options: choices([["screen", qsTr("the screen")], ["window", qsTr("a window:")]]),
+                  encode: v => v === "window", decode: v => v ? "window" : "screen" },
+                Object.assign({ kind: "dropdown", key: "by", options: windowMatchOptions }, { when: i => !!i && i.window }),
+                Object.assign(value("WindowPattern", "pattern"), { when: i => !!i && i.window })] },
+            ShowTooltip: { icon: "message-square", head: [label(qsTr("show tooltip")), value("TooltipText", "text"),
+                { kind: "dropdown", key: "place", options: choices([["Mouse", qsTr("at the mouse")], ["TopLeft", qsTr("top left")], ["TopRight", qsTr("top right")],
+                    ["BottomLeft", qsTr("bottom left")], ["BottomRight", qsTr("bottom right")], ["Center", qsTr("in the middle")]]) },
+                label(qsTr("for")), Object.assign(value("TooltipDuration", "duration"), { unit: qsTr("ms") })] },
+            ShowMenu: { icon: "list", head: [label(qsTr("menu of")), { kind: "dropdown", key: "list", options: "lists" },
+                label(qsTr("at the mouse into")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
             MoveWindow: { icon: "move", head: [
                 { kind: "dropdown", key: "resize", options: [{ value: "move", label: qsTr("move") }, { value: "resize", label: qsTr("resize") }],
                   encode: v => v === "resize", decode: v => v ? "resize" : "move" },
@@ -625,6 +701,10 @@ QtObject {
     function screenRows(p) {
         const { label, imagePieces, value, box, regionPieces, timeoutComponent, errorTimeoutComponent, toleranceComponent, regionComponent, pickComponent, countComponent } = p;
         return {
+            FindColor: { icon: "pipette", head: [label(qsTr("find color")), value("ColorValue", "color"), label(qsTr("put x in")),
+                { kind: "dropdown", key: "x_variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") },
+                label(qsTr("y in")), { kind: "dropdown", key: "y_variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }],
+                components: [toleranceComponent, regionComponent] },
             FindImage: { icon: "search", head: [label(qsTr("find")), ...imagePieces, label(qsTr("put x in")),
                 { kind: "dropdown", key: "x_variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") },
                 label(qsTr("y in")), { kind: "dropdown", key: "y_variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }],
@@ -703,7 +783,8 @@ QtObject {
         BlockRegistry.registerVariableFields({
             WhenWebhook: ["variable"], AskText: ["name"], AskYesNo: ["name"], AskChoice: ["name"],
             HttpRequest: ["variable"], BrowserScript: ["variable"],
-            FindImage: ["x_variable", "y_variable", "count_variable"],
+            FindImage: ["x_variable", "y_variable", "count_variable"], FindColor: ["x_variable", "y_variable"],
+            AskFile: ["name"], ReadKeys: ["name"], ShowMenu: ["name"],
             DetectObjectsInWindow: ["count_variable"], AimAtDetection: ["status_variable"],
             ForEachItem: ["variable"], ForEachKey: ["variable"], ForEachPart: ["variable"], ForEachFile: ["variable"]
         });
@@ -727,6 +808,23 @@ QtObject {
             WhenKey: () => ({ key: textValue(page.sidebarKey), direction: "Press" }),
             RemapKey: { from: textValue("CapsLock"), to: textValue("Escape") },
             WaitForKey: () => ({ key: textValue(page.sidebarKey), pressed: true }),
+            ReadKeys: () => ({ name: page.firstVariableName(), end_keys: textValue("Return") }),
+            WaitForApp: { pattern: textValue("firefox"), running: true },
+            WaitForClipboard: {},
+            CopyFile: { path: textValue("~/notes.txt"), to: textValue("~/Documents"), move_file: false },
+            DeleteFile: { path: textValue("~/old.txt") },
+            MakeFolder: { path: textValue("~/new folder") },
+            AskFile: () => ({ prompt: textValue(qsTr("Pick a file")), folder: false, name: page.firstVariableName() }),
+            KillProcess: { pid: numberValue(0) },
+            SetVolume: { volume: numberValue(50) },
+            SetMute: { mode: "Toggle" },
+            PlaySound: { path: textValue("~/sound.wav") },
+            Power: { action: "Lock" },
+            SetWindow: { setting: "Opacity", pattern: textValue("Firefox"), by: "Title", value: numberValue(80) },
+            UseCoordinates: { window: true, pattern: textValue("Firefox"), by: "Title" },
+            ShowTooltip: { text: textValue(qsTr("Hello!")), place: "Mouse", duration: numberValue(3000) },
+            ShowMenu: () => ({ list: page.firstListName(), name: page.firstVariableName() }),
+            FindColor: () => ({ color: textValue("#ff0000"), x_variable: page.firstVariableName(), y_variable: page.firstVariableName() }),
             Button: { button: "Left", direction: "Click" },
             MoveMouse: { x: numberValue(0), y: numberValue(0), coordinate: "Relative" },
             Scroll: { amount: numberValue(4), axis: "Vertical" },

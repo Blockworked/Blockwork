@@ -14,7 +14,17 @@ macro_rules! for_each_ref {
             | InstructionKind::BrowserScript { variable: name, .. }
             | InstructionKind::AskText { name, .. }
             | InstructionKind::AskYesNo { name, .. }
+            | InstructionKind::AskFile { name, .. }
+            | InstructionKind::ReadKeys { name, .. }
             | InstructionKind::WhenWebhook { variable: name, .. } => $f(RefKind::Variable, name),
+            InstructionKind::FindColor {
+                x_variable,
+                y_variable,
+                ..
+            } => {
+                $f(RefKind::Variable, x_variable);
+                $f(RefKind::Variable, y_variable);
+            }
             InstructionKind::FindImage {
                 x_variable,
                 y_variable,
@@ -27,7 +37,8 @@ macro_rules! for_each_ref {
                     $f(RefKind::Variable, count_variable);
                 }
             }
-            InstructionKind::AskChoice { list, name, .. } => {
+            InstructionKind::AskChoice { list, name, .. }
+            | InstructionKind::ShowMenu { list, name } => {
                 $f(RefKind::List, list);
                 $f(RefKind::Variable, name);
             }

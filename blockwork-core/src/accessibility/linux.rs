@@ -1,3 +1,4 @@
+use super::common::{Found, contains, inspected, matches, picked, resolve, with_selector};
 use super::*;
 use crate::input::value::Evaluated;
 use crate::window::ScreenWindow;
@@ -111,9 +112,6 @@ fn key(object: &ObjectRefOwned) -> String {
         object.path_as_str()
     )
 }
-fn contains(value: &str, filter: &str) -> bool {
-    filter.is_empty() || value.to_lowercase().contains(&filter.to_lowercase())
-}
 fn is_window(role: Role) -> bool {
     matches!(
         role,
@@ -122,20 +120,6 @@ fn is_window(role: Role) -> bool {
 }
 fn enabled_in(state: &atspi::StateSet) -> bool {
     state.contains(State::Enabled) && state.contains(State::Sensitive)
-}
-
-/// One element a search walked past.
-struct Found {
-    object: ObjectRefOwned,
-    node: UiNode,
-    showing: bool,
-}
-fn matches(selector: &UiSelector, window_filter: &str, node: &UiNode) -> bool {
-    contains(&node.app, &selector.app)
-        && contains(&node.window, window_filter)
-        && contains(&node.name, &selector.name)
-        && (selector.role.is_empty() || node.role.eq_ignore_ascii_case(&selector.role))
-        && (selector.id.is_empty() || node.id == selector.id)
 }
 
 /// The window that has focus, by its own AT-SPI state.
@@ -175,7 +159,7 @@ async fn find(
     selector: &UiSelector,
     limit: usize,
     ids: bool,
-) -> Result<Vec<Found>, String> {
+) -> Result<Vec<Found<ObjectRefOwned>>, String> {
     let apps = apps(connection).await?;
     let mut queue = VecDeque::new();
     let mut window_filter = selector.window.clone();
@@ -256,18 +240,9 @@ async fn find(
             if !ids && node.id.is_empty() {
                 node.id = proxy.accessible_id().await.unwrap_or_default();
             }
-            node.selector = UiSelector {
-                scope: UiScope::App,
-                app: app.clone(),
-                window: window.clone(),
-                name: node.name.clone(),
-                role: node.role.clone(),
-                id: node.id.clone(),
-            };
-            node.text = node.selector.to_text();
             result.push(Found {
                 object: object.clone(),
-                node,
+                node: with_selector(node),
                 showing: state.contains(State::Showing),
             });
             if result.len() >= limit {
@@ -281,94 +256,6 @@ async fn find(
         }
     }
     Ok(result)
-}
-
-/// The one element a block means. Hidden copies (a closed menu's items, an
-/// inactive tab) give way to the one on screen; otherwise more than one
-/// match is an error, never a guess.
-fn resolve(mut found: Vec<Found>) -> Result<Option<Found>, String> {
-    if found.len() <= 1 {
-        return Ok(found.pop());
-    }
-    let total = found.len();
-    let mut showing: Vec<Found> = found.into_iter().filter(|f| f.showing).collect();
-    if showing.len() == 1 {
-        return Ok(showing.pop());
-    }
-    let count = if showing.is_empty() {
-        total
-    } else {
-        showing.len()
-    };
-    Err(format!(
-        "{count} UI elements match; narrow the selector's name, role, ID or window (Pick element writes one that matches only its element)"
-    ))
-}
-
-/// What `resolve` would pick among `all` for `selector`, and how many
-/// elements the selector matches.
-fn resolve_in<'a>(all: &'a [Found], selector: &UiSelector) -> (Option<&'a Found>, usize) {
-    let hits: Vec<&Found> = all
-        .iter()
-        .filter(|f| matches(selector, &selector.window, &f.node))
-        .collect();
-    if hits.len() == 1 {
-        return (Some(hits[0]), 1);
-    }
-    let showing: Vec<&Found> = hits.iter().copied().filter(|f| f.showing).collect();
-    if showing.len() == 1 {
-        return (Some(showing[0]), 1);
-    }
-    let count = if showing.is_empty() {
-        hits.len()
-    } else {
-        showing.len()
-    };
-    (None, count)
-}
-
-/// The shortest selector that finds `target` alone among `all`: by ID, by
-/// role and name, then with the window added. Window titles often change
-/// (an open document's name), so they're only added when needed.
-fn shortest(all: &[Found], target: &Found) -> (UiSelector, usize) {
-    let n = &target.node;
-    let base = |window: bool, name: bool, role: bool, id: bool| UiSelector {
-        scope: UiScope::App,
-        app: n.app.clone(),
-        window: if window {
-            n.window.clone()
-        } else {
-            String::new()
-        },
-        name: if name { n.name.clone() } else { String::new() },
-        role: if role { n.role.clone() } else { String::new() },
-        id: if id { n.id.clone() } else { String::new() },
-    };
-    let mut candidates = vec![];
-    if !n.id.is_empty() {
-        candidates.push(base(false, false, false, true));
-        candidates.push(base(false, false, true, true));
-    }
-    if !n.name.is_empty() {
-        candidates.push(base(false, true, true, false));
-        candidates.push(base(true, true, true, false));
-    } else {
-        candidates.push(base(false, false, true, false));
-        candidates.push(base(true, false, true, false));
-    }
-    candidates.push(base(true, true, true, !n.id.is_empty()));
-    let mut last = (candidates[candidates.len() - 1].clone(), 0);
-    for candidate in candidates {
-        if candidate.require_target().is_err() {
-            continue;
-        }
-        let (picked, count) = resolve_in(all, &candidate);
-        if picked.is_some_and(|p| key(&p.object) == key(&target.object)) {
-            return (candidate, 1);
-        }
-        last = (candidate, count.max(1));
-    }
-    last
 }
 
 macro_rules! proxy {
@@ -412,20 +299,7 @@ pub fn inspect(selector: &UiSelector) -> Result<Vec<UiNode>, String> {
             ..UiSelector::default()
         };
         let all = find(&connection, &everything, LIMIT_NODES, true).await?;
-        Ok(all
-            .iter()
-            .filter(|f| matches(selector, &selector.window, &f.node))
-            .filter(|f| !f.node.role.is_empty() && f.node.role != "application")
-            .take(100)
-            .map(|f| {
-                let (selector, count) = shortest(&all, f);
-                let mut node = f.node.clone();
-                node.text = selector.to_text();
-                node.selector = selector;
-                node.matches = count;
-                node
-            })
-            .collect())
+        Ok(inspected(&all, selector, "application"))
     })
 }
 pub fn query(selector: &UiSelector, query: Query) -> Result<Evaluated, String> {
@@ -827,17 +701,12 @@ pub fn pick(x: f64, y: f64, ignore: &str) -> Result<Option<UiPick>, String> {
             ..UiSelector::default()
         };
         let all = find(&connection, &everything, LIMIT_NODES, true).await?;
-        let Some(target) = all.iter().find(|f| key(&f.object) == key(&object)) else {
+        let Some(target) = all.iter().position(|f| key(&f.object) == key(&object)) else {
             return Ok(Some(UiPick { hit, node: None }));
         };
-        let (selector, count) = shortest(&all, target);
-        let mut node = target.node.clone();
-        node.text = selector.to_text();
-        node.selector = selector;
-        node.matches = count;
         Ok(Some(UiPick {
             hit,
-            node: Some(node),
+            node: Some(picked(&all, target)),
         }))
     })
 }

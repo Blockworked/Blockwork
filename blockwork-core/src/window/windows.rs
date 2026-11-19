@@ -1,4 +1,5 @@
-use super::{Action, ActiveWindow, MatchBy, Rect, no_match};
+use super::{Action, ActiveWindow, MatchBy, Rect, ScreenWindow, no_match};
+use std::sync::Mutex;
 use std::time::{Duration, Instant};
 use windows_sys::Win32::Foundation::{CloseHandle, HWND, LPARAM, POINT, RECT};
 use windows_sys::Win32::Graphics::Dwm::{
@@ -15,10 +16,15 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     BringWindowToTop, EnumChildWindows, EnumWindows, GA_ROOTOWNER, GWL_EXSTYLE, GetAncestor,
     GetClientRect, GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowTextW,
-    GetWindowThreadProcessId, IsIconic, IsWindowVisible, IsZoomed, PostMessageW, SW_MAXIMIZE,
-    SW_MINIMIZE, SW_RESTORE, SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER,
-    SetForegroundWindow, SetWindowPos, ShowWindow, WM_CLOSE, WS_EX_TOOLWINDOW,
+    GetWindowThreadProcessId, HWND_NOTOPMOST, HWND_TOPMOST, IsIconic, IsWindowVisible, IsZoomed,
+    LWA_ALPHA, PostMessageW, SW_HIDE, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, SW_SHOW,
+    SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetForegroundWindow,
+    SetLayeredWindowAttributes, SetWindowLongW, SetWindowPos, SetWindowTextW, ShowWindow, WM_CLOSE,
+    WS_EX_LAYERED, WS_EX_TOOLWINDOW,
 };
+
+/// Windows the Hide action took off the screen, so Show can still find them.
+static HIDDEN: Mutex<Vec<usize>> = Mutex::new(Vec::new());
 
 /// Why Windows refuses to touch a window, almost always.
 const ELEVATED: &str = "Windows blocked it; the window may belong to a program running as administrator, \
@@ -151,8 +157,13 @@ fn find(pattern: &str, by: MatchBy) -> Result<HWND, String> {
             Ok(hwnd)
         };
     }
+    let hidden: Vec<HWND> = HIDDEN
+        .lock()
+        .map(|h| h.iter().map(|&w| w as HWND).collect())
+        .unwrap_or_default();
     windows()
         .into_iter()
+        .chain(hidden)
         .find(|w| {
             let info = info(*w);
             !info.title.is_empty() && info.matches(pattern, by)
@@ -230,8 +241,101 @@ pub fn act(action: Action, pattern: &str, by: MatchBy) -> Result<(), String> {
                 }
                 0
             }
+            Action::AlwaysOnTop | Action::NotOnTop => {
+                let after = if action == Action::AlwaysOnTop {
+                    HWND_TOPMOST
+                } else {
+                    HWND_NOTOPMOST
+                };
+                let flags = SWP_NOMOVE | SWP_NOSIZE | SWP_NOACTIVATE;
+                if SetWindowPos(hwnd, after, 0, 0, 0, 0, flags) == 0 {
+                    return Err(format!("couldn't change the window: {ELEVATED}"));
+                }
+                0
+            }
+            Action::Hide => {
+                if let Ok(mut hidden) = HIDDEN.lock() {
+                    hidden.retain(|&w| w != hwnd as usize);
+                    hidden.push(hwnd as usize);
+                }
+                ShowWindow(hwnd, SW_HIDE)
+            }
+            Action::Show => {
+                if let Ok(mut hidden) = HIDDEN.lock() {
+                    hidden.retain(|&w| w != hwnd as usize);
+                }
+                ShowWindow(hwnd, SW_SHOW)
+            }
             Action::Focus => unreachable!(),
         };
+    }
+    Ok(())
+}
+
+/// Every app window, front to back.
+pub fn list() -> Result<Vec<ScreenWindow>, String> {
+    Ok(handles().into_iter().map(|(_, w)| w).collect())
+}
+
+/// Titled app windows, frontmost first, with their handles; and the
+/// foreground window's handle. Native UI automation walks these.
+pub(crate) fn handles() -> Vec<(isize, ScreenWindow)> {
+    windows()
+        .into_iter()
+        .filter_map(|hwnd| {
+            let info = info(hwnd);
+            if info.title.is_empty() {
+                return None;
+            }
+            let mut pid = 0u32;
+            // SAFETY: a plain query on a handle EnumWindows gave us.
+            unsafe { GetWindowThreadProcessId(hwnd, &mut pid) };
+            let mut rect: RECT = unsafe { std::mem::zeroed() };
+            // SAFETY: `rect` is a plain out-parameter.
+            unsafe { GetWindowRect(hwnd, &mut rect) };
+            Some((
+                hwnd as isize,
+                ScreenWindow {
+                    title: info.title,
+                    app: info.app,
+                    pid,
+                    bounds: Rect {
+                        x: rect.left as f64,
+                        y: rect.top as f64,
+                        width: (rect.right - rect.left) as f64,
+                        height: (rect.bottom - rect.top) as f64,
+                    },
+                },
+            ))
+        })
+        .collect()
+}
+
+pub(crate) fn foreground() -> isize {
+    // SAFETY: no arguments; may return null.
+    unsafe { GetForegroundWindow() as isize }
+}
+
+pub(super) fn set_opacity(pattern: &str, by: MatchBy, opacity: f64) -> Result<(), String> {
+    let hwnd = find(pattern, by)?;
+    // SAFETY: Win32 window calls on a handle `find` gave us.
+    unsafe {
+        let style = GetWindowLongW(hwnd, GWL_EXSTYLE) as u32;
+        SetWindowLongW(hwnd, GWL_EXSTYLE, (style | WS_EX_LAYERED) as i32);
+        let alpha = (opacity.clamp(0.0, 1.0) * 255.0).round() as u8;
+        if SetLayeredWindowAttributes(hwnd, 0, alpha, LWA_ALPHA) == 0 {
+            return Err(format!("couldn't change the window: {ELEVATED}"));
+        }
+    }
+    Ok(())
+}
+
+pub(super) fn set_title(pattern: &str, by: MatchBy, title: &str) -> Result<(), String> {
+    let hwnd = find(pattern, by)?;
+    let wide: Vec<u16> = title.encode_utf16().chain([0]).collect();
+    // SAFETY: `wide` is nul-terminated and outlives the call.
+    if unsafe { SetWindowTextW(hwnd, wide.as_ptr()) } == 0 {
+        return Err(format!("couldn't rename the window: {ELEVATED}"));
     }
     Ok(())
 }

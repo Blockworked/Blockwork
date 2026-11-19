@@ -1332,5 +1332,183 @@
     }
    }
   ]
+ },
+ {
+  "type": "SaveClipboard",
+  "id": "saveclipboard"
+ },
+ {
+  "type": "RestoreClipboard",
+  "id": "restoreclipboard"
+ },
+ {
+  "type": "DeleteFile",
+  "id": "deletefile",
+  "path": {
+   "kind": "Number",
+   "value": 701
+  }
+ },
+ {
+  "type": "MakeFolder",
+  "id": "makefolder",
+  "path": {
+   "kind": "Number",
+   "value": 702
+  }
+ },
+ {
+  "type": "KillProcess",
+  "id": "killprocess",
+  "pid": {
+   "kind": "Number",
+   "value": 703
+  }
+ },
+ {
+  "type": "SetVolume",
+  "id": "setvolume",
+  "volume": {
+   "kind": "Number",
+   "value": 704
+  }
+ },
+ {
+  "type": "CopyFile",
+  "id": "copyfile",
+  "path": {
+   "kind": "Number",
+   "value": 705
+  },
+  "to": {
+   "kind": "Number",
+   "value": 706
+  },
+  "move_file": true
+ },
+ {
+  "type": "AskFile",
+  "id": "askfile",
+  "prompt": {
+   "kind": "Number",
+   "value": 707
+  },
+  "folder": true,
+  "name": "AskFile.name"
+ },
+ {
+  "type": "WaitForApp",
+  "id": "waitforapp",
+  "pattern": {
+   "kind": "Number",
+   "value": 708
+  },
+  "running": false,
+  "timeout": {
+   "kind": "Number",
+   "value": 709
+  }
+ },
+ {
+  "type": "SetMute",
+  "id": "setmute",
+  "mode": "Toggle"
+ },
+ {
+  "type": "PlaySound",
+  "id": "playsound",
+  "path": {
+   "kind": "Number",
+   "value": 710
+  },
+  "wait": true
+ },
+ {
+  "type": "Power",
+  "id": "power",
+  "action": "ShutDown"
+ },
+ {
+  "type": "FindColor",
+  "id": "findcolor",
+  "color": {
+   "kind": "Number",
+   "value": 711
+  },
+  "tolerance": {
+   "kind": "Number",
+   "value": 712
+  },
+  "x_variable": "FindColor.x_variable",
+  "y_variable": "FindColor.y_variable",
+  "region": "1,2,3,4"
+ },
+ {
+  "type": "WaitForClipboard",
+  "id": "waitforclipboard",
+  "timeout": {
+   "kind": "Number",
+   "value": 713
+  }
+ },
+ {
+  "type": "ReadKeys",
+  "id": "readkeys",
+  "name": "ReadKeys.name",
+  "end_keys": {
+   "kind": "Number",
+   "value": 714
+  },
+  "count": {
+   "kind": "Number",
+   "value": 715
+  },
+  "timeout": {
+   "kind": "Number",
+   "value": 716
+  }
+ },
+ {
+  "type": "UseCoordinates",
+  "id": "usecoordinates",
+  "window": true,
+  "pattern": {
+   "kind": "Number",
+   "value": 801
+  },
+  "by": "App"
+ },
+ {
+  "type": "SetWindow",
+  "id": "setwindow",
+  "setting": "Monitor",
+  "pattern": {
+   "kind": "Number",
+   "value": 802
+  },
+  "by": "Title",
+  "value": {
+   "kind": "Number",
+   "value": 803
+  }
+ },
+ {
+  "type": "ShowTooltip",
+  "id": "showtooltip",
+  "text": {
+   "kind": "Number",
+   "value": 804
+  },
+  "place": "BottomRight",
+  "duration": {
+   "kind": "Number",
+   "value": 805
+  }
+ },
+ {
+  "type": "ShowMenu",
+  "id": "showmenu",
+  "list": "ShowMenu.list",
+  "name": "ShowMenu.name"
  }
 ]

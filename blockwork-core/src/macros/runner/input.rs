@@ -235,7 +235,9 @@ pub(super) fn run_token(
             };
             let result = match coordinate {
                 Coordinate::Rel => em.move_mouse_rel(x, y),
-                Coordinate::Abs => em.move_mouse_abs(x, y),
+                Coordinate::Abs => crate::screen::origin().and_then(|(ox, oy)| {
+                    em.move_mouse_abs(x + ox.round() as i32, y + oy.round() as i32)
+                }),
             };
             if let Err(err) = result {
                 warn!("Failed to move mouse ({}, {}): {}", x, y, err);

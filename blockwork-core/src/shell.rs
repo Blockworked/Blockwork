@@ -7,6 +7,8 @@ use std::process::{Command, Stdio};
 pub struct Output {
     pub stdout: String,
     pub success: bool,
+    /// The exit code; -1 when a signal ended it.
+    pub code: i32,
 }
 
 #[cfg(windows)]
@@ -42,6 +44,7 @@ pub fn run(script: &str) -> Result<Output, String> {
     Ok(Output {
         stdout,
         success: output.status.success(),
+        code: output.status.code().unwrap_or(-1),
     })
 }
 
@@ -55,5 +58,6 @@ mod tests {
         assert_eq!(out.stdout, "hello");
         assert!(out.success);
         assert!(!run("exit 3").unwrap().success);
+        assert_eq!(run("exit 3").unwrap().code, 3);
     }
 }

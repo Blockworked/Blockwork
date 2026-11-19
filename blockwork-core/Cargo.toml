@@ -77,6 +77,8 @@ tract-cuda = { version = "=0.23.9", optional = true }
 [target.'cfg(windows)'.dependencies]
 enigo.workspace = true
 windows-sys.workspace = true
+# Speaker volume through COM (see src/sound.rs) and UI Automation (src/accessibility/windows.rs).
+windows = { version = "0.62", features = ["Win32_UI_Accessibility", "Win32_UI_WindowsAndMessaging", "Win32_Foundation", "Win32_Media_Audio", "Win32_Media_Audio_Endpoints", "Win32_System_Com", "Win32_System_Com_StructuredStorage", "Win32_System_Variant"] }
 self_update = { workspace = true, optional = true }
 http = { workspace = true, optional = true }
 

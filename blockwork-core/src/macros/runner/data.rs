@@ -48,6 +48,22 @@ pub(super) fn run_data_block(
                 Err(e) => soft_fail(ctx, &ins.id, "Set clipboard", e)?,
             }
         }
+        InstructionKind::SaveClipboard => match crate::clipboard::save() {
+            Ok(saved) => {
+                saved_clipboards().insert(ctx.source.macro_id.clone(), saved);
+            }
+            Err(e) => soft_fail(ctx, &ins.id, "Save clipboard", e)?,
+        },
+        InstructionKind::RestoreClipboard => {
+            let saved = saved_clipboards().get(&ctx.source.macro_id).cloned();
+            let restored = match saved {
+                Some(saved) => crate::clipboard::restore(&saved),
+                None => Err("nothing saved yet (use save clipboard first)".into()),
+            };
+            if let Err(e) = restored {
+                soft_fail(ctx, &ins.id, "Restore clipboard", e)?;
+            }
+        }
         InstructionKind::AddToList { value, name } => {
             match ctx.resolve(value, depth).and_then(|v| v.eval()) {
                 Ok(value) => match ListItem::from_evaluated(value) {
@@ -246,4 +262,13 @@ pub(super) fn run_data_block(
         _ => unreachable!("run_data_block got another block"),
     }
     Ok(None)
+}
+
+/// What each macro's `SaveClipboard` kept, by macro id.
+fn saved_clipboards() -> std::sync::MutexGuard<'static, HashMap<String, crate::clipboard::Saved>> {
+    static SAVED: OnceLock<Mutex<HashMap<String, crate::clipboard::Saved>>> = OnceLock::new();
+    SAVED
+        .get_or_init(Default::default)
+        .lock()
+        .unwrap_or_else(|e| e.into_inner())
 }

@@ -12,7 +12,7 @@ pub struct ActiveWindow {
     pub app: String,
 }
 
-/// Which part of a window a pattern is matched against.
+/// Which part of a window a pattern is matched against, and how.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MatchBy {
     /// The title or the app.
@@ -20,6 +20,10 @@ pub enum MatchBy {
     Any,
     Title,
     App,
+    /// The whole title, ignoring case.
+    Exact,
+    /// A regular expression on the title, ignoring case.
+    Regex,
 }
 
 impl std::str::FromStr for MatchBy {
@@ -29,6 +33,8 @@ impl std::str::FromStr for MatchBy {
             "" | "Any" => Ok(MatchBy::Any),
             "Title" => Ok(MatchBy::Title),
             "App" => Ok(MatchBy::App),
+            "Exact" => Ok(MatchBy::Exact),
+            "Regex" => Ok(MatchBy::Regex),
             _ => Err(format!("unknown window match '{s}'")),
         }
     }
@@ -38,10 +44,22 @@ impl ActiveWindow {
     /// Case-insensitive substring match on the title and/or app; an empty
     /// pattern matches any window.
     pub fn matches(&self, pattern: &str, by: MatchBy) -> bool {
-        let pattern = pattern.trim().to_lowercase();
-        pattern.is_empty()
-            || (by != MatchBy::App && self.title.to_lowercase().contains(&pattern))
-            || (by != MatchBy::Title && self.app.to_lowercase().contains(&pattern))
+        let pattern = pattern.trim();
+        if pattern.is_empty() {
+            return true;
+        }
+        match by {
+            MatchBy::Exact => self.title.trim().to_lowercase() == pattern.to_lowercase(),
+            MatchBy::Regex => regex::RegexBuilder::new(pattern)
+                .case_insensitive(true)
+                .build()
+                .is_ok_and(|re| re.is_match(&self.title)),
+            _ => {
+                let pattern = pattern.to_lowercase();
+                (by != MatchBy::App && self.title.to_lowercase().contains(&pattern))
+                    || (by != MatchBy::Title && self.app.to_lowercase().contains(&pattern))
+            }
+        }
     }
 }
 
@@ -53,9 +71,25 @@ pub enum Action {
     Maximize,
     Restore,
     Close,
+    /// Keeps the window above other windows.
+    AlwaysOnTop,
+    NotOnTop,
+    /// Takes the window off the screen and the taskbar, until `Show`.
+    Hide,
+    Show,
 }
 
-pub const ACTIONS: [&str; 5] = ["Focus", "Minimize", "Maximize", "Restore", "Close"];
+pub const ACTIONS: [&str; 9] = [
+    "Focus",
+    "Minimize",
+    "Maximize",
+    "Restore",
+    "Close",
+    "AlwaysOnTop",
+    "NotOnTop",
+    "Hide",
+    "Show",
+];
 
 impl std::str::FromStr for Action {
     type Err = String;
@@ -66,6 +100,10 @@ impl std::str::FromStr for Action {
             "Maximize" => Ok(Action::Maximize),
             "Restore" => Ok(Action::Restore),
             "Close" => Ok(Action::Close),
+            "AlwaysOnTop" => Ok(Action::AlwaysOnTop),
+            "NotOnTop" => Ok(Action::NotOnTop),
+            "Hide" => Ok(Action::Hide),
+            "Show" => Ok(Action::Show),
             _ => Err(format!("unknown window action '{s}'")),
         }
     }
@@ -132,11 +170,112 @@ pub fn stacked() -> Result<Vec<ScreenWindow>, String> {
     linux::stacked()
 }
 
+/// Changes a matching window's opacity (0 to 100), title, or monitor
+/// (counting from 1, in the order of the monitor reporters).
+pub fn set(
+    setting: blockwork_model::macros::WindowSetting,
+    pattern: &str,
+    by: MatchBy,
+    value: &str,
+) -> Result<(), String> {
+    use blockwork_model::macros::WindowSetting;
+    let number = || {
+        value
+            .trim()
+            .parse::<f64>()
+            .map_err(|_| format!("'{value}' isn't a number"))
+    };
+    match setting {
+        WindowSetting::Opacity => {
+            let percent = number()?;
+            if !(0.0..=100.0).contains(&percent) {
+                return Err(format!("{percent} isn't an opacity from 0 to 100"));
+            }
+            set_opacity(pattern.trim(), by, percent / 100.0)
+        }
+        WindowSetting::Title => set_title(pattern.trim(), by, value),
+        WindowSetting::Monitor => to_monitor(pattern, by, number()?),
+    }
+}
+
+/// Moves a window to the same spot on another monitor.
+fn to_monitor(pattern: &str, by: MatchBy, n: f64) -> Result<(), String> {
+    let monitors = crate::screen::monitors();
+    let target = monitors
+        .get((n.round() as usize).wrapping_sub(1))
+        .ok_or_else(|| format!("there's no monitor {n} ({} found)", monitors.len()))?;
+    let window = bounds(pattern, by)?;
+    let (cx, cy) = (
+        window.x + window.width / 2.0,
+        window.y + window.height / 2.0,
+    );
+    let from = monitors
+        .iter()
+        .find(|m| cx >= m.x && cy >= m.y && cx < m.x + m.width && cy < m.y + m.height)
+        .unwrap_or(target);
+    // Keep the same offset, but stay on the target monitor.
+    let x = (target.x + (window.x - from.x))
+        .clamp(target.x, (target.x + target.width - 50.0).max(target.x));
+    let y = (target.y + (window.y - from.y))
+        .clamp(target.y, (target.y + target.height - 50.0).max(target.y));
+    place(pattern, by, false, x.round() as i32, y.round() as i32)
+}
+
+/// Every window, topmost first where the system says.
+#[cfg(target_os = "linux")]
+pub fn list() -> Result<Vec<ScreenWindow>, String> {
+    stacked()
+}
+
+#[cfg(target_os = "linux")]
+fn set_opacity(pattern: &str, by: MatchBy, opacity: f64) -> Result<(), String> {
+    linux::set_opacity(pattern, by, opacity)
+}
+
+#[cfg(target_os = "linux")]
+fn set_title(pattern: &str, by: MatchBy, title: &str) -> Result<(), String> {
+    linux::set_title(pattern, by, title)
+}
+
 #[cfg(windows)]
-pub use windows::{act, active, bounds, exists, place};
+pub use windows::{act, active, bounds, exists, list, place};
+#[cfg(windows)]
+pub(crate) use windows::{foreground, handles};
+#[cfg(windows)]
+use windows::{set_opacity, set_title};
 
 #[cfg(target_os = "macos")]
 pub use macos::{act, active, bounds, exists, place};
+
+#[cfg(not(any(target_os = "linux", windows)))]
+pub fn list() -> Result<Vec<ScreenWindow>, String> {
+    Err("listing windows isn't supported on this system yet".into())
+}
+
+#[cfg(not(any(target_os = "linux", windows)))]
+fn set_opacity(_: &str, _: MatchBy, _: f64) -> Result<(), String> {
+    Err("changing a window's opacity isn't supported on this system".into())
+}
+
+#[cfg(not(any(target_os = "linux", windows)))]
+fn set_title(_: &str, _: MatchBy, _: &str) -> Result<(), String> {
+    Err("renaming windows isn't supported on this system".into())
+}
+
+/// The process ID of the first window matching `pattern`.
+pub fn pid(pattern: &str, by: MatchBy) -> Result<u32, String> {
+    list()?
+        .into_iter()
+        .find(|w| {
+            ActiveWindow {
+                title: w.title.clone(),
+                app: w.app.clone(),
+            }
+            .matches(pattern, by)
+        })
+        .map(|w| w.pid)
+        .ok_or_else(|| format!("no window matches '{}'", pattern.trim()))
+}
 
 #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
 mod unsupported {
@@ -212,6 +351,9 @@ mod tests {
         assert!(!w.matches("firefox", MatchBy::Any));
         assert!(w.matches("inbox", MatchBy::Title) && !w.matches("inbox", MatchBy::App));
         assert!(w.matches("thunder", MatchBy::App) && !w.matches("thunder", MatchBy::Title));
+        assert!(w.matches("inbox - MAIL", MatchBy::Exact) && !w.matches("inbox", MatchBy::Exact));
+        assert!(w.matches("^inbox.*mail$", MatchBy::Regex) && !w.matches("^mail", MatchBy::Regex));
+        assert!(!w.matches("(", MatchBy::Regex));
     }
 
     #[cfg(target_os = "linux")]

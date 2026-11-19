@@ -51,6 +51,43 @@ pub(super) fn act(action: Action, pattern: &str, by: MatchBy) -> Result<(), Stri
     }
 }
 
+pub(super) fn set_opacity(pattern: &str, by: MatchBy, opacity: f64) -> Result<(), String> {
+    match desktop()? {
+        Desktop::Hyprland => hypr::set_opacity(&hypr::find(pattern, by)?, opacity),
+        Desktop::Sway => sway::command(&sway::find(pattern, by)?, &format!("opacity {opacity:.2}")),
+        Desktop::Kde => kde::set(
+            &kde::find(pattern, by)?,
+            &format!("w.opacity = {opacity:.3};"),
+        ),
+        Desktop::X11 => {
+            let x = x11::X11::connect()?;
+            let w = x.find(pattern, by)?;
+            x.set_opacity(w, opacity)
+        }
+    }
+}
+
+pub(super) fn set_title(pattern: &str, by: MatchBy, title: &str) -> Result<(), String> {
+    match desktop()? {
+        Desktop::Sway => {
+            // Sway draws a title format; `%` would start a placeholder.
+            let escaped = title.replace('%', "%%").replace('"', "\\\"");
+            sway::command(
+                &sway::find(pattern, by)?,
+                &format!("title_format \"{escaped}\""),
+            )
+        }
+        Desktop::X11 => {
+            let x = x11::X11::connect()?;
+            let w = x.find(pattern, by)?;
+            x.set_title(w, title)
+        }
+        Desktop::Hyprland | Desktop::Kde => {
+            Err("this desktop doesn't let other apps rename windows".into())
+        }
+    }
+}
+
 pub(super) fn place(
     pattern: &str,
     by: MatchBy,
@@ -228,7 +265,19 @@ mod hypr {
         match action {
             Action::Focus => dispatch(&["focuswindow", &target]),
             Action::Close => dispatch(&["closewindow", &target]),
-            Action::Minimize => Err("Hyprland has no minimized windows".into()),
+            Action::Minimize | Action::Hide => Err("Hyprland has no minimized windows".into()),
+            Action::Show => dispatch(&["focuswindow", &target]),
+            // Pinned floating windows stay above the others on every workspace.
+            Action::AlwaysOnTop | Action::NotOnTop => {
+                let pinned = client.get("pinned").and_then(|p| p.as_bool()) == Some(true);
+                if pinned == (action == Action::AlwaysOnTop) {
+                    return Ok(());
+                }
+                if client.get("floating").and_then(|f| f.as_bool()) != Some(true) {
+                    dispatch(&["setfloating", &target])?;
+                }
+                dispatch(&["pin", &target])
+            }
             Action::Maximize => {
                 dispatch(&["focuswindow", &target])?;
                 if fullscreen(client) == 0 {
@@ -247,6 +296,11 @@ mod hypr {
                 }
             }
         }
+    }
+
+    pub(super) fn set_opacity(client: &serde_json::Value, opacity: f64) -> Result<(), String> {
+        let target = address(client)?;
+        dispatch(&["setprop", &target, "alpha", &format!("{opacity:.2}")])
     }
 
     pub(super) fn bounds(client: &serde_json::Value) -> Result<Rect, String> {
@@ -454,7 +508,7 @@ pub(super) mod sway {
             .ok_or_else(|| no_match(pattern))
     }
 
-    fn command(node: &serde_json::Value, command: &str) -> Result<(), String> {
+    pub(super) fn command(node: &serde_json::Value, command: &str) -> Result<(), String> {
         let id = node
             .get("id")
             .and_then(|i| i.as_u64())
@@ -480,10 +534,14 @@ pub(super) mod sway {
         match action {
             Action::Focus => "focus",
             Action::Close => "kill",
-            Action::Minimize => "move scratchpad",
+            Action::Minimize | Action::Hide => "move scratchpad",
             Action::Maximize => "fullscreen enable",
-            Action::Restore if in_scratchpad => "scratchpad show, floating disable",
+            Action::Restore | Action::Show if in_scratchpad => "scratchpad show, floating disable",
             Action::Restore => "fullscreen disable",
+            Action::Show => "focus",
+            // Sticky floating windows follow every workspace, drawn over tiles.
+            Action::AlwaysOnTop => "floating enable, sticky enable",
+            Action::NotOnTop => "sticky disable",
         }
     }
 
@@ -537,10 +595,14 @@ pub(super) mod kde {
         // the instance name is a fallback for apps that only set that.
         let fields: &[Option<&str>] = match by {
             MatchBy::Any => &[None],
-            MatchBy::Title => &[Some("--name")],
+            MatchBy::Title | MatchBy::Exact | MatchBy::Regex => &[Some("--name")],
             MatchBy::App => &[Some("--class"), Some("--classname")],
         };
-        let pattern = escape(pattern);
+        let pattern = match by {
+            MatchBy::Exact => format!("^{}$", escape(pattern)),
+            MatchBy::Regex => pattern.to_string(),
+            _ => escape(pattern),
+        };
         for field in fields {
             let mut args = vec!["search", "--limit", "1"];
             args.extend(*field);
@@ -659,7 +721,35 @@ pub(super) mod kde {
         }
     }
 
+    /// Runs `body` with `w` bound to the window kdotool calls `id`.
+    pub(super) fn set(id: &str, body: &str) -> Result<(), String> {
+        let script = format!(
+            "const w = workspace.windowList().find(w => w.internalId.toString() === {});\n\
+             if (w) {{ {body} }}\n\
+             reply(w ? \"ok\" : \"\");",
+            crate::kwin::js_string(id)
+        );
+        match crate::kwin::script(&script)?.as_str() {
+            "ok" => Ok(()),
+            _ => Err("the window closed".into()),
+        }
+    }
+
     pub(super) fn act(action: Action, id: &str) -> Result<(), String> {
+        let state = match action {
+            Action::AlwaysOnTop => Some("w.keepAbove = true;"),
+            Action::NotOnTop => Some("w.keepAbove = false;"),
+            Action::Hide => {
+                Some("w.skipTaskbar = true; w.skipSwitcher = true; w.minimized = true;")
+            }
+            Action::Show => Some(
+                "w.skipTaskbar = false; w.skipSwitcher = false; w.minimized = false; workspace.activeWindow = w;",
+            ),
+            _ => None,
+        };
+        if let Some(body) = state {
+            return set(id, body);
+        }
         let args: &[&str] = match action {
             Action::Focus => &["windowactivate", id],
             Action::Close => &["windowclose", id],
@@ -675,6 +765,9 @@ pub(super) mod kde {
                 "MINIMIZED",
                 id,
             ],
+            Action::AlwaysOnTop | Action::NotOnTop | Action::Hide | Action::Show => {
+                unreachable!("handled by a KWin script above")
+            }
         };
         run("kdotool", args).map(drop)
     }
@@ -858,7 +951,25 @@ pub(super) mod x11 {
                 self.atom("_NET_WM_STATE_MAXIMIZED_VERT")?,
                 self.atom("_NET_WM_STATE_MAXIMIZED_HORZ")?,
             ];
+            let state = |add: u32, names: &[&str]| -> Result<(), String> {
+                let mut data = [add, 0, 0, 2, 0];
+                for (i, name) in names.iter().take(2).enumerate() {
+                    data[1 + i] = self.atom(name)?;
+                }
+                self.message(window, "_NET_WM_STATE", data)
+            };
+            let skip = ["_NET_WM_STATE_SKIP_TASKBAR", "_NET_WM_STATE_SKIP_PAGER"];
             match action {
+                Action::AlwaysOnTop => state(1, &["_NET_WM_STATE_ABOVE"]),
+                Action::NotOnTop => state(0, &["_NET_WM_STATE_ABOVE"]),
+                Action::Hide => {
+                    state(1, &skip)?;
+                    self.message(window, "WM_CHANGE_STATE", [3, 0, 0, 0, 0])
+                }
+                Action::Show => {
+                    state(0, &skip)?;
+                    self.message(window, "_NET_ACTIVE_WINDOW", [2, 0, 0, 0, 0])
+                }
                 Action::Focus => self.message(window, "_NET_ACTIVE_WINDOW", [2, 0, 0, 0, 0]),
                 Action::Close => self.message(window, "_NET_CLOSE_WINDOW", [0, 2, 0, 0, 0]),
                 // ICCCM IconicState.
@@ -871,6 +982,62 @@ pub(super) mod x11 {
                     self.message(window, "_NET_ACTIVE_WINDOW", [2, 0, 0, 0, 0])
                 }
             }
+        }
+
+        /// The window manager's frame around `window`, or `window` itself.
+        fn frame(&self, window: Window) -> Window {
+            let mut current = window;
+            while let Some(tree) = self
+                .conn
+                .query_tree(current)
+                .ok()
+                .and_then(|c| c.reply().ok())
+            {
+                if tree.parent == self.root || tree.parent == 0 {
+                    break;
+                }
+                current = tree.parent;
+            }
+            current
+        }
+
+        /// Compositors read `_NET_WM_WINDOW_OPACITY` from the frame.
+        pub(crate) fn set_opacity(&self, window: Window, opacity: f64) -> Result<(), String> {
+            use x11rb::protocol::xproto::PropMode;
+            use x11rb::wrapper::ConnectionExt as _;
+            let atom = self.atom("_NET_WM_WINDOW_OPACITY")?;
+            let value = (opacity.clamp(0.0, 1.0) * u32::MAX as f64) as u32;
+            for target in [window, self.frame(window)] {
+                self.conn
+                    .change_property32(
+                        PropMode::REPLACE,
+                        target,
+                        atom,
+                        AtomEnum::CARDINAL,
+                        &[value],
+                    )
+                    .map_err(|e| e.to_string())?;
+            }
+            self.conn.flush().map_err(|e| e.to_string())
+        }
+
+        pub(crate) fn set_title(&self, window: Window, title: &str) -> Result<(), String> {
+            use x11rb::protocol::xproto::PropMode;
+            use x11rb::wrapper::ConnectionExt as _;
+            let (name, utf8) = (self.atom("_NET_WM_NAME")?, self.atom("UTF8_STRING")?);
+            self.conn
+                .change_property8(PropMode::REPLACE, window, name, utf8, title.as_bytes())
+                .map_err(|e| e.to_string())?;
+            self.conn
+                .change_property8(
+                    PropMode::REPLACE,
+                    window,
+                    AtomEnum::WM_NAME,
+                    AtomEnum::STRING,
+                    title.as_bytes(),
+                )
+                .map_err(|e| e.to_string())?;
+            self.conn.flush().map_err(|e| e.to_string())
         }
 
         /// The window's own area (without the frame), translated to root coordinates.

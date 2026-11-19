@@ -183,6 +183,20 @@ static OPERATORS: &[ExtOperator] = &[
         },
     },
     ExtOperator {
+        kind: "FileInfo",
+        op: "FileInfo",
+        arity: 2,
+        default_args: || vec![Value::text("size"), Value::text("~/notes.txt")],
+        eval: |args| {
+            crate::permissions::require("files_read")?;
+            let path = args[1].as_text();
+            Ok(Evaluated::Number(match args[0].as_text().as_str() {
+                "modified" => crate::files::modified(&path)?,
+                _ => crate::files::size(&path)?,
+            }))
+        },
+    },
+    ExtOperator {
         kind: "HttpGet",
         op: "HttpGet",
         arity: 1,
@@ -226,6 +240,18 @@ static OPERATORS: &[ExtOperator] = &[
             Ok(Evaluated::Bool(
                 crate::shell::run(&args[0].as_text())?.success,
             ))
+        },
+    },
+    ExtOperator {
+        kind: "CommandExitCode",
+        op: "CommandExitCode",
+        arity: 1,
+        default_args: || vec![Value::text("true")],
+        eval: |args| {
+            crate::permissions::require("commands")?;
+            Ok(Evaluated::Number(f64::from(
+                crate::shell::run(&args[0].as_text())?.code,
+            )))
         },
     },
     ExtOperator {
@@ -309,9 +335,10 @@ static OPERATORS: &[ExtOperator] = &[
         default_args: || numbers(&[100.0, 100.0]),
         eval: |args| {
             crate::permissions::require("screen")?;
+            let (ox, oy) = crate::screen::origin()?;
             Ok(Evaluated::Text(crate::screen::pixel_color(
-                args[0].as_number()?,
-                args[1].as_number()?,
+                args[0].as_number()? + ox,
+                args[1].as_number()? + oy,
             )?))
         },
     },
@@ -323,9 +350,10 @@ static OPERATORS: &[ExtOperator] = &[
         eval: |args| {
             crate::permissions::require("screen")?;
             let n = |i: usize| args[i].as_number();
+            let (ox, oy) = crate::screen::origin()?;
             Ok(Evaluated::Text(crate::screen::average_color(
-                n(0)?,
-                n(1)?,
+                n(0)? + ox,
+                n(1)? + oy,
                 n(2)?,
                 n(3)?,
             )?))
@@ -358,9 +386,10 @@ static OPERATORS: &[ExtOperator] = &[
         eval: |args| {
             crate::permissions::require("screen")?;
             let n = |i: usize| args[i].as_number();
+            let (ox, oy) = crate::screen::origin()?;
             Ok(Evaluated::Text(crate::screen::read_text(
-                n(0)?,
-                n(1)?,
+                n(0)? + ox,
+                n(1)? + oy,
                 n(2)?,
                 n(3)?,
             )?))
@@ -373,9 +402,12 @@ static OPERATORS: &[ExtOperator] = &[
         default_args: || vec![Value::text("x")],
         eval: |args| {
             let (x, y) = crate::screen::cursor()?;
-            Ok(Evaluated::Number(
-                if args[0].as_text() == "y" { y } else { x } as f64,
-            ))
+            let (ox, oy) = crate::screen::origin()?;
+            Ok(Evaluated::Number(if args[0].as_text() == "y" {
+                y as f64 - oy
+            } else {
+                x as f64 - ox
+            }))
         },
     },
     ExtOperator {
@@ -444,6 +476,75 @@ static OPERATORS: &[ExtOperator] = &[
                 &args[0].as_text(),
             )?))
         },
+    },
+    ExtOperator {
+        kind: "WindowList",
+        op: "WindowList",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| {
+            let titles: Vec<String> = crate::window::list()?
+                .into_iter()
+                .map(|w| w.title)
+                .filter(|t| !t.trim().is_empty())
+                .collect();
+            Ok(Evaluated::Text(titles.join("\n")))
+        },
+    },
+    ExtOperator {
+        kind: "WindowPid",
+        op: "WindowPid",
+        arity: 1,
+        default_args: || vec![Value::text("Firefox")],
+        eval: |args| {
+            Ok(Evaluated::Number(f64::from(crate::window::pid(
+                &args[0].as_text(),
+                crate::window::MatchBy::Any,
+            )?)))
+        },
+    },
+    ExtOperator {
+        kind: "AppPid",
+        op: "AppPid",
+        arity: 1,
+        default_args: || vec![Value::text("firefox")],
+        eval: |args| {
+            Ok(Evaluated::Number(
+                crate::system::app_pid(&args[0].as_text())?.map_or(-1.0, f64::from),
+            ))
+        },
+    },
+    ExtOperator {
+        kind: "SystemInfo",
+        op: "SystemInfo",
+        arity: 1,
+        default_args: || vec![Value::text("user name")],
+        eval: |args| Ok(Evaluated::Text(crate::system::info(&args[0].as_text())?)),
+    },
+    ExtOperator {
+        kind: "EnvVar",
+        op: "EnvVar",
+        arity: 1,
+        default_args: || vec![Value::text("HOME")],
+        eval: |args| {
+            Ok(Evaluated::Text(
+                std::env::var(args[0].as_text().trim()).unwrap_or_default(),
+            ))
+        },
+    },
+    ExtOperator {
+        kind: "Volume",
+        op: "Volume",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Number(crate::sound::volume()?)),
+    },
+    ExtOperator {
+        kind: "Muted",
+        op: "Muted",
+        arity: 0,
+        default_args: Vec::new,
+        eval: |_| Ok(Evaluated::Bool(crate::sound::muted()?)),
     },
     ExtOperator {
         kind: "IdleSeconds",
