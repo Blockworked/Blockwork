@@ -63,6 +63,14 @@ impl Backend {
                     ignore.as_deref().unwrap_or_default(),
                 )?)
             }
+            "inspect_mouse" => {
+                let ignore: Option<String> = arg(&args, "ignore")?;
+                let color: Option<bool> = arg(&args, "color")?;
+                to_json(blockwork_core::inspect::at_mouse(
+                    ignore.as_deref().unwrap_or_default(),
+                    color.unwrap_or(false),
+                )?)
+            }
             "native_ui_pick" => {
                 let ignore: Option<String> = arg(&args, "ignore")?;
                 to_json(blockwork_core::accessibility::pick(

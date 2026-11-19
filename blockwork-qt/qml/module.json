@@ -23,6 +23,7 @@
     "UsbDeviceDialog.qml",
     "ScreenPicker.qml",
     "ElementPickerOverlay.qml",
+    "InspectorWindow.qml",
     "BlockCatalog.qml",
     "BlockHelp.qml",
     "MakeBlockDialog.qml",

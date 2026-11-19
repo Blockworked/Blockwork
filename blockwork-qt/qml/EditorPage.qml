@@ -401,6 +401,7 @@ Item {
                         StitchMenuItem { iconName: "sparkles"; text: qsTr("New from template..."); onTriggered: templateDialog.open() }
                         StitchMenuItem { iconName: "copy"; text: qsTr("Duplicate macro"); enabled: !!root.macro; onTriggered: root.invoke("duplicate_macro", { id: root.macro.id }) }
                         StitchMenuItem { iconName: "upload"; text: qsTr("Export..."); enabled: !!root.macro && !!root.macroFiles; onTriggered: root.macroFiles.exportMacro(root.macro.id) }
+                        StitchMenuItem { iconName: "crosshair"; text: qsTr("Inspector…"); visible: Qt.platform.os !== "wasm"; height: visible ? implicitHeight : 0; onTriggered: { inspector.show(); inspector.raise(); } }
                         StitchMenuItem { iconName: "circle-dot"; text: qsTr("Clear breakpoints"); enabled: (appState.breakpoints || []).length > 0; onTriggered: root.invoke("clear_breakpoints") }
                         StitchMenuItem { iconName: "octagon"; text: qsTr("Emergency stop"); danger: true; onTriggered: root.invoke("emergency_stop") }
                         StitchMenuItem { iconName: "trash"; text: qsTr("Delete macro"); danger: true; enabled: !!root.macro; onTriggered: removeDialog.open() }
@@ -889,6 +890,11 @@ Item {
                 open(); variableValue.forceActiveFocus();
             });
         }
+    }
+    InspectorWindow {
+        id: inspector
+        visible: false
+        call: (command, args, done) => root.daemonCall(command, args, done)
     }
     SignalsDialog {
         id: signalsDialog; page: root
