@@ -97,7 +97,11 @@ impl InstructionKind {
             | K::IfElse { .. }
             | K::Repeat { .. }
             | K::Forever { .. }
-            | K::While { .. } => of(Control, &[]),
+            | K::While { .. }
+            | K::ForEachItem { .. }
+            | K::ForEachKey { .. }
+            | K::ForEachPart { .. } => of(Control, &[]),
+            K::ForEachFile { .. } => of(Control, &["files_read"]),
 
             K::SetVariable { .. }
             | K::ChangeVariable { .. }
@@ -108,7 +112,11 @@ impl InstructionKind {
             | K::InsertIntoList { .. }
             | K::ReplaceItemOfList { .. }
             | K::ReverseList { .. }
-            | K::SplitIntoList { .. } => of(Data, &[]),
+            | K::SplitIntoList { .. }
+            | K::SetDictKey { .. }
+            | K::DeleteDictKey { .. }
+            | K::ClearDict { .. }
+            | K::DictFromJson { .. } => of(Data, &[]),
             K::SetClipboard(_) => of(Data, &["clipboard"]),
 
             K::AskText { .. } | K::AskYesNo { .. } | K::AskChoice { .. } | K::ShowMessage(_) => {

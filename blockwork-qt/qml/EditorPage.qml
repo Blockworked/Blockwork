@@ -23,6 +23,8 @@ Item {
     readonly property var macroVariables: JSON.parse(macroVariablesKey)
     readonly property string macroListsKey: JSON.stringify(root.macro && root.macro.lists ? root.macro.lists : [])
     readonly property var macroLists: JSON.parse(macroListsKey)
+    readonly property string macroDictsKey: JSON.stringify(root.macro && root.macro.dicts ? root.macro.dicts : [])
+    readonly property var macroDicts: JSON.parse(macroDictsKey)
     readonly property bool recording: appState.recording_phase && appState.recording_phase.phase === "Active"
     readonly property bool recordingCountdown: !!appState.recording_phase && appState.recording_phase.phase === "Countdown"
     // Counting down or recording: the canvas stays locked for both.
@@ -54,6 +56,7 @@ Item {
     readonly property var userVariables: JSON.parse(userVariablesKey)
     function firstVariableName() { return BlockRegistry.defaultVariableName(userVariableNames()); }
     function firstListName() { return root.macro && root.macro.lists && root.macro.lists.length ? root.macro.lists[0].name : ""; }
+    function firstDictName() { return root.macroDicts.length ? root.macroDicts[0].name : ""; }
     function customEntry(definition) { return { kind: "custom", definition: definition, instruction: palette.customInstruction(definition) }; }
     // The palette drag controller, for tests.
     property alias paletteDrags: dragController
@@ -572,6 +575,9 @@ Item {
                     onDragCanceled: dragController.cancel()
                     sectionsListBlocks: true
                     listInstructionTypes: root.catalog.listInstructionTypes
+                    dictsEnabled: true
+                    dictInstructionTypes: root.catalog.dictInstructionTypes
+                    dicts: root.macroDicts
                     extraOperators: root.browserShown ? root.catalog.extraOperators : root.catalog.extraOperators.filter(o => root.catalog.categoryOf(o[0]) !== "browser")
                     sections: root.browserShown ? root.catalog.paletteSections : root.catalog.paletteSections.filter(s => s.category !== "browser")
                     appCategories: [
@@ -600,6 +606,10 @@ Item {
                     onListEditorStateRequested: (name, visible, x, y) => root.invoke("set_list_editor_state", { name: name, visible: visible, x: x, y: y })
                     onRenameListRequested: name => listDialog.openForRename(name)
                     onDeleteListRequested: name => { deleteListDialog.listName = name; deleteListDialog.open(); }
+                    onMakeDictRequested: dictDialog.openForCreate()
+                    onDictEditorStateRequested: (name, visible, x, y) => root.invoke("set_dict_editor_state", { name: name, visible: visible, x: x, y: y })
+                    onRenameDictRequested: name => dictDialog.openForRename(name)
+                    onDeleteDictRequested: name => { deleteDictDialog.dictName = name; deleteDictDialog.open(); }
                     onMakeBlockRequested: blockDialog.openForCreate()
                     blockLibraryEnabled: !!root.blockLibrary
                     onBrowseBlocksRequested: root.blockLibrary.browse()
@@ -684,6 +694,9 @@ Item {
                     onFloatingValueRemoved: floatingId => root.invoke("remove_floating_value", { floatingId: floatingId })
                     onListItemsEdited: (name, items) => root.invoke("set_list_items", { name: name, items: items })
                     onListEditorStateChanged: (name, visible, x, y) => root.invoke("set_list_editor_state", { name: name, visible: visible, x: x, y: y })
+                    dicts: root.macroDicts
+                    onDictEntriesEdited: (name, entries) => root.invoke("set_dict_entries", { name: name, entries: entries })
+                    onDictEditorStateChanged: (name, visible, x, y) => root.invoke("set_dict_editor_state", { name: name, visible: visible, x: x, y: y })
                 }
             }
             RecordingOverlay {
@@ -884,6 +897,7 @@ Item {
     }
     RenameSignalDialog { id: signalDialog; page: root }
     DataNameDialog { id: listDialog; objectName: "listDialog"; fieldObjectName: "listName"; page: root; kind: "list" }
+    DataNameDialog { id: dictDialog; objectName: "dictDialog"; fieldObjectName: "dictName"; page: root; kind: "dict" }
     AppDialog {
         id: clearInstructionsDialog
         objectName: "clearInstructionsDialog"
@@ -917,6 +931,14 @@ Item {
         property string listName: ""
         Text { text: qsTr("Delete \"%1\" and its saved items?").arg(deleteListDialog.listName); color: Theme.text }
         onAccepted: root.invoke("delete_list", { name: deleteListDialog.listName })
+    }
+    AppDialog {
+        id: deleteDictDialog
+        objectName: "deleteDictDialog"
+        title: qsTr("Delete dict?"); standardButtons: Dialog.Yes | Dialog.Cancel
+        property string dictName: ""
+        Text { text: qsTr("Delete \"%1\" and its saved keys?").arg(deleteDictDialog.dictName); color: Theme.text }
+        onAccepted: root.invoke("delete_dict", { name: deleteDictDialog.dictName })
     }
     BlockDetailsDialog { id: detailsDialog }
     MakeBlockDialog {

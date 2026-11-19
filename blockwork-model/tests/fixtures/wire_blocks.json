@@ -1222,5 +1222,115 @@
  {
   "type": "ResetGamepad",
   "id": "resetgamepad"
+ },
+ {
+  "type": "SetDictKey",
+  "id": "setdictkey",
+  "name": "SetDictKey.name",
+  "key": {
+   "kind": "Number",
+   "value": 601
+  },
+  "value": {
+   "kind": "Number",
+   "value": 602
+  }
+ },
+ {
+  "type": "DeleteDictKey",
+  "id": "deletedictkey",
+  "name": "DeleteDictKey.name",
+  "key": {
+   "kind": "Number",
+   "value": 603
+  }
+ },
+ {
+  "type": "ClearDict",
+  "id": "cleardict",
+  "name": "ClearDict.name"
+ },
+ {
+  "type": "DictFromJson",
+  "id": "dictfromjson",
+  "text": {
+   "kind": "Number",
+   "value": 604
+  },
+  "name": "DictFromJson.name"
+ },
+ {
+  "type": "ForEachItem",
+  "id": "foreachitem",
+  "list": "ForEachItem.list",
+  "variable": "ForEachItem.variable",
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child605",
+    "duration": {
+     "kind": "Number",
+     "value": 605
+    }
+   }
+  ]
+ },
+ {
+  "type": "ForEachKey",
+  "id": "foreachkey",
+  "dict": "ForEachKey.dict",
+  "variable": "ForEachKey.variable",
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child606",
+    "duration": {
+     "kind": "Number",
+     "value": 606
+    }
+   }
+  ]
+ },
+ {
+  "type": "ForEachPart",
+  "id": "foreachpart",
+  "text": {
+   "kind": "Number",
+   "value": 607
+  },
+  "separator": {
+   "kind": "Number",
+   "value": 608
+  },
+  "variable": "ForEachPart.variable",
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child609",
+    "duration": {
+     "kind": "Number",
+     "value": 609
+    }
+   }
+  ]
+ },
+ {
+  "type": "ForEachFile",
+  "id": "foreachfile",
+  "folder": {
+   "kind": "Number",
+   "value": 610
+  },
+  "variable": "ForEachFile.variable",
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child611",
+    "duration": {
+     "kind": "Number",
+     "value": 611
+    }
+   }
+  ]
  }
 ]

@@ -557,6 +557,54 @@ pub enum InstructionKind {
         separator: Value,
         name: String,
     },
+    /// Sets `key` in a named dict to a number or text value.
+    SetDictKey {
+        name: String,
+        key: Value,
+        value: Value,
+    },
+    /// Removes `key` from a named dict.
+    DeleteDictKey {
+        name: String,
+        key: Value,
+    },
+    /// Empties a named dict.
+    ClearDict {
+        name: String,
+    },
+    /// Fills a named dict from a JSON object's text, replacing what it held.
+    DictFromJson {
+        text: Value,
+        name: String,
+    },
+    /// Runs `body` once for each item of a named list, with `variable` set
+    /// to the item. The items are read once, before the first pass.
+    ForEachItem {
+        list: String,
+        variable: String,
+        body: Vec<Instruction>,
+    },
+    /// Runs `body` once for each key of a named dict, with `variable` set
+    /// to the key.
+    ForEachKey {
+        dict: String,
+        variable: String,
+        body: Vec<Instruction>,
+    },
+    /// Runs `body` once for each part of `text` split at `separator`.
+    ForEachPart {
+        text: Value,
+        separator: Value,
+        variable: String,
+        body: Vec<Instruction>,
+    },
+    /// Runs `body` once for each entry of a folder, with `variable` set to
+    /// its full path, in name order.
+    ForEachFile {
+        folder: Value,
+        variable: String,
+        body: Vec<Instruction>,
+    },
     /// Header for a strand fired when the computer goes online (or offline).
     WhenNetwork {
         connected: bool,

@@ -191,7 +191,6 @@ enum MacroDe {
         settings: MacroSettings,
         #[serde(default)]
         lists: Vec<ListDef>,
-        // Carried for round-trip only, Blockwork has no dict blocks or UI.
         #[serde(default)]
         dicts: Vec<DictDef>,
     },

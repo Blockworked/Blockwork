@@ -87,6 +87,10 @@ pub enum FieldId {
     ScheduleTime,
     SplitText,
     SplitSeparator,
+    DictKey,
+    DictEntryValue,
+    DictJson,
+    EachFolder,
     UsbPattern,
     MouseModifiers,
     OnlyWhen,
@@ -325,6 +329,9 @@ pub(crate) fn slots_mut<'a>(
         }
         InstructionKind::SplitIntoList {
             text, separator, ..
+        }
+        | InstructionKind::ForEachPart {
+            text, separator, ..
         } => {
             f(F::SplitText, text, Any);
             f(F::SplitSeparator, separator, Any);
@@ -493,6 +500,13 @@ pub(crate) fn slots_mut<'a>(
         | InstructionKind::IfElse { condition, .. }
         | InstructionKind::While { condition, .. } => f(F::Condition, condition, Bool),
         InstructionKind::AddToList { value, .. } => f(F::AddToListValue, value, Any),
+        InstructionKind::SetDictKey { key, value, .. } => {
+            f(F::DictKey, key, Any);
+            f(F::DictEntryValue, value, Any);
+        }
+        InstructionKind::DeleteDictKey { key, .. } => f(F::DictKey, key, Any),
+        InstructionKind::DictFromJson { text, .. } => f(F::DictJson, text, Any),
+        InstructionKind::ForEachFile { folder, .. } => f(F::EachFolder, folder, Any),
         InstructionKind::InsertIntoList { value, index, .. } => {
             f(F::InsertIntoListValue, value, Any);
             f(F::InsertIntoListIndex, index, Any);
@@ -526,6 +540,9 @@ pub(crate) fn slots_mut<'a>(
         | InstructionKind::CloseApp { .. }
         | InstructionKind::DeleteAllOfList { .. }
         | InstructionKind::ReverseList { .. }
+        | InstructionKind::ClearDict { .. }
+        | InstructionKind::ForEachItem { .. }
+        | InstructionKind::ForEachKey { .. }
         | InstructionKind::RunBranch(_) => {}
     }
 }

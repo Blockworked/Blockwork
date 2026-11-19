@@ -27,6 +27,8 @@ section below as the GitHub release notes, followed by the downloads table.
 - Only when: key, mouse button and typed text triggers can carry their own condition, so they fire (and block) only while it is true.
 - Key held reporter and Wait for key block.
 - Typed text triggers can match in any case and only at the start of a word or as a whole word; the key that ends the word is kept.
+- For each loops over a list's items, a dict's keys, the parts of a split text, or the files in a folder.
+- Dicts: named collections of values looked up by key, with an editor on the canvas, blocks to set, delete and clear keys or fill a dict from JSON, and reporters to read them.
 
 ### Changed
 - The Text block spaces keystrokes 0.5 ms apart on Windows and macOS too, as it already did on Linux, so fast typing doesn't drop or merge characters.

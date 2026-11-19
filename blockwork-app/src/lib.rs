@@ -158,6 +158,7 @@ fn initial_state(
         emulator,
         variable_values: Arc::new(Mutex::new(HashMap::new())),
         list_values: Arc::new(Mutex::new(HashMap::new())),
+        dict_values: Arc::new(Mutex::new(HashMap::new())),
         thread_pool: ThreadPool::new(),
         is_looping: Arc::new(Mutex::new(false)),
         global_speed_multiplier: settings.global_speed_multiplier.unwrap_or(1.0),

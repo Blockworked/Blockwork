@@ -5,7 +5,7 @@
 use crate::AppHandle;
 use crate::state::{SharedState, build_state_dto};
 use blockstitch_core::graph::ListDef;
-use blockstitch_core::graph::ListStore;
+use blockstitch_core::graph::{DictStore, ListStore};
 use blockwork_core::config::MacroFiles;
 use blockwork_core::input::value::Evaluated;
 use blockwork_core::macros::Run;
@@ -84,7 +84,7 @@ pub(crate) fn fire_with_input(
     let shared = input.is_none();
     std::thread::spawn(move || {
         // Looked up here, off the watcher's thread, which may hold the lock.
-        let (source, max_secs, max_loops, block_table, settings) = {
+        let (source, max_secs, max_loops, block_table, settings, dicts) = {
             let Ok(s) = shared_state.lock() else { return };
             if s.triggers_paused {
                 return;
@@ -104,6 +104,7 @@ pub(crate) fn fire_with_input(
                 mac.map_or(0, |m| m.settings.max_loop_iterations),
                 mac.map(|m| m.block_table()).unwrap_or_default(),
                 mac.map(|m| m.settings.clone()).unwrap_or_default(),
+                mac.map(|m| m.dict_store()).unwrap_or_default(),
             )
         };
         // Conditions may ask the window system, so checked unlocked.
@@ -111,10 +112,10 @@ pub(crate) fn fire_with_input(
             return;
         }
         run_log::run_event(&source, run_log::RunEvent::Fired, message);
-        let (variables, lists) = if shared {
-            live_stores::join(&macro_id, variables, lists)
+        let (variables, lists, dicts) = if shared {
+            live_stores::join(&macro_id, variables, lists, dicts)
         } else {
-            (variables, lists)
+            (variables, lists, dicts)
         };
         let run_flag = run_registry::begin_macro_run(&macro_id);
         let done = limit_run(&source, &run_flag, max_secs);
@@ -126,6 +127,7 @@ pub(crate) fn fire_with_input(
             speed_multiplier,
             Arc::clone(&variables),
             Arc::clone(&lists),
+            Arc::clone(&dicts),
             block_table,
             max_loops,
         );
@@ -136,7 +138,7 @@ pub(crate) fn fire_with_input(
         {
             vars.insert(name, value);
         }
-        persist_fired_variables(&shared_state, &app, &macro_id, &variables, &lists);
+        persist_fired_variables(&shared_state, &app, &macro_id, &variables, &lists, &dicts);
         if shared {
             live_stores::leave(&macro_id);
         }
@@ -149,13 +151,14 @@ pub(crate) fn fire_with_input(
 /// rather than starting from the saved values, which the other run hasn't
 /// written back yet.
 mod live_stores {
-    use super::{ListStore, VariableStore};
+    use super::{DictStore, ListStore, VariableStore};
     use std::collections::HashMap;
     use std::sync::{Arc, Mutex, OnceLock};
 
     struct Live {
         variables: VariableStore,
         lists: ListStore,
+        dicts: DictStore,
         runs: usize,
     }
 
@@ -170,17 +173,23 @@ mod live_stores {
         macro_id: &str,
         variables: VariableStore,
         lists: ListStore,
-    ) -> (VariableStore, ListStore) {
+        dicts: DictStore,
+    ) -> (VariableStore, ListStore, DictStore) {
         let Ok(mut live) = live().lock() else {
-            return (variables, lists);
+            return (variables, lists, dicts);
         };
         let entry = live.entry(macro_id.to_string()).or_insert(Live {
             variables,
             lists,
+            dicts,
             runs: 0,
         });
         entry.runs += 1;
-        (Arc::clone(&entry.variables), Arc::clone(&entry.lists))
+        (
+            Arc::clone(&entry.variables),
+            Arc::clone(&entry.lists),
+            Arc::clone(&entry.dicts),
+        )
     }
 
     /// Ends one [`join`]; the last run out drops the stores.
@@ -209,7 +218,8 @@ mod live_stores {
             let id = "live-stores-test";
             let (first, first_lists) = {
                 let (v, l) = stores(false);
-                join(id, v, l)
+                let (v, l, _) = join(id, v, l, Arc::default());
+                (v, l)
             };
             first
                 .lock()
@@ -217,7 +227,8 @@ mod live_stores {
                 .insert("toggle".into(), Evaluated::Bool(true));
             let (second, _) = {
                 let (v, l) = stores(false);
-                join(id, v, l)
+                let (v, l, _) = join(id, v, l, Arc::default());
+                (v, l)
             };
             assert!(Arc::ptr_eq(&first, &second));
             assert_eq!(
@@ -229,7 +240,8 @@ mod live_stores {
             // Once both ended, the next fire starts from what it's given.
             let (third, third_lists) = {
                 let (v, l) = stores(false);
-                join(id, v, l)
+                let (v, l, _) = join(id, v, l, Arc::default());
+                (v, l)
             };
             assert!(!Arc::ptr_eq(&first, &third));
             assert!(!Arc::ptr_eq(&first_lists, &third_lists));
@@ -297,6 +309,7 @@ pub(crate) fn persist_fired_variables(
     macro_id: &str,
     variables: &VariableStore,
     lists: &ListStore,
+    dicts: &DictStore,
 ) {
     let (mac_to_save, dto) = {
         let Ok(mut s) = shared_state.lock() else {
@@ -317,6 +330,9 @@ pub(crate) fn persist_fired_variables(
         }
         if let Ok(values) = lists.lock() {
             mac.sync_lists_from(&values);
+        }
+        if let Ok(values) = dicts.lock() {
+            mac.sync_dicts_from(&values);
         }
         let mac_to_save = mac.clone();
         if let Some(entry) = s.macros_list.iter_mut().find(|m| m.id == macro_id) {

@@ -299,3 +299,179 @@ fn globals_accept_variable_and_computed_names() {
     assert_eq!(vars.get("result"), Some(&Evaluated::Number(7.0)));
     crate::globals::remove(name);
 }
+
+#[test]
+fn for_each_loops_and_dict_blocks() {
+    use crate::input::value::Op;
+    use blockstitch_core::graph::{DictEntry, DictItem, DictStore};
+
+    let text = |value: &str| Value::text(value);
+    let var = |name: &str| Value::Var { name: name.into() };
+    let join = |a: Value, b: Value| Value::op(Op::from_name("Join"), vec![a, b]);
+    let append = |into: &str, value: Value| set(into, join(var(into), value));
+    let variables: VariableStore = Arc::new(Mutex::new(HashMap::from([
+        ("seen".to_string(), Evaluated::Text(String::new())),
+        ("parts".to_string(), Evaluated::Text(String::new())),
+        ("keys".to_string(), Evaluated::Text(String::new())),
+    ])));
+    let lists: ListStore = Arc::new(Mutex::new(HashMap::from([(
+        "items".to_string(),
+        vec![
+            ListItem::Text("a".into()),
+            ListItem::Number(2.0),
+            ListItem::Text("stop".into()),
+            ListItem::Text("never".into()),
+        ],
+    )])));
+    let dicts: DictStore = Arc::new(Mutex::new(HashMap::from([(
+        "prices".to_string(),
+        vec![DictEntry::new("tea".into(), DictItem::Number(3.0))],
+    )])));
+
+    run_fired_strand(
+        crate::run_log::Source::default(),
+        vec![
+            // Escape loop leaves a for-each like any other loop.
+            Instruction::new(InstructionKind::ForEachItem {
+                list: "items".into(),
+                variable: "item".into(),
+                body: vec![
+                    Instruction::new(InstructionKind::If {
+                        condition: Value::op(Op::Eq, vec![var("item"), text("stop")]),
+                        body: vec![Instruction::new(InstructionKind::EscapeLoop)],
+                    }),
+                    append("seen", var("item")),
+                ],
+            }),
+            Instruction::new(InstructionKind::ForEachPart {
+                text: text("x;y;z"),
+                separator: text(";"),
+                variable: "part".into(),
+                body: vec![append("parts", var("part"))],
+            }),
+            Instruction::new(InstructionKind::SetDictKey {
+                name: "prices".into(),
+                key: text("cake"),
+                value: Value::number(5.0),
+            }),
+            Instruction::new(InstructionKind::SetDictKey {
+                name: "prices".into(),
+                key: text("tea"),
+                value: Value::number(4.0),
+            }),
+            Instruction::new(InstructionKind::ForEachKey {
+                dict: "prices".into(),
+                variable: "key".into(),
+                body: vec![append(
+                    "keys",
+                    join(
+                        var("key"),
+                        Value::op(Op::from_name("DictValue"), vec![var("key"), text("prices")]),
+                    ),
+                )],
+            }),
+            Instruction::new(InstructionKind::DeleteDictKey {
+                name: "prices".into(),
+                key: text("tea"),
+            }),
+            set(
+                "size",
+                Value::op(Op::from_name("DictSize"), vec![text("prices")]),
+            ),
+        ],
+        noop_emulator(),
+        None,
+        1.0,
+        Arc::clone(&variables),
+        lists,
+        Arc::clone(&dicts),
+        Arc::new(HashMap::new()),
+        0,
+    );
+    {
+        let vars = variables.lock().unwrap();
+        let get = |name: &str| vars.get(name).cloned().map(|v| v.as_text());
+        assert_eq!(get("seen").as_deref(), Some("a2"));
+        assert_eq!(get("parts").as_deref(), Some("xyz"));
+        assert_eq!(get("keys").as_deref(), Some("tea4cake5"));
+        assert_eq!(get("size").as_deref(), Some("1"));
+    }
+
+    // Filled from JSON, then cleared.
+    run_fired_strand(
+        crate::run_log::Source::default(),
+        vec![
+            Instruction::new(InstructionKind::DictFromJson {
+                text: text(r#"{"name": "Sam", "age": 7}"#),
+                name: "prices".into(),
+            }),
+            set(
+                "name",
+                Value::op(
+                    Op::from_name("DictValue"),
+                    vec![text("name"), text("prices")],
+                ),
+            ),
+        ],
+        noop_emulator(),
+        None,
+        1.0,
+        Arc::clone(&variables),
+        Default::default(),
+        Arc::clone(&dicts),
+        Arc::new(HashMap::new()),
+        0,
+    );
+    assert_eq!(
+        variables.lock().unwrap().get("name"),
+        Some(&Evaluated::Text("Sam".into()))
+    );
+    run_fired_strand(
+        crate::run_log::Source::default(),
+        vec![Instruction::new(InstructionKind::ClearDict {
+            name: "prices".into(),
+        })],
+        noop_emulator(),
+        None,
+        1.0,
+        Arc::clone(&variables),
+        Default::default(),
+        Arc::clone(&dicts),
+        Arc::new(HashMap::new()),
+        0,
+    );
+    assert!(dicts.lock().unwrap()["prices"].is_empty());
+}
+
+#[test]
+fn for_each_file_walks_a_folder_in_name_order() {
+    let dir = std::env::temp_dir().join(format!("blockwork-each-{}", std::process::id()));
+    std::fs::create_dir_all(&dir).unwrap();
+    for name in ["b.txt", "a.txt"] {
+        std::fs::write(dir.join(name), "").unwrap();
+    }
+    let variables: VariableStore = Arc::new(Mutex::new(HashMap::from([(
+        "found".to_string(),
+        Evaluated::Number(0.0),
+    )])));
+    run_instructions(
+        vec![Instruction::new(InstructionKind::ForEachFile {
+            folder: Value::text(dir.to_str().unwrap()),
+            variable: "path".into(),
+            body: vec![bump("found")],
+        })],
+        noop_emulator(),
+        None,
+        1.0,
+        Arc::clone(&variables),
+    );
+    let vars = variables.lock().unwrap();
+    assert_eq!(vars.get("found"), Some(&Evaluated::Number(2.0)));
+    assert_eq!(
+        vars.get("path"),
+        Some(&Evaluated::Text(
+            dir.join("b.txt").to_string_lossy().into_owned()
+        ))
+    );
+    std::fs::remove_dir_all(&dir).ok();
+}

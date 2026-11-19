@@ -108,6 +108,7 @@ fn loop_limit_stops_a_runaway_loop() {
         1.0,
         Arc::clone(&vars),
         Arc::new(Mutex::new(HashMap::new())),
+        Default::default(),
         Arc::new(HashMap::new()),
         10,
     );
@@ -251,6 +252,7 @@ fn run_log_errors_name_the_failing_block() {
         1.0,
         empty_vars(),
         Arc::new(Mutex::new(HashMap::new())),
+        Default::default(),
         Arc::new(HashMap::new()),
         0,
     );

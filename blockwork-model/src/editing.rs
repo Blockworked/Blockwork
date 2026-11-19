@@ -11,7 +11,7 @@ use blockstitch_core::editor::{
     ValueDestination, ValueLocation, apply_buffer_effects, drop_strand_buffers,
     prune_value_buffers, retain_live_buffers,
 };
-use blockstitch_core::graph::ListItem;
+use blockstitch_core::graph::{DictEntry, ListItem};
 use serde::de::DeserializeOwned;
 use serde_json::Value as Json;
 
@@ -92,6 +92,11 @@ pub const COMMANDS: &[&str] = &[
     "delete_list",
     "set_list_items",
     "set_list_editor_state",
+    "create_dict",
+    "rename_dict",
+    "delete_dict",
+    "set_dict_entries",
+    "set_dict_editor_state",
     "create_block",
     "edit_block",
     "delete_block",
@@ -415,6 +420,32 @@ pub fn dispatch<D: Document>(doc: &mut D, cmd: &str, args: &Json) -> Option<Resu
             let (x, y): (i32, i32) = (arg(args, "x")?, arg(args, "y")?);
             // Where the card sits: a view preference, not an undo step.
             graph_change(doc, |g| g.set_list_editor_state(&name, visible, x, y))?;
+            Ok(Json::Null)
+        })(),
+        "create_dict" => (|| {
+            create_dict(doc, &arg::<String>(args, "name")?)?;
+            Ok(Json::Null)
+        })(),
+        "rename_dict" => (|| {
+            let (old, new): (String, String) = (arg(args, "oldName")?, arg(args, "newName")?);
+            rename_dict(doc, &old, &new)?;
+            Ok(Json::Null)
+        })(),
+        "delete_dict" => (|| {
+            delete_dict(doc, &arg::<String>(args, "name")?)?;
+            Ok(Json::Null)
+        })(),
+        "set_dict_entries" => (|| {
+            let (name, entries): (String, Vec<DictEntry>) =
+                (arg(args, "name")?, arg(args, "entries")?);
+            graph_change(doc, |g| g.set_dict_entries(&name, entries))?;
+            doc.lists_changed();
+            Ok(Json::Null)
+        })(),
+        "set_dict_editor_state" => (|| {
+            let (name, visible): (String, bool) = (arg(args, "name")?, arg(args, "visible")?);
+            let (x, y): (i32, i32) = (arg(args, "x")?, arg(args, "y")?);
+            graph_change(doc, |g| g.set_dict_editor_state(&name, visible, x, y))?;
             Ok(Json::Null)
         })(),
 
@@ -999,6 +1030,66 @@ pub fn delete_list<D: Document>(doc: &mut D, name: &str) -> Result<(), String> {
         push_undo(doc);
         if let Some(mac) = doc.parts().open {
             mac.graph.remove_list(name);
+        }
+    }
+    doc.lists_changed();
+    doc.changed();
+    Ok(())
+}
+
+/// `name` trimmed, if a dict can take it (`old` being renamed).
+fn check_dict_name(mac: &Macro, name: &str, old: Option<&str>) -> Result<String, String> {
+    let trimmed = name.trim();
+    let exists = |name: &str| mac.graph.dicts.iter().any(|dict| dict.name == name);
+    if trimmed.is_empty() {
+        return Err("Dict name can't be empty".into());
+    }
+    if Some(trimmed) != old && exists(trimmed) {
+        return Err(format!("A dict named \"{trimmed}\" already exists"));
+    }
+    if old.is_some_and(|old| !exists(old)) {
+        return Err("Dict not found".into());
+    }
+    Ok(trimmed.to_string())
+}
+
+/// A new empty dict, its editor card placed like a new list's.
+pub fn create_dict<D: Document>(doc: &mut D, name: &str) -> Result<(), String> {
+    check_dict_name(doc.parts().open.ok_or(NO_MACRO)?, name, None)?;
+    push_undo(doc);
+    let graph = &mut doc.parts().open.ok_or(NO_MACRO)?.graph;
+    let trimmed = graph.create_dict(name)?;
+    if let Some(dict) = graph.dicts.iter_mut().find(|d| d.name == trimmed) {
+        dict.editor_x = 36;
+        dict.editor_y = 36;
+    }
+    doc.lists_changed();
+    doc.changed();
+    Ok(())
+}
+
+/// Renames a dict and every block and reporter naming it.
+pub fn rename_dict<D: Document>(doc: &mut D, old: &str, new: &str) -> Result<(), String> {
+    if check_dict_name(doc.parts().open.ok_or(NO_MACRO)?, new, Some(old))? == old {
+        return Ok(());
+    }
+    push_undo(doc);
+    doc.parts()
+        .open
+        .ok_or(NO_MACRO)?
+        .graph
+        .rename_dict(old, new)?;
+    doc.lists_changed();
+    doc.changed();
+    Ok(())
+}
+
+pub fn delete_dict<D: Document>(doc: &mut D, name: &str) -> Result<(), String> {
+    let mac = doc.parts().open.ok_or(NO_MACRO)?;
+    if mac.graph.dicts.iter().any(|dict| dict.name == name) {
+        push_undo(doc);
+        if let Some(mac) = doc.parts().open {
+            mac.graph.remove_dict(name);
         }
     }
     doc.lists_changed();

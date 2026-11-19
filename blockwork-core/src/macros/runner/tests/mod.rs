@@ -206,6 +206,7 @@ fn run_instructions_with_lists(
         speed_multiplier,
         variables,
         lists,
+        Default::default(),
         Arc::new(HashMap::new()),
         0,
     );

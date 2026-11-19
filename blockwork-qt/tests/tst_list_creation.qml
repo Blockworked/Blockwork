@@ -189,5 +189,34 @@ Item {
             compare(scene.edits.length, 1);
             compare(scene.edits[0].name, "existing");
         }
+        function test_dicts_are_made_and_deleted_from_the_palette() {
+            scene.calls = []; scene.failure = "";
+            const page = createTemporaryObject(editorComponent, scene);
+            wait(50);
+            const palette = all(page).find(object => typeof object.makeDictRequested === "function");
+            verify(palette.dictsEnabled);
+            verify(palette.dictInstructionTypes.indexOf("SetDictKey") >= 0);
+            palette.makeDictRequested();
+            const dialog = findChild(page, "dictDialog");
+            tryCompare(dialog, "visible", true);
+            compare(dialog.title, "Make a Dict");
+            findChild(page, "dictName").text = " prices ";
+            dialog.accept();
+            compare(scene.calls[0], {command: "create_dict", args: {name: "prices"}});
+            palette.deleteDictRequested("prices");
+            const confirm = findChild(page, "deleteDictDialog");
+            tryCompare(confirm, "opened", true);
+            mouseClick(confirm.standardButton(Dialog.Yes));
+            compare(scene.calls[1], {command: "delete_dict", args: {name: "prices"}});
+        }
+        function test_for_each_blocks_start_with_the_first_names() {
+            const page = createTemporaryObject(editorComponent, scene);
+            wait(50);
+            const item = page.defaultInstruction("ForEachItem");
+            compare(item.list, "existing");
+            compare(item.variable, "existing");
+            compare(item.body.length, 0);
+            compare(page.defaultInstruction("ForEachPart").separator, {kind: "Text", value: ","});
+        }
     }
 }

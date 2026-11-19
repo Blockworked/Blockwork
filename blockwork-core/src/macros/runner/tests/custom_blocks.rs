@@ -177,6 +177,7 @@ fn pack_state_is_isolated_persistent_and_available_to_reporters_and_triggers() {
         1.0,
         Arc::clone(&triggered),
         Arc::new(Mutex::new(HashMap::new())),
+        Default::default(),
         loaded.block_table(),
         0,
     );
@@ -545,6 +546,7 @@ fn fired_strand_can_call_custom_block() {
         1.0,
         Arc::clone(&vars),
         Arc::new(Mutex::new(HashMap::new())),
+        Default::default(),
         mac.block_table(),
         0,
     );

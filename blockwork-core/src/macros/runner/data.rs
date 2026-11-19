@@ -1,6 +1,7 @@
 //! The variable and list blocks.
 
 use super::*;
+use blockstitch_core::graph::{DictItem, dict_remove, dict_set, parse_json_object};
 
 /// Runs one variable or list block. `Some(flow)` ends the strand with it; `None` goes on to the next block.
 pub(super) fn run_data_block(
@@ -183,6 +184,63 @@ pub(super) fn run_data_block(
                     }
                 }
                 Err(e) => soft_fail(ctx, &ins.id, "Split", e)?,
+            }
+        }
+        InstructionKind::SetDictKey { name, key, value } => {
+            let key = ctx.resolve(key, depth).and_then(|v| v.eval_text());
+            let value = ctx.resolve(value, depth).and_then(|v| v.eval());
+            match (key, value) {
+                (Ok(key), Ok(value)) => match DictItem::from_evaluated(value) {
+                    Some(item) => {
+                        if let Ok(mut dicts) = ctx.dicts.lock()
+                            && let Some(entries) = dicts.get_mut(name)
+                        {
+                            dict_set(entries, key, item);
+                        }
+                    }
+                    None => soft_fail(
+                        ctx,
+                        &ins.id,
+                        "Set dict key",
+                        "dict values must be number or text",
+                    )?,
+                },
+                (Err(e), _) | (_, Err(e)) => soft_fail(ctx, &ins.id, "Set dict key", e)?,
+            }
+        }
+        InstructionKind::DeleteDictKey { name, key } => {
+            match ctx.resolve(key, depth).and_then(|v| v.eval_text()) {
+                Ok(key) => {
+                    if let Ok(mut dicts) = ctx.dicts.lock()
+                        && let Some(entries) = dicts.get_mut(name)
+                    {
+                        dict_remove(entries, &key);
+                    }
+                }
+                Err(e) => soft_fail(ctx, &ins.id, "Delete dict key", e)?,
+            }
+        }
+        InstructionKind::ClearDict { name } => {
+            if let Ok(mut dicts) = ctx.dicts.lock()
+                && let Some(entries) = dicts.get_mut(name)
+            {
+                entries.clear();
+            }
+        }
+        InstructionKind::DictFromJson { text, name } => {
+            match ctx
+                .resolve(text, depth)
+                .and_then(|v| v.eval_text())
+                .and_then(|text| parse_json_object(&text))
+            {
+                Ok(entries) => {
+                    if let Ok(mut dicts) = ctx.dicts.lock()
+                        && let Some(slot) = dicts.get_mut(name)
+                    {
+                        *slot = entries;
+                    }
+                }
+                Err(e) => soft_fail(ctx, &ins.id, "Dict from JSON", e)?,
             }
         }
         _ => unreachable!("run_data_block got another block"),

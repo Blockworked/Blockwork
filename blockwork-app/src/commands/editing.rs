@@ -92,7 +92,7 @@ pub(crate) fn preview_value(state: &SharedState, value: Value) -> Result<String,
     if blockwork_core::input::value::has_side_effect_operator(&value) {
         return Err("Preview is off for blocks that run commands or go online".into());
     }
-    let (env, lists) = {
+    let (env, lists, dicts) = {
         let s = state.lock().map_err(|e| e.to_string())?;
         let env: HashMap<String, Evaluated> = s
             .variable_values
@@ -100,10 +100,11 @@ pub(crate) fn preview_value(state: &SharedState, value: Value) -> Result<String,
             .map(|g| g.clone())
             .unwrap_or_default();
         let lists = s.list_values.lock().map(|g| g.clone()).unwrap_or_default();
-        (env, lists)
+        let dicts = s.dict_values.lock().map(|g| g.clone()).unwrap_or_default();
+        (env, lists, dicts)
     };
     // Evaluated unlocked: a file or window read may be slow.
-    preview_value_with_env_and_lists(&value, &env, &lists)
+    preview_value_with_env_and_lists(&value, &env, &lists, &dicts)
         .map(|text| blockwork_core::secrets::redact(&text))
 }
 
@@ -114,15 +115,17 @@ pub(super) fn preview_value_with_env(
     value: &Value,
     env: &HashMap<String, Evaluated>,
 ) -> Result<String, String> {
-    preview_value_with_env_and_lists(value, env, &HashMap::new())
+    preview_value_with_env_and_lists(value, env, &HashMap::new(), &HashMap::new())
 }
 
 pub(super) fn preview_value_with_env_and_lists(
     value: &Value,
     env: &HashMap<String, Evaluated>,
     lists: &HashMap<String, Vec<ListItem>>,
+    dicts: &HashMap<String, Vec<blockstitch_core::graph::DictEntry>>,
 ) -> Result<String, String> {
-    resolve_list_reporters(&value.resolve_vars(env), lists)?.eval_text()
+    let resolved = resolve_list_reporters(&value.resolve_vars(env), lists)?;
+    blockstitch_core::graph::resolve_dict_reporters(&resolved, dicts)?.eval_text()
 }
 
 /// A canvas command that needs no permission, from code that can't wait.
