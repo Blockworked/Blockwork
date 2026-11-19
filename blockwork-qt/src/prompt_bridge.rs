@@ -22,6 +22,12 @@ pub mod qobject {
         #[qinvokable]
         fn finish(self: &PromptBridge, answer: &QString, text: &QString);
 
+        /// A window's reply with its controls' values (a JSON object);
+        /// quits after it unless it's a `click`.
+        #[qinvokable]
+        #[cxx_name = "sendValues"]
+        fn send_values(self: &PromptBridge, answer: &QString, text: &QString, values: &QString);
+
         /// Takes keyboard focus from whatever app has it. The daemon starts
         /// this process in the background, and Windows keeps those behind.
         #[qinvokable]
@@ -110,6 +116,25 @@ impl qobject::PromptBridge {
         let _ = writeln!(out, "{reply}");
         let _ = out.flush();
         std::process::exit(0);
+    }
+
+    fn send_values(
+        &self,
+        answer: &cxx_qt_lib::QString,
+        text: &cxx_qt_lib::QString,
+        values: &cxx_qt_lib::QString,
+    ) {
+        let values: serde_json::Value =
+            serde_json::from_str(&values.to_string()).unwrap_or_else(|_| serde_json::json!({}));
+        let answer = answer.to_string();
+        let reply =
+            serde_json::json!({ "answer": answer, "text": text.to_string(), "values": values });
+        let mut out = std::io::stdout().lock();
+        let _ = writeln!(out, "{reply}");
+        let _ = out.flush();
+        if answer != "click" {
+            std::process::exit(0);
+        }
     }
 
     fn parent_alive(&self) -> bool {

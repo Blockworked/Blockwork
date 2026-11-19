@@ -6,8 +6,8 @@ import com.blockworked.Blockstitch 1.0
 import com.blockworked.Blockwork 1.0
 
 // One macro dialog (`blockwork --prompt`): ask, yes/no, choose, message,
-// permission, pick a file or folder, a tooltip or a menu at the mouse.
-// Closing the window answers "cancel".
+// permission, pick a file or folder, a tooltip or a menu at the mouse, or a
+// window a macro built from controls. Closing the window answers "cancel".
 ApplicationWindow {
     id: root
     readonly property var request: { try { return JSON.parse(bridge.requestJson); } catch (e) { return ({}); } }
@@ -15,17 +15,35 @@ ApplicationWindow {
     readonly property bool picksPath: kind === "file" || kind === "folder"
     readonly property bool isTooltip: kind === "tooltip"
     readonly property bool isMenu: kind === "menu"
+    readonly property bool isForm: kind === "window"
+    readonly property var controls: request.controls || []
+    // A window's values by variable name, sent with every click.
+    property var formValues: {
+        const out = {};
+        for (const c of controls) if (c.name && c.kind !== "button" && c.kind !== "note") out[c.name] = c.value;
+        return out;
+    }
+    function setFormValue(name, value) {
+        const next = Object.assign({}, formValues);
+        next[name] = value;
+        formValues = next;
+    }
+    function click(control) {
+        if (control.close) answer("ok", control.label);
+        else bridge.sendValues("click", control.label, JSON.stringify(formValues));
+    }
     // Small frameless boxes instead of a dialog.
     readonly property bool boxed: isTooltip || isMenu
     Binding { target: Theme; property: "mode"; value: blockworkAppearance }
     Binding { target: Motion; property: "durationScale"; value: root.request.animation_speed ?? 1 }
     width: isTooltip ? Math.min(480, tipText.implicitWidth + 24) : isMenu ? 260 : 440
     height: isTooltip ? tipText.implicitHeight + 16 : isMenu ? Math.min(400, menuList.contentHeight + 8)
+        : isForm ? Math.min(640, form.implicitHeight + 40)
         : Math.min(560, content.implicitHeight + 40)
     minimumWidth: boxed ? 0 : 320
     visible: true
     title: kind === "permission" ? qsTr("Blockwork permission") : (request.title || "Blockwork")
-    flags: isTooltip ? (Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus | Qt.WindowTransparentForInput)
+    flags: isForm ? Qt.Window : isTooltip ? (Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus | Qt.WindowTransparentForInput)
         : isMenu ? (Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         : (Qt.Dialog | Qt.WindowStaysOnTopHint)
     color: Theme.panel
@@ -41,7 +59,8 @@ ApplicationWindow {
     function answer(button, text) {
         if (answered) return;
         answered = true;
-        bridge.finish(button, text || "");
+        if (isForm) bridge.sendValues(button, text || "", JSON.stringify(formValues));
+        else bridge.finish(button, text || "");
     }
     onClosing: answer(kind === "message" || isTooltip ? "ok" : "cancel", "")
     // Where a box goes: by the mouse, or a corner of the screen it's on.
@@ -148,6 +167,7 @@ ApplicationWindow {
         permission: [[qsTr("Deny"), "deny", false], [qsTr("Allow this time"), "once", false], [qsTr("Always allow"), "always", true]]
     })[kind] || [[qsTr("OK"), "ok", true]]
     function accept() {
+        if (isForm) return;
         if (kind === "choice") { if (choices.currentIndex >= 0) answer("ok", request.options[choices.currentIndex]); }
         else if (isMenu) { if (menuList.currentIndex >= 0) answer("ok", request.options[menuList.currentIndex]); }
         else if (kind === "text") answer("ok", field.text);
@@ -198,9 +218,78 @@ ApplicationWindow {
         }
     }
 
+    // A window a macro built: its controls in order, buttons along the bottom.
+    ColumnLayout {
+        id: form
+        objectName: "promptForm"
+        visible: root.isForm
+        anchors.fill: parent; anchors.margins: 20
+        spacing: 12
+        Repeater {
+            model: root.isForm ? root.controls.filter(c => c.kind !== "button") : []
+            delegate: ColumnLayout {
+                id: row
+                required property var modelData
+                required property int index
+                Layout.fillWidth: true
+                spacing: 5
+                Text {
+                    visible: row.modelData.kind === "note" || row.modelData.kind === "text" || row.modelData.kind === "choice"
+                    Layout.fillWidth: true
+                    text: row.modelData.label
+                    textFormat: Text.PlainText; wrapMode: Text.WordWrap
+                    color: Theme.text; font.pixelSize: row.modelData.kind === "note" ? 14 : 13
+                }
+                StitchTextField {
+                    objectName: "promptFormText_" + row.index
+                    visible: row.modelData.kind === "text"
+                    Accessible.name: row.modelData.label
+                    Layout.fillWidth: true
+                    text: row.modelData.value === null || row.modelData.value === undefined ? "" : String(row.modelData.value)
+                    onTextEdited: root.setFormValue(row.modelData.name, text)
+                }
+                StitchCheckBox {
+                    objectName: "promptFormCheck_" + row.index
+                    visible: row.modelData.kind === "check"
+                    text: row.modelData.label
+                    checked: row.modelData.value === true
+                    onToggled: root.setFormValue(row.modelData.name, checked)
+                }
+                StitchComboBox {
+                    objectName: "promptFormChoice_" + row.index
+                    visible: row.modelData.kind === "choice"
+                    Accessible.name: row.modelData.label
+                    Layout.fillWidth: true
+                    model: row.modelData.options || []
+                    currentIndex: Math.max(0, (row.modelData.options || []).indexOf(String(row.modelData.value)))
+                    onActivated: index => root.setFormValue(row.modelData.name, model[index])
+                    Component.onCompleted: if (row.modelData.kind === "choice" && count > 0) root.setFormValue(row.modelData.name, model[currentIndex])
+                }
+            }
+        }
+        Item { Layout.fillHeight: true }
+        Flow {
+            Layout.fillWidth: true
+            layoutDirection: Qt.RightToLeft
+            spacing: 8
+            Repeater {
+                // Right to left, so the first button ends up leftmost.
+                model: root.isForm ? root.controls.filter(c => c.kind === "button").reverse() : []
+                delegate: StitchButton {
+                    required property var modelData
+                    required property int index
+                    objectName: "promptFormButton_" + modelData.label
+                    text: modelData.label
+                    primary: !!modelData.close
+                    onClicked: root.click(modelData)
+                }
+            }
+        }
+    }
+
     ColumnLayout {
         id: content
-        visible: !root.boxed
+        visible: !root.boxed && !root.isForm
         anchors.fill: parent; anchors.margins: 20
         spacing: 14
         RowLayout {

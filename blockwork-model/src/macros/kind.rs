@@ -657,6 +657,40 @@ pub enum InstructionKind {
     },
     /// Shows a message in a dialog and waits until it's closed.
     ShowMessage(Value),
+    /// Opens a window built from the `Window*` control blocks in `body`
+    /// and waits until it's closed. Its controls read and write variables,
+    /// and its buttons start `WhenWindowButton` strands.
+    ShowWindow {
+        title: Value,
+        body: Vec<Instruction>,
+    },
+    /// Inside `ShowWindow`: a text box for variable `name`.
+    WindowTextBox {
+        label: Value,
+        name: String,
+    },
+    /// Inside `ShowWindow`: a checkbox for variable `name` (true or false).
+    WindowCheckbox {
+        label: Value,
+        name: String,
+    },
+    /// Inside `ShowWindow`: a drop-down of list `list`'s items for variable `name`.
+    WindowChoice {
+        label: Value,
+        list: String,
+        name: String,
+    },
+    /// Inside `ShowWindow`: a button; with `close`, clicking it also closes
+    /// the window.
+    WindowButton {
+        label: Value,
+        close: bool,
+    },
+    /// Inside `ShowWindow`: a line of text.
+    WindowNote(Value),
+    /// Header for a strand a `ShowWindow` button with this label starts,
+    /// sharing that run's variables.
+    WhenWindowButton(Value),
     /// Header for a strand fired once at a date and time, like `2026-12-24 18:00`.
     WhenAt(Value),
     /// Header for a strand started by a `SendSignal` of the same name in this macro.

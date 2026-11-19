@@ -295,7 +295,10 @@ impl Macro {
         self.strands.iter().any(|st| {
             st.instructions.first().is_some_and(|i| {
                 i.kind.info().role == Role::Trigger
-                    && !matches!(i.kind, InstructionKind::WhenSignal(_))
+                    && !matches!(
+                        i.kind,
+                        InstructionKind::WhenSignal(_) | InstructionKind::WhenWindowButton(_)
+                    )
             })
         })
     }

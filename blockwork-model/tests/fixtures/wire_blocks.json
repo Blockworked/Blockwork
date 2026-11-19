@@ -1532,5 +1532,68 @@
    "value": "Say hi"
   },
   "id": "whentrayitem"
+ },
+ {
+  "type": "ShowWindow",
+  "title": {
+   "kind": "Text",
+   "value": "Settings"
+  },
+  "body": [
+   {
+    "type": "WindowTextBox",
+    "id": "child_textbox",
+    "label": {
+     "kind": "Text",
+     "value": "Name"
+    },
+    "name": "WindowTextBox.name"
+   },
+   {
+    "type": "WindowCheckbox",
+    "id": "child_checkbox",
+    "label": {
+     "kind": "Text",
+     "value": "Loud"
+    },
+    "name": "WindowCheckbox.name"
+   },
+   {
+    "type": "WindowChoice",
+    "id": "child_choice",
+    "label": {
+     "kind": "Text",
+     "value": "Color"
+    },
+    "list": "WindowChoice.list",
+    "name": "WindowChoice.name"
+   },
+   {
+    "type": "WindowButton",
+    "id": "child_button",
+    "label": {
+     "kind": "Text",
+     "value": "Go"
+    },
+    "close": true
+   },
+   {
+    "type": "WindowNote",
+    "id": "child_note",
+    "text": {
+     "kind": "Text",
+     "value": "Hello"
+    }
+   }
+  ],
+  "id": "showwindow"
+ },
+ {
+  "type": "WhenWindowButton",
+  "label": {
+   "kind": "Text",
+   "value": "Go"
+  },
+  "id": "whenwindowbutton"
  }
 ]

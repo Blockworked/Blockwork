@@ -70,6 +70,7 @@ impl InstructionKind {
             | K::WhenMouseButton { block: false, .. }
             | K::WhenAt(_)
             | K::WhenSignal(_)
+            | K::WhenWindowButton(_)
             | K::WhenWebhook { .. } => of(Trigger, &[]),
             K::WhenClipboardChanged => of(Trigger, &["clipboard"]),
             K::WhenWindow { .. } | K::WhenApp { .. } => of(Trigger, &["windows"]),
@@ -126,7 +127,14 @@ impl InstructionKind {
             | K::AskFile { .. }
             | K::ShowMenu { .. }
             | K::ShowTooltip { .. }
-            | K::ShowMessage(_) => of(Dialogs, &[]),
+            | K::ShowMessage(_)
+            | K::ShowWindow { .. } => of(Dialogs, &[]),
+            // Read by the `ShowWindow` around them, never run on their own.
+            K::WindowTextBox { .. }
+            | K::WindowCheckbox { .. }
+            | K::WindowChoice { .. }
+            | K::WindowButton { .. }
+            | K::WindowNote(_) => of(Comment, &[]),
 
             K::Token(_)
             | K::TouchGesture { .. }

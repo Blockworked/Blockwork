@@ -45,7 +45,7 @@
 <context>
     <name>EditorPage</name>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="497"/>
+        <location filename="../qml/EditorPage.qml" line="499"/>
         <source>Paused before &quot;%1&quot; (%n strand(s) waiting)</source>
         <translation>
             <numerusform>Paused before &quot;%1&quot; (%n strand waiting)</numerusform>
@@ -53,7 +53,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/EditorPage.qml" line="658"/>
+        <location filename="../qml/EditorPage.qml" line="660"/>
         <source>Delete %n block(s)</source>
         <translation>
             <numerusform>Delete %n block</numerusform>
@@ -75,7 +75,7 @@
 <context>
     <name>MacroFiles</name>
     <message numerus="yes">
-        <location filename="../qml/MacroFiles.qml" line="172"/>
+        <location filename="../qml/MacroFiles.qml" line="192"/>
         <source>Exported %n macro(s), including any macros they run.</source>
         <translation>
             <numerusform>Exported %n macro, including any macros it runs.</numerusform>
@@ -83,7 +83,7 @@
         </translation>
     </message>
     <message numerus="yes">
-        <location filename="../qml/MacroFiles.qml" line="213"/>
+        <location filename="../qml/MacroFiles.qml" line="233"/>
         <source>This bundle has %n macro(s): %1.</source>
         <translation>
             <numerusform>This bundle has %n macro: %1.</numerusform>

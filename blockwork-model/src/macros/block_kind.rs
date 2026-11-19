@@ -15,6 +15,8 @@ macro_rules! for_each_ref {
             | InstructionKind::AskText { name, .. }
             | InstructionKind::AskYesNo { name, .. }
             | InstructionKind::AskFile { name, .. }
+            | InstructionKind::WindowTextBox { name, .. }
+            | InstructionKind::WindowCheckbox { name, .. }
             | InstructionKind::ReadKeys { name, .. }
             | InstructionKind::WhenWebhook { variable: name, .. } => $f(RefKind::Variable, name),
             InstructionKind::FindColor {
@@ -38,6 +40,7 @@ macro_rules! for_each_ref {
                 }
             }
             InstructionKind::AskChoice { list, name, .. }
+            | InstructionKind::WindowChoice { list, name, .. }
             | InstructionKind::ShowMenu { list, name } => {
                 $f(RefKind::List, list);
                 $f(RefKind::Variable, name);
@@ -121,6 +124,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Retry { body, .. }, 0) => Some(body),
             (InstructionKind::WithLock { body, .. }, 0) => Some(body),
             (InstructionKind::WithInputBlocked { body }, 0) => Some(body),
+            (InstructionKind::ShowWindow { body, .. }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get(slot as usize),
             _ => None,
         }
@@ -143,6 +147,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Retry { body, .. }, 0) => Some(body),
             (InstructionKind::WithLock { body, .. }, 0) => Some(body),
             (InstructionKind::WithInputBlocked { body }, 0) => Some(body),
+            (InstructionKind::ShowWindow { body, .. }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get_mut(slot as usize),
             _ => None,
         }
