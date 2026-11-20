@@ -48,6 +48,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Window blocks work on GNOME on Wayland through a small Shell extension (install it in Settings > Integrations) and on COSMIC, which allows focusing, minimizing, maximizing and closing ([docs](docs/linux-windows.md)).
 
 ### Changed
+- Window controls have their own square tab and violet tint, and only fit inside a show window block. Other blocks no longer go inside one, and controls no longer stack under normal blocks. Blocks already in the wrong place are dimmed with a warning.
 - The Text block spaces keystrokes 0.5 ms apart on Windows and macOS too, as it already did on Linux, so fast typing doesn't drop or merge characters.
 
 ### Fixed

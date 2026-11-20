@@ -147,28 +147,28 @@
 <context>
     <name>BlockAppearancePopup</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockAppearancePopup.qml" line="20"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockAppearancePopup.qml" line="20"/>
         <source>Appearance</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockAppearancePopup.qml" line="74"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockAppearancePopup.qml" line="74"/>
         <source>Icon</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockAppearancePopup.qml" line="80"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockAppearancePopup.qml" line="80"/>
         <source>Default</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockAppearancePopup.qml" line="92"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockAppearancePopup.qml" line="92"/>
         <source>Reset</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockAppearancePopup.qml" line="226"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockAppearancePopup.qml" line="235"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockAppearancePopup.qml" line="226"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockAppearancePopup.qml" line="235"/>
         <source>Done</source>
         <translation type="unfinished"></translation>
     </message>
@@ -176,12 +176,12 @@
 <context>
     <name>BlockCanvas</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="11"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockCanvas.qml" line="11"/>
         <source>Block canvas</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockCanvas.qml" line="29"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockCanvas.qml" line="29"/>
         <source>Delete all blocks</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2590,71 +2590,81 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="834"/>
+        <location filename="../qml/BlockCatalog.qml" line="801"/>
+        <source>Window controls only go inside a show window block</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="802"/>
+        <source>Only window controls go inside a show window block</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockCatalog.qml" line="838"/>
         <source>Pick a file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="844"/>
+        <location filename="../qml/BlockCatalog.qml" line="848"/>
         <source>My window</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="845"/>
+        <location filename="../qml/BlockCatalog.qml" line="849"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="846"/>
+        <location filename="../qml/BlockCatalog.qml" line="850"/>
         <source>Turned on</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="848"/>
+        <location filename="../qml/BlockCatalog.qml" line="852"/>
         <source>Go</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="862"/>
+        <location filename="../qml/BlockCatalog.qml" line="866"/>
         <source>What&apos;s your name?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="863"/>
+        <location filename="../qml/BlockCatalog.qml" line="867"/>
         <source>Continue?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="847"/>
-        <location filename="../qml/BlockCatalog.qml" line="864"/>
+        <location filename="../qml/BlockCatalog.qml" line="851"/>
+        <location filename="../qml/BlockCatalog.qml" line="868"/>
         <source>Pick one</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="865"/>
-        <location filename="../qml/BlockCatalog.qml" line="893"/>
+        <location filename="../qml/BlockCatalog.qml" line="869"/>
+        <location filename="../qml/BlockCatalog.qml" line="897"/>
         <source>Done!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="842"/>
-        <location filename="../qml/BlockCatalog.qml" line="887"/>
-        <location filename="../qml/BlockCatalog.qml" line="922"/>
+        <location filename="../qml/BlockCatalog.qml" line="846"/>
+        <location filename="../qml/BlockCatalog.qml" line="891"/>
+        <location filename="../qml/BlockCatalog.qml" line="926"/>
         <source>Hello!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="871"/>
+        <location filename="../qml/BlockCatalog.qml" line="875"/>
         <source>Run my macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="894"/>
+        <location filename="../qml/BlockCatalog.qml" line="898"/>
         <source>checkpoint</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="896"/>
+        <location filename="../qml/BlockCatalog.qml" line="900"/>
         <source>something went wrong</source>
         <translation type="unfinished"></translation>
     </message>
@@ -2831,243 +2841,243 @@
 <context>
     <name>BlockDefinitionEditor</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="267"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="286"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="267"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="286"/>
         <source>block name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="601"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="601"/>
         <source>Every input and branch needs a name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="603"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="603"/>
         <source>Input and branch names must be unique</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="621"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="621"/>
         <source>Give the block a name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="361"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="361"/>
         <source>value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="134"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="134"/>
         <source>Identifier</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="35"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="35"/>
         <source>AUTHOR_BLOCKNAME</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="142"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="142"/>
         <source>Description</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="352"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="352"/>
         <source>component</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="361"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="361"/>
         <source>label</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="581"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="581"/>
         <source>Enter a finite number for each numeric default</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="588"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="588"/>
         <source>Components must come before branches</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="986"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="986"/>
         <source>Appearance</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="947"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="947"/>
         <source>Add label</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="361"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="361"/>
         <source>settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="592"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="592"/>
         <source>Choose inputs for every settings button in Inputs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="610"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="610"/>
         <source>Every hidden input needs a settings button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="611"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="611"/>
         <source>Component toggles must stay on the block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="612"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="612"/>
         <source>A dropdown can have at most 128 choices</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="614"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="614"/>
         <source>Choices need labels and unique non-empty values</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="618"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="618"/>
         <source>Choose a starting value from the dropdown choices</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="905"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="905"/>
         <source>Move branch up</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="906"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="906"/>
         <source>Remove branch</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="907"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="907"/>
         <source>Move branch down</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="993"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="993"/>
         <source>Inputs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1016"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1016"/>
         <source>Component</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1017"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1017"/>
         <source>optional group</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1023"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1023"/>
         <source>Input</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1024"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1024"/>
         <source>text or number</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1030"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1030"/>
         <source>Boolean</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1031"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1031"/>
         <source>true or false</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1037"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1037"/>
         <source>Branch</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1038"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1038"/>
         <source>nested blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1044"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1044"/>
         <source>Button</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1045"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1045"/>
         <source>settings screen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1051"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1051"/>
         <source>Label</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="147"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="147"/>
         <source>Description for Details (optional)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="155"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="155"/>
         <source>Done</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="361"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="361"/>
         <source>branch</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1126"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1126"/>
         <source>Return Text or Number</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1126"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1126"/>
         <source>Normal block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1133"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1133"/>
         <source>Return a Boolean</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1133"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1133"/>
         <source>Ending block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1142"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1142"/>
         <source>Returns a value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="1164"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="1164"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="38"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="38"/>
         <source>OK</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="30"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="30"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="32"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockDefinitionEditor.qml" line="32"/>
         <source>A public identifier and a description for this block.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -3110,6 +3120,11 @@
     <message>
         <location filename="../qml/BlockHelp.qml" line="27"/>
         <source>Shows the items of a list and puts the one you pick in the variable. Cancel stops the run, unless it&apos;s inside a try block.</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../qml/BlockHelp.qml" line="28"/>
+        <source>Opens a window made of the text boxes, checkboxes, drop-downs, buttons and text inside it, and waits until it&apos;s closed. Each control starts with its variable&apos;s value and writes back what you enter. Only window controls fit inside it; put the blocks a button runs inside that button.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -3525,11 +3540,6 @@
     <message>
         <location filename="../qml/BlockHelp.qml" line="20"/>
         <source>How many elements the selector matches on the page. Handy for checking a selector picks only one.</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockHelp.qml" line="28"/>
-        <source>Opens a window made of the text boxes, checkboxes, drop-downs, buttons and text inside it, and waits until it&apos;s closed. Each control starts with its variable&apos;s value and writes back what you enter. Put the blocks a button runs inside that button; other blocks directly inside show window are skipped.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
@@ -4471,12 +4481,12 @@
 <context>
     <name>BlockIconPopup</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockIconPopup.qml" line="43"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockIconPopup.qml" line="43"/>
         <source>Search icons</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockIconPopup.qml" line="93"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockIconPopup.qml" line="93"/>
         <source>No icons match</source>
         <translation type="unfinished"></translation>
     </message>
@@ -4484,77 +4494,77 @@
 <context>
     <name>BlockInputsPopup</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="21"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="21"/>
         <source>Inputs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="25"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="25"/>
         <source>Starting values for new blocks added from the sidebar (existing blocks keep their values), dropdown choices, settings buttons and text boxes.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="26"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="26"/>
         <source>Which inputs get a text box of their own, for text with several lines.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="41"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="41"/>
         <source>Add an input to the block to set its options.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="71"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="71"/>
         <source>Multi-line text box under the block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="78"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="78"/>
         <source>Dropdown choices (one per line; label | value)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="94"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="94"/>
         <source>Show only in a settings screen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="104"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="104"/>
         <source>Screen title</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="108"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="108"/>
         <source>Inputs on this screen</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="138"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="138"/>
         <source>Number</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="138"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="138"/>
         <source>Text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="152"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="152"/>
         <source>False</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="152"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="152"/>
         <source>True</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="177"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="177"/>
         <source>Enter a finite number</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockInputsPopup.qml" line="186"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockInputsPopup.qml" line="186"/>
         <source>Done</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5109,47 +5119,47 @@
 <context>
     <name>BlockMenu</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="14"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockMenu.qml" line="14"/>
         <source>Edit block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="20"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockMenu.qml" line="20"/>
         <source>Copy block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="26"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockMenu.qml" line="26"/>
         <source>Copy all</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="32"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockMenu.qml" line="32"/>
         <source>Duplicate block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="38"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockMenu.qml" line="38"/>
         <source>Cut block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="44"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockMenu.qml" line="44"/>
         <source>Add Comment</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="44"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockMenu.qml" line="44"/>
         <source>Comment</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="50"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockMenu.qml" line="50"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockMenu.qml" line="58"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockMenu.qml" line="58"/>
         <source>Delete block</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5157,27 +5167,27 @@
 <context>
     <name>BlockPiece</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockPiece.qml" line="26"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockPiece.qml" line="26"/>
         <source>Component: %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockPiece.qml" line="63"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockPiece.qml" line="63"/>
         <source>choose</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockPiece.qml" line="158"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockPiece.qml" line="158"/>
         <source>Block settings</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockPiece.qml" line="236"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockPiece.qml" line="236"/>
         <source>Add an option</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockPiece.qml" line="283"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockPiece.qml" line="283"/>
         <source>Remove %1</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5185,379 +5195,385 @@
 <context>
     <name>BlockRegistry</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="200"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="200"/>
         <source>abs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="200"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="200"/>
         <source>floor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="200"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="200"/>
         <source>ceiling</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="200"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="200"/>
         <source>sign</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="201"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="201"/>
         <source>sqrt</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="201"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="201"/>
         <source>sin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="201"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="201"/>
         <source>cos</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="201"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="201"/>
         <source>tan</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="202"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="202"/>
         <source>asin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="202"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="202"/>
         <source>acos</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="202"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="202"/>
         <source>atan</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="202"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="202"/>
         <source>ln</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="203"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="203"/>
         <source>log</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="203"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="203"/>
         <source>log2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="203"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="203"/>
         <source>e ^</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="205"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="205"/>
         <source>uppercase</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="205"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="205"/>
         <source>lowercase</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="207"/>
         <source>year</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="207"/>
         <source>month</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="207"/>
         <source>date</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="207"/>
         <source>day of week</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="208"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="208"/>
         <source>hour</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="208"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="208"/>
         <source>minute</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="208"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="208"/>
         <source>second</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="212"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="212"/>
         <source>mod</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="213"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="213"/>
         <source>round</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="124"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="128"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="129"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="213"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="217"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="223"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="124"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="128"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="129"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="213"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="217"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="223"/>
         <source>of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="214"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="214"/>
         <source>pick random</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="121"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="123"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="214"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="218"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="121"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="123"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="214"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="218"/>
         <source>to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="215"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="215"/>
         <source>join</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="215"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="215"/>
         <source>new line</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="215"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="215"/>
         <source>tab character</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="216"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="216"/>
         <source>index of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="216"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="224"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="225"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="231"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="216"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="216"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="224"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="225"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="231"/>
         <source>in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="216"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="216"/>
         <source>last index of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="217"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="217"/>
         <source>letter</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="217"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="226"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="217"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="226"/>
         <source>length of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="220"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="220"/>
         <source>and</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="220"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="220"/>
         <source>or</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="221"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="221"/>
         <source>not</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="221"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="221"/>
         <source>true</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="221"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="221"/>
         <source>false</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="222"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="222"/>
         <source>current</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="223"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="228"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="223"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="228"/>
         <source>item</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="224"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="224"/>
         <source>item # of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="225"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="225"/>
         <source>amount of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="227"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="227"/>
         <source>contains</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="228"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="228"/>
         <source>exists in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="229"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="236"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="229"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="236"/>
         <source>is</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="229"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="236"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="229"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="236"/>
         <source>empty?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="230"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="235"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="230"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="235"/>
         <source>as JSON</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="231"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="231"/>
         <source>value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="232"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="232"/>
         <source>has key</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="233"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="233"/>
         <source>size of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="234"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="234"/>
         <source>keys of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="394"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="394"/>
         <source>Make a List…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="127"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="490"/>
+        <source>This block doesn&apos;t fit here</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="127"/>
         <source>at</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="121"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="121"/>
         <source>set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="122"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="122"/>
         <source>change</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="122"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="126"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="122"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="126"/>
         <source>by</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="123"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="123"/>
         <source>add</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="124"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="124"/>
         <source>delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="125"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="125"/>
         <source>delete all of</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="126"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="126"/>
         <source>shift</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="119"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="119"/>
         <source>Choose list</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="127"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="127"/>
         <source>insert</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="129"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="129"/>
         <source>replace item</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="130"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="130"/>
         <source>with</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="131"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="131"/>
         <source>reverse</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="132"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="132"/>
         <source>return</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="133"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="133"/>
         <source>break loop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="134"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockRegistry.qml" line="134"/>
         <source>continue loop</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5565,27 +5581,27 @@
 <context>
     <name>BlockSettingsDialog</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockSettingsDialog.qml" line="60"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockSettingsDialog.qml" line="60"/>
         <source>Reporter inputs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockSettingsDialog.qml" line="75"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockSettingsDialog.qml" line="75"/>
         <source>Enabled</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockSettingsDialog.qml" line="119"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockSettingsDialog.qml" line="119"/>
         <source>Enter a finite number</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockSettingsDialog.qml" line="122"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockSettingsDialog.qml" line="122"/>
         <source>Cancel</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockSettingsDialog.qml" line="123"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockSettingsDialog.qml" line="123"/>
         <source>Apply</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5593,17 +5609,17 @@
 <context>
     <name>BlockUi</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockUi.qml" line="49"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockUi.qml" line="49"/>
         <source>The block&apos;s inputs changed. Reopen its settings.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockUi.qml" line="51"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockUi.qml" line="51"/>
         <source>An input changed while this screen was open. Reopen its settings.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockUi.qml" line="65"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BlockUi.qml" line="65"/>
         <source>The block changed. Reopen its settings.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5611,7 +5627,7 @@
 <context>
     <name>BoxLeaf</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BoxLeaf.qml" line="80"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/BoxLeaf.qml" line="80"/>
         <source>Edit in a bigger box</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5619,12 +5635,12 @@
 <context>
     <name>CanvasMenu</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CanvasMenu.qml" line="28"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CanvasMenu.qml" line="28"/>
         <source>Paste</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CanvasMenu.qml" line="33"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CanvasMenu.qml" line="33"/>
         <source>Add Comment</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5632,42 +5648,42 @@
 <context>
     <name>CollectionPanel</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CollectionPanel.qml" line="34"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CollectionPanel.qml" line="34"/>
         <source>Show %1 on canvas</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CollectionPanel.qml" line="44"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CollectionPanel.qml" line="44"/>
         <source>Rename dict</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CollectionPanel.qml" line="44"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CollectionPanel.qml" line="44"/>
         <source>Rename variable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CollectionPanel.qml" line="44"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CollectionPanel.qml" line="44"/>
         <source>Rename list</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CollectionPanel.qml" line="45"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CollectionPanel.qml" line="45"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CollectionPanel.qml" line="46"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CollectionPanel.qml" line="46"/>
         <source>Delete dict</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CollectionPanel.qml" line="46"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CollectionPanel.qml" line="46"/>
         <source>Delete variable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CollectionPanel.qml" line="46"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CollectionPanel.qml" line="46"/>
         <source>Delete list</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5675,12 +5691,12 @@
 <context>
     <name>CommentCard</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CommentCard.qml" line="63"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CommentCard.qml" line="63"/>
         <source>Comment</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/CommentCard.qml" line="137"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/CommentCard.qml" line="137"/>
         <source>Delete comment</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6235,27 +6251,27 @@
 <context>
     <name>DefinitionPiece</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/DefinitionPiece.qml" line="73"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/DefinitionPiece.qml" line="73"/>
         <source>Add label</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/DefinitionPiece.qml" line="73"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/DefinitionPiece.qml" line="73"/>
         <source>value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/DefinitionPiece.qml" line="124"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/DefinitionPiece.qml" line="124"/>
         <source>Move left</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/DefinitionPiece.qml" line="129"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/DefinitionPiece.qml" line="129"/>
         <source>Remove</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/DefinitionPiece.qml" line="134"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/DefinitionPiece.qml" line="134"/>
         <source>Move right</source>
         <translation type="unfinished"></translation>
     </message>
@@ -6322,27 +6338,27 @@
 <context>
     <name>DictEditorCard</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="173"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/DictEditorCard.qml" line="173"/>
         <source>This dict is empty.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="215"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/DictEditorCard.qml" line="215"/>
         <source>key</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="235"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/DictEditorCard.qml" line="235"/>
         <source>value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="274"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/DictEditorCard.qml" line="274"/>
         <source>Add entry</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="282"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/DictEditorCard.qml" line="282"/>
         <source>%n entry(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -7198,12 +7214,12 @@
 <context>
     <name>FloatingValue</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/FloatingValue.qml" line="35"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/FloatingValue.qml" line="35"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/FloatingValue.qml" line="40"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/FloatingValue.qml" line="40"/>
         <source>Delete value</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7347,44 +7363,44 @@
 <context>
     <name>InstructionBlock</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="528"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/InstructionBlock.qml" line="537"/>
         <source>custom block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="537"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="594"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="610"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/InstructionBlock.qml" line="546"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/InstructionBlock.qml" line="603"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/InstructionBlock.qml" line="619"/>
         <source>(deleted block)</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="989"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/InstructionBlock.qml" line="1006"/>
         <source>if</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="1010"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/InstructionBlock.qml" line="1027"/>
         <source>then</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="1017"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/InstructionBlock.qml" line="1034"/>
         <source>repeat</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="1043"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/InstructionBlock.qml" line="1060"/>
         <source>forever</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="1050"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/InstructionBlock.qml" line="1067"/>
         <source>while</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/InstructionBlock.qml" line="696"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/InstructionBlock.qml" line="705"/>
         <source>Breakpoint: runs pause here. Click to remove.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7392,17 +7408,17 @@
 <context>
     <name>KeycapLeaf</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/KeycapLeaf.qml" line="23"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/KeycapLeaf.qml" line="23"/>
         <source>Click to set key</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/KeycapLeaf.qml" line="23"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/KeycapLeaf.qml" line="23"/>
         <source>Press keys...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/KeycapLeaf.qml" line="73"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/KeycapLeaf.qml" line="73"/>
         <source>Click to set key, or drop a variable here</source>
         <translation type="unfinished"></translation>
     </message>
@@ -7596,17 +7612,17 @@
 <context>
     <name>ListEditorCard</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ListEditorCard.qml" line="157"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/ListEditorCard.qml" line="157"/>
         <source>This list is empty.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ListEditorCard.qml" line="244"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/ListEditorCard.qml" line="244"/>
         <source>Add item</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/ListEditorCard.qml" line="252"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/ListEditorCard.qml" line="252"/>
         <source>%n item(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -7883,82 +7899,82 @@
 <context>
     <name>NameDialog</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="20"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="20"/>
         <source>Make a Variable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="20"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="20"/>
         <source>Rename Variable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="20"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="20"/>
         <source>Variable name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="20"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="20"/>
         <source>Variable name can&apos;t be empty</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="21"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="21"/>
         <source>Make a List</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="21"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="21"/>
         <source>Rename List</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="21"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="21"/>
         <source>List name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="21"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="21"/>
         <source>List name can&apos;t be empty</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="22"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="22"/>
         <source>Make a Dict</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="22"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="22"/>
         <source>Rename Dict</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="22"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="22"/>
         <source>Dict name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="22"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="22"/>
         <source>Dict name can&apos;t be empty</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="24"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="24"/>
         <source>Make a %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="24"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="24"/>
         <source>Rename %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="24"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="24"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/NameDialog.qml" line="24"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/NameDialog.qml" line="24"/>
         <source>The name can&apos;t be empty</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8189,68 +8205,68 @@
 <context>
     <name>PaletteBlockList</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="101"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="101"/>
         <source>See what this block does and where it can be used.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="143"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="143"/>
         <source>Set value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="149"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="149"/>
         <source>Rename variable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="154"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="154"/>
         <source>Delete variable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="178"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="178"/>
         <source>A document-wide ordered collection of text and number items.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="187"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="187"/>
         <source>Make a dict, then check it to open its editor on the canvas.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="191"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="191"/>
         <source>A document-wide collection of text and number values, looked up by key.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="203"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="203"/>
         <source>My blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="207"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="207"/>
         <source>Make a Block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="276"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="276"/>
         <source>Community blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="280"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="280"/>
         <source>Browse</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="342"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="372"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="342"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="372"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteBlockList.qml" line="385"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteBlockList.qml" line="385"/>
         <source>No blocks match &quot;%1&quot;</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8258,7 +8274,7 @@
 <context>
     <name>PaletteDragController</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteDragController.qml" line="310"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteDragController.qml" line="310"/>
         <source>custom block</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8266,164 +8282,164 @@
 <context>
     <name>PalettePanel</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="173"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="173"/>
         <source>Edit block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="178"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="178"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="184"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="184"/>
         <source>Share as a pack...</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="190"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="190"/>
         <source>Delete block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="293"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="293"/>
         <source>Variables</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="299"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="299"/>
         <source>Lists</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="305"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="305"/>
         <source>Dicts</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="447"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="447"/>
         <source>All</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="448"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="448"/>
         <source>Events</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="449"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="449"/>
         <source>Flow</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="450"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="450"/>
         <source>Data</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="451"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="451"/>
         <source>Operators</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="459"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="459"/>
         <source>Custom</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="461"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="461"/>
         <source>Community</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="438"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="438"/>
         <source>A value or operator block that can be placed in an input.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="421"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="421"/>
         <source>Make a Variable</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="421"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="421"/>
         <source>Make a List</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="435"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="435"/>
         <source>A list reporter block that reads data without changing the list.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="421"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="421"/>
         <source>Make a Dict</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="437"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="437"/>
         <source>A dict reporter block that reads data without changing the dict.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="133"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="133"/>
         <source>Community blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="10"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="10"/>
         <source>A custom block defined here.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="11"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="11"/>
         <source>A custom reporter block defined here.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="506"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="507"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="506"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="507"/>
         <source>if</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="506"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="507"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="506"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="507"/>
         <source>then</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="507"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="507"/>
         <source>else</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="508"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="508"/>
         <source>repeat</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="509"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="509"/>
         <source>forever</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="510"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="510"/>
         <source>while</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="758"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="758"/>
         <source>Search blocks</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="852"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="852"/>
         <source>All categories</source>
         <translation type="unfinished"></translation>
     </message>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="939"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="939"/>
         <source>%n block(s)</source>
         <translation type="unfinished">
             <numerusform></numerusform>
@@ -8431,12 +8447,12 @@
         </translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="1120"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="1120"/>
         <source>Release to delete</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="1120"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="1120"/>
         <source>Drop here to delete</source>
         <translation type="unfinished"></translation>
     </message>
@@ -8444,7 +8460,7 @@
 <context>
     <name>PaletteValue</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/PaletteValue.qml" line="11"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PaletteValue.qml" line="11"/>
         <source>custom block</source>
         <translation type="unfinished"></translation>
     </message>
@@ -10040,7 +10056,7 @@
 <context>
     <name>StrandView</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/StrandView.qml" line="9"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/StrandView.qml" line="9"/>
         <source>Block strand</source>
         <translation type="unfinished"></translation>
     </message>
@@ -10048,17 +10064,17 @@
 <context>
     <name>SummaryLeaf</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/SummaryLeaf.qml" line="37"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/SummaryLeaf.qml" line="37"/>
         <source>+1 line</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/SummaryLeaf.qml" line="37"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/SummaryLeaf.qml" line="37"/>
         <source>+%1 lines</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/SummaryLeaf.qml" line="56"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/SummaryLeaf.qml" line="56"/>
         <source>Text, %1 lines. Click to edit.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -10104,17 +10120,17 @@
 <context>
     <name>TextEditorDialog</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/TextEditorDialog.qml" line="11"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/TextEditorDialog.qml" line="11"/>
         <source>Edit text</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/TextEditorDialog.qml" line="16"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/TextEditorDialog.qml" line="16"/>
         <source>Done</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/TextEditorDialog.qml" line="50"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/TextEditorDialog.qml" line="50"/>
         <source>Enter adds a line. Ctrl+Enter saves.</source>
         <translation type="unfinished"></translation>
     </message>
@@ -10122,7 +10138,7 @@
 <context>
     <name>TextLeaf</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/TextLeaf.qml" line="57"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/TextLeaf.qml" line="57"/>
         <source>Edit in a bigger box (Shift+Enter adds a line)</source>
         <translation type="unfinished"></translation>
     </message>
@@ -10355,37 +10371,37 @@
 <context>
     <name>ValueChip</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="11"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/ValueChip.qml" line="11"/>
         <source>custom block</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="21"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/ValueChip.qml" line="21"/>
         <source>choose</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="88"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/ValueChip.qml" line="88"/>
         <source>Key %1</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="240"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/ValueChip.qml" line="240"/>
         <source>This editor cannot replace reporter values.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="537"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/ValueChip.qml" line="537"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="892"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/ValueChip.qml" line="892"/>
         <source>Add a component</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="892"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/ValueChip.qml" line="892"/>
         <source>Remove %1</source>
         <translation type="unfinished"></translation>
     </message>

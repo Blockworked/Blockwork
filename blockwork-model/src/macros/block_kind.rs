@@ -88,6 +88,8 @@ macro_rules! for_each_ref {
     };
 }
 
+/// Stack kind of the blocks laid out inside a `ShowWindow`.
+pub const WINDOW_CONTROL: &str = "control";
 impl BlockKind for InstructionKind {
     const HEADER_LABEL: &'static str = "When Ran/Block Definition";
     // CallBlock branch callbacks need one body slot per branch (up to 255,
@@ -105,6 +107,33 @@ impl BlockKind for InstructionKind {
     /// nothing may stack above them, and they render with a flat top edge.
     fn is_header(&self) -> bool {
         matches!(self.info().role, Role::Header | Role::Trigger)
+    }
+
+    /// Window controls only stack inside `ShowWindow`, and nothing else does.
+    fn stack_kind(&self) -> &'static str {
+        match self {
+            InstructionKind::WindowTextBox { .. }
+            | InstructionKind::WindowCheckbox { .. }
+            | InstructionKind::WindowChoice { .. }
+            | InstructionKind::WindowButton { .. }
+            | InstructionKind::WindowNote(_) => WINDOW_CONTROL,
+            _ => "",
+        }
+    }
+
+    fn body_stack_kind(&self, _slot: u8) -> &'static str {
+        match self {
+            InstructionKind::ShowWindow { .. } => WINDOW_CONTROL,
+            _ => "",
+        }
+    }
+
+    fn stack_mismatch(block: &str, _list: &str) -> String {
+        if block == WINDOW_CONTROL {
+            "Window controls only go inside a show window block".to_string()
+        } else {
+            "Only window controls go inside a show window block".to_string()
+        }
     }
 
     fn body(&self, slot: u8) -> Option<&Vec<Instruction>> {

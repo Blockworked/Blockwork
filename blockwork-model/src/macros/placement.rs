@@ -205,4 +205,27 @@ mod tests {
             .is_err()
         );
     }
+
+    #[test]
+    fn only_window_controls_go_inside_show_window() {
+        let window = Instruction::new(InstructionKind::ShowWindow {
+            title: Value::text("Hi"),
+            body: vec![],
+        });
+        // Macro::new puts a When Ran block first, so the window is at index 1.
+        let mut mac = Macro::new("m".into(), String::new(), vec![window]);
+        let strand = mac.strands[0].id.clone();
+        let inside = [PathStep::into_body(1, 0), PathStep::at(0)];
+        let note = || Instruction::new(InstructionKind::WindowNote(Value::text("x")));
+        let other = Instruction::new(InstructionKind::Comment("x".into()));
+        assert_eq!(
+            mac.insert_instruction(&strand, &inside, other),
+            Err("Only window controls go inside a show window block".to_string())
+        );
+        assert_eq!(mac.insert_instruction(&strand, &inside, note()), Ok(true));
+        assert_eq!(
+            mac.insert_instruction(&strand, &[PathStep::at(2)], note()),
+            Err("Window controls only go inside a show window block".to_string())
+        );
+    }
 }

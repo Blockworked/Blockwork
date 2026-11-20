@@ -34,7 +34,7 @@
 <context>
     <name>DictEditorCard</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/DictEditorCard.qml" line="282"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/DictEditorCard.qml" line="282"/>
         <source>%n entry(s)</source>
         <translation>
             <numerusform>%n entry</numerusform>
@@ -64,7 +64,7 @@
 <context>
     <name>ListEditorCard</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/ListEditorCard.qml" line="252"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/ListEditorCard.qml" line="252"/>
         <source>%n item(s)</source>
         <translation>
             <numerusform>%n item</numerusform>
@@ -94,7 +94,7 @@
 <context>
     <name>PalettePanel</name>
     <message numerus="yes">
-        <location filename="../../../blockstitch/qml/Blockstitch/PalettePanel.qml" line="939"/>
+        <location filename="../../../blockstitch-wct/qml/Blockstitch/PalettePanel.qml" line="939"/>
         <source>%n block(s)</source>
         <translation>
             <numerusform>%n block</numerusform>

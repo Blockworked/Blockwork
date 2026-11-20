@@ -25,7 +25,7 @@ QtObject {
             AskText: qsTr("Shows a dialog asking for text and puts the answer in the variable. Cancel stops the run, unless it's inside a try block, where it's an error you can catch."),
             AskYesNo: qsTr("Shows a yes/no question and puts true or false in the variable."),
             AskChoice: qsTr("Shows the items of a list and puts the one you pick in the variable. Cancel stops the run, unless it's inside a try block."),
-            ShowWindow: qsTr("Opens a window made of the text boxes, checkboxes, drop-downs, buttons and text inside it, and waits until it's closed. Each control starts with its variable's value and writes back what you enter. Put the blocks a button runs inside that button; other blocks directly inside show window are skipped."),
+            ShowWindow: qsTr("Opens a window made of the text boxes, checkboxes, drop-downs, buttons and text inside it, and waits until it's closed. Each control starts with its variable's value and writes back what you enter. Only window controls fit inside it; put the blocks a button runs inside that button."),
             WindowTextBox: qsTr("Inside show window: a text box. It starts with the variable's value, and what you type goes back into the variable."),
             WindowCheckbox: qsTr("Inside show window: a checkbox that puts true or false in the variable."),
             WindowChoice: qsTr("Inside show window: a drop-down of the list's items. The one picked goes in the variable."),
