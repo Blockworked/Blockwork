@@ -1069,7 +1069,16 @@ fn run_block(
         // their strands out of `entry_strands`, and a watcher starts from the
         // block after the header.
         match ins.kind.info().role {
-            Role::Header | Role::Trigger | Role::Comment => {}
+            Role::Header | Role::Trigger | Role::Comment => {
+                if ins.kind.is_window_part() {
+                    soft_fail(
+                        ctx,
+                        &ins.id,
+                        "Window part",
+                        "it only works inside a show window block",
+                    )?;
+                }
+            }
             Role::Dialogs => {
                 if let Some(flow) = dialogs::run_dialog_block(ins, ctx, depth)? {
                     return Ok(flow);

@@ -17,8 +17,8 @@ pub mod placement;
 pub mod trigger;
 
 pub use blockstitch_core::graph::{
-    BlockDef, BlockGraph, BlockKind, BlockPiece, BlockShape, Comment, DictDef, FloatingValue,
-    InputValueType, ListDef, ListItem, RefKind, VariableDef, default_block_color,
+    BlockDef, BlockGraph, BlockKind, BlockPiece, BlockShape, Comment, Connector, DictDef,
+    FloatingValue, InputValueType, ListDef, ListItem, RefKind, VariableDef, default_block_color,
     normalize_block_color,
 };
 pub use fields::FieldId;

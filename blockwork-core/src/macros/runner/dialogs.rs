@@ -149,7 +149,7 @@ fn show_window(
         let mut request = crate::prompt::Request::new(crate::prompt::Kind::Window, &title, "");
         for child in body {
             let Some(control) = control(ctx, child, depth)? else {
-                continue;
+                return Err("only window parts work inside a window".to_string());
             };
             if let InstructionKind::WindowButton { body, .. } = &child.kind {
                 buttons.push((control.label.clone(), body.clone()));
