@@ -40,7 +40,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - When tray item is clicked: adds an item to the Blockwork icon's tray menu that runs the blocks below it.
 - `blockwork run <file>` runs a macro or bundle file through the background service without opening the editor or adding it to your library.
 - Export as runnable (in the editor's menu): a folder with the macro and a launcher that runs it without the editor. On Windows, macOS and AppImage it carries its own copy of Blockwork, so it runs on computers without Blockwork installed.
-- Show window: build your own window from text boxes, checkboxes, drop-downs, buttons and text. Its controls read and write variables, and each button runs the blocks inside it when clicked.
+- Show window: build your own window from text boxes, checkboxes, drop-downs, buttons and text. Its controls read and write variables, and each button runs the blocks inside it when clicked. Window parts have a square tab and a violet tint, and only fit inside a show window block, so other blocks can't end up in a window by mistake.
 - With keyboard and mouse blocked: runs its blocks while your own keyboard and mouse can't reach any app; the emergency stop hotkey still works.
 - Window blocks: keep a window on top, hide and show it, set its transparency or title, and move it to another monitor. Windows can be matched by exact title or a regex too, and reporters list open windows and give a window's process ID.
 - Use coordinates block: mouse, pixel, region and image positions after it count from a window's corner instead of the screen's.

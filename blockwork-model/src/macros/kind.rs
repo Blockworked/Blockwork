@@ -905,6 +905,18 @@ pub enum InstructionKind {
 }
 
 impl InstructionKind {
+    /// A control that only makes sense inside a `ShowWindow`.
+    pub fn is_window_part(&self) -> bool {
+        matches!(
+            self,
+            InstructionKind::WindowTextBox { .. }
+                | InstructionKind::WindowCheckbox { .. }
+                | InstructionKind::WindowChoice { .. }
+                | InstructionKind::WindowButton { .. }
+                | InstructionKind::WindowNote(_)
+        )
+    }
+
     /// A plain `WhenKey`: no blocking, gesture or condition.
     pub fn when_key(key: Value, direction: Direction) -> Self {
         InstructionKind::WhenKey {

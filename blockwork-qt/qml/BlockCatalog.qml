@@ -688,18 +688,18 @@ QtObject {
                 { kind: "dropdown", key: "place", options: choices([["Mouse", qsTr("at the mouse")], ["TopLeft", qsTr("top left")], ["TopRight", qsTr("top right")],
                     ["BottomLeft", qsTr("bottom left")], ["BottomRight", qsTr("bottom right")], ["Center", qsTr("in the middle")]]) },
                 label(qsTr("for")), Object.assign(value("TooltipDuration", "duration"), { unit: qsTr("ms") })] },
-            ShowWindow: { icon: "app-window", mouths: ["body"], head: [label(qsTr("show window")), value("WindowTitle", "title")] },
-            WindowTextBox: { icon: "text-cursor-input", head: [label(qsTr("text box")), value("WindowLabel", "label"),
+            ShowWindow: { icon: "app-window", mouths: ["body"], mouthConnectors: ["part"], head: [label(qsTr("show window")), value("WindowTitle", "title")] },
+            WindowTextBox: { icon: "text-cursor-input", connector: "part", head: [label(qsTr("text box")), value("WindowLabel", "label"),
                 label(qsTr("for")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
-            WindowCheckbox: { icon: "circle-check", head: [label(qsTr("checkbox")), value("WindowLabel", "label"),
+            WindowCheckbox: { icon: "circle-check", connector: "part", head: [label(qsTr("checkbox")), value("WindowLabel", "label"),
                 label(qsTr("for")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
-            WindowChoice: { icon: "chevron-down", head: [label(qsTr("drop-down")), value("WindowLabel", "label"), label(qsTr("of")),
+            WindowChoice: { icon: "chevron-down", connector: "part", head: [label(qsTr("drop-down")), value("WindowLabel", "label"), label(qsTr("of")),
                 { kind: "dropdown", key: "list", options: "lists" },
                 label(qsTr("for")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
-            WindowButton: { icon: "square-mouse-pointer", mouths: ["body"], head: [label(qsTr("button")), value("WindowLabel", "label"),
+            WindowButton: { icon: "square-mouse-pointer", connector: "part", mouths: ["body"], head: [label(qsTr("button")), value("WindowLabel", "label"),
                 { kind: "dropdown", key: "close", options: [{ value: "stay", label: qsTr("that keeps it open") }, { value: "close", label: qsTr("that closes it") }],
                   encode: v => v === "close", decode: v => v ? "close" : "stay" }] },
-            WindowNote: { icon: "info", head: [label(qsTr("label")), value("WindowLabel", "text")] },
+            WindowNote: { icon: "info", connector: "part", head: [label(qsTr("label")), value("WindowLabel", "text")] },
             ShowMenu: { icon: "list", head: [label(qsTr("menu of")), { kind: "dropdown", key: "list", options: "lists" },
                 label(qsTr("at the mouse into")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
             MoveWindow: { icon: "move", head: [
@@ -796,6 +796,10 @@ QtObject {
         const p = rowPieces();
         const rows = Object.assign({}, eventRows(p), inputRows(p), controlRows(p), dataRows(p), systemRows(p), screenRows(p), browserRows(p));
         BlockRegistry.registerRows(rows);
+        BlockRegistry.connectorHints = {
+            part: qsTr("Only window parts fit here"),
+            normal: qsTr("Window parts only fit inside a show window block")
+        };
         BlockRegistry.registerVariableFields({
             WhenWebhook: ["variable"], AskText: ["name"], AskYesNo: ["name"], AskChoice: ["name"],
             HttpRequest: ["variable"], BrowserScript: ["variable"],

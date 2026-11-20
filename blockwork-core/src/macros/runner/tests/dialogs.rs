@@ -147,8 +147,6 @@ fn window_saves_its_values_and_buttons_run_their_blocks() {
                         label: Value::text("Loud"),
                         name: "loud".into(),
                     }),
-                    // Other blocks inside are skipped.
-                    set("skipped", Value::number(1.0)),
                     button("Apply", false, "applied"),
                     button("Done", true, "done"),
                 ],
@@ -170,5 +168,34 @@ fn window_saves_its_values_and_buttons_run_their_blocks() {
     assert_eq!(vars.get("applied"), typed);
     assert_eq!(vars.get("done"), typed);
     assert_eq!(vars.get("after"), typed);
-    assert_eq!(vars.get("skipped"), None);
+}
+
+#[test]
+fn a_window_with_a_normal_block_inside_fails_and_parts_outside_do_nothing() {
+    install_test_dialogs();
+    let mac = Macro::new(
+        "Window".into(),
+        String::new(),
+        vec![
+            Instruction::new(InstructionKind::WindowNote(Value::text("Loose"))),
+            Instruction::new(InstructionKind::ShowWindow {
+                title: Value::text("Settings"),
+                body: vec![
+                    set("inside", Value::number(1.0)),
+                    Instruction::new(InstructionKind::WindowButton {
+                        label: Value::text("Done"),
+                        close: true,
+                        body: vec![set("done", Value::number(1.0))],
+                    }),
+                ],
+            }),
+            set("after", Value::number(1.0)),
+        ],
+    );
+    let vars = empty_vars();
+    mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+    let vars = vars.lock().unwrap();
+    assert_eq!(vars.get("inside"), None);
+    assert_eq!(vars.get("done"), None, "the window never opened");
+    assert_eq!(vars.get("after"), Some(&Evaluated::Number(1.0)));
 }

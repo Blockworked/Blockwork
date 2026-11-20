@@ -90,6 +90,7 @@ macro_rules! for_each_ref {
 
 impl BlockKind for InstructionKind {
     const HEADER_LABEL: &'static str = "When Ran/Block Definition";
+    const PART_LABEL: &'static str = "window part";
     // CallBlock branch callbacks need one body slot per branch (up to 255,
     // see validate_block_pieces), so walks cover every slot and `body_mut`
     // decides per instruction. Other instructions answer `None` past their
@@ -105,6 +106,21 @@ impl BlockKind for InstructionKind {
     /// nothing may stack above them, and they render with a flat top edge.
     fn is_header(&self) -> bool {
         matches!(self.info().role, Role::Header | Role::Trigger)
+    }
+
+    fn connector(&self) -> Connector {
+        if self.is_window_part() {
+            Connector::Part
+        } else {
+            Connector::Normal
+        }
+    }
+
+    fn body_connector(&self, _slot: u8) -> Connector {
+        match self {
+            InstructionKind::ShowWindow { .. } => Connector::Part,
+            _ => Connector::Normal,
+        }
     }
 
     fn body(&self, slot: u8) -> Option<&Vec<Instruction>> {
