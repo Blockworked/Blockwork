@@ -426,6 +426,16 @@ fn script() -> Vec<(&'static str, Value)> {
         /* 92 */ ("undo", json!({})),
         /* 93 */ ("redo", json!({})),
         /* 94 */ ("delete_dict", json!({ "name": "costs" })),
+        /* 95 */
+        (
+            "start_value_key_capture",
+            json!({ "location": wait_field("$1", 1) }),
+        ),
+        /* 96 */
+        (
+            "key_capture_event",
+            json!({ "keys": [["AltLeft", "Alt"], ["KeyK", "k"]] }),
+        ),
     ]
 }
 

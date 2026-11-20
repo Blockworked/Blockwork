@@ -48,6 +48,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Window blocks work on GNOME on Wayland through a small Shell extension (install it in Settings > Integrations) and on COSMIC, which allows focusing, minimizing, maximizing and closing ([docs](docs/linux-windows.md)).
 
 ### Changed
+- The "key held?" reporter records its key or combo with a click, like the Key block, instead of a text field.
 - The Text block spaces keystrokes 0.5 ms apart on Windows and macOS too, as it already did on Linux, so fast typing doesn't drop or merge characters.
 
 ### Fixed

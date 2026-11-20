@@ -5,7 +5,7 @@ use crate::AppHandle;
 use crate::macros_thread;
 use crate::state::{
     AppState, ComboCapture, HotkeyActionDto, KeyCaptureTarget, Page, PathStep, RecordingPhase,
-    SharedState, StateDto, UpdateCheckState, build_state_dto, dto_to_hotkey_action,
+    SharedState, StateDto, UpdateCheckState, ValueLocation, build_state_dto, dto_to_hotkey_action,
     emit_state_updated,
 };
 use blockstitch_core::graph::{ListItem, ListStore, resolve_list_reporters};

@@ -4,7 +4,7 @@
 
 use std::collections::HashMap;
 
-use blockstitch_core::editor::{History, PathStep, ValueBuffers};
+use blockstitch_core::editor::{History, PathStep, ValueBuffers, ValueLocation};
 use blockstitch_core::graph::{ListItem, resolve_list_reporters};
 use blockstitch_ffi::{Host, arg};
 use blockwork_model::editing;
@@ -22,6 +22,7 @@ use serde_json::{Value as Json, json};
 
 enum KeyCapture {
     Strand(String, Vec<PathStep>, Option<String>),
+    Value(ValueLocation),
     Standalone,
 }
 
@@ -74,6 +75,7 @@ const PAGE_COMMANDS: &[&str] = &[
     "set_palette_layout",
     "start_key_capture",
     "start_standalone_key_capture",
+    "start_value_key_capture",
     "key_capture_event",
     "clear_standalone_key_capture",
 ];
@@ -263,6 +265,10 @@ impl Demo {
                 self.key_capture = Some(KeyCapture::Standalone);
                 Ok(Json::Null)
             }
+            "start_value_key_capture" => {
+                self.key_capture = Some(KeyCapture::Value(arg(a, "location")?));
+                Ok(Json::Null)
+            }
             "clear_standalone_key_capture" => {
                 self.standalone_key = None;
                 Ok(Json::Null)
@@ -413,6 +419,13 @@ impl Demo {
                     *value = Value::Text { value: text };
                 }
             }
+            Some(KeyCapture::Value(location)) => {
+                if let Some(mac) = self.open_mut()
+                    && let Some(value) = mac.value_at_mut(&location)
+                {
+                    *value = Value::Text { value: text };
+                }
+            }
             Some(KeyCapture::Standalone) => self.standalone_key = Some(text),
             None => {}
         }
@@ -436,12 +449,21 @@ impl Demo {
                 strand_id: Some(strand_id.clone()),
                 index: Some(index.clone()),
                 field: field.clone(),
+                location: None,
+            },
+            KeyCapture::Value(location) => KeyCaptureDto {
+                kind: "Value".into(),
+                strand_id: None,
+                index: None,
+                field: None,
+                location: Some(location.clone()),
             },
             KeyCapture::Standalone => KeyCaptureDto {
                 kind: "Standalone".into(),
                 strand_id: None,
                 index: None,
                 field: None,
+                location: None,
             },
         });
         let library: Vec<Json> = self

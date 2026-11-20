@@ -172,7 +172,7 @@ QtObject {
             ColorsMatch: { infix: [qsTr("matches"), qsTr("within")], suffix: "%", result: "bool" },
             ScreenText: { prefix: qsTr("text on screen at x"), infix: [qsTr("y"), qsTr("width"), qsTr("height")], result: "text",
                 pickOp: { action: "pickScreenRegion", icon: "square-dashed", tip: qsTr("Drag out a region on screen") } },
-            KeyHeld: { prefix: qsTr("key"), suffix: qsTr("held?"), result: "bool" },
+            KeyHeld: { prefix: qsTr("key"), suffix: qsTr("held?"), result: "bool", keyArg: { index: 0 } },
             MousePosition: { prefix: qsTr("mouse"), result: "number", enumArg: { index: 0, options: [{ value: "x", label: qsTr("x") }, { value: "y", label: qsTr("y") }] } },
             ScreenSize: { prefix: qsTr("screen"), result: "number", enumArg: { index: 0, options: [{ value: "width", label: qsTr("width") }, { value: "height", label: qsTr("height") }] } },
             MonitorCount: { prefix: qsTr("number of monitors"), result: "number" },
