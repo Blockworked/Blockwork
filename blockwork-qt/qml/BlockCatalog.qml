@@ -796,10 +796,6 @@ QtObject {
         const p = rowPieces();
         const rows = Object.assign({}, eventRows(p), inputRows(p), controlRows(p), dataRows(p), systemRows(p), screenRows(p), browserRows(p));
         BlockRegistry.registerRows(rows);
-        BlockRegistry.connectorHints = {
-            part: qsTr("Only window parts fit here"),
-            normal: qsTr("Window parts only fit inside a show window block")
-        };
         BlockRegistry.registerVariableFields({
             WhenWebhook: ["variable"], AskText: ["name"], AskYesNo: ["name"], AskChoice: ["name"],
             HttpRequest: ["variable"], BrowserScript: ["variable"],

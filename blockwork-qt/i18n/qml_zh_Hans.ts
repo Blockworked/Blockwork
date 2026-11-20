@@ -2589,81 +2589,71 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="800"/>
-        <source>Only window parts fit here</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockCatalog.qml" line="801"/>
-        <source>Window parts only fit inside a show window block</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../qml/BlockCatalog.qml" line="838"/>
+        <location filename="../qml/BlockCatalog.qml" line="834"/>
         <source>Pick a file</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="848"/>
+        <location filename="../qml/BlockCatalog.qml" line="844"/>
         <source>My window</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="849"/>
+        <location filename="../qml/BlockCatalog.qml" line="845"/>
         <source>Name</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="850"/>
+        <location filename="../qml/BlockCatalog.qml" line="846"/>
         <source>Turned on</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="852"/>
+        <location filename="../qml/BlockCatalog.qml" line="848"/>
         <source>Go</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="866"/>
+        <location filename="../qml/BlockCatalog.qml" line="862"/>
         <source>What&apos;s your name?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="867"/>
+        <location filename="../qml/BlockCatalog.qml" line="863"/>
         <source>Continue?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="851"/>
-        <location filename="../qml/BlockCatalog.qml" line="868"/>
+        <location filename="../qml/BlockCatalog.qml" line="847"/>
+        <location filename="../qml/BlockCatalog.qml" line="864"/>
         <source>Pick one</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="869"/>
-        <location filename="../qml/BlockCatalog.qml" line="897"/>
+        <location filename="../qml/BlockCatalog.qml" line="865"/>
+        <location filename="../qml/BlockCatalog.qml" line="893"/>
         <source>Done!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="846"/>
-        <location filename="../qml/BlockCatalog.qml" line="891"/>
-        <location filename="../qml/BlockCatalog.qml" line="926"/>
+        <location filename="../qml/BlockCatalog.qml" line="842"/>
+        <location filename="../qml/BlockCatalog.qml" line="887"/>
+        <location filename="../qml/BlockCatalog.qml" line="922"/>
         <source>Hello!</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="875"/>
+        <location filename="../qml/BlockCatalog.qml" line="871"/>
         <source>Run my macro</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="898"/>
+        <location filename="../qml/BlockCatalog.qml" line="894"/>
         <source>checkpoint</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../qml/BlockCatalog.qml" line="900"/>
+        <location filename="../qml/BlockCatalog.qml" line="896"/>
         <source>something went wrong</source>
         <translation type="unfinished"></translation>
     </message>
@@ -5485,16 +5475,6 @@
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="394"/>
         <source>Make a List…</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="492"/>
-        <source>Only parts fit here</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="493"/>
-        <source>This only fits inside the block it belongs to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
