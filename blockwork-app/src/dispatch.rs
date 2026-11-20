@@ -4,7 +4,7 @@
 
 use crate::Backend;
 use crate::commands;
-use crate::state::{HotkeyActionDto, PathStep};
+use crate::state::{HotkeyActionDto, PathStep, ValueLocation};
 use blockwork_core::input::value::Value as BlockValue;
 use serde::de::DeserializeOwned;
 use serde_json::Value;
@@ -562,6 +562,14 @@ impl Backend {
                     strand_id,
                     path,
                     field,
+                )?)
+            }
+            "start_value_key_capture" => {
+                let location: ValueLocation = arg(&args, "location")?;
+                to_json(commands::start_value_key_capture(
+                    &self.state,
+                    &self.app,
+                    location,
                 )?)
             }
             "start_standalone_key_capture" => to_json(commands::start_standalone_key_capture(

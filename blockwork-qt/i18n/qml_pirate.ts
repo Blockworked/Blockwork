@@ -5185,379 +5185,379 @@
 <context>
     <name>BlockRegistry</name>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="200"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
         <source>abs</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="200"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
         <source>floor</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="200"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
         <source>ceiling</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="200"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
         <source>sign</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="201"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="208"/>
         <source>sqrt</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="201"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="208"/>
         <source>sin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="201"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="208"/>
         <source>cos</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="201"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="208"/>
         <source>tan</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="202"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="209"/>
         <source>asin</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="202"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="209"/>
         <source>acos</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="202"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="209"/>
         <source>atan</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="202"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="209"/>
         <source>ln</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="203"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="210"/>
         <source>log</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="203"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="210"/>
         <source>log2</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="203"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="210"/>
         <source>e ^</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="205"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="212"/>
         <source>uppercase</source>
         <translation>SHOUTIN&apos;</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="205"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="212"/>
         <source>lowercase</source>
         <translation>whisperin&apos;</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="214"/>
         <source>year</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="214"/>
         <source>month</source>
         <translation>moon</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="214"/>
         <source>date</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="207"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="214"/>
         <source>day of week</source>
         <translation>day o&apos; the week</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="208"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="215"/>
         <source>hour</source>
         <translation>bell</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="208"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="215"/>
         <source>minute</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="208"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="215"/>
         <source>second</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="212"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="219"/>
         <source>mod</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="213"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="220"/>
         <source>round</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="124"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="128"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="129"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="213"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="217"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="223"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="130"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="134"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="135"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="220"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="224"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="230"/>
         <source>of</source>
         <translation>o&apos;</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="214"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="221"/>
         <source>pick random</source>
         <translation>roll the dice from</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="121"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="123"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="214"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="218"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="127"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="129"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="221"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="225"/>
         <source>to</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="215"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="222"/>
         <source>join</source>
         <translation>lash together</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="215"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="222"/>
         <source>new line</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="215"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="222"/>
         <source>tab character</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="216"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="223"/>
         <source>index of</source>
         <translation>where be</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="216"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="224"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="225"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="223"/>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="231"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="232"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="238"/>
         <source>in</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="216"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="223"/>
         <source>last index of</source>
         <translation>last place o&apos;</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="217"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="224"/>
         <source>letter</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="217"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="226"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="224"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="233"/>
         <source>length of</source>
         <translation>length o&apos;</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="220"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="227"/>
         <source>and</source>
         <translation>an&apos;</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="220"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="227"/>
         <source>or</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="221"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="228"/>
         <source>not</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="221"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="228"/>
         <source>true</source>
         <translation>aye</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="221"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="228"/>
         <source>false</source>
         <translation>nay</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="222"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="229"/>
         <source>current</source>
-        <translation type="unfinished"></translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="223"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="228"/>
-        <source>item</source>
-        <translation>cargo</translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="224"/>
-        <source>item # of</source>
-        <translation>cargo # o&apos;</translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="225"/>
-        <source>amount of</source>
-        <translation>count o&apos;</translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="227"/>
-        <source>contains</source>
-        <translation>holds</translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="228"/>
-        <source>exists in</source>
-        <translation>be aboard</translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="229"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="236"/>
-        <source>is</source>
-        <translation>be</translation>
-    </message>
-    <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="229"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="236"/>
-        <source>empty?</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="230"/>
         <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="235"/>
+        <source>item</source>
+        <translation>cargo</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="231"/>
+        <source>item # of</source>
+        <translation>cargo # o&apos;</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="232"/>
+        <source>amount of</source>
+        <translation>count o&apos;</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="234"/>
+        <source>contains</source>
+        <translation>holds</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="235"/>
+        <source>exists in</source>
+        <translation>be aboard</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="236"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="243"/>
+        <source>is</source>
+        <translation>be</translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="236"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="243"/>
+        <source>empty?</source>
+        <translation type="unfinished"></translation>
+    </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="237"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="242"/>
         <source>as JSON</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="231"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="238"/>
         <source>value</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="232"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="239"/>
         <source>has key</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="233"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="240"/>
         <source>size of</source>
         <translation>size o&apos;</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="234"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="241"/>
         <source>keys of</source>
         <translation>keys o&apos;</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="394"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="401"/>
         <source>Make a List…</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="127"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="133"/>
         <source>at</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="121"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="127"/>
         <source>set</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="122"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="128"/>
         <source>change</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="122"/>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="126"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="128"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="132"/>
         <source>by</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="123"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="129"/>
         <source>add</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="124"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="130"/>
         <source>delete</source>
         <translation>scuttle</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="125"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="131"/>
         <source>delete all of</source>
         <translation>scuttle all o&apos;</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="126"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="132"/>
         <source>shift</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="119"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="125"/>
         <source>Choose list</source>
         <translation>Pick a list</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="127"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="133"/>
         <source>insert</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="129"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="135"/>
         <source>replace item</source>
         <translation>replace cargo</translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="130"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="136"/>
         <source>with</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="131"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="137"/>
         <source>reverse</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="132"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="138"/>
         <source>return</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="133"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="139"/>
         <source>break loop</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="134"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockRegistry.qml" line="140"/>
         <source>continue loop</source>
         <translation type="unfinished"></translation>
     </message>
@@ -10370,22 +10370,22 @@
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="240"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="241"/>
         <source>This editor cannot replace reporter values.</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="537"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="543"/>
         <source>Details</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="892"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="898"/>
         <source>Add a component</source>
         <translation type="unfinished"></translation>
     </message>
     <message>
-        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="892"/>
+        <location filename="../../../blockstitch/qml/Blockstitch/ValueChip.qml" line="898"/>
         <source>Remove %1</source>
         <translation type="unfinished"></translation>
     </message>

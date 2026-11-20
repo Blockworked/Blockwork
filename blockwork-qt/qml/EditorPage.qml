@@ -1057,6 +1057,10 @@ Item {
         // Name slots share the same picker in instructions and reporters.
         BlockRegistry.pickHandler = (action, location, value, anchor) =>
             BlockUi.open(action, {kind: "value", location: location, value: value, anchor: anchor}, root.blockScreens);
+        // A reporter's key slot records a key like the Key block's.
+        BlockRegistry.keyCaptureHandler = location => root.invoke("start_value_key_capture", {location: location});
+        BlockRegistry.capturingKey = Qt.binding(() => root.appState && root.appState.key_capture && root.appState.key_capture.kind === "Value"
+            ? BlockRegistry.locationKey(root.appState.key_capture.location) : "");
         if (pendingRecordingReview) recordingReview.show(pendingRecordingReview);
     }
     Connections {

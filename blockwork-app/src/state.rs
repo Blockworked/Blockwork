@@ -4,7 +4,9 @@ use blockwork_core::macros::thread_pool::ThreadPool;
 // Canvas addressing and undo come from blockstitch. Both these groups are
 // re-exported so the rest of the crate still reaches them via `crate::state`.
 use crate::AppHandle;
-pub(crate) use blockstitch_core::editor::{History, InstrPath, PathStep, ValueBuffers};
+pub(crate) use blockstitch_core::editor::{
+    History, InstrPath, PathStep, ValueBuffers, ValueLocation,
+};
 pub(crate) use blockstitch_core::graph::ListItem;
 pub(crate) use blockwork_core::input::value::Evaluated;
 pub(crate) use blockwork_core::macros::Macro;
@@ -57,6 +59,8 @@ pub(crate) enum ComboCapture {
 pub(crate) enum KeyCaptureTarget {
     /// The strand, the block's path and the key slot's field, if given.
     Strand(String, InstrPath, Option<String>),
+    /// A value slot, such as the key a reporter checks.
+    Value(ValueLocation),
     Standalone,
 }
 
@@ -472,12 +476,21 @@ pub(crate) fn build_state_dto(s: &AppState) -> StateDto {
             strand_id: Some(strand_id.clone()),
             index: Some(index.clone()),
             field: field.clone(),
+            location: None,
+        },
+        KeyCaptureTarget::Value(location) => KeyCaptureDto {
+            kind: "Value".to_string(),
+            strand_id: None,
+            index: None,
+            field: None,
+            location: Some(location.clone()),
         },
         KeyCaptureTarget::Standalone => KeyCaptureDto {
             kind: "Standalone".to_string(),
             strand_id: None,
             index: None,
             field: None,
+            location: None,
         },
     });
 

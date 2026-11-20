@@ -18,6 +18,18 @@ pub(crate) fn start_key_capture(
     Ok(())
 }
 
+/// Same capture flow for a value slot, such as the key a reporter checks.
+pub(crate) fn start_value_key_capture(
+    state: &SharedState,
+    app: &AppHandle,
+    location: ValueLocation,
+) -> Result<(), String> {
+    let mut s = state.lock().map_err(|e| e.to_string())?;
+    s.key_capture = Some(KeyCaptureTarget::Value(location));
+    emit_state_updated(app, &s);
+    Ok(())
+}
+
 /// Same capture flow, but for a key field with no backing strand/instruction
 /// (the sidebar's Key prefab) - the result lands in `pending_standalone_key`
 /// instead of being written into a strand.
@@ -72,6 +84,21 @@ pub(crate) fn key_capture_event(
                     None => false,
                 }
             });
+            if captured {
+                auto_save(&mut s);
+            }
+        }
+        KeyCaptureTarget::Value(location) => {
+            let slot = s
+                .current_macro
+                .as_mut()
+                .and_then(|mac| mac.value_at_mut(&location));
+            let captured = if let Some(value) = slot {
+                *value = Value::Text { value: text };
+                true
+            } else {
+                false
+            };
             if captured {
                 auto_save(&mut s);
             }

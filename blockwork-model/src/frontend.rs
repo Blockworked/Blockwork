@@ -166,6 +166,9 @@ pub struct KeyCaptureDto {
     /// Which key slot of the block, when it has more than one.
     #[serde(skip_serializing_if = "Option::is_none")]
     pub field: Option<String>,
+    /// The value slot a `Value` capture writes, such as a reporter's key.
+    #[serde(skip_serializing_if = "Option::is_none")]
+    pub location: Option<ValueLocation>,
 }
 
 /// Copied blocks and the notes pinned to them, as the editor's copy buffer
