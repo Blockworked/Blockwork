@@ -50,6 +50,9 @@ section below as the GitHub release notes, followed by the downloads table.
 ### Changed
 - The Text block spaces keystrokes 0.5 ms apart on Windows and macOS too, as it already did on Linux, so fast typing doesn't drop or merge characters.
 
+### Fixed
+- Toolbar buttons such as Hide sidebar work again with Qt 6.12.
+
 ## [0.6.2] - 2026-11-14
 
 ### Added
