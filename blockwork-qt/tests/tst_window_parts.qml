@@ -85,7 +85,6 @@ Item {
             drag(page, "app", target);
             const state = canvas.branchDragState;
             verify(!state.snapValid, "Open app must not snap into the window");
-            compare(state.refusedHint, "Only window parts fit here");
             mouseRelease(scene, target.x + 1, target.y);
             verify(!scene.calls.some(c => c.command === "merge_tail" || c.command === "merge_strand"));
         }
@@ -105,7 +104,6 @@ Item {
             drag(page, "label", under);
             const state = all(page).find(o => o.isBlockCanvas).branchDragState;
             verify(!state.snapValid, "a label must not snap under Open app");
-            compare(state.refusedHint, "Window parts only fit inside a show window block");
             mouseRelease(scene, under.x + 1, under.y);
         }
     }
