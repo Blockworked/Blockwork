@@ -198,6 +198,7 @@ fn native_ui_survives_rapid_actions_and_parallel_queries() {
     let _ = std::fs::remove_dir_all(directory);
 }
 
+#[cfg(target_os = "linux")]
 #[test]
 #[ignore = "requires the isolated GTK or Qt fixture; use scripts/test-native-ui.sh"]
 fn picking_from_the_screen_finds_elements_and_writes_selectors() {

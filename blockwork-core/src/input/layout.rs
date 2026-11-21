@@ -235,17 +235,15 @@ fn read_layout() -> Option<(String, String)> {
         return Some(parsed);
     }
     // System-wide settings, as localectl writes them.
-    for path in ["/etc/X11/xorg.conf.d/00-keyboard.conf"] {
-        if let Ok(text) = std::fs::read_to_string(path) {
-            let option = |name: &str| {
-                text.lines()
-                    .find(|l| l.contains(name))
-                    .and_then(|l| l.split('"').nth(3))
-                    .map(str::to_string)
-            };
-            if let Some(layout) = option("XkbLayout") {
-                return Some((layout, option("XkbVariant").unwrap_or_default()));
-            }
+    if let Ok(text) = std::fs::read_to_string("/etc/X11/xorg.conf.d/00-keyboard.conf") {
+        let option = |name: &str| {
+            text.lines()
+                .find(|l| l.contains(name))
+                .and_then(|l| l.split('"').nth(3))
+                .map(str::to_string)
+        };
+        if let Some(layout) = option("XkbLayout") {
+            return Some((layout, option("XkbVariant").unwrap_or_default()));
         }
     }
     for path in ["/etc/default/keyboard", "/etc/vconsole.conf"] {

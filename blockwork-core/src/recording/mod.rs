@@ -511,6 +511,8 @@ fn open_span(placeholder: Instruction, start: Duration) -> Option<String> {
 /// Whatever comes next waits from the span's end, since the block it became
 /// takes `length` to play.
 fn close_span(id: &str, kind: Option<InstructionKind>, start: Duration, length: Duration) {
+    // Atomic::try_update is newer than the workspace's minimum Rust version.
+    #[allow(deprecated)]
     let _ = OPEN_SPANS.fetch_update(Ordering::Relaxed, Ordering::Relaxed, |n| n.checked_sub(1));
     if let Ok(mut q) = get_recording_queue().lock()
         && let Some(index) = q.iter().position(|i| i.id == id)

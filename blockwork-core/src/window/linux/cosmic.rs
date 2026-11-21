@@ -423,9 +423,8 @@ impl Dispatch<cosmic_handle::ZcosmicToplevelHandleV1, ObjectId> for State {
 
 /// A Wayland `array` of native-endian u32 values.
 fn states(raw: &[u8]) -> Vec<u32> {
-    raw.chunks_exact(4)
-        .map(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]]))
-        .collect()
+    let (states, _) = raw.as_chunks();
+    states.iter().copied().map(u32::from_ne_bytes).collect()
 }
 
 impl Dispatch<cosmic_info::ZcosmicToplevelInfoV1, ()> for State {

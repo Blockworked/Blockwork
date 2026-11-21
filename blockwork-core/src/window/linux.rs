@@ -997,9 +997,10 @@ pub(super) mod x11 {
                 let states = self
                     .property(window, state, AtomEnum::ATOM.into())
                     .unwrap_or_default();
+                let (states, _) = states.as_chunks();
                 if states
-                    .chunks_exact(4)
-                    .any(|c| u32::from_ne_bytes([c[0], c[1], c[2], c[3]]) == hidden)
+                    .iter()
+                    .any(|&state| u32::from_ne_bytes(state) == hidden)
                 {
                     continue;
                 }
