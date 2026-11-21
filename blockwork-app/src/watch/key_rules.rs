@@ -57,7 +57,7 @@ fn rule_of(kind: &InstructionKind, mac: &Macro, can_remap: bool) -> Option<Rule>
             block: true,
             ..
         } => {
-            let combo = modifiers.as_ref().and_then(&text).unwrap_or_default();
+            let combo = modifiers.as_ref().and_then(text).unwrap_or_default();
             let modifiers = if combo.trim().is_empty() {
                 None
             } else {

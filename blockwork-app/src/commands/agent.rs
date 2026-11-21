@@ -1450,12 +1450,11 @@ mod tests {
                 continue;
             }
             let result = backend.dispatch_agent(name, json!({})).await;
-            match result {
-                Err(e) => assert!(
+            if let Err(e) = result {
+                assert!(
                     !e.contains("unknown agent command"),
                     "handler missing for {name}: {e}"
-                ),
-                Ok(_) => {}
+                );
             }
         }
     }

@@ -79,14 +79,11 @@ impl Image {
         if max_side == 0 || (self.width <= max_side && self.height <= max_side) {
             return self.clone();
         }
-        let factor = (self.width.max(self.height) + max_side - 1) / max_side;
+        let factor = self.width.max(self.height).div_ceil(max_side);
         if factor <= 1 {
             return self.clone();
         }
-        let (width, height) = (
-            (self.width + factor - 1) / factor,
-            (self.height + factor - 1) / factor,
-        );
+        let (width, height) = (self.width.div_ceil(factor), self.height.div_ceil(factor));
         let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
         for y in 0..height {
             for x in 0..width {
@@ -100,15 +97,15 @@ impl Image {
                             continue;
                         }
                         let i = (sy as usize * self.width as usize + sx as usize) * 4;
-                        for c in 0..4 {
-                            sum[c] += self.rgba[i + c] as u64;
+                        for (total, &channel) in sum.iter_mut().zip(&self.rgba[i..i + 4]) {
+                            *total += u64::from(channel);
                         }
                         count += 1;
                     }
                 }
                 let count = count.max(1);
-                for c in 0..4 {
-                    rgba.push((sum[c] / count) as u8);
+                for total in sum {
+                    rgba.push((total / count) as u8);
                 }
             }
         }
