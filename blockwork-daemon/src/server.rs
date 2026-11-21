@@ -132,6 +132,23 @@ async fn handle_connection(
                 let _ = tokio::time::timeout(std::time::Duration::from_secs(1), writer_task).await;
                 return false;
             }
+            Ok(ClientMessage::Agent { client, protocol }) => {
+                serve_agent(
+                    &mut reader,
+                    backend,
+                    &tx,
+                    &mut writer_task,
+                    &client,
+                    protocol,
+                )
+                .await;
+                drop(tx);
+                if !writer_task.is_finished() {
+                    let _ =
+                        tokio::time::timeout(std::time::Duration::from_secs(1), writer_task).await;
+                }
+                return false;
+            }
             _ => {
                 writer_task.abort();
                 return false;
@@ -193,7 +210,12 @@ async fn handle_connection(
                     break;
                 }
             }
-            Ok(ClientMessage::Hello | ClientMessage::Script | ClientMessage::SystemStartup) => {}
+            Ok(
+                ClientMessage::Hello
+                | ClientMessage::Script
+                | ClientMessage::SystemStartup
+                | ClientMessage::Agent { .. },
+            ) => {}
             Err(e) => tracing::warn!("Ignoring malformed message from the UI: {e}"),
         }
     }
@@ -237,6 +259,62 @@ async fn serve_script<R: tokio::io::AsyncBufRead + Unpin>(
             backend.dispatch(&cmd, args).await
         } else {
             Err(format!("\"{cmd}\" isn't available to scripts"))
+        };
+        if tx
+            .try_send(encode(&DaemonMessage::reply(id, result)))
+            .is_err()
+        {
+            return;
+        }
+    }
+}
+
+/// Answers an agent client's calls until it hangs up. Gated on the persisted
+/// `agent_enabled` setting (or `BLOCKWORK_AGENT=1` override). Only
+/// [`blockwork_protocol::AGENT_COMMANDS`] are allowed; structured errors are
+/// passed through as `error` strings containing the JSON object.
+async fn serve_agent<R: tokio::io::AsyncBufRead + Unpin>(
+    reader: &mut R,
+    backend: &Backend,
+    tx: &mpsc::Sender<String>,
+    writer_task: &mut tokio::task::JoinHandle<()>,
+    client: &str,
+    protocol: u32,
+) {
+    use blockwork_protocol::{AGENT_PROTOCOL_MAX, AGENT_PROTOCOL_MIN};
+    let enabled = std::env::var("BLOCKWORK_AGENT")
+        .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+        .unwrap_or(false)
+        || backend.agent_enabled();
+    if !enabled {
+        let _ = tx.try_send(encode(&DaemonMessage::hello(false)));
+        return;
+    }
+    if !(AGENT_PROTOCOL_MIN..=AGENT_PROTOCOL_MAX).contains(&protocol) {
+        let _ = tx.try_send(encode(&DaemonMessage::hello(false)));
+        return;
+    }
+    tracing::info!("Agent connected: {client} protocol {protocol}");
+    if tx.try_send(encode(&DaemonMessage::hello(true))).is_err() {
+        return;
+    }
+    loop {
+        let line = tokio::select! {
+            _ = &mut *writer_task => return,
+            line = blockwork_protocol::read_line(reader) => match line {
+                Ok(Some(line)) => line,
+                _ => return,
+            },
+        };
+        let Ok(ClientMessage::Call { id, cmd, args }) =
+            serde_json::from_str::<ClientMessage>(&line)
+        else {
+            continue;
+        };
+        let result = if blockwork_protocol::AGENT_COMMANDS.contains(&cmd.as_str()) {
+            backend.dispatch_agent(&cmd, args).await
+        } else {
+            Err(format!("\"{cmd}\" isn't available to agents"))
         };
         if tx
             .try_send(encode(&DaemonMessage::reply(id, result)))

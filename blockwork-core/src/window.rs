@@ -12,6 +12,15 @@ pub struct ActiveWindow {
     pub app: String,
 }
 
+/// One top-level window for the agent `windows` list.
+#[derive(Debug, Clone, Default, PartialEq, serde::Serialize, serde::Deserialize)]
+pub struct WindowInfo {
+    pub title: String,
+    pub app: String,
+    pub rect: Rect,
+    pub focused: bool,
+}
+
 /// Which part of a window a pattern is matched against, and how.
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Default)]
 pub enum MatchBy {
@@ -146,6 +155,11 @@ pub fn exists(pattern: &str) -> Result<bool, String> {
     linux::exists(pattern.trim())
 }
 
+#[cfg(target_os = "linux")]
+pub fn list_for_agent() -> Result<Vec<WindowInfo>, String> {
+    linux::list_for_agent()
+}
+
 /// A window on screen, for finding what is under a point.
 #[derive(Debug, Clone, PartialEq)]
 pub struct ScreenWindow {
@@ -247,14 +261,14 @@ fn set_title(pattern: &str, by: MatchBy, title: &str) -> Result<(), String> {
 }
 
 #[cfg(windows)]
-pub use windows::{act, active, bounds, exists, list, place};
+pub use windows::{act, active, bounds, exists, list, list_for_agent, place};
 #[cfg(windows)]
 pub(crate) use windows::{foreground, handles};
 #[cfg(windows)]
 use windows::{set_opacity, set_title};
 
 #[cfg(target_os = "macos")]
-pub use macos::{act, active, bounds, exists, place};
+pub use macos::{act, active, bounds, exists, list_for_agent, place};
 
 #[cfg(not(any(target_os = "linux", windows)))]
 pub fn list() -> Result<Vec<ScreenWindow>, String> {
@@ -305,9 +319,12 @@ mod unsupported {
     pub fn exists(_: &str) -> Result<bool, String> {
         Err(MSG.into())
     }
+    pub fn list_for_agent() -> Result<Vec<super::WindowInfo>, String> {
+        Err(MSG.into())
+    }
 }
 #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
-pub use unsupported::{act, active, bounds, exists, place};
+pub use unsupported::{act, active, bounds, exists, list_for_agent, place};
 
 #[cfg(target_os = "linux")]
 mod linux;

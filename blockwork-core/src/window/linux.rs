@@ -181,6 +181,17 @@ pub(super) fn stacked() -> Result<Vec<ScreenWindow>, String> {
     }
 }
 
+pub(super) fn list_for_agent() -> Result<Vec<crate::window::WindowInfo>, String> {
+    match desktop()? {
+        Desktop::Hyprland => hypr::list(),
+        Desktop::Sway => sway::list(),
+        Desktop::Kde => kde::list(),
+        Desktop::Gnome => gnome::list_for_agent(),
+        Desktop::Cosmic => cosmic::list_for_agent(),
+        Desktop::X11 => x11::X11::connect()?.list(),
+    }
+}
+
 fn run(program: &str, args: &[&str]) -> Result<String, String> {
     let output = host_command(program)
         .args(args)
@@ -417,6 +428,25 @@ mod hypr {
         };
         dispatch(&[verb, &format!("exact {a} {b},{target}")])
     }
+
+    pub(super) fn list() -> Result<Vec<crate::window::WindowInfo>, String> {
+        use crate::window::WindowInfo;
+        let clients = json("hyprctl", &["clients", "-j"])?;
+        Ok(clients
+            .as_array()
+            .into_iter()
+            .flatten()
+            .map(|c| {
+                let rect = bounds(c).unwrap_or_default();
+                WindowInfo {
+                    title: info(c).title,
+                    app: info(c).app,
+                    rect,
+                    focused: c.get("focusHistoryID").and_then(|v| v.as_i64()) == Some(0),
+                }
+            })
+            .collect())
+    }
 }
 
 pub(super) mod sway {
@@ -599,6 +629,22 @@ pub(super) mod sway {
             format!("move absolute position {a} {b}")
         };
         command(node, &format!("floating enable, {verb}"))
+    }
+
+    pub(super) fn list() -> Result<Vec<crate::window::WindowInfo>, String> {
+        use crate::window::WindowInfo;
+        Ok(windows()?
+            .iter()
+            .map(|n| {
+                let inf = info(n);
+                WindowInfo {
+                    title: inf.title,
+                    app: inf.app,
+                    rect: bounds(n).unwrap_or_default(),
+                    focused: n.get("focused").and_then(|f| f.as_bool()) == Some(true),
+                }
+            })
+            .collect())
     }
 }
 
@@ -797,6 +843,24 @@ pub(super) mod kde {
             }
         };
         run("kdotool", args).map(drop)
+    }
+
+    pub(super) fn list() -> Result<Vec<crate::window::WindowInfo>, String> {
+        use crate::window::WindowInfo;
+        let out = run("kdotool", &["search", "--limit", "200", ""])?;
+        let active_id = active().unwrap_or_default();
+        let mut result = Vec::new();
+        for id in out.lines().map(str::trim).filter(|l| !l.is_empty()) {
+            let inf = info(id)?;
+            let rect = bounds(id).unwrap_or_default();
+            result.push(WindowInfo {
+                title: inf.title,
+                app: inf.app,
+                rect,
+                focused: id == active_id,
+            });
+        }
+        Ok(result)
     }
 }
 
@@ -1110,6 +1174,24 @@ pub(super) mod x11 {
                 "_NET_MOVERESIZE_WINDOW",
                 [flags | (2 << 12), data[0], data[1], data[2], data[3]],
             )
+        }
+
+        pub(crate) fn list(&self) -> Result<Vec<crate::window::WindowInfo>, String> {
+            use crate::window::WindowInfo;
+            let active = self.active()?.unwrap_or(0);
+            Ok(self
+                .windows_in("_NET_CLIENT_LIST")?
+                .iter()
+                .map(|w| {
+                    let info = self.info(*w);
+                    WindowInfo {
+                        title: info.title,
+                        app: info.app,
+                        rect: self.bounds(*w).unwrap_or_default(),
+                        focused: *w == active,
+                    }
+                })
+                .collect())
         }
     }
 }

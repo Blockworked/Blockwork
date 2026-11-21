@@ -148,6 +148,7 @@ pub(crate) fn get_state(state: &SharedState) -> Result<StateDto, String> {
     Ok(build_state_dto(&s))
 }
 
+pub(crate) mod agent;
 mod debugging;
 mod editing;
 mod files;

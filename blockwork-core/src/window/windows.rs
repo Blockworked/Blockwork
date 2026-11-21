@@ -431,3 +431,42 @@ pub fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
 pub fn exists(pattern: &str) -> Result<bool, String> {
     Ok(pattern.trim().is_empty() || find(pattern, MatchBy::Any).is_ok())
 }
+
+pub fn list_for_agent() -> Result<Vec<crate::window::WindowInfo>, String> {
+    use crate::window::WindowInfo;
+    let foreground = unsafe { GetForegroundWindow() };
+    let mut out = Vec::new();
+    for hwnd in windows() {
+        let info = info(hwnd);
+        let rect = bounds_rect(hwnd).unwrap_or_default();
+        out.push(WindowInfo {
+            title: info.title,
+            app: info.app,
+            rect,
+            focused: hwnd == foreground,
+        });
+    }
+    Ok(out)
+}
+
+fn bounds_rect(hwnd: HWND) -> Result<Rect, String> {
+    unsafe {
+        let mut rect: RECT = std::mem::zeroed();
+        if GetWindowRect(hwnd, &mut rect) == 0 {
+            return Err("couldn't read the window's rect".into());
+        }
+        let (width, height) = (
+            (rect.right - rect.left) as f64,
+            (rect.bottom - rect.top) as f64,
+        );
+        if width < 1.0 || height < 1.0 {
+            return Err("the window is minimized or hidden".into());
+        }
+        Ok(Rect {
+            x: rect.left as f64,
+            y: rect.top as f64,
+            width,
+            height,
+        })
+    }
+}

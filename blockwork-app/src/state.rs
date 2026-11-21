@@ -126,6 +126,18 @@ pub(crate) struct AppState {
     pub(crate) pending_pack: Option<crate::block_library::PendingPack>,
     /// Set by the emergency stop; watchers fire nothing until it's cleared.
     pub(crate) triggers_paused: bool,
+    /// Document store for headless agent editing: per-macro undo history keyed
+    /// by macro id. `current_macro`'s history stays in `history` for the
+    /// editor; non-open macros use these so agents and the editor never share
+    /// a single undo stack.
+    pub(crate) agent_histories: HashMap<String, History<EditorSnapshot>>,
+    /// Per-macro revision counters for optimistic concurrency. Every agent
+    /// edit carries `base_revision`; editor edits bump the same counter.
+    pub(crate) doc_revisions: HashMap<String, u64>,
+    /// Agent channel gate (persisted in `AppSettings::agent_enabled`).
+    pub(crate) agent_enabled: bool,
+    /// Input synthesis gate (persisted in `AppSettings::agent_input_allowed`).
+    pub(crate) agent_input_allowed: bool,
 }
 
 // ─── Serializable DTO ──────────────────────────────────────────────────────

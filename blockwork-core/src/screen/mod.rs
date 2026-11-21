@@ -51,7 +51,7 @@ mod platform {
 }
 
 /// A rectangle in screen coordinates.
-#[derive(Debug, Clone, Copy, PartialEq, serde::Serialize)]
+#[derive(Debug, Clone, Copy, Default, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct Rect {
     pub x: f64,
     pub y: f64,

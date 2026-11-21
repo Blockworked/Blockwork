@@ -17,6 +17,13 @@ use blockstitch_core::graph::{Fragment, ListDef, ListItem};
 use serde::{Deserialize, Serialize};
 use std::collections::HashSet;
 
+/// Current wire format version for `MacroDto`. Bumps are breaking; golden
+/// fixtures in `blockwork-model/tests/` pin the shape.
+pub const DTO_VERSION: u32 = 1;
+pub fn dto_version_default() -> u32 {
+    1
+}
+
 #[derive(Serialize, Deserialize, Clone, Debug)]
 #[serde(tag = "kind", content = "value")]
 pub enum ListItemDto {
@@ -59,6 +66,10 @@ pub fn dto_to_list_item(item: &ListItemDto) -> ListItem {
 
 #[derive(Serialize, Clone)]
 pub struct MacroDto {
+    /// Wire format version. `1` is the first frozen agent-facing shape;
+    /// unknown future versions are rejected with a hint, never silently accepted.
+    #[serde(default = "dto_version_default")]
+    pub dto_version: u32,
     pub id: String,
     pub name: String,
     pub description: String,
@@ -229,6 +240,7 @@ pub fn macro_to_dto(mac: &Macro) -> MacroDto {
         }
     }
     MacroDto {
+        dto_version: DTO_VERSION,
         id: mac.id.clone(),
         name: mac.name.clone(),
         description: mac.description.clone(),

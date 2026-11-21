@@ -27,6 +27,16 @@ pub enum ClientMessage {
     /// instead of `Hello`. It gets no state pushes, may only call
     /// [`SCRIPT_COMMANDS`], and doesn't count as an open window.
     Script,
+    /// First message from an agent client (`blockwork-agent`) instead of
+    /// `Hello`. Versioned handshake; see `AGENT_PROTOCOL` and
+    /// `AGENT_COMMANDS`. Agent connections do not take the UI slot, get no
+    /// `State` pushes, and the daemon survives their disconnect.
+    Agent {
+        #[serde(default)]
+        client: String,
+        #[serde(default)]
+        protocol: u32,
+    },
     /// Runs a backend command; answered by a reply with the same `id`.
     Call {
         id: u64,
@@ -43,6 +53,152 @@ pub const SCRIPT_COMMANDS: [&str; 5] = [
     "run_macro_file",
     "macro_running",
     "stop_macro_named",
+];
+
+/// The agent handshake version this build speaks. The daemon negotiates
+/// against `AGENT_PROTOCOL_MIN..=AGENT_PROTOCOL_MAX`.
+pub const AGENT_PROTOCOL: u32 = 1;
+pub const AGENT_PROTOCOL_MIN: u32 = 1;
+pub const AGENT_PROTOCOL_MAX: u32 = 1;
+
+/// Structured agent error codes (see `AgentError`).
+pub const AGENT_ERROR_CODES: [&str; 7] = [
+    "NOT_FOUND",
+    "CONFLICT",
+    "BAD_ARGS",
+    "BUSY",
+    "FORBIDDEN",
+    "DAEMON_UNAVAILABLE",
+    "UNSUPPORTED",
+];
+
+/// A structured error for agent commands: `{code, message, hint?}`.
+#[derive(Serialize, Deserialize, Debug, Clone, PartialEq, Eq)]
+pub struct AgentError {
+    pub code: String,
+    pub message: String,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub hint: Option<String>,
+}
+
+impl AgentError {
+    pub fn new(code: &str, message: impl Into<String>) -> Self {
+        Self {
+            code: code.to_string(),
+            message: message.into(),
+            hint: None,
+        }
+    }
+    pub fn not_found(message: impl Into<String>) -> Self {
+        Self::new("NOT_FOUND", message)
+    }
+    pub fn conflict(message: impl Into<String>) -> Self {
+        Self::new("CONFLICT", message)
+    }
+    pub fn bad_args(message: impl Into<String>) -> Self {
+        Self::new("BAD_ARGS", message)
+    }
+    pub fn busy(message: impl Into<String>) -> Self {
+        Self::new("BUSY", message)
+    }
+    pub fn forbidden(message: impl Into<String>) -> Self {
+        Self::new("FORBIDDEN", message)
+    }
+    pub fn unsupported(message: impl Into<String>) -> Self {
+        Self::new("UNSUPPORTED", message)
+    }
+    pub fn with_hint(mut self, hint: impl Into<String>) -> Self {
+        self.hint = Some(hint.into());
+        self
+    }
+}
+
+impl std::fmt::Display for AgentError {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}: {}", self.code, self.message)
+    }
+}
+
+/// The allowlist for [`ClientMessage::Agent`] connections. Kept in
+/// `blockwork-protocol` so the daemon, the backend parity tests and the
+/// `blockwork-agent` client all agree on it. Add a command in exactly three
+/// places: here, `blockwork-app::commands::agent`, and
+/// `blockwork-agent/tools.rs` - the parity test enforces the third.
+pub const AGENT_COMMANDS: [&str; 69] = [
+    // Library
+    "agent_list_macros",
+    "agent_get_macro",
+    "agent_create_macro",
+    "agent_create_from_template",
+    "agent_duplicate_macro",
+    "agent_delete_macro",
+    "agent_rename_macro",
+    "agent_get_macro_settings",
+    "agent_update_macro_settings",
+    "agent_get_global_settings",
+    "agent_set_global_settings",
+    "agent_get_hotkeys",
+    "agent_set_hotkeys",
+    "agent_list_templates",
+    "agent_describe_blocks",
+    "agent_export_macro",
+    "agent_import_macro",
+    "agent_confirm_import",
+    // Canvas
+    "agent_add_strand",
+    "agent_remove_strand",
+    "agent_add_block",
+    "agent_edit_block",
+    "agent_remove_block",
+    "agent_move_block",
+    "agent_find_blocks",
+    "agent_add_comment",
+    "agent_remove_comment",
+    "agent_create_variable",
+    "agent_rename_variable",
+    "agent_delete_variable",
+    "agent_set_variable_value",
+    "agent_set_list_items",
+    "agent_create_list",
+    "agent_rename_list",
+    "agent_delete_list",
+    "agent_replace_canvas",
+    "agent_undo",
+    "agent_redo",
+    // Run
+    "agent_run_macro",
+    "agent_stop_macro",
+    "agent_stop_all",
+    "agent_run_status",
+    "agent_run_log",
+    "agent_trace",
+    "agent_emergency_stop",
+    "agent_resume_triggers",
+    // See
+    "agent_crop",
+    "agent_screenshot",
+    "agent_ocr",
+    "agent_find_image",
+    "agent_pixel",
+    // Act (window/input/clipboard; input gated additionally at runtime)
+    "agent_move_mouse",
+    "agent_move_mouse_rel",
+    "agent_click",
+    "agent_scroll",
+    "agent_key",
+    "agent_type_text",
+    "agent_button",
+    "agent_window_action",
+    "agent_window_move",
+    "agent_clipboard_get",
+    "agent_clipboard_set",
+    "agent_notify",
+    "agent_list_apps",
+    "agent_launch_app",
+    "agent_windows",
+    "agent_active_window",
+    "agent_window_bounds",
+    "agent_cursor",
 ];
 
 /// A message from the daemon to the UI. Kept as one flat struct rather than

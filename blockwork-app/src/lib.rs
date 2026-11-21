@@ -215,6 +215,10 @@ fn initial_state(
         pending_import: None,
         pending_pack: None,
         triggers_paused: false,
+        agent_histories: HashMap::new(),
+        doc_revisions: HashMap::new(),
+        agent_enabled: settings.agent_enabled.unwrap_or(false),
+        agent_input_allowed: settings.agent_input_allowed.unwrap_or(false),
     }
 }
 
@@ -460,6 +464,15 @@ impl Backend {
         Backend { state: shared, app }
     }
 
+    /// Agent entry point for the daemon server (allowlist checked by caller).
+    pub async fn dispatch_agent(
+        &self,
+        cmd: &str,
+        args: serde_json::Value,
+    ) -> Result<serde_json::Value, String> {
+        commands::agent::dispatch_agent(&self.state, &self.app, cmd, args).await
+    }
+
     /// Receives every [`Event`] published from now on.
     pub fn subscribe(&self) -> broadcast::Receiver<Event> {
         self.app.events.subscribe()
@@ -473,6 +486,24 @@ impl Backend {
 
     pub fn close_to_tray(&self) -> bool {
         self.state.lock().map(|s| s.close_to_tray).unwrap_or(false)
+    }
+
+    /// Whether the agent channel is enabled (persisted setting, re-read per
+    /// handshake by the daemon server, cached here for dispatch gates).
+    pub fn agent_enabled(&self) -> bool {
+        let env = std::env::var("BLOCKWORK_AGENT")
+            .map(|v| v == "1" || v.eq_ignore_ascii_case("true"))
+            .unwrap_or(false);
+        env || self.state.lock().map(|s| s.agent_enabled).unwrap_or(false)
+    }
+
+    /// Whether agents may synthesize desktop input. Separate explicit opt-in,
+    /// default off.
+    pub fn agent_input_allowed(&self) -> bool {
+        self.state
+            .lock()
+            .map(|s| s.agent_enabled && s.agent_input_allowed)
+            .unwrap_or(false)
     }
 
     /// Asks every subscriber to shut down (publishes [`Event::Quit`]).

@@ -72,6 +72,53 @@ impl Image {
         }
     }
 
+    /// Shrinks so the larger side is at most `max_side`, preserving aspect
+    /// ratio. Box-average sampled; receivers map delivered pixels back with
+    /// the returned width/height.
+    pub fn downscale(&self, max_side: u32) -> Image {
+        if max_side == 0 || (self.width <= max_side && self.height <= max_side) {
+            return self.clone();
+        }
+        let factor = (self.width.max(self.height) + max_side - 1) / max_side;
+        if factor <= 1 {
+            return self.clone();
+        }
+        let (width, height) = (
+            (self.width + factor - 1) / factor,
+            (self.height + factor - 1) / factor,
+        );
+        let mut rgba = Vec::with_capacity(width as usize * height as usize * 4);
+        for y in 0..height {
+            for x in 0..width {
+                let mut sum = [0u64; 4];
+                let mut count = 0u64;
+                for dy in 0..factor {
+                    for dx in 0..factor {
+                        let sx = x * factor + dx;
+                        let sy = y * factor + dy;
+                        if sx >= self.width || sy >= self.height {
+                            continue;
+                        }
+                        let i = (sy as usize * self.width as usize + sx as usize) * 4;
+                        for c in 0..4 {
+                            sum[c] += self.rgba[i + c] as u64;
+                        }
+                        count += 1;
+                    }
+                }
+                let count = count.max(1);
+                for c in 0..4 {
+                    rgba.push((sum[c] / count) as u8);
+                }
+            }
+        }
+        Image {
+            width,
+            height,
+            rgba,
+        }
+    }
+
     pub fn from_png(bytes: &[u8]) -> Result<Image, String> {
         let mut decoder = png::Decoder::new(std::io::Cursor::new(bytes));
         decoder.set_transformations(png::Transformations::normalize_to_color8());
@@ -188,5 +235,16 @@ mod tests {
         assert_eq!(image.crop(1, 0, 1, 1).pixel(0, 0), [10, 20, 30]);
         assert_eq!(image.scale_up(2).pixel(3, 1), [10, 20, 30]);
         assert!(Image::load("").is_err());
+    }
+
+    #[test]
+    fn downscale_averages_boxes() {
+        let mut image = Image::new(4, 2);
+        image.rgba[0..4].copy_from_slice(&[255, 0, 0, 255]);
+        image.rgba[4..8].copy_from_slice(&[0, 255, 0, 255]);
+        let down = image.downscale(2);
+        assert_eq!((down.width, down.height), (2, 1));
+        assert_eq!(down.pixel(0, 0), [63, 63, 0]);
+        assert!(image.downscale(8).rgba == image.rgba);
     }
 }

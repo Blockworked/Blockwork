@@ -6,12 +6,25 @@ use super::Image;
 
 /// Candidates the coarse pass hands to the full-size check.
 const CANDIDATES: usize = 12;
-/// Coarse positions under the limit kept per phase when every match is
-/// wanted, and how many distinct spots of them get the full-size check.
+/// Coarse positions under the limit kept when every match is wanted, and
+/// how many distinct spots of them get the full-size check.
 const ALL_CANDIDATES: usize = 50_000;
 const ALL_SPOTS: usize = 1024;
 /// Most matches [`find_all`] reports.
 pub const MAX_MATCHES: usize = 200;
+
+/// Shrink factor for the coarse pass: shrink both images until the needle
+/// is about this small on its short side. Searching every sub-grid offset
+/// costs factor*factor coarse scans (64 at factor 8), which on a large
+/// multi-monitor haystack hangs the daemon for minutes - one phase with a
+/// wide enough refine radius is enough since the full-res check covers
+/// the grid offset.
+fn shrink_factor(needle: &Image) -> u32 {
+    [8, 4, 2, 1]
+        .into_iter()
+        .find(|f| needle.width / f >= 7 && needle.height / f >= 7)
+        .unwrap_or(1)
+}
 
 /// One place `needle` matches: its top-left pixel and mean per-channel
 /// difference (0-255).
@@ -47,30 +60,17 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
         return None;
     }
     // Shrink both as far as the needle stays recognizable.
-    let factor = [4, 2, 1]
-        .into_iter()
-        .find(|f| needle.width / f >= 7 && needle.height / f >= 7)
-        .unwrap_or(1);
+    let factor = shrink_factor(needle);
     let small_hay = Rgb::shrink(hay, factor);
-
-    // A match can sit at any offset from the shrunken grid, so the needle is
-    // shrunk once per offset; the right one lines up exactly.
+    let small_needle = Rgb::shrink(needle, factor);
+    let area = (small_needle.width as u64 * small_needle.height as u64).max(1);
     let mut candidates: Vec<(u64, i64, i64)> = Vec::new();
-    for py in 0..factor {
-        for px in 0..factor {
-            let phase = needle.crop(px, py, needle.width - px, needle.height - py);
-            let small_needle = Rgb::shrink(&phase, factor);
-            let area = (small_needle.width as u64 * small_needle.height as u64).max(1);
-            for (sum, cx, cy) in coarse(&small_hay, &small_needle, Some(CANDIDATES), u64::MAX) {
-                // Compare per pixel, since phases shrink to different sizes.
-                let score = sum * 1024 / area;
-                candidates.push((
-                    score,
-                    (cx * factor) as i64 - px as i64,
-                    (cy * factor) as i64 - py as i64,
-                ));
-            }
-        }
+    for (sum, cx, cy) in coarse(&small_hay, &small_needle, Some(CANDIDATES), u64::MAX) {
+        candidates.push((
+            sum * 1024 / area,
+            (cx * factor) as i64,
+            (cy * factor) as i64,
+        ));
     }
     candidates.sort_unstable();
     candidates.truncate(CANDIDATES);
@@ -80,9 +80,9 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
         (hay.width - needle.width) as i64,
         (hay.height - needle.height) as i64,
     );
-    // Flat areas can give several phases the same coarse score. Refine a
-    // whole downsampled cell so choosing one phase cannot lose its neighbors.
-    let radius = factor.saturating_sub(1).max(1) as i64;
+    // One phase can be off by up to factor-1 pixels from the shrunken
+    // grid; refining one cell in every direction covers it.
+    let radius = factor as i64;
     for (_, cx, cy) in candidates {
         for y in (cy - radius).max(0)..=(cy + radius).min(max_y) {
             for x in (cx - radius).max(0)..=(cx + radius).min(max_x) {
@@ -122,28 +122,18 @@ pub fn find_all(hay: &Image, needle: &Image, tolerance: f64) -> Vec<Match> {
     });
     let max_diff = tolerance.clamp(0.0, 100.0) / 100.0 * 255.0;
     if max_diff > 0.0 {
-        let factor = [4, 2, 1]
-            .into_iter()
-            .find(|f| needle.width / f >= 7 && needle.height / f >= 7)
-            .unwrap_or(1);
+        let factor = shrink_factor(needle);
         let small_hay = Rgb::shrink(hay, factor);
-        // Averaging never adds difference, so a real match's coarse score
-        // stays under the limit; the slack covers rounding and cropped edges.
+        let small_needle = Rgb::shrink(needle, factor);
+        let area = (small_needle.width as u64 * small_needle.height as u64).max(1);
+        let cap = ((max_diff + 2.0) * 1.1 * 3.0 * area as f64) as u64 + 1;
         let mut candidates: Vec<(u64, i64, i64)> = Vec::new();
-        for py in 0..factor {
-            for px in 0..factor {
-                let phase = needle.crop(px, py, needle.width - px, needle.height - py);
-                let small_needle = Rgb::shrink(&phase, factor);
-                let area = (small_needle.width as u64 * small_needle.height as u64).max(1);
-                let cap = ((max_diff + 2.0) * 1.1 * 3.0 * area as f64) as u64 + 1;
-                for (sum, cx, cy) in coarse(&small_hay, &small_needle, None, cap) {
-                    candidates.push((
-                        sum * 1024 / area,
-                        (cx * factor) as i64 - px as i64,
-                        (cy * factor) as i64 - py as i64,
-                    ));
-                }
-            }
+        for (sum, cx, cy) in coarse(&small_hay, &small_needle, None, cap) {
+            candidates.push((
+                sum * 1024 / area,
+                (cx * factor) as i64,
+                (cy * factor) as i64,
+            ));
         }
         candidates.sort_unstable();
         // One spot per would-be match: the best position, with the others
@@ -164,7 +154,7 @@ pub fn find_all(hay: &Image, needle: &Image, tolerance: f64) -> Vec<Match> {
             (hay.width - needle.width) as i64,
             (hay.height - needle.height) as i64,
         );
-        let radius = factor.saturating_sub(1).max(1) as i64;
+        let radius = factor as i64;
         for (cx, cy) in spots {
             let mut best: Option<Match> = None;
             for y in (cy - radius).max(0)..=(cy + radius).min(max_y) {
@@ -411,8 +401,10 @@ fn coarse(hay: &Rgb, needle: &Rgb, keep: Option<usize>, cap: u64) -> Vec<(u64, u
         return Vec::new();
     }
     let rows = hay.height - needle.height + 1;
+    // Cap threads so a wide desktop does not oversubscribe the daemon.
     let threads = std::thread::available_parallelism()
         .map_or(4, |n| n.get())
+        .min(8)
         .min(rows as usize)
         .max(1) as u32;
     let chunk = rows.div_ceil(threads);

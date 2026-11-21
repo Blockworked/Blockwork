@@ -75,6 +75,21 @@ pub(super) fn active() -> Result<Option<Value>, String> {
     Ok(windows()?.into_iter().find(|w| flag(w, "focused")))
 }
 
+pub(super) fn list_for_agent() -> Result<Vec<crate::window::WindowInfo>, String> {
+    Ok(windows()?
+        .iter()
+        .map(|w| {
+            let ActiveWindow { title, app } = info(w);
+            crate::window::WindowInfo {
+                title,
+                app,
+                rect: bounds(w).unwrap_or_default(),
+                focused: flag(w, "focused"),
+            }
+        })
+        .collect())
+}
+
 pub(super) fn find(pattern: &str, by: MatchBy) -> Result<Value, String> {
     let list = windows()?;
     if pattern.trim().is_empty() {

@@ -23,6 +23,9 @@ impl Backend {
     /// Runs the command named `cmd` with `args` (a JSON object keyed by
     /// camelCase argument name) and returns its result as JSON.
     pub async fn dispatch(&self, cmd: &str, args: Value) -> Result<Value, String> {
+        if blockwork_protocol::AGENT_COMMANDS.contains(&cmd) {
+            return commands::agent::dispatch_agent(&self.state, &self.app, cmd, args).await;
+        }
         if let Some(result) = commands::edit_command(&self.state, &self.app, cmd, &args).await {
             return result;
         }

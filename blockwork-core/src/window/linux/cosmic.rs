@@ -232,6 +232,19 @@ pub(super) fn active() -> Result<ActiveWindow, String> {
         .unwrap_or_default())
 }
 
+pub(super) fn list_for_agent() -> Result<Vec<crate::window::WindowInfo>, String> {
+    Ok(session()?
+        .windows()
+        .into_iter()
+        .map(|w| crate::window::WindowInfo {
+            title: w.title,
+            app: w.app,
+            rect: w.bounds.unwrap_or_default(),
+            focused: w.focused,
+        })
+        .collect())
+}
+
 fn find_in(session: &Session, pattern: &str, by: MatchBy) -> Result<Window, String> {
     let list = session.windows();
     if pattern.trim().is_empty() {
