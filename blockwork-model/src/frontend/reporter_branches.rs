@@ -1,30 +1,20 @@
-//! Runs instruction edits inside a reporter's branches: blockstitch opens
-//! them as temporary strands (`open_reporter_branches`), this runs the edit,
-//! and blockstitch writes them back.
+//! Runs instruction edits inside a reporter's branches through
+//! blockstitch's `edit_reporter_branch`; this supplies Blockwork's
+//! instruction JSON.
 
 use crate::macros::InstructionKind;
-use blockstitch_core::editor::{
-    BranchArgKeys, EditCommand, EditContext, ValueDestination, ValueLocation,
-};
+use blockstitch_core::editor::{BranchArgKeys, BranchCodec, CANVAS_ARG_KEYS};
 use blockstitch_core::graph::BlockGraph;
-use serde::de::DeserializeOwned;
-use serde_json::{Value as Json, json};
+use serde_json::Value as Json;
 
 type Graph = BlockGraph<InstructionKind>;
 
 /// Where Blockwork's commands put strand ids and value locations.
-pub const BRANCH_ARG_KEYS: BranchArgKeys<'static> = BranchArgKeys {
-    ids: &["strandId", "targetId", "draggedId"],
-    locations: &["location", "from", "to"],
-};
+pub const BRANCH_ARG_KEYS: BranchArgKeys<'static> = CANVAS_ARG_KEYS;
 
 /// Whether a command's arguments name a reporter branch.
 pub fn targets_reporter_branch(args: &Json) -> bool {
     blockstitch_core::editor::targets_reporter_branch(args, BRANCH_ARG_KEYS)
-}
-
-fn arg<T: DeserializeOwned>(args: &Json, name: &str) -> Result<T, String> {
-    serde_json::from_value(args.get(name).cloned().unwrap_or(Json::Null)).map_err(|e| e.to_string())
 }
 
 fn read_body(body: &[Json]) -> Result<Vec<crate::macros::Instruction>, String> {
@@ -36,166 +26,27 @@ fn write_instruction(instruction: &crate::macros::Instruction) -> Result<Json, S
         .map_err(|e| e.to_string())
 }
 
+fn read_instruction(json: &Json) -> Result<crate::macros::Instruction, String> {
+    let dto = serde_json::from_value(json.clone()).map_err(|e| e.to_string())?;
+    crate::frontend::dto_to_instruction(&dto).ok_or_else(|| "Unknown instruction type".into())
+}
+
+fn write_fragment(
+    fragment: &blockstitch_core::graph::Fragment<InstructionKind>,
+) -> Result<Json, String> {
+    serde_json::to_value(crate::frontend::fragment_to_dto(fragment)).map_err(|e| e.to_string())
+}
+
 /// Runs one editor command inside a reporter's branches (an `args` naming a
 /// `@reporter-branch:` strand). Call it on a clone and commit only on `Ok`.
 pub fn edit_reporter_branch(graph: &mut Graph, cmd: &str, args: &Json) -> Result<Json, String> {
-    let ids = blockstitch_core::editor::reporter_branch_ids(args, BRANCH_ARG_KEYS);
-    let branches = graph.open_reporter_branches(&ids, &read_body)?;
-    let strand = || arg::<String>(args, "strandId");
-    let path = || arg(args, "path");
-    let result = match cmd {
-        "add_instruction" => {
-            let instruction = crate::frontend::dto_to_instruction(&arg(args, "instruction")?)
-                .ok_or("Unknown instruction type")?;
-            graph
-                .apply_edit(
-                    EditCommand::InsertInstruction {
-                        strand_id: strand()?,
-                        path: path()?,
-                        instruction,
-                    },
-                    &EditContext::default(),
-                )
-                .map_err(String::from)?;
-            Json::Null
-        }
-        "edit_instruction" => {
-            let instruction = crate::frontend::dto_to_instruction(&arg(args, "instruction")?)
-                .ok_or("Unknown instruction type")?;
-            if !graph.replace_instruction(&strand()?, &path()?, instruction) {
-                return Err("Instruction is missing".into());
-            }
-            Json::Null
-        }
-        "merge_strand" => {
-            graph.merge_strand(
-                &arg::<String>(args, "draggedId")?,
-                &arg::<String>(args, "targetId")?,
-                &path()?,
-            )?;
-            Json::Null
-        }
-        "merge_tail" => {
-            graph.merge_tail(
-                &strand()?,
-                &path()?,
-                &arg::<String>(args, "targetId")?,
-                &arg::<Vec<blockstitch_core::editor::PathStep>>(args, "targetPath")?,
-            )?;
-            Json::Null
-        }
-        "split_strand" => {
-            json!(graph.split_strand(&strand()?, &path()?, arg(args, "x")?, arg(args, "y")?)?)
-        }
-        "move_strand" => json!(graph.split_strand(
-            &strand()?,
-            &[blockstitch_core::editor::PathStep {
-                index: 0,
-                slot: None
-            }],
-            arg(args, "x")?,
-            arg(args, "y")?
-        )?),
-        "remove_strand" => {
-            graph
-                .strands
-                .retain(|s| s.id != strand().unwrap_or_default());
-            Json::Null
-        }
-        "remove_instruction" => {
-            graph
-                .apply_edit(
-                    EditCommand::RemoveInstructions {
-                        strand_id: strand()?,
-                        path: path()?,
-                        count: arg::<Option<usize>>(args, "count")?.unwrap_or(1),
-                    },
-                    &EditContext::default(),
-                )
-                .map_err(String::from)?;
-            Json::Null
-        }
-        "duplicate_instruction" => {
-            graph
-                .apply_edit(
-                    EditCommand::DuplicateInstruction {
-                        strand_id: strand()?,
-                        path: path()?,
-                    },
-                    &EditContext::default(),
-                )
-                .map_err(String::from)?;
-            Json::Null
-        }
-        "copy_instructions" => serde_json::to_value(crate::frontend::fragment_to_dto(
-            &graph.copy_fragment(&strand()?, &path()?, arg(args, "count")?)?,
-        ))
-        .map_err(|e| e.to_string())?,
-        "edit_value_field" => {
-            graph
-                .apply_edit(
-                    EditCommand::EditFieldText {
-                        location: arg(args, "location")?,
-                        text: arg(args, "text")?,
-                    },
-                    &EditContext::default(),
-                )
-                .map_err(String::from)?;
-            Json::Null
-        }
-        "put_value" => {
-            if !graph.put_value(&arg(args, "location")?, arg(args, "value")?) {
-                return Err("Value slot is missing".into());
-            }
-            Json::Null
-        }
-        "take_value" => serde_json::to_value(graph.take_value(&arg(args, "location")?))
-            .map_err(|e| e.to_string())?,
-        "move_value" => {
-            let to = arg::<Option<ValueLocation>>(args, "to")?
-                .map(ValueDestination::Slot)
-                .unwrap_or(ValueDestination::Canvas {
-                    x: arg::<Option<i32>>(args, "x")?.unwrap_or(0),
-                    y: arg::<Option<i32>>(args, "y")?.unwrap_or(0),
-                    origin_block_id: arg(args, "originBlockId")?,
-                });
-            graph
-                .apply_edit(
-                    EditCommand::MoveValue {
-                        from: arg(args, "from")?,
-                        to,
-                    },
-                    &EditContext::default(),
-                )
-                .map_err(String::from)?;
-            Json::Null
-        }
-        _ => {
-            return Err(format!(
-                "Command '{cmd}' is unavailable inside a reporter branch"
-            ));
-        }
+    let codec = BranchCodec {
+        read: &read_body,
+        write: &write_instruction,
+        instruction: &read_instruction,
+        fragment: &write_fragment,
     };
-    if matches!(cmd, "merge_strand" | "merge_tail")
-        && let Some(y) = arg::<Option<i32>>(args, "targetY")?
-    {
-        let target_path: Vec<blockstitch_core::editor::PathStep> = arg(
-            args,
-            if cmd == "merge_tail" {
-                "targetPath"
-            } else {
-                "path"
-            },
-        )?;
-        if target_path.len() == 1
-            && target_path[0].index == 0
-            && let Some(target) = graph.strand_mut(&arg::<String>(args, "targetId")?)
-        {
-            target.y = y;
-        }
-    }
-    graph.close_reporter_branches(branches, &write_instruction)?;
-    Ok(result)
+    graph.edit_reporter_branch(cmd, args, &codec)
 }
 
 #[cfg(test)]
@@ -203,8 +54,10 @@ mod tests {
     use super::*;
     use crate::input::value::Value;
     use blockstitch_core::editor::REPORTER_BRANCH_PREFIX as PREFIX;
+    use blockstitch_core::editor::ValueLocation;
     use blockstitch_core::graph::Strand;
     use blockstitch_core::graph::{FloatingValue, Instruction};
+    use serde_json::json;
 
     fn fixture() -> (Graph, String, ValueLocation) {
         let mut graph = Graph::new();
