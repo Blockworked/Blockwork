@@ -17,6 +17,8 @@ gpg_args=(--gpg-sign="$key")
 
 mkdir -p "$site"
 [ -f "$repo/config" ] || ostree init --mode=archive-z2 --repo="$repo"
+# Object storage keeps no empty folders, so a downloaded repo lacks these.
+mkdir -p "$repo"/refs/{heads,remotes,mirrors} "$repo"/{objects,tmp/cache,extensions,state}
 
 for bundle in "$@"; do
     flatpak build-import-bundle "${gpg_args[@]}" "$repo" "$bundle"
