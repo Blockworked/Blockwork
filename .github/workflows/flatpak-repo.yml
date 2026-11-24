@@ -103,3 +103,8 @@ jobs:
           $S3 sync --only-show-errors --cache-control 'public, max-age=300' site/ "s3://$BUCKET/" \
             --exclude 'repo/objects/*' --exclude 'repo/deltas/*'
           $S3 sync --only-show-errors --delete site/ "s3://$BUCKET/"
+          # Software centers only open these when served with their own types.
+          $S3 cp --only-show-errors --cache-control 'public, max-age=300' \
+            --content-type application/vnd.flatpak.ref site/blockwork.flatpakref "s3://$BUCKET/blockwork.flatpakref"
+          $S3 cp --only-show-errors --cache-control 'public, max-age=300' \
+            --content-type application/vnd.flatpak.repo site/blockwork.flatpakrepo "s3://$BUCKET/blockwork.flatpakrepo"
