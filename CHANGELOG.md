@@ -10,11 +10,16 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ## [Unreleased]
 
+## [0.6.3] - 2026-11-24
+
 ### Added
 - Report a community pack, or someone else's comment on it, from its page in the Block library.
 
 ### Changed
 - The Text block spaces keystrokes 0.5 ms apart on Windows and macOS too, as it already did on Linux, so fast typing doesn't drop or merge characters.
+
+### Fixed
+- Date and time format patterns such as `MMM d` are no longer translated, so dates in the run log show the right format in every language.
 
 ## [0.6.2] - 2026-11-14
 
