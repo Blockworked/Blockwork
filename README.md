@@ -53,6 +53,16 @@ GitHub release. To build one locally:
 
 ## Linux
 
+Any distribution: install from the Flatpak repo, which then updates with
+`flatpak update`:
+
+```sh
+flatpak install https://flatpak.blockworked.com/blockwork.flatpakref
+```
+
+Fedora 43 and newer: `sudo dnf copr enable ethanstokes/Blockwork`, then
+`sudo dnf install blockwork`.
+
 Ubuntu and Debian: each release has a `.deb` built against Ubuntu 26.04's and
 26.10's own Qt, and one with Qt bundled for Debian 13, Ubuntu 24.04 and other
 releases whose Qt is older than 6.10. Install it with
