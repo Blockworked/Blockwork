@@ -25,7 +25,7 @@ jobs:
       TAG: ${{ inputs.tag }}
       COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
       # owner/project on copr.fedorainfracloud.org; the COPR_PROJECT variable overrides it
-      COPR_PROJECT: ${{ vars.COPR_PROJECT || 'ethanstokes/blockwork' }}
+      COPR_PROJECT: ${{ vars.COPR_PROJECT || 'ethanstokes/Blockwork' }}
 
     steps:
       - name: Install tools
