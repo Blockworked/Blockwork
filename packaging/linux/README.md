@@ -23,7 +23,7 @@ the `input` group. The packages don't add anyone to it.
   network. `packaging/rpm/build-srpm.sh` turns it and `blockwork.spec.in` into a
   source RPM, and `copr-cli` submits it. Needs the `COPR_CONFIG` secret (the
   contents of `~/.config/copr` from https://copr.fedorainfracloud.org/api/) and
-  the `COPR_PROJECT` variable (`owner/project`). The chroots built are the ones
+  the `COPR_PROJECT` variable (`owner/project`, `ethanstokes/blockwork` when unset). The chroots built are the ones
   enabled on the COPR project; Qt 6.10 or newer is needed, so Fedora 43 and up.
 - **AUR** (`aur.yml`): `packaging/aur/render.sh` fills in versions and checksums
   for `blockwork` (from source), `blockwork-bin` (the release AppImages,
