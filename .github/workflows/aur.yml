@@ -1,0 +1,92 @@
+name: AUR
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+      push:
+        description: "Only set by release.yml; manual runs push only when asked"
+        type: boolean
+        default: true
+    secrets:
+      AUR_SSH_PRIVATE_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to render the PKGBUILDs for (e.g. 0.6.2)"
+        required: true
+        type: string
+      push:
+        description: "Push to the AUR"
+        type: boolean
+        default: false
+
+jobs:
+  aur:
+    name: Render, check and push AUR packages
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    env:
+      TAG: ${{ inputs.tag }}
+      AUR_KEY: ${{ secrets.AUR_SSH_PRIVATE_KEY }}
+
+    steps:
+      - name: Install tools
+        run: pacman -Syu --noconfirm --needed base-devel git openssh curl
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Render PKGBUILDs
+        run: packaging/aur/render.sh "$TAG" dist/aur
+
+      # makepkg refuses root; check the prebuilt package installs and makes .SRCINFO files.
+      - name: Check blockwork-bin and write .SRCINFO
+        run: |
+          useradd -m builder
+          chown -R builder dist/aur
+          su builder -c 'cd dist/aur/blockwork-bin && makepkg --noconfirm --nodeps'
+          for pkg in blockwork blockwork-bin blockwork-git; do
+            su builder -c "cd dist/aur/$pkg && makepkg --printsrcinfo > .SRCINFO"
+          done
+          pacman -Qip dist/aur/blockwork-bin/*.pkg.tar.zst
+          pacman -Qlp dist/aur/blockwork-bin/*.pkg.tar.zst | grep -E 'usr/bin/blockwork|opt/blockwork/bin/blockwork-daemon'
+
+      - name: Upload PKGBUILDs
+        uses: actions/upload-artifact@v4
+        with:
+          name: aur-pkgbuilds
+          path: |
+            dist/aur/*/PKGBUILD
+            dist/aur/*/.SRCINFO
+
+      - name: Push to the AUR
+        if: inputs.push && env.AUR_KEY != ''
+        env:
+          GIT_AUTHOR_NAME: ${{ vars.AUR_GIT_NAME || 'Ethan Stokes' }}
+          GIT_AUTHOR_EMAIL: ${{ vars.AUR_GIT_EMAIL || 'erstokes10@gmail.com' }}
+          GIT_COMMITTER_NAME: ${{ vars.AUR_GIT_NAME || 'Ethan Stokes' }}
+          GIT_COMMITTER_EMAIL: ${{ vars.AUR_GIT_EMAIL || 'erstokes10@gmail.com' }}
+        run: |
+          install -dm700 ~/.ssh
+          printf '%s\n' "$AUR_KEY" > ~/.ssh/aur
+          chmod 600 ~/.ssh/aur
+          ssh-keyscan -t ed25519,rsa aur.archlinux.org >> ~/.ssh/known_hosts
+          export GIT_SSH_COMMAND="ssh -i ~/.ssh/aur -o IdentitiesOnly=yes"
+          for pkg in blockwork blockwork-bin blockwork-git; do
+            rm -rf "aur-$pkg"
+            git clone "ssh://aur@aur.archlinux.org/$pkg.git" "aur-$pkg"
+            cp "dist/aur/$pkg/PKGBUILD" "dist/aur/$pkg/.SRCINFO" "aur-$pkg/"
+            git -C "aur-$pkg" add PKGBUILD .SRCINFO
+            if git -C "aur-$pkg" diff --cached --quiet; then
+              echo "$pkg unchanged"
+            else
+              git -C "aur-$pkg" commit -m "Update to ${TAG#v}"
+              git -C "aur-$pkg" push origin HEAD:master
+            fi
+          done

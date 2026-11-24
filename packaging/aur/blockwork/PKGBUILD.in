@@ -1,0 +1,48 @@
+# Maintainer: Ethan Stokes <erstokes10@gmail.com>
+# Rendered from packaging/aur/blockwork/PKGBUILD.in in Blockworked/Blockwork by .github/workflows/aur.yml.
+
+pkgname=blockwork
+pkgver=@VERSION@
+pkgrel=1
+pkgdesc='Build keyboard and mouse macros by snapping blocks together'
+url='https://blockworked.com'
+arch=('x86_64' 'aarch64')
+license=('GPL-3.0-only')
+depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'hicolor-icon-theme' 'gcc-libs' 'glibc' 'dbus' 'libxkbcommon' 'wayland' 'gtk3')
+makedepends=('cargo' 'cmake' 'clang' 'lld' 'pkgconf')
+optdepends=('qt6-wayland: native Wayland window'
+            'tesseract: text recognition blocks'
+            'grim: screen blocks on wlroots desktops'
+            'kdotool: window blocks on KDE Plasma')
+provides=('macros')
+conflicts=('blockwork-bin' 'blockwork-git' 'macros')
+options=('!lto')
+_qwk=@QWK_COMMIT@
+source=("$pkgname-$pkgver.tar.gz::https://github.com/Blockworked/Blockwork/archive/refs/tags/$pkgver.tar.gz"
+        "qwindowkit-$_qwk.tar.gz::https://codeload.github.com/stdware/qwindowkit/tar.gz/$_qwk")
+sha256sums=('@SHA256@'
+            '@QWK_SHA256@')
+
+prepare() {
+    cd "Blockwork-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    cargo fetch --locked --target "$(rustc -vV | sed -n 's/host: //p')"
+}
+
+build() {
+    cd "Blockwork-$pkgver"
+    export RUSTUP_TOOLCHAIN=stable
+    export CARGO_TARGET_DIR=target
+    export CARGO_NET_OFFLINE=true
+    export QMAKE=/usr/bin/qmake6
+    # GNU ld with --as-needed drops Qt libraries only the cxx-qt archives use; rustup's Rust links with lld too.
+    export RUSTFLAGS="${RUSTFLAGS:-} -Clink-arg=-fuse-ld=lld"
+    export BLOCKWORK_QWINDOWKIT_SOURCE_DIR="$srcdir/qwindowkit-$_qwk"
+    cargo build --release --frozen --workspace --exclude blockwork-linux-bridge
+}
+
+package() {
+    cd "Blockwork-$pkgver"
+    packaging/linux/install.sh "$pkgdir" /usr
+    install -Dm644 LICENSE "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+}
