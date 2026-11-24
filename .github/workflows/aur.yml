@@ -73,11 +73,14 @@ jobs:
           GIT_COMMITTER_NAME: ${{ vars.AUR_GIT_NAME || 'Ethan Stokes' }}
           GIT_COMMITTER_EMAIL: ${{ vars.AUR_GIT_EMAIL || 'erstokes10@gmail.com' }}
         run: |
-          install -dm700 ~/.ssh
-          printf '%s\n' "$AUR_KEY" > ~/.ssh/aur
-          chmod 600 ~/.ssh/aur
-          ssh-keyscan -t ed25519,rsa aur.archlinux.org >> ~/.ssh/known_hosts
-          export GIT_SSH_COMMAND="ssh -i ~/.ssh/aur -o IdentitiesOnly=yes"
+          # In a container job $HOME isn't the home ssh reads, so name every file.
+          ssh_dir="$HOME/.ssh"
+          install -dm700 "$ssh_dir"
+          printf '%s\n' "$AUR_KEY" > "$ssh_dir/aur"
+          chmod 600 "$ssh_dir/aur"
+          ssh-keyscan -t ed25519,rsa aur.archlinux.org > "$ssh_dir/known_hosts"
+          test -s "$ssh_dir/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $ssh_dir/aur -o IdentitiesOnly=yes -o UserKnownHostsFile=$ssh_dir/known_hosts"
           for pkg in blockwork blockwork-bin blockwork-git; do
             rm -rf "aur-$pkg"
             git clone "ssh://aur@aur.archlinux.org/$pkg.git" "aur-$pkg"
