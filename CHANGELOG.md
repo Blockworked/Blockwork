@@ -389,6 +389,9 @@ Initial release.
 - Global shortcuts (navigation, loop mode) on Linux; global keybinds on Windows.
 - App icons, updater and confirm dialogs, Wayland support.
 
+[0.6.3]: https://github.com/Blockworked/Blockwork/compare/0.6.2...0.6.3
+[0.6.2]: https://github.com/Blockworked/Blockwork/compare/0.6.1...0.6.2
+[0.6.1]: https://github.com/Blockworked/Blockwork/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/Blockworked/Blockwork/compare/0.5.4...0.6.0
 [0.5.4]: https://github.com/Blockworked/Blockwork/compare/0.5.3...0.5.4
 [0.5.3]: https://github.com/Blockworked/Blockwork/compare/0.5.2...0.5.3
