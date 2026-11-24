@@ -33,7 +33,16 @@ the `input` group. The packages don't add anyone to it.
   maintains the packages. Commits are made as `AUR_GIT_NAME`/`AUR_GIT_EMAIL`
   (variables), Ethan Stokes by default.
 
-Both workflows can also be run by hand for an existing tag; the AUR one only
+- **Debian and Ubuntu** (`release.yml` itself, attached to the GitHub release):
+  `packaging/deb/build-deb.sh native` packages a build linked against the
+  distro's own Qt, made in `ubuntu:26.04` and `ubuntu:26.10` containers, and
+  depends on that release's Qt and QML packages. `build-deb.sh bundled` packages
+  the AppImage's AppDir, Qt included, in `/opt/blockwork` for releases whose Qt is
+  older than 6.10 (Debian 13, Ubuntu 24.04). The AppImage job runs on Ubuntu
+  24.04 for this, since the bundle needs at least the glibc it was built with.
+  There's no apt repository yet.
+
+COPR and AUR can also be run by hand for an existing tag; the AUR one only
 pushes when asked.
 
 ## Nix
@@ -53,4 +62,8 @@ to install it with the udev rule and `uinput` loaded.
 packaging/linux/source-tarball.sh dist              # dist/blockwork-<version>.tar.xz
 packaging/rpm/build-srpm.sh dist/blockwork-*.tar.xz dist   # on Fedora
 rpmbuild --rebuild dist/blockwork-*.src.rpm
+
+# on Ubuntu 26.04 or newer, after cargo build --release (with QMAKE=qmake6
+# and RUSTFLAGS=-Clink-arg=-fuse-ld=lld)
+packaging/deb/build-deb.sh native dist
 ```

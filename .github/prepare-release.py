@@ -16,6 +16,12 @@ DOWNLOADS = [
     ("Linux x86_64 (Flatpak)", "blockwork-linux-x86_64.flatpak", True),
     ("Linux arm64 (AppImage)", "blockwork-linux-arm64.AppImage", True),
     ("Linux arm64 (Flatpak)", "blockwork-linux-arm64.flatpak", True),
+    ("Ubuntu 26.04 x86_64 (.deb)", "blockwork-ubuntu-26.04-amd64.deb", True),
+    ("Ubuntu 26.04 arm64 (.deb)", "blockwork-ubuntu-26.04-arm64.deb", True),
+    ("Ubuntu 26.10 x86_64 (.deb)", "blockwork-ubuntu-26.10-amd64.deb", True),
+    ("Ubuntu 26.10 arm64 (.deb)", "blockwork-ubuntu-26.10-arm64.deb", True),
+    ("Debian 13, Ubuntu 24.04 and newer x86_64 (.deb, Qt bundled)", "blockwork-linux-x86_64.deb", True),
+    ("Debian 13, Ubuntu 24.04 and newer arm64 (.deb, Qt bundled)", "blockwork-linux-arm64.deb", True),
     ("macOS arm64 (app bundle, unsigned)", "blockwork-macos-arm64.app.zip", True),
     ("macOS x86_64 (app bundle, unsigned)", "blockwork-macos-x86_64.app.zip", True),
 ]
