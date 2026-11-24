@@ -71,6 +71,13 @@
   </screenshots>
 
   <releases>
+    <release version="0.6.4" date="2026-11-24">
+      <description>
+        <ul>
+          <li>The Flatpak version history and screenshots now correctly display the latest version.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.6.3" date="2026-11-24">
       <description>
         <ul>

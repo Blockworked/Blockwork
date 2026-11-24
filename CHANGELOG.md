@@ -10,6 +10,11 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ## [Unreleased]
 
+## [0.6.4] - 2026-11-24
+
+### Fixed
+- The Flatpak version history and screenshots now correctly display the latest version.
+
 ## [0.6.3] - 2026-11-24
 
 ### Added
@@ -389,6 +394,7 @@ Initial release.
 - Global shortcuts (navigation, loop mode) on Linux; global keybinds on Windows.
 - App icons, updater and confirm dialogs, Wayland support.
 
+[0.6.4]: https://github.com/Blockworked/Blockwork/compare/0.6.3...0.6.4
 [0.6.3]: https://github.com/Blockworked/Blockwork/compare/0.6.2...0.6.3
 [0.6.2]: https://github.com/Blockworked/Blockwork/compare/0.6.1...0.6.2
 [0.6.1]: https://github.com/Blockworked/Blockwork/compare/0.6.0...0.6.1
