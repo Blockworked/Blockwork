@@ -57,16 +57,16 @@
 
   <screenshots>
     <screenshot type="default">
-      <image>https://raw.githubusercontent.com/Blockworked/Blockwork/0.5.4/res/screenshots/editor.png</image>
+      <image>https://raw.githubusercontent.com/Blockworked/Blockwork/0.6.3/res/screenshots/editor.png</image>
       <caption>Building a macro in the block editor</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Blockworked/Blockwork/0.5.4/res/screenshots/recording.png</image>
+      <image>https://raw.githubusercontent.com/Blockworked/Blockwork/0.6.3/res/screenshots/recording.png</image>
       <caption>Recording keyboard and mouse input</caption>
     </screenshot>
     <screenshot>
-      <image>https://raw.githubusercontent.com/Blockworked/Blockwork/0.5.4/res/screenshots/settings.png</image>
-      <caption>Configuring global and per-macro hotkeys</caption>
+      <image>https://raw.githubusercontent.com/Blockworked/Blockwork/0.6.3/res/screenshots/settings.png</image>
+      <caption>Choosing how Blockwork looks and starts</caption>
     </screenshot>
   </screenshots>
 
