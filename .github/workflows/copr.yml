@@ -1,0 +1,59 @@
+name: COPR
+
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+    secrets:
+      COPR_CONFIG:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to build (e.g. 0.6.2)"
+        required: true
+        type: string
+
+jobs:
+  copr:
+    name: Build source RPM and submit to COPR
+    runs-on: ubuntu-latest
+    container: registry.fedoraproject.org/fedora:latest
+    env:
+      TAG: ${{ inputs.tag }}
+      COPR_CONFIG: ${{ secrets.COPR_CONFIG }}
+      # owner/project on copr.fedorainfracloud.org, e.g. treetrain1/blockwork
+      COPR_PROJECT: ${{ vars.COPR_PROJECT }}
+
+    steps:
+      - name: Install tools
+        run: dnf -y install git cargo rpm-build xz tar curl copr-cli
+
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.tag }}
+
+      - name: Source tarball with vendored crates
+        run: |
+          git config --global --add safe.directory "$PWD"
+          packaging/linux/source-tarball.sh dist
+
+      - name: Source RPM
+        run: packaging/rpm/build-srpm.sh "dist/blockwork-${TAG#v}.tar.xz" dist
+
+      - name: Upload source RPM
+        uses: actions/upload-artifact@v4
+        with:
+          name: blockwork-srpm
+          path: dist/*.src.rpm
+
+      - name: Submit to COPR
+        if: env.COPR_CONFIG != '' && env.COPR_PROJECT != ''
+        run: |
+          mkdir -p ~/.config
+          printf '%s\n' "$COPR_CONFIG" > ~/.config/copr
+          # Builds every chroot the COPR project has enabled; follow it on the COPR page.
+          copr-cli build --nowait "$COPR_PROJECT" dist/*.src.rpm

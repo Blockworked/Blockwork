@@ -1,0 +1,4 @@
+# Blockwork plays macros back through a virtual keyboard and mouse.
+# Give the user at the seat access to /dev/uinput (reading input devices
+# still needs the input group).
+KERNEL=="uinput", SUBSYSTEM=="misc", TAG+="uaccess", OPTIONS+="static_node=uinput"

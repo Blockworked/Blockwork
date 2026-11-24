@@ -1,0 +1,92 @@
+# Rendered by packaging/rpm/build-srpm.sh; @VERSION@ comes from Cargo.toml.
+# The release profile carries no debug info.
+%global debug_package %{nil}
+# GCC LTO objects in the C++ static archives cxx-qt builds lose symbols at link time.
+%global _lto_cflags %{nil}
+
+Name:           blockwork
+Version:        @VERSION@
+Release:        1%{?dist}
+Summary:        Build keyboard and mouse macros with blocks
+
+# Blockwork is GPL-3.0-only; vendored crates are mostly MIT/Apache-2.0,
+# QWindowKit is Apache-2.0.
+License:        GPL-3.0-only AND Apache-2.0 AND MIT
+URL:            https://blockworked.com
+# packaging/linux/source-tarball.sh: the tag plus vendored crates and QWindowKit.
+Source0:        %{name}-%{version}.tar.xz
+
+ExclusiveArch:  x86_64 aarch64
+
+BuildRequires:  cargo
+BuildRequires:  rust >= 1.91
+BuildRequires:  gcc-c++
+BuildRequires:  cmake
+BuildRequires:  clang-devel
+BuildRequires:  lld
+BuildRequires:  pkgconfig
+BuildRequires:  qt6-qtbase-devel >= 6.10
+BuildRequires:  qt6-qtbase-private-devel
+BuildRequires:  qt6-qtdeclarative-devel
+BuildRequires:  dbus-devel
+BuildRequires:  libxkbcommon-devel
+BuildRequires:  wayland-devel
+BuildRequires:  gtk3-devel
+BuildRequires:  desktop-file-utils
+BuildRequires:  libappstream-glib
+BuildRequires:  systemd-rpm-macros
+
+# QWindowKit is built against Qt's private headers, so the exact Qt build matters.
+%{?_qt6:Requires: %{_qt6}%{?_isa} = %{_qt6_version}}
+Requires:       qt6-qtdeclarative%{?_isa}
+Requires:       qt6-qtsvg%{?_isa}
+Recommends:     qt6-qtwayland%{?_isa}
+Requires:       hicolor-icon-theme
+# Screen text recognition shells out to tesseract.
+Suggests:       tesseract
+
+%description
+Blockwork lets you build keyboard and mouse macros by snapping blocks
+together, without writing any code. Record your input and turn it into
+editable blocks, or assemble a sequence by hand, then play it back with
+a global hotkey. Triggers, screen, window, file and web blocks let macros
+react to what happens on the computer.
+
+Recording input and hotkeys need your user in the input group:
+sudo usermod -aG input $USER
+
+%prep
+%autosetup -p1
+
+%build
+export QMAKE=%{_qt6_qmake}
+export CARGO_NET_OFFLINE=true
+export BLOCKWORK_QWINDOWKIT_SOURCE_DIR="$PWD/third_party/qwindowkit"
+export CARGO_PROFILE_RELEASE_STRIP=true
+# Link with lld like rustup's Rust does: GNU ld with --as-needed drops the Qt
+# libraries that only the later cxx-qt static archives use.
+export RUSTFLAGS="${RUSTFLAGS:-} -Clink-arg=-fuse-ld=lld"
+cargo build --release --frozen --workspace --exclude blockwork-linux-bridge
+
+%install
+packaging/linux/install.sh %{buildroot} %{_prefix}
+
+%check
+desktop-file-validate %{buildroot}%{_datadir}/applications/com.blockworked.Blockwork.desktop
+appstream-util validate-relax --nonet %{buildroot}%{_metainfodir}/com.blockworked.Blockwork.metainfo.xml
+
+%files
+%license LICENSE res/licenses/QWindowKit-LICENSE
+%doc README.md CHANGELOG.md
+%{_bindir}/blockwork
+%{_prefix}/lib/blockwork/
+%{_datadir}/applications/com.blockworked.Blockwork.desktop
+%{_metainfodir}/com.blockworked.Blockwork.metainfo.xml
+%{_datadir}/icons/hicolor/512x512/apps/blockwork.png
+%{_udevrulesdir}/60-blockwork-uinput.rules
+%{_modulesloaddir}/blockwork-uinput.conf
+%exclude %{_datadir}/licenses/blockwork/QWindowKit-LICENSE
+
+%changelog
+* @DATE@ Ethan Stokes <erstokes10@gmail.com> - @VERSION@-1
+- Blockwork @VERSION@, see https://github.com/Blockworked/Blockwork/releases/tag/@VERSION@

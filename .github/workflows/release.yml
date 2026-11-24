@@ -508,6 +508,22 @@ jobs:
       tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     secrets: inherit
 
+  copr:
+    name: COPR
+    needs: [release]
+    uses: ./.github/workflows/copr.yml
+    with:
+      tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    secrets: inherit
+
+  aur:
+    name: AUR
+    needs: [release]
+    uses: ./.github/workflows/aur.yml
+    with:
+      tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    secrets: inherit
+
   winget:
     name: Publish to winget
     needs: [release]

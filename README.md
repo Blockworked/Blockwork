@@ -53,6 +53,11 @@ GitHub release. To build one locally:
 
 ## Linux
 
+Arch Linux: `blockwork` (built from source), `blockwork-bin` (prebuilt) or
+`blockwork-git` from the AUR. Nix: `nix run github:Blockworked/Blockwork`, or
+`programs.blockwork.enable` from the flake's NixOS module. See
+[packaging/linux](packaging/linux/README.md) for how the packages are made.
+
 Recording input and playing back macros uses `/dev/uinput` and `/dev/input/event*`
 directly, so your user needs to be in the `input` group:
 
