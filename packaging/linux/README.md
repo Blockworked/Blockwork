@@ -42,7 +42,20 @@ the `input` group. The packages don't add anyone to it.
   24.04 for this, since the bundle needs at least the glibc it was built with.
   There's no apt repository yet.
 
-COPR and AUR can also be run by hand for an existing tag; the AUR one only
+- **Flatpak repo** (`flatpak-repo.yml`): `packaging/flatpak/update-repo.sh`
+  adds the release's Flatpak bundles to a GPG-signed OSTree repo, keeping the
+  last three commits per arch with static deltas between them, and writes
+  `blockwork.flatpakrepo` and `blockwork.flatpakref`. The repo lives in a
+  Cloudflare R2 bucket (`FLATPAK_R2_BUCKET`, default `blockwork-flatpak`) served
+  at `https://flatpak.blockworked.com` (`FLATPAK_REPO_URL`); each run downloads
+  it, adds the bundles and uploads objects before the summary. Needs the
+  `FLATPAK_GPG_PRIVATE_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and
+  `R2_SECRET_ACCESS_KEY` secrets. With `packaging/flatpak/blockwork.gpg` (the
+  public key) in the tree, the release bundles also name the repo, so installing
+  one adds it as a remote. Users install with
+  `flatpak install https://flatpak.blockworked.com/blockwork.flatpakref`.
+
+COPR, AUR and the Flatpak repo can also be run by hand for an existing tag; the AUR one only
 pushes when asked.
 
 ## Nix

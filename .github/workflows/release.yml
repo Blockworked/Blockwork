@@ -498,7 +498,13 @@ jobs:
             !skip
           ' "$manifest.yml" > "$manifest.local.yml"
           flatpak-builder --force-clean --user --default-branch=stable --repo=flatpak-repo flatpak-build "$manifest.local.yml"
-          flatpak build-bundle flatpak-repo ${{ matrix.artifact_name }}.flatpak com.blockworked.Blockwork stable
+          # A bundle that names the repo and its key adds the repo as a remote
+          # on install, so it updates with `flatpak update` from then on.
+          bundle_args=(--runtime-repo=https://dl.flathub.org/repo/flathub.flatpakrepo)
+          if [ -s packaging/flatpak/blockwork.gpg ]; then
+            bundle_args+=(--repo-url=https://flatpak.blockworked.com/repo/ --gpg-keys=packaging/flatpak/blockwork.gpg)
+          fi
+          flatpak build-bundle "${bundle_args[@]}" flatpak-repo ${{ matrix.artifact_name }}.flatpak com.blockworked.Blockwork stable
 
       - name: Upload Flatpak artifact
         uses: actions/upload-artifact@v4
@@ -581,6 +587,14 @@ jobs:
     needs: [release]
     if: ${{ needs.release.outputs.has_macos == 'true' }}
     uses: ./.github/workflows/homebrew.yml
+    with:
+      tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
+    secrets: inherit
+
+  flatpak-repo:
+    name: Flatpak repo
+    needs: [release]
+    uses: ./.github/workflows/flatpak-repo.yml
     with:
       tag: ${{ github.event_name == 'workflow_dispatch' && inputs.tag || github.ref_name }}
     secrets: inherit
