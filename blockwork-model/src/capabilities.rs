@@ -63,6 +63,7 @@ pub const UNGUARDED_OPERATORS: &[&str] = &[
     "BatteryPercentage",
     "PluggedIn",
     "JsonGet",
+    "FormWindowOpen",
     "Detection",
     "ColorsMatch",
     "MousePosition",

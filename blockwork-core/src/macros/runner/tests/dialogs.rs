@@ -199,3 +199,77 @@ fn a_window_with_a_normal_block_inside_fails_and_parts_outside_do_nothing() {
     assert_eq!(vars.get("done"), None, "the window never opened");
     assert_eq!(vars.get("after"), Some(&Evaluated::Number(1.0)));
 }
+
+#[test]
+fn named_window_applies_lifecycle_and_binding_updates_while_running() {
+    install_test_dialogs();
+    let id = Value::text("named-form-lifecycle-test");
+    let open = Value::op(Op::from_name("FormWindowOpen"), vec![id.clone()]);
+    let window_part = |kind| Instruction::new(kind);
+    let var = Value::Var {
+        name: "input".into(),
+    };
+    let mac = Macro::new(
+        "Named form".into(),
+        String::new(),
+        vec![
+            set("input", Value::text("initial")),
+            window_part(InstructionKind::OpenFormWindow {
+                window: id.clone(),
+                title: Value::text("Named form test"),
+                width: Value::number(500.0),
+                height: Value::number(300.0),
+                body: vec![
+                    window_part(InstructionKind::WindowLayout {
+                        layout: "row".into(),
+                        label: Value::text(""),
+                        key: "details".into(),
+                        columns: Value::number(2.0),
+                        body: vec![
+                            window_part(InstructionKind::WindowTextBox {
+                                label: Value::text("Input"),
+                                name: "input".into(),
+                            }),
+                            window_part(InstructionKind::WindowNote(var.clone())),
+                        ],
+                    }),
+                    window_part(InstructionKind::WindowButton {
+                        label: Value::text("Verified"),
+                        close: false,
+                        body: vec![set("verified", Value::number(1.0))],
+                    }),
+                    window_part(InstructionKind::WindowOnChange {
+                        name: "input".into(),
+                        body: vec![set("changed", var)],
+                    }),
+                ],
+            }),
+            set("open", open.clone()),
+            window_part(InstructionKind::SetFormWindowTitle {
+                window: id.clone(),
+                title: Value::text("Updated"),
+            }),
+            window_part(InstructionKind::ResizeFormWindow {
+                window: id.clone(),
+                width: Value::number(600.0),
+                height: Value::number(400.0),
+            }),
+            window_part(InstructionKind::SetFormComponent {
+                window: id.clone(),
+                component: Value::text("details"),
+                property: "visible".into(),
+                state: Value::number(0.0),
+            }),
+            window_part(InstructionKind::CloseFormWindow(id.clone())),
+            window_part(InstructionKind::WaitForFormWindow(id)),
+            set("after", open),
+        ],
+    );
+    let vars = empty_vars();
+    mac.run(noop_emulator(), None, 1.0, Arc::clone(&vars));
+    let vars = vars.lock().unwrap();
+    assert_eq!(vars.get("open"), Some(&Evaluated::Bool(true)));
+    assert_eq!(vars.get("after"), Some(&Evaluated::Bool(false)));
+    assert_eq!(vars.get("changed"), Some(&Evaluated::Text("edited".into())));
+    assert_eq!(vars.get("verified"), Some(&Evaluated::Number(1.0)));
+}

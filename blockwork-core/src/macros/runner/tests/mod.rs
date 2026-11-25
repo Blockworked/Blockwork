@@ -172,10 +172,11 @@ fn bump(name: &str) -> Instruction {
 /// that closes it.
 fn install_test_dialogs() {
     use crate::prompt::{Kind, Reply};
-    crate::prompt::set_handler(Arc::new(
+    crate::prompt::set_live_handler(Arc::new(
         |request: &crate::prompt::Request,
          _stopped: &dyn Fn() -> bool,
-         on_click: &dyn Fn(&Reply)| {
+         on_click: &dyn Fn(&Reply),
+         updates: &crate::prompt::Updates<'_>| {
             let reply = |answer: &str, text: &str| {
                 Ok(Reply {
                     answer: answer.into(),
@@ -183,6 +184,54 @@ fn install_test_dialogs() {
                     ..Reply::default()
                 })
             };
+            if request.title == "Named form test" {
+                let controls = &request.controls[0].children;
+                let (text_id, mirror_id) = (&controls[0].id, &controls[1].id);
+                on_click(&Reply {
+                    answer: "change".into(),
+                    text: "1".into(),
+                    values: serde_json::Map::from_iter([("input".into(), "edited".into())]),
+                });
+                let deadline = Instant::now() + Duration::from_secs(3);
+                let mut observed = serde_json::json!({});
+                loop {
+                    if let Some(patch) = updates() {
+                        for (key, value) in patch.as_object().unwrap() {
+                            if key == "controls" {
+                                for (id, fields) in value.as_object().unwrap() {
+                                    for (field, value) in fields.as_object().unwrap() {
+                                        observed[key][id][field] = value.clone();
+                                    }
+                                }
+                            } else {
+                                observed[key] = value.clone();
+                            }
+                        }
+                    }
+                    if observed["close"] == true {
+                        break;
+                    }
+                    if Instant::now() >= deadline {
+                        return Err("test timed out waiting for the close patch".into());
+                    }
+                    std::thread::sleep(Duration::from_millis(5));
+                }
+                if observed["ack"] != "1"
+                    || observed["title"] != "Updated"
+                    || observed["size"] != serde_json::json!([600, 400])
+                    || observed["controls"][&request.controls[0].id]["visible"] != false
+                    || observed["controls"][text_id]["value"] != "edited"
+                    || observed["controls"][mirror_id]["label"] != "edited"
+                {
+                    return Err(format!("unexpected form updates: {observed}"));
+                }
+                on_click(&Reply {
+                    answer: "click".into(),
+                    text: request.controls[1].id.clone(),
+                    ..Reply::default()
+                });
+                return reply("cancel", "");
+            }
             if request.kind == Kind::Window {
                 let mut values = serde_json::Map::new();
                 for c in &request.controls {

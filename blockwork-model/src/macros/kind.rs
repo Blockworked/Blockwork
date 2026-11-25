@@ -690,6 +690,52 @@ pub enum InstructionKind {
     },
     /// Inside `ShowWindow`: a line of text.
     WindowNote(Value),
+    OpenFormWindow {
+        window: Value,
+        title: Value,
+        width: Value,
+        height: Value,
+        body: Vec<Instruction>,
+    },
+    WindowLayout {
+        layout: String,
+        label: Value,
+        key: String,
+        columns: Value,
+        body: Vec<Instruction>,
+    },
+    WindowDisplay {
+        display: String,
+        label: Value,
+        data: Value,
+    },
+    WindowInput {
+        input: String,
+        label: Value,
+        name: String,
+        options: Value,
+    },
+    WindowOnChange {
+        name: String,
+        body: Vec<Instruction>,
+    },
+    CloseFormWindow(Value),
+    WaitForFormWindow(Value),
+    SetFormWindowTitle {
+        window: Value,
+        title: Value,
+    },
+    ResizeFormWindow {
+        window: Value,
+        width: Value,
+        height: Value,
+    },
+    SetFormComponent {
+        window: Value,
+        component: Value,
+        property: String,
+        state: Value,
+    },
     /// Header for a strand fired once at a date and time, like `2026-12-24 18:00`.
     WhenAt(Value),
     /// Header for a strand started by a `SendSignal` of the same name in this macro.
@@ -914,6 +960,10 @@ impl InstructionKind {
                 | InstructionKind::WindowChoice { .. }
                 | InstructionKind::WindowButton { .. }
                 | InstructionKind::WindowNote(_)
+                | InstructionKind::WindowLayout { .. }
+                | InstructionKind::WindowDisplay { .. }
+                | InstructionKind::WindowInput { .. }
+                | InstructionKind::WindowOnChange { .. }
         )
     }
 

@@ -127,13 +127,23 @@ impl InstructionKind {
             | K::ShowMenu { .. }
             | K::ShowTooltip { .. }
             | K::ShowMessage(_)
-            | K::ShowWindow { .. } => of(Dialogs, &[]),
+            | K::ShowWindow { .. }
+            | K::OpenFormWindow { .. }
+            | K::CloseFormWindow(_)
+            | K::WaitForFormWindow(_)
+            | K::SetFormWindowTitle { .. }
+            | K::ResizeFormWindow { .. }
+            | K::SetFormComponent { .. } => of(Dialogs, &[]),
             // Read by the `ShowWindow` around them, never run on their own.
             K::WindowTextBox { .. }
             | K::WindowCheckbox { .. }
             | K::WindowChoice { .. }
             | K::WindowButton { .. }
-            | K::WindowNote(_) => of(Comment, &[]),
+            | K::WindowNote(_)
+            | K::WindowLayout { .. }
+            | K::WindowDisplay { .. }
+            | K::WindowInput { .. }
+            | K::WindowOnChange { .. } => of(Comment, &[]),
 
             K::Token(_)
             | K::TouchGesture { .. }

@@ -269,6 +269,17 @@ static OPERATORS: &[ExtOperator] = &[
         eval: |_| Ok(Evaluated::Text(crate::window::active()?.app)),
     },
     ExtOperator {
+        kind: "FormWindowOpen",
+        op: "FormWindowOpen",
+        arity: 1,
+        default_args: || vec![Value::text("my-window")],
+        eval: |args| {
+            Ok(Evaluated::Bool(crate::macros::runner::form_window_is_open(
+                &args[0].as_text(),
+            )))
+        },
+    },
+    ExtOperator {
         kind: "WindowExists",
         op: "WindowExists",
         arity: 1,

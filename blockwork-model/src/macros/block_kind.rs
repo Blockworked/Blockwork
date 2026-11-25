@@ -17,6 +17,8 @@ macro_rules! for_each_ref {
             | InstructionKind::AskFile { name, .. }
             | InstructionKind::WindowTextBox { name, .. }
             | InstructionKind::WindowCheckbox { name, .. }
+            | InstructionKind::WindowInput { name, .. }
+            | InstructionKind::WindowOnChange { name, .. }
             | InstructionKind::ReadKeys { name, .. }
             | InstructionKind::WhenWebhook { variable: name, .. } => $f(RefKind::Variable, name),
             InstructionKind::FindColor {
@@ -118,7 +120,9 @@ impl BlockKind for InstructionKind {
 
     fn body_connector(&self, _slot: u8) -> Connector {
         match self {
-            InstructionKind::ShowWindow { .. } => Connector::Part,
+            InstructionKind::ShowWindow { .. }
+            | InstructionKind::OpenFormWindow { .. }
+            | InstructionKind::WindowLayout { .. } => Connector::Part,
             _ => Connector::Normal,
         }
     }
@@ -140,7 +144,10 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Retry { body, .. }, 0) => Some(body),
             (InstructionKind::WithLock { body, .. }, 0) => Some(body),
             (InstructionKind::WithInputBlocked { body }, 0) => Some(body),
-            (InstructionKind::ShowWindow { body, .. }, 0) => Some(body),
+            (InstructionKind::ShowWindow { body, .. }, 0)
+            | (InstructionKind::OpenFormWindow { body, .. }, 0)
+            | (InstructionKind::WindowLayout { body, .. }, 0)
+            | (InstructionKind::WindowOnChange { body, .. }, 0) => Some(body),
             (InstructionKind::WindowButton { body, .. }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get(slot as usize),
             _ => None,
@@ -164,7 +171,10 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Retry { body, .. }, 0) => Some(body),
             (InstructionKind::WithLock { body, .. }, 0) => Some(body),
             (InstructionKind::WithInputBlocked { body }, 0) => Some(body),
-            (InstructionKind::ShowWindow { body, .. }, 0) => Some(body),
+            (InstructionKind::ShowWindow { body, .. }, 0)
+            | (InstructionKind::OpenFormWindow { body, .. }, 0)
+            | (InstructionKind::WindowLayout { body, .. }, 0)
+            | (InstructionKind::WindowOnChange { body, .. }, 0) => Some(body),
             (InstructionKind::WindowButton { body, .. }, 0) => Some(body),
             (InstructionKind::CallBlock { branches, .. }, slot) => branches.get_mut(slot as usize),
             _ => None,

@@ -2,8 +2,8 @@
 //! daemon. The request arrives as JSON on stdin and the answer leaves as
 //! JSON on stdout.
 
-use std::io::{Read, Write};
-use std::sync::OnceLock;
+use std::io::{BufRead, Write};
+use std::sync::{Mutex, OnceLock, mpsc};
 
 #[cxx_qt::bridge]
 pub mod qobject {
@@ -35,12 +35,17 @@ pub mod qobject {
         fn bring_to_front(self: &PromptBridge);
 
         #[qinvokable]
+        #[cxx_name = "takeUpdates"]
+        fn take_updates(self: &PromptBridge) -> QString;
+
+        #[qinvokable]
         #[cxx_name = "parentAlive"]
         fn parent_alive(self: &PromptBridge) -> bool;
     }
 }
 
 static REQUEST: OnceLock<String> = OnceLock::new();
+static UPDATES: OnceLock<Mutex<mpsc::Receiver<serde_json::Value>>> = OnceLock::new();
 /// The daemon's PID, and whether it was our direct parent at launch.
 #[cfg(unix)]
 static PARENT: OnceLock<(libc::pid_t, bool)> = OnceLock::new();
@@ -81,8 +86,26 @@ pub fn requested() -> bool {
         // cancelling a dialog it may still be waiting on.
     }
     let mut text = String::new();
-    let _ = std::io::stdin().read_to_string(&mut text);
+    let _ = std::io::stdin().read_line(&mut text);
+    let live = serde_json::from_str::<serde_json::Value>(&text)
+        .ok()
+        .and_then(|request| request["live"].as_bool())
+        .unwrap_or(false);
     let _ = REQUEST.set(text);
+    if live {
+        let (tx, rx) = mpsc::sync_channel(16);
+        let _ = UPDATES.set(Mutex::new(rx));
+        std::thread::spawn(move || {
+            for line in std::io::stdin().lock().lines() {
+                let Ok(line) = line else { break };
+                if let Ok(update) = serde_json::from_str(&line)
+                    && tx.send(update).is_err()
+                {
+                    break;
+                }
+            }
+        });
+    }
     true
 }
 
@@ -132,9 +155,20 @@ impl qobject::PromptBridge {
         let mut out = std::io::stdout().lock();
         let _ = writeln!(out, "{reply}");
         let _ = out.flush();
-        if answer != "click" {
+        if !matches!(answer.as_str(), "click" | "change") {
             std::process::exit(0);
         }
+    }
+
+    fn take_updates(&self) -> cxx_qt_lib::QString {
+        let Some(updates) = UPDATES.get().and_then(|updates| updates.lock().ok()) else {
+            return cxx_qt_lib::QString::default();
+        };
+        let updates: Vec<_> = updates.try_iter().take(16).collect();
+        if updates.is_empty() {
+            return cxx_qt_lib::QString::default();
+        }
+        cxx_qt_lib::QString::from(serde_json::json!(updates).to_string().as_str())
     }
 
     fn parent_alive(&self) -> bool {

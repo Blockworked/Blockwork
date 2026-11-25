@@ -1534,6 +1534,163 @@
   "id": "whentrayitem"
  },
  {
+  "type": "OpenFormWindow",
+  "id": "sample-OpenFormWindow",
+  "window": {
+   "kind": "Text",
+   "value": "my-window"
+  },
+  "title": {
+   "kind": "Text",
+   "value": "My window"
+  },
+  "width": {
+   "kind": "Number",
+   "value": 640
+  },
+  "height": {
+   "kind": "Number",
+   "value": 480
+  },
+  "body": [
+   {
+    "type": "WindowNote",
+    "id": "child-note",
+    "text": {
+     "kind": "Text",
+     "value": "Nested"
+    }
+   }
+  ]
+ },
+ {
+  "type": "CloseFormWindow",
+  "id": "sample-CloseFormWindow",
+  "window": {
+   "kind": "Text",
+   "value": "my-window"
+  }
+ },
+ {
+  "type": "WaitForFormWindow",
+  "id": "sample-WaitForFormWindow",
+  "window": {
+   "kind": "Text",
+   "value": "my-window"
+  }
+ },
+ {
+  "type": "SetFormWindowTitle",
+  "id": "sample-SetFormWindowTitle",
+  "window": {
+   "kind": "Text",
+   "value": "my-window"
+  },
+  "title": {
+   "kind": "Text",
+   "value": "My window"
+  }
+ },
+ {
+  "type": "ResizeFormWindow",
+  "id": "sample-ResizeFormWindow",
+  "window": {
+   "kind": "Text",
+   "value": "my-window"
+  },
+  "width": {
+   "kind": "Number",
+   "value": 640
+  },
+  "height": {
+   "kind": "Number",
+   "value": 480
+  }
+ },
+ {
+  "type": "SetFormComponent",
+  "id": "sample-SetFormComponent",
+  "window": {
+   "kind": "Text",
+   "value": "my-window"
+  },
+  "component": {
+   "kind": "Text",
+   "value": "details"
+  },
+  "property": "enabled",
+  "state": {
+   "kind": "Number",
+   "value": 0
+  }
+ },
+ {
+  "type": "WindowLayout",
+  "id": "sample-WindowLayout",
+  "layout": "group",
+  "label": {
+   "kind": "Text",
+   "value": "Details"
+  },
+  "key": "details",
+  "columns": {
+   "kind": "Number",
+   "value": 2
+  },
+  "body": [
+   {
+    "type": "WindowNote",
+    "id": "child-note",
+    "text": {
+     "kind": "Text",
+     "value": "Nested"
+    }
+   }
+  ]
+ },
+ {
+  "type": "WindowDisplay",
+  "id": "sample-WindowDisplay",
+  "display": "table",
+  "label": {
+   "kind": "Text",
+   "value": "Results"
+  },
+  "data": {
+   "kind": "Text",
+   "value": "[[\"Name\"],[\"Ada\"]]"
+  }
+ },
+ {
+  "type": "WindowInput",
+  "id": "sample-WindowInput",
+  "input": "slider",
+  "label": {
+   "kind": "Text",
+   "value": "Volume"
+  },
+  "name": "volume",
+  "options": {
+   "kind": "Text",
+   "value": "[]"
+  }
+ },
+ {
+  "type": "WindowOnChange",
+  "id": "sample-WindowOnChange",
+  "name": "volume",
+  "body": [
+   {
+    "type": "ShowMessage",
+    "id": "child-message",
+    "message": {
+     "kind": "Text",
+     "value": "Changed"
+    }
+   }
+  ]
+ },
+ {
   "type": "ShowWindow",
   "title": {
    "kind": "Text",

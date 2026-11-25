@@ -83,6 +83,57 @@ Item {
             compare(sent.signalArguments[1][1], "Done");
             compare(replies.count, 0);
         }
+        function test_live_window_updates_in_place() {
+            configure("window", {live: true, inline_buttons: true, width: 600, height: 440, controls: [
+                {kind: "row", id: "row", label: "", children: [
+                    {kind: "text", id: "field", label: "Name", name: "__proto__", value: "Ann"},
+                    {kind: "note", id: "mirror", label: "Ann"}
+                ]},
+                {kind: "scroll", id: "scroll", children: [
+                    {kind: "grid", columns: 2, children: [
+                        {kind: "table", label: "Files", value: '[["Name","Size"],["Example",10]]'},
+                        {kind: "progress", label: "Used", value: "30"}
+                    ]}
+                ]},
+                {kind: "tabs", id: "tabs", children: [
+                    {kind: "group", id: "first", label: "One", children: [{kind: "heading", label: "First page"}]},
+                    {kind: "group", id: "second", label: "Two", children: [{kind: "heading", label: "Second page"}]}
+                ]},
+                {kind: "button", id: "button1", label: "Done", close: true}
+            ]});
+            const name = control("promptFormText_0");
+            compare(name.text, "Ann");
+            compare(dialog.width, 600);
+            compare(dialog.height, 440);
+            name.forceActiveFocus();
+            name.selectAll();
+            keyClick(Qt.Key_B);
+            tryCompare(sent, "count", 1);
+            compare(sent.signalArguments[0][0], "change");
+            compare(JSON.parse(sent.signalArguments[0][2])["__proto__"], "b");
+            dialog.applyFormUpdates([{controls: {field: {value: "Old"}}}]);
+            compare(name.text, "b");
+            dialog.applyFormUpdates([{ack: "1", controls: {field: {value: "b"}, mirror: {label: "b"}},
+                size: [640, 480], title: "Updated"}]);
+            compare(dialog.title, "Updated");
+            compare(dialog.width, 640);
+            compare(control("promptFormLabel_1").text, "b");
+            compare(control("promptFormText_0"), name);
+            mouseClick(control("promptFormTab_second"));
+            compare(control("promptFormLabel_0").text, "Second page");
+            dialog.applyFormUpdates([{controls: {row: {enabled: false}}}]);
+            compare(name.enabled, false);
+            compare(control("promptFormLabel_0").text, "Second page");
+            mouseClick(control("promptFormTab_first"));
+            compare(control("promptFormLabel_0").text, "First page");
+            dialog.applyFormUpdates([{controls: {first: {visible: false}}}]);
+            compare(control("promptFormLabel_0").text, "Second page");
+            mouseClick(control("promptFormButton_Done"));
+            tryCompare(sent, "count", 2);
+            compare(sent.signalArguments[1][0], "ok");
+            compare(sent.signalArguments[1][1], "button1");
+            compare(sent.signalArguments[1][2], "{}");
+        }
         function test_text_keyboard_and_return() {
             configure("text");
             const field = control("promptText");

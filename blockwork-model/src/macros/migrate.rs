@@ -9,11 +9,11 @@ use serde_json::{Map, Value, json};
 /// run command into one that waits and one that doesn't. Version 3 adds pack state,
 /// version 4 adds Stop scopes, and version 5 adds text typing speeds.
 /// Version 6 adds custom block menus, native input blocks, and key
-/// blocking and remapping. Bump it
+/// blocking and remapping. Version 7 adds live form window blocks. Bump it
 /// with a new step in [`STEPS`] (a no-op one when old files load as they are)
 /// whenever a release adds block kinds or changes their fields, so an older
 /// Blockwork says the file is too new instead of turning blocks into notes.
-pub const FORMAT_VERSION: u64 = 6;
+pub const FORMAT_VERSION: u64 = 7;
 const VERSION_KEY: &str = "format_version";
 
 /// What loading had to change.
@@ -42,7 +42,11 @@ const STEPS: [Step; FORMAT_VERSION as usize] = [
     v3_stop_scopes,
     v4_text_speeds,
     v5_block_ui,
+    v6_form_windows,
 ];
+
+// Existing forms keep their serialized shape.
+fn v6_form_windows(_: &mut Value, _: &mut Vec<String>) {}
 
 // UI metadata is optional on legacy custom block inputs.
 fn v5_block_ui(_: &mut Value, _: &mut Vec<String>) {}

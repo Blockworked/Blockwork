@@ -103,6 +103,13 @@ pub enum FieldId {
     MessageText,
     WindowTitle,
     WindowLabel,
+    FormWindowId,
+    FormWidth,
+    FormHeight,
+    FormColumns,
+    FormData,
+    FormComponent,
+    FormState,
     AtTime,
     SignalName,
     WebhookPath,
@@ -356,6 +363,57 @@ pub(crate) fn slots_mut<'a>(
         }
         InstructionKind::ShowMessage(v) => f(F::MessageText, v, Any),
         InstructionKind::ShowWindow { title, .. } => f(F::WindowTitle, title, Any),
+        InstructionKind::OpenFormWindow {
+            window,
+            title,
+            width,
+            height,
+            ..
+        } => {
+            f(F::FormWindowId, window, Any);
+            f(F::WindowTitle, title, Any);
+            f(F::FormWidth, width, Any);
+            f(F::FormHeight, height, Any);
+        }
+        InstructionKind::WindowLayout { label, columns, .. } => {
+            f(F::WindowLabel, label, Any);
+            f(F::FormColumns, columns, Any);
+        }
+        InstructionKind::WindowDisplay { label, data, .. }
+        | InstructionKind::WindowInput {
+            label,
+            options: data,
+            ..
+        } => {
+            f(F::WindowLabel, label, Any);
+            f(F::FormData, data, Any);
+        }
+        InstructionKind::CloseFormWindow(window) | InstructionKind::WaitForFormWindow(window) => {
+            f(F::FormWindowId, window, Any);
+        }
+        InstructionKind::SetFormWindowTitle { window, title } => {
+            f(F::FormWindowId, window, Any);
+            f(F::WindowTitle, title, Any);
+        }
+        InstructionKind::ResizeFormWindow {
+            window,
+            width,
+            height,
+        } => {
+            f(F::FormWindowId, window, Any);
+            f(F::FormWidth, width, Any);
+            f(F::FormHeight, height, Any);
+        }
+        InstructionKind::SetFormComponent {
+            window,
+            component,
+            state,
+            ..
+        } => {
+            f(F::FormWindowId, window, Any);
+            f(F::FormComponent, component, Any);
+            f(F::FormState, state, Any);
+        }
         InstructionKind::WindowTextBox { label, .. }
         | InstructionKind::WindowCheckbox { label, .. }
         | InstructionKind::WindowChoice { label, .. }
@@ -620,6 +678,7 @@ pub(crate) fn slots_mut<'a>(
         | InstructionKind::SetMute { .. }
         | InstructionKind::Power { .. }
         | InstructionKind::ShowMenu { .. }
+        | InstructionKind::WindowOnChange { .. }
         | InstructionKind::RunBranch(_) => {}
     }
 }

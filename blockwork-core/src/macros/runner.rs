@@ -547,6 +547,8 @@ mod browser;
 mod control;
 mod data;
 mod dialogs;
+mod forms;
+pub(crate) use forms::is_open as form_window_is_open;
 mod input;
 mod stop;
 mod system;

@@ -26,10 +26,11 @@ pub enum Kind {
     Window,
 }
 
-/// One control in a [`Kind::Window`]: `text`, `check`, `choice`, `button`
-/// or `note`.
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+/// One node of a window form.
+#[derive(Debug, Clone, Default, PartialEq, Serialize, Deserialize)]
 pub struct Control {
+    #[serde(default)]
+    pub id: String,
     pub kind: String,
     pub label: String,
     /// The variable it reads and writes; empty for buttons and notes.
@@ -42,6 +43,10 @@ pub struct Control {
     /// A button that also closes the window.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub close: bool,
+    #[serde(default, skip_serializing_if = "Vec::is_empty")]
+    pub children: Vec<Control>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub columns: Option<u32>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -75,6 +80,14 @@ pub struct Request {
     pub duration_ms: Option<f64>,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub controls: Vec<Control>,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub live: bool,
+    #[serde(default, skip_serializing_if = "std::ops::Not::not")]
+    pub inline_buttons: bool,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub width: Option<u32>,
+    #[serde(default, skip_serializing_if = "Option::is_none")]
+    pub height: Option<u32>,
 }
 
 impl Request {
@@ -93,6 +106,10 @@ impl Request {
             y: None,
             duration_ms: None,
             controls: Vec::new(),
+            live: false,
+            inline_buttons: false,
+            width: None,
+            height: None,
         }
     }
 }
@@ -116,11 +133,22 @@ pub struct Reply {
 pub type Handler =
     dyn Fn(&Request, &dyn Fn() -> bool, &dyn Fn(&Reply)) -> Result<Reply, String> + Send + Sync;
 
-static HANDLER: RwLock<Option<Arc<Handler>>> = RwLock::new(None);
+pub type Updates<'a> = dyn Fn() -> Option<serde_json::Value> + 'a;
+pub type LiveHandler = dyn Fn(&Request, &dyn Fn() -> bool, &dyn Fn(&Reply), &Updates<'_>) -> Result<Reply, String>
+    + Send
+    + Sync;
+
+static HANDLER: RwLock<Option<Arc<LiveHandler>>> = RwLock::new(None);
 /// One dialog at a time, so parallel strands don't stack windows.
 static SHOWING: Mutex<()> = Mutex::new(());
 
 pub fn set_handler(handler: Arc<Handler>) {
+    set_live_handler(Arc::new(move |request, stopped, reply, _| {
+        handler(request, stopped, reply)
+    }));
+}
+
+pub fn set_live_handler(handler: Arc<LiveHandler>) {
     if let Ok(mut slot) = HANDLER.write() {
         *slot = Some(handler);
     }
@@ -144,7 +172,7 @@ pub fn ask(request: &Request, stopped: &dyn Fn() -> bool) -> Result<Reply, Strin
             }
         }
     };
-    handler(request, stopped, &|_| {})
+    handler(request, stopped, &|_| {}, &|| None)
 }
 
 /// Shows a [`Kind::Window`] until it's closed, passing each click to
@@ -155,12 +183,21 @@ pub fn show_window(
     stopped: &dyn Fn() -> bool,
     on_click: &dyn Fn(&Reply),
 ) -> Result<Reply, String> {
+    show_live_window(request, stopped, on_click, &|| None)
+}
+
+pub fn show_live_window(
+    request: &Request,
+    stopped: &dyn Fn() -> bool,
+    on_event: &dyn Fn(&Reply),
+    updates: &Updates<'_>,
+) -> Result<Reply, String> {
     let handler = HANDLER
         .read()
         .ok()
         .and_then(|h| h.clone())
         .ok_or_else(|| "dialogs aren't available here".to_string())?;
-    handler(request, stopped, on_click)
+    handler(request, stopped, on_event, updates)
 }
 
 /// Counts tooltips shown, so a newer one (or hiding) closes the one before.
@@ -197,7 +234,7 @@ pub fn show_tooltip(
                 TOOLTIP.load(std::sync::atomic::Ordering::SeqCst) != generation
                     || shown.elapsed().as_secs_f64() > limit
             };
-            let _ = handler(&request, &replaced, &|_| {});
+            let _ = handler(&request, &replaced, &|_| {}, &|| None);
         })
         .map_err(|e| e.to_string())?;
     std::thread::Builder::new()

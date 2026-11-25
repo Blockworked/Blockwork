@@ -8,4 +8,5 @@ QtObject {
     signal sent(string answer, string text, string values)
     function sendValues(answer, text, values) { sent(answer, text, values); }
     function bringToFront() {}
+    function takeUpdates() { return ""; }
 }

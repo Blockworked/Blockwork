@@ -17,32 +17,90 @@ ApplicationWindow {
     readonly property bool isMenu: kind === "menu"
     readonly property bool isForm: kind === "window"
     readonly property var controls: request.controls || []
-    // A window's values by variable name, sent with every click.
-    property var formValues: {
-        const out = {};
-        for (const c of controls) if (c.name && c.kind !== "button" && c.kind !== "note") out[c.name] = c.value;
-        return out;
+    property var formValues: Object.create(null)
+    property var formUpdates: ({})
+    property var pendingEdits: ({})
+    property int editSequence: 0
+    property var formSize: null
+    property var formTitle: null
+    onRequestChanged: {
+        formUpdates = {};
+        pendingEdits = {};
+        editSequence = 0;
+        formSize = null;
+        formTitle = null;
+        const values = Object.create(null);
+        for (const c of (request.controls || [])) if (c.name) values[c.name] = c.value;
+        formValues = values;
+        Qt.callLater(focusInput);
     }
-    function setFormValue(name, value) {
-        const next = Object.assign({}, formValues);
-        next[name] = value;
-        formValues = next;
+    function properties(node) {
+        return (node.id && formUpdates[node.id]) || {};
+    }
+    function controlValue(node) {
+        const pending = node.id && pendingEdits[node.id];
+        if (pending) return pending.value;
+        if (!request.live && node.name && (node.name in formValues)) return formValues[node.name];
+        return properties(node).value ?? node.value;
+    }
+    function setFormValue(node, value) {
+        if (!node.name || controlValue(node) === value) return;
+        if (!request.live) {
+            const next = Object.assign(Object.create(null), formValues);
+            next[node.name] = value;
+            formValues = next;
+            return;
+        }
+        const next = Object.assign({}, pendingEdits);
+        next[node.id] = {sequence: ++editSequence, value};
+        pendingEdits = next;
+        bridge.sendValues("change", String(editSequence), JSON.stringify({[node.name]: value}));
     }
     function click(control) {
-        if (control.close) answer("ok", control.label);
-        else bridge.sendValues("click", control.label, JSON.stringify(formValues));
+        const id = control.id || control.label;
+        if (control.close) answer("ok", id);
+        else bridge.sendValues("click", id, JSON.stringify(request.live ? {} : formValues));
+    }
+    function applyFormUpdates(patches) {
+        let states = Object.assign({}, formUpdates);
+        let pending = Object.assign({}, pendingEdits);
+        for (const patch of patches) {
+            for (const id of Object.keys(patch.controls || {}))
+                states[id] = Object.assign({}, states[id], patch.controls[id]);
+            if (patch.ack) {
+                for (const id of Object.keys(pending))
+                    if (pending[id].sequence <= Number(patch.ack)) delete pending[id];
+            }
+            if (patch.size) formSize = patch.size;
+            if (patch.title !== undefined) formTitle = patch.title;
+            if (patch.close) {
+                answer("cancel", "");
+                break;
+            }
+        }
+        formUpdates = states;
+        pendingEdits = pending;
+    }
+    Timer {
+        interval: 33
+        running: root.isForm && !!root.request.live && !root.answered
+        repeat: true
+        onTriggered: {
+            const updates = bridge.takeUpdates();
+            if (updates) root.applyFormUpdates(JSON.parse(updates));
+        }
     }
     // Small frameless boxes instead of a dialog.
     readonly property bool boxed: isTooltip || isMenu
     Binding { target: Theme; property: "mode"; value: blockworkAppearance }
     Binding { target: Motion; property: "durationScale"; value: root.request.animation_speed ?? 1 }
-    width: isTooltip ? Math.min(480, tipText.implicitWidth + 24) : isMenu ? 260 : 440
+    width: isTooltip ? Math.min(480, tipText.implicitWidth + 24) : isMenu ? 260 : isForm ? (formSize?.[0] ?? request.width ?? 440) : 440
     height: isTooltip ? tipText.implicitHeight + 16 : isMenu ? Math.min(400, menuList.contentHeight + 8)
-        : isForm ? Math.min(640, form.implicitHeight + 40)
+        : isForm ? (formSize?.[1] ?? request.height ?? Math.min(640, Math.max(120, form.implicitHeight + 40)))
         : Math.min(560, content.implicitHeight + 40)
     minimumWidth: boxed ? 0 : 320
     visible: true
-    title: kind === "permission" ? qsTr("Blockwork permission") : (request.title || "Blockwork")
+    title: kind === "permission" ? qsTr("Blockwork permission") : (formTitle ?? (request.title || "Blockwork"))
     flags: isForm ? Qt.Window : isTooltip ? (Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint | Qt.WindowDoesNotAcceptFocus | Qt.WindowTransparentForInput)
         : isMenu ? (Qt.Tool | Qt.FramelessWindowHint | Qt.WindowStaysOnTopHint)
         : (Qt.Dialog | Qt.WindowStaysOnTopHint)
@@ -59,7 +117,7 @@ ApplicationWindow {
     function answer(button, text) {
         if (answered) return;
         answered = true;
-        if (isForm) bridge.sendValues(button, text || "", JSON.stringify(formValues));
+        if (isForm) bridge.sendValues(button, text || "", JSON.stringify(request.live ? {} : formValues));
         else bridge.finish(button, text || "");
     }
     onClosing: answer(kind === "message" || isTooltip ? "ok" : "cancel", "")
@@ -97,8 +155,6 @@ ApplicationWindow {
         else if (kind === "choice") choices.forceActiveFocus();
         else if (isMenu) menuList.forceActiveFocus();
     }
-    // Each new question puts the keyboard back in its input.
-    onRequestChanged: Qt.callLater(focusInput)
     Component.onCompleted: {
         placeBox();
         if (isTooltip) return;
@@ -174,7 +230,7 @@ ApplicationWindow {
         else if (picksPath) { if (pathField.text.trim() !== "") answer("ok", pathField.text.trim()); }
         else answer(buttons[buttons.length - 1][1], "");
     }
-    Shortcut { sequences: ["Return", "Enter"]; onActivated: root.accept() }
+    Shortcut { enabled: !root.isForm; sequences: ["Return", "Enter"]; onActivated: root.accept() }
     Shortcut { sequence: "Escape"; onActivated: root.close() }
 
     Rectangle {
@@ -218,68 +274,39 @@ ApplicationWindow {
         }
     }
 
-    // A window a macro built: its controls in order, buttons along the bottom.
     ColumnLayout {
         id: form
         objectName: "promptForm"
+        implicitHeight: formControls.implicitHeight + (footer.visible ? footer.implicitHeight + spacing : 0)
         visible: root.isForm
         anchors.fill: parent; anchors.margins: 20
         spacing: 12
-        Repeater {
-            model: root.isForm ? root.controls.filter(c => c.kind !== "button") : []
-            delegate: ColumnLayout {
-                id: row
-                required property var modelData
-                required property int index
-                Layout.fillWidth: true
-                spacing: 5
-                Text {
-                    visible: row.modelData.kind === "note" || row.modelData.kind === "text" || row.modelData.kind === "choice"
-                    Layout.fillWidth: true
-                    text: row.modelData.label
-                    textFormat: Text.PlainText; wrapMode: Text.WordWrap
-                    color: Theme.text; font.pixelSize: row.modelData.kind === "note" ? 14 : 13
-                }
-                StitchTextField {
-                    objectName: "promptFormText_" + row.index
-                    visible: row.modelData.kind === "text"
-                    Accessible.name: row.modelData.label
-                    Layout.fillWidth: true
-                    text: row.modelData.value === null || row.modelData.value === undefined ? "" : String(row.modelData.value)
-                    onTextEdited: root.setFormValue(row.modelData.name, text)
-                }
-                StitchCheckBox {
-                    objectName: "promptFormCheck_" + row.index
-                    visible: row.modelData.kind === "check"
-                    text: row.modelData.label
-                    checked: row.modelData.value === true
-                    onToggled: root.setFormValue(row.modelData.name, checked)
-                }
-                StitchComboBox {
-                    objectName: "promptFormChoice_" + row.index
-                    visible: row.modelData.kind === "choice"
-                    Accessible.name: row.modelData.label
-                    Layout.fillWidth: true
-                    model: row.modelData.options || []
-                    currentIndex: Math.max(0, (row.modelData.options || []).indexOf(String(row.modelData.value)))
-                    onActivated: index => root.setFormValue(row.modelData.name, model[index])
-                    Component.onCompleted: if (row.modelData.kind === "choice" && count > 0) root.setFormValue(row.modelData.name, model[currentIndex])
-                }
+
+        ScrollView {
+            Layout.fillWidth: true
+            Layout.fillHeight: true
+            contentWidth: availableWidth
+            clip: true
+            MacroFormLayout {
+                id: formControls
+                width: parent ? parent.width : 0
+                form: root
+                nodes: !root.isForm ? [] : root.request.inline_buttons ? root.controls : root.controls.filter(c => c.kind !== "button")
             }
         }
-        Item { Layout.fillHeight: true }
         Flow {
+            id: footer
+            visible: footerButtons.count > 0
             Layout.fillWidth: true
             layoutDirection: Qt.RightToLeft
             spacing: 8
             Repeater {
-                // Right to left, so the first button ends up leftmost.
-                model: root.isForm ? root.controls.filter(c => c.kind === "button").reverse() : []
+                id: footerButtons
+                model: root.isForm && !root.request.inline_buttons ? root.controls.filter(c => c.kind === "button").reverse() : []
                 delegate: StitchButton {
                     required property var modelData
-                    required property int index
                     objectName: "promptFormButton_" + modelData.label
-                    text: modelData.label
+                    text: root.properties(modelData).label ?? modelData.label
                     primary: !!modelData.close
                     onClicked: root.click(modelData)
                 }

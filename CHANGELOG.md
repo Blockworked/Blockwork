@@ -13,7 +13,8 @@ section below as the GitHub release notes, followed by the downloads table.
 ### Added
 - Custom blocks can have dropdown choices and buttons opening their own settings screens, including inputs shown only on those screens.
 - Built-in block menus and pickers use the same shared UI framework.
-- Saved macro format 6 preserves custom block menus; macros from earlier versions still load.
+- Macro form windows support nested layouts, scrolling, live variable bindings, tables, and named window controls.
+- Saved macro format 7 includes form windows and custom block menus. Macros from earlier versions still load.
 - When system starts header: runs once per login when Start at system startup is on ([docs](docs/system-startup.md)).
 - Touch gesture and touch paths blocks, with a multi-finger path editor; Linux (experimental) and Windows ([docs](docs/touch.md)).
 - Physical controller triggers and reporters, and on Linux a virtual controller for playback ([docs](docs/controllers.md)).
