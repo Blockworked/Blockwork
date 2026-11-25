@@ -1,0 +1,110 @@
+name: Flatpak repo
+
+# Adds a release's Flatpak bundles to the signed repo at flatpak.blockworked.com
+# (a Cloudflare R2 bucket), so installs from it update with `flatpak update`.
+on:
+  workflow_call:
+    inputs:
+      tag:
+        type: string
+        required: true
+    secrets:
+      FLATPAK_GPG_PRIVATE_KEY:
+        required: false
+      R2_ACCOUNT_ID:
+        required: false
+      R2_ACCESS_KEY_ID:
+        required: false
+      R2_SECRET_ACCESS_KEY:
+        required: false
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: "Existing release tag to publish (e.g. 0.6.3)"
+        required: true
+        type: string
+
+concurrency:
+  # Two runs at once would each upload a repo missing the other's commit.
+  group: flatpak-repo
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Update the Flatpak repo
+    runs-on: ubuntu-latest
+    env:
+      TAG: ${{ inputs.tag }}
+      GPG_KEY: ${{ secrets.FLATPAK_GPG_PRIVATE_KEY }}
+      R2_ACCOUNT_ID: ${{ secrets.R2_ACCOUNT_ID }}
+      AWS_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+      AWS_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+      AWS_DEFAULT_REGION: auto
+      # R2 doesn't take the checksum headers newer AWS CLIs send by default.
+      AWS_REQUEST_CHECKSUM_CALCULATION: when_required
+      AWS_RESPONSE_CHECKSUM_VALIDATION: when_required
+      BUCKET: ${{ vars.FLATPAK_R2_BUCKET || 'blockwork-flatpak' }}
+      REPO_URL: ${{ vars.FLATPAK_REPO_URL || 'https://flatpak.blockworked.com' }}
+
+    steps:
+      - name: Check secrets
+        id: check
+        run: |
+          if [ -n "$GPG_KEY" ] && [ -n "$R2_ACCOUNT_ID" ] && [ -n "$AWS_ACCESS_KEY_ID" ] && [ -n "$AWS_SECRET_ACCESS_KEY" ]; then
+            echo "ready=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "::notice::Flatpak repo secrets aren't set, skipping"
+          fi
+
+      - name: Checkout
+        if: steps.check.outputs.ready
+        uses: actions/checkout@v4
+
+      - name: Install tools
+        if: steps.check.outputs.ready
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends flatpak ostree
+
+      - name: Download the release's bundles
+        if: steps.check.outputs.ready
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release download "$TAG" -R "$GITHUB_REPOSITORY" -p 'blockwork-linux-*.flatpak' -D bundles
+
+      - name: Import the signing key
+        if: steps.check.outputs.ready
+        run: |
+          export GNUPGHOME="$RUNNER_TEMP/gnupg"
+          install -dm700 "$GNUPGHOME"
+          printf '%s\n' "$GPG_KEY" | gpg --batch --import
+          echo "GNUPGHOME=$GNUPGHOME" >> "$GITHUB_ENV"
+          echo "KEY_ID=$(gpg --list-secret-keys --with-colons | awk -F: '/^fpr/ {print $10; exit}')" >> "$GITHUB_ENV"
+
+      - name: Download the current repo
+        if: steps.check.outputs.ready
+        run: |
+          echo "S3=aws s3 --endpoint-url https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" >> "$GITHUB_ENV"
+          aws s3 --endpoint-url "https://$R2_ACCOUNT_ID.r2.cloudflarestorage.com" sync --only-show-errors "s3://$BUCKET/" site/
+
+      - name: Add the bundles
+        if: steps.check.outputs.ready
+        run: packaging/flatpak/update-repo.sh site "$KEY_ID" bundles/*.flatpak
+
+      - name: Upload
+        if: steps.check.outputs.ready
+        run: |
+          # New objects and deltas first, then the summary that points at them,
+          # then pruned files, so a client never sees a summary it can't follow.
+          $S3 sync --only-show-errors --exclude 'repo/summary*' --exclude 'repo/summaries/*' \
+            --cache-control 'public, max-age=31536000, immutable' site/repo/objects "s3://$BUCKET/repo/objects"
+          $S3 sync --only-show-errors --cache-control 'public, max-age=31536000, immutable' \
+            site/repo/deltas "s3://$BUCKET/repo/deltas" || true
+          $S3 sync --only-show-errors --cache-control 'public, max-age=300' site/ "s3://$BUCKET/" \
+            --exclude 'repo/objects/*' --exclude 'repo/deltas/*'
+          $S3 sync --only-show-errors --delete site/ "s3://$BUCKET/"
+          # Download these rather than show them, so the software center opens them.
+          $S3 cp --only-show-errors --cache-control 'public, max-age=300' \
+            --content-type application/vnd.flatpak.ref --content-disposition 'attachment; filename=blockwork.flatpakref' site/blockwork.flatpakref "s3://$BUCKET/blockwork.flatpakref"
+          $S3 cp --only-show-errors --cache-control 'public, max-age=300' \
+            --content-type application/vnd.flatpak.repo --content-disposition 'attachment; filename=blockwork.flatpakrepo' site/blockwork.flatpakrepo "s3://$BUCKET/blockwork.flatpakrepo"

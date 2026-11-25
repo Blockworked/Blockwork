@@ -3072,6 +3072,11 @@
         <source>A public identifier and a description for this block.</source>
         <translation type="unfinished"></translation>
     </message>
+    <message>
+        <location filename="../../../blockstitch/qml/Blockstitch/BlockDefinitionEditor.qml" line="605"/>
+        <source>A block that returns a value can&apos;t have branches</source>
+        <translation type="unfinished"></translation>
+    </message>
 </context>
 <context>
     <name>BlockDetailsDialog</name>

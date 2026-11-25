@@ -135,8 +135,11 @@ Item {
         }
         function test_drop_into_slot() {
             const page = editor();
-            const target = all(page).find(o => o.isValueChip && o.visible && o.width > 0 && o.valueLocation && o.valueLocation.strand_id === "definition" && o.valueLocation.field_id === "WaitDuration");
-            verify(!!target);
+            let target;
+            tryVerify(() => {
+                target = all(page).find(o => o.isValueChip && o.visible && o.width > 0 && o.valueLocation && o.valueLocation.strand_id === "definition" && o.valueLocation.field_id === "WaitDuration");
+                return !!target;
+            }, 5000, "Wait duration slot is laid out before dragging");
             startDrag(page, parameter(page, "gain"));
             const at = target.mapToItem(scene, target.width / 2, target.height / 2);
             mouseMove(scene, at.x, at.y, 20);

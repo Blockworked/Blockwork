@@ -467,18 +467,21 @@ Item {
         }
         function test_held_ghost_until_the_macro_shows_it() {
             const page = editor();
+            const drags = page.paletteDrags;
+            // Keep the fallback timer outside the assertion window on slow runners.
+            drags.holdTimeout = 60000;
             dragFromPalette(page, "Wait", 900, 650);
-            compare(scene.calls.filter(c => c.command === "add_strand").length, 1);
-            verify(page.paletteDrags.holding);
+            const drops = scene.calls.filter(c => c.command === "add_strand");
+            compare(drops.length, 1);
+            verify(drags.holding);
             verify(ghost(page).visible);
             // An unrelated state push (same strands) keeps it.
             page.appState = scene.state(scene.macro("macro", scene.strands));
             wait(20);
-            verify(page.paletteDrags.holding);
-            const added = scene.strands.concat([{id: "new", x: 500, y: 500, instructions: [scene.calls[0].args.instruction]}]);
+            verify(drags.holding, "an unrelated state push keeps the ghost held");
+            const added = scene.strands.concat([{id: "new", x: 500, y: 500, instructions: [drops[0].args.instruction]}]);
             page.appState = scene.state(scene.macro("macro", added));
-            wait(20);
-            verify(!page.paletteDrags.holding);
+            tryCompare(drags, "holding", false);
             verify(!ghost(page).visible);
         }
         function test_rejected_drop_lets_go_and_shows_the_error() {

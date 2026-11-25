@@ -23,12 +23,14 @@ the `input` group. The packages don't add anyone to it.
   network. `packaging/rpm/build-srpm.sh` turns it and `blockwork.spec.in` into a
   source RPM, and `copr-cli` submits it. Needs the `COPR_CONFIG` secret (the
   contents of `~/.config/copr` from https://copr.fedorainfracloud.org/api/) and
-  the `COPR_PROJECT` variable (`owner/project`). The chroots built are the ones
+  the `COPR_PROJECT` variable (`owner/project`, `ethanstokes/Blockwork` when unset). The chroots built are the ones
   enabled on the COPR project; Qt 6.10 or newer is needed, so Fedora 43 and up.
-- **AUR** (`aur.yml`): `packaging/aur/render.sh` fills in versions and checksums
-  for `blockwork` (from source), `blockwork-bin` (the release AppImages,
-  extracted to `/opt/blockwork`) and `blockwork-git`, builds `blockwork-bin` once
-  as a check, writes the `.SRCINFO` files and pushes the packages that changed.
+- **AUR** (`aur.yml`): `release.yml` builds the `blockwork` source recipe on
+  Arch Linux x86_64 and Arch Linux ARM aarch64 and attaches the native packages
+  to the GitHub release. `blockwork-bin` uses those packages and depends on
+  system Qt. `packaging/aur/render.sh` sets versions and checksums for
+  `blockwork`, `blockwork-bin` and `blockwork-git`. The AUR workflow checks
+  `blockwork-bin`, writes the `.SRCINFO` files and pushes the packages that changed.
   Needs the `AUR_SSH_PRIVATE_KEY` secret: a key added to the AUR account that
   maintains the packages. Commits are made as `AUR_GIT_NAME`/`AUR_GIT_EMAIL`
   (variables), Ethan Stokes by default.
@@ -42,7 +44,20 @@ the `input` group. The packages don't add anyone to it.
   24.04 for this, since the bundle needs at least the glibc it was built with.
   There's no apt repository yet.
 
-COPR and AUR can also be run by hand for an existing tag; the AUR one only
+- **Flatpak repo** (`flatpak-repo.yml`): `packaging/flatpak/update-repo.sh`
+  adds the release's Flatpak bundles to a GPG-signed OSTree repo, keeping the
+  last three commits per arch with static deltas between them, and writes
+  `blockwork.flatpakrepo` and `blockwork.flatpakref`. The repo lives in a
+  Cloudflare R2 bucket (`FLATPAK_R2_BUCKET`, default `blockwork-flatpak`) served
+  at `https://flatpak.blockworked.com` (`FLATPAK_REPO_URL`); each run downloads
+  it, adds the bundles and uploads objects before the summary. Needs the
+  `FLATPAK_GPG_PRIVATE_KEY`, `R2_ACCOUNT_ID`, `R2_ACCESS_KEY_ID` and
+  `R2_SECRET_ACCESS_KEY` secrets. With `packaging/flatpak/blockwork.gpg` (the
+  public key) in the tree, the release bundles also name the repo, so installing
+  one adds it as a remote. Users install with
+  `flatpak install https://flatpak.blockworked.com/blockwork.flatpakref`.
+
+COPR, AUR and the Flatpak repo can also be run by hand for an existing tag; the AUR one only
 pushes when asked.
 
 ## Nix

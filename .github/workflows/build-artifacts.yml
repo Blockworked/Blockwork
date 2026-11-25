@@ -206,12 +206,26 @@ jobs:
           retention-days: 14
 
       - name: Upload macOS app bundle
+        id: upload-macos
         if: runner.os == 'macOS'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}.app.zip
           path: ${{ matrix.artifact_name }}.app.zip
           if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Retry macOS app bundle upload
+        if: runner.os == 'macOS' && steps.upload-macos.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}.app.zip
+          path: ${{ matrix.artifact_name }}.app.zip
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
           retention-days: 14
 
   linux-appimage:
@@ -330,6 +344,10 @@ jobs:
           export QML_SOURCES_PATHS="$PWD/blockwork-qt/qml:$PWD/../blockstitch/qml"
 
           RELEASE_DIR="target/${{ matrix.target }}/release"
+          # The Wayland platform plugin loads its EGL integration separately.
+          wayland_egl=wayland-graphics-integration-client/libqt-plugin-wayland-egl.so
+          install -Dm755 "$("$QMAKE" -query QT_INSTALL_PLUGINS)/$wayland_egl" \
+            "AppDir/usr/plugins/$wayland_egl"
 
           ./linuxdeploy.AppImage \
             --appdir AppDir \
@@ -337,6 +355,7 @@ jobs:
             --executable "$RELEASE_DIR/blockwork-daemon" \
             --desktop-file res/blockwork.desktop \
             --icon-file res/icons/blockwork.png \
+            --deploy-deps-only "AppDir/usr/plugins/$wayland_egl" \
             --plugin qt \
             --output appimage
           mv Blockwork*.AppImage ${{ matrix.artifact_name }}.AppImage

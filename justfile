@@ -131,6 +131,11 @@ replace-fast: build install
 flatpak-sources:
     flatpak run --command=flatpak-cargo-generator org.flatpak.Builder -o packaging/flatpak/cargo-sources.json Cargo.lock
 
+# Set the version, date the changelog, update the metainfo and Flatpak files,
+# then commit everything and tag it: `just release 0.6.4`. Pushes nothing.
+release version:
+    python3 scripts/release.py {{version}}
+
 flatpak-build *args:
     #!/usr/bin/env bash
     set -euo pipefail

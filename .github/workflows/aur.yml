@@ -39,8 +39,6 @@ jobs:
 
       - name: Checkout
         uses: actions/checkout@v4
-        with:
-          ref: ${{ inputs.tag }}
 
       - name: Render PKGBUILDs
         run: packaging/aur/render.sh "$TAG" dist/aur
@@ -55,12 +53,16 @@ jobs:
             su builder -c "cd dist/aur/$pkg && makepkg --printsrcinfo > .SRCINFO"
           done
           pacman -Qip dist/aur/blockwork-bin/*.pkg.tar.zst
-          pacman -Qlp dist/aur/blockwork-bin/*.pkg.tar.zst | grep -E 'usr/bin/blockwork|opt/blockwork/bin/blockwork-daemon'
+          files=$(pacman -Qqlp dist/aur/blockwork-bin/*.pkg.tar.zst)
+          grep -Fx /usr/bin/blockwork <<< "$files"
+          grep -Fx /usr/lib/blockwork/blockwork <<< "$files"
+          grep -Fx /usr/lib/blockwork/blockwork-daemon <<< "$files"
 
       - name: Upload PKGBUILDs
         uses: actions/upload-artifact@v4
         with:
           name: aur-pkgbuilds
+          include-hidden-files: true
           path: |
             dist/aur/*/PKGBUILD
             dist/aur/*/.SRCINFO
@@ -73,11 +75,14 @@ jobs:
           GIT_COMMITTER_NAME: ${{ vars.AUR_GIT_NAME || 'Ethan Stokes' }}
           GIT_COMMITTER_EMAIL: ${{ vars.AUR_GIT_EMAIL || 'erstokes10@gmail.com' }}
         run: |
-          install -dm700 ~/.ssh
-          printf '%s\n' "$AUR_KEY" > ~/.ssh/aur
-          chmod 600 ~/.ssh/aur
-          ssh-keyscan -t ed25519,rsa aur.archlinux.org >> ~/.ssh/known_hosts
-          export GIT_SSH_COMMAND="ssh -i ~/.ssh/aur -o IdentitiesOnly=yes"
+          # In a container job $HOME isn't the home ssh reads, so name every file.
+          ssh_dir="$HOME/.ssh"
+          install -dm700 "$ssh_dir"
+          printf '%s\n' "$AUR_KEY" > "$ssh_dir/aur"
+          chmod 600 "$ssh_dir/aur"
+          ssh-keyscan -t ed25519,rsa aur.archlinux.org > "$ssh_dir/known_hosts"
+          test -s "$ssh_dir/known_hosts"
+          export GIT_SSH_COMMAND="ssh -i $ssh_dir/aur -o IdentitiesOnly=yes -o UserKnownHostsFile=$ssh_dir/known_hosts"
           for pkg in blockwork blockwork-bin blockwork-git; do
             rm -rf "aur-$pkg"
             git clone "ssh://aur@aur.archlinux.org/$pkg.git" "aur-$pkg"

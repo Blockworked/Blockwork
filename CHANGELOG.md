@@ -11,7 +11,6 @@ section below as the GitHub release notes, followed by the downloads table.
 ## [Unreleased]
 
 ### Added
-- Report a community pack, or someone else's comment on it, from its page in the Block library.
 - Custom blocks can have dropdown choices and buttons opening their own settings screens, including inputs shown only on those screens.
 - Built-in block menus and pickers use the same shared UI framework.
 - Saved macro format 6 preserves custom block menus; macros from earlier versions still load.
@@ -49,10 +48,30 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ### Changed
 - The "key held?" reporter records its key or combo with a click, like the Key block, instead of a text field.
-- The Text block spaces keystrokes 0.5 ms apart on Windows and macOS too, as it already did on Linux, so fast typing doesn't drop or merge characters.
 
 ### Fixed
 - Toolbar buttons such as Hide sidebar work again with Qt 6.12.
+
+## [0.6.5] - 2026-11-25
+
+### Fixed
+- Fixed a startup crash on Wayland in the Linux AppImage and bundled .deb by including Qt's Wayland EGL plugin.
+
+## [0.6.4] - 2026-11-24
+
+### Fixed
+- The Flatpak version history and screenshots now correctly display the latest version.
+
+## [0.6.3] - 2026-11-24
+
+### Added
+- Report a community pack, or someone else's comment on it, from its page in the Block library.
+
+### Changed
+- The Text block spaces keystrokes 0.5 ms apart on Windows and macOS too, as it already did on Linux, so fast typing doesn't drop or merge characters.
+
+### Fixed
+- Date and time format patterns such as `MMM d` are no longer translated, so dates in the run log show the right format in every language.
 
 ## [0.6.2] - 2026-11-14
 
@@ -422,6 +441,11 @@ Initial release.
 - Global shortcuts (navigation, loop mode) on Linux; global keybinds on Windows.
 - App icons, updater and confirm dialogs, Wayland support.
 
+[0.6.5]: https://github.com/Blockworked/Blockwork/compare/0.6.4...0.6.5
+[0.6.4]: https://github.com/Blockworked/Blockwork/compare/0.6.3...0.6.4
+[0.6.3]: https://github.com/Blockworked/Blockwork/compare/0.6.2...0.6.3
+[0.6.2]: https://github.com/Blockworked/Blockwork/compare/0.6.1...0.6.2
+[0.6.1]: https://github.com/Blockworked/Blockwork/compare/0.6.0...0.6.1
 [0.6.0]: https://github.com/Blockworked/Blockwork/compare/0.5.4...0.6.0
 [0.5.4]: https://github.com/Blockworked/Blockwork/compare/0.5.3...0.5.4
 [0.5.3]: https://github.com/Blockworked/Blockwork/compare/0.5.2...0.5.3

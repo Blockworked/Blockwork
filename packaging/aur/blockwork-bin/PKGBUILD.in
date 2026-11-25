@@ -4,48 +4,26 @@
 pkgname=blockwork-bin
 pkgver=@VERSION@
 pkgrel=1
-pkgdesc='Build keyboard and mouse macros by snapping blocks together (prebuilt, bundles its own Qt)'
+pkgdesc='Build keyboard and mouse macros by snapping blocks together (prebuilt for Arch)'
 url='https://blockworked.com'
 arch=('x86_64' 'aarch64')
 license=('GPL-3.0-only')
-depends=('glibc' 'gcc-libs' 'fontconfig' 'freetype2' 'libglvnd' 'libxkbcommon' 'dbus' 'hicolor-icon-theme')
-optdepends=('tesseract: text recognition blocks'
+depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'hicolor-icon-theme' 'gcc-libs' 'glibc' 'dbus' 'libxkbcommon' 'wayland' 'gtk3')
+optdepends=('qt6-wayland: native Wayland window'
+            'tesseract: text recognition blocks'
             'grim: screen blocks on wlroots desktops'
             'kdotool: window blocks on KDE Plasma')
-provides=('blockwork' 'macros')
+provides=("blockwork=$pkgver" 'macros')
 conflicts=('blockwork' 'blockwork-git' 'macros')
 options=('!strip' '!debug')
-_repo=https://github.com/Blockworked/Blockwork
-source=("LICENSE-$pkgver::https://raw.githubusercontent.com/Blockworked/Blockwork/$pkgver/LICENSE"
-        "60-blockwork-uinput.rules-$pkgver::https://raw.githubusercontent.com/Blockworked/Blockwork/$pkgver/packaging/linux/60-blockwork-uinput.rules"
-        "metainfo-$pkgver.xml::https://raw.githubusercontent.com/Blockworked/Blockwork/$pkgver/res/com.blockworked.Blockwork.metainfo.xml")
-source_x86_64=("blockwork-$pkgver-x86_64.AppImage::$_repo/releases/download/$pkgver/blockwork-linux-x86_64.AppImage")
-source_aarch64=("blockwork-$pkgver-aarch64.AppImage::$_repo/releases/download/$pkgver/blockwork-linux-arm64.AppImage")
-noextract=("blockwork-$pkgver-$CARCH.AppImage")
-sha256sums=('@LICENSE_SHA256@'
-            '@RULES_SHA256@'
-            '@METAINFO_SHA256@')
+_release=https://github.com/Blockworked/Blockwork/releases/download/@TAG@
+source_x86_64=("blockwork-$pkgver-x86_64.pkg.tar.zst::$_release/blockwork-arch-x86_64.pkg.tar.zst")
+source_aarch64=("blockwork-$pkgver-aarch64.pkg.tar.zst::$_release/blockwork-arch-aarch64.pkg.tar.zst")
+noextract=("blockwork-$pkgver-x86_64.pkg.tar.zst" "blockwork-$pkgver-aarch64.pkg.tar.zst")
 sha256sums_x86_64=('@X86_64_SHA256@')
 sha256sums_aarch64=('@AARCH64_SHA256@')
 
-prepare() {
-    rm -rf squashfs-root
-    chmod +x "blockwork-$pkgver-$CARCH.AppImage"
-    "./blockwork-$pkgver-$CARCH.AppImage" --appimage-extract >/dev/null
-}
-
 package() {
-    # The AppImage's own tree (Qt included); its RPATHs are relative.
-    install -d "$pkgdir/opt/blockwork"
-    cp -a squashfs-root/usr/. "$pkgdir/opt/blockwork/"
-    chmod -R u+rwX,go+rX,go-w "$pkgdir/opt/blockwork"
-    install -d "$pkgdir/usr/bin"
-    ln -s /opt/blockwork/bin/blockwork "$pkgdir/usr/bin/blockwork"
-
-    install -Dm644 squashfs-root/blockwork.desktop "$pkgdir/usr/share/applications/com.blockworked.Blockwork.desktop"
-    install -Dm644 "metainfo-$pkgver.xml" "$pkgdir/usr/share/metainfo/com.blockworked.Blockwork.metainfo.xml"
-    install -Dm644 squashfs-root/blockwork.png "$pkgdir/usr/share/icons/hicolor/512x512/apps/blockwork.png"
-    install -Dm644 "60-blockwork-uinput.rules-$pkgver" "$pkgdir/usr/lib/udev/rules.d/60-blockwork-uinput.rules"
-    echo uinput | install -Dm644 /dev/stdin "$pkgdir/usr/lib/modules-load.d/blockwork-uinput.conf"
-    install -Dm644 "LICENSE-$pkgver" "$pkgdir/usr/share/licenses/$pkgname/LICENSE"
+    bsdtar -xf "$srcdir/blockwork-$pkgver-$CARCH.pkg.tar.zst" -C "$pkgdir" usr/
+    mv "$pkgdir/usr/share/licenses/blockwork" "$pkgdir/usr/share/licenses/$pkgname"
 }
