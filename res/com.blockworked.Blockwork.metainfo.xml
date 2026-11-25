@@ -71,6 +71,13 @@
   </screenshots>
 
   <releases>
+    <release version="0.6.5" date="2026-11-25">
+      <description>
+        <ul>
+          <li>Fixed a startup crash on Wayland in the Linux AppImage and bundled .deb by including Qt's Wayland EGL plugin.</li>
+        </ul>
+      </description>
+    </release>
     <release version="0.6.4" date="2026-11-24">
       <description>
         <ul>

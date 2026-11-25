@@ -339,6 +339,10 @@ jobs:
           export QML_SOURCES_PATHS="$PWD/blockwork-qt/qml:$PWD/../blockstitch/qml"
 
           RELEASE_DIR="target/${{ matrix.target }}/release"
+          # The Wayland platform plugin loads its EGL integration separately.
+          wayland_egl=wayland-graphics-integration-client/libqt-plugin-wayland-egl.so
+          install -Dm755 "$("$QMAKE" -query QT_INSTALL_PLUGINS)/$wayland_egl" \
+            "AppDir/usr/plugins/$wayland_egl"
 
           ./linuxdeploy.AppImage \
             --appdir AppDir \
@@ -346,6 +350,7 @@ jobs:
             --executable "$RELEASE_DIR/blockwork-daemon" \
             --desktop-file res/blockwork.desktop \
             --icon-file res/icons/blockwork.png \
+            --deploy-deps-only "AppDir/usr/plugins/$wayland_egl" \
             --plugin qt \
             --output appimage
           mv Blockwork*.AppImage ${{ matrix.artifact_name }}.AppImage

@@ -10,6 +10,11 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ## [Unreleased]
 
+## [0.6.5] - 2026-11-25
+
+### Fixed
+- Fixed a startup crash on Wayland in the Linux AppImage and bundled .deb by including Qt's Wayland EGL plugin.
+
 ## [0.6.4] - 2026-11-24
 
 ### Fixed
@@ -394,6 +399,7 @@ Initial release.
 - Global shortcuts (navigation, loop mode) on Linux; global keybinds on Windows.
 - App icons, updater and confirm dialogs, Wayland support.
 
+[0.6.5]: https://github.com/Blockworked/Blockwork/compare/0.6.4...0.6.5
 [0.6.4]: https://github.com/Blockworked/Blockwork/compare/0.6.3...0.6.4
 [0.6.3]: https://github.com/Blockworked/Blockwork/compare/0.6.2...0.6.3
 [0.6.2]: https://github.com/Blockworked/Blockwork/compare/0.6.1...0.6.2
