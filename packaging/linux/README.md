@@ -25,10 +25,12 @@ the `input` group. The packages don't add anyone to it.
   contents of `~/.config/copr` from https://copr.fedorainfracloud.org/api/) and
   the `COPR_PROJECT` variable (`owner/project`, `ethanstokes/Blockwork` when unset). The chroots built are the ones
   enabled on the COPR project; Qt 6.10 or newer is needed, so Fedora 43 and up.
-- **AUR** (`aur.yml`): `packaging/aur/render.sh` fills in versions and checksums
-  for `blockwork` (from source), `blockwork-bin` (the release AppImages,
-  extracted to `/opt/blockwork`) and `blockwork-git`, builds `blockwork-bin` once
-  as a check, writes the `.SRCINFO` files and pushes the packages that changed.
+- **AUR** (`aur.yml`): `release.yml` builds the `blockwork` source recipe on
+  Arch Linux x86_64 and Arch Linux ARM aarch64 and attaches the native packages
+  to the GitHub release. `blockwork-bin` uses those packages and depends on
+  system Qt. `packaging/aur/render.sh` sets versions and checksums for
+  `blockwork`, `blockwork-bin` and `blockwork-git`. The AUR workflow checks
+  `blockwork-bin`, writes the `.SRCINFO` files and pushes the packages that changed.
   Needs the `AUR_SSH_PRIVATE_KEY` secret: a key added to the AUR account that
   maintains the packages. Commits are made as `AUR_GIT_NAME`/`AUR_GIT_EMAIL`
   (variables), Ethan Stokes by default.
