@@ -206,12 +206,26 @@ jobs:
           retention-days: 14
 
       - name: Upload macOS app bundle
+        id: upload-macos
         if: runner.os == 'macOS'
+        continue-on-error: true
         uses: actions/upload-artifact@v4
         with:
           name: ${{ matrix.artifact_name }}.app.zip
           path: ${{ matrix.artifact_name }}.app.zip
           if-no-files-found: error
+          compression-level: 0
+          retention-days: 14
+
+      - name: Retry macOS app bundle upload
+        if: runner.os == 'macOS' && steps.upload-macos.outcome == 'failure'
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact_name }}.app.zip
+          path: ${{ matrix.artifact_name }}.app.zip
+          if-no-files-found: error
+          compression-level: 0
+          overwrite: true
           retention-days: 14
 
   linux-appimage:
