@@ -1633,6 +1633,15 @@
    "value": "Details"
   },
   "key": "details",
+  "size": {
+   "kind": "Text",
+   "value": "w:fill h:auto"
+  },
+  "icon": {
+   "kind": "Text",
+   "value": "layout-grid"
+  },
+  "style": "card",
   "columns": {
    "kind": "Number",
    "value": 2
@@ -1651,6 +1660,16 @@
  {
   "type": "WindowDisplay",
   "id": "sample-WindowDisplay",
+  "key": "results",
+  "size": {
+   "kind": "Text",
+   "value": "w:fill"
+  },
+  "tone": "muted",
+  "icon": {
+   "kind": "Text",
+   "value": "info"
+  },
   "display": "table",
   "label": {
    "kind": "Text",
@@ -1664,6 +1683,15 @@
  {
   "type": "WindowInput",
   "id": "sample-WindowInput",
+  "key": "volume",
+  "size": {
+   "kind": "Text",
+   "value": "w:30%"
+  },
+  "icon": {
+   "kind": "Text",
+   "value": "sliders-horizontal"
+  },
   "input": "slider",
   "label": {
    "kind": "Text",
@@ -1700,6 +1728,11 @@
    {
     "type": "WindowTextBox",
     "id": "child_textbox",
+    "key": "name_box",
+    "size": {
+     "kind": "Text",
+     "value": "w:auto"
+    },
     "label": {
      "kind": "Text",
      "value": "Name"
@@ -1709,6 +1742,11 @@
    {
     "type": "WindowCheckbox",
     "id": "child_checkbox",
+    "key": "loud_box",
+    "size": {
+     "kind": "Text",
+     "value": ""
+    },
     "label": {
      "kind": "Text",
      "value": "Loud"
@@ -1718,6 +1756,11 @@
    {
     "type": "WindowChoice",
     "id": "child_choice",
+    "key": "color_box",
+    "size": {
+     "kind": "Text",
+     "value": "w:160"
+    },
     "label": {
      "kind": "Text",
      "value": "Color"
@@ -1728,6 +1771,16 @@
    {
     "type": "WindowButton",
     "id": "child_button",
+    "key": "go_button",
+    "size": {
+     "kind": "Text",
+     "value": "w:auto"
+    },
+    "icon": {
+     "kind": "Text",
+     "value": "check"
+    },
+    "variant": "primary",
     "label": {
      "kind": "Text",
      "value": "Go"

@@ -159,6 +159,21 @@ impl Form {
         Ok(initial)
     }
 
+    /// Gives a part the ID blocks can address it by while the window is open.
+    fn component(&mut self, key: &str, id: &str) -> Result<(), String> {
+        if key.is_empty() {
+            return Ok(());
+        }
+        if self
+            .components
+            .insert(key.to_string(), id.to_string())
+            .is_some()
+        {
+            return Err(format!("duplicate component ID \"{key}\""));
+        }
+        Ok(())
+    }
+
     fn input(&mut self, ctx: &ExecCtx, control: &mut Control, name: &str, input: Input) {
         let vars = ctx.variables.lock().unwrap();
         control.value = input.json(vars.get(name));
@@ -202,9 +217,17 @@ impl Form {
                     label: text,
                     close,
                     body,
+                    key,
+                    size,
+                    icon,
+                    variant,
                 } => {
                     control.label = label(self, text)?;
                     control.close = *close;
+                    control.size = self.content(ctx, size, depth, &id, "size")?;
+                    control.icon = self.content(ctx, icon, depth, &id, "icon")?;
+                    control.variant = variant.clone();
+                    self.component(key, &id)?;
                     self.buttons.push(Button {
                         id,
                         label: control.label.clone(),
@@ -213,13 +236,27 @@ impl Form {
                     });
                     "button"
                 }
-                InstructionKind::WindowTextBox { label: text, name } => {
+                InstructionKind::WindowTextBox {
+                    label: text,
+                    name,
+                    key,
+                    size,
+                } => {
                     control.label = label(self, text)?;
+                    control.size = self.content(ctx, size, depth, &id, "size")?;
+                    self.component(key, &id)?;
                     self.input(ctx, &mut control, name, Input::Text);
                     "text"
                 }
-                InstructionKind::WindowCheckbox { label: text, name } => {
+                InstructionKind::WindowCheckbox {
+                    label: text,
+                    name,
+                    key,
+                    size,
+                } => {
                     control.label = label(self, text)?;
+                    control.size = self.content(ctx, size, depth, &id, "size")?;
+                    self.component(key, &id)?;
                     self.input(ctx, &mut control, name, Input::Check);
                     "check"
                 }
@@ -227,8 +264,12 @@ impl Form {
                     label: text,
                     list,
                     name,
+                    key,
+                    size,
                 } => {
                     control.label = label(self, text)?;
+                    control.size = self.content(ctx, size, depth, &id, "size")?;
+                    self.component(key, &id)?;
                     self.input(ctx, &mut control, name, Input::Text);
                     control.options = choices(&ctx.lists, list);
                     self.bindings.push(Binding {
@@ -245,18 +286,29 @@ impl Form {
                     key,
                     columns,
                     body,
+                    size,
+                    icon,
+                    style,
                 } => {
                     if !matches!(
                         layout.as_str(),
-                        "row" | "column" | "grid" | "scroll" | "group" | "spacer" | "tabs"
+                        "row"
+                            | "column"
+                            | "grid"
+                            | "scroll"
+                            | "group"
+                            | "spacer"
+                            | "tabs"
+                            | "split"
                     ) {
                         return Err(format!("unknown window layout \"{layout}\""));
                     }
                     self.has_layout = true;
                     control.label = label(self, text)?;
-                    if !key.is_empty() && self.components.insert(key.clone(), id).is_some() {
-                        return Err(format!("duplicate component ID \"{key}\""));
-                    }
+                    control.size = self.content(ctx, size, depth, &id, "size")?;
+                    control.icon = self.content(ctx, icon, depth, &id, "icon")?;
+                    control.style = style.clone();
+                    self.component(key, &id)?;
                     if layout == "grid" {
                         control.columns = Some(
                             ctx.resolve(columns, depth)?.eval_number()?.clamp(1.0, 12.0) as u32,
@@ -269,15 +321,32 @@ impl Form {
                     display,
                     label: text,
                     data,
+                    key,
+                    size,
+                    tone,
+                    icon,
                 } => {
                     if !matches!(
                         display.as_str(),
-                        "heading" | "table" | "progress" | "chart" | "image"
+                        "heading"
+                            | "subheading"
+                            | "body"
+                            | "caption"
+                            | "divider"
+                            | "icon"
+                            | "table"
+                            | "progress"
+                            | "chart"
+                            | "image"
                     ) {
                         return Err(format!("unknown window display \"{display}\""));
                     }
                     control.label = label(self, text)?;
-                    if display != "heading" {
+                    control.size = self.content(ctx, size, depth, &id, "size")?;
+                    control.icon = self.content(ctx, icon, depth, &id, "icon")?;
+                    control.tone = tone.clone();
+                    self.component(key, &id)?;
+                    if display != "heading" && display != "divider" {
                         control.value = json!(self.content(ctx, data, depth, &id, "value")?);
                     }
                     display
@@ -287,17 +356,22 @@ impl Form {
                     label: text,
                     name,
                     options,
+                    key,
+                    size,
+                    icon,
                 } => {
                     let kind = match input.as_str() {
                         "slider" => Input::Slider,
-                        "multiline" | "list" | "file" | "folder" => Input::Text,
+                        "multiline" | "list" | "table" | "file" | "folder" => Input::Text,
                         _ => return Err(format!("unknown window input \"{input}\"")),
                     };
                     control.label = label(self, text)?;
+                    control.size = self.content(ctx, size, depth, &id, "size")?;
+                    control.icon = self.content(ctx, icon, depth, &id, "icon")?;
+                    self.component(key, &id)?;
                     self.input(ctx, &mut control, name, kind);
-                    if input == "list" {
-                        let data = self.content(ctx, options, depth, &id, "data")?;
-                        control.options = serde_json::from_str(&data).unwrap_or_default();
+                    if input == "list" || input == "table" {
+                        control.data = self.content(ctx, options, depth, &id, "data")?;
                     }
                     input
                 }

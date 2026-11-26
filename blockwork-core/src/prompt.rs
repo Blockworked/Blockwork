@@ -40,9 +40,27 @@ pub struct Control {
     pub value: serde_json::Value,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub options: Vec<String>,
+    /// Raw JSON behind a selectable list or table, kept live when bound.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub data: String,
     /// A button that also closes the window.
     #[serde(default, skip_serializing_if = "std::ops::Not::not")]
     pub close: bool,
+    /// How much room it asks for: "w:fill h:fill", "w:30%", "w:220".
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub size: String,
+    /// A Lucide icon name, possibly read from a variable.
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub icon: String,
+    /// Text colour: "muted", "accent", "success", "warning" or "danger".
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub tone: String,
+    /// A button's look, independent of what it does: "primary", "quiet", "danger".
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub variant: String,
+    /// A layout's look: "card" or "panel".
+    #[serde(default, skip_serializing_if = "String::is_empty")]
+    pub style: String,
     #[serde(default, skip_serializing_if = "Vec::is_empty")]
     pub children: Vec<Control>,
     #[serde(default, skip_serializing_if = "Option::is_none")]
@@ -245,4 +263,44 @@ pub fn show_tooltip(
         })
         .map(|_| ())
         .map_err(|e| e.to_string())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn a_control_keeps_its_size_icon_tone_and_look() {
+        let control = Control {
+            kind: "button".into(),
+            size: "w:auto".into(),
+            icon: "trash-2".into(),
+            tone: "danger".into(),
+            variant: "danger".into(),
+            style: "card".into(),
+            data: "[]".into(),
+            ..Control::default()
+        };
+        let json = serde_json::to_value(&control).unwrap();
+        assert_eq!(json["size"], "w:auto");
+        assert_eq!(json["icon"], "trash-2");
+        assert_eq!(json["tone"], "danger");
+        assert_eq!(json["variant"], "danger");
+        assert_eq!(json["style"], "card");
+        assert_eq!(json["data"], "[]");
+        let back: Control = serde_json::from_value(json).unwrap();
+        assert_eq!(back, control);
+    }
+
+    #[test]
+    fn empty_optional_control_fields_stay_off_the_wire() {
+        let control = Control {
+            kind: "note".into(),
+            ..Control::default()
+        };
+        let json = serde_json::to_value(&control).unwrap();
+        for key in ["size", "icon", "tone", "variant", "style", "data"] {
+            assert!(json.get(key).is_none(), "{key} was serialized");
+        }
+    }
 }

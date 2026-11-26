@@ -668,25 +668,47 @@ pub enum InstructionKind {
     WindowTextBox {
         label: Value,
         name: String,
+        #[serde(default)]
+        key: String,
+        #[serde(default = "empty_text")]
+        size: Value,
     },
     /// Inside `ShowWindow`: a checkbox for variable `name` (true or false).
     WindowCheckbox {
         label: Value,
         name: String,
+        #[serde(default)]
+        key: String,
+        #[serde(default = "empty_text")]
+        size: Value,
     },
     /// Inside `ShowWindow`: a drop-down of list `list`'s items for variable `name`.
     WindowChoice {
         label: Value,
         list: String,
         name: String,
+        #[serde(default)]
+        key: String,
+        #[serde(default = "empty_text")]
+        size: Value,
     },
     /// Inside `ShowWindow`: a button that runs `body` when clicked. With
     /// `close` it also closes the window, and `body` runs before the blocks
     /// after the window; without, `body` runs alongside the open window.
+    /// `variant` picks its look and `icon` its glyph; both are independent
+    /// of `close`.
     WindowButton {
         label: Value,
         close: bool,
         body: Vec<Instruction>,
+        #[serde(default)]
+        key: String,
+        #[serde(default = "empty_text")]
+        size: Value,
+        #[serde(default = "empty_text")]
+        icon: Value,
+        #[serde(default)]
+        variant: String,
     },
     /// Inside `ShowWindow`: a line of text.
     WindowNote(Value),
@@ -697,23 +719,49 @@ pub enum InstructionKind {
         height: Value,
         body: Vec<Instruction>,
     },
+    /// Arranges the window parts in `body`. `size` hints how much room it
+    /// takes ("w:fill h:fill", "w:30%", "w:220 h:auto"), `style` draws it as
+    /// a card or panel, and `icon` labels a tab or group.
     WindowLayout {
         layout: String,
         label: Value,
         key: String,
         columns: Value,
         body: Vec<Instruction>,
+        #[serde(default = "empty_text")]
+        size: Value,
+        #[serde(default = "empty_text")]
+        icon: Value,
+        #[serde(default)]
+        style: String,
     },
+    /// Shows a heading, text, divider, table, progress bar, chart or image.
+    /// `tone` colours text and `icon` leads a text line.
     WindowDisplay {
         display: String,
         label: Value,
         data: Value,
+        #[serde(default)]
+        key: String,
+        #[serde(default = "empty_text")]
+        size: Value,
+        #[serde(default)]
+        tone: String,
+        #[serde(default = "empty_text")]
+        icon: Value,
     },
+    /// Edits a variable: a slider, text box, list of items or a table.
     WindowInput {
         input: String,
         label: Value,
         name: String,
         options: Value,
+        #[serde(default)]
+        key: String,
+        #[serde(default = "empty_text")]
+        size: Value,
+        #[serde(default = "empty_text")]
+        icon: Value,
     },
     WindowOnChange {
         name: String,
@@ -1064,6 +1112,11 @@ pub(crate) fn first_match() -> Value {
 
 pub(crate) fn zero_value() -> Value {
     Value::number(0.0)
+}
+
+/// A new text slot's value: empty, so older macros and fresh blocks agree.
+pub(crate) fn empty_text() -> Value {
+    Value::text("")
 }
 
 /// Which match an image block uses when the picture is on screen more

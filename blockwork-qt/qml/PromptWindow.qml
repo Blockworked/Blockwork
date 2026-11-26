@@ -92,11 +92,12 @@ ApplicationWindow {
     }
     // Small frameless boxes instead of a dialog.
     readonly property bool boxed: isTooltip || isMenu
+    readonly property bool formNeedsHeight: isForm && !!formControls && formControls.hasFillHeight
     Binding { target: Theme; property: "mode"; value: blockworkAppearance }
     Binding { target: Motion; property: "durationScale"; value: root.request.animation_speed ?? 1 }
     width: isTooltip ? Math.min(480, tipText.implicitWidth + 24) : isMenu ? 260 : isForm ? (formSize?.[0] ?? request.width ?? 440) : 440
     height: isTooltip ? tipText.implicitHeight + 16 : isMenu ? Math.min(400, menuList.contentHeight + 8)
-        : isForm ? (formSize?.[1] ?? request.height ?? Math.min(640, Math.max(120, form.implicitHeight + 40)))
+        : isForm ? (formSize?.[1] ?? request.height ?? Math.min(640, Math.max(120, form.implicitHeight + 40, formNeedsHeight ? 360 : 0)))
         : Math.min(560, content.implicitHeight + 40)
     minimumWidth: boxed ? 0 : 320
     visible: true
@@ -283,14 +284,19 @@ ApplicationWindow {
         spacing: 12
 
         ScrollView {
+            id: formScroll
             Layout.fillWidth: true
             Layout.fillHeight: true
             contentWidth: availableWidth
             clip: true
             MacroFormLayout {
                 id: formControls
-                width: parent ? parent.width : 0
+                width: formScroll.availableWidth
+                // Give fill-height parts the window's spare room instead of
+                // leaving it empty below content-sized blocks.
+                height: Math.max(implicitHeight, formScroll.availableHeight)
                 form: root
+                availableHeight: formScroll.availableHeight
                 nodes: !root.isForm ? [] : root.request.inline_buttons ? root.controls : root.controls.filter(c => c.kind !== "button")
             }
         }
@@ -307,7 +313,10 @@ ApplicationWindow {
                     required property var modelData
                     objectName: "promptFormButton_" + modelData.label
                     text: root.properties(modelData).label ?? modelData.label
-                    primary: !!modelData.close
+                    primary: modelData.variant === "primary" || (!modelData.variant && !!modelData.close)
+                    danger: modelData.variant === "danger"
+                    flat: modelData.variant === "quiet"
+                    iconName: root.properties(modelData).icon ?? modelData.icon ?? ""
                     onClicked: root.click(modelData)
                 }
             }

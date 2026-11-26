@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import com.blockworked.Blockstitch 1.0
+import com.blockworked.Blockstitch 1.0 as Stitch
 
 AppDialog {
     id: root
@@ -37,7 +38,13 @@ AppDialog {
         { name: qsTr("Group"), type: "WindowLayout", layout: "group", icon: "folder", group: qsTr("Layout") },
         { name: qsTr("Spacer"), type: "WindowLayout", layout: "spacer", icon: "minus", group: qsTr("Layout") },
         { name: qsTr("Tabs"), type: "WindowLayout", layout: "tabs", icon: "layout-panel-top", group: qsTr("Layout") },
+        { name: qsTr("Split panes"), type: "WindowLayout", layout: "split", icon: "columns-2", group: qsTr("Layout") },
         { name: qsTr("Heading"), type: "WindowDisplay", display: "heading", icon: "type", group: qsTr("Display") },
+        { name: qsTr("Subheading"), type: "WindowDisplay", display: "subheading", icon: "heading-2", group: qsTr("Display") },
+        { name: qsTr("Text"), type: "WindowDisplay", display: "body", icon: "file-text", group: qsTr("Display") },
+        { name: qsTr("Caption"), type: "WindowDisplay", display: "caption", icon: "info", group: qsTr("Display") },
+        { name: qsTr("Divider"), type: "WindowDisplay", display: "divider", icon: "minus", group: qsTr("Display") },
+        { name: qsTr("Icon"), type: "WindowDisplay", display: "icon", icon: "star", group: qsTr("Display") },
         { name: qsTr("Table"), type: "WindowDisplay", display: "table", icon: "layout-grid", group: qsTr("Display") },
         { name: qsTr("Progress bar"), type: "WindowDisplay", display: "progress", icon: "gauge", group: qsTr("Display") },
         { name: qsTr("Bar chart"), type: "WindowDisplay", display: "chart", icon: "sliders-horizontal", group: qsTr("Display") },
@@ -49,6 +56,7 @@ AppDialog {
         { name: qsTr("Slider"), type: "WindowInput", input: "slider", icon: "sliders-horizontal", group: qsTr("Input") },
         { name: qsTr("Multiline text"), type: "WindowInput", input: "multiline", icon: "file-text", group: qsTr("Input") },
         { name: qsTr("Selectable list"), type: "WindowInput", input: "list", icon: "list", group: qsTr("Input") },
+        { name: qsTr("Selectable table"), type: "WindowInput", input: "table", icon: "table", group: qsTr("Input") },
         { name: qsTr("File picker"), type: "WindowInput", input: "file", icon: "folder-open", group: qsTr("Input") },
         { name: qsTr("Folder picker"), type: "WindowInput", input: "folder", icon: "folder", group: qsTr("Input") },
         { name: qsTr("Button"), type: "WindowButton", icon: "square-mouse-pointer", group: qsTr("Actions") },
@@ -58,13 +66,18 @@ AppDialog {
         { key: "label", name: qsTr("Label") }, { key: "title", name: qsTr("Window title") },
         { key: "text", name: qsTr("Text") }, { key: "window", name: qsTr("Window ID") },
         { key: "width", name: qsTr("Width") }, { key: "height", name: qsTr("Height") },
-        { key: "key", name: qsTr("Layout ID") },
+        { key: "key", name: qsTr("Component ID") },
         { key: "columns", name: qsTr("Grid columns") }, { key: "data", name: qsTr("Data") },
-        { key: "options", name: qsTr("List options") }
+        { key: "options", name: qsTr("List options") },
+        { key: "size", name: qsTr("Size") }, { key: "icon", name: qsTr("Icon") }
     ].filter(field => block[field.key] !== undefined
         && (field.key !== "columns" || block.layout === "grid")
-        && (field.key !== "data" || block.display !== "heading")
-        && (field.key !== "options" || block.input === "list")) : []
+        && (field.key !== "data" || (block.display !== "heading" && block.display !== "divider"))
+        && (field.key !== "options" || block.input === "list" || block.input === "table")
+        && (field.key !== "size" || block.type === "WindowLayout" || ["WindowDisplay", "WindowInput", "WindowTextBox", "WindowCheckbox", "WindowChoice", "WindowButton"].includes(block.type))
+        && (field.key !== "icon" || framed(block)
+            || (block.type === "WindowDisplay" && block.display !== "divider" && block.display !== "icon")
+            || ["WindowInput", "WindowButton"].includes(block.type))) : []
 
     function clone(value) { return JSON.parse(JSON.stringify(value)); }
     function openFor(target) {
@@ -89,11 +102,20 @@ AppDialog {
     }
     function at(window, path) { return path.reduce((parent, index) => parent.body[index], window); }
     function isContainer(block) { return block.type === "WindowLayout" && block.layout !== "spacer"; }
+    // Layouts that draw a label header, so icon and frame have somewhere to go.
+    function framed(block) {
+        return !!block && block.type === "WindowLayout"
+            && ["column", "row", "grid", "group"].indexOf(block.layout) >= 0;
+    }
     function partFor(block) {
         return parts.find(item => item.type === block.type && item.layout === block.layout
             && item.display === block.display && item.input === block.input);
     }
     function partName(block) { return partFor(block)?.name ?? block.type; }
+    // A standalone icon display keeps its glyph in `data`, not `icon`.
+    function iconKey(block) {
+        return block?.type === "WindowDisplay" && block.display === "icon" ? "data" : "icon";
+    }
     function componentName(block) {
         return String(displayValue(block.label ?? block.text) || partName(block));
     }
@@ -170,12 +192,14 @@ AppDialog {
         return body.map(previewControl).filter(node => node !== null);
     }
     function previewControl(item) {
-        const node = {id: item.id, label: String(displayValue(item.label ?? item.text)), name: item.name || ""};
+        const node = {id: item.id, label: String(displayValue(item.label ?? item.text)), name: item.name || "",
+            size: displayValue(item.size, ""), icon: displayValue(item.icon, ""), tone: item.tone || "",
+            variant: item.variant || "", style: item.style || ""};
         switch (item.type) {
         case "WindowLayout":
             return Object.assign(node, {kind: item.layout, columns: Number(displayValue(item.columns, 2)), children: previewControls(item.body)});
         case "WindowDisplay": {
-            const samples = {progress: 68, table: '[["Name","Value"],["Sample",42]]', chart: "[3,7,4,8]"};
+            const samples = {progress: 68, table: '[["Name","Value"],["Sample",42]]', chart: "[3,7,4,8]", icon: "star"};
             const value = displayValue(item.data, samples[item.display] ?? "");
             return Object.assign(node, {kind: item.display, value: value === "" ? samples[item.display] ?? "" : value});
         }
@@ -189,9 +213,12 @@ AppDialog {
         }
         case "WindowInput": {
             const value = item.input === "slider" ? 50 : "";
+            const data = displayValue(item.options, "[]");
+            if (item.input === "list" || item.input === "table")
+                return Object.assign(node, {kind: item.input === "table" ? "table-input" : "list", value, data});
             let options = [];
-            try { options = JSON.parse(displayValue(item.options, "[]")); } catch (_) {}
-            return Object.assign(node, {kind: item.input, value, options: Array.isArray(options) ? options.filter(item => typeof item === "string") : []});
+            try { options = JSON.parse(data); } catch (_) {}
+            return Object.assign(node, {kind: item.input, value, options: Array.isArray(options) ? options.filter(entry => typeof entry === "string") : []});
         }
         default: return null;
         }
@@ -262,6 +289,7 @@ AppDialog {
                             Layout.leftMargin: 3
                             Layout.rightMargin: 3
                             form: previewHost
+                            availableHeight: preview.availableHeight
                             nodes: root.draft ? root.previewControls(root.draft.body) : []
                         }
                         QtObject {
@@ -350,6 +378,40 @@ AppDialog {
                         currentIndex: root.block ? root.lists.indexOf(root.block.list) : -1
                         onActivated: index => root.setField("list", model[index])
                     }
+                    FieldLabel { visible: root.block?.type === "WindowButton"; text: qsTr("Look") }
+                    StitchComboBox {
+                        visible: root.block?.type === "WindowButton"
+                        Layout.fillWidth: true
+                        model: [qsTr("auto"), qsTr("primary"), qsTr("quiet"), qsTr("danger")]
+                        currentIndex: ["", "primary", "quiet", "danger"].indexOf(root.block?.variant ?? "")
+                        onActivated: index => root.setField("variant", ["", "primary", "quiet", "danger"][index])
+                    }
+                    FieldLabel { visible: root.block?.type === "WindowDisplay" && ["heading", "subheading", "body", "caption", "icon"].includes(root.block?.display); text: qsTr("Tone") }
+                    StitchComboBox {
+                        visible: root.block?.type === "WindowDisplay" && ["heading", "subheading", "body", "caption", "icon"].includes(root.block?.display)
+                        Layout.fillWidth: true
+                        model: [qsTr("default"), qsTr("muted"), qsTr("accent"), qsTr("success"), qsTr("warning"), qsTr("danger")]
+                        currentIndex: ["", "muted", "accent", "success", "warning", "danger"].indexOf(root.block?.tone ?? "")
+                        onActivated: index => root.setField("tone", ["", "muted", "accent", "success", "warning", "danger"][index])
+                    }
+                    FieldLabel { visible: framed(root.block); text: qsTr("Frame") }
+                    StitchComboBox {
+                        visible: framed(root.block)
+                        Layout.fillWidth: true
+                        model: [qsTr("plain"), qsTr("card"), qsTr("panel")]
+                        currentIndex: ["", "card", "panel"].indexOf(root.block?.style ?? "")
+                        onActivated: index => root.setField("style", ["", "card", "panel"][index])
+                    }
+                    StitchButton {
+                        visible: root.block?.type === "WindowButton" || root.block?.type === "WindowDisplay" || root.block?.type === "WindowInput"
+                        Layout.fillWidth: true
+                        text: qsTr("Pick icon…")
+                        onClicked: {
+                            iconHost.blockIcon = root.displayValue(root.block?.[root.iconKey(root.block)], "");
+                            iconHost.iconSearch = "";
+                            iconPicker.open();
+                        }
+                    }
                     StitchCheckBox {
                         visible: root.block?.type === "WindowButton"
                         text: qsTr("Close window on click")
@@ -362,6 +424,24 @@ AppDialog {
                         text: qsTr("%n action block(s). Edit actions on the block canvas.", "", root.block?.body?.length ?? 0)
                     }
                 }
+            }
+        }
+        Item {
+            id: iconHost
+            visible: false
+            width: 0
+            height: 0
+            property string iconSearch: ""
+            readonly property var allIcons: Object.keys(Stitch.Icons.paths).sort()
+            property string blockIcon: ""
+        }
+        BlockIconPopup {
+            id: iconPicker
+            editor: iconHost
+            onClosed: {
+                const key = root.iconKey(root.block);
+                if (iconHost.blockIcon && iconHost.blockIcon !== root.displayValue(root.block?.[key], ""))
+                    root.setField(key, page.textValue(iconHost.blockIcon));
             }
         }
         FieldLabel { visible: !!root.errorText; text: root.errorText; color: Theme.danger }

@@ -108,6 +108,8 @@ pub enum FieldId {
     FormHeight,
     FormColumns,
     FormData,
+    FormSize,
+    FormIcon,
     FormComponent,
     FormState,
     AtTime,
@@ -375,18 +377,36 @@ pub(crate) fn slots_mut<'a>(
             f(F::FormWidth, width, Any);
             f(F::FormHeight, height, Any);
         }
-        InstructionKind::WindowLayout { label, columns, .. } => {
+        InstructionKind::WindowLayout {
+            label,
+            columns,
+            size,
+            icon,
+            ..
+        } => {
             f(F::WindowLabel, label, Any);
             f(F::FormColumns, columns, Any);
+            f(F::FormSize, size, Any);
+            f(F::FormIcon, icon, Any);
         }
-        InstructionKind::WindowDisplay { label, data, .. }
+        InstructionKind::WindowDisplay {
+            label,
+            data,
+            size,
+            icon,
+            ..
+        }
         | InstructionKind::WindowInput {
             label,
             options: data,
+            size,
+            icon,
             ..
         } => {
             f(F::WindowLabel, label, Any);
             f(F::FormData, data, Any);
+            f(F::FormSize, size, Any);
+            f(F::FormIcon, icon, Any);
         }
         InstructionKind::CloseFormWindow(window) | InstructionKind::WaitForFormWindow(window) => {
             f(F::FormWindowId, window, Any);
@@ -414,11 +434,20 @@ pub(crate) fn slots_mut<'a>(
             f(F::FormComponent, component, Any);
             f(F::FormState, state, Any);
         }
-        InstructionKind::WindowTextBox { label, .. }
-        | InstructionKind::WindowCheckbox { label, .. }
-        | InstructionKind::WindowChoice { label, .. }
-        | InstructionKind::WindowButton { label, .. }
-        | InstructionKind::WindowNote(label) => f(F::WindowLabel, label, Any),
+        InstructionKind::WindowButton {
+            label, size, icon, ..
+        } => {
+            f(F::WindowLabel, label, Any);
+            f(F::FormSize, size, Any);
+            f(F::FormIcon, icon, Any);
+        }
+        InstructionKind::WindowTextBox { label, size, .. }
+        | InstructionKind::WindowCheckbox { label, size, .. }
+        | InstructionKind::WindowChoice { label, size, .. } => {
+            f(F::WindowLabel, label, Any);
+            f(F::FormSize, size, Any);
+        }
+        InstructionKind::WindowNote(label) => f(F::WindowLabel, label, Any),
         InstructionKind::WhenAt(v) => f(F::AtTime, v, Any),
         InstructionKind::WhenWebhook { path, .. } => f(F::WebhookPath, path, Any),
         InstructionKind::BrowserOpen { url, .. } => f(F::BrowserUrl, url, Any),

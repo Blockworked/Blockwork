@@ -117,6 +117,45 @@ Item {
             report("load_only_400_sync", bestSync);
             report("load_all_400", bestAll);
         }
+        function test_nestedForm() {
+            const page = createTemporaryObject(editorComponent, scene);
+            const palette = all(page).find(o => typeof o.prefab === "function" && o.resolvedSections !== undefined);
+            const canvas = all(page).find(o => typeof o.syncStrands === "function");
+            const text = value => ({kind: "Text", value});
+            const reporter = (op, ...args) => ({kind: "Op", op, args});
+            let nextId = 0;
+            function block(type, fields) {
+                return Object.assign({}, palette.prefab(type), fields, {id: "form-" + nextId++});
+            }
+            // The layout owns the button callbacks. A flat strand with the
+            // same number of instructions exercises a different loading path.
+            const tabs = ["Overview", "Folders", "Files", "Cleanup"].map(label => {
+                const buttons = Array.from({length: 6}, (_, i) => block("WindowButton", {
+                    label: text("Action " + (i + 1)),
+                    body: Array.from({length: 8}, () => block("SetVariable", {
+                        name: "v", value: reporter("Join", text("Result "), reporter("Length", text(label)))
+                    }))
+                }));
+                return block("WindowLayout", {layout: "group", label: text(label), body: buttons});
+            });
+            const form = block("OpenFormWindow", {
+                body: [block("WindowLayout", {layout: "tabs", body: tabs})]
+            });
+            const document = scene.macro([{id: "form", x: 25, y: 40, instructions: [form]}]);
+            wait(300);
+            tryVerify(() => !all(page).some(o => o.pendingEntries > 0), 20000);
+            for (let i = 0; i < 3; ++i) {
+                page.appState = scene.state(scene.macro([]));
+                wait(250);
+                const start = Date.now();
+                page.appState = scene.state(document);
+                report("nested_form_sync", Date.now() - start);
+                frame();
+                report("nested_form_first_turn", Date.now() - start);
+                tryVerify(() => canvas.pendingBuilds() === 0, 30000);
+                report("nested_form_all", Date.now() - start);
+            }
+        }
         // One very long strand: load, edits that shift every block below,
         // dragging its head (the whole strand) and its tail, and scrolling.
         function test_long() {

@@ -14,6 +14,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Custom blocks can have dropdown choices and buttons opening their own settings screens, including inputs shown only on those screens.
 - Built-in block menus and pickers use the same shared UI framework.
 - Macro form windows support nested layouts, scrolling, live variable bindings, tables, and named window controls.
+- Window parts take size hints (fill, fixed pixels, percentages, weights), fill the spare height, and can sit in split panes. Displays come in heading, subheading, body, caption, divider and icon styles with tone colors and icons. Buttons have variants (default, primary, quiet, danger) and icons, lists accept subtitles and icons, and tables can be sorted and selected.
 - Saved macro format 7 includes form windows and custom block menus. Macros from earlier versions still load.
 - When system starts header: runs once per login when Start at system startup is on ([docs](docs/system-startup.md)).
 - Touch gesture and touch paths blocks, with a multi-finger path editor; Linux (experimental) and Windows ([docs](docs/touch.md)).

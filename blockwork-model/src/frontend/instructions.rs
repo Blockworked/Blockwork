@@ -11,7 +11,7 @@ use crate::input::gamepad::{GamepadAxis, GamepadButton, GamepadStick};
 use crate::input::index_to_mouse_button;
 use crate::input::touch::TouchGestureKind;
 use crate::input::ui::{UiAction, UiProperty};
-use crate::macros::StopScope;
+use crate::macros::{StopScope, empty_text};
 
 /// One field's wire form: the same value for most types, the DTO list for a
 /// nested body.
@@ -232,17 +232,17 @@ wire_blocks! {
         ShowMenu { list: String, name: String },
         ShowWindow { title: Value, body: Vec<InstructionDto> },
         OpenFormWindow { window: Value, title: Value, width: Value, height: Value, body: Vec<InstructionDto> },
-        WindowLayout { layout: String, label: Value, key: String, columns: Value, body: Vec<InstructionDto> },
-        WindowDisplay { display: String, label: Value, data: Value },
-        WindowInput { input: String, label: Value, name: String, options: Value },
+        WindowLayout { layout: String, label: Value, key: String, columns: Value, body: Vec<InstructionDto>, #[serde(default = "empty_text")] size: Value, #[serde(default = "empty_text")] icon: Value, #[serde(default)] style: String },
+        WindowDisplay { display: String, label: Value, data: Value, #[serde(default)] key: String, #[serde(default = "empty_text")] size: Value, #[serde(default)] tone: String, #[serde(default = "empty_text")] icon: Value },
+        WindowInput { input: String, label: Value, name: String, options: Value, #[serde(default)] key: String, #[serde(default = "empty_text")] size: Value, #[serde(default = "empty_text")] icon: Value },
         WindowOnChange { name: String, body: Vec<InstructionDto> },
         SetFormWindowTitle { window: Value, title: Value },
         ResizeFormWindow { window: Value, width: Value, height: Value },
         SetFormComponent { window: Value, component: Value, property: String, state: Value },
-        WindowTextBox { label: Value, name: String },
-        WindowCheckbox { label: Value, name: String },
-        WindowChoice { label: Value, list: String, name: String },
-        WindowButton { label: Value, close: bool, body: Vec<InstructionDto> },
+        WindowTextBox { label: Value, name: String, #[serde(default)] key: String, #[serde(default = "empty_text")] size: Value },
+        WindowCheckbox { label: Value, name: String, #[serde(default)] key: String, #[serde(default = "empty_text")] size: Value },
+        WindowChoice { label: Value, list: String, name: String, #[serde(default)] key: String, #[serde(default = "empty_text")] size: Value },
+        WindowButton { label: Value, close: bool, body: Vec<InstructionDto>, #[serde(default)] key: String, #[serde(default = "empty_text")] size: Value, #[serde(default = "empty_text")] icon: Value, #[serde(default)] variant: String },
         ReadKeys { name: String, end_keys: Value, #[serde(default, skip_serializing_if = "Option::is_none")] count: Option<Value>, #[serde(default, skip_serializing_if = "Option::is_none")] timeout: Option<Value> },
         BrowserScript { code: Value, variable: String },
     }

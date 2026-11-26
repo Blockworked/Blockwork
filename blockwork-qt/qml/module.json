@@ -2,11 +2,12 @@
   "uri": "com.blockworked.Blockwork",
   "version": "1.0",
   "qt_modules": ["Qml", "Quick", "QuickControls2", "QuickDialogs2"],
-  "singletons": ["Schedules.qml"],
+  "singletons": ["Schedules.qml", "WindowSizing.qml"],
   "editor": [
     "EditorPage.qml",
     "WindowDesigner.qml",
     "WindowDesignerOutline.qml",
+    "WindowSizing.qml",
     "MacroFormLayout.qml",
     "MacroFormControl.qml",
     "MacroFormTable.qml",

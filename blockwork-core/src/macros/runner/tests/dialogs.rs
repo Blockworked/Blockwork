@@ -128,6 +128,10 @@ fn window_saves_its_values_and_buttons_run_their_blocks() {
             label: Value::text(label),
             close,
             body: vec![set(var, Value::Var { name: "who".into() })],
+            key: String::new(),
+            size: Value::text(""),
+            icon: Value::text(""),
+            variant: String::new(),
         })
     };
     let mac = Macro::new(
@@ -142,10 +146,14 @@ fn window_saves_its_values_and_buttons_run_their_blocks() {
                     Instruction::new(InstructionKind::WindowTextBox {
                         label: Value::text("Name"),
                         name: "who".into(),
+                        key: String::new(),
+                        size: Value::text(""),
                     }),
                     Instruction::new(InstructionKind::WindowCheckbox {
                         label: Value::text("Loud"),
                         name: "loud".into(),
+                        key: String::new(),
+                        size: Value::text(""),
                     }),
                     button("Apply", false, "applied"),
                     button("Done", true, "done"),
@@ -186,6 +194,10 @@ fn a_window_with_a_normal_block_inside_fails_and_parts_outside_do_nothing() {
                         label: Value::text("Done"),
                         close: true,
                         body: vec![set("done", Value::number(1.0))],
+                        key: String::new(),
+                        size: Value::text(""),
+                        icon: Value::text(""),
+                        variant: String::new(),
                     }),
                 ],
             }),
@@ -229,14 +241,23 @@ fn named_window_applies_lifecycle_and_binding_updates_while_running() {
                             window_part(InstructionKind::WindowTextBox {
                                 label: Value::text("Input"),
                                 name: "input".into(),
+                                key: String::new(),
+                                size: Value::text(""),
                             }),
                             window_part(InstructionKind::WindowNote(var.clone())),
                         ],
+                        size: Value::text(""),
+                        icon: Value::text(""),
+                        style: String::new(),
                     }),
                     window_part(InstructionKind::WindowButton {
                         label: Value::text("Verified"),
                         close: false,
                         body: vec![set("verified", Value::number(1.0))],
+                        key: String::new(),
+                        size: Value::text(""),
+                        icon: Value::text(""),
+                        variant: String::new(),
                     }),
                     window_part(InstructionKind::WindowOnChange {
                         name: "input".into(),

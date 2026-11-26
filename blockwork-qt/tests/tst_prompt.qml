@@ -208,6 +208,54 @@ Item {
             mouseClick(control("promptButton_cancel"));
             reply("cancel", "");
         }
+        function test_fill_height_opens_a_tall_enough_window() {
+            configure("window", {live: true, controls: [
+                {kind: "text", id: "a", label: "A", name: "a", value: "", size: "h:fill"},
+                {kind: "button", id: "done", label: "Done", close: true}]});
+            verify(dialog.height >= 360);
+        }
+        function test_display_kinds_set_their_own_type_size() {
+            configure("window", {live: true, controls: [
+                {kind: "heading", id: "h", label: "Title"},
+                {kind: "subheading", id: "s", label: "Sub"},
+                {kind: "body", id: "b", label: "Body"},
+                {kind: "caption", id: "c", label: "Cap"},
+                {kind: "button", id: "done", label: "Done", close: true}]});
+            compare(control("promptFormLabel_0").font.pixelSize, 22);
+            compare(control("promptFormLabel_1").font.pixelSize, 16);
+            compare(control("promptFormLabel_2").font.pixelSize, 14);
+            compare(control("promptFormLabel_3").font.pixelSize, 12);
+        }
+        function test_button_variants_override_the_close_look() {
+            configure("window", {live: true, controls: [
+                {kind: "button", id: "p", label: "Primary", variant: "primary", icon: "check"},
+                {kind: "button", id: "d", label: "Danger", variant: "danger"},
+                {kind: "button", id: "q", label: "Quiet", variant: "quiet"},
+                {kind: "button", id: "done", label: "Done", close: true}]});
+            const primary = control("promptFormButton_Primary");
+            compare(primary.primary, true);
+            compare(primary.iconName, "check");
+            compare(control("promptFormButton_Danger").danger, true);
+            compare(control("promptFormButton_Quiet").flat, true);
+            compare(control("promptFormButton_Done").primary, true);
+        }
+        function test_selectable_table_sorts_and_writes_the_row() {
+            configure("window", {live: true, controls: [
+                {kind: "table-input", id: "rows", label: "Rows", name: "picked", value: "",
+                 data: '[["Name","Size"],["B","2"],["A","1"]]'},
+                {kind: "button", id: "done", label: "Done", close: true}]});
+            const table = control("promptFormTable_0");
+            compare(table.header.length, 2);
+            compare(table.body.length, 2);
+            table.sortBy(0);
+            compare(table.body[0][0], "A");
+            table.sortBy(0);
+            compare(table.body[0][0], "B");
+            table.selected(["A", "1"]);
+            tryCompare(sent, "count", 1);
+            compare(sent.signalArguments[0][0], "change");
+            compare(JSON.parse(sent.signalArguments[0][2]).picked, '{"Name":"A","Size":"1"}');
+        }
     }
 }
 }

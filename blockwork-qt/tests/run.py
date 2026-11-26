@@ -23,7 +23,7 @@ pinned = re.search(r'^blockstitch-core *=[^}]*?rev *= *"([^"]+)"', (root / "Carg
 local = (root / ".cargo/config.toml").is_file() or os.environ.get("BLOCKWORK_ANY_BLOCKSTITCH") == "1"
 if pinned and not local:
     head = subprocess.run(["git", "-C", str(blockstitch), "rev-parse", "HEAD"], capture_output=True, text=True).stdout.strip()
-    if head != pinned.group(1):
+    if not head.startswith(pinned.group(1)):
         sys.exit(f"{blockstitch} is at {head or 'no commit'}, Cargo.toml pins {pinned.group(1)}.\n"
                  f"Run scripts/fetch-blockstitch.sh {blockstitch}, or set BLOCKWORK_ANY_BLOCKSTITCH=1.")
 if not (root / "blockwork-qt/qml/Lucide").is_dir():
