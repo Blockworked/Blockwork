@@ -99,6 +99,7 @@ struct ExecCtx<'a> {
     signal_threads: Vec<std::thread::JoinHandle<()>>,
     /// Virtual time this strand has waited through in host-clock mode.
     host_time_ms: f64,
+    scheduled_waits: bool,
     /// Set when the backend can't send input; input blocks are skipped and
     /// the first one reports why.
     input_unavailable: Option<String>,
@@ -244,7 +245,7 @@ fn call_block(
         .collect();
     let saved_env = std::mem::replace(&mut ctx.param_env, new_env);
     let saved_branches = std::mem::replace(&mut ctx.branch_env, new_branches);
-    let result = run_block(&runtime.body, ctx, depth, Instant::now());
+    let result = run_block(&runtime.body, ctx, depth);
     ctx.param_env = saved_env;
     ctx.branch_env = saved_branches;
     // A stray Break/Continue reaching a custom block's own top level (no
@@ -450,6 +451,7 @@ struct Spawner {
     dicts: DictStore,
     block_table: BlockTable,
     max_loop_iterations: u32,
+    scheduled_waits: bool,
 }
 
 impl Spawner {
@@ -464,6 +466,7 @@ impl Spawner {
             dicts: Arc::clone(&ctx.dicts),
             block_table: Arc::clone(&ctx.block_table),
             max_loop_iterations: u32::try_from(ctx.max_loop_iterations).unwrap_or(u32::MAX),
+            scheduled_waits: ctx.scheduled_waits,
         }
     }
 
@@ -479,11 +482,12 @@ impl Spawner {
             dicts: Arc::clone(&self.dicts),
             block_table: Arc::clone(&self.block_table),
             max_loop_iterations: self.max_loop_iterations,
+            wait_offset: self.scheduled_waits.then_some(Duration::ZERO),
         };
         std::thread::Builder::new()
             .name(name)
             .stack_size(STRAND_STACK_SIZE)
-            .spawn(move || run_strand(run, body, Duration::ZERO))
+            .spawn(move || run_strand(run, body))
             .inspect_err(|e| warn!("Failed to start a strand: {e}"))
             .ok()
     }
@@ -573,6 +577,8 @@ pub struct RunOptions {
     /// Pretends the run started this long ago, so a run that starts late
     /// (a synced start) keeps its waits on the intended schedule.
     pub offset: Duration,
+    /// Keeps waits on a cumulative wall-clock schedule even with zero offset.
+    pub scheduled_waits: bool,
 }
 
 impl RunOptions {
@@ -586,6 +592,7 @@ impl RunOptions {
             lists: None,
             dicts: None,
             offset: Duration::ZERO,
+            scheduled_waits: false,
         }
     }
 }
@@ -802,6 +809,7 @@ fn run_entries(mac: Macro, pick: impl Fn(&Strand) -> bool, options: RunOptions) 
         lists,
         dicts,
         offset: initial_offset,
+        scheduled_waits,
     } = options;
     let stop = StrandStop::new(stop_flag, &mac.id);
     let run = StrandRun {
@@ -814,6 +822,7 @@ fn run_entries(mac: Macro, pick: impl Fn(&Strand) -> bool, options: RunOptions) 
         dicts: dicts.unwrap_or_else(|| mac.dict_store()),
         block_table: mac.block_table(),
         max_loop_iterations: mac.settings.max_loop_iterations,
+        wait_offset: (scheduled_waits || !initial_offset.is_zero()).then_some(initial_offset),
     };
     let entry_strands: Vec<(Vec<Instruction>, StrandStop)> = mac
         .graph
@@ -837,7 +846,7 @@ fn run_entries(mac: Macro, pick: impl Fn(&Strand) -> bool, options: RunOptions) 
             run.stop_flag = Some(stop);
             let spawned = std::thread::Builder::new()
                 .stack_size(STRAND_STACK_SIZE)
-                .spawn_scoped(scope, move || run_strand(run, instructions, initial_offset));
+                .spawn_scoped(scope, move || run_strand(run, instructions));
             if let Err(e) = spawned {
                 warn!("Failed to start a strand thread: {e}");
             }
@@ -868,13 +877,14 @@ pub(super) struct StrandRun {
     pub(super) dicts: DictStore,
     pub(super) block_table: BlockTable,
     pub(super) max_loop_iterations: u32,
+    wait_offset: Option<Duration>,
 }
 
 /// Per-thread entry point for one strand: runs it via `run_block`, then
 /// releases any keys/buttons still held, whether the strand finished,
 /// stopped, or errored. A `Return` reaching strand level has nowhere to hand
 /// its value, so it is dropped.
-pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>, initial_offset: Duration) {
+pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>) {
     let StrandRun {
         source,
         emulator,
@@ -885,18 +895,18 @@ pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>, initial
         dicts,
         block_table,
         max_loop_iterations,
+        wait_offset,
     } = run;
     let _detach = host_clock::enabled().then(|| Defer(Some(host_clock::detach)));
     // Each strand starts out in screen coordinates (see `UseCoordinates`).
     crate::screen::set_origin(None);
     raise_current_thread_priority();
-    // Priority-raise happens first (its latency shouldn't eat into the
-    // offset), then anchor "now" for this strand's Wait chain, backdated by
-    // initial_offset. `checked_sub` guards the (only theoretically
-    // reachable) case of an offset larger than the process's own uptime.
-    let start = Instant::now()
-        .checked_sub(initial_offset)
-        .unwrap_or_else(Instant::now);
+    // Anchor synced playback after raising priority so that setup time
+    // does not consume the offset.
+    let wait_schedule = wait_offset.map(|offset| {
+        let now = Instant::now();
+        now.checked_sub(offset).unwrap_or(now)
+    });
     let mut pressed_keys: Vec<MacroKey> = Vec::new();
     let mut pressed_buttons: Vec<MacroButton> = Vec::new();
     let permission_stop = stop_flag.clone();
@@ -925,11 +935,12 @@ pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>, initial
             max_loop_iterations: max_loop_iterations.into(),
             signal_threads: Vec::new(),
             host_time_ms: 0.0,
+            scheduled_waits: wait_schedule.is_some(),
             input_unavailable: emulator.lock().ok().and_then(|em| em.unavailable_reason()),
             input_unavailable_reported: false,
         };
         // An error reaching the top ends this strand.
-        if let Err(e) = run_block(&instructions, &mut ctx, 0, start) {
+        if let Err(e) = run_block_on_schedule(&instructions, &mut ctx, 0, wait_schedule) {
             warn!("Strand ended with an error: {e}");
             crate::run_log::block_error(&source, &ctx.error_block, e);
         }
@@ -1008,26 +1019,32 @@ pub fn run_fired_strand(
         dicts,
         block_table,
         max_loop_iterations,
+        wait_offset: None,
     };
-    run_strand(run, instructions, Duration::ZERO);
+    run_strand(run, instructions);
+}
+
+fn run_block(instructions: &[Instruction], ctx: &mut ExecCtx, depth: u32) -> Result<Flow, String> {
+    run_block_on_schedule(
+        instructions,
+        ctx,
+        depth,
+        ctx.scheduled_waits.then(Instant::now),
+    )
 }
 
 /// Runs `instructions` in order, sending each block to its category's file.
 /// Returns early on a return or loop-control block; `Err` is a hard failure
 /// (too deep, or a bad return value). The stop flag is checked between blocks.
-fn run_block(
+fn run_block_on_schedule(
     instructions: &[Instruction],
     ctx: &mut ExecCtx,
     depth: u32,
-    start: Instant,
+    mut wait_schedule: Option<Instant>,
 ) -> Result<Flow, String> {
     if depth > MAX_CALL_DEPTH {
         return Err("custom block call depth exceeded (possible infinite recursion)".to_string());
     }
-
-    // Each block list keeps its own wait schedule. Only a strand's top
-    // level starts backdated (`RunOptions::offset`).
-    let mut deadline = start;
 
     for ins in instructions {
         if let Some(flag) = &ctx.stop_flag
@@ -1051,8 +1068,9 @@ fn run_block(
                 &ctx.param_env,
             );
             if !paused.is_zero() {
-                // Waits after the pause keep their spacing instead of catching up.
-                deadline += paused;
+                if let Some(deadline) = &mut wait_schedule {
+                    *deadline += paused;
+                }
                 if stopped() {
                     break;
                 }
@@ -1087,7 +1105,8 @@ fn run_block(
                 }
             }
             Role::System => system::run_system_block(ins, ctx, depth)?,
-            Role::Control => match control::run_control_block(ins, ctx, depth, &mut deadline)? {
+            Role::Control => match control::run_control_block(ins, ctx, depth, &mut wait_schedule)?
+            {
                 control::Next::Go => {}
                 control::Next::Stop => break,
                 control::Next::Exit(flow) => return Ok(flow),

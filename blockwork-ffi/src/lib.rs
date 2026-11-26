@@ -275,6 +275,7 @@ pub unsafe extern "C" fn blockwork_run_macro(
                     stop_flag: Some(Arc::clone(&flag)),
                     speed_multiplier,
                     offset: initial_offset,
+                    scheduled_waits: true,
                     ..RunOptions::new(emulator, variables)
                 });
                 run_registry::end_run(&flag);

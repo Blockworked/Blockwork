@@ -72,6 +72,33 @@ impl Image {
         }
     }
 
+    /// Resample the template at a different display scale.
+    pub(super) fn resize(&self, width: u32, height: u32) -> Image {
+        let xs = sample_axis(self.width, width);
+        let ys = sample_axis(self.height, height);
+        let mut image = Image::new(width, height);
+        for (row, &(y0, y1, wy)) in ys.iter().enumerate() {
+            for (col, &(x0, x1, wx)) in xs.iter().enumerate() {
+                let source = |x, y| (y * self.width as usize + x) * 4;
+                let [a, b, c, d] = [
+                    source(x0, y0),
+                    source(x1, y0),
+                    source(x0, y1),
+                    source(x1, y1),
+                ];
+                let dest = (row * width as usize + col) * 4;
+                for channel in 0..4 {
+                    let top = self.rgba[a + channel] as f64 * (1.0 - wx)
+                        + self.rgba[b + channel] as f64 * wx;
+                    let bottom = self.rgba[c + channel] as f64 * (1.0 - wx)
+                        + self.rgba[d + channel] as f64 * wx;
+                    image.rgba[dest + channel] = (top * (1.0 - wy) + bottom * wy).round() as u8;
+                }
+            }
+        }
+        image
+    }
+
     /// Shrinks so the larger side is at most `max_side`, preserving aspect
     /// ratio. Box-average sampled; receivers map delivered pixels back with
     /// the returned width/height.
@@ -192,6 +219,17 @@ impl Image {
         let bytes = crate::files::read_bytes(source)?;
         Image::from_png(&bytes)
     }
+}
+
+fn sample_axis(source: u32, target: u32) -> Vec<(usize, usize, f64)> {
+    let ratio = source as f64 / target as f64;
+    (0..target)
+        .map(|i| {
+            let at = ((i as f64 + 0.5) * ratio - 0.5).clamp(0.0, f64::from(source - 1));
+            let low = at as usize;
+            (low, (low + 1).min(source as usize - 1), at.fract())
+        })
+        .collect()
 }
 
 /// [`Image::load`], remembering recent images so a block in a loop doesn't

@@ -173,6 +173,7 @@ Item {
     // Native adapters for the shared block UI. Custom settings forms use the
     // same argument values and undo commands as these built-in screens.
     readonly property var blockScreens: ({
+        designWindow: request => { if (!request.palette && !root.recordingBusy) windowDesigner.openFor(request); },
         pickController: request => controllerPicker.openFor(request),
         pickNativeUi: request => screenPicker.startElementPick(request),
         touchPaths: request => touchPathsDialog.openFor(request),
@@ -779,6 +780,7 @@ Item {
     ControllerPickerDialog { id: controllerPicker; page: root }
     NativeUiPickerDialog { id: nativeUiPicker; page: root; onPickOnScreen: request => screenPicker.startElementPick(request) }
     TouchPathsDialog { id: touchPathsDialog; page: root }
+    WindowDesigner { id: windowDesigner; page: root }
     DetectionModelDialog { id: modelDialog; page: root; onFailed: message => pickError.show(message) }
     NamePicker {
         id: signalPicker

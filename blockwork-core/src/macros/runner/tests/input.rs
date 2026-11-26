@@ -194,9 +194,9 @@ fn combo_letters_dont_add_shift() {
 }
 
 #[test]
-fn typed_text_with_a_speed_sends_one_character_at_a_time() {
+fn waits_after_paced_typing_follow_the_playback_mode() {
     #[derive(Default)]
-    struct Typed(Arc<Mutex<Vec<String>>>);
+    struct Typed(Arc<Mutex<Vec<(String, Instant)>>>);
     impl InputBackend for Typed {
         fn key(&mut self, _: MacroKey, _: Direction) -> Result<(), String> {
             Ok(())
@@ -217,7 +217,10 @@ fn typed_text_with_a_speed_sends_one_character_at_a_time() {
             Ok(())
         }
         fn text(&mut self, text: &str) -> Result<(), String> {
-            self.0.lock().unwrap().push(text.to_string());
+            self.0
+                .lock()
+                .unwrap()
+                .push((text.to_string(), Instant::now()));
             Ok(())
         }
         fn cursor_pos(&self) -> Option<(i32, i32)> {
@@ -225,26 +228,43 @@ fn typed_text_with_a_speed_sends_one_character_at_a_time() {
         }
     }
     use crate::input::types::{TextSpeed, TextSpeedMode, TextToken};
-    let typed = Typed::default();
-    let seen = Arc::clone(&typed.0);
     let text = |speed: Option<TextSpeed>| {
         Instruction::new(InstructionKind::Token(InputToken::Text(TextToken {
             text: Value::text("hi"),
             speed,
         })))
     };
-    run_instructions(
-        vec![
+    let play = |scheduled_waits| {
+        let typed = Typed::default();
+        let seen = Arc::clone(&typed.0);
+        let body = vec![
             text(Some(TextSpeed {
                 mode: TextSpeedMode::PerCharacter,
-                value: Value::number(0.0),
+                value: Value::number(175.0),
             })),
+            Instruction::new(InstructionKind::Wait(Value::number(150.0))),
             text(None),
-        ],
-        Arc::new(Mutex::new(typed)),
-        None,
-        1.0,
-        empty_vars(),
-    );
-    assert_eq!(*seen.lock().unwrap(), ["h", "i", "hi"]);
+            Instruction::new(InstructionKind::Wait(Value::number(150.0))),
+            text(None),
+        ];
+        let mac = macro_with_double_block(vec![Instruction::new(InstructionKind::If {
+            condition: true_cond(),
+            body,
+        })]);
+        mac.run_with(RunOptions {
+            scheduled_waits,
+            ..RunOptions::new(Arc::new(Mutex::new(typed)), empty_vars())
+        });
+        let seen = seen.lock().unwrap();
+        assert_eq!(
+            seen.iter().map(|(s, _)| s.as_str()).collect::<Vec<_>>(),
+            ["h", "i", "hi", "hi"]
+        );
+        [seen[2].1 - seen[1].1, seen[3].1 - seen[2].1]
+    };
+    let [first, second] = play(false);
+    assert!(first >= Duration::from_millis(315), "{first:?}");
+    assert!(second >= Duration::from_millis(145), "{second:?}");
+    let [_, second] = play(true);
+    assert!(second < Duration::from_millis(125), "{second:?}");
 }

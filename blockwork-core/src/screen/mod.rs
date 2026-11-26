@@ -271,6 +271,40 @@ pub fn find_image_all(
         .collect())
 }
 
+/// Best image block match, including common changes in display scale.
+pub(crate) fn find_scaled_image_in(
+    needle: &Image,
+    tolerance: f64,
+    region: Option<Rect>,
+) -> Result<Option<(f64, f64)>, String> {
+    let shot = search_area(region)?;
+    Ok(find::find_scaled(&shot.image, needle, tolerance).map(|m| {
+        let (x, y) = m.center();
+        shot.to_screen(x, y)
+    }))
+}
+
+/// All image block matches at the original or a different display scale.
+pub(crate) fn find_scaled_image_all(
+    needle: &Image,
+    tolerance: f64,
+    region: Option<Rect>,
+) -> Result<Vec<ScreenMatch>, String> {
+    let shot = search_area(region)?;
+    Ok(find::find_all_scaled(&shot.image, needle, tolerance)
+        .into_iter()
+        .map(|m| {
+            let (px, py) = m.center();
+            let (x, y) = shot.to_screen(px, py);
+            ScreenMatch {
+                x,
+                y,
+                diff: m.hit.diff,
+            }
+        })
+        .collect())
+}
+
 /// The screen point of the first pixel within `tolerance` percent of
 /// `color` (see [`color_distance`]), on screen or in `region` of it, reading
 /// rows top to bottom.

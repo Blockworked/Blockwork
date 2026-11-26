@@ -367,6 +367,7 @@ fn run_macro_blocking(
         stop_flag: Some(Arc::clone(&flag)),
         speed_multiplier,
         offset,
+        scheduled_waits: true,
         ..RunOptions::new(emulator, variables)
     });
     run_registry::end_run(&flag);

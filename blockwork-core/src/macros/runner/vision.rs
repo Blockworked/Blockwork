@@ -24,7 +24,7 @@ pub(super) fn find_picked_image(
     let needle = crate::screen::image::load_cached(search.image)?;
     let region = screen_region(search.region.unwrap_or(""))?;
     if search.pick.is_none() && !count {
-        let at = crate::screen::find_image_in(&needle, tolerance, region)?;
+        let at = crate::screen::find_scaled_image_in(&needle, tolerance, region)?;
         return Ok((at, at.map_or(0, |_| 1)));
     }
     let target = match search.pick {
@@ -44,7 +44,7 @@ pub(super) fn find_picked_image(
             }
         },
     };
-    let matches = crate::screen::find_image_all(&needle, tolerance, region)?;
+    let matches = crate::screen::find_scaled_image_all(&needle, tolerance, region)?;
     let picked = pick_match(&matches, target)?;
     Ok((picked.map(|m| (m.x, m.y)), matches.len()))
 }
@@ -551,7 +551,7 @@ pub(super) fn run_screen_block(
             };
             let started = Instant::now();
             loop {
-                match crate::screen::find_image_in(&needle, tolerance, region) {
+                match crate::screen::find_scaled_image_in(&needle, tolerance, region) {
                     Ok(at) if at.is_some() == *appear => break,
                     Ok(_) => {}
                     Err(e) => {

@@ -21,15 +21,16 @@ pub(super) enum Next {
 }
 
 /// Runs one flow block, recursing into `run_block` for its bodies.
-/// `deadline` is the strand's wait schedule (see `run_wait`).
 pub(super) fn run_control_block(
     ins: &Instruction,
     ctx: &mut ExecCtx,
     depth: u32,
-    deadline: &mut Instant,
+    wait_schedule: &mut Option<Instant>,
 ) -> Result<Next, String> {
     match &ins.kind {
-        InstructionKind::Wait(duration) => return run_wait(ins, duration, ctx, depth, deadline),
+        InstructionKind::Wait(duration) => {
+            return run_wait(ins, duration, ctx, depth, wait_schedule);
+        }
         InstructionKind::WithLock { name, body } => {
             let name = match ctx.resolve(name, depth).and_then(|v| v.eval_text()) {
                 Ok(name) => name,
@@ -46,14 +47,14 @@ pub(super) fn run_control_block(
             else {
                 return Ok(Next::Stop);
             };
-            let flow = run_block(body, ctx, depth, Instant::now())?;
+            let flow = run_block(body, ctx, depth)?;
             if flow != Flow::Normal {
                 return Ok(Next::Exit(flow));
             }
         }
         InstructionKind::WithInputBlocked { body } => {
             let _blocked = crate::recording::key_rules::block_all_input();
-            let flow = run_block(body, ctx, depth, Instant::now())?;
+            let flow = run_block(body, ctx, depth)?;
             if flow != Flow::Normal {
                 return Ok(Next::Exit(flow));
             }
@@ -87,7 +88,7 @@ pub(super) fn run_control_block(
         }
         InstructionKind::TryCatch { body, catch_body } => {
             ctx.try_depth += 1;
-            let result = run_block(body, ctx, depth, Instant::now());
+            let result = run_block(body, ctx, depth);
             ctx.try_depth -= 1;
             match result {
                 Ok(Flow::Normal) => {}
@@ -96,7 +97,7 @@ pub(super) fn run_control_block(
                     crate::run_log::info(&ctx.source, format!("Handled error: {message}"));
                     ctx.error_block.clear();
                     LAST_ERROR.with(|e| *e.borrow_mut() = message);
-                    let flow = run_block(catch_body, ctx, depth, Instant::now())?;
+                    let flow = run_block(catch_body, ctx, depth)?;
                     if flow != Flow::Normal {
                         return Ok(Next::Exit(flow));
                     }
@@ -115,7 +116,7 @@ pub(super) fn run_control_block(
             };
             for attempt in 1..=attempts {
                 ctx.try_depth += 1;
-                let result = run_block(body, ctx, depth, Instant::now());
+                let result = run_block(body, ctx, depth);
                 ctx.try_depth -= 1;
                 let message = match result {
                     Ok(Flow::Normal) => break,
@@ -405,7 +406,7 @@ pub(super) fn run_control_block(
         }
         InstructionKind::RunBranch(name) => {
             if let Some(body) = ctx.branch_env.get(name).cloned() {
-                let flow = run_block(&body, ctx, depth, Instant::now())?;
+                let flow = run_block(&body, ctx, depth)?;
                 if flow != Flow::Normal {
                     return Ok(Next::Exit(flow));
                 }
@@ -415,7 +416,7 @@ pub(super) fn run_control_block(
             match ctx.resolve(condition, depth).and_then(|v| v.eval()) {
                 Ok(cond) => {
                     if cond.as_bool() {
-                        let flow = run_block(body, ctx, depth, Instant::now())?;
+                        let flow = run_block(body, ctx, depth)?;
                         if flow != Flow::Normal {
                             return Ok(Next::Exit(flow));
                         }
@@ -431,7 +432,7 @@ pub(super) fn run_control_block(
         } => match ctx.resolve(condition, depth).and_then(|v| v.eval()) {
             Ok(cond) => {
                 let branch = if cond.as_bool() { then_body } else { else_body };
-                let flow = run_block(branch, ctx, depth, Instant::now())?;
+                let flow = run_block(branch, ctx, depth)?;
                 if flow != Flow::Normal {
                     return Ok(Next::Exit(flow));
                 }
@@ -457,7 +458,7 @@ pub(super) fn run_control_block(
                 if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
                     break;
                 }
-                match run_block(body, ctx, depth, Instant::now())? {
+                match run_block(body, ctx, depth)? {
                     Flow::Normal | Flow::Continue => {}
                     Flow::Break => break,
                     flow @ Flow::Return(_) => return Ok(Next::Exit(flow)),
@@ -475,7 +476,7 @@ pub(super) fn run_control_block(
                 if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
                     break;
                 }
-                match run_block(body, ctx, depth, Instant::now())? {
+                match run_block(body, ctx, depth)? {
                     Flow::Normal | Flow::Continue => {}
                     Flow::Break => break,
                     flow @ Flow::Return(_) => return Ok(Next::Exit(flow)),
@@ -504,7 +505,7 @@ pub(super) fn run_control_block(
                 if loop_limit_hit(ctx, &ins.id, &mut iterations)? {
                     break;
                 }
-                match run_block(body, ctx, depth, Instant::now())? {
+                match run_block(body, ctx, depth)? {
                     Flow::Normal | Flow::Continue => {}
                     Flow::Break => break,
                     flow @ Flow::Return(_) => return Ok(Next::Exit(flow)),
@@ -616,7 +617,7 @@ fn run_each(
         {
             vars.insert(variable.to_string(), value);
         }
-        match run_block(body, ctx, depth, Instant::now())? {
+        match run_block(body, ctx, depth)? {
             Flow::Normal | Flow::Continue => {}
             Flow::Break => break,
             flow @ Flow::Return(_) => return Ok(Next::Exit(flow)),
@@ -625,15 +626,13 @@ fn run_each(
     Ok(Next::Go)
 }
 
-/// Runs a `Wait`. `deadline` is the strand's running schedule: each wait adds
-/// to it, so a chain of waits keeps its spacing however long the blocks
-/// between them took.
+/// Runs a `Wait`. A synced strand adds waits to its backdated schedule.
 fn run_wait(
     ins: &Instruction,
     duration: &Value,
     ctx: &mut ExecCtx,
     depth: u32,
-    deadline: &mut Instant,
+    wait_schedule: &mut Option<Instant>,
 ) -> Result<Next, String> {
     let duration = match ctx.resolve(duration, depth).and_then(|v| v.eval_number()) {
         Ok(v) => v,
@@ -654,7 +653,13 @@ fn run_wait(
         }
         return Ok(Next::Go);
     }
-    *deadline += Duration::from_secs_f64(actual / 1000.0);
+    let duration = Duration::from_secs_f64(actual / 1000.0);
+    let deadline = if let Some(scheduled) = wait_schedule {
+        *scheduled += duration;
+        *scheduled
+    } else {
+        Instant::now() + duration
+    };
 
     if let Some(flag) = &ctx.stop_flag {
         loop {
@@ -662,23 +667,25 @@ fn run_wait(
                 return Ok(Next::Stop);
             }
             let now = Instant::now();
-            if now >= *deadline {
+            if now >= deadline {
                 break;
             }
-            let remaining = *deadline - now;
+            let remaining = deadline - now;
             if remaining > STOP_POLL_INTERVAL {
                 spin_sleeper().sleep(STOP_POLL_INTERVAL);
             } else {
-                spin_sleeper().sleep_until(*deadline);
+                spin_sleeper().sleep_until(deadline);
                 break;
             }
         }
     } else {
         let now = Instant::now();
-        if now >= *deadline {
-            *deadline = now; // fell behind; re-anchor instead of catching up
+        if now >= deadline {
+            if let Some(scheduled) = wait_schedule {
+                *scheduled = now;
+            }
         } else {
-            spin_sleeper().sleep_until(*deadline);
+            spin_sleeper().sleep_until(deadline);
         }
     }
     Ok(Next::Go)

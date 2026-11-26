@@ -694,7 +694,7 @@ QtObject {
                     ["BottomLeft", qsTr("bottom left")], ["BottomRight", qsTr("bottom right")], ["Center", qsTr("in the middle")]]) },
                 label(qsTr("for")), Object.assign(value("TooltipDuration", "duration"), { unit: qsTr("ms") })] },
             OpenFormWindow: { icon: "app-window", mouths: ["body"], mouthConnectors: ["part"], head: [label(qsTr("open form window")), value("FormWindowId", "window"),
-                label(qsTr("titled")), value("WindowTitle", "title"), label(qsTr("size")), value("FormWidth", "width"), label("×"), value("FormHeight", "height")] },
+                label(qsTr("titled")), value("WindowTitle", "title"), label(qsTr("size")), value("FormWidth", "width"), label("×"), value("FormHeight", "height"), designWindow] },
             CloseFormWindow: { icon: "app-window", head: [label(qsTr("close form window")), value("FormWindowId", "window")] },
             WaitForFormWindow: { icon: "app-window", head: [label(qsTr("wait for form window")), value("FormWindowId", "window"), label(qsTr("to close"))] },
             SetFormWindowTitle: { icon: "app-window", head: [label(qsTr("set title of form window")), value("FormWindowId", "window"), label(qsTr("to")), value("WindowTitle", "title")] },
@@ -729,8 +729,8 @@ QtObject {
                 Object.assign(label(qsTr("options")), { when: i => i.input === "list" }),
                 Object.assign(value("FormData", "options"), { when: i => i.input === "list" })] },
             WindowOnChange: { icon: "refresh-cw", connector: "part", mouths: ["body"], head: [label(qsTr("when this window edits")),
-                { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
-            ShowWindow: { icon: "app-window", mouths: ["body"], mouthConnectors: ["part"], head: [label(qsTr("show window")), value("WindowTitle", "title")] },
+                { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }, label(qsTr("run"))] },
+            ShowWindow: { icon: "app-window", mouths: ["body"], mouthConnectors: ["part"], head: [label(qsTr("show window")), value("WindowTitle", "title"), designWindow] },
             WindowTextBox: { icon: "text-cursor-input", connector: "part", head: [label(qsTr("text box")), value("WindowLabel", "label"),
                 label(qsTr("for")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
             WindowCheckbox: { icon: "circle-check", connector: "part", head: [label(qsTr("checkbox")), value("WindowLabel", "label"),
@@ -740,7 +740,7 @@ QtObject {
                 label(qsTr("for")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
             WindowButton: { icon: "square-mouse-pointer", connector: "part", mouths: ["body"], head: [label(qsTr("button")), value("WindowLabel", "label"),
                 { kind: "dropdown", key: "close", options: [{ value: "stay", label: qsTr("that keeps it open") }, { value: "close", label: qsTr("that closes it") }],
-                  encode: v => v === "close", decode: v => v ? "close" : "stay" }] },
+                  encode: v => v === "close", decode: v => v ? "close" : "stay" }, label(qsTr("runs on click"))] },
             WindowNote: { icon: "info", connector: "part", head: [label(qsTr("label")), value("WindowLabel", "text")] },
             ShowMenu: { icon: "list", head: [label(qsTr("menu of")), { kind: "dropdown", key: "list", options: "lists" },
                 label(qsTr("at the mouse into")), { kind: "dropdown", key: "name", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") }] },
@@ -821,6 +821,7 @@ QtObject {
     // END block rows
     // Hands every row, operator, icon and prefab to blockstitch's BlockRegistry.
     // Labels are read once, so the page calls this again in a new language.
+    readonly property var designWindow: ({kind: "button", action: "designWindow", icon: "layout-grid", text: qsTr("Design Window")})
     function register() {
         // Blockwork's own icon set covers every icon below; the blocks draw
         // with blockstitch's, so hand it the ones it lacks.

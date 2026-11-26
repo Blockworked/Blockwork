@@ -1,5 +1,6 @@
 import QtQuick
 import QtQuick.Layouts
+import com.blockworked.Blockstitch 1.0
 
 GridLayout {
     id: root
@@ -21,6 +22,15 @@ GridLayout {
             Layout.alignment: Qt.AlignTop
             Layout.minimumWidth: 0
             Layout.preferredWidth: modelData.kind === "spacer" ? 1 : Math.min(implicitWidth, 160)
+            Rectangle {
+                visible: !!root.form.request.preview && root.form.selectionPath.slice(-1)[0] === modelData.id
+                anchors.fill: parent
+                anchors.margins: -3
+                color: "transparent"
+                radius: Theme.radius
+                border.color: Theme.accent
+                z: 2
+            }
             Component.onCompleted: setSource(Qt.resolvedUrl("MacroFormControl.qml"), {
                 form: root.form, node: modelData, nodeIndex: index
             })

@@ -609,7 +609,7 @@ pub(super) fn run_form_block(
     depth: u32,
 ) -> Result<Option<Flow>, String> {
     match run(ins, ctx, depth) {
-        Ok(Some(body)) => match run_block(&body, ctx, depth, Instant::now())? {
+        Ok(Some(body)) => match run_block(&body, ctx, depth)? {
             Flow::Normal => {}
             flow => return Ok(Some(flow)),
         },

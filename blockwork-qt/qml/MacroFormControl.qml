@@ -98,10 +98,20 @@ Loader {
                 pages = next;
                 tabBar.setCurrentIndex(index);
             }
-            Component.onCompleted: syncPages()
+            function revealSelection() {
+                if (!root.form.request.preview) return;
+                const index = pages.findIndex(page => root.form.selectionPath.includes(page.id));
+                if (index >= 0) tabBar.setCurrentIndex(index);
+            }
+            Component.onCompleted: {
+                syncPages();
+                revealSelection();
+            }
             Connections {
                 target: root.form
+                ignoreUnknownSignals: true
                 function onFormUpdatesChanged() { tabLayout.syncPages(); }
+                function onSelectionPathChanged() { tabLayout.revealSelection(); }
             }
             spacing: 10
             TabBar {
@@ -359,6 +369,7 @@ Loader {
             }
             StitchButton {
                 text: qsTr("Browse…")
+                enabled: !root.form.request.preview
                 onClicked: {
                     if (root.kind === "folder") folder.open();
                     else file.open();

@@ -2,6 +2,8 @@
 //! matches that downsampling would hide. For approximate matches, a coarse
 //! RGB search picks candidates for the full-resolution comparison.
 
+use std::cell::OnceCell;
+
 use super::Image;
 
 /// Candidates the coarse pass hands to the full-size check.
@@ -12,6 +14,63 @@ const ALL_CANDIDATES: usize = 50_000;
 const ALL_SPOTS: usize = 1024;
 /// Most matches [`find_all`] reports.
 pub const MAX_MATCHES: usize = 200;
+
+// Resolution and DPI ratios between common display sizes and scale settings.
+const DISPLAY_SCALES: [f64; 12] = [
+    2.0 / 3.0,
+    1.5,
+    0.5,
+    2.0,
+    0.8,
+    1.25,
+    0.75,
+    4.0 / 3.0,
+    5.0 / 6.0,
+    1.2,
+    0.625,
+    1.6,
+];
+
+struct Search<'a> {
+    hay: &'a Image,
+    coarse: [OnceCell<Rgb>; 4],
+}
+
+impl<'a> Search<'a> {
+    fn new(hay: &'a Image) -> Self {
+        Self {
+            hay,
+            coarse: Default::default(),
+        }
+    }
+
+    fn shrink(&self, factor: u32) -> &Rgb {
+        self.coarse[factor.trailing_zeros() as usize].get_or_init(|| Rgb::shrink(self.hay, factor))
+    }
+
+    fn scaled_templates(&self, needle: &'a Image) -> impl Iterator<Item = Image> + use<'a> {
+        // A solid swatch has no shape from which to infer a different size.
+        let scalable = needle.width > 0 && needle.height > 0 && Shape::of(needle).spread >= 1.0;
+        let (max_width, max_height) = (self.hay.width, self.hay.height);
+        let mut seen = vec![(needle.width, needle.height)];
+        DISPLAY_SCALES.into_iter().filter_map(move |scale| {
+            let width = (needle.width as f64 * scale).round() as u32;
+            let height = (needle.height as f64 * scale).round() as u32;
+            if !scalable
+                || width == 0
+                || height == 0
+                || width > max_width
+                || height > max_height
+                || seen.contains(&(width, height))
+            {
+                return None;
+            }
+            seen.push((width, height));
+            let resized = needle.resize(width, height);
+            (Shape::of(&resized).spread >= 1.0).then_some(resized)
+        })
+    }
+}
 
 /// Shrink factor for the coarse pass: shrink both images until the needle
 /// is about this small on its short side. Searching every sub-grid offset
@@ -38,6 +97,11 @@ pub struct Match {
 /// Top-left pixel of the best match of `needle` in `hay`, if its pixels
 /// differ by at most `tolerance` percent on average.
 pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
+    best_match(&Search::new(hay), needle, tolerance, false).map(|m| (m.x, m.y))
+}
+
+fn best_match(search: &Search<'_>, needle: &Image, tolerance: f64, scaled: bool) -> Option<Match> {
+    let hay = search.hay;
     if needle.width == 0
         || needle.height == 0
         || needle.width > hay.width
@@ -49,7 +113,7 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
     // An exact copy must not depend on surviving a bounded coarse shortlist.
     let mut exact = None;
     exact_positions(hay, needle, |x, y| {
-        exact = Some((x, y));
+        exact = Some(Match { x, y, diff: 0.0 });
         false
     });
     if exact.is_some() {
@@ -61,11 +125,16 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
     }
     // Shrink both as far as the needle stays recognizable.
     let factor = shrink_factor(needle);
-    let small_hay = Rgb::shrink(hay, factor);
+    let small_hay = search.shrink(factor);
     let small_needle = Rgb::shrink(needle, factor);
     let area = (small_needle.width as u64 * small_needle.height as u64).max(1);
     let mut candidates: Vec<(u64, i64, i64)> = Vec::new();
-    for (sum, cx, cy) in coarse(&small_hay, &small_needle, Some(CANDIDATES), u64::MAX) {
+    let cap = if scaled {
+        coarse_limit(max_diff, area)
+    } else {
+        u64::MAX
+    };
+    for (sum, cx, cy) in coarse(small_hay, &small_needle, Some(CANDIDATES), cap) {
         candidates.push((
             sum * 1024 / area,
             (cx * factor) as i64,
@@ -83,6 +152,7 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
     // One phase can be off by up to factor-1 pixels from the shrunken
     // grid; refining one cell in every direction covers it.
     let radius = factor as i64;
+    let shape = scaled.then(|| Shape::of(needle));
     for (_, cx, cy) in candidates {
         for y in (cy - radius).max(0)..=(cy + radius).min(max_y) {
             for x in (cx - radius).max(0)..=(cx + radius).min(max_x) {
@@ -90,19 +160,27 @@ pub fn find(hay: &Image, needle: &Image, tolerance: f64) -> Option<(u32, u32)> {
                 let limit = best.map_or(max_diff, |(d, ..)| d.min(max_diff));
                 if let Some(diff) = color_diff(hay, needle, x, y, limit)
                     && best.is_none_or(|(d, ..)| diff < d)
+                    && shape
+                        .as_ref()
+                        .is_none_or(|shape| shape.matches(hay, needle, x, y))
                 {
                     best = Some((diff, x, y));
                 }
             }
         }
     }
-    best.map(|(_, x, y)| (x, y))
+    best.map(|(diff, x, y)| Match { x, y, diff })
 }
 
 /// Every place `needle` matches in `hay` within `tolerance` percent, best
 /// first. A match overlapping a better one by more than half the needle's
 /// width and height is the same match, so it's left out.
 pub fn find_all(hay: &Image, needle: &Image, tolerance: f64) -> Vec<Match> {
+    all_matches(&Search::new(hay), needle, tolerance)
+}
+
+fn all_matches(search: &Search<'_>, needle: &Image, tolerance: f64) -> Vec<Match> {
+    let hay = search.hay;
     if needle.width == 0
         || needle.height == 0
         || needle.width > hay.width
@@ -123,12 +201,12 @@ pub fn find_all(hay: &Image, needle: &Image, tolerance: f64) -> Vec<Match> {
     let max_diff = tolerance.clamp(0.0, 100.0) / 100.0 * 255.0;
     if max_diff > 0.0 {
         let factor = shrink_factor(needle);
-        let small_hay = Rgb::shrink(hay, factor);
+        let small_hay = search.shrink(factor);
         let small_needle = Rgb::shrink(needle, factor);
         let area = (small_needle.width as u64 * small_needle.height as u64).max(1);
-        let cap = ((max_diff + 2.0) * 1.1 * 3.0 * area as f64) as u64 + 1;
+        let cap = coarse_limit(max_diff, area);
         let mut candidates: Vec<(u64, i64, i64)> = Vec::new();
-        for (sum, cx, cy) in coarse(&small_hay, &small_needle, None, cap) {
+        for (sum, cx, cy) in coarse(small_hay, &small_needle, None, cap) {
             candidates.push((
                 sum * 1024 / area,
                 (cx * factor) as i64,
@@ -197,6 +275,90 @@ pub fn find_all(hay: &Image, needle: &Image, tolerance: f64) -> Vec<Match> {
     kept
 }
 
+fn coarse_limit(max_diff: f64, area: u64) -> u64 {
+    ((max_diff + 2.0) * 1.1 * 3.0 * area as f64) as u64 + 1
+}
+
+pub(super) struct ScaledMatch {
+    pub hit: Match,
+    pub width: u32,
+    pub height: u32,
+}
+
+impl ScaledMatch {
+    fn new(hit: Match, image: &Image) -> Self {
+        Self {
+            hit,
+            width: image.width,
+            height: image.height,
+        }
+    }
+
+    pub fn center(&self) -> (f64, f64) {
+        (
+            self.hit.x as f64 + self.width as f64 / 2.0,
+            self.hit.y as f64 + self.height as f64 / 2.0,
+        )
+    }
+
+    fn overlaps(&self, other: &Self) -> bool {
+        let (x, y) = self.center();
+        let (other_x, other_y) = other.center();
+        (x - other_x).abs() < f64::from(self.width.min(other.width).div_ceil(2))
+            && (y - other_y).abs() < f64::from(self.height.min(other.height).div_ceil(2))
+    }
+}
+
+pub(super) fn find_scaled(hay: &Image, needle: &Image, tolerance: f64) -> Option<ScaledMatch> {
+    let search = Search::new(hay);
+    let mut best =
+        best_match(&search, needle, tolerance, false).map(|hit| ScaledMatch::new(hit, needle));
+    if best.as_ref().is_some_and(|m| m.hit.diff == 0.0) {
+        return best;
+    }
+    for variant in search.scaled_templates(needle) {
+        let limit = best
+            .as_ref()
+            .map_or(tolerance, |m| m.hit.diff * 100.0 / 255.0);
+        if let Some(hit) = best_match(&search, &variant, limit, true)
+            && best.as_ref().is_none_or(|m| hit.diff < m.hit.diff)
+        {
+            best = Some(ScaledMatch::new(hit, &variant));
+            if hit.diff == 0.0 {
+                break;
+            }
+        }
+    }
+    best
+}
+
+pub(super) fn find_all_scaled(hay: &Image, needle: &Image, tolerance: f64) -> Vec<ScaledMatch> {
+    let search = Search::new(hay);
+    let at_scale = |image: &Image| {
+        all_matches(&search, image, tolerance)
+            .into_iter()
+            .map(|hit| ScaledMatch::new(hit, image))
+            .collect::<Vec<_>>()
+    };
+    let mut found = at_scale(needle);
+    for variant in search.scaled_templates(needle) {
+        found.extend(at_scale(&variant));
+    }
+    // Keep the best fit at each spot. Stable sorting favors the original size on ties.
+    found.sort_by(|a, b| a.hit.diff.total_cmp(&b.hit.diff));
+    let mut kept: Vec<ScaledMatch> = Vec::new();
+    for hit in found {
+        if kept.len() >= MAX_MATCHES {
+            break;
+        }
+        if !kept.iter().any(|other| other.overlaps(&hit)) {
+            kept.push(hit);
+        }
+    }
+    reading_order_by(&mut kept, |m| (m.hit.x, m.hit.y, m.height));
+    kept
+}
+
 /// A needle's own colors around their mean, to tell a real match from a
 /// patch that is merely about as bright.
 struct Shape {
@@ -262,17 +424,24 @@ impl Shape {
 /// to right. Matches whose tops are less than half a needle apart share a
 /// row, so a row of buttons a pixel out of line still reads left to right.
 pub fn reading_order(matches: &mut [Match], needle_height: u32) {
-    matches.sort_by_key(|m| (m.y, m.x));
-    let band = needle_height.div_ceil(2).max(1);
+    reading_order_by(matches, |m| (m.x, m.y, needle_height));
+}
+
+fn reading_order_by<T>(matches: &mut [T], geometry: impl Fn(&T) -> (u32, u32, u32)) {
+    matches.sort_by_key(|m| {
+        let (x, y, _) = geometry(m);
+        (y, x)
+    });
     let mut start = 0;
     while start < matches.len() {
-        let top = matches[start].y;
+        let (_, top, height) = geometry(&matches[start]);
+        let band = height.div_ceil(2).max(1);
         let end = start
             + matches[start..]
                 .iter()
-                .take_while(|m| m.y - top < band)
+                .take_while(|m| geometry(m).1 - top < band)
                 .count();
-        matches[start..end].sort_by_key(|m| m.x);
+        matches[start..end].sort_by_key(|m| geometry(m).0);
         start = end;
     }
 }
@@ -440,11 +609,7 @@ fn coarse_rows(
     let (nw, nh) = (needle.width as usize, needle.height as usize);
     for y in start..end {
         for x in 0..=hay.width - needle.width {
-            let cap = if best.len() == keep {
-                best[keep - 1].0
-            } else {
-                limit
-            };
+            let cap = best.get(keep - 1).map_or(limit, |&(sum, ..)| sum);
             let mut sum = 0u64;
             for row in 0..nh {
                 let h = (y as usize + row) * hay.width as usize + x as usize;
@@ -572,6 +737,55 @@ mod tests {
 
     fn spots(matches: &[Match]) -> Vec<(u32, u32)> {
         matches.iter().map(|m| (m.x, m.y)).collect()
+    }
+
+    #[test]
+    fn finds_a_saved_image_after_a_display_scale_change() {
+        let needle = button(0).scale_up(3);
+        let saved = needle.to_data_uri().unwrap();
+        let needle = Image::load(&saved).unwrap();
+        let mut hay = Image::new(168, 104);
+        // Render the same button independently at 1440p (two thirds of 4K).
+        paste(&mut hay, &button(0).scale_up(2), 99, 49, 7);
+        assert_eq!(find(&hay, &needle, 10.0), None);
+        assert_eq!(find_scaled(&hay, &needle, 1.0).map(|m| m.center()), None);
+        assert_eq!(
+            find_scaled(&hay, &needle, 10.0).map(|m| m.center()),
+            Some((123.0, 67.0))
+        );
+        assert_eq!(
+            find_all_scaled(&hay, &needle, 10.0)
+                .iter()
+                .map(ScaledMatch::center)
+                .collect::<Vec<_>>(),
+            [(123.0, 67.0)]
+        );
+
+        let mut hay = Image::new(168, 104);
+        paste(&mut hay, &needle, 17, 23, 0);
+        let smaller_needle = button(0).scale_up(2);
+        assert_eq!(
+            find_scaled(&hay, &smaller_needle, 10.0).map(|m| m.center()),
+            Some((53.0, 50.0))
+        );
+    }
+
+    #[test]
+    fn counts_mixed_scale_matches_once_in_reading_order() {
+        let needle = button(0).scale_up(3);
+        let mut hay = Image::new(196, 132);
+        paste(&mut hay, &needle, 110, 6, 0);
+        paste(&mut hay, &button(0).scale_up(2), 25, 9, 0);
+        paste(&mut hay, &needle, 50, 75, 0);
+        let matches = find_all_scaled(&hay, &needle, 10.0);
+        assert_eq!(
+            matches.iter().map(ScaledMatch::center).collect::<Vec<_>>(),
+            [(49.0, 27.0), (146.0, 33.0), (86.0, 102.0)]
+        );
+        assert_eq!(
+            find_scaled(&hay, &needle, 10.0).map(|m| m.center()),
+            Some((146.0, 33.0))
+        );
     }
 
     #[test]
