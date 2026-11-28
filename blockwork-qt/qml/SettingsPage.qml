@@ -532,20 +532,26 @@ Item {
                                         text: !backgroundRow.status ? qsTr("Checking") : backgroundRow.status.ready ? qsTr("Ready") : qsTr("Not available")
                                     }
                                 }
-                                readonly property string pluginState: status && status.plugin ? status.plugin.state : ""
-                                StitchButton {
-                                    visible: backgroundRow.pluginState === "missing" || backgroundRow.pluginState === "outdated"
-                                    iconName: "download"; primary: true
-                                    text: backgroundRow.pluginState === "outdated" ? qsTr("Update plugin") : qsTr("Install plugin")
-                                    onClicked: kwinPluginDialog.openFor(backgroundRow.status.plugin)
+                                readonly property var plugin: status && status.plugin ? status.plugin : null
+                                readonly property string pluginState: plugin ? plugin.state : ""
+                                readonly property bool pluginInstalled: !!(plugin && plugin.installed_for)
+                                Connections {
+                                    target: root.kwinPluginDialog
+                                    function onInstalled() { backgroundRow.refresh() }
                                 }
                                 StitchButton {
-                                    visible: backgroundRow.pluginState === "relogin"
+                                    visible: !!root.kwinPluginDialog && (backgroundRow.pluginState === "missing" || backgroundRow.pluginInstalled)
+                                    iconName: "download"; primary: backgroundRow.pluginState !== "ready" && backgroundRow.pluginState !== "relogin"
+                                    text: backgroundRow.pluginInstalled ? qsTr("Update plugin") : qsTr("Install plugin")
+                                    onClicked: root.kwinPluginDialog.openFor(backgroundRow.plugin)
+                                }
+                                StitchButton {
+                                    visible: !!root.kwinPluginDialog && backgroundRow.pluginState === "relogin"
                                     iconName: "hammer"; text: qsTr("Build here instead")
-                                    onClicked: kwinPluginDialog.openFor(backgroundRow.status.plugin, true)
+                                    onClicked: root.kwinPluginDialog.openFor(backgroundRow.plugin, true)
                                 }
                                 StitchButton {
-                                    visible: !!(backgroundRow.status && backgroundRow.status.plugin && backgroundRow.status.plugin.installed_for)
+                                    visible: backgroundRow.pluginInstalled
                                     iconName: "trash-2"; text: qsTr("Remove plugin")
                                     onClicked: root.withReply("kwin_plugin_remove", () => backgroundRow.refresh(), e => backgroundRow.status = { ready: false, detail: e })
                                 }
@@ -761,18 +767,13 @@ Item {
     // fetched when copied or shown.
     property int callSeq: 0
     property var callbacks: ({})
+    property var kwinPluginDialog: null
     property string gnomeExtensionNote: ""
     function withReply(command, done, failed) {
         if (!appBridge) return;
         const key = "settings" + (++callSeq);
         callbacks[key] = { done: done, failed: failed };
         appBridge.callCommand(key, command, "{}");
-    }
-    function withArgs(command, args, done, failed) {
-        if (!appBridge) return;
-        const key = "settings" + (++callSeq);
-        callbacks[key] = { done: done, failed: failed };
-        appBridge.callCommand(key, command, JSON.stringify(args));
     }
     function withWebhookToken(done) { withReply("webhook_token", done) }
     Connections {
@@ -804,47 +805,6 @@ Item {
     function updateDetail() {
         const u = appState.update_check_state || {};
         return u.error || qsTr("Check for a new release of Blockwork.");
-    }
-
-    AppDialog {
-        id: kwinPluginDialog
-        objectName: "kwinPluginDialog"
-        title: qsTr("Background input plugin")
-        standardButtons: busy ? Dialog.NoButton : Dialog.Close
-        property var plugin: null
-        property bool busy: false
-        property string result: ""
-        property bool failed: false
-        property bool build: false
-        function openFor(p, buildHere) { plugin = p; build = !!buildHere; busy = false; result = ""; failed = false; open() }
-        closePolicy: busy ? Popup.NoAutoClose : Popup.CloseOnEscape
-        Column { width: 440; spacing: 10
-            Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
-                text: kwinPluginDialog.plugin && kwinPluginDialog.plugin.state === "outdated"
-                    ? qsTr("The plugin was built for KWin %1, and Plasma now runs KWin %2. Update it to keep using background input.").arg(kwinPluginDialog.plugin.installed_for).arg(kwinPluginDialog.plugin.kwin)
-                    : kwinPluginDialog.build ? qsTr("If background input still isn't running after you logged out and back in, the downloaded plugin may not suit your distro's Qt. Blockwork can build it on this computer instead.")
-                    : qsTr("The In window block's background input runs inside KWin, Plasma's window manager, through a small plugin.") }
-            Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                text: qsTr("Blockwork downloads the build made for your KWin (%1) from its GitHub releases, or builds it on this computer when there isn't one. It's installed for your user only, so no password is needed, and Remove plugin takes it out again.").arg(kwinPluginDialog.plugin ? kwinPluginDialog.plugin.kwin : "") }
-            Text { visible: kwinPluginDialog.busy; width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12
-                text: qsTr("Installing... building it here can take a minute or two.") }
-            Text { visible: kwinPluginDialog.result !== ""; width: parent.width; wrapMode: Text.WordWrap; font.pixelSize: 12
-                color: kwinPluginDialog.failed ? Theme.danger : Theme.running
-                text: kwinPluginDialog.result.charAt(0).toUpperCase() + kwinPluginDialog.result.slice(1) + (kwinPluginDialog.failed ? "" : ".") }
-            StitchButton {
-                visible: !kwinPluginDialog.busy && (kwinPluginDialog.result === "" || kwinPluginDialog.failed)
-                iconName: "download"; primary: true
-                text: kwinPluginDialog.failed ? qsTr("Try again") : kwinPluginDialog.plugin && kwinPluginDialog.plugin.state === "outdated" ? qsTr("Update") : qsTr("Install")
-                onClicked: {
-                    kwinPluginDialog.busy = true; kwinPluginDialog.result = ""; kwinPluginDialog.failed = false;
-                    root.withArgs("kwin_plugin_install", { build: kwinPluginDialog.build }, outcome => {
-                        kwinPluginDialog.busy = false; kwinPluginDialog.result = outcome.message; backgroundRow.refresh();
-                    }, error => {
-                        kwinPluginDialog.busy = false; kwinPluginDialog.failed = true; kwinPluginDialog.result = error;
-                    });
-                }
-            }
-        }
     }
 
     AppDialog {

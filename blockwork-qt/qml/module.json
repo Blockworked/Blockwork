@@ -49,6 +49,7 @@
   "desktop": [
     "Main.qml",
     "SettingsPage.qml",
+    "KwinPluginDialog.qml",
     "OnboardingPage.qml",
     "MacroFiles.qml",
     "PromptWindow.qml",
