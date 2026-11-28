@@ -258,6 +258,7 @@ pub(crate) fn slots_mut<'a>(
             }
         }
         InstructionKind::UseCoordinates { pattern, .. } => f(F::WindowPattern, pattern, Any),
+        InstructionKind::InWindow { pattern, .. } => f(F::WindowPattern, pattern, Any),
         InstructionKind::SetWindow { pattern, value, .. } => {
             f(F::WindowPattern, pattern, Any);
             f(F::WindowValue, value, Any);

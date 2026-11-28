@@ -175,6 +175,7 @@ impl InstructionKind {
                 of(System, &["windows"])
             }
             K::UseCoordinates { .. } => of(Control, &["windows"]),
+            K::InWindow { .. } => of(Control, &["windows", "input"]),
             K::RunMacro { .. } | K::StopMacroNamed(_) => of(System, &["macros"]),
             K::SetGlobal { .. } | K::ChangeGlobal { .. } => of(System, &["globals"]),
 

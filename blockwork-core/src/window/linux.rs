@@ -156,6 +156,34 @@ pub(super) fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
     }
 }
 
+pub(super) fn desktop_kind() -> Option<crate::window::DesktopKind> {
+    use crate::window::DesktopKind;
+    match desktop().ok()? {
+        Desktop::Kde => Some(DesktopKind::Kde),
+        _ => Some(DesktopKind::Other),
+    }
+}
+
+pub(super) fn resolve(pattern: &str, by: MatchBy) -> Result<crate::window::WindowRef, String> {
+    use crate::window::{DesktopKind, WindowRef};
+    match desktop()? {
+        Desktop::Kde => Ok(WindowRef {
+            id: kde::find(pattern, by)?,
+            desktop: DesktopKind::Kde,
+        }),
+        _ => Err("background input only works on KDE Plasma so far: pick \"brought to front\" in the In window block".into()),
+    }
+}
+
+pub(super) fn bounds_of(window: &crate::window::WindowRef) -> Result<Rect, String> {
+    match window.desktop {
+        crate::window::DesktopKind::Kde => kde::bounds(&window.id),
+        crate::window::DesktopKind::Other => {
+            Err("background input only works on KDE Plasma so far: pick \"brought to front\" in the In window block".into())
+        }
+    }
+}
+
 pub(super) fn exists(pattern: &str) -> Result<bool, String> {
     if pattern.is_empty() {
         return Ok(true);

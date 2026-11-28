@@ -962,6 +962,21 @@ pub enum InstructionKind {
         #[serde(default = "match_by_title")]
         by: String,
     },
+    /// Runs `body` with its keys, clicks, positions and screen reading aimed
+    /// at a matching window. In the background the window gets input without
+    /// taking the desktop's focus; with `front` it's activated first. When
+    /// background input isn't possible, `or_front` brings it to front
+    /// instead of failing.
+    InWindow {
+        pattern: Value,
+        #[serde(default = "match_by_title")]
+        by: String,
+        #[serde(default)]
+        front: bool,
+        #[serde(default)]
+        or_front: bool,
+        body: Vec<Instruction>,
+    },
     /// Changes a matching window's opacity (0 to 100), title, or monitor
     /// (from 1).
     SetWindow {

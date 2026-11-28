@@ -141,8 +141,40 @@ const REUSE_FOR: Duration = Duration::from_millis(60);
 
 static LAST: Mutex<Option<(Instant, Arc<Shot>)>> = Mutex::new(None);
 
+thread_local! {
+    /// The window this strand reads the screen from (`InWindow` in the
+    /// background), so covered or off-screen windows still read right.
+    static SOURCE: std::cell::RefCell<Option<crate::window::WindowRef>> = const { std::cell::RefCell::new(None) };
+}
+
+/// Makes this thread's screen reading come from one window alone, or with
+/// `None`, from the desktop again. Returns what it replaces.
+pub fn set_capture_source(
+    window: Option<crate::window::WindowRef>,
+) -> Option<crate::window::WindowRef> {
+    SOURCE.with(|s| std::mem::replace(&mut *s.borrow_mut(), window))
+}
+
+/// The capture source window's contents, when this thread has one and the
+/// desktop can draw it alone. Otherwise the desktop is read as usual,
+/// which sees whatever covers the window.
+fn source_shot() -> Option<Shot> {
+    let window = SOURCE.with(|s| s.borrow().clone())?;
+    #[cfg(target_os = "linux")]
+    {
+        if let Some(shot) = linux::capture_window(&window, true) {
+            return Some(shot);
+        }
+    }
+    let _ = window;
+    None
+}
+
 /// The current screen contents (reused for a few ms).
 pub fn capture() -> Result<Arc<Shot>, String> {
+    if let Some(shot) = source_shot() {
+        return Ok(Arc::new(shot));
+    }
     let mut last = LAST.lock().unwrap_or_else(|e| e.into_inner());
     if let Some((at, shot)) = last.as_ref()
         && at.elapsed() < REUSE_FOR
@@ -164,6 +196,9 @@ pub fn capture_fresh() -> Result<Arc<Shot>, String> {
 /// What's under a screen rectangle: captured on its own where that's cheap,
 /// otherwise cut from the shared desktop capture.
 fn area(rect: Rect) -> Result<Shot, String> {
+    if let Some(shot) = source_shot() {
+        return shot.crop(rect);
+    }
     if platform::CHEAP_AREAS
         && let Some(shot) = platform::capture_area(rect, true)
     {
@@ -424,9 +459,45 @@ thread_local! {
 }
 
 struct Origin {
-    pattern: String,
-    by: crate::window::MatchBy,
+    target: OriginTarget,
     seen: Option<(Instant, (f64, f64))>,
+}
+
+enum OriginTarget {
+    Pattern(String, crate::window::MatchBy),
+    /// A window found once (`InWindow`), followed by its id.
+    Window(crate::window::WindowRef),
+}
+
+/// A strand's origin as it was, to put back with [`restore_origin`].
+pub struct SavedOrigin(Option<Origin>);
+
+/// Makes this thread's coordinates count from a resolved window until
+/// [`restore_origin`] puts the old origin back.
+pub fn set_origin_window(window: crate::window::WindowRef) -> SavedOrigin {
+    ORIGIN.with(|o| {
+        SavedOrigin(o.borrow_mut().replace(Origin {
+            target: OriginTarget::Window(window),
+            seen: None,
+        }))
+    })
+}
+
+/// Swaps in a pattern origin (or the screen's with `None`), keeping the old one.
+pub fn swap_origin(window: Option<(String, crate::window::MatchBy)>) -> SavedOrigin {
+    ORIGIN.with(|o| {
+        SavedOrigin(std::mem::replace(
+            &mut *o.borrow_mut(),
+            window.map(|(pattern, by)| Origin {
+                target: OriginTarget::Pattern(pattern, by),
+                seen: None,
+            }),
+        ))
+    })
+}
+
+pub fn restore_origin(saved: SavedOrigin) {
+    ORIGIN.with(|o| *o.borrow_mut() = saved.0);
 }
 
 /// How long a window's position is reused before asking again.
@@ -437,8 +508,7 @@ const ORIGIN_FOR: Duration = Duration::from_millis(250);
 pub fn set_origin(window: Option<(String, crate::window::MatchBy)>) {
     ORIGIN.with(|o| {
         *o.borrow_mut() = window.map(|(pattern, by)| Origin {
-            pattern,
-            by,
+            target: OriginTarget::Pattern(pattern, by),
             seen: None,
         })
     });
@@ -456,7 +526,10 @@ pub fn origin() -> Result<(f64, f64), String> {
         {
             return Ok(point);
         }
-        let bounds = crate::window::bounds(&origin.pattern, origin.by)?;
+        let bounds = match &origin.target {
+            OriginTarget::Pattern(pattern, by) => crate::window::bounds(pattern, *by)?,
+            OriginTarget::Window(window) => crate::window::bounds_of(window)?,
+        };
         let point = (bounds.x, bounds.y);
         origin.seen = Some((Instant::now(), point));
         Ok(point)

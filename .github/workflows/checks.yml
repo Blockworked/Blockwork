@@ -31,6 +31,16 @@ jobs:
       - name: Test native macOS bundle validation
         run: python3 scripts/macos/test-verify-bundle.py
 
+  # Builds the background input plugin against Arch's current KWin.
+  kwin-plugin:
+    name: KWin plugin
+    runs-on: ubuntu-latest
+    container: archlinux:latest
+    steps:
+      - run: pacman -Syu --noconfirm --needed base-devel cmake kwin wayland libxkbcommon
+      - uses: actions/checkout@v4
+      - run: cmake -S blockwork-kwin -B build-kwin && cmake --build build-kwin
+
   windows-core:
     name: Windows core and FFI
     runs-on: windows-latest

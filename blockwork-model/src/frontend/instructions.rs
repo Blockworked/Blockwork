@@ -227,6 +227,7 @@ wire_blocks! {
         FindColor { color: Value, #[serde(default, skip_serializing_if = "Option::is_none")] tolerance: Option<Value>, x_variable: String, y_variable: String, #[serde(default, skip_serializing_if = "Option::is_none")] region: Option<String> },
         WaitForClipboard { #[serde(default, skip_serializing_if = "Option::is_none")] timeout: Option<Value> },
         UseCoordinates { window: bool, pattern: Value, #[serde(default = "match_by_title")] by: String },
+        InWindow { pattern: Value, #[serde(default = "match_by_title")] by: String, #[serde(default)] front: bool, #[serde(default)] or_front: bool, body: Vec<InstructionDto> },
         SetWindow { setting: crate::macros::WindowSetting, pattern: Value, #[serde(default = "match_by_title")] by: String, value: Value },
         ShowTooltip { text: Value, place: crate::macros::TooltipPlace, duration: Value },
         ShowMenu { list: String, name: String },

@@ -149,6 +149,53 @@ pub fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
     linux::bounds(pattern.trim(), by)
 }
 
+/// Which desktop a [`WindowRef`] came from.
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
+pub enum DesktopKind {
+    Kde,
+    Other,
+}
+
+/// A window found once and then followed by its id, so a block that works
+/// on it for a while keeps the same window when titles change.
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct WindowRef {
+    /// The desktop's own id (KWin's internal UUID on KDE).
+    pub id: String,
+    pub desktop: DesktopKind,
+}
+
+/// The desktop this session runs, as far as window handles care.
+pub fn desktop_kind() -> Option<DesktopKind> {
+    #[cfg(target_os = "linux")]
+    return linux::desktop_kind();
+    #[cfg(not(target_os = "linux"))]
+    Some(DesktopKind::Other)
+}
+
+/// Finds a matching window (the active one when `pattern` is empty) and
+/// returns a handle that keeps pointing at it.
+pub fn resolve(pattern: &str, by: MatchBy) -> Result<WindowRef, String> {
+    #[cfg(target_os = "linux")]
+    return linux::resolve(pattern.trim(), by);
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = (pattern, by);
+        Err("background input only works on KDE Plasma so far: pick \"brought to front\" in the In window block".into())
+    }
+}
+
+/// The content area of a resolved window, in screen coordinates.
+pub fn bounds_of(window: &WindowRef) -> Result<Rect, String> {
+    #[cfg(target_os = "linux")]
+    return linux::bounds_of(window);
+    #[cfg(not(target_os = "linux"))]
+    {
+        let _ = window;
+        Err("background input only works on KDE Plasma so far: pick \"brought to front\" in the In window block".into())
+    }
+}
+
 /// Whether any window's title or app contains `pattern`.
 #[cfg(target_os = "linux")]
 pub fn exists(pattern: &str) -> Result<bool, String> {

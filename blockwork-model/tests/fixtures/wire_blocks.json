@@ -1469,6 +1469,27 @@
   }
  },
  {
+  "type": "InWindow",
+  "id": "inwindow",
+  "pattern": {
+   "kind": "Text",
+   "value": "Kate"
+  },
+  "by": "App",
+  "front": false,
+  "or_front": true,
+  "body": [
+   {
+    "type": "Wait",
+    "id": "child800",
+    "duration": {
+     "kind": "Number",
+     "value": 800
+    }
+   }
+  ]
+ },
+ {
   "type": "UseCoordinates",
   "id": "usecoordinates",
   "window": true,
