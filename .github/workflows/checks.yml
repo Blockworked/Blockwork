@@ -37,7 +37,7 @@ jobs:
     runs-on: ubuntu-latest
     container: archlinux:latest
     steps:
-      - run: pacman -Syu --noconfirm --needed base-devel cmake extra-cmake-modules kwin wayland libxkbcommon
+      - run: pacman -Syu --noconfirm --needed base-devel cmake extra-cmake-modules kwin wayland libxkbcommon vulkan-headers
       - uses: actions/checkout@v4
       - run: cmake -S blockwork-kwin -B build-kwin && cmake --build build-kwin
 
