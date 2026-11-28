@@ -144,6 +144,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Retry { body, .. }, 0) => Some(body),
             (InstructionKind::WithLock { body, .. }, 0) => Some(body),
             (InstructionKind::WithInputBlocked { body }, 0) => Some(body),
+            (InstructionKind::InWindow { body, .. }, 0) => Some(body),
             (InstructionKind::ShowWindow { body, .. }, 0)
             | (InstructionKind::OpenFormWindow { body, .. }, 0)
             | (InstructionKind::WindowLayout { body, .. }, 0)
@@ -171,6 +172,7 @@ impl BlockKind for InstructionKind {
             (InstructionKind::Retry { body, .. }, 0) => Some(body),
             (InstructionKind::WithLock { body, .. }, 0) => Some(body),
             (InstructionKind::WithInputBlocked { body }, 0) => Some(body),
+            (InstructionKind::InWindow { body, .. }, 0) => Some(body),
             (InstructionKind::ShowWindow { body, .. }, 0)
             | (InstructionKind::OpenFormWindow { body, .. }, 0)
             | (InstructionKind::WindowLayout { body, .. }, 0)

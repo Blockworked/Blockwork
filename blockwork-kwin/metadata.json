@@ -1,0 +1,10 @@
+{
+    "KPlugin": {
+        "Id": "blockworkseathost",
+        "Name": "Blockwork background input",
+        "Description": "Lets Blockwork macros type and click into one window without moving your focus",
+        "Version": "0.1.0",
+        "License": "GPL-3.0-or-later",
+        "EnabledByDefault": true
+    }
+}

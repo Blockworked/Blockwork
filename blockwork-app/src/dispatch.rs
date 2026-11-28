@@ -396,6 +396,13 @@ impl Backend {
             }
             "new_browser_key" => to_json(crate::browser_bridge::new_key(&self.state, &self.app)?),
             "browser_key" => to_json(blockwork_core::browser::key()),
+            "background_input_status" => {
+                let status = blockwork_core::macros::lane::availability();
+                to_json(serde_json::json!({
+                    "ready": status.is_ok(),
+                    "detail": status.unwrap_or_else(|e| e),
+                }))
+            }
             "new_webhook_token" => to_json(crate::webhook::new_token(&self.state, &self.app)?),
             "webhook_token" => to_json(crate::webhook::token()),
             "set_macro_max_run_secs" => {

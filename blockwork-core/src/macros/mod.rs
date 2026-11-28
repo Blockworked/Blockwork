@@ -9,6 +9,7 @@ pub mod conditions;
 pub mod debug;
 pub mod gdr_import;
 pub mod host_clock;
+pub mod lane;
 pub mod locks;
 pub mod loop_control;
 pub mod priority;

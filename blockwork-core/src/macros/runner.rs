@@ -69,6 +69,9 @@ enum Flow {
 /// isolated from its caller's.
 struct ExecCtx<'a> {
     emulator: Arc<Mutex<dyn InputBackend>>,
+    /// The desktop backend while `emulator` is an `InWindow` lane, so
+    /// signals started inside one still get the desktop.
+    desktop_emulator: Option<Arc<Mutex<dyn InputBackend>>>,
     gamepad: Option<crate::input::virtual_gamepad::Lease>,
     stop_flag: Option<StrandStop>,
     speed_multiplier: f64,
@@ -458,7 +461,7 @@ impl Spawner {
     fn of(ctx: &ExecCtx) -> Self {
         Spawner {
             source: Arc::clone(&ctx.source),
-            emulator: Arc::clone(&ctx.emulator),
+            emulator: Arc::clone(ctx.desktop_emulator.as_ref().unwrap_or(&ctx.emulator)),
             stop_flag: ctx.stop_flag.clone(),
             speed_multiplier: ctx.speed_multiplier,
             variables: Arc::clone(&ctx.variables),
@@ -900,6 +903,7 @@ pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>) {
     let _detach = host_clock::enabled().then(|| Defer(Some(host_clock::detach)));
     // Each strand starts out in screen coordinates (see `UseCoordinates`).
     crate::screen::set_origin(None);
+    crate::screen::set_capture_source(None);
     raise_current_thread_priority();
     // Anchor synced playback after raising priority so that setup time
     // does not consume the offset.
@@ -918,6 +922,7 @@ pub(super) fn run_strand(run: StrandRun, instructions: Vec<Instruction>) {
         let mut ctx = ExecCtx {
             gamepad: None,
             emulator: Arc::clone(&emulator),
+            desktop_emulator: None,
             stop_flag,
             speed_multiplier,
             variables,

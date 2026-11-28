@@ -52,6 +52,35 @@ pub(super) fn run_control_block(
                 return Ok(Next::Exit(flow));
             }
         }
+        InstructionKind::InWindow {
+            pattern,
+            by,
+            front,
+            or_front,
+            body,
+        } => {
+            let target = ctx
+                .resolve(pattern, depth)
+                .and_then(|v| v.eval_text())
+                .and_then(|p| Ok((p, by.parse::<crate::window::MatchBy>()?)));
+            let (pattern, by) = match target {
+                Ok(target) => target,
+                Err(e) => {
+                    soft_fail(ctx, &ins.id, "In window", e)?;
+                    return Ok(Next::Go);
+                }
+            };
+            let flow = match in_window(ctx, &pattern, by, *front, *or_front) {
+                Ok(scope) => scope.run(body, ctx, depth)?,
+                Err(e) => {
+                    soft_fail(ctx, &ins.id, "In window", e)?;
+                    return Ok(Next::Go);
+                }
+            };
+            if flow != Flow::Normal {
+                return Ok(Next::Exit(flow));
+            }
+        }
         InstructionKind::WithInputBlocked { body } => {
             let _blocked = crate::recording::key_rules::block_all_input();
             let flow = run_block(body, ctx, depth)?;
@@ -689,4 +718,84 @@ fn run_wait(
         }
     }
     Ok(Next::Go)
+}
+
+/// What an `InWindow` block put in place for its body.
+enum WindowScope {
+    /// A lane into the window; the desktop's focus stays put.
+    Background {
+        window: crate::window::WindowRef,
+        lane: Arc<Mutex<dyn InputBackend>>,
+    },
+    /// The window was brought to front; input goes through the desktop.
+    Front {
+        pattern: String,
+        by: crate::window::MatchBy,
+    },
+}
+
+/// Opens a lane into the window, or brings it to front when asked to
+/// (`front`) or when a lane isn't possible and `or_front` allows it.
+fn in_window(
+    ctx: &ExecCtx,
+    pattern: &str,
+    by: crate::window::MatchBy,
+    front: bool,
+    or_front: bool,
+) -> Result<WindowScope, String> {
+    if !front {
+        let lane = crate::window::resolve(pattern, by)
+            .and_then(|window| Ok((crate::macros::lane::open(&window)?, window)));
+        match lane {
+            Ok((lane, window)) => {
+                let lane: Arc<Mutex<dyn InputBackend>> =
+                    Arc::new(Mutex::new(crate::macros::lane::LaneBackend::new(lane)));
+                return Ok(WindowScope::Background { window, lane });
+            }
+            Err(e) if !or_front => return Err(e),
+            Err(e) => crate::run_log::info(
+                &ctx.source,
+                format!("In window: bringing it to front instead ({e})"),
+            ),
+        }
+    }
+    crate::window::act(crate::window::Action::Focus, pattern, by)?;
+    Ok(WindowScope::Front {
+        pattern: pattern.to_string(),
+        by,
+    })
+}
+
+impl WindowScope {
+    /// Runs `body` aimed at the window, then puts the strand's input,
+    /// origin and screen source back, whatever way the body ended.
+    fn run(self, body: &[Instruction], ctx: &mut ExecCtx, depth: u32) -> Result<Flow, String> {
+        match self {
+            WindowScope::Front { pattern, by } => {
+                let saved = crate::screen::swap_origin(Some((pattern, by)));
+                let flow = run_block(body, ctx, depth);
+                crate::screen::restore_origin(saved);
+                flow
+            }
+            WindowScope::Background { window, lane } => {
+                let saved_origin = crate::screen::set_origin_window(window.clone());
+                let saved_source = crate::screen::set_capture_source(Some(window));
+                let desktop = std::mem::replace(&mut ctx.emulator, lane);
+                let outer = ctx.desktop_emulator.replace(Arc::clone(&desktop));
+                let unavailable = ctx.input_unavailable.take();
+                // The lane lets go of what it holds when it's dropped, so keys
+                // pressed inside never reach the desktop's cleanup.
+                let (keys, buttons) = (ctx.pressed_keys.len(), ctx.pressed_buttons.len());
+                let flow = run_block(body, ctx, depth);
+                ctx.pressed_keys.truncate(keys);
+                ctx.pressed_buttons.truncate(buttons);
+                ctx.input_unavailable = unavailable;
+                ctx.desktop_emulator = outer;
+                ctx.emulator = desktop;
+                crate::screen::set_capture_source(saved_source);
+                crate::screen::restore_origin(saved_origin);
+                flow
+            }
+        }
+    }
 }

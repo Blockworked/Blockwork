@@ -3,7 +3,9 @@
 Wayland leaves window control to each desktop, so the window blocks
 (Window action, Move window, Set window, the window reporters and Use
 coordinates) talk to each one its own way. The code is in
-`blockwork-core/src/window/linux.rs` and `window/linux/`.
+`blockwork-core/src/window/linux.rs` and `window/linux/`. The In window
+block's background mode only works on KDE: see
+[background-input.md](background-input.md).
 
 | Desktop | How | Can't do |
 |---|---|---|

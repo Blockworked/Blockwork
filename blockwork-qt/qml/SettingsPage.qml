@@ -513,6 +513,29 @@ Item {
                             }
                         }
                         SettingsSection {
+                            visible: Qt.platform.os === "linux"
+                            SettingsRow {
+                                first: true
+                                id: backgroundRow
+                                property var status: null
+                                function refresh() { root.withReply("background_input_status", s => backgroundRow.status = s, e => backgroundRow.status = { ready: false, detail: e }) }
+                                Component.onCompleted: refresh()
+                                title: qsTr("Background input")
+                                detail: (backgroundRow.status ? backgroundRow.status.detail + "\n" : "")
+                                    + qsTr("Lets the In window block type and click into one window while you keep using yours. Needs KDE Plasma and the Blockwork KWin plugin.")
+                                Row {
+                                    anchors.verticalCenter: parent.verticalCenter; spacing: 6
+                                    readonly property color tint: !backgroundRow.status ? Theme.textDim : backgroundRow.status.ready ? Theme.running : Theme.textDim
+                                    Rectangle { width: 8; height: 8; radius: 4; color: parent.tint; anchors.verticalCenter: parent.verticalCenter }
+                                    Text {
+                                        anchors.verticalCenter: parent.verticalCenter; color: parent.tint; font.pixelSize: 13
+                                        text: !backgroundRow.status ? qsTr("Checking") : backgroundRow.status.ready ? qsTr("Ready") : qsTr("Not available")
+                                    }
+                                }
+                                StitchButton { iconName: "refresh-cw"; text: qsTr("Check again"); onClicked: { backgroundRow.status = null; backgroundRow.refresh() } }
+                            }
+                        }
+                        SettingsSection {
                             SettingsRow {
                                 first: true
                                 id: browserRow

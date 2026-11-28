@@ -65,6 +65,25 @@ pub(super) fn capture_area(rect: Rect, native: bool) -> Option<Shot> {
     })
 }
 
+/// One window alone, drawn by KWin even when it's covered (KDE only).
+pub(super) fn capture_window(window: &crate::window::WindowRef, native: bool) -> Option<Shot> {
+    if !wayland() || window.desktop != crate::window::DesktopKind::Kde {
+        return None;
+    }
+    let bounds = crate::window::bounds_of(window).ok()?;
+    let image = kwin::window(&window.id, native)?;
+    let scale = if bounds.width > 0.0 {
+        image.width as f64 / bounds.width
+    } else {
+        1.0
+    };
+    Some(Shot {
+        image,
+        origin: (bounds.x, bounds.y),
+        scale,
+    })
+}
+
 fn wayland_capture() -> Result<Image, String> {
     if let Some(image) = kwin::workspace() {
         return Ok(image);
@@ -154,6 +173,55 @@ mod kwin {
     /// `native` asks for every physical pixel; otherwise it's the logical size.
     pub(super) fn area(x: i32, y: i32, width: u32, height: u32, native: bool) -> Option<Image> {
         capture("CaptureArea", Some((x, y, width, height)), native)
+    }
+
+    /// The window's content, without its frame or what covers it.
+    pub(super) fn window(id: &str, native: bool) -> Option<Image> {
+        if UNAVAILABLE.waiting() {
+            return None;
+        }
+        try_window(id, native)
+            .inspect_err(|e| tracing::debug!("KWin CaptureWindow failed: {e}"))
+            .ok()
+    }
+
+    fn try_window(id: &str, native: bool) -> Result<Image, String> {
+        let _runtime = crate::dbus::enter();
+        let connection = crate::kwin::connection()?;
+        let (mut read, write) = std::io::pipe().map_err(|e| e.to_string())?;
+        let mut options: HashMap<&str, Value> = HashMap::new();
+        options.insert("native-resolution", native.into());
+        options.insert("include-decoration", false.into());
+        options.insert("include-shadow", false.into());
+        let fd = Fd::from(write.as_fd());
+        let reply = connection
+            .call_method(
+                Some("org.kde.KWin"),
+                "/org/kde/KWin/ScreenShot2",
+                Some("org.kde.KWin.ScreenShot2"),
+                "CaptureWindow",
+                &(id, &options, &fd),
+            )
+            .map_err(|e| e.to_string())?;
+        drop(fd);
+        drop(write);
+        let mut data = Vec::new();
+        read.read_to_end(&mut data).map_err(|e| e.to_string())?;
+        let results: HashMap<String, OwnedValue> =
+            reply.body().deserialize().map_err(|e| e.to_string())?;
+        let number = |key: &str| {
+            results
+                .get(key)
+                .and_then(|v| u32::try_from(v).ok())
+                .ok_or(format!("KWin's screenshot has no {key}"))
+        };
+        decode(
+            number("format")?,
+            number("width")?,
+            number("height")?,
+            number("stride")?,
+            &data,
+        )
     }
 
     fn capture(method: &str, area: Option<(i32, i32, u32, u32)>, native: bool) -> Option<Image> {

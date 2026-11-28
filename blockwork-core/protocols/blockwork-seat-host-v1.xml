@@ -1,0 +1,155 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<protocol name="blockwork_seat_host_v1">
+  <copyright>
+    SPDX-License-Identifier: GPL-3.0-or-later
+  </copyright>
+
+  <description summary="background input into one window">
+    Offered by Blockwork's KWin plugin (blockwork-kwin/). Each lane is an
+    extra wl_seat the compositor created at startup, with its own keyboard
+    focus, pointer and modifiers. Binding a lane to a window sends that
+    window keyboard enter and pointer enter on the lane's seat only, so the
+    user's focus and pointer stay where they are.
+
+    Only clients outside a sandbox, or a sandboxed client whose app id is
+    com.blockworked.Blockwork, may bind this global. Closing the connection
+    releases every key and button the client's lanes hold.
+  </description>
+
+  <interface name="blockwork_seat_host_v1" version="1">
+    <description summary="hands out lanes"/>
+
+    <enum name="error">
+      <entry name="no_free_lane" value="0" summary="every lane is in use"/>
+    </enum>
+
+    <request name="destroy" type="destructor"/>
+
+    <request name="get_lane">
+      <description summary="take a free lane">
+        Takes a free lane. If none is free, the lane is sent
+        refused(no_free_lane) and stays inert.
+      </description>
+      <arg name="id" type="new_id" interface="blockwork_seat_lane_v1"/>
+    </request>
+
+    <event name="info">
+      <description summary="what this host is">
+        Sent once on bind. kwin_version is the KWin version the plugin was
+        built against; lanes is how many seats it made at startup.
+      </description>
+      <arg name="kwin_version" type="string"/>
+      <arg name="build" type="string"/>
+      <arg name="lanes" type="uint"/>
+    </event>
+  </interface>
+
+  <interface name="blockwork_seat_lane_v1" version="1">
+    <description summary="one extra seat aimed at one window"/>
+
+    <enum name="reason">
+      <entry name="no_free_lane" value="0"/>
+      <entry name="no_window" value="1" summary="no window has that id"/>
+      <entry name="not_native" value="2" summary="XWayland or internal window"/>
+      <entry name="not_bound" value="3" summary="the app never bound the lane's seat"/>
+      <entry name="shared_focus" value="4" summary="the app shares focus across windows and the user is in another of them"/>
+      <entry name="closed" value="5" summary="the window closed"/>
+      <entry name="outside" value="6" summary="a position outside the window"/>
+    </enum>
+
+    <enum name="key_state">
+      <entry name="released" value="0"/>
+      <entry name="pressed" value="1"/>
+    </enum>
+
+    <enum name="axis">
+      <entry name="vertical" value="0"/>
+      <entry name="horizontal" value="1"/>
+    </enum>
+
+    <request name="destroy" type="destructor">
+      <description summary="release everything and give the lane back"/>
+    </request>
+
+    <request name="bind">
+      <description summary="aim the lane at a window">
+        window is KWin's internal window id (a UUID, braces optional).
+        Answered with bound once the app has made a keyboard and pointer
+        on the lane's seat, or refused.
+      </description>
+      <arg name="window" type="string"/>
+    </request>
+
+    <request name="set_keymap">
+      <description summary="the keymap the window sees for this lane">
+        An XKB v1 text keymap. Until one is set the lane uses a US layout.
+      </description>
+      <arg name="fd" type="fd"/>
+      <arg name="size" type="uint"/>
+    </request>
+
+    <request name="key">
+      <description summary="press or release an evdev key code"/>
+      <arg name="key" type="uint"/>
+      <arg name="state" type="uint" enum="key_state"/>
+    </request>
+
+    <request name="motion">
+      <description summary="move the lane's pointer">
+        In logical pixels from the top left of the window's content.
+      </description>
+      <arg name="x" type="fixed"/>
+      <arg name="y" type="fixed"/>
+    </request>
+
+    <request name="relative_motion">
+      <description summary="move by a delta, for apps that lock the pointer"/>
+      <arg name="dx" type="fixed"/>
+      <arg name="dy" type="fixed"/>
+    </request>
+
+    <request name="button">
+      <description summary="press or release an evdev button code"/>
+      <arg name="button" type="uint"/>
+      <arg name="state" type="uint" enum="key_state"/>
+    </request>
+
+    <request name="axis">
+      <description summary="scroll; value120 is one wheel notch per 120"/>
+      <arg name="axis" type="uint" enum="axis"/>
+      <arg name="value120" type="int"/>
+    </request>
+
+    <request name="release_all">
+      <description summary="let go of every key and button the lane holds"/>
+    </request>
+
+    <event name="bound">
+      <description summary="the lane is aimed at the window">
+        width and height are the window content's logical size.
+      </description>
+      <arg name="width" type="uint"/>
+      <arg name="height" type="uint"/>
+    </event>
+
+    <event name="refused">
+      <arg name="reason" type="uint" enum="reason"/>
+      <arg name="message" type="string"/>
+    </event>
+
+    <event name="lost">
+      <description summary="the lane can't reach its window any more">
+        The lane has let go of everything and is unbound.
+      </description>
+      <arg name="reason" type="uint" enum="reason"/>
+      <arg name="message" type="string"/>
+    </event>
+
+    <event name="preempted">
+      <description summary="the user used the same window">
+        Physical input reached the lane's window. The lane keeps working;
+        Blockwork waits a moment before its next input.
+      </description>
+    </event>
+  </interface>
+</protocol>
