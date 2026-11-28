@@ -396,13 +396,24 @@ impl Backend {
             }
             "new_browser_key" => to_json(crate::browser_bridge::new_key(&self.state, &self.app)?),
             "browser_key" => to_json(blockwork_core::browser::key()),
-            "background_input_status" => {
-                let status = blockwork_core::macros::lane::availability();
-                to_json(serde_json::json!({
-                    "ready": status.is_ok(),
-                    "detail": status.unwrap_or_else(|e| e),
-                }))
+            "background_input_status" => to_json(
+                tokio::task::spawn_blocking(background_input_status)
+                    .await
+                    .map_err(|e| e.to_string())?,
+            ),
+            #[cfg(target_os = "linux")]
+            "kwin_plugin_install" => {
+                let build = args.get("build").and_then(|v| v.as_bool()).unwrap_or(false);
+                to_json(
+                    tokio::task::spawn_blocking(move || {
+                        blockwork_core::macros::lane::kwin_plugin::install(build)
+                    })
+                    .await
+                    .map_err(|e| e.to_string())??,
+                )
             }
+            #[cfg(target_os = "linux")]
+            "kwin_plugin_remove" => to_json(blockwork_core::macros::lane::kwin_plugin::remove()?),
             "new_webhook_token" => to_json(crate::webhook::new_token(&self.state, &self.app)?),
             "webhook_token" => to_json(crate::webhook::token()),
             "set_macro_max_run_secs" => {
@@ -789,4 +800,24 @@ impl Backend {
             other => Err(format!("unknown command: {other}")),
         }
     }
+}
+
+/// Background input's state for Settings; on Linux, the KWin plugin's too.
+fn background_input_status() -> serde_json::Value {
+    #[cfg(target_os = "linux")]
+    {
+        let status = blockwork_core::macros::lane::kwin_plugin::status();
+        if status.state != "unsupported" {
+            return serde_json::json!({
+                "ready": status.ready,
+                "detail": status.detail,
+                "plugin": status,
+            });
+        }
+    }
+    let status = blockwork_core::macros::lane::availability();
+    serde_json::json!({
+        "ready": status.is_ok(),
+        "detail": status.unwrap_or_else(|e| e),
+    })
 }

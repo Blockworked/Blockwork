@@ -1,0 +1,142 @@
+# Builds the background input KWin plugin for every KWin release (KWin
+# loads only plugins built for its exact version) and publishes them to the
+# kwin-plugin-<version> release, where Settings > Integrations installs them
+# from. Each build runs on an Arch Linux Archive snapshot from a day that
+# release was Arch's KWin. Daily runs add new KWin releases.
+name: KWin plugin builds
+
+on:
+  push:
+    paths:
+      - blockwork-kwin/**
+      - blockwork-core/protocols/blockwork-seat-host-v1.xml
+      - scripts/kwin-plugin-matrix.py
+      - .github/workflows/kwin-plugin-builds.yml
+  pull_request:
+    paths:
+      - blockwork-kwin/**
+      - scripts/kwin-plugin-matrix.py
+      - .github/workflows/kwin-plugin-builds.yml
+  schedule:
+    - cron: "17 5 * * *"
+  workflow_dispatch:
+    inputs:
+      rebuild:
+        description: Rebuild versions that are already published
+        type: boolean
+        default: false
+      publish:
+        description: Publish the builds (master always does)
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+
+jobs:
+  plan:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.plan.outputs.matrix }}
+      count: ${{ steps.plan.outputs.count }}
+      version: ${{ steps.plan.outputs.version }}
+      publish: ${{ steps.plan.outputs.publish }}
+    steps:
+      - uses: actions/checkout@v4
+      - id: plan
+        env:
+          GH_TOKEN: ${{ github.token }}
+          REBUILD: ${{ inputs.rebuild || github.event_name == 'push' }}
+          PUBLISH: ${{ github.ref == 'refs/heads/master' && github.event_name != 'pull_request' || inputs.publish }}
+        run: |
+          version=$(sed -n 's/^project(blockwork_kwin VERSION \([0-9.]*\).*/\1/p' blockwork-kwin/CMakeLists.txt)
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          echo "publish=$PUBLISH" >> "$GITHUB_OUTPUT"
+          args=""
+          if [ "$REBUILD" != true ] && gh release download "kwin-plugin-$version" -p index.json -D published 2>/dev/null; then
+            args="--index published/index.json"
+          fi
+          # Pull requests and branch pushes only check the newest few.
+          if [ "$PUBLISH" != true ]; then args="$args --limit 3"; fi
+          matrix=$(python3 scripts/kwin-plugin-matrix.py $args)
+          echo "$matrix"
+          echo "matrix=$matrix" >> "$GITHUB_OUTPUT"
+          echo "count=$(echo "$matrix" | python3 -c 'import json,sys; print(len(json.load(sys.stdin)["include"]))')" >> "$GITHUB_OUTPUT"
+
+  build:
+    needs: plan
+    if: needs.plan.outputs.count != '0'
+    runs-on: ubuntu-latest
+    container: archlinux:base-devel
+    strategy:
+      fail-fast: false
+      matrix: ${{ fromJson(needs.plan.outputs.matrix) }}
+    name: KWin ${{ matrix.kwin }}
+    steps:
+      - name: Use the archive snapshot
+        run: |
+          echo 'Server = https://archive.archlinux.org/repos/${{ matrix.day }}/$repo/os/$arch' > /etc/pacman.d/mirrorlist
+          sed -i 's/^SigLevel.*/SigLevel = Required DatabaseOptional/' /etc/pacman.conf
+          pacman-key --init
+          pacman-key --populate archlinux
+          pacman -Syyuu --noconfirm --needed cmake extra-cmake-modules kwin wayland libxkbcommon vulkan-headers
+          pacman -Q kwin
+      - uses: actions/checkout@v4
+      - name: Build
+        run: |
+          got=$(pacman -Q kwin | awk '{print $2}' | cut -d- -f1 | cut -d. -f1-3)
+          if [ "$got" != "${{ matrix.kwin }}" ]; then
+            echo "The snapshot has KWin $got, not ${{ matrix.kwin }}: fix the snapshot day in scripts/kwin-plugin-matrix.py" >&2
+            exit 1
+          fi
+          cmake -S blockwork-kwin -B build -DCMAKE_BUILD_TYPE=Release
+          cmake --build build
+          strip --strip-unneeded build/blockworkseathost.so
+          mkdir out
+          cp build/blockworkseathost.so "out/blockworkseathost-kwin-${{ matrix.kwin }}.so"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: kwin-${{ matrix.kwin }}
+          path: out/*.so
+
+  publish:
+    needs: [plan, build]
+    # Some old KWin releases may not build; publish the rest.
+    if: always() && needs.plan.outputs.publish == 'true' && needs.plan.result == 'success'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v4
+        continue-on-error: true
+        with:
+          path: built
+          merge-multiple: true
+      - name: Publish
+        env:
+          GH_TOKEN: ${{ github.token }}
+          GH_REPO: ${{ github.repository }}
+          VERSION: ${{ needs.plan.outputs.version }}
+        run: |
+          tag="kwin-plugin-$VERSION"
+          ls built/*.so >/dev/null 2>&1 || { echo "Nothing new to publish"; exit 0; }
+          if ! gh release view "$tag" >/dev/null 2>&1; then
+            gh release create "$tag" --target "$GITHUB_SHA" --latest=false \
+              --title "KWin plugin $VERSION" \
+              --notes "Builds of Blockwork's background input KWin plugin, one per KWin release. Blockwork installs the right one from Settings > Integrations > Background input; you don't need to download these by hand."
+          fi
+          gh release download "$tag" -p index.json -D old 2>/dev/null || true
+          python3 - <<'EOF'
+          import hashlib, json, os, pathlib
+          index = {"plugin": os.environ["VERSION"], "builds": {}}
+          try:
+              index["builds"] = json.load(open("old/index.json"))["builds"]
+          except (OSError, ValueError, KeyError):
+              pass
+          for so in sorted(pathlib.Path("built").glob("*.so")):
+              kwin = so.name.removeprefix("blockworkseathost-kwin-").removesuffix(".so")
+              data = so.read_bytes()
+              index["builds"][kwin] = {"file": so.name, "sha256": hashlib.sha256(data).hexdigest(), "bytes": len(data)}
+          json.dump(index, open("index.json", "w"), indent=1, sort_keys=True)
+          EOF
+          gh release upload "$tag" built/*.so index.json --clobber

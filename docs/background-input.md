@@ -49,9 +49,33 @@ before the plugin loaded needs a restart.
 
 ## Installing the plugin
 
-KWin only loads plugins built for its exact version, so the plugin comes as a
-distro package built against the distro's own KWin (`blockwork-kwin`), and
-needs a rebuild for each Plasma release. To build it yourself:
+KWin only loads plugins built for its exact version (down to the patch
+release), so there's no one plugin to ship. Settings > Integrations >
+Background input installs it for the current user, and an In window block
+that needs it offers the same:
+
+- It reads the running KWin's version over D-Bus and downloads the build for
+  it from the `kwin-plugin-<plugin version>` GitHub release, checked against
+  that release's `index.json`. `.github/workflows/kwin-plugin-builds.yml`
+  builds one per KWin release from 6.0 on, each on an Arch Linux Archive
+  snapshot from a day it was Arch's KWin (`scripts/kwin-plugin-matrix.py`),
+  and a daily run adds new ones.
+- With no build for that KWin (a distro-patched or brand new one), it builds
+  the plugin on the computer from the sources compiled into Blockwork, through
+  `flatpak-spawn --host` from the Flatpak. That needs CMake,
+  extra-cmake-modules, a C++ compiler, KWin's development files, wayland,
+  libxkbcommon and the Vulkan headers; the error names the distro's command.
+- The plugin goes in `~/.local/share/blockwork/kwin-plugin/kwin/plugins/`,
+  and `~/.config/plasma-workspace/env/blockwork-kwin-plugin.sh` adds that
+  folder to `QT_PLUGIN_PATH`, which Plasma runs before KWin starts. No sudo.
+  KWin only reads that path at startup, so a first install needs one log-out;
+  if the folder is already on its path, KWin's `LoadPlugin` starts it at once.
+  KWin can't swap a running plugin, so an update also waits for the next
+  login. Remove plugin deletes both files.
+- After a Plasma update the copy no longer matches KWin, and Settings and the
+  block offer an update.
+
+Developers can still build and install it system-wide:
 
 ```bash
 cmake -S blockwork-kwin -B build-kwin -DCMAKE_INSTALL_PREFIX=/usr
@@ -59,10 +83,8 @@ cmake --build build-kwin
 sudo cmake --install build-kwin
 ```
 
-Then log out and back in. It needs CMake, extra-cmake-modules, KWin's
-development headers, Qt 6, wayland and libxkbcommon. On Arch and CachyOS:
-`sudo pacman -S --needed base-devel cmake extra-cmake-modules kwin wayland libxkbcommon`. A Flatpak Blockwork uses
-the host's plugin; it can't add one itself.
+`just run` does this through `just kwin-plugin`. On Arch and CachyOS the build
+needs `sudo pacman -S --needed base-devel cmake extra-cmake-modules kwin wayland libxkbcommon vulkan-headers`.
 
 ## How it fits together
 
@@ -101,6 +123,10 @@ the host's plugin; it can't add one itself.
   hover there. It also can't be locked, so a game that turns the camera with
   a locked pointer only does so for your own mouse.
 - Clipboard blocks still use the desktop clipboard.
+- Downloaded builds come from Arch's KWin and Qt; a distro with an older Qt
+  than Arch had for that KWin release may not load one. Settings then still
+  says the plugin will start at the next login even after one; Build here
+  instead then builds it on the computer.
 - On KWin 6.0 to 6.7, window capture needs Blockwork's desktop file to list
   `org.kde.KWin.ScreenShot2` in `X-KDE-DBUS-Restricted-Interfaces`.
 

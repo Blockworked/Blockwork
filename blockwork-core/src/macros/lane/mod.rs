@@ -9,6 +9,8 @@ use crate::window::WindowRef;
 
 #[cfg(target_os = "linux")]
 mod kde;
+#[cfg(target_os = "linux")]
+pub mod kwin_plugin;
 #[cfg(target_os = "macos")]
 mod macos;
 #[cfg(windows)]
