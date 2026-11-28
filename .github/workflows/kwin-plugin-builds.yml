@@ -79,7 +79,7 @@ jobs:
           sed -i 's/^SigLevel.*/SigLevel = Required DatabaseOptional/' /etc/pacman.conf
           pacman-key --init
           pacman-key --populate archlinux
-          pacman -Syyuu --noconfirm --needed cmake extra-cmake-modules kwin wayland libxkbcommon vulkan-headers
+          pacman -Syyuu --noconfirm --needed --overwrite '*' cmake extra-cmake-modules kwin wayland libxkbcommon vulkan-headers
           pacman -Q kwin
       - uses: actions/checkout@v4
       - name: Build
