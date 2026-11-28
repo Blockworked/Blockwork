@@ -16,8 +16,8 @@ use windows_sys::Win32::UI::Input::KeyboardAndMouse::{
 use windows_sys::Win32::UI::WindowsAndMessaging::{
     BringWindowToTop, EnumChildWindows, EnumWindows, GA_ROOTOWNER, GWL_EXSTYLE, GetAncestor,
     GetClientRect, GetForegroundWindow, GetWindowLongW, GetWindowRect, GetWindowTextW,
-    GetWindowThreadProcessId, HWND_NOTOPMOST, HWND_TOPMOST, IsIconic, IsWindowVisible, IsZoomed,
-    LWA_ALPHA, PostMessageW, SW_HIDE, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, SW_SHOW,
+    GetWindowThreadProcessId, HWND_NOTOPMOST, HWND_TOPMOST, IsIconic, IsWindow, IsWindowVisible,
+    IsZoomed, LWA_ALPHA, PostMessageW, SW_HIDE, SW_MAXIMIZE, SW_MINIMIZE, SW_RESTORE, SW_SHOW,
     SWP_NOACTIVATE, SWP_NOMOVE, SWP_NOSIZE, SWP_NOZORDER, SetForegroundWindow,
     SetLayeredWindowAttributes, SetWindowLongW, SetWindowPos, SetWindowTextW, ShowWindow, WM_CLOSE,
     WS_EX_LAYERED, WS_EX_TOOLWINDOW,
@@ -401,7 +401,36 @@ pub fn place(pattern: &str, by: MatchBy, resize: bool, a: i32, b: i32) -> Result
 
 /// The client area, so title bars and borders don't shift the center.
 pub fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
+    client_bounds(find(pattern, by)?)
+}
+
+/// A handle that stays on the matching window while its title changes.
+pub(super) fn resolve(pattern: &str, by: MatchBy) -> Result<super::WindowRef, String> {
     let hwnd = find(pattern, by)?;
+    Ok(super::WindowRef {
+        id: (hwnd as isize).to_string(),
+        desktop: super::DesktopKind::Windows,
+    })
+}
+
+pub(super) fn bounds_of(window: &super::WindowRef) -> Result<Rect, String> {
+    client_bounds(hwnd_of(window)?)
+}
+
+/// The window behind a handle from `resolve`, while it still exists.
+pub(crate) fn hwnd_of(window: &super::WindowRef) -> Result<HWND, String> {
+    let hwnd = window
+        .id
+        .parse::<isize>()
+        .map_err(|_| format!("'{}' isn't a window handle", window.id))? as HWND;
+    // SAFETY: IsWindow accepts any value and only checks it.
+    if unsafe { IsWindow(hwnd) } == 0 {
+        return Err("the window closed".into());
+    }
+    Ok(hwnd)
+}
+
+fn client_bounds(hwnd: HWND) -> Result<Rect, String> {
     // SAFETY: as in `act`; `rect` and `origin` are plain out-parameters.
     unsafe {
         if IsIconic(hwnd) != 0 {

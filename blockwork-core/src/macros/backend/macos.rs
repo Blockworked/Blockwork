@@ -19,7 +19,7 @@ const SYNTHETIC_EVENT_TAG: i64 = 0x424c4f434b574f52;
 
 // ── Key mapping ───────────────────────────────────────────────────────────────
 
-fn macro_key_to_cgkeycode(key: &MacroKey) -> Option<(u16, bool)> {
+pub(crate) fn macro_key_to_cgkeycode(key: &MacroKey) -> Option<(u16, bool)> {
     // CGKeyCode values from HIToolbox/Events.h
     Some(match key {
         MacroKey::Return => (36, false),

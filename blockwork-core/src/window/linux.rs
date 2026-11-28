@@ -171,15 +171,15 @@ pub(super) fn resolve(pattern: &str, by: MatchBy) -> Result<crate::window::Windo
             id: kde::find(pattern, by)?,
             desktop: DesktopKind::Kde,
         }),
-        _ => Err("background input only works on KDE Plasma so far: pick \"brought to front\" in the In window block".into()),
+        _ => Err("background input on Linux only works on KDE Plasma so far: pick \"brought to front\" in the In window block".into()),
     }
 }
 
 pub(super) fn bounds_of(window: &crate::window::WindowRef) -> Result<Rect, String> {
     match window.desktop {
         crate::window::DesktopKind::Kde => kde::bounds(&window.id),
-        crate::window::DesktopKind::Other => {
-            Err("background input only works on KDE Plasma so far: pick \"brought to front\" in the In window block".into())
+        _ => {
+            Err("background input on Linux only works on KDE Plasma so far: pick \"brought to front\" in the In window block".into())
         }
     }
 }

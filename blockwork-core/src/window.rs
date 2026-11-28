@@ -153,6 +153,8 @@ pub fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum DesktopKind {
     Kde,
+    Windows,
+    Macos,
     Other,
 }
 
@@ -160,7 +162,8 @@ pub enum DesktopKind {
 /// on it for a while keeps the same window when titles change.
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct WindowRef {
-    /// The desktop's own id (KWin's internal UUID on KDE).
+    /// The desktop's own id: KWin's internal UUID on KDE, the HWND on
+    /// Windows, "pid:window number" on macOS.
     pub id: String,
     pub desktop: DesktopKind,
 }
@@ -169,7 +172,11 @@ pub struct WindowRef {
 pub fn desktop_kind() -> Option<DesktopKind> {
     #[cfg(target_os = "linux")]
     return linux::desktop_kind();
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(windows)]
+    return Some(DesktopKind::Windows);
+    #[cfg(target_os = "macos")]
+    return Some(DesktopKind::Macos);
+    #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
     Some(DesktopKind::Other)
 }
 
@@ -178,23 +185,46 @@ pub fn desktop_kind() -> Option<DesktopKind> {
 pub fn resolve(pattern: &str, by: MatchBy) -> Result<WindowRef, String> {
     #[cfg(target_os = "linux")]
     return linux::resolve(pattern.trim(), by);
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(windows)]
+    return windows::resolve(pattern.trim(), by);
+    #[cfg(target_os = "macos")]
+    return macos::resolve(pattern.trim(), by);
+    #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
     {
         let _ = (pattern, by);
-        Err("background input only works on KDE Plasma so far: pick \"brought to front\" in the In window block".into())
+        Err(NO_HANDLES.into())
     }
+}
+
+/// The HWND behind a resolved window.
+#[cfg(windows)]
+pub fn windows_hwnd(window: &WindowRef) -> Result<windows_sys::Win32::Foundation::HWND, String> {
+    windows::hwnd_of(window)
+}
+
+/// The process id and window number behind a resolved window.
+#[cfg(target_os = "macos")]
+pub fn macos_window(window: &WindowRef) -> Result<(i32, u32), String> {
+    macos::pid_and_number(window)
 }
 
 /// The content area of a resolved window, in screen coordinates.
 pub fn bounds_of(window: &WindowRef) -> Result<Rect, String> {
     #[cfg(target_os = "linux")]
     return linux::bounds_of(window);
-    #[cfg(not(target_os = "linux"))]
+    #[cfg(windows)]
+    return windows::bounds_of(window);
+    #[cfg(target_os = "macos")]
+    return macos::bounds_of(window);
+    #[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
     {
         let _ = window;
-        Err("background input only works on KDE Plasma so far: pick \"brought to front\" in the In window block".into())
+        Err(NO_HANDLES.into())
     }
 }
+
+#[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
+const NO_HANDLES: &str = "background input doesn't work on this system: pick \"brought to front\" in the In window block";
 
 /// Whether any window's title or app contains `pattern`.
 #[cfg(target_os = "linux")]

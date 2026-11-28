@@ -109,6 +109,39 @@ fn normalize_image(image: &CGImage) -> Image {
     }
 }
 
+/// One window as it draws itself, even while covered by others.
+pub(super) fn capture_window(window: &crate::window::WindowRef, native: bool) -> Option<Shot> {
+    use core_graphics::window::{
+        kCGWindowImageBoundsIgnoreFraming, kCGWindowListOptionIncludingWindow,
+    };
+    if !unsafe { CGPreflightScreenCaptureAccess() } {
+        return None;
+    }
+    let (_, number) = crate::window::macos_window(window).ok()?;
+    let bounds = crate::window::bounds_of(window).ok()?;
+    let resolution = if native {
+        kCGWindowImageBestResolution
+    } else {
+        kCGWindowImageNominalResolution
+    };
+    // CGRectNull: the window's own bounds.
+    let null = CGRect::new(
+        &CGPoint::new(f64::INFINITY, f64::INFINITY),
+        &CGSize::new(0.0, 0.0),
+    );
+    let image = create_image(
+        null,
+        kCGWindowListOptionIncludingWindow,
+        number,
+        kCGWindowImageBoundsIgnoreFraming | resolution,
+    )?;
+    Some(Shot {
+        scale: image.width() as f64 / bounds.width.max(1.0),
+        image: normalize_image(&image),
+        origin: (bounds.x, bounds.y),
+    })
+}
+
 pub(super) fn monitors() -> Vec<Rect> {
     CGDisplay::active_displays()
         .unwrap_or_default()

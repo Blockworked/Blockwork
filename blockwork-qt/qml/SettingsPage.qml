@@ -513,7 +513,6 @@ Item {
                             }
                         }
                         SettingsSection {
-                            visible: Qt.platform.os === "linux"
                             SettingsRow {
                                 first: true
                                 id: backgroundRow
@@ -522,7 +521,8 @@ Item {
                                 Component.onCompleted: refresh()
                                 title: qsTr("Background input")
                                 detail: (backgroundRow.status ? backgroundRow.status.detail + "\n" : "")
-                                    + qsTr("Lets the In window block type and click into one window while you keep using yours. Needs KDE Plasma and the Blockwork KWin plugin.")
+                                    + (Qt.platform.os === "linux" ? qsTr("Lets the In window block type and click into one window while you keep using yours. Needs KDE Plasma and the Blockwork KWin plugin.")
+                                        : qsTr("Lets the In window block type and click into one window while you keep using yours."))
                                 Row {
                                     anchors.verticalCenter: parent.verticalCenter; spacing: 6
                                     readonly property color tint: !backgroundRow.status ? Theme.textDim : backgroundRow.status.ready ? Theme.running : Theme.textDim
