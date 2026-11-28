@@ -39,6 +39,7 @@ public:
     ~BlockworkSeatHost() override;
 
     void keyboardKey(KeyboardKeyEvent *event) override;
+    void pointerMotion(PointerMotionEvent *event) override;
     void pointerButton(PointerButtonEvent *event) override;
     void pointerAxis(PointerAxisEvent *event) override;
 
@@ -56,6 +57,12 @@ public:
         QMetaObject::Connection closed;
         QTimer *binding = nullptr;
         qint64 bindDeadline = 0;
+        /// Keyboard entered; bound waits for the app's next wl_display.sync.
+        bool entered = false;
+        /// The user's own pointer was over the target at the last check.
+        bool userPointerOver = false;
+        bool awaitingSync = false;
+        qint64 syncDeadline = 0;
         qint64 lastPreempt = -1000;
     };
 
@@ -84,6 +91,7 @@ private:
     void stamp(Lane &lane);
     void setDefaultKeymap(Lane &lane);
     void preempt(Window *window);
+    void recheckPointers();
 
     bool keyboardReady(SeatInterface *seat, wl_client *client) const;
     bool pointerReady(SeatInterface *seat, wl_client *client) const;
@@ -104,6 +112,7 @@ private:
         uint32_t id;
     };
     std::vector<KeyboardRequest> m_keyboards;
+    bool m_pointerRecheck = false;
 };
 
 } // namespace KWin

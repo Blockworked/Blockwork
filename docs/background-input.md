@@ -56,7 +56,10 @@ the host's plugin; it can't add one itself.
   lent to one connection and returned (with every key and button released)
   when it closes. It also keeps the window rendering while it's covered or
   minimized, and tells Blockwork when you touch the same window, so the macro
-  waits a moment for you.
+  waits a moment for you. On bind it puts the lane's pointer in the window's
+  middle (games like Sober only take keys under a pointer) and waits for the
+  app's next sync, since Qt only makes a window active, and runs its
+  shortcuts, one round trip after keyboard focus arrives.
 - `blockwork-core/src/macros/lane/`: the `Lane` trait and `LaneBackend`, which
   stands in for the strand's input backend inside the block, so every input
   block works unchanged. Typing sends a keymap made for the text, so your
@@ -70,6 +73,10 @@ the host's plugin; it can't add one itself.
 - Grabbing popups (menus) of the target app can take the user's keyboard,
   since KWin routes popups through its one main seat.
 - Signals sent inside the block run on the desktop, not in the window.
+- While the block runs, a Qt app treats the target as its active window, so
+  shortcuts in another window of the same app wait until the block ends.
+- The lane's pointer rests in the window's middle, so the app may show a
+  hover there.
 - Clipboard blocks still use the desktop clipboard.
 - On KWin 6.0 to 6.7, window capture needs Blockwork's desktop file to list
   `org.kde.KWin.ScreenShot2` in `X-KDE-DBUS-Restricted-Interfaces`.

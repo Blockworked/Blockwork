@@ -126,7 +126,8 @@
 
     <event name="bound">
       <description summary="the lane is aimed at the window">
-        width and height are the window content's logical size.
+        width and height are the window content's logical size. The lane's
+        pointer starts in the middle of it.
       </description>
       <arg name="width" type="uint"/>
       <arg name="height" type="uint"/>
