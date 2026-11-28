@@ -15,6 +15,10 @@ pub(crate) struct AppEntry {
     pub(crate) name: String,
     pub(crate) command: String,
     pub(crate) icon: Option<String>,
+    /// What its windows report as their app, for window blocks matching by app.
+    pub(crate) window: String,
+    /// Its running program's name, for the app-running reporters.
+    pub(crate) process: String,
 }
 
 #[cfg(target_os = "linux")]
@@ -35,6 +39,54 @@ pub(crate) fn list_apps() -> Vec<AppEntry> {
 #[cfg(not(any(target_os = "linux", target_os = "windows", target_os = "macos")))]
 pub(crate) fn list_apps() -> Vec<AppEntry> {
     Vec::new()
+}
+
+/// The file a Windows `.lnk` shortcut points at, from its LinkInfo's local
+/// base path (MS-SHLLINK 2.3). None for advertised or network shortcuts.
+#[cfg_attr(not(any(windows, test)), allow(dead_code))]
+fn shortcut_target(bytes: &[u8]) -> Option<String> {
+    let u16_at = |at: usize| Some(u16::from_le_bytes(bytes.get(at..at + 2)?.try_into().ok()?));
+    let u32_at =
+        |at: usize| Some(u32::from_le_bytes(bytes.get(at..at + 4)?.try_into().ok()?) as usize);
+    if u32_at(0)? != 0x4c {
+        return None;
+    }
+    let flags = u32_at(0x14)?;
+    let mut at = 0x4c;
+    if flags & 0x1 != 0 {
+        at += 2 + u16_at(at)? as usize;
+    }
+    if flags & 0x2 == 0 {
+        return None;
+    }
+    let info = at;
+    let header_size = u32_at(info + 4)?;
+    if u32_at(info + 8)? & 0x1 == 0 {
+        return None;
+    }
+    let ansi = |offset: usize| {
+        let start = info.checked_add(offset)?;
+        let rest = bytes.get(start..)?;
+        let end = rest.iter().position(|&b| b == 0)?;
+        Some(String::from_utf8_lossy(&rest[..end]).into_owned())
+    };
+    let wide = |offset: usize| {
+        let start = info.checked_add(offset)?;
+        let units: Vec<u16> = bytes
+            .get(start..)?
+            .chunks_exact(2)
+            .map(|c| u16::from_le_bytes([c[0], c[1]]))
+            .take_while(|&u| u != 0)
+            .collect();
+        Some(String::from_utf16_lossy(&units))
+    };
+    let (base, suffix) = if header_size >= 0x24 {
+        (wide(u32_at(info + 0x1c)?)?, wide(u32_at(info + 0x20)?)?)
+    } else {
+        (ansi(u32_at(info + 0x10)?)?, ansi(u32_at(info + 0x18)?)?)
+    };
+    let target = base + &suffix;
+    (!target.is_empty()).then_some(target)
 }
 
 #[cfg(target_os = "linux")]
@@ -70,6 +122,8 @@ mod linux {
         name: String,
         command: String,
         icon: Option<String>,
+        window: String,
+        process: String,
     }
 
     pub(crate) fn list_apps() -> Vec<AppEntry> {
@@ -101,12 +155,12 @@ mod linux {
                 else {
                     continue;
                 };
-                if !seen_ids.insert(id) {
+                if !seen_ids.insert(id.clone()) {
                     continue;
                 }
                 let Some(entry) = fs::read_to_string(&path)
                     .ok()
-                    .and_then(|c| parse_desktop_entry(&c))
+                    .and_then(|c| parse_desktop_entry(&id, &c))
                 else {
                     continue;
                 };
@@ -114,6 +168,8 @@ mod linux {
                     name: entry.name,
                     command: entry.command,
                     icon: entry.icon.and_then(|i| resolve_icon(&i)),
+                    window: entry.window,
+                    process: entry.process,
                 });
             }
         }
@@ -123,11 +179,12 @@ mod linux {
     /// Reads the handful of keys we care about out of a `.desktop` file's
     /// `[Desktop Entry]` section - a purpose-built scan rather than a general
     /// INI parser, since that's all this needs.
-    fn parse_desktop_entry(content: &str) -> Option<DesktopEntry> {
+    fn parse_desktop_entry(id: &str, content: &str) -> Option<DesktopEntry> {
         let mut in_main_section = false;
         let mut name = None;
         let mut exec = None;
         let mut icon = None;
+        let mut wm_class = None;
         let mut no_display = false;
         let mut hidden = false;
         let mut is_application = true;
@@ -149,6 +206,8 @@ mod linux {
                 exec = Some(v.to_string());
             } else if let Some(v) = line.strip_prefix("Icon=") {
                 icon = Some(v.to_string());
+            } else if let Some(v) = line.strip_prefix("StartupWMClass=") {
+                wm_class = Some(v.trim().to_string()).filter(|v| !v.is_empty());
             } else if let Some(v) = line.strip_prefix("NoDisplay=") {
                 no_display = v.eq_ignore_ascii_case("true");
             } else if let Some(v) = line.strip_prefix("Hidden=") {
@@ -166,11 +225,55 @@ mod linux {
         if command.is_empty() {
             return None;
         }
+        let id = id.strip_suffix(".desktop").unwrap_or(id);
         Some(DesktopEntry {
             name,
+            // Wayland app IDs are the desktop file's name; X11 classes are
+            // what StartupWMClass says when it differs.
+            window: wm_class.unwrap_or_else(|| id.to_string()),
+            process: program_name(&command, id),
             command,
             icon,
         })
+    }
+
+    #[cfg(test)]
+    pub(super) fn parse_desktop_entry_for_test(
+        id: &str,
+        content: &str,
+    ) -> Option<(String, String)> {
+        parse_desktop_entry(id, content).map(|e| (e.window, e.process))
+    }
+
+    /// The program an `Exec=` line runs, as the process list names it:
+    /// past `env VAR=value`, and the app inside `flatpak run`.
+    fn program_name(command: &str, id: &str) -> String {
+        let mut words = command
+            .split_whitespace()
+            .map(|w| w.trim_matches(|c| c == '"' || c == '\''));
+        let mut program = words.next().unwrap_or_default();
+        if program.rsplit('/').next() == Some("env") {
+            program = words
+                .by_ref()
+                .find(|w| !w.contains('=') && !w.starts_with('-'))
+                .unwrap_or_default();
+        }
+        let program = program.rsplit('/').next().unwrap_or_default();
+        if program != "flatpak" {
+            return program.to_string();
+        }
+        let rest: Vec<&str> = words.collect();
+        if let Some(command) = rest.iter().find_map(|w| w.strip_prefix("--command=")) {
+            return command.rsplit('/').next().unwrap_or_default().to_string();
+        }
+        let app = rest
+            .iter()
+            .skip_while(|w| **w != "run")
+            .skip(1)
+            .find(|w| !w.starts_with('-'))
+            .copied()
+            .unwrap_or(id);
+        app.rsplit('.').next().unwrap_or(app).to_lowercase()
     }
 
     /// Strips freedesktop field codes (`%f`/`%F`/`%u`/`%U`/etc.) from an
@@ -370,7 +473,7 @@ done
                 if !seen_ids.insert(id) {
                     continue;
                 }
-                if let Some(entry) = parse_desktop_entry(content) {
+                if let Some(entry) = parse_desktop_entry(id, content) {
                     entries.push(entry);
                 }
             }
@@ -389,6 +492,8 @@ done
                     icon: entry.icon.and_then(|i| icons.get(&i).cloned()),
                     name: entry.name,
                     command: entry.command,
+                    window: entry.window,
+                    process: entry.process,
                 })
                 .collect()
         }
@@ -487,10 +592,23 @@ mod windows {
             if lower.starts_with("uninstall") || lower.contains("website") {
                 continue;
             }
+            // Windows name an app by its executable; a shortcut whose
+            // target can't be read falls back to its own name.
+            let program = std::fs::read(&path)
+                .ok()
+                .and_then(|bytes| super::shortcut_target(&bytes))
+                .and_then(|target| {
+                    Path::new(&target)
+                        .file_stem()
+                        .map(|s| s.to_string_lossy().into_owned())
+                })
+                .unwrap_or_else(|| stem.to_string());
             out.push(AppEntry {
                 name: stem.to_string(),
                 command: path.to_string_lossy().to_string(),
                 icon: None,
+                window: program.clone(),
+                process: program,
             });
         }
     }
@@ -556,6 +674,8 @@ mod macos {
                     name: name.into(),
                     command: path.to_string_lossy().into_owned(),
                     icon: None,
+                    window: name.into(),
+                    process: name.into(),
                 });
                 continue;
             }
@@ -618,5 +738,79 @@ mod macos {
             assert!(apps.iter().all(|a| Path::new(&a.command).is_dir()));
             std::fs::remove_dir_all(root).unwrap();
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::shortcut_target;
+
+    fn shortcut(base: &str, suffix: &str) -> Vec<u8> {
+        let mut bytes = vec![0u8; 0x4c];
+        bytes[0] = 0x4c;
+        bytes[0x14] = 0x2;
+        let base_at = 0x1c;
+        let suffix_at = base_at + base.len() + 1;
+        let size = suffix_at + suffix.len() + 1;
+        for value in [size, 0x1c, 1, 0, base_at, 0, suffix_at] {
+            bytes.extend_from_slice(&(value as u32).to_le_bytes());
+        }
+        for text in [base, suffix] {
+            bytes.extend_from_slice(text.as_bytes());
+            bytes.push(0);
+        }
+        bytes
+    }
+
+    #[test]
+    fn reads_a_shortcuts_local_target() {
+        let lnk = shortcut(r"C:\Program Files\Google\Chrome\Application\chrome.exe", "");
+        assert_eq!(
+            shortcut_target(&lnk).as_deref(),
+            Some(r"C:\Program Files\Google\Chrome\Application\chrome.exe")
+        );
+        assert_eq!(shortcut_target(&lnk[..0x50]), None);
+        let mut advertised = lnk.clone();
+        advertised[0x14] = 0;
+        assert_eq!(shortcut_target(&advertised), None);
+    }
+
+    #[cfg(target_os = "linux")]
+    #[test]
+    fn desktop_entries_name_their_window_and_program() {
+        let entry = |id: &str, body: &str| {
+            let text = format!("[Desktop Entry]\nType=Application\nName=App\n{body}");
+            let e = super::linux::parse_desktop_entry_for_test(id, &text).unwrap();
+            (e.0, e.1)
+        };
+        assert_eq!(
+            entry("org.kde.kate.desktop", "Exec=kate -b %U"),
+            ("org.kde.kate".into(), "kate".into())
+        );
+        assert_eq!(
+            entry(
+                "google-chrome.desktop",
+                "Exec=/usr/bin/google-chrome-stable %U\nStartupWMClass=Google-chrome"
+            ),
+            ("Google-chrome".into(), "google-chrome-stable".into())
+        );
+        assert_eq!(
+            entry("x.desktop", "Exec=env GDK_BACKEND=x11 /opt/tool/bin/tool"),
+            ("x".into(), "tool".into())
+        );
+        assert_eq!(
+            entry(
+                "org.mozilla.firefox.desktop",
+                "Exec=/usr/bin/flatpak run --branch=stable --arch=x86_64 --command=firefox --file-forwarding org.mozilla.firefox @@u %u @@"
+            ),
+            ("org.mozilla.firefox".into(), "firefox".into())
+        );
+        assert_eq!(
+            entry(
+                "org.gnome.Calculator.desktop",
+                "Exec=flatpak run org.gnome.Calculator"
+            ),
+            ("org.gnome.Calculator".into(), "calculator".into())
+        );
     }
 }

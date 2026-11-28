@@ -15,6 +15,8 @@ AppDialog {
     signal selected(var app)
 
     property string searchText: ""
+    // Offers the search text itself, for slots that match part of a name.
+    property bool allowTyped: false
     // Set when a fetch takes longer than expected so the dialog stops
     // looking merely "loading" and offers a retry instead.
     property bool timedOut: false
@@ -35,7 +37,7 @@ AppDialog {
     property var filteredApps: {
         const q = searchText.trim().toLowerCase();
         if (!q) return allApps;
-        return allApps.filter(a => (a.name || "").toLowerCase().indexOf(q) >= 0);
+        return allApps.filter(a => [a.name, a.window, a.process].some(n => (n || "").toLowerCase().indexOf(q) >= 0));
     }
 
     function refreshApps() {
@@ -216,6 +218,11 @@ AppDialog {
 
         RowLayout {
             Layout.fillWidth: true
+            StitchButton {
+                visible: root.allowTyped && root.searchText.trim().length > 0
+                text: qsTr("Use \u201c%1\u201d").arg(root.searchText.trim())
+                onClicked: root.choose({ typed: root.searchText.trim() })
+            }
             Item { Layout.fillWidth: true }
             StitchButton {
                 visible: root.timedOut || root.appsError.length > 0

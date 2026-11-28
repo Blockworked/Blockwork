@@ -184,6 +184,8 @@ Item {
         pickUsb: request => usbDialog.openFor(request),
         pickApp: request => request.palette ? root.openPaletteAppPicker(request.instruction)
             : root.openAppPicker(request.strandId, request.path, request.instruction),
+        pickWindowApp: request => root.openValueAppPicker(request, "window"),
+        pickRunningApp: request => root.openValueAppPicker(request, "process"),
         launchOptions: request => launchDialog.openFor(request),
         pickRegion: request => root.startScreenPick(Object.assign({}, request, {kind: "region"})),
         clearRegion: request => {
@@ -218,13 +220,42 @@ Item {
     function openAppPicker(strandId, path, instruction) {
         appPickerRequest = { strandId: strandId, path: path, instruction: instruction };
         appSelector.title = instruction && instruction.type === "CloseApp" ? qsTr("Choose an App to Close") : qsTr("Choose an App");
+        appSelector.allowTyped = false;
         appSelector.open();
     }
     function openPaletteAppPicker(instruction) {
         const type = instruction ? instruction.type : "OpenApp";
         appPickerRequest = { paletteType: type };
         appSelector.title = type === "CloseApp" ? qsTr("Choose an App to Close") : qsTr("Choose an App");
+        appSelector.allowTyped = false;
         appSelector.open();
+    }
+    // A value slot naming an app: `kind` is "window" (what its windows
+    // report) or "process" (its running program).
+    function openValueAppPicker(request, kind) {
+        if (!request.location) return;
+        appPickerRequest = { location: request.location, kind: kind };
+        appSelector.title = qsTr("Choose an App");
+        appSelector.allowTyped = true;
+        appSelector.open();
+    }
+    readonly property var installedApps: {
+        try { return JSON.parse(root.appBridge ? root.appBridge.installedAppsJson : "[]") || []; } catch (e) { return []; }
+    }
+    property bool appLabelsRequested: false
+    function requestAppLabels() {
+        if (appLabelsRequested || !root.appBridge || typeof root.appBridge.refreshInstalledApps !== "function") return;
+        appLabelsRequested = true;
+        root.appBridge.refreshInstalledApps();
+    }
+    // The installed app a slot's text names, or the text itself.
+    function appLabel(text, kind) {
+        const t = String(text || "").trim();
+        if (!t) return qsTr("Choose app...");
+        if (!installedApps.length) Qt.callLater(root.requestAppLabels);
+        const lower = t.toLowerCase();
+        const app = installedApps.find(a => (a[kind] || "").toLowerCase() === lower);
+        return app ? app.name : t;
     }
     function resolvePickedIcon(app) {
         if (app.icon) return app.icon;
@@ -244,6 +275,13 @@ Item {
         const req = appPickerRequest;
         appPickerRequest = null;
         if (!req || !app) return;
+        if (req.location) {
+            // An older background service sends no window/process names.
+            const text = app.typed !== undefined ? app.typed : (app[req.kind] || app.name || "");
+            root.invoke("put_value", { location: req.location, value: root.textValue(text) });
+            return;
+        }
+        if (app.typed !== undefined) return;
         if (req.paletteType) {
             const fresh = defaultInstruction(req.paletteType);
             fresh.command = app.command;

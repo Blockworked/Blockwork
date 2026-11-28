@@ -23,6 +23,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Recording can include touchscreen gestures and a controller, and opens a review before the blocks are added ([docs](docs/recording.md)).
 - In window block: runs its blocks aimed at one window, in the background on Windows, macOS, and KDE Plasma with the new Blockwork KWin plugin (your keyboard, mouse and focus stay yours), or by bringing it to front anywhere else ([docs](docs/background-input.md)).
 - Input diagnostics in Settings > Integrations, to copy into a bug report.
+- Blocks that name an app (window blocks matching by app, In window, Wait for app, When app, and the app running and process ID reporters) choose it from the installed apps, like Open app. The picker can still use typed text that matches part of a name.
 - Starter templates: Controller to keyboard, Touch swipe and Startup notice.
 - Key and mouse button triggers can block the input from reaching other apps ("and block it"). Key triggers can also fire on a double press or a long hold, ignore other keys held with them, and tell left and right modifiers apart (LeftControl, RightShift).
 - Remap key block: turns one key or combo into another while Blockwork runs, with optional blocks to run on each press. A held remapped key repeats at the system's key repeat rate. The Copilot key can be remapped or blocked too, without opening the start menu.

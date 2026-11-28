@@ -184,8 +184,8 @@ QtObject {
                 enumArg: { index: 1, options: choices([["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")], ["center x", qsTr("center x")], ["center y", qsTr("center y")]]) } },
             Detection: { infix: qsTr("of detection"), result: "text",
                 enumArg: { index: 0, options: choices([["center x", qsTr("center x")], ["center y", qsTr("center y")], ["x", qsTr("x")], ["y", qsTr("y")], ["width", qsTr("width")], ["height", qsTr("height")], ["score", qsTr("score")], ["label", qsTr("label")], ["id", qsTr("id")]]) } },
-            AppRunning: { prefix: qsTr("app"), suffix: qsTr("is running?"), result: "bool" },
-            AppPid: { prefix: qsTr("process ID of app"), result: "number" },
+            AppRunning: { prefix: qsTr("app"), suffix: qsTr("is running?"), result: "bool", pickArg: { index: 0, action: "pickRunningApp", icon: "app-window" } },
+            AppPid: { prefix: qsTr("process ID of app"), result: "number", pickArg: { index: 0, action: "pickRunningApp", icon: "app-window" } },
             SystemInfo: { prefix: qsTr("computer"), result: "text",
                 enumArg: { index: 0, options: choices([["user name", qsTr("user name")], ["computer name", qsTr("name")], ["system", qsTr("system")],
                     ["system version", qsTr("system version")], ["home folder", qsTr("home folder")], ["display scale", qsTr("display scale")]]) } },
@@ -324,6 +324,15 @@ QtObject {
         const value = (field, key) => ({ kind: "value", field: field, key: key });
         // A text slot drawn as a box of its own under the row, for text with several lines.
         const box = (field, key, caption) => ({ kind: "value", field: field, key: key, box: true, boxLabel: caption });
+        // A window blocks' pattern: typed, or the app picker while it matches by app.
+        const windowTarget = (shown) => [
+            Object.assign(value("WindowPattern", "pattern"), { when: i => (!shown || shown(i)) && (!i || i.by !== "App") }),
+            Object.assign(value("WindowPattern", "pattern"), { when: i => (!shown || shown(i)) && !!i && i.by === "App",
+                pick: { action: "pickWindowApp", icon: "app-window", display: t => page.appLabel(t, "window"),
+                        tip: qsTr("Click to choose an app, or drop a reporter here") } })];
+        // A running program's name, chosen from the installed apps.
+        const appPattern = Object.assign(value("AppPattern", "pattern"), { pick: { action: "pickRunningApp", icon: "app-window",
+            display: t => page.appLabel(t, "process"), tip: qsTr("Click to choose an app, or drop a reporter here") } });
         const signalPieces = [{ kind: "value", field: "SignalName", key: "name", pickAction: "pickSignal", expression: "expression" }];
         // The detect blocks' search area: the whole window, or a part picked on screen.
         const regionPieces = [
@@ -405,11 +414,11 @@ QtObject {
         // A switch with nothing to fill in: on while the instruction's flag is true.
         const flagComponent = (key, text, icon) => ({ key: key, label: text, icon: icon, fresh: true,
             present: i => !!i && i[key] === true, pieces: [label(text.toUpperCase())] });
-        return { onlyWhenComponent, flagComponent, label, commandField, imagePieces, value, box, signalPieces, regionPieces, timeoutComponent, errorTimeoutComponent, toleranceComponent, regionComponent, pickComponent, browserMatchComponent, countComponent, whenTimeHead, launchSummary, direction, keyValue };
+        return { onlyWhenComponent, flagComponent, label, commandField, imagePieces, value, box, windowTarget, appPattern, signalPieces, regionPieces, timeoutComponent, errorTimeoutComponent, toleranceComponent, regionComponent, pickComponent, browserMatchComponent, countComponent, whenTimeHead, launchSummary, direction, keyValue };
     }
     // Triggers (the When... headers).
     function eventRows(p) {
-        const { label, value, signalPieces, whenTimeHead, direction, keyValue, onlyWhenComponent, flagComponent } = p;
+        const { label, value, signalPieces, whenTimeHead, direction, keyValue, onlyWhenComponent, flagComponent, appPattern } = p;
         const blockComponent = flagComponent("block", qsTr("and block it"), "hand");
         return {
             WhenNativeUiChanged: {shape: "header",icon:"scan",head:[label(qsTr("WHEN NATIVE ELEMENT")),Object.assign(value("NativeUiSelector","selector"),{pick:{action:"pickNativeUi",icon:"scan",display:t=>nativeUiLabel(t)}}),
@@ -462,7 +471,7 @@ QtObject {
             ], head: [label(qsTr("WHEN I TYPE")), value("TypedText", "text"), label(qsTr("THEN")),
                 { kind: "dropdown", key: "erase", options: [{ value: "erase", label: qsTr("erase it") }, { value: "keep", label: qsTr("keep it") }],
                   encode: v => v === "erase", decode: v => v ? "erase" : "keep" }] },
-            WhenApp: { shape: "header", icon: "app-window", head: [label(qsTr("WHEN APP")), value("AppPattern", "pattern"),
+            WhenApp: { shape: "header", icon: "app-window", head: [label(qsTr("WHEN APP")), appPattern,
                 { kind: "dropdown", key: "started", options: [{ value: "starts", label: qsTr("starts") }, { value: "exits", label: qsTr("exits") }],
                   encode: v => v === "starts", decode: v => v ? "starts" : "exits" }] },
             WhenTrayItem: { shape: "header", icon: "menu", head: [label(qsTr("WHEN TRAY ITEM")), value("TrayLabel", "label"), label(qsTr("IS CLICKED"))] },
@@ -546,7 +555,7 @@ QtObject {
 
     // Waiting, errors, other macros, signals and locks.
     function controlRows(p) {
-        const { label, value, signalPieces, timeoutComponent, errorTimeoutComponent, keyValue } = p;
+        const { label, value, signalPieces, timeoutComponent, errorTimeoutComponent, keyValue, appPattern } = p;
         // A wait's limit that ends the strand with an error, kept in "timeout".
         const errorAfter = () => ({ key: "timeout", label: qsTr("or error after"), icon: "timer", fresh: () => numberValue(10000), pieces: [
             label(qsTr("or error after")), value("WaitTimeout", "timeout"), label(qsTr("ms"))] });
@@ -575,7 +584,7 @@ QtObject {
                 { kind: "dropdown", key: "wait", options: [{ value: "start", label: qsTr("and continue") }, { value: "wait", label: qsTr("and wait") }],
                   encode: v => v === "wait", decode: v => v ? "wait" : "start" }] },
             StopMacroNamed: { icon: "square", head: [label(qsTr("stop macro")), value("MacroTarget", "target")] },
-            WaitForApp: { icon: "app-window", components: [errorAfter()], head: [label(qsTr("wait until app")), value("AppPattern", "pattern"),
+            WaitForApp: { icon: "app-window", components: [errorAfter()], head: [label(qsTr("wait until app")), appPattern,
                 { kind: "dropdown", key: "running", options: choices([["running", qsTr("is running")], ["closed", qsTr("has closed")]]),
                   encode: v => v === "running", decode: v => v ? "running" : "closed" }] },
             WaitForClipboard: { icon: "clipboard-check", components: [errorAfter()], head: [label(qsTr("wait until the clipboard changes"))] },
@@ -621,7 +630,7 @@ QtObject {
 
     // Apps, windows, clipboard, files, web and dialogs.
     function systemRows(p) {
-        const { label, commandField, value, box, launchSummary, flagComponent } = p;
+        const { label, commandField, value, box, launchSummary, flagComponent, windowTarget } = p;
         return {
             CopyFile: { icon: "copy", head: [
                 { kind: "dropdown", key: "move_file", options: choices([["copy", qsTr("copy")], ["move", qsTr("move")]]),
@@ -679,18 +688,18 @@ QtObject {
             WindowAction: { icon: "app-window", head: [
                 { kind: "dropdown", key: "action", options: choices([["Focus", qsTr("focus")], ["Minimize", qsTr("minimize")], ["Maximize", qsTr("maximize")], ["Restore", qsTr("restore")], ["Close", qsTr("close")],
                     ["AlwaysOnTop", qsTr("keep on top")], ["NotOnTop", qsTr("stop keeping on top")], ["Hide", qsTr("hide")], ["Show", qsTr("show")]]) },
-                { kind: "dropdown", key: "by", options: windowMatchOptions }, value("WindowPattern", "pattern")] },
+                { kind: "dropdown", key: "by", options: windowMatchOptions }, ...windowTarget()] },
             SetWindow: { icon: "app-window", head: [label(qsTr("set")),
                 { kind: "dropdown", key: "setting", options: choices([["Opacity", qsTr("opacity %")], ["Title", qsTr("title")], ["Monitor", qsTr("monitor")]]) },
-                label(qsTr("of")), { kind: "dropdown", key: "by", options: windowMatchOptions }, value("WindowPattern", "pattern"),
+                label(qsTr("of")), { kind: "dropdown", key: "by", options: windowMatchOptions }, ...windowTarget(),
                 label(qsTr("to")), value("WindowValue", "value")] },
             UseCoordinates: { icon: "crosshair", head: [label(qsTr("use coordinates of")),
                 { kind: "dropdown", key: "window", options: choices([["screen", qsTr("the screen")], ["window", qsTr("a window:")]]),
                   encode: v => v === "window", decode: v => v ? "window" : "screen" },
                 Object.assign({ kind: "dropdown", key: "by", options: windowMatchOptions }, { when: i => !!i && i.window }),
-                Object.assign(value("WindowPattern", "pattern"), { when: i => !!i && i.window })] },
+                ...windowTarget(i => !!i && i.window)] },
             InWindow: { icon: "app-window", mouths: ["body"], head: [label(qsTr("in")),
-                { kind: "dropdown", key: "by", options: windowMatchOptions }, value("WindowPattern", "pattern"),
+                { kind: "dropdown", key: "by", options: windowMatchOptions }, ...windowTarget(),
                 { kind: "dropdown", key: "front", options: choices([["background", qsTr("in the background")], ["front", qsTr("brought to front")]]),
                   encode: v => v === "front", decode: v => v ? "front" : "background" },
                 Object.assign({ kind: "dropdown", key: "or_front", options: choices([["stop", qsTr("else stop")], ["front", qsTr("else bring it to front")]]),
@@ -786,7 +795,7 @@ QtObject {
             MoveWindow: { icon: "move", head: [
                 { kind: "dropdown", key: "resize", options: [{ value: "move", label: qsTr("move") }, { value: "resize", label: qsTr("resize") }],
                   encode: v => v === "resize", decode: v => v ? "resize" : "move" },
-                { kind: "dropdown", key: "by", options: windowMatchOptions }, value("WindowPattern", "pattern"),
+                { kind: "dropdown", key: "by", options: windowMatchOptions }, ...windowTarget(),
                 Object.assign(label(qsTr("to x")), { when: i => !i || !i.resize }), Object.assign(label(qsTr("to width")), { when: i => !!i && i.resize }),
                 value("WindowX", "x"),
                 Object.assign(label(qsTr("y")), { when: i => !i || !i.resize }), Object.assign(label(qsTr("height")), { when: i => !!i && i.resize }),
@@ -796,7 +805,7 @@ QtObject {
 
     // Images and object detection.
     function screenRows(p) {
-        const { label, imagePieces, value, box, regionPieces, timeoutComponent, errorTimeoutComponent, toleranceComponent, regionComponent, pickComponent, countComponent } = p;
+        const { label, imagePieces, value, box, regionPieces, timeoutComponent, errorTimeoutComponent, toleranceComponent, regionComponent, pickComponent, countComponent, windowTarget } = p;
         return {
             FindColor: { icon: "pipette", head: [label(qsTr("find color")), value("ColorValue", "color"), label(qsTr("put x in")),
                 { kind: "dropdown", key: "x_variable", options: () => page.variableChoices(), placeholder: qsTr("(no variable)") },
@@ -814,7 +823,7 @@ QtObject {
                 { kind: "dropdown", key: "appear", options: [{ value: "appears", label: qsTr("appears") }, { value: "gone", label: qsTr("disappears") }],
                   encode: v => v === "appears", decode: v => v ? "appears" : "gone" }] },
             DetectObjectsInWindow: { icon: "aperture", head: [label(qsTr("detect")), value("DetectLabel", "label"), label(qsTr("in")),
-                { kind: "dropdown", key: "by", options: windowMatchOptions }, value("WindowPattern", "pattern"), ...regionPieces,
+                { kind: "dropdown", key: "by", options: windowMatchOptions }, ...windowTarget(), ...regionPieces,
                 label(qsTr("with")), value("DetectorUrl", "detector"), { kind: "button", action: "pickModel", icon: "box" }, label(qsTr("at least")), value("DetectConfidence", "confidence"), label(qsTr("% into")),
                 { kind: "dropdown", key: "results_list", options: "lists" },
                 { kind: "dropdown", key: "sort", options: detectionSortOptions },
@@ -822,11 +831,11 @@ QtObject {
             WaitForDetection: { icon: "eye", head: [label(qsTr("wait until")), value("DetectLabel", "label"),
                 { kind: "dropdown", key: "appear", options: [{ value: "appears", label: qsTr("appears") }, { value: "gone", label: qsTr("disappears") }],
                   encode: v => v === "appears", decode: v => v ? "appears" : "gone" },
-                label(qsTr("in")), { kind: "dropdown", key: "by", options: windowMatchOptions }, value("WindowPattern", "pattern"), ...regionPieces,
+                label(qsTr("in")), { kind: "dropdown", key: "by", options: windowMatchOptions }, ...windowTarget(), ...regionPieces,
                 label(qsTr("with")), value("DetectorUrl", "detector"), { kind: "button", action: "pickModel", icon: "box" }, label(qsTr("at least")), value("DetectConfidence", "confidence"),
                 label(qsTr("% for up to")), value("WaitTimeout", "timeout"), label(qsTr("ms"))] },
             AimStep: { icon: "crosshair", head: [label(qsTr("aim from center of")), { kind: "dropdown", key: "by", options: windowMatchOptions },
-                value("WindowPattern", "pattern"), label(qsTr("toward x")), value("AimTargetX", "target_x"), label(qsTr("y")), value("AimTargetY", "target_y"),
+                ...windowTarget(), label(qsTr("toward x")), value("AimTargetX", "target_x"), label(qsTr("y")), value("AimTargetY", "target_y"),
                 label(qsTr("gain")), value("AimGain", "gain"), label(qsTr("max step")), value("AimMaxStep", "max_step"),
                 label(qsTr("deadzone")), value("AimDeadzone", "deadzone")] },
             AimAtDetection: { icon: "target", head: [label(qsTr("aim at item")), value("AimIndex", "index"), label(qsTr("of")),

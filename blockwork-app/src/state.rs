@@ -294,6 +294,8 @@ pub(crate) struct AppEntryDto {
     pub(crate) name: String,
     pub(crate) command: String,
     pub(crate) icon: Option<String>,
+    pub(crate) window: String,
+    pub(crate) process: String,
 }
 
 #[derive(Serialize, Clone)]

@@ -180,6 +180,8 @@ pub(crate) async fn list_installed_apps() -> Vec<crate::state::AppEntryDto> {
             name: a.name,
             command: a.command,
             icon: a.icon,
+            window: a.window,
+            process: a.process,
         })
         .collect()
 }
