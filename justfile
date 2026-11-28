@@ -24,12 +24,64 @@ default: build
 # so the whole workspace has to be built, not just the default members.
 # blockwork-linux-bridge is Linux-only and ships with the Geometry Dash mod
 # (blockwork-ffi/build-windows.sh builds it).
+# qt-version only accepts x.y.0 releases, so a distro Qt like 6.12.1 is skipped
+# for a Qt minimal download that QWindowKit can't build against. Prefer qmake6.
+[unix]
+build *args:
+    #!/bin/sh
+    set -eu
+    q="${QMAKE:-$(command -v qmake6 || true)}"
+    if [ -n "$q" ]; then export QMAKE="$q"; fi
+    cargo build --release --workspace --exclude blockwork-linux-bridge {{args}}
+
+[windows]
 build *args:
     cargo build --release --workspace --exclude blockwork-linux-bridge {{args}}
 
-[unix]
+[linux]
+run: build kwin-plugin
+    "{{TARGET}}"
+
+[macos]
 run: build
     "{{TARGET}}"
+
+# The KWin plugin behind the In window block's background input. Skips with a
+# note when KWin's dev files are missing; installing it asks for sudo.
+[linux]
+kwin-plugin:
+    #!/bin/sh
+    set -u
+    if ! command -v cmake >/dev/null || [ ! -d /usr/share/ECM ] || ! ls /usr/lib*/cmake/KWin/KWinConfig.cmake >/dev/null 2>&1; then
+        echo "Skipping the KWin plugin: needs cmake, extra-cmake-modules and KWin's dev files"
+        exit 0
+    fi
+    if ! { cmake -S blockwork-kwin -B target/kwin-plugin -DCMAKE_BUILD_TYPE=Release >/dev/null && cmake --build target/kwin-plugin; }; then
+        echo "KWin plugin build failed: background input stays off, see the output above" >&2
+        exit 0
+    fi
+    built=target/kwin-plugin/blockworkseathost.so
+    plugins="$(qtpaths6 --query QT_INSTALL_PLUGINS 2>/dev/null || echo /usr/lib/qt6/plugins)/kwin/plugins"
+    changed=0
+    if ! cmp -s "$built" "$plugins/blockworkseathost.so"; then
+        echo "Installing the KWin plugin to $plugins"
+        sudo install -Dm755 "$built" "$plugins/blockworkseathost.so" || { echo "KWin plugin not installed: rerun and allow sudo" >&2; exit 0; }
+        changed=1
+    fi
+    # Only a running KWin can load it; it can't unload an old copy.
+    loaded="$(qdbus6 org.kde.KWin /Plugins org.kde.KWin.Plugins.LoadedPlugins 2>/dev/null || true)"
+    if [ -z "$loaded" ]; then
+        exit 0
+    elif echo "$loaded" | grep -qx blockworkseathost; then
+        if [ "$changed" = 1 ]; then echo "KWin still runs the old plugin: log out and back in to load the new one"; fi
+    else
+        qdbus6 org.kde.KWin /Plugins org.kde.KWin.Plugins.LoadPlugin blockworkseathost >/dev/null
+        if qdbus6 org.kde.KWin /Plugins org.kde.KWin.Plugins.LoadedPlugins | grep -qx blockworkseathost; then
+            echo "KWin plugin loaded"
+        else
+            echo "KWin didn't load the plugin: log out and back in, then check journalctl --user -b | grep -i kwin" >&2
+        fi
+    fi
 
 # Stage the Qt DLLs and QML plugins beside both executables before launching.
 [windows]

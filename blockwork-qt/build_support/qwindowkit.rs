@@ -43,7 +43,9 @@ pub fn build() -> PathBuf {
         // conf.cmake looks Qt up as "QT" first, which Qt6_DIR alone doesn't answer.
         .define("QT_VERSION_MAJOR", "6")
         .define("QT_DIR", &qt_cmake)
-        .define("CMAKE_PREFIX_PATH", Path::new(&libraries).join("cmake"))
+        // The Qt prefix, not lib/cmake: Unix find_package only checks <prefix>/lib/cmake/<name>,
+        // so lib/cmake let Qt6CorePrivate and friends resolve to a system Qt instead.
+        .define("CMAKE_PREFIX_PATH", Path::new(&libraries).parent().unwrap())
         .define("Qt6_DIR", qt_cmake)
         .define("CMAKE_INSTALL_LIBDIR", "lib")
         .define("CMAKE_DEBUG_POSTFIX", "")
