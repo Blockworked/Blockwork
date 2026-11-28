@@ -72,8 +72,12 @@ that needs it offers the same:
   if the folder is already on its path, KWin's `LoadPlugin` starts it at once.
   KWin can't swap a running plugin, so an update also waits for the next
   login. Remove plugin deletes both files.
-- After a Plasma update the copy no longer matches KWin, and Settings and the
-  block offer an update.
+- After a Plasma update the copy no longer matches KWin, and after a Blockwork
+  update it may be older than the plugin this Blockwork ships. Either way
+  Blockwork offers the update when it starts, and Settings has Update plugin
+  and Remove plugin. Bump the version in `blockwork-kwin/CMakeLists.txt` and
+  `metadata.json` whenever the plugin changes, so installed copies update and
+  CI publishes a new `kwin-plugin-<version>` release.
 
 Developers can still build and install it system-wide:
 

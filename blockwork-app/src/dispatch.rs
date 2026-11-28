@@ -413,7 +413,10 @@ impl Backend {
                 )
             }
             #[cfg(target_os = "linux")]
-            "kwin_plugin_remove" => to_json(blockwork_core::macros::lane::kwin_plugin::remove()?),
+            "kwin_plugin_remove" => {
+                blockwork_core::macros::lane::kwin_plugin::remove()?;
+                to_json(true)
+            }
             "new_webhook_token" => to_json(crate::webhook::new_token(&self.state, &self.app)?),
             "webhook_token" => to_json(crate::webhook::token()),
             "set_macro_max_run_secs" => {

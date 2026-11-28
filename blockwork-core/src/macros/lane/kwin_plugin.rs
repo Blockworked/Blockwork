@@ -145,14 +145,18 @@ fn load_now() -> bool {
 /// Where the plugin stands, for Settings and the install dialog.
 #[derive(Debug, Clone, Serialize, PartialEq)]
 pub struct Status {
-    /// "ready", "missing", "outdated" (built for another KWin), "relogin"
-    /// (installed, loads at the next login) or "unsupported".
+    /// "ready", "missing", "outdated" (built for another KWin), "stale" (an
+    /// older plugin than this Blockwork's), "relogin" (installed, loads at the
+    /// next login) or "unsupported".
     pub state: &'static str,
     pub ready: bool,
     pub detail: String,
     pub kwin: String,
     /// The KWin version this user's copy was built for.
     pub installed_for: String,
+    /// The plugin version of this user's copy, and the one this Blockwork ships.
+    pub installed_plugin: String,
+    pub plugin: String,
 }
 
 pub fn status() -> Status {
@@ -176,7 +180,19 @@ fn status_with(ready: Result<String, String>) -> Status {
         .as_ref()
         .map(|i| i.kwin.clone())
         .unwrap_or_default();
+    let running = ready.is_ok();
+    let installed_plugin = installed
+        .as_ref()
+        .map(|i| i.plugin.clone())
+        .unwrap_or_default();
     let (state, detail) = match ready {
+        _ if kde && !installed_plugin.is_empty() && installed_plugin != plugin_version() => (
+            "stale",
+            format!(
+                "this Blockwork comes with KWin plugin {} but {installed_plugin} is installed: update it",
+                plugin_version()
+            ),
+        ),
         Ok(detail) => ("ready", detail),
         Err(why) if !kde => ("unsupported", why),
         Err(_) => match installed {
@@ -199,10 +215,12 @@ fn status_with(ready: Result<String, String>) -> Status {
     };
     Status {
         state,
-        ready: state == "ready",
+        ready: running,
         detail,
         kwin,
         installed_for,
+        installed_plugin,
+        plugin: plugin_version().to_string(),
     }
 }
 
@@ -409,16 +427,16 @@ pub fn remove() -> Result<(), String> {
 /// when it's running now.
 pub fn offer() -> Result<bool, String> {
     let status = missing();
-    if !matches!(status.state, "missing" | "outdated") {
+    if !matches!(status.state, "missing" | "outdated" | "stale") {
         return Ok(false);
     }
     if crate::permissions::require("network").is_err() {
         return Ok(false);
     }
-    let action = if status.state == "outdated" {
-        "Update"
-    } else {
+    let action = if status.state == "missing" {
         "Install"
+    } else {
+        "Update"
     };
     let message = format!(
         "Background input needs Blockwork's KWin plugin. {action} it for KWin {} now? It's downloaded from Blockwork's GitHub releases (or built on this computer when there's no download for your KWin) and installed for your user only, no password needed.",

@@ -143,6 +143,7 @@ ApplicationWindow {
         onStateJsonChanged: {
             try {
                 root.appState = JSON.parse(stateJson);
+                if (!root.initialStateReceived) kwinPlugin.checkAtStartup();
                 root.initialStateReceived = true;
             }
             catch (error) { console.warn("Invalid Blockwork state", error); }
@@ -153,6 +154,8 @@ ApplicationWindow {
         onFocusSerialChanged: { root.show(); root.raise(); root.requestActivate(); }
     }
     Component.onCompleted: { bridge.start(); bridge.setWindowFrameMargin(shadowMargin); }
+    // Offers a plugin update after Blockwork or Plasma updates.
+    KwinPluginDialog { id: kwinPlugin; appBridge: bridge }
     // Compositor treats the shadow as outside the window, so it can reach the screen edges.
     onShadowMarginChanged: bridge.setWindowFrameMargin(shadowMargin)
     onActiveChanged: if (!active && appState.combo_capture) invoke("cancel_combo_capture")
@@ -262,7 +265,7 @@ ApplicationWindow {
     }
     Component { id: onboardingComponent; OnboardingPage { appState: root.appState; invoke: root.invoke } }
     // Distinct IDs avoid resolving a page's injected property to itself.
-    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; appBridge: bridge; translator: sharedTranslator } }
+    Component { id: settingsComponent; SettingsPage { appState: root.appState; invoke: root.invoke; appBridge: bridge; translator: sharedTranslator; kwinPluginDialog: kwinPlugin } }
     MacroFiles { id: sharedMacroFiles; appState: root.appState; invoke: root.invoke; appBridge: bridge }
     BlockLibrary { id: sharedBlockLibrary; appState: root.appState; invoke: root.invoke; appBridge: bridge; macroFiles: sharedMacroFiles }
 
