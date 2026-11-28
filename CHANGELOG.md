@@ -52,6 +52,7 @@ section below as the GitHub release notes, followed by the downloads table.
 
 ### Fixed
 - Toolbar buttons such as Hide sidebar work again with Qt 6.12.
+- Dragging an operator right after typing into one of its fields no longer puts the old value back.
 
 ## [0.6.5] - 2026-11-25
 
