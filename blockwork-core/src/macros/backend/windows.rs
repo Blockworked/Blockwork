@@ -247,6 +247,20 @@ impl InputBackend for WinApiBackend {
 
     fn button(&mut self, button: MacroButton, dir: Direction) -> Result<(), String> {
         use enigo::{Axis as EAxis, Button as EButton};
+        let is_scroll = matches!(
+            button,
+            MacroButton::ScrollUp
+                | MacroButton::ScrollDown
+                | MacroButton::ScrollLeft
+                | MacroButton::ScrollRight
+        );
+        // Hold the button briefly: games that poll button state miss a
+        // press and release delivered in one SendInput batch.
+        if matches!(dir, Direction::Click) && !is_scroll {
+            self.button(button.clone(), Direction::Press)?;
+            std::thread::sleep(super::CLICK_HOLD);
+            return self.button(button, Direction::Release);
+        }
         let dir = to_enigo_dir(dir);
         match button {
             // enigo's vertical scroll sign is inverted relative to the wheel

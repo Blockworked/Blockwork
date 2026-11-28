@@ -657,15 +657,19 @@ impl InputBackend for MacosBackend {
                 let ev = CGEvent::new_mouse_event(self.source.clone(), down_ty, pos, mouse_btn)
                     .map_err(|_| format!("CGEvent mouse down failed"))?;
                 ev.set_integer_value_field(EventField::MOUSE_EVENT_BUTTON_NUMBER, number as i64);
+                ev.set_integer_value_field(EventField::MOUSE_EVENT_CLICK_STATE, 1);
                 self.post(ev);
                 self.held_buttons |= 1 << number;
                 if matches!(dir, Direction::Click) {
+                    // Hold briefly so apps that poll button state see the press.
+                    std::thread::sleep(super::CLICK_HOLD);
                     let ev = CGEvent::new_mouse_event(self.source.clone(), up_ty, pos, mouse_btn)
                         .map_err(|_| format!("CGEvent mouse up failed"))?;
                     ev.set_integer_value_field(
                         EventField::MOUSE_EVENT_BUTTON_NUMBER,
                         number as i64,
                     );
+                    ev.set_integer_value_field(EventField::MOUSE_EVENT_CLICK_STATE, 1);
                     self.post(ev);
                     self.held_buttons &= !(1 << number);
                 }
@@ -674,6 +678,7 @@ impl InputBackend for MacosBackend {
                 let ev = CGEvent::new_mouse_event(self.source.clone(), up_ty, pos, mouse_btn)
                     .map_err(|_| format!("CGEvent mouse up failed"))?;
                 ev.set_integer_value_field(EventField::MOUSE_EVENT_BUTTON_NUMBER, number as i64);
+                ev.set_integer_value_field(EventField::MOUSE_EVENT_CLICK_STATE, 1);
                 self.post(ev);
                 self.held_buttons &= !(1 << number);
             }

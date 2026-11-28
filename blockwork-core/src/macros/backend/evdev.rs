@@ -259,6 +259,36 @@ fn emit_key_click(key: KeyCode, needs_shift: bool) -> Result<(), String> {
     Ok(())
 }
 
+/// A button press and release in one evdev frame leaves libinput's button
+/// mask unchanged, so the click is lost. Send them as two frames, held apart.
+fn emit_button_click(button: KeyCode) -> Result<(), String> {
+    let vd = get_or_init_virtual_device().map_err(|e| e.to_string())?;
+    {
+        let mut vd = vd.lock().unwrap();
+        let held = PASSED_DOWN.lock().unwrap().contains(&button.0);
+        vd.emit(&button_press_events(button, held))
+            .map_err(|e| e.to_string())?;
+    }
+    std::thread::sleep(super::CLICK_HOLD);
+    let mut vd = vd.lock().unwrap();
+    vd.emit(&[InputEvent::new(EventType::KEY.0, button.0, 0), syn_event()])
+        .map_err(|e| e.to_string())?;
+    PASSED_DOWN.lock().unwrap().retain(|code| *code != button.0);
+    Ok(())
+}
+
+/// The press half of a click, ending a physically held press first.
+fn button_press_events(button: KeyCode, was_held: bool) -> Vec<InputEvent> {
+    let mut events = Vec::with_capacity(4);
+    if was_held {
+        events.push(InputEvent::new(EventType::KEY.0, button.0, 0));
+        events.push(syn_event());
+    }
+    events.push(InputEvent::new(EventType::KEY.0, button.0, 1));
+    events.push(syn_event());
+    events
+}
+
 fn key_click_events(key: KeyCode, needs_shift: bool, was_held: bool) -> Vec<InputEvent> {
     let mut events: Vec<InputEvent> = Vec::with_capacity(8);
     if was_held {
@@ -335,8 +365,23 @@ fn click_mouse_abs_portal(
         .move_mouse(x, y, EnigoCoordinate::Abs)
         .map_err(|err| err.to_string())?;
     cursor_track::set_exact(f64::from(x), f64::from(y));
+    if matches!(
+        button,
+        enigo::Button::ScrollUp
+            | enigo::Button::ScrollDown
+            | enigo::Button::ScrollLeft
+            | enigo::Button::ScrollRight
+    ) {
+        return mouse
+            .button(button, enigo::Direction::Click)
+            .map_err(|err| err.to_string());
+    }
     mouse
-        .button(button, enigo::Direction::Click)
+        .button(button, enigo::Direction::Press)
+        .map_err(|err| err.to_string())?;
+    std::thread::sleep(super::CLICK_HOLD);
+    mouse
+        .button(button, enigo::Direction::Release)
         .map_err(|err| err.to_string())
 }
 
@@ -566,7 +611,7 @@ impl InputBackend for EvdevBackend {
         match dir {
             Direction::Press => emit_key(evdev_btn, true),
             Direction::Release => emit_key(evdev_btn, false),
-            Direction::Click => emit_key_click(evdev_btn, false),
+            Direction::Click => emit_button_click(evdev_btn),
         }
     }
 
@@ -1248,11 +1293,12 @@ mod tests {
             button: enigo::Button,
             direction: enigo::Direction,
         ) -> enigo::InputResult<()> {
-            assert_eq!(
-                (button, direction),
-                (enigo::Button::Right, enigo::Direction::Click)
-            );
-            self.events.push("click");
+            assert_eq!(button, enigo::Button::Right);
+            self.events.push(match direction {
+                enigo::Direction::Press => "press",
+                enigo::Direction::Release => "release",
+                enigo::Direction::Click => "click",
+            });
             if self.fail_click {
                 Err(enigo::InputError::Simulate("click failed"))
             } else {
@@ -1274,7 +1320,7 @@ mod tests {
     fn image_click_uses_portal_after_absolute_move() {
         let mut mouse = PortalMouse::default();
         click_mouse_abs_portal(&mut mouse, 120, 240, MacroButton::Right).unwrap();
-        assert_eq!(mouse.events, ["move", "click"]);
+        assert_eq!(mouse.events, ["move", "press", "release"]);
     }
 
     #[test]
@@ -1295,7 +1341,23 @@ mod tests {
         };
         let err = click_mouse_abs_portal(&mut mouse, 120, 240, MacroButton::Right).unwrap_err();
         assert!(err.contains("click failed"));
-        assert_eq!(mouse.events, ["move", "click"]);
+        assert_eq!(mouse.events, ["move", "press"]);
+    }
+
+    #[test]
+    fn button_press_ends_its_frame_before_the_release() {
+        // libinput diffs button state per frame, so press and release can't share one.
+        let events = button_press_events(KeyCode::BTN_LEFT, false);
+        assert_eq!(events.len(), 2);
+        assert_eq!(events[0].value(), 1);
+        assert_eq!(events[1].event_type(), EventType::SYNCHRONIZATION);
+        let held = button_press_events(KeyCode::BTN_LEFT, true);
+        let values: Vec<i32> = held
+            .iter()
+            .filter(|e| e.event_type() == EventType::KEY)
+            .map(|e| e.value())
+            .collect();
+        assert_eq!(values, [0, 1]);
     }
 
     #[test]

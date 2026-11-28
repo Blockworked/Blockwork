@@ -36,6 +36,11 @@ pub enum CaptureEvent {
 #[cfg(any(target_os = "linux", windows, target_os = "macos"))]
 pub(crate) const INTER_CHAR_DELAY: std::time::Duration = std::time::Duration::from_micros(500);
 
+/// How long a mouse Click holds the button. A press and release in the same
+/// instant is dropped by libinput and missed by apps that poll button state.
+#[cfg(any(target_os = "linux", windows, target_os = "macos"))]
+pub(crate) const CLICK_HOLD: std::time::Duration = std::time::Duration::from_millis(10);
+
 /// Types `s` one character at a time, `INTER_CHAR_DELAY` apart.
 #[cfg(any(target_os = "linux", windows, target_os = "macos"))]
 pub(crate) fn type_chars(
