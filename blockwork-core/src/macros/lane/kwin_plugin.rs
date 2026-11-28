@@ -156,6 +156,8 @@ pub struct Status {
     pub installed_for: String,
     /// The plugin version of this user's copy, and the one this Blockwork ships.
     pub installed_plugin: String,
+    /// The version KWin is running now, whoever installed it.
+    pub running_plugin: String,
     pub plugin: String,
 }
 
@@ -181,6 +183,14 @@ fn status_with(ready: Result<String, String>) -> Status {
         .map(|i| i.kwin.clone())
         .unwrap_or_default();
     let running = ready.is_ok();
+    // The running plugin's version, from "ready: 4 lanes, plugin 0.1.0 built for KWin ...".
+    let running_plugin = ready
+        .as_ref()
+        .ok()
+        .and_then(|d| d.split("plugin ").nth(1))
+        .and_then(|rest| rest.split_whitespace().next())
+        .unwrap_or_default()
+        .to_string();
     let installed_plugin = installed
         .as_ref()
         .map(|i| i.plugin.clone())
@@ -193,6 +203,24 @@ fn status_with(ready: Result<String, String>) -> Status {
                 plugin_version()
             ),
         ),
+        // A system-wide copy (or one from before) that's older than this Blockwork's.
+        Ok(_) if !running_plugin.is_empty() && running_plugin != plugin_version() => {
+            if installed_plugin == plugin_version() {
+                (
+                    "relogin",
+                    "the KWin plugin is updated: log out and back in to start the new one"
+                        .to_string(),
+                )
+            } else {
+                (
+                    "stale",
+                    format!(
+                        "this Blockwork comes with KWin plugin {} but KWin runs {running_plugin}: update it",
+                        plugin_version()
+                    ),
+                )
+            }
+        }
         Ok(detail) => ("ready", detail),
         Err(why) if !kde => ("unsupported", why),
         Err(_) => match installed {
@@ -220,6 +248,7 @@ fn status_with(ready: Result<String, String>) -> Status {
         kwin,
         installed_for,
         installed_plugin,
+        running_plugin,
         plugin: plugin_version().to_string(),
     }
 }

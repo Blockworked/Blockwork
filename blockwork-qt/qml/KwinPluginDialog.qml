@@ -1,3 +1,4 @@
+import QtCore
 import QtQuick
 import QtQuick.Controls
 import com.blockworked.Blockstitch 1.0
@@ -19,12 +20,19 @@ AppDialog {
 
     function openFor(p, build) { plugin = p; buildHere = !!build; busy = false; outcome = ""; outcomeFailed = false; open() }
     // Asks once per start whether this user's copy needs an update.
+    // "Not now" holds until the plugin or KWin version changes.
+    Settings { id: remembered; category: "KwinPlugin"; property string dismissed: "" }
+    readonly property string offerKey: plugin ? plugin.plugin + "/" + plugin.kwin : ""
     function checkAtStartup() {
         if (Qt.platform.os !== "linux") return;
         call("background_input_status", {}, s => {
-            if (s && s.plugin && s.plugin.installed_for && (s.plugin.state === "outdated" || s.plugin.state === "stale")) openFor(s.plugin);
+            const p = s && s.plugin;
+            if (!p || !(p.state === "outdated" || p.state === "stale")) return;
+            if (remembered.dismissed === p.plugin + "/" + p.kwin) return;
+            openFor(p);
         });
     }
+    onClosed: if (!busy && (outcome === "" || outcomeFailed) && (pluginState === "outdated" || pluginState === "stale")) remembered.dismissed = offerKey
 
     property int callSeq: 0
     property var callbacks: ({})
@@ -51,7 +59,7 @@ AppDialog {
         Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.text; font.pixelSize: 13
             text: dialog.pluginState === "outdated"
                 ? qsTr("The plugin was built for KWin %1, and Plasma now runs KWin %2. Update it to keep using background input.").arg(dialog.plugin.installed_for).arg(dialog.plugin.kwin)
-                : dialog.pluginState === "stale" ? qsTr("This version of Blockwork comes with a newer KWin plugin (%1, you have %2). Update it to keep background input working.").arg(dialog.plugin.plugin).arg(dialog.plugin.installed_plugin)
+                : dialog.pluginState === "stale" ? qsTr("This version of Blockwork comes with a newer KWin plugin (%1, you have %2). Update it to keep background input working.").arg(dialog.plugin.plugin).arg(dialog.plugin.running_plugin || dialog.plugin.installed_plugin)
                 : dialog.buildHere ? qsTr("If background input still isn't running after you logged out and back in, the downloaded plugin may not suit your distro's Qt. Blockwork can build it on this computer instead.")
                 : qsTr("The In window block's background input runs inside KWin, Plasma's window manager, through a small plugin.") }
         Text { width: parent.width; wrapMode: Text.WordWrap; color: Theme.textDim; font.pixelSize: 12

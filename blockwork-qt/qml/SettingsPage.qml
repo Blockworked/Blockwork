@@ -540,7 +540,7 @@ Item {
                                     function onInstalled() { backgroundRow.refresh() }
                                 }
                                 StitchButton {
-                                    visible: !!root.kwinPluginDialog && (backgroundRow.pluginState === "missing" || backgroundRow.pluginInstalled)
+                                    visible: !!root.kwinPluginDialog && (backgroundRow.pluginState === "missing" || backgroundRow.pluginState === "stale" || backgroundRow.pluginInstalled)
                                     iconName: "download"; primary: backgroundRow.pluginState !== "ready" && backgroundRow.pluginState !== "relogin"
                                     text: backgroundRow.pluginInstalled ? qsTr("Update plugin") : qsTr("Install plugin")
                                     onClicked: root.kwinPluginDialog.openFor(backgroundRow.plugin)
