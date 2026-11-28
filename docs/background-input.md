@@ -12,8 +12,25 @@ to front** tries the background first and falls back when it can't.
 
 ## Where it works
 
-Only KDE Plasma 6 on Wayland, with the Blockwork KWin plugin installed.
 Settings > Integrations > Background input says whether it's ready.
+
+- **Linux:** KDE Plasma 6 on Wayland, with the Blockwork KWin plugin
+  installed (below).
+- **Windows:** built in. Keys, clicks and text are posted to the window as
+  window messages (like AutoHotkey's ControlSend and ControlClick). Most
+  desktop apps take them; apps that read raw input or DirectInput, which is
+  most games, don't. Modifiers are set on the window's thread key state, so
+  shortcuts like Ctrl+S work. A window running as administrator needs
+  Blockwork as administrator too. Minimized windows can't be aimed at.
+  Screen blocks read the window with PrintWindow, so it can be covered.
+- **macOS:** built in, with Accessibility access. Events are posted to the
+  window's app (CGEventPostToPid) and mouse events name the window, so the
+  frontmost app and the real cursor stay put. Cocoa apps generally take
+  keys and shortcuts; some apps ignore clicks that aren't from the real
+  mouse, and some games read input in ways this doesn't reach. Screen
+  blocks read the window on its own (needs Screen Recording access).
+
+## KDE Plasma
 
 Other routes (uinput, libei, the remote desktop portal, KWin's fake input)
 all type into whichever window has focus, so they can't do this. The plugin
@@ -64,12 +81,14 @@ the host's plugin; it can't add one itself.
   stands in for the strand's input backend inside the block, so every input
   block works unchanged. Typing sends a keymap made for the text, so your
   layout doesn't matter.
+  `lane/windows.rs` and `lane/macos.rs` are the Windows and macOS lanes.
 - `InWindow` in `macros/runner/control.rs` swaps the backend, the strand's
   origin and the screen source (`screen::set_capture_source`, KWin's
   `CaptureWindow`) for its body and puts them back after.
 
 ## Known gaps
 
+- Windows and macOS lanes haven't been tried on real machines yet.
 - Grabbing popups (menus) of the target app can take the user's keyboard,
   since KWin routes popups through its one main seat.
 - Signals sent inside the block run on the desktop, not in the window.

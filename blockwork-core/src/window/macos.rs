@@ -124,6 +124,8 @@ fn perform(element: &CFType, action: &str) -> Result<(), String> {
 #[derive(Clone)]
 struct Window {
     pid: i32,
+    /// WindowServer's window number.
+    number: u32,
     info: ActiveWindow,
     rect: Rect,
 }
@@ -180,6 +182,7 @@ fn windows(on_screen: bool) -> Result<Vec<Window>, String> {
         }
         result.push(Window {
             pid: pid as i32,
+            number: number(&dict, "kCGWindowNumber").unwrap_or(0.0) as u32,
             rect,
             info: ActiveWindow {
                 app: string(&dict, "kCGWindowOwnerName"),
@@ -319,6 +322,57 @@ pub fn bounds(pattern: &str, by: MatchBy) -> Result<Rect, String> {
         return Err("the window is minimized or hidden".into());
     }
     ax_bounds(&window)
+}
+
+/// A handle that stays on the matching window while its title changes.
+pub(super) fn resolve(pattern: &str, by: MatchBy) -> Result<super::WindowRef, String> {
+    let all = windows(false)?;
+    let found = match all
+        .iter()
+        .find(|w| !pattern.is_empty() && !w.info.title.is_empty() && w.info.matches(pattern, by))
+    {
+        Some(window) => window.clone(),
+        // Titles need Screen Recording; Accessibility finds the window
+        // without it, and its app's window at the same place is the one.
+        None => {
+            let (app, window) = find(pattern, by)?;
+            let mut pid = 0;
+            check(unsafe { AXUIElementGetPid(app.as_CFTypeRef(), &mut pid) })?;
+            let at = ax_bounds(&window)?;
+            all.into_iter()
+                .filter(|w| w.pid == pid)
+                .min_by(|a, b| {
+                    let off = |w: &Window| (w.rect.x - at.x).abs() + (w.rect.y - at.y).abs();
+                    off(a).total_cmp(&off(b))
+                })
+                .ok_or("the window isn't on screen: unminimize it first")?
+        }
+    };
+    if found.number == 0 {
+        return Err("macOS didn't give the window a number: try again once it's on screen".into());
+    }
+    Ok(super::WindowRef {
+        id: format!("{}:{}", found.pid, found.number),
+        desktop: super::DesktopKind::Macos,
+    })
+}
+
+/// The process and window number behind a handle from `resolve`.
+pub(crate) fn pid_and_number(window: &super::WindowRef) -> Result<(i32, u32), String> {
+    window
+        .id
+        .split_once(':')
+        .and_then(|(pid, number)| Some((pid.parse().ok()?, number.parse().ok()?)))
+        .ok_or_else(|| format!("'{}' isn't a window handle", window.id))
+}
+
+pub(super) fn bounds_of(window: &super::WindowRef) -> Result<Rect, String> {
+    let (_, number) = pid_and_number(window)?;
+    windows(false)?
+        .into_iter()
+        .find(|w| w.number == number)
+        .map(|w| w.rect)
+        .ok_or_else(|| "the window closed".into())
 }
 
 pub fn exists(pattern: &str) -> Result<bool, String> {

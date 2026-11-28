@@ -166,6 +166,18 @@ fn source_shot() -> Option<Shot> {
             return Some(shot);
         }
     }
+    #[cfg(windows)]
+    {
+        if let Some(shot) = windows::capture_window(&window) {
+            return Some(shot);
+        }
+    }
+    #[cfg(target_os = "macos")]
+    {
+        if let Some(shot) = macos::capture_window(&window, true) {
+            return Some(shot);
+        }
+    }
     let _ = window;
     None
 }

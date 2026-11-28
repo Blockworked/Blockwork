@@ -21,7 +21,7 @@ section below as the GitHub release notes, followed by the downloads table.
 - Physical controller triggers and reporters, and on Linux a virtual controller for playback ([docs](docs/controllers.md)).
 - Native UI automation on Linux and Windows: read and control other apps' buttons, fields and sliders by selector. Pick an element by pointing at it on screen, or search a list ([docs](docs/native-ui.md)).
 - Recording can include touchscreen gestures and a controller, and opens a review before the blocks are added ([docs](docs/recording.md)).
-- In window block: runs its blocks aimed at one window, in the background on KDE Plasma with the new Blockwork KWin plugin (your keyboard, mouse and focus stay yours), or by bringing it to front anywhere else ([docs](docs/background-input.md)).
+- In window block: runs its blocks aimed at one window, in the background on Windows, macOS, and KDE Plasma with the new Blockwork KWin plugin (your keyboard, mouse and focus stay yours), or by bringing it to front anywhere else ([docs](docs/background-input.md)).
 - Input diagnostics in Settings > Integrations, to copy into a bug report.
 - Starter templates: Controller to keyboard, Touch swipe and Startup notice.
 - Key and mouse button triggers can block the input from reaching other apps ("and block it"). Key triggers can also fire on a double press or a long hold, ignore other keys held with them, and tell left and right modifiers apart (LeftControl, RightShift).

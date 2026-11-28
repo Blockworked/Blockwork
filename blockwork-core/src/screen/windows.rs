@@ -146,3 +146,58 @@ pub(super) fn cursor() -> Result<(i32, i32), String> {
     }
     Ok((point.x, point.y))
 }
+
+/// A window's client area as the window draws it, even while covered.
+pub(super) fn capture_window(window: &crate::window::WindowRef) -> Option<Shot> {
+    use windows_sys::Win32::Storage::Xps::{PW_CLIENTONLY, PrintWindow};
+    use windows_sys::Win32::UI::WindowsAndMessaging::PW_RENDERFULLCONTENT;
+    let hwnd = crate::window::windows_hwnd(window).ok()?;
+    let bounds = crate::window::bounds_of(window).ok()?;
+    let (w, h) = (bounds.width as i32, bounds.height as i32);
+    // SAFETY: plain GDI calls; every handle made here is released below.
+    unsafe {
+        let screen = GetDC(null_mut());
+        let memory = CreateCompatibleDC(screen);
+        let bitmap = CreateCompatibleBitmap(screen, w, h);
+        let previous = SelectObject(memory, bitmap);
+        // Full content also gets DirectX and browser windows, not black.
+        let printed = PrintWindow(hwnd, memory, PW_CLIENTONLY | PW_RENDERFULLCONTENT);
+        let mut info: BITMAPINFO = zeroed();
+        info.bmiHeader.biSize = size_of::<BITMAPINFOHEADER>() as u32;
+        info.bmiHeader.biWidth = w;
+        info.bmiHeader.biHeight = -h;
+        info.bmiHeader.biPlanes = 1;
+        info.bmiHeader.biBitCount = 32;
+        info.bmiHeader.biCompression = BI_RGB;
+        let mut rgba = vec![0u8; w as usize * h as usize * 4];
+        let rows = GetDIBits(
+            memory,
+            bitmap,
+            0,
+            h as u32,
+            rgba.as_mut_ptr().cast(),
+            &mut info,
+            DIB_RGB_COLORS,
+        );
+        SelectObject(memory, previous);
+        DeleteObject(bitmap);
+        DeleteDC(memory);
+        ReleaseDC(null_mut(), screen);
+        if printed == 0 || rows == 0 {
+            return None;
+        }
+        for px in rgba.as_chunks_mut::<4>().0.iter_mut() {
+            px.swap(0, 2);
+            px[3] = 255;
+        }
+        Some(Shot {
+            image: Image {
+                width: w as u32,
+                height: h as u32,
+                rgba,
+            },
+            origin: (bounds.x, bounds.y),
+            scale: 1.0,
+        })
+    }
+}

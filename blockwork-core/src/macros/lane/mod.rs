@@ -9,14 +9,20 @@ use crate::window::WindowRef;
 
 #[cfg(target_os = "linux")]
 mod kde;
+#[cfg(target_os = "macos")]
+mod macos;
+#[cfg(windows)]
+mod windows;
 
 /// One extra input seat aimed at one window. Positions are logical pixels
 /// from the top left of the window's content. Dropping it lets go of every
 /// key and button it holds.
 pub trait Lane: Send {
-    /// Presses or releases an evdev key code.
+    /// Presses or releases a key: an evdev code on Linux, a virtual-key code
+    /// on Windows, a CGKeyCode on macOS.
     fn key(&mut self, code: u16, pressed: bool) -> Result<(), String>;
-    /// Presses or releases an evdev button code.
+    /// Presses or releases a button: an evdev code on Linux; elsewhere 0 is
+    /// left, 1 right, 2 middle, 3 back and 4 forward.
     fn button(&mut self, code: u16, pressed: bool) -> Result<(), String>;
     fn motion(&mut self, x: f64, y: f64) -> Result<(), String>;
     /// Moves by a delta: relative motion when the app has locked the pointer.
@@ -38,8 +44,15 @@ pub fn open(window: &WindowRef) -> Result<Box<dyn Lane>, String> {
             return kde::open(window).map(|lane| Box::new(lane) as Box<dyn Lane>);
         }
     }
-    let _ = window;
-    Err(unsupported())
+    #[cfg(windows)]
+    return windows::open(window).map(|lane| Box::new(lane) as Box<dyn Lane>);
+    #[cfg(target_os = "macos")]
+    return macos::open(window).map(|lane| Box::new(lane) as Box<dyn Lane>);
+    #[allow(unreachable_code)]
+    {
+        let _ = window;
+        Err(unsupported())
+    }
 }
 
 /// Whether this desktop can send background input at all, and why not.
@@ -50,11 +63,17 @@ pub fn availability() -> Result<String, String> {
             return kde::availability();
         }
     }
+    #[cfg(windows)]
+    return windows::availability();
+    #[cfg(target_os = "macos")]
+    return macos::availability();
+    #[allow(unreachable_code)]
     Err(unsupported())
 }
 
+#[cfg_attr(any(windows, target_os = "macos"), allow(dead_code))]
 fn unsupported() -> String {
-    "background input only works on KDE Plasma (Wayland) with the Blockwork KWin plugin: pick \"brought to front\" in the In window block to use it here".into()
+    "background input on Linux only works on KDE Plasma (Wayland) with the Blockwork KWin plugin: pick \"brought to front\" in the In window block to use it here".into()
 }
 
 /// A lane as the strand's input backend. Screen positions from the blocks
@@ -94,7 +113,18 @@ fn key_code(key: &MacroKey) -> Result<(u16, bool), String> {
         .ok_or_else(|| format!("no key code for {key:?}"))
 }
 
-#[cfg(not(target_os = "linux"))]
+#[cfg(windows)]
+fn key_code(key: &MacroKey) -> Result<(u16, bool), String> {
+    windows::key_code(key).ok_or_else(|| format!("no key code for {key:?}"))
+}
+
+#[cfg(target_os = "macos")]
+fn key_code(key: &MacroKey) -> Result<(u16, bool), String> {
+    crate::macros::backend::macos::macro_key_to_cgkeycode(key)
+        .ok_or_else(|| format!("no key code for {key:?}"))
+}
+
+#[cfg(not(any(target_os = "linux", windows, target_os = "macos")))]
 fn key_code(key: &MacroKey) -> Result<(u16, bool), String> {
     Err(format!("no key code for {key:?}"))
 }
@@ -108,11 +138,23 @@ fn button_code(button: &MacroButton) -> Result<u16, String> {
 
 #[cfg(not(target_os = "linux"))]
 fn button_code(button: &MacroButton) -> Result<u16, String> {
-    Err(format!("no button code for {button:?}"))
+    Ok(match button {
+        MacroButton::Left => 0,
+        MacroButton::Right => 1,
+        MacroButton::Middle => 2,
+        MacroButton::Back => 3,
+        MacroButton::Forward => 4,
+        _ => return Err(format!("no button code for {button:?}")),
+    })
 }
 
-/// evdev KEY_LEFTSHIFT.
+/// The left Shift key: evdev KEY_LEFTSHIFT, VK_LSHIFT, kVK_Shift.
+#[cfg(not(any(windows, target_os = "macos")))]
 const LEFT_SHIFT: u16 = 42;
+#[cfg(windows)]
+const LEFT_SHIFT: u16 = 0xA0;
+#[cfg(target_os = "macos")]
+const LEFT_SHIFT: u16 = 56;
 
 impl InputBackend for LaneBackend {
     fn key(&mut self, key: MacroKey, dir: Direction) -> Result<(), String> {
@@ -181,8 +223,8 @@ impl InputBackend for LaneBackend {
     }
 
     fn scroll(&mut self, amount: i32, axis: Axis) -> Result<(), String> {
-        // Blockwork's positive vertical amount is up (like REL_WHEEL);
-        // Wayland's positive axis is down.
+        // Blockwork's positive vertical amount is up (like REL_WHEEL); a
+        // lane's positive axis is down, as on Wayland.
         let value = match axis {
             Axis::Vertical => -amount * 120,
             Axis::Horizontal => amount * 120,
