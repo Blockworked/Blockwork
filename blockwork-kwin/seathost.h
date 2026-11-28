@@ -79,6 +79,7 @@ public:
     void releaseAll(Lane &lane);
     /// Lets go of everything and returns the lane to the pool.
     void giveBack(Lane &lane);
+    bool ownsSeat(SeatInterface *seat) const;
 
 private:
     bool allowed(wl_client *client) const;

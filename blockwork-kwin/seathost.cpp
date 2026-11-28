@@ -3,6 +3,7 @@
 #include "seathost.h"
 
 #include "blockwork-seat-host-v1-server.h"
+#include "pointer-constraints-unstable-v1-server.h"
 
 #include <config-kwin.h>
 #include <input.h>
@@ -656,12 +657,125 @@ bool BlockworkSeatHost::pointerReady(SeatInterface *seat, wl_client *client) con
     return query.found;
 }
 
+namespace {
+
+/// The head of libwayland's wl_resource, up to its dispatcher. Checked
+/// against the public getters before it's trusted.
+struct ResourceLayout {
+    const wl_interface *interface;
+    const void *implementation;
+    uint32_t id;
+    wl_resource_destroy_func_t destroy;
+    wl_list link;
+    wl_signal deprecatedDestroy;
+    wl_client *client;
+    void *data;
+    int version;
+    wl_dispatcher_func_t dispatcher;
+};
+
+// zwp_pointer_constraints_v1 request opcodes.
+constexpr uint32_t ConstraintsDestroy = 0;
+constexpr uint32_t ConstraintsLock = 1;
+constexpr uint32_t ConstraintsConfine = 2;
+
+const struct zwp_locked_pointer_v1_interface InertLock = {
+    .destroy = [](wl_client *, wl_resource *resource) {
+        wl_resource_destroy(resource);
+    },
+    .set_cursor_position_hint = [](wl_client *, wl_resource *, wl_fixed_t, wl_fixed_t) {},
+    .set_region = [](wl_client *, wl_resource *, wl_resource *) {},
+};
+
+const struct zwp_confined_pointer_v1_interface InertConfine = {
+    .destroy = [](wl_client *, wl_resource *resource) {
+        wl_resource_destroy(resource);
+    },
+    .set_region = [](wl_client *, wl_resource *, wl_resource *) {},
+};
+
+/// zwp_pointer_constraints_v1 requests, with lane pointers' locks and
+/// confines answered by an inert object: KWin allows one constraint per
+/// surface whatever the seat, and kills a client asking for a second.
+int dispatchConstraints(const void *implementation, void *target, uint32_t opcode, const wl_message *, wl_argument *args)
+{
+    auto *resource = static_cast<wl_resource *>(target);
+    auto *original = static_cast<const struct zwp_pointer_constraints_v1_interface *>(implementation);
+    wl_client *client = wl_resource_get_client(resource);
+    if (opcode == ConstraintsDestroy) {
+        original->destroy(client, resource);
+        return 0;
+    }
+    if (opcode != ConstraintsLock && opcode != ConstraintsConfine) {
+        return 0;
+    }
+    const uint32_t id = args[0].n;
+    auto *surface = reinterpret_cast<wl_resource *>(args[1].o);
+    auto *pointer = reinterpret_cast<wl_resource *>(args[2].o);
+    auto *region = reinterpret_cast<wl_resource *>(args[3].o);
+    auto *owner = KWin::PointerInterface::get(pointer);
+    if (owner && s_host && s_host->ownsSeat(owner->seat())) {
+        const bool lock = opcode == ConstraintsLock;
+        wl_resource *inert = wl_resource_create(client,
+                                                lock ? &zwp_locked_pointer_v1_interface : &zwp_confined_pointer_v1_interface,
+                                                wl_resource_get_version(resource), id);
+        if (!inert) {
+            wl_resource_post_no_memory(resource);
+            return 0;
+        }
+        wl_resource_set_implementation(inert, lock ? static_cast<const void *>(&InertLock) : &InertConfine, nullptr, nullptr);
+        return 0;
+    }
+    if (opcode == ConstraintsLock) {
+        original->lock_pointer(client, resource, id, surface, pointer, region, args[4].u);
+    } else {
+        original->confine_pointer(client, resource, id, surface, pointer, region, args[4].u);
+    }
+    return 0;
+}
+
+/// Routes a constraints object's requests through dispatchConstraints,
+/// starting with the one being logged (libwayland reads the dispatcher after).
+void takeConstraints(wl_resource *resource)
+{
+    auto *layout = reinterpret_cast<ResourceLayout *>(resource);
+    if (layout->dispatcher == &dispatchConstraints) {
+        return;
+    }
+    if (layout->client != wl_resource_get_client(resource) || layout->data != wl_resource_get_user_data(resource)
+        || layout->version != wl_resource_get_version(resource) || layout->dispatcher || !layout->implementation) {
+        static bool warned = false;
+        if (!warned) {
+            warned = true;
+            qWarning("Blockwork background input: unknown libwayland layout; games that lock the pointer may close");
+        }
+        return;
+    }
+    wl_resource_set_dispatcher(resource, &dispatchConstraints, layout->implementation, layout->data, layout->destroy);
+}
+
+} // namespace
+
+bool BlockworkSeatHost::ownsSeat(SeatInterface *seat) const
+{
+    for (const auto &lane : m_lanes) {
+        if (lane->seat.get() == seat) {
+            return true;
+        }
+    }
+    return false;
+}
+
 void BlockworkSeatHost::logRequest(void *data, wl_protocol_logger_type direction, const wl_protocol_logger_message *message)
 {
     if (direction != WL_PROTOCOL_LOGGER_REQUEST) {
         return;
     }
     auto *self = static_cast<BlockworkSeatHost *>(data);
+    if (std::strcmp(wl_resource_get_class(message->resource), "zwp_pointer_constraints_v1") == 0) {
+        takeConstraints(message->resource);
+        return;
+    }
     if (std::strcmp(message->message->name, "sync") == 0
         && std::strcmp(wl_resource_get_class(message->resource), "wl_display") == 0) {
         wl_client *client = wl_resource_get_client(message->resource);

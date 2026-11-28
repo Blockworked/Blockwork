@@ -76,7 +76,10 @@ the host's plugin; it can't add one itself.
   waits a moment for you. On bind it puts the lane's pointer in the window's
   middle (games like Sober only take keys under a pointer) and waits for the
   app's next sync, since Qt only makes a window active, and runs its
-  shortcuts, one round trip after keyboard focus arrives.
+  shortcuts, one round trip after keyboard focus arrives. KWin allows one
+  pointer lock per window whatever the seat and disconnects an app that asks
+  for a second, so a lock or confine an app asks for on a lane's pointer gets
+  an inert object instead (Sober locks every pointer it has on a right click).
 - `blockwork-core/src/macros/lane/`: the `Lane` trait and `LaneBackend`, which
   stands in for the strand's input backend inside the block, so every input
   block works unchanged. Typing sends a keymap made for the text, so your
@@ -95,7 +98,8 @@ the host's plugin; it can't add one itself.
 - While the block runs, a Qt app treats the target as its active window, so
   shortcuts in another window of the same app wait until the block ends.
 - The lane's pointer rests in the window's middle, so the app may show a
-  hover there.
+  hover there. It also can't be locked, so a game that turns the camera with
+  a locked pointer only does so for your own mouse.
 - Clipboard blocks still use the desktop clipboard.
 - On KWin 6.0 to 6.7, window capture needs Blockwork's desktop file to list
   `org.kde.KWin.ScreenShot2` in `X-KDE-DBUS-Restricted-Interfaces`.
