@@ -9,7 +9,7 @@ pkgdesc='Build keyboard and mouse macros by snapping blocks together (latest mas
 url='https://blockworked.com'
 arch=('x86_64' 'aarch64')
 license=('GPL-3.0-only')
-depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'hicolor-icon-theme' 'gcc-libs' 'glibc' 'dbus' 'libxkbcommon' 'wayland' 'gtk3')
+depends=('qt6-base' 'qt6-declarative' 'qt6-svg' 'hicolor-icon-theme' 'gcc-libs' 'glibc' 'dbus' 'systemd-libs' 'libxkbcommon' 'wayland' 'gtk3')
 makedepends=('git' 'cargo' 'cmake' 'clang' 'lld' 'pkgconf')
 optdepends=('qt6-wayland: native Wayland window'
             'tesseract: text recognition blocks'

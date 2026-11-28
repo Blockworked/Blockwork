@@ -29,6 +29,7 @@ BuildRequires:  qt6-qtbase-devel >= 6.10
 BuildRequires:  qt6-qtbase-private-devel
 BuildRequires:  qt6-qtdeclarative-devel
 BuildRequires:  dbus-devel
+BuildRequires:  systemd-devel
 BuildRequires:  libxkbcommon-devel
 BuildRequires:  wayland-devel
 BuildRequires:  gtk3-devel

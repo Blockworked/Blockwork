@@ -310,6 +310,7 @@ jobs:
             libayatana-appindicator3-dev \
             librsvg2-dev \
             libdbus-1-dev \
+            libudev-dev \
             libxkbcommon-dev \
             libxkbcommon-x11-0 \
             libx11-dev \

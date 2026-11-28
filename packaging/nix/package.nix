@@ -11,6 +11,7 @@
   pkg-config,
   qt6,
   dbus,
+  udev,
   libxkbcommon,
   gtk3,
   wayland,
@@ -37,7 +38,7 @@ rustPlatform.buildRustPackage {
   };
 
   nativeBuildInputs = [ cmake lld autoPatchelfHook pkg-config qt6.wrapQtAppsHook rustPlatform.bindgenHook ];
-  buildInputs = [ qt qt6.qtbase qt6.qtwayland dbus libxkbcommon gtk3 wayland libGL ];
+  buildInputs = [ qt qt6.qtbase qt6.qtwayland dbus udev libxkbcommon gtk3 wayland libGL ];
 
   # cmake is for QWindowKit, which build.rs drives itself.
   dontUseCmakeConfigure = true;
