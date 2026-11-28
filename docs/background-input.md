@@ -42,8 +42,9 @@ cmake --build build-kwin
 sudo cmake --install build-kwin
 ```
 
-Then log out and back in. It needs KWin's development headers, Qt 6,
-wayland-server, wayland-scanner and libxkbcommon. A Flatpak Blockwork uses
+Then log out and back in. It needs CMake, extra-cmake-modules, KWin's
+development headers, Qt 6, wayland and libxkbcommon. On Arch and CachyOS:
+`sudo pacman -S --needed base-devel cmake extra-cmake-modules kwin wayland libxkbcommon`. A Flatpak Blockwork uses
 the host's plugin; it can't add one itself.
 
 ## How it fits together
