@@ -6,6 +6,9 @@ cd "$(dirname "$0")/.."
 dest="${1:-../blockstitch}"
 rev=$(sed -n '/^blockstitch-core *=/,/}/p' Cargo.toml | grep -oE 'rev *= *"[^"]+"' | head -n 1 | cut -d'"' -f2)
 [ -n "$rev" ] || { echo "no blockstitch-core rev in Cargo.toml" >&2; exit 1; }
+# GitHub only fetches full hashes; Cargo.lock has the full one for a short pin.
+full=$(grep -m1 -oE "blockstitch\?rev=$rev#[0-9a-f]{40}" Cargo.lock 2>/dev/null | cut -d'#' -f2 || true)
+[ -n "$full" ] && rev="$full"
 git init -q "$dest"
 git -C "$dest" remote add origin https://github.com/Blockworked/blockstitch.git 2>/dev/null || true
 git -C "$dest" fetch --depth 1 origin "$rev"
