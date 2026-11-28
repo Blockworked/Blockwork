@@ -49,6 +49,8 @@ struct State {
     info: Option<(String, String, u32)>,
     status: Status,
     preempted: Option<Instant>,
+    /// The window's size from `bound`.
+    size: (u32, u32),
 }
 
 impl Dispatch<wl_registry::WlRegistry, GlobalListContents> for State {
@@ -91,7 +93,10 @@ impl Dispatch<BlockworkSeatLaneV1, ()> for State {
         _: &QueueHandle<Self>,
     ) {
         match event {
-            lane::Event::Bound { .. } => state.status = Status::Bound,
+            lane::Event::Bound { width, height } => {
+                state.status = Status::Bound;
+                state.size = (width, height);
+            }
             lane::Event::Refused { message, .. } => state.status = Status::Refused(message),
             lane::Event::Lost { message, .. } => state.status = Status::Lost(message),
             lane::Event::Preempted => state.preempted = Some(Instant::now()),
@@ -119,6 +124,7 @@ fn connect() -> Result<(Connection, EventQueue<State>, BlockworkSeatHostV1, Stat
         info: None,
         status: Status::Waiting,
         preempted: None,
+        size: (0, 0),
     };
     queue
         .roundtrip(&mut state)
@@ -152,7 +158,12 @@ pub(super) fn open(window: &WindowRef) -> Result<KdeLane, String> {
     lane.lane.bind(window.id.clone());
     lane.wait(|s| s.status != Status::Waiting, BIND_TIMEOUT)?;
     match lane.state.status.clone() {
-        Status::Bound => Ok(lane),
+        Status::Bound => {
+            // The plugin starts the lane's pointer in the middle.
+            let (w, h) = lane.state.size;
+            lane.pointer = (f64::from(w) / 2.0, f64::from(h) / 2.0);
+            Ok(lane)
+        }
         Status::Waiting => Err("the window didn't take background input in time: its app may not support it (Chromium, Electron and XWayland apps can't)".into()),
         Status::Refused(why) | Status::Lost(why) => Err(why),
     }
@@ -336,7 +347,9 @@ impl Lane for KdeLane {
 impl Drop for KdeLane {
     fn drop(&mut self) {
         self.lane.destroy();
-        let _ = self.queue.flush();
+        // A compositor drops whatever it hasn't read yet when a client hangs
+        // up, so wait until it has taken the last keys before closing.
+        let _ = self.queue.roundtrip(&mut self.state);
     }
 }
 

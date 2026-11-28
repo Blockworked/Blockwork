@@ -33,6 +33,8 @@ constexpr int LaneCount = 4;
 /// Blockwork waits two seconds for bound; answer before it gives up.
 constexpr int BindTimeoutMs = 1500;
 constexpr int BindCheckMs = 10;
+/// Longest wait for an app's sync after keyboard enter.
+constexpr int SyncWaitMs = 100;
 /// At most one preempted event per lane this often.
 constexpr int PreemptEveryMs = 100;
 /// Biggest keymap a client may send.
@@ -353,9 +355,25 @@ void BlockworkSeatHost::checkBinding(Lane &lane)
         return;
     }
     lane.binding->stop();
-    stamp(lane);
-    lane.seat->setFocusedKeyboardSurface(window->surface());
     const QSizeF size = window->clientGeometry().size();
+    if (!lane.entered) {
+        // Point at the middle right away: games like Sober only take keys
+        // while a pointer is over them.
+        lane.pointer = QPointF(uint32_t(size.width()) / 2.0, uint32_t(size.height()) / 2.0);
+        enterPointer(lane);
+        stamp(lane);
+        lane.seat->setFocusedKeyboardSurface(window->surface());
+        lane.entered = true;
+        // Qt activates a window one wl_display.sync after keyboard enter, and
+        // only an active window runs shortcuts or Qt Quick key handling.
+        lane.awaitingSync = !window->isActive();
+        lane.syncDeadline = m_clock.elapsed() + SyncWaitMs;
+    }
+    if (lane.awaitingSync && m_clock.elapsed() < lane.syncDeadline) {
+        lane.binding->start();
+        return;
+    }
+    lane.awaitingSync = false;
     blockwork_seat_lane_v1_send_bound(lane.owner, uint32_t(size.width()), uint32_t(size.height()));
 }
 
@@ -368,6 +386,9 @@ void BlockworkSeatHost::unbind(Lane &lane)
         lane.target->unrefOffscreenRendering();
     }
     lane.target = nullptr;
+    lane.entered = false;
+    lane.awaitingSync = false;
+    lane.userPointerOver = false;
     lane.seat->setFocusedKeyboardSurface(nullptr);
     if (lane.pointerIn) {
         lane.seat->notifyPointerLeave();
@@ -557,6 +578,40 @@ void BlockworkSeatHost::keyboardKey(KeyboardKeyEvent *)
     preempt(workspace()->activeWindow());
 }
 
+void BlockworkSeatHost::pointerMotion(PointerMotionEvent *)
+{
+    // KWin moves the user's pointer focus after the spies run, so look next turn.
+    if (!m_pointerRecheck) {
+        m_pointerRecheck = true;
+        QTimer::singleShot(0, this, [this] {
+            m_pointerRecheck = false;
+            recheckPointers();
+        });
+    }
+}
+
+void BlockworkSeatHost::recheckPointers()
+{
+    SurfaceInterface *user = waylandServer()->seat()->focusedPointerSurface();
+    for (auto &lane : m_lanes) {
+        if (!lane->target || !lane->pointerIn || lane->binding->isActive()) {
+            lane->userPointerOver = false;
+            continue;
+        }
+        const bool over = user && user == lane->target->surface();
+        // An app that keeps one pointer focus drops it when the user's pointer
+        // leaves, so enter the lane's pointer again.
+        if (lane->userPointerOver && !over) {
+            stamp(*lane);
+            lane->seat->notifyPointerLeave();
+            lane->seat->notifyPointerFrame();
+            lane->pointerIn = false;
+            enterPointer(*lane);
+        }
+        lane->userPointerOver = over;
+    }
+}
+
 void BlockworkSeatHost::pointerButton(PointerButtonEvent *event)
 {
     preempt(input()->findToplevel(event->position));
@@ -603,13 +658,27 @@ bool BlockworkSeatHost::pointerReady(SeatInterface *seat, wl_client *client) con
 
 void BlockworkSeatHost::logRequest(void *data, wl_protocol_logger_type direction, const wl_protocol_logger_message *message)
 {
-    // KWin keeps no list of which seat a wl_keyboard came from, so note
-    // get_keyboard on our seats as it happens.
-    if (direction != WL_PROTOCOL_LOGGER_REQUEST || std::strcmp(message->message->name, "get_keyboard") != 0
-        || std::strcmp(wl_resource_get_class(message->resource), "wl_seat") != 0) {
+    if (direction != WL_PROTOCOL_LOGGER_REQUEST) {
         return;
     }
     auto *self = static_cast<BlockworkSeatHost *>(data);
+    if (std::strcmp(message->message->name, "sync") == 0
+        && std::strcmp(wl_resource_get_class(message->resource), "wl_display") == 0) {
+        wl_client *client = wl_resource_get_client(message->resource);
+        for (const auto &lane : self->m_lanes) {
+            if (lane->awaitingSync && lane->target && lane->target->surface()
+                && lane->target->surface()->client()->client() == client) {
+                lane->awaitingSync = false;
+            }
+        }
+        return;
+    }
+    // KWin keeps no list of which seat a wl_keyboard came from, so note
+    // get_keyboard on our seats as it happens.
+    if (std::strcmp(message->message->name, "get_keyboard") != 0
+        || std::strcmp(wl_resource_get_class(message->resource), "wl_seat") != 0) {
+        return;
+    }
     auto *seat = SeatInterface::get(message->resource);
     auto *client = ClientConnection::get(wl_resource_get_client(message->resource));
     for (const auto &lane : self->m_lanes) {
