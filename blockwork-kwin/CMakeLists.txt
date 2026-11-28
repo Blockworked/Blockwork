@@ -7,23 +7,17 @@ set(CMAKE_CXX_STANDARD 23)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 set(CMAKE_AUTOMOC ON)
 
-find_package(Qt6 REQUIRED COMPONENTS Core Gui)
+# KWin::kwin links these but its config doesn't find them.
+find_package(Qt6 REQUIRED COMPONENTS Core DBus Gui Quick Widgets)
+# KWin's config brings the KF6, epoxy, libdrm and Vulkan headers its own
+# headers include.
+find_package(KWin REQUIRED)
 include(GNUInstallDirs)
 find_package(PkgConfig REQUIRED)
 pkg_check_modules(XKBCOMMON REQUIRED IMPORTED_TARGET xkbcommon)
 pkg_check_modules(WAYLAND_SERVER REQUIRED IMPORTED_TARGET wayland-server)
 find_program(WAYLAND_SCANNER wayland-scanner REQUIRED)
-
-find_path(KWIN_INCLUDE_DIR plugin.h PATH_SUFFIXES kwin REQUIRED)
-find_library(KWIN_LIBRARY NAMES kwin REQUIRED)
-
-# KWin only loads a plugin built against its exact version.
-file(READ "${KWIN_INCLUDE_DIR}/config-kwin.h" KWIN_CONFIG)
-string(REGEX MATCH "#define KWIN_PLUGIN_VERSION_STRING \"([0-9.]+)\"" _ "${KWIN_CONFIG}")
-if(NOT CMAKE_MATCH_1)
-    message(FATAL_ERROR "config-kwin.h has no KWIN_PLUGIN_VERSION_STRING: is KWin 6 installed?")
-endif()
-message(STATUS "Building for KWin ${CMAKE_MATCH_1}")
+message(STATUS "Building for KWin ${KWin_VERSION}")
 
 set(PROTOCOL "${CMAKE_CURRENT_SOURCE_DIR}/../blockwork-core/protocols/blockwork-seat-host-v1.xml")
 set(GENERATED "${CMAKE_CURRENT_BINARY_DIR}/generated")
@@ -42,9 +36,9 @@ add_library(blockworkseathost MODULE
     "${GENERATED}/blockwork-seat-host-v1.c")
 set_target_properties(blockworkseathost PROPERTIES PREFIX "")
 target_compile_definitions(blockworkseathost PRIVATE BLOCKWORK_KWIN_BUILD="${PROJECT_VERSION}")
-target_include_directories(blockworkseathost PRIVATE ${KWIN_INCLUDE_DIR} "${GENERATED}")
+target_include_directories(blockworkseathost PRIVATE "${GENERATED}")
 target_link_libraries(blockworkseathost PRIVATE
-    ${KWIN_LIBRARY} Qt6::Core Qt6::Gui PkgConfig::XKBCOMMON PkgConfig::WAYLAND_SERVER)
+    KWin::kwin Qt6::Core Qt6::Gui PkgConfig::XKBCOMMON PkgConfig::WAYLAND_SERVER)
 
 install(TARGETS blockworkseathost
     LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}/qt6/plugins/kwin/plugins)
