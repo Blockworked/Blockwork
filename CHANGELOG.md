@@ -53,6 +53,7 @@ section below as the GitHub release notes, followed by the downloads table.
 ### Fixed
 - Toolbar buttons such as Hide sidebar work again with Qt 6.12.
 - Mouse button blocks set to Click register reliably: the button is held for 10 ms instead of being released in the same instant, which Linux dropped and games missed.
+- Dragging an operator right after typing into one of its fields no longer puts the old value back.
 
 ## [0.6.5] - 2026-11-25
 
