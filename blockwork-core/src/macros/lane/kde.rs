@@ -104,7 +104,7 @@ impl Dispatch<BlockworkSeatLaneV1, ()> for State {
     }
 }
 
-const NOT_INSTALLED: &str = "background input needs the Blockwork KWin plugin: install the blockwork-kwin package, then log out and back in";
+const NOT_INSTALLED: &str = "background input needs Blockwork's KWin plugin: install it in Settings > Integrations > Background input";
 
 /// Connects and binds the host, or says what's missing.
 fn connect() -> Result<(Connection, EventQueue<State>, BlockworkSeatHostV1, State), String> {
@@ -113,13 +113,13 @@ fn connect() -> Result<(Connection, EventQueue<State>, BlockworkSeatHostV1, Stat
     let (globals, mut queue) = registry_queue_init::<State>(&conn)
         .map_err(|e| format!("can't read the compositor's globals: {e}"))?;
     let qh = queue.handle();
-    let host: BlockworkSeatHostV1 = globals.bind(&qh, 1..=1, ()).map_err(|_| {
-        if crate::flatpak::is_flatpak() {
-            format!("{NOT_INSTALLED} on the host system (a Flatpak can't add it itself)")
-        } else {
-            NOT_INSTALLED.to_string()
-        }
-    })?;
+    let host: BlockworkSeatHostV1 =
+        globals
+            .bind(&qh, 1..=1, ())
+            .map_err(|_| match super::kwin_plugin::missing() {
+                status if status.state == "missing" => NOT_INSTALLED.to_string(),
+                status => status.detail,
+            })?;
     let mut state = State {
         info: None,
         status: Status::Waiting,
@@ -142,7 +142,15 @@ pub(super) fn availability() -> Result<String, String> {
 }
 
 pub(super) fn open(window: &WindowRef) -> Result<KdeLane, String> {
-    let (conn, queue, host, state) = connect()?;
+    let (conn, queue, host, state) = match connect() {
+        Ok(connected) => connected,
+        // Offer the plugin, and go on if KWin could start it right away.
+        Err(why) => match super::kwin_plugin::offer() {
+            Ok(true) => connect()?,
+            Ok(false) => return Err(why),
+            Err(after) => return Err(after),
+        },
+    };
     let lane = host.get_lane(&queue.handle(), ());
     let mut lane = KdeLane {
         _conn: conn,
