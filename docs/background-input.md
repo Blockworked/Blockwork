@@ -76,7 +76,9 @@ the host's plugin; it can't add one itself.
 - While the block runs, a Qt app treats the target as its active window, so
   shortcuts in another window of the same app wait until the block ends.
 - The lane's pointer rests in the window's middle, so the app may show a
-  hover there.
+  hover there. It steps out while your own pointer is over the window or the
+  window holds a pointer lock: KWin allows one lock per window whatever the
+  seat, and closes an app (Sober, on right click) that asks for a second.
 - Clipboard blocks still use the desktop clipboard.
 - On KWin 6.0 to 6.7, window capture needs Blockwork's desktop file to list
   `org.kde.KWin.ScreenShot2` in `X-KDE-DBUS-Restricted-Interfaces`.

@@ -360,7 +360,7 @@ void BlockworkSeatHost::checkBinding(Lane &lane)
         // Point at the middle right away: games like Sober only take keys
         // while a pointer is over them.
         lane.pointer = QPointF(uint32_t(size.width()) / 2.0, uint32_t(size.height()) / 2.0);
-        enterPointer(lane);
+        restPointer(lane);
         stamp(lane);
         lane.seat->setFocusedKeyboardSurface(window->surface());
         lane.entered = true;
@@ -388,7 +388,6 @@ void BlockworkSeatHost::unbind(Lane &lane)
     lane.target = nullptr;
     lane.entered = false;
     lane.awaitingSync = false;
-    lane.userPointerOver = false;
     lane.seat->setFocusedKeyboardSurface(nullptr);
     if (lane.pointerIn) {
         lane.seat->notifyPointerLeave();
@@ -464,6 +463,11 @@ bool BlockworkSeatHost::enterPointer(Lane &lane)
     if (!window || lane.binding->isActive()) {
         return false;
     }
+    // KWin allows one pointer constraint per surface, whatever the seat, and
+    // kills a client that asks for a second; Sober asks once per pointer in it.
+    if (!lane.pointerIn && constrained(lane)) {
+        return false;
+    }
     const QRectF client = window->clientGeometry();
     lane.pointer.setX(qBound(0.0, lane.pointer.x(), client.width() - 1));
     lane.pointer.setY(qBound(0.0, lane.pointer.y(), client.height() - 1));
@@ -511,6 +515,10 @@ void BlockworkSeatHost::button(Lane &lane, uint32_t button, uint32_t state)
     stamp(lane);
     lane.seat->notifyPointerButton(button, pressed ? PointerButtonState::Pressed : PointerButtonState::Released);
     lane.seat->notifyPointerFrame();
+    // Stay out from under the user's pointer once the click is done.
+    if (lane.buttons.isEmpty() && userPointerOver(lane)) {
+        leavePointer(lane);
+    }
 }
 
 void BlockworkSeatHost::axis(Lane &lane, uint32_t axis, int32_t value120)
@@ -592,29 +600,60 @@ void BlockworkSeatHost::pointerMotion(PointerMotionEvent *)
 
 void BlockworkSeatHost::recheckPointers()
 {
-    SurfaceInterface *user = waylandServer()->seat()->focusedPointerSurface();
     for (auto &lane : m_lanes) {
-        if (!lane->target || !lane->pointerIn || lane->binding->isActive()) {
-            lane->userPointerOver = false;
+        if (!lane->target || lane->binding->isActive() || !lane->buttons.isEmpty()) {
             continue;
         }
-        const bool over = user && user == lane->target->surface();
-        // An app that keeps one pointer focus drops it when the user's pointer
-        // leaves, so enter the lane's pointer again.
-        if (lane->userPointerOver && !over) {
-            stamp(*lane);
-            lane->seat->notifyPointerLeave();
-            lane->seat->notifyPointerFrame();
-            lane->pointerIn = false;
-            enterPointer(*lane);
+        if (userPointerOver(*lane)) {
+            leavePointer(*lane);
+        } else {
+            restPointer(*lane);
         }
-        lane->userPointerOver = over;
     }
+}
+
+bool BlockworkSeatHost::userPointerOver(const Lane &lane) const
+{
+    SurfaceInterface *user = waylandServer()->seat()->focusedPointerSurface();
+    return user && lane.target && user == lane.target->surface();
+}
+
+bool BlockworkSeatHost::constrained(const Lane &lane) const
+{
+    SurfaceInterface *surface = lane.target ? lane.target->surface() : nullptr;
+    return surface && (surface->lockedPointer() || surface->confinedPointer());
+}
+
+void BlockworkSeatHost::restPointer(Lane &lane)
+{
+    // Games like Sober only take keys with a pointer over them. The user's
+    // own pointer does that while it's there, and two pointers can't both be.
+    if (!lane.pointerIn && !userPointerOver(lane)) {
+        enterPointer(lane);
+    }
+}
+
+void BlockworkSeatHost::leavePointer(Lane &lane)
+{
+    if (!lane.pointerIn) {
+        return;
+    }
+    stamp(lane);
+    lane.seat->notifyPointerLeave();
+    lane.seat->notifyPointerFrame();
+    lane.pointerIn = false;
 }
 
 void BlockworkSeatHost::pointerButton(PointerButtonEvent *event)
 {
-    preempt(input()->findToplevel(event->position));
+    Window *window = input()->findToplevel(event->position);
+    preempt(window);
+    // Leave before the app sees the user's click, so it constrains one pointer.
+    for (auto &lane : m_lanes) {
+        if (window && lane->target == window && lane->buttons.isEmpty()) {
+            leavePointer(*lane);
+        }
+    }
 }
 
 void BlockworkSeatHost::pointerAxis(PointerAxisEvent *event)

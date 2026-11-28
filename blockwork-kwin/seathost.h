@@ -59,8 +59,6 @@ public:
         qint64 bindDeadline = 0;
         /// Keyboard entered; bound waits for the app's next wl_display.sync.
         bool entered = false;
-        /// The user's own pointer was over the target at the last check.
-        bool userPointerOver = false;
         bool awaitingSync = false;
         qint64 syncDeadline = 0;
         qint64 lastPreempt = -1000;
@@ -92,6 +90,10 @@ private:
     void setDefaultKeymap(Lane &lane);
     void preempt(Window *window);
     void recheckPointers();
+    bool userPointerOver(const Lane &lane) const;
+    bool constrained(const Lane &lane) const;
+    void restPointer(Lane &lane);
+    void leavePointer(Lane &lane);
 
     bool keyboardReady(SeatInterface *seat, wl_client *client) const;
     bool pointerReady(SeatInterface *seat, wl_client *client) const;
