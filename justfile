@@ -73,7 +73,7 @@ kwin-plugin:
     if [ -z "$loaded" ]; then
         exit 0
     elif echo "$loaded" | grep -qx blockworkseathost; then
-        if [ "$changed" = 1 ]; then echo "KWin still runs the old plugin: log out and back in to load the new one"; fi
+        if [ "$changed" = 1 ]; then echo "KWin still runs the old plugin: log out and back in to load the new one"; else echo "KWin plugin up to date and loaded"; fi
     else
         qdbus6 org.kde.KWin /Plugins org.kde.KWin.Plugins.LoadPlugin blockworkseathost >/dev/null
         if qdbus6 org.kde.KWin /Plugins org.kde.KWin.Plugins.LoadedPlugins | grep -qx blockworkseathost; then
